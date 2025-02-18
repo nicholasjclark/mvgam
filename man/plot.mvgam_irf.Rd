@@ -2,8 +2,7 @@
 % Please edit documentation in R/mvgam_irf-class.R
 \name{plot.mvgam_irf}
 \alias{plot.mvgam_irf}
-\title{Plot impulse responses from an mvgam_irf object
-This function takes an \code{mvgam_irf} object and produces plots of Impulse Response Functions}
+\title{Plot impulse responses from an \code{mvgam_irf} object}
 \usage{
 \method{plot}{mvgam_irf}(x, series = 1, ...)
 }
@@ -18,7 +17,6 @@ This function takes an \code{mvgam_irf} object and produces plots of Impulse Res
 A base R plot or set of plots
 }
 \description{
-Plot impulse responses from an mvgam_irf object
 This function takes an \code{mvgam_irf} object and produces plots of Impulse Response Functions
 }
 \author{

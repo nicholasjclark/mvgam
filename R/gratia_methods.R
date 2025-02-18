@@ -24,10 +24,10 @@
   }
 }
 
-#' Enhance mvgam post-processing using gratia functionality
+#' Enhance post-processing of \pkg{mvgam} models using \pkg{gratia} functionality
 #'
 #' These evaluation and plotting functions exist to allow some popular `gratia`
-#' methods to work with `mvgam` models
+#' methods to work with `mvgam` or `jsdgam` models
 #' @name gratia_mvgam_enhancements
 #' @param object a fitted mvgam, the result of a call to [mvgam()].
 #' @param model a fitted `mgcv` model of clas `gam` or `bam`.
@@ -152,15 +152,18 @@
 #' of `mvgam` smooth functions using [ggplot2::ggplot()] utilities
 #' @author Nicholas J Clark
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Fit a simple GAM and draw partial effects of smooths using gratia
 #' set.seed(0)
 #' library(ggplot2); theme_set(theme_bw())
 #' library(gratia)
 #' dat <- mgcv::gamSim(1, n = 200, scale = 2)
 #' mod <- mvgam(y ~ s(x1, bs = 'moi') +
-#'               te(x0, x2), data = dat,
-#'              family = gaussian())
+#'               te(x0, x2),
+#'              data = dat,
+#'              family = gaussian(),
+#'              chains = 2,
+#'              silent = 2)
 #'
 #' draw(mod)
 #'}

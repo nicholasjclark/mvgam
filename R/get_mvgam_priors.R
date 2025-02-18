@@ -1,7 +1,7 @@
-#'Extract information on default prior distributions for an mvgam model
+#'Extract information on default prior distributions for an \pkg{mvgam} model
 #'
 #'This function lists the parameters that can have their prior distributions
-#'changed for a given `mvgam` model, as well listing their default distributions
+#'changed for a given model, as well listing their default distributions
 #'
 #'@inheritParams mvgam
 #'@inheritParams jsdgam

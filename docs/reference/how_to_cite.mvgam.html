@@ -54,7 +54,7 @@ for fitted mvgam and jsdgam models"><meta property="og:image" content="https://n
 </nav><div class="container template-reference-topic">
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.png" class="logo" alt=""><h1>Generate a methods description for mvgam models</h1>
+      <img src="../logo.png" class="logo" alt=""><h1>Generate a methods description for <span class="pkg">mvgam</span> models</h1>
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/R/how_to_cite.R" class="external-link"><code>R/how_to_cite.R</code></a></small>
       <div class="d-none name"><code>how_to_cite.mvgam.Rd</code></div>
     </div>
@@ -109,7 +109,7 @@ meant to get you started.</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate 4 time series with hierarchical seasonality</span></span></span>
 <span class="r-in"><span><span class="co"># and a VAR(1) dynamic process</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span></span>
@@ -122,26 +122,61 @@ meant to get you started.</p>
 <span class="r-in"><span>              data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">VAR</a></span><span class="op">(</span>cor <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>              silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">how_to_cite</span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Methods text skeleton</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> We used the R package mvgam (version 1.1.4; Clark &amp; Wells, 2023) to construct, fit and interrogate the model. mvgam fits Bayesian State-Space models that can include flexible predictor effects in both the process and observation components by incorporating functionalities from the brms (Burkner 2017), mgcv (Wood 2017) and splines2 (Wang &amp; Yan, 2023) packages. To encourage stability and prevent forecast variance from increasing indefinitely, we enforced stationarity of the Vector Autoregressive process following methods described by Heaps (2023). The mvgam-constructed model and observed data were passed to the probabilistic programming environment Stan (version 2.34.1; Carpenter et al. 2017, Stan Development Team 2025), specifically through the cmdstanr interface (Gabry &amp; Cesnovar, 2021). We ran 2 Hamiltonian Monte Carlo chains for 500 warmup iterations and 500 sampling iterations for joint posterior estimation. Rank normalized split Rhat (Vehtari et al. 2021) and effective sample sizes were used to monitor convergence.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Primary references</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Clark, NJ and Wells K (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. Methods in Ecology and Evolution, 14, 771-784. doi.org/10.1111/2041-210X.13974"                                                  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2] "Burkner, PC (2017). brms: An R Package for Bayesian Multilevel Models Using Stan. Journal of Statistical Software, 80(1), 1-28. doi:10.18637/jss.v080.i01"                                                                                                  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3] "Wood, SN (2017). Generalized Additive Models: An Introduction with R (2nd edition). Chapman and Hall/CRC."                                                                                                                                                  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4] "Wang W and Yan J (2021). Shape-Restricted Regression Splines with R Package splines2. Journal of Data Science, 19(3), 498-517. doi:10.6339/21-JDS1020 https://doi.org/10.6339/21-JDS1020."                                                                  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5] "Heaps, SE (2023). Enforcing stationarity through the prior in vector autoregressions. Journal of Computational and Graphical Statistics 32, 74-83."                                                                                                         </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6] "Carpenter, B, Gelman, A, Hoffman, MD, Lee, D, Goodrich, B, Betancourt, M, Brubaker, M, Guo, J, Li, P and Riddell, A (2017). Stan: A probabilistic programming language. Journal of Statistical Software 76."                                                </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [7] "Gabry J, Cesnovar R, Johnson A, and Bronder S (2025). cmdstanr: R Interface to 'CmdStan'. https://mc-stan.org/cmdstanr/, https://discourse.mc-stan.org."                                                                                                    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [8] "Vehtari A, Gelman A, Simpson D, Carpenter B, and Burkner P (2021). Rank-normalization, folding, and localization: An improved Rhat for assessing convergence of MCMC (with discussion). Bayesian Analysis 16(2) 667-718. https://doi.org/10.1214/20-BA1221."</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Other useful references</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Arel-Bundock, V, Greifer, N, and Heiss, A (2024). How to interpret statistical models using marginaleffects for R and Python. Journal of Statistical Software, 111(9), 1-32. https://doi.org/10.18637/jss.v111.i09"                               </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2] "Gabry J, Simpson D, Vehtari A, Betancourt M, and Gelman A (2019). Visualization in Bayesian workflow. Journal of the Royal Statatistical Society A, 182, 389-402. doi:10.1111/rssa.12378."                                                        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3] "Vehtari A, Gelman A, and Gabry J (2017). Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Statistics and Computing, 27, 1413-1432. doi:10.1007/s11222-016-9696-4."                                              </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4] "Burkner, PC, Gabry, J, and Vehtari, A. (2020). Approximate leave-future-out cross-validation for Bayesian time series models. Journal of Statistical Computation and Simulation, 90(14), 2499-2523. https://doi.org/10.1080/00949655.2020.1783262"</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># For a GP example, simulate data using the mgcv package</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu">mgcv</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/gamSim.html" class="external-link">gamSim</a></span><span class="op">(</span><span class="fl">1</span>, n <span class="op">=</span> <span class="fl">30</span>, scale <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Gu &amp; Wahba 4 term additive model</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit a model that uses an approximate GP from the brms package</span></span></span>
 <span class="r-in"><span><span class="va">mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp</a></span><span class="op">(</span><span class="va">x2</span>, k <span class="op">=</span> <span class="fl">12</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              data <span class="op">=</span> <span class="va">dat</span>,</span></span>
 <span class="r-in"><span>              family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>              silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>gp effects in mvgam cannot yet handle autogrouping</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> resetting all instances of 'gr = TRUE' to 'gr = FALSE'</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span style="color: #555555;">This warning is displayed once per session.</span></span>
 <span class="r-in"><span><span class="fu">how_to_cite</span><span class="op">(</span><span class="va">mod2</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Repeat using meanfield variational inference</span></span></span>
-<span class="r-in"><span><span class="va">mod3</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp</a></span><span class="op">(</span><span class="va">x2</span>, k <span class="op">=</span> <span class="fl">12</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              data <span class="op">=</span> <span class="va">dat</span>,</span></span>
-<span class="r-in"><span>              family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              algorithm <span class="op">=</span> <span class="st">'meanfield'</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu">how_to_cite</span><span class="op">(</span><span class="va">mod3</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Methods text skeleton</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> We used the R package mvgam (version 1.1.4; Clark &amp; Wells, 2023) to construct, fit and interrogate the model. mvgam fits Bayesian State-Space models that can include flexible predictor effects in both the process and observation components by incorporating functionalities from the brms (Burkner 2017), mgcv (Wood 2017) and splines2 (Wang &amp; Yan, 2023) packages. Gaussian Process functional effects were estimated using a low-rank Hilbert space approximation following methods described by Riutort-Mayol et al. (2023). The mvgam-constructed model and observed data were passed to the probabilistic programming environment Stan (version 2.34.1; Carpenter et al. 2017, Stan Development Team 2025), specifically through the cmdstanr interface (Gabry &amp; Cesnovar, 2021). We ran 2 Hamiltonian Monte Carlo chains for 500 warmup iterations and 500 sampling iterations for joint posterior estimation. Rank normalized split Rhat (Vehtari et al. 2021) and effective sample sizes were used to monitor convergence.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Primary references</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Clark, NJ and Wells K (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. Methods in Ecology and Evolution, 14, 771-784. doi.org/10.1111/2041-210X.13974"                                                  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2] "Burkner, PC (2017). brms: An R Package for Bayesian Multilevel Models Using Stan. Journal of Statistical Software, 80(1), 1-28. doi:10.18637/jss.v080.i01"                                                                                                  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3] "Wood, SN (2017). Generalized Additive Models: An Introduction with R (2nd edition). Chapman and Hall/CRC."                                                                                                                                                  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4] "Wang W and Yan J (2021). Shape-Restricted Regression Splines with R Package splines2. Journal of Data Science, 19(3), 498-517. doi:10.6339/21-JDS1020 https://doi.org/10.6339/21-JDS1020."                                                                  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5] "Riutort-Mayol, G, Burkner, PC, Andersen, MR, Solin, A and Vehtari, A (2023). Practical Hilbert space approximate Bayesian Gaussian processes for probabilistic programming. Statistics and Computing 33, 1. https://doi.org/10.1007/s11222-022-10167-2"     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6] "Carpenter, B, Gelman, A, Hoffman, MD, Lee, D, Goodrich, B, Betancourt, M, Brubaker, M, Guo, J, Li, P and Riddell, A (2017). Stan: A probabilistic programming language. Journal of Statistical Software 76."                                                </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [7] "Gabry J, Cesnovar R, Johnson A, and Bronder S (2025). cmdstanr: R Interface to 'CmdStan'. https://mc-stan.org/cmdstanr/, https://discourse.mc-stan.org."                                                                                                    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [8] "Vehtari A, Gelman A, Simpson D, Carpenter B, and Burkner P (2021). Rank-normalization, folding, and localization: An improved Rhat for assessing convergence of MCMC (with discussion). Bayesian Analysis 16(2) 667-718. https://doi.org/10.1214/20-BA1221."</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Other useful references</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Arel-Bundock, V, Greifer, N, and Heiss, A (2024). How to interpret statistical models using marginaleffects for R and Python. Journal of Statistical Software, 111(9), 1-32. https://doi.org/10.18637/jss.v111.i09"                               </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2] "Gabry J, Simpson D, Vehtari A, Betancourt M, and Gelman A (2019). Visualization in Bayesian workflow. Journal of the Royal Statatistical Society A, 182, 389-402. doi:10.1111/rssa.12378."                                                        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3] "Vehtari A, Gelman A, and Gabry J (2017). Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Statistics and Computing, 27, 1413-1432. doi:10.1007/s11222-016-9696-4."                                              </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4] "Burkner, PC, Gabry, J, and Vehtari, A. (2020). Approximate leave-future-out cross-validation for Bayesian time series models. Journal of Statistical Computation and Simulation, 90(14), 2499-2523. https://doi.org/10.1080/00949655.2020.1783262"</span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

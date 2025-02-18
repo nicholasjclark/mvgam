@@ -1,4 +1,4 @@
-#' Posterior draws of `mvgam` residuals
+#' Posterior draws of residuals from \pkg{mvgam} models
 #'
 #' This method extracts posterior draws of Dunn-Smyth (randomized quantile)
 #' residuals in the order in which the data were supplied to the model. It included

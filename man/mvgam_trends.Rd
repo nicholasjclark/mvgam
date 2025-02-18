@@ -2,9 +2,9 @@
 % Please edit documentation in R/trends.R
 \name{mvgam_trends}
 \alias{mvgam_trends}
-\title{Supported mvgam trend models}
+\title{Supported latent trend models in \pkg{mvgam}}
 \description{
-Supported mvgam trend models
+Supported latent trend models in \pkg{mvgam}
 }
 \details{
 \code{mvgam} currently supports the following dynamic trend models:

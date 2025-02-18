@@ -1,10 +1,10 @@
-#'Plot mvgam random effect terms
+#'Plot random effect terms from \pkg{mvgam} models
 #'
 #'This function plots posterior empirical quantiles for random effect smooths (bs = re)
 #'
 #'@importFrom graphics layout title
 #'@inheritParams plot.mvgam
-#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
+#'@param object \code{list} object of class \code{mvgam}. See [mvgam()]
 #'@details Posterior empirical quantiles of random effect coefficient estimates
 #'(on the link scale) are calculated and visualised as ribbon plots.
 #'Labels for coefficients are taken from the levels of the original factor variable

@@ -4,7 +4,7 @@
 \alias{conditional_effects.mvgam}
 \alias{plot.mvgam_conditional_effects}
 \alias{print.mvgam_conditional_effects}
-\title{Display Conditional Effects of Predictors}
+\title{Display conditional effects of predictors for \pkg{mvgam} models}
 \usage{
 \method{conditional_effects}{mvgam}(
   x,
@@ -20,7 +20,7 @@
 \method{print}{mvgam_conditional_effects}(x, ...)
 }
 \arguments{
-\item{x}{Object of class \code{mvgam} or \code{mvgam_conditional_effects}}
+\item{x}{Object of class \code{mvgam}, \code{jsdgam} or \code{mvgam_conditional_effects}}
 
 \item{effects}{An optional character vector naming effects (main effects or
 interactions) for which to compute conditional plots. Interactions are
@@ -64,7 +64,7 @@ The corresponding \code{plot} method will draw these plots in the active graphic
 }
 \description{
 Display conditional effects of one or more numeric and/or categorical
-predictors in \code{mvgam} models, including two-way interaction effects.
+predictors in models of class \code{mvgam} and \code{jsdgam}, including two-way interaction effects.
 }
 \details{
 This function acts as a wrapper to the more
@@ -108,7 +108,7 @@ mod <- mvgam(y ~ te(x0, x1, k = 5) + s(x2, k = 6) + s(x3, k = 6),
 conditional_effects(mod)
 conditional_effects(mod, conf_level = 0.5, type = 'link')
 
-\dontrun{
+\donttest{
 # ggplot objects can be modified and combined with the help of many
 # additional packages. Here is an example using the patchwork package
 
@@ -117,7 +117,9 @@ dat <- mgcv::gamSim(1, n = 200, scale = 2)
 mod <- mvgam(y ~ s(x1, bs = 'moi') +
                te(x0, x2),
              data = dat,
-             family = gaussian())
+             family = gaussian(),
+             chains = 2,
+             silent = 2)
 
 # Extract the list of ggplot conditional_effect plots
 m <- plot(conditional_effects(mod), plot = FALSE)

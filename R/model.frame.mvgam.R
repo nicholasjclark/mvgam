@@ -1,4 +1,4 @@
-#'Extract model.frame from a fitted mvgam object
+#'Extract model.frame from a fitted \pkg{mvgam} object
 #'
 #'
 #'@inheritParams stats::model.frame

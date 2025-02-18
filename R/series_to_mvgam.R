@@ -1,4 +1,4 @@
-# Convert timeseries object to format necessary for mvgam
+#' Convert timeseries object to format necessary for \pkg{mvgam} models
 #'
 #'This function converts univariate or multivariate time series (\code{xts} or \code{ts} objects)
 #'to the format necessary for \code{\link{mvgam}}

@@ -9,8 +9,8 @@
 #' @name mvgam_irf-class
 NULL
 
-#'Plot impulse responses from an mvgam_irf object
-
+#'Plot impulse responses from an `mvgam_irf` object
+#'
 #'This function takes an \code{mvgam_irf} object and produces plots of Impulse Response Functions
 #'
 #'@param x \code{list} object of class \code{mvgam_irf}. See [irf()]

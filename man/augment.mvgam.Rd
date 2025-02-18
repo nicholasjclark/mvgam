@@ -2,7 +2,7 @@
 % Please edit documentation in R/tidier_methods.R
 \name{augment.mvgam}
 \alias{augment.mvgam}
-\title{Augment an 'mvgam' object's data}
+\title{Augment an \pkg{mvgam} object's data}
 \usage{
 \method{augment}{mvgam}(x, robust = FALSE, probs = c(0.025, 0.975), ...)
 }
@@ -39,7 +39,7 @@ The arguments \code{robust} and \code{probs} are applied to both the fit and
 residuals calls (see \code{\link[=fitted.mvgam]{fitted.mvgam()}} and \code{\link[=residuals.mvgam]{residuals.mvgam()}} for details).
 }
 \examples{
-\dontrun{
+\donttest{
 set.seed(0)
 dat <- sim_mvgam(T = 80,
                  n_series = 3,

@@ -1,6 +1,6 @@
-#'Summary for a fitted mvgam object
+#'Summary for a fitted \pkg{mvgam} object
 #'
-#'This function takes a fitted \code{mvgam} object and prints a quick summary
+#'This function takes a fitted \code{mvgam} or \code{jsdgam} object and prints a quick summary
 #'
 #'@param x \code{list} object returned from \code{mvgam}
 #'@param ... Ignored

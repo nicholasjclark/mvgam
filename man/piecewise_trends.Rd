@@ -2,7 +2,7 @@
 % Please edit documentation in R/mvgam_trend_types.R
 \name{PW}
 \alias{PW}
-\title{Specify piecewise linear or logistic trends}
+\title{Specify piecewise linear or logistic trends in \pkg{mvgam} models}
 \usage{
 PW(
   n_changepoints = 10,

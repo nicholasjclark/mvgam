@@ -2,8 +2,7 @@
 % Please edit documentation in R/series_to_mvgam.R
 \name{series_to_mvgam}
 \alias{series_to_mvgam}
-\title{This function converts univariate or multivariate time series (\code{xts} or \code{ts} objects)
-to the format necessary for \code{\link{mvgam}}}
+\title{Convert timeseries object to format necessary for \pkg{mvgam} models}
 \usage{
 series_to_mvgam(series, freq, train_prop = 0.85)
 }

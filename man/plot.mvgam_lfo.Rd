@@ -2,7 +2,7 @@
 % Please edit documentation in R/lfo_cv.mvgam.R
 \name{plot.mvgam_lfo}
 \alias{plot.mvgam_lfo}
-\title{Plot Pareto-k and ELPD values from a leave-future-out object}
+\title{Plot Pareto-k and ELPD values from a \code{mvgam_lfo} object}
 \usage{
 \method{plot}{mvgam_lfo}(x, ...)
 }

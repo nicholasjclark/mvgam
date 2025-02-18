@@ -1,6 +1,6 @@
-#' Defining dynamic coefficients in mvgam formulae
+#' Defining dynamic coefficients in \pkg{mvgam} formulae
 #'
-#' Set up time-varying (dynamic) coefficients for use in mvgam models. Currently, only
+#' Set up time-varying (dynamic) coefficients for use in \pkg{mvgam} models. Currently, only
 #' low-rank Gaussian Process smooths are available for estimating the dynamics of the
 #' time-varying coefficient.
 #'

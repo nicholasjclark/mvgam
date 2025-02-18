@@ -11,7 +11,7 @@
 \alias{as_draws_array.mvgam}
 \alias{as_draws_list.mvgam}
 \alias{as_draws_rvars.mvgam}
-\title{Extract posterior draws from fitted \code{mvgam} objects}
+\title{Extract posterior draws from fitted \pkg{mvgam} objects}
 \usage{
 \method{as.data.frame}{mvgam}(
   x,
@@ -119,14 +119,14 @@ A \code{data.frame}, \code{matrix}, or \code{array} containing the posterior dra
 Extract posterior draws in conventional formats as data.frames, matrices, or arrays.
 }
 \examples{
-\dontrun{
+\donttest{
 sim <- sim_mvgam(family = Gamma())
 mod1 <- mvgam(y ~ s(season, bs = 'cc'),
              trend_model = 'AR1',
              data = sim$data_train,
              family = Gamma(),
              chains = 2,
-             samples = 300)
+             silent = 2)
 beta_draws_df <- as.data.frame(mod1, variable = 'betas')
 head(beta_draws_df)
 str(beta_draws_df)

@@ -22,7 +22,7 @@ A \code{data.frame} containing posterior draws for each stability metric.
 \description{
 Compute reactivity, return rates and contributions of interactions to
 stationary forecast variance from
-\code{mvgam} models with Vector Autoregressive dynamics
+\pkg{mvgam} models with Vector Autoregressive dynamics
 }
 \details{
 These measures of stability can be used to assess how important inter-series
@@ -116,6 +116,7 @@ mod <- mvgam(y ~ -1,
              trend_model = VAR(cor = TRUE),
              family = gaussian(),
              data = simdat$data_train,
+             chains = 2,
              silent = 2)
 
 # Calulate stability metrics for this system

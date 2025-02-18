@@ -2,7 +2,7 @@
 #'
 #' Compute reactivity, return rates and contributions of interactions to
 #' stationary forecast variance from
-#' \code{mvgam} models with Vector Autoregressive dynamics
+#' \pkg{mvgam} models with Vector Autoregressive dynamics
 #'
 #'@name stability.mvgam
 #'@param object \code{list} object of class \code{mvgam} resulting from a call to [mvgam()]
@@ -105,6 +105,7 @@
 #'              trend_model = VAR(cor = TRUE),
 #'              family = gaussian(),
 #'              data = simdat$data_train,
+#'              chains = 2,
 #'              silent = 2)
 #'
 #' # Calulate stability metrics for this system

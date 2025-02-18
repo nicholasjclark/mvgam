@@ -475,9 +475,6 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>                          <span class="co"># Poisson observations</span></span></span>
 <span class="r-in"><span>                          family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>gp effects in mvgam cannot yet handle autogrouping</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> resetting all instances of 'gr = TRUE' to 'gr = FALSE'</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span style="color: #555555;">This warning is displayed once per session.</span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">priors</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                            param_name param_length</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1                                         (Intercept)            1</span>
@@ -547,27 +544,14 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span>              family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>              silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpwbtRRG/model-2c78394a3e74.hpp:2:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot species-level intercept estimates</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">'species'</span>,</span></span>
+<span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">'species'</span>,</span></span>
 <span class="r-in"><span>                 type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="jsdgam-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot species' hierarchical responses to temperature</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'temperature'</span>, <span class="st">'species'</span>, <span class="st">'species'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'temperature'</span>, <span class="st">'species'</span>, <span class="st">'species'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                 type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="jsdgam-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
@@ -590,25 +574,25 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span><span class="co"># some of the estimated correlations</span></span></span>
 <span class="r-in"><span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>            species_1  species_2   species_3  species_4   species_5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000  0.7606789  0.70196887  0.7628489 -0.25099259</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_2  0.7606789  1.0000000  0.18720736  0.4210261 -0.49124204</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.7019689  0.1872074  1.00000000  0.8902954 -0.06361541</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.7628489  0.4210261  0.89029541  1.0000000 -0.47114518</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.2509926 -0.4912420 -0.06361541 -0.4711452  1.00000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000  0.7237809  0.73850218  0.7433769 -0.13264438</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_2  0.7237809  1.0000000  0.21316041  0.4341254 -0.50467700</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.7385022  0.2131604  1.00000000  0.9058743 -0.08107566</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.7433769  0.4341254  0.90587434  1.0000000 -0.45655760</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.1326444 -0.5046770 -0.08107566 -0.4565576  1.00000000</span>
 <span class="r-in"><span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor_upper</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           species_1  species_2 species_3  species_4  species_5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_1 1.0000000  0.9596571 0.9345862  0.9434505  0.1851578</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_2 0.9596571  1.0000000 0.5336101  0.7186475 -0.1905583</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_3 0.9345862  0.5336101 1.0000000  0.9751394  0.2694864</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_4 0.9434505  0.7186475 0.9751394  1.0000000 -0.1440963</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 0.1851578 -0.1905583 0.2694864 -0.1440963  1.0000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_1 1.0000000  0.9201620 0.9421907  0.9232413  0.2367689</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_2 0.9201620  1.0000000 0.5579433  0.7217424 -0.2029880</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_3 0.9421907  0.5579433 1.0000000  0.9753439  0.2500284</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_4 0.9232413  0.7217424 0.9753439  1.0000000 -0.1280637</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 0.2367689 -0.2029880 0.2500284 -0.1280637  1.0000000</span>
 <span class="r-in"><span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor_lower</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            species_1  species_2  species_3  species_4  species_5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000  0.4727149  0.2516898  0.3537814 -0.6142443</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_2  0.4727149  1.0000000 -0.1914547  0.0542295 -0.7282459</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.2516898 -0.1914547  1.0000000  0.7389518 -0.3915772</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.3537814  0.0542295  0.7389518  1.0000000 -0.7116399</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.6142443 -0.7282459 -0.3915772 -0.7116399  1.0000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            species_1   species_2  species_3   species_4  species_5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000  0.45690725  0.3440677  0.36628912 -0.4677614</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_2  0.4569072  1.00000000 -0.1677706  0.05746113 -0.7382997</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.3440677 -0.16777062  1.0000000  0.77683992 -0.4304073</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.3662891  0.05746113  0.7768399  1.00000000 -0.7135887</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.4677614 -0.73829968 -0.4304073 -0.71358871  1.0000000</span>
 <span class="r-in"><span><span class="co"># A quick and dirty plot of the posterior median correlations</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/image.html" class="external-link">image</a></span><span class="op">(</span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="jsdgam-7.png" alt="" width="700" height="433"></span>
@@ -622,19 +606,19 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 600 log-likelihood matrix.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate    SE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo  -2189.4  50.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo       421.9  26.3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> looic      4378.8 100.9</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate   SE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo  -2182.7 49.7</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo       413.8 25.3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> looic      4365.5 99.3</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> MCSE of elpd_loo is NA.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.0, 1.6]).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.0, 2.2]).</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Pareto k diagnostic values:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                           Count Pct.    Min. ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.67]   (good)     441   73.5%   1       </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.67, 1]   (bad)      129   21.5%   &lt;NA&gt;    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     (1, Inf)   (very bad)  30    5.0%   &lt;NA&gt;    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.67]   (good)     438   73.0%   32      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.67, 1]   (bad)      126   21.0%   &lt;NA&gt;    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     (1, Inf)   (very bad)  36    6.0%   &lt;NA&gt;    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> See help('pareto-k-diagnostic') for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Forecast log(counts) for entire region (site value doesn't matter as long</span></span></span>

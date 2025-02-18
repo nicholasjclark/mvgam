@@ -1,11 +1,11 @@
-#'Plot mvgam smooth terms
+#'Plot smooth terms from \pkg{mvgam} models
 #'
 #'This function plots posterior empirical quantiles for a series-specific smooth term
 #'
 #'@importFrom grDevices hcl.colors
 #'@importFrom stats quantile predict
 #'@inheritParams plot.mvgam
-#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
+#'@param object \code{list} object of class \code{mvgam}. See [mvgam()]
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param smooth either a \code{character} or \code{integer} specifying which smooth term to be plotted
 #'@param residuals \code{logical}. If \code{TRUE} then posterior quantiles of partial residuals are added

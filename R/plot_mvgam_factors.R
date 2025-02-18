@@ -1,4 +1,4 @@
-#'Latent factor summaries for a fitted mvgam object
+#'Latent factor summaries for a fitted \pkg{mvgam} object
 #'
 #'This function takes a fitted \code{mvgam} object and returns plots and summary statistics for
 #'the latent dynamic factors

@@ -1,9 +1,9 @@
-#' LOO information criteria for `mvgam` models
+#' LOO information criteria for \pkg{mvgam} models
 #'
 #' Extract the LOOIC (leave-one-out information criterion) using
 #' [loo::loo()]
 #' @importFrom loo loo is.loo
-#' @param x Object of class `mvgam`
+#' @param x Object of class `mvgam` or `jsdgam`
 #' @param incl_dynamics Logical; indicates if any latent dynamic structures that
 #' were included in the model should be considered when calculating in-sample
 #' log-likelihoods. Defaults to `TRUE`

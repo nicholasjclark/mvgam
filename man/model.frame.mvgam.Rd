@@ -3,7 +3,7 @@
 \name{model.frame.mvgam}
 \alias{model.frame.mvgam}
 \alias{model.frame.mvgam_prefit}
-\title{Extract model.frame from a fitted mvgam object}
+\title{Extract model.frame from a fitted \pkg{mvgam} object}
 \usage{
 \method{model.frame}{mvgam}(formula, trend_effects = FALSE, ...)
 
@@ -23,7 +23,7 @@ model (if\code{TRUE})}
 A \code{matrix} containing the fitted model frame
 }
 \description{
-Extract model.frame from a fitted mvgam object
+Extract model.frame from a fitted \pkg{mvgam} object
 }
 \author{
 Nicholas J Clark

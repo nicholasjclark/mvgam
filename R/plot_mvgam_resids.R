@@ -1,4 +1,4 @@
-#'Residual diagnostics for a fitted mvgam object
+#'Residual diagnostics for a fitted \pkg{mvgam} object
 #'
 #'This function takes a fitted \code{mvgam} object and returns various residual diagnostic plots
 #'
@@ -20,7 +20,7 @@
 #'@return A series of facetted ggplot object
 #'@author Nicholas J Clark and Matthijs Hollanders
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' simdat <- sim_mvgam(n_series = 3, trend_model = AR())
 #' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
 #'             trend_model = AR(),

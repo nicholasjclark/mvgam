@@ -1,7 +1,7 @@
-#'@title Approximate leave-future-out cross-validation of fitted `mvgam` objects
+#'@title Approximate leave-future-out cross-validation of fitted \pkg{mvgam} objects
 #'@name lfo_cv.mvgam
 #'@importFrom stats update logLik
-#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
+#'@param object \code{list} object of class \code{mvgam}. See [mvgam()]
 #'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
 #''series' (character or factor index of the series IDs)
@@ -48,7 +48,7 @@
 #'@references Paul-Christian Bürkner, Jonah Gabry & Aki Vehtari (2020). Approximate leave-future-out cross-validation for Bayesian time series models
 #'Journal of Statistical Computation and Simulation. 90:14, 2499-2523.
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'# Simulate from a Poisson-AR2 model with a seasonal smooth
 #'set.seed(100)
 #'dat <- sim_mvgam(T = 75,
@@ -68,8 +68,6 @@
 #'                family = poisson(),
 #'                data = dat$data_train,
 #'                newdata = dat$data_test,
-#'                burnin = 300,
-#'                samples = 300,
 #'                chains = 2,
 #'                silent = 2)
 #'
@@ -79,8 +77,6 @@
 #'               family = poisson(),
 #'               data = dat$data_train,
 #'               newdata = dat$data_test,
-#'               burnin = 300,
-#'               samples = 300,
 #'               chains = 2,
 #'               silent = 2)
 #'
@@ -277,7 +273,7 @@ lfo_cv.mvgam = function(object,
                    class = 'mvgam_lfo'))
 }
 
-#' Plot Pareto-k and ELPD values from a leave-future-out object
+#' Plot Pareto-k and ELPD values from a `mvgam_lfo` object
 #'
 #' This function takes an object of class `mvgam_lfo` and creates several
 #' informative diagnostic plots

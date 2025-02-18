@@ -2,7 +2,7 @@
 % Please edit documentation in R/posterior_epred.mvgam.R
 \name{posterior_predict.mvgam}
 \alias{posterior_predict.mvgam}
-\title{Draws from the posterior predictive distribution for 'mvgam' objects}
+\title{Draws from the posterior predictive distribution for \pkg{mvgam} objects}
 \usage{
 \method{posterior_predict}{mvgam}(
   object,
@@ -14,7 +14,7 @@
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same variables
 that were included in the original \code{data} used to fit the model. If not supplied,
@@ -64,12 +64,14 @@ of a \code{mvgam} model, while the forecasting functions
 that respect the temporal dynamics of estimated latent trends.
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate some data and fit a model
-simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 mod <- mvgam(y ~ s(season, bs = 'cc'),
-            trend_model = 'AR1',
-            data = simdat$data_train)
+            trend_model = AR(),
+            data = simdat$data_train,
+            chains = 2,
+            silent = 2)
 
 # Compute posterior predictions
 predictions <- posterior_predict(mod)

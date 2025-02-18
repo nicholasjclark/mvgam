@@ -3,7 +3,7 @@
 \name{score.mvgam_forecast}
 \alias{score.mvgam_forecast}
 \alias{score}
-\title{Compute probabilistic forecast scores for mvgam objects}
+\title{Compute probabilistic forecast scores for \pkg{mvgam} models}
 \usage{
 \method{score}{mvgam_forecast}(
   object,
@@ -58,7 +58,7 @@ posterior empirical quantiles. Intervals are not calculated when using \code{elp
 will only contain the linear predictors
 }
 \description{
-Compute probabilistic forecast scores for mvgam objects
+Compute probabilistic forecast scores for \pkg{mvgam} models
 }
 \examples{
 \donttest{

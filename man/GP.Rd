@@ -2,7 +2,7 @@
 % Please edit documentation in R/mvgam_trend_types.R
 \name{GP}
 \alias{GP}
-\title{Specify dynamic Gaussian processes}
+\title{Specify dynamic Gaussian process trends in \pkg{mvgam} models}
 \usage{
 GP(...)
 }

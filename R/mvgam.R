@@ -366,7 +366,8 @@
 #'               trend_model = AR(),
 #'               family = poisson(),
 #'               noncentred = TRUE,
-#'               chains = 2)
+#'               chains = 2,
+#'               silent = 2)
 #'
 #' # Extract the model summary
 #' summary(mod1)
@@ -436,7 +437,8 @@
 #'              trend_model = AR(),
 #'              data = mod_data,
 #'              return_model_data = TRUE,
-#'              chains = 2)
+#'              chains = 2,
+#'              silent = 2)
 #'
 #' # The mapping matrix is now supplied as data to the model in the 'Z' element
 #' mod$model_data$Z
@@ -479,7 +481,8 @@
 #'              family = gaussian(),
 #'              data = data_train,
 #'              newdata = data_test,
-#'              chains = 2)
+#'              chains = 2,
+#'              silent = 2)
 #'
 #' # Inspect the model summary, forecast and time-varying coefficient distribution
 #' summary(mod)
@@ -510,7 +513,8 @@
 #'               s(season, bs = 'cc') +
 #'               s(season, by = series, m = 1, k = 5),
 #'              data = dat$data_train,
-#'              chains = 2)
+#'              chains = 2,
+#'              silent = 2)
 #'
 #' # Inspect the model file to see the modification to the linear predictor
 #' # (eta)
@@ -580,7 +584,8 @@
 #' mod <- mvgam(cbind(y, ntrials) ~ series + s(x, by = series),
 #'              family = binomial(),
 #'              data = dat,
-#'              chains = 2)
+#'              chains = 2,
+#'              silent = 2)
 #' summary(mod)
 #' pp_check(mod, type = "bars_grouped",
 #'          group = "series", ndraws = 50)

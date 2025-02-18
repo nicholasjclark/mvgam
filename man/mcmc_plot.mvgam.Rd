@@ -2,7 +2,7 @@
 % Please edit documentation in R/mcmc_plot.mvgam.R
 \name{mcmc_plot.mvgam}
 \alias{mcmc_plot.mvgam}
-\title{MCMC plots as implemented in \pkg{bayesplot}}
+\title{MCMC plots of \pkg{mvgam} parameters, as implemented in \pkg{bayesplot}}
 \usage{
 \method{mcmc_plot}{mvgam}(
   object,
@@ -49,16 +49,17 @@ that can be further customized using the \pkg{ggplot2} package.
 }
 \description{
 Convenient way to call MCMC plotting functions
-implemented in the \pkg{bayesplot} package
+implemented in the \pkg{bayesplot} package for \pkg{mvgam} models
 }
 \examples{
-\dontrun{
+\donttest{
 simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
              trend_model = AR(),
              noncentred = TRUE,
              data = simdat$data_train,
-             chains = 2)
+             chains = 2,
+             silent = 2)
 mcmc_plot(mod)
 mcmc_plot(mod, type = 'neff_hist')
 mcmc_plot(mod, variable = 'betas', type = 'areas')

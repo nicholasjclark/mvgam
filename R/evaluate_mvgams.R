@@ -1,4 +1,4 @@
-#'Evaluate forecasts from fitted mvgam objects
+#'Evaluate forecasts from fitted \pkg{mvgam} objects
 #'
 #'@importFrom graphics barplot boxplot axis
 #'@importFrom stats quantile ecdf median predict
@@ -60,7 +60,7 @@
 #'stable forecasts
 #'@seealso \code{\link{forecast}}, \code{\link{score}}, \code{\link{lfo_cv}}
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'# Simulate from a Poisson-AR2 model with a seasonal smooth
 #'set.seed(100)
 #'dat <- sim_mvgam(T = 75,
@@ -76,7 +76,8 @@
 #'                 family = poisson(),
 #'                 data = dat$data_train,
 #'                 newdata = dat$data_test,
-#'                 chains = 2)
+#'                 chains = 2,
+#'                 silent = 2)
 #'
 #'# Fit a less appropriate model
 #'mod_rw <- mvgam(y ~ s(season, bs = 'cc'),
@@ -84,7 +85,8 @@
 #'                family = poisson(),
 #'                data = dat$data_train,
 #'                newdata = dat$data_test,
-#'                chains = 2)
+#'                chains = 2,
+#'                silent = 2)
 #'
 #'# Compare Discrete Ranked Probability Scores for the testing period
 #'fc_ar2 <- forecast(mod_ar2)
@@ -108,10 +110,12 @@
 #'# for estimating model parameters
 #'lfo_ar2 <- lfo_cv(mod_ar2,
 #'                  min_t = 40,
-#'                  fc_horizon = 3)
+#'                  fc_horizon = 3,
+#'                  silent = 2)
 #'lfo_rw <- lfo_cv(mod_rw,
 #'                 min_t = 40,
-#'                 fc_horizon = 3)
+#'                 fc_horizon = 3,
+#'                 silent = 2)
 #'
 #'# Plot Pareto-K values and ELPD estimates
 #'plot(lfo_ar2)

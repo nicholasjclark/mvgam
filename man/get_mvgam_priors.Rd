@@ -2,7 +2,7 @@
 % Please edit documentation in R/get_mvgam_priors.R
 \name{get_mvgam_priors}
 \alias{get_mvgam_priors}
-\title{Extract information on default prior distributions for an mvgam model}
+\title{Extract information on default prior distributions for an \pkg{mvgam} model}
 \usage{
 get_mvgam_priors(
   formula,
@@ -158,7 +158,7 @@ can be modified through the \code{mvgam} interface
 }
 \description{
 This function lists the parameters that can have their prior distributions
-changed for a given \code{mvgam} model, as well listing their default distributions
+changed for a given model, as well listing their default distributions
 }
 \details{
 Users can supply a model formula, prior to fitting the model, so that default priors can be inspected and

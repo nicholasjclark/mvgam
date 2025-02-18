@@ -66,7 +66,7 @@ As `mvgam` acts as an interface to `Stan`, please additionally cite:
 
 `mvgam` relies on several other `R` packages and, of course, on `R` itself. To
 find out how to cite `R` and its packages, use the `citation()` function. There are
-some features of `mvgam` which specifically rely on certain packages. The most important of these is the generation of data necessary to estimate smoothing splines, which rely on `mgcv` and `splines2`. The `rstan` and `cmdstanr` packages together with `Rcpp` makes `Stan` conveniently accessible in `R`. If you use some of these features, please also consider citing the related packages.
+some features of `mvgam` which specifically rely on certain packages. The most important of these is the generation of data necessary to estimate smoothing splines and Gaussian Processes, which rely on the `mgcv`, `brms` and `splines2` packages. The `rstan` and `cmdstanr` packages together with `Rcpp` makes `Stan` conveniently accessible in `R`. If you use some of these features, please also consider citing the related packages.
 
 ## Cheatsheet
 [![`mvgam` usage cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
@@ -109,8 +109,8 @@ lynx_full$series <- factor('series1')
 
 Split the data into training (first 50 years) and testing (next 10 years of data) to evaluate forecasts
 ```{r}
-lynx_train = lynx_full[1:50, ]
-lynx_test = lynx_full[51:60, ]
+lynx_train <- lynx_full[1:50, ]
+lynx_test <- lynx_full[51:60, ]
 ```
 
 Inspect the series in a bit more detail using `mvgam`'s plotting utility

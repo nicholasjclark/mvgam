@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot.mvgam.R
 \name{plot.mvgam}
 \alias{plot.mvgam}
-\title{Default mvgam plots}
+\title{Default plots for \pkg{mvgam} models}
 \usage{
 \method{plot}{mvgam}(
   x,
@@ -78,7 +78,8 @@ dat <- sim_mvgam(T = 80, n_series = 3)
 mod <- mvgam(y ~ s(season, bs = 'cc') + s(series, bs = 're'),
             data = dat$data_train,
             trend_model = RW(),
-            chains = 2)
+            chains = 2,
+            silent = 2)
 
 # Plot predictions and residuals for each series
 plot(mod, type = 'forecast', series = 1)
@@ -106,7 +107,8 @@ mod <- mvgam(y ~ -1,
             trend_formula = ~ s(season, bs = 'cc'),
             data = dat$data_train,
             trend_model = RW(),
-            chains = 2)
+            chains = 2,
+            silent = 2)
 plot(mod, type = 'smooths', trend_effects = TRUE)
 
 # But marginaleffects functions work without any modification

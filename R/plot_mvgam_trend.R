@@ -1,4 +1,4 @@
-#'Plot mvgam latent trend for a specified series
+#'Plot latent trend predictions from \pkg{mvgam} models
 #'@importFrom graphics par lines polygon box abline
 #'@importFrom stats sd quantile
 #'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]

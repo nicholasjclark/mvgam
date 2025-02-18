@@ -52,13 +52,13 @@
 </nav><div class="container template-reference-topic">
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.png" class="logo" alt=""><h1>Evaluate forecasts from fitted mvgam objects</h1>
+      <img src="../logo.png" class="logo" alt=""><h1>Evaluate forecasts from fitted <span class="pkg">mvgam</span> objects</h1>
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/R/evaluate_mvgams.R" class="external-link"><code>R/evaluate_mvgams.R</code></a></small>
       <div class="d-none name"><code>evaluate_mvgams.Rd</code></div>
     </div>
 
     <div class="ref-description section level2">
-    <p>Evaluate forecasts from fitted mvgam objects</p>
+    <p>Evaluate forecasts from fitted <span class="pkg">mvgam</span> objects</p>
     </div>
 
     <div class="section level2">
@@ -214,7 +214,7 @@ provides a series of summary plots to facilitate model selection. It is essentia
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate from a Poisson-AR2 model with a seasonal smooth</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">100</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>T <span class="op">=</span> <span class="fl">75</span>,</span></span>
@@ -230,7 +230,8 @@ provides a series of summary plots to facilitate model selection. It is essentia
 <span class="r-in"><span>                family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>                newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
-<span class="r-in"><span>                chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span>                chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>                silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit a less appropriate model</span></span></span>
 <span class="r-in"><span><span class="va">mod_rw</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
@@ -238,7 +239,8 @@ provides a series of summary plots to facilitate model selection. It is essentia
 <span class="r-in"><span>               family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>               data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>               newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
-<span class="r-in"><span>               chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span>               chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>               silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Compare Discrete Ranked Probability Scores for the testing period</span></span></span>
 <span class="r-in"><span><span class="va">fc_ar2</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod_ar2</span><span class="op">)</span></span></span>
@@ -246,7 +248,9 @@ provides a series of summary plots to facilitate model selection. It is essentia
 <span class="r-in"><span><span class="va">score_ar2</span> <span class="op">&lt;-</span> <span class="fu"><a href="score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">fc_ar2</span>, score <span class="op">=</span> <span class="st">'drps'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">score_rw</span> <span class="op">&lt;-</span> <span class="fu"><a href="score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">fc_rw</span>, score <span class="op">=</span> <span class="st">'drps'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">score_ar2</span><span class="op">$</span><span class="va">series_1</span><span class="op">$</span><span class="va">score</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 23.33755</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">score_rw</span><span class="op">$</span><span class="va">series_1</span><span class="op">$</span><span class="va">score</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 142.8332</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Use rolling evaluation for approximate comparisons of 3-step ahead</span></span></span>
 <span class="r-in"><span><span class="co"># forecasts across the training period</span></span></span>
@@ -255,6 +259,17 @@ provides a series of summary plots to facilitate model selection. It is essentia
 <span class="r-in"><span>              fc_horizon <span class="op">=</span> <span class="fl">3</span>,</span></span>
 <span class="r-in"><span>              n_samples <span class="op">=</span> <span class="fl">1000</span>,</span></span>
 <span class="r-in"><span>              n_evaluations <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> RPS summaries per model (lower is better)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             Min.  1st Qu.    Median      Mean   3rd Qu.      Max.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Model 1 5.083941 5.487984  5.892027  5.798657  6.156015  6.420003</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Model 2 7.534408 8.818621 10.102834 11.343673 13.248306 16.393777</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 90% interval coverages per model (closer to 0.9 is better)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Model 1 1 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Model 2 1</span>
+<span class="r-plt img"><img src="evaluate_mvgams-1.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="evaluate_mvgams-2.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="evaluate_mvgams-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now use approximate leave-future-out CV to compare</span></span></span>
 <span class="r-in"><span><span class="co"># rolling forecasts; start at time point 40 to reduce</span></span></span>
@@ -262,24 +277,31 @@ provides a series of summary plots to facilitate model selection. It is essentia
 <span class="r-in"><span><span class="co"># for estimating model parameters</span></span></span>
 <span class="r-in"><span><span class="va">lfo_ar2</span> <span class="op">&lt;-</span> <span class="fu"><a href="lfo_cv.mvgam.html">lfo_cv</a></span><span class="op">(</span><span class="va">mod_ar2</span>,</span></span>
 <span class="r-in"><span>                 min_t <span class="op">=</span> <span class="fl">40</span>,</span></span>
-<span class="r-in"><span>                 fc_horizon <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
+<span class="r-in"><span>                 fc_horizon <span class="op">=</span> <span class="fl">3</span>,</span></span>
+<span class="r-in"><span>                 silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">lfo_rw</span> <span class="op">&lt;-</span> <span class="fu"><a href="lfo_cv.mvgam.html">lfo_cv</a></span><span class="op">(</span><span class="va">mod_rw</span>,</span></span>
 <span class="r-in"><span>                min_t <span class="op">=</span> <span class="fl">40</span>,</span></span>
-<span class="r-in"><span>                fc_horizon <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
+<span class="r-in"><span>                fc_horizon <span class="op">=</span> <span class="fl">3</span>,</span></span>
+<span class="r-in"><span>                silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot Pareto-K values and ELPD estimates</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">lfo_ar2</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="evaluate_mvgams-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">lfo_rw</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="evaluate_mvgams-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Proportion of timepoints in which AR2 model gives</span></span></span>
 <span class="r-in"><span><span class="co"># better forecasts</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="op">(</span><span class="va">lfo_ar2</span><span class="op">$</span><span class="va">elpds</span> <span class="op">-</span> <span class="va">lfo_rw</span><span class="op">$</span><span class="va">elpds</span><span class="op">)</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span><span class="op">)</span> <span class="op">/</span></span></span>
 <span class="r-in"><span>      <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">lfo_ar2</span><span class="op">$</span><span class="va">elpds</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.9230769</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># A higher total ELPD is preferred</span></span></span>
 <span class="r-in"><span><span class="va">lfo_ar2</span><span class="op">$</span><span class="va">sum_ELPD</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] -77.75851</span>
 <span class="r-in"><span><span class="va">lfo_rw</span><span class="op">$</span><span class="va">sum_ELPD</span></span></span>
-<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] -92.46379</span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

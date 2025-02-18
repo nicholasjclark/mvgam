@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_mvgam_trend.R
 \name{plot_mvgam_trend}
 \alias{plot_mvgam_trend}
-\title{Plot mvgam latent trend for a specified series}
+\title{Plot latent trend predictions from \pkg{mvgam} models}
 \usage{
 plot_mvgam_trend(
   object,
@@ -55,7 +55,7 @@ estimated 1st derivative for the estimated trend}
 A base \code{R} graphics plot
 }
 \description{
-Plot mvgam latent trend for a specified series
+Plot latent trend predictions from \pkg{mvgam} models
 }
 \examples{
 \donttest{

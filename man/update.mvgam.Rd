@@ -3,7 +3,7 @@
 \name{update.mvgam}
 \alias{update.mvgam}
 \alias{update.jsdgam}
-\title{Update an existing \code{mvgam} object}
+\title{Update an existing \pkg{mvgam} model object}
 \usage{
 \method{update}{mvgam}(
   object,
@@ -237,7 +237,7 @@ for other functions in the package. See \code{\link{mvgam-class}} for details.
 Use \code{methods(class = "mvgam")} for an overview on available methods.
 }
 \description{
-This function allows a previously fitted \code{mvgam} model to be updated
+This function allows a previously fitted \pkg{mvgam} model to be updated
 }
 \examples{
 \donttest{

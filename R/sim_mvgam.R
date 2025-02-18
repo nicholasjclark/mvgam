@@ -1,4 +1,4 @@
-#'Simulate a set of time series for mvgam modelling
+#'Simulate a set of time series for modelling in \pkg{mvgam}
 #'
 #'This function simulates sets of time series data for fitting a multivariate GAM that includes
 #'shared seasonality and dependence on state-space latent dynamic factors. Random

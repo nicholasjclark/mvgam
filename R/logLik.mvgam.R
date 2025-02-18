@@ -1,7 +1,7 @@
-#'@title Compute pointwise Log-Likelihoods from fitted `mvgam` objects
+#'@title Compute pointwise Log-Likelihoods from fitted \pkg{mvgam} objects
 #'
 #'@importFrom parallel setDefaultCluster stopCluster
-#'@param object \code{list} object returned from \code{mvgam}
+#'@param object \code{list} object of class \code{mvgam} or \code{jsdgam}
 #'@param linpreds Optional `matrix` of linear predictor draws to use for calculating
 #'pointwise log-likelihoods
 #'@param newdata Optional `data.frame` or `list` object specifying which series each column
@@ -20,15 +20,14 @@
 #'original model via the `newdata` argument in \code{\link{mvgam}},
 #'testing observations)
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Simulate some data and fit a model
 #' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 #' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
 #'              trend_model = AR(),
 #'              data = simdat$data_train,
-#'              burnin = 300,
-#'              samples = 300,
-#'              chains = 2)
+#'              chains = 2,
+#'              silent = 2)
 #'
 #'# Extract logLikelihood values
 #'lls <- logLik(mod)

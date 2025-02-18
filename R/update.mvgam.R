@@ -1,6 +1,6 @@
-#'Update an existing `mvgam` object
+#'Update an existing \pkg{mvgam} model object
 #'
-#'This function allows a previously fitted `mvgam` model to be updated
+#'This function allows a previously fitted \pkg{mvgam} model to be updated
 #'@name update.mvgam
 #'@importFrom mgcv nb betar
 #'@importFrom rlang missing_arg

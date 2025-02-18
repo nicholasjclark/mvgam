@@ -1,4 +1,4 @@
-#'@title Compute probabilistic forecast scores for mvgam objects
+#'@title Compute probabilistic forecast scores for \pkg{mvgam} models
 #'@param object `mvgam_forecast` object. See [forecast.mvgam()].
 #'If the test data
 #'supplied to \code{forecast.mvgam} contained out of sample test observations, the calibration

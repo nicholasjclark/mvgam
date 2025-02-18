@@ -3,7 +3,7 @@
 #' A \code{\link[graphics:pairs]{pairs}}
 #' method that is customized for MCMC output.
 #'
-#' @param x An object of class \code{mvgam}
+#' @param x An object of class \code{mvgam} or \code{jsdgam}
 #' @inheritParams mcmc_plot.mvgam
 #' @param ... Further arguments to be passed to
 #'   \code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}}.

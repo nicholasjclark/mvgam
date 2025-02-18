@@ -3,7 +3,7 @@
 \name{ppc.mvgam}
 \alias{ppc.mvgam}
 \alias{ppc}
-\title{Plot mvgam conditional posterior predictive checks for a specified series}
+\title{Plot conditional posterior predictive checks from \pkg{mvgam} models}
 \usage{
 ppc(object, ...)
 
@@ -64,7 +64,7 @@ posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or 
 Integral Transform histogram (for \code{type == 'pit'}).
 }
 \description{
-Plot mvgam conditional posterior predictive checks for a specified series
+Plot conditional posterior predictive checks from \pkg{mvgam} models
 }
 \details{
 Conditional posterior predictions are drawn from the fitted \code{mvgam} and compared against
@@ -88,7 +88,8 @@ dat <- mgcv::gamSim(1, n = 200, scale = 2)
 mod <- mvgam(y ~ s(x0) + s(x1) + s(x2) + s(x3),
             data = dat,
             family = gaussian(),
-            chains = 2)
+            chains = 2,
+            silent = 2)
 
 # Posterior checks
 ppc(mod, type = 'hist')

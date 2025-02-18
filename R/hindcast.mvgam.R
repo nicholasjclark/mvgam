@@ -23,7 +23,8 @@ hindcast <- function(object, ...){
 #'             trend_model = AR(),
 #'             noncentred = TRUE,
 #'             data = simdat$data_train,
-#'             chains = 2)
+#'             chains = 2,
+#'             silent = 2)
 #'
 #' # Hindcasts on response scale
 #' hc <- hindcast(mod)

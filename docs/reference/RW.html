@@ -142,7 +142,7 @@ arguments to be interpreted by the parsing functions in <span class="pkg">mvgam<
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="co"># A short example to illustrate CAR(1) models</span></span></span>
 <span class="r-in"><span><span class="co"># Function to simulate CAR1 data with seasonality</span></span></span>
 <span class="r-in"><span><span class="va">sim_corcar1</span> <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">n</span> <span class="op">=</span> <span class="fl">120</span>,</span></span>
@@ -194,15 +194,107 @@ arguments to be interpreted by the parsing functions in <span class="pkg">mvgam<
 <span class="r-in"><span>            data <span class="op">=</span> <span class="va">dat</span>,</span></span>
 <span class="r-in"><span>            family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            samples <span class="op">=</span> <span class="fl">300</span>,</span></span>
-<span class="r-in"><span>            chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span>            chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>            silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># View usual summaries and plots</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'expected'</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM observation formula:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> y ~ 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000002835ba2c4d0&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM process formula:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ~s(season, bs = "cc", k = 5, by = trend)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000002835ba2c4d0&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gaussian</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Link function:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> identity</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Trend model:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> CAR()</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> N process models:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> N series:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> N timepoints:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 120 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Status:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Fitted using Stan </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 chains, each with iter = 800; warmup = 500; thin = 1 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total post-warmup draws = 600</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Observation error parameter estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>               2.5%  50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_obs[1] 0.041 0.14  0.80 2.34     2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_obs[2] 0.040 0.12  0.27 2.21     1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM observation model coefficient (beta) estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>              2.5%    50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept) -0.97 -0.023  0.22 3.37     1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Process model AR parameter estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>        2.5%  50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1] 0.29 0.54  0.72 1.07    33</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[2] 0.65 0.77  0.85 1.07    26</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Process error parameter estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          2.5%  50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1] 0.80 1.20   1.3 1.55     3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[2] 0.84 0.94   1.1 1.04    62</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM process model coefficient (beta) estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                2.5%    50%   97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)_trend             -0.41 -0.041  0.9300 2.74     1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend1.1_trend -0.11  0.310  0.6900 1.10    21</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend1.2_trend -0.83 -0.410  0.0098 1.30     3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend1.3_trend -1.20 -0.510 -0.0880 1.18    13</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend2.1_trend -0.08  0.380  0.7000 1.08    22</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend2.2_trend -0.96 -0.500  0.0870 1.14     6</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend2.3_trend -1.10 -0.690 -0.1600 1.25     4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM process smooths:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                         edf Ref.df Chi.sq p-value  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriestrend1 1.62      3   20.3   0.096 .</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriestrend2 1.89      3   29.6   0.018 *</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Rhats above 1.05 found for 661 parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  *Diagnose further to investigate why the chains have not mixed</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 215 of 600 iterations ended with a divergence (35.8333%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  *Try running with larger adapt_delta to remove the divergences</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 600 iterations saturated the maximum tree depth of 10 (0%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1: E-FMI = 0.114</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2: E-FMI = 0.0233</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  *E-FMI below 0.2 indicates you may need to reparameterize your model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Tue Feb 18 10:44:06 AM 2025.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Use how_to_cite(mod) to get started describing this model</span>
+<span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'expected'</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="RW-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="RW-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="RW-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'residuals'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="RW-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'residuals'</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="RW-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now an example illustrating hierarchical dynamics</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span></span>
@@ -238,22 +330,125 @@ arguments to be interpreted by the parsing functions in <span class="pkg">mvgam<
 <span class="r-in"><span><span class="fu"><a href="get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="va">species</span>,</span></span>
 <span class="r-in"><span>                trend_model <span class="op">=</span> <span class="fu">AR</span><span class="op">(</span>gr <span class="op">=</span> <span class="va">region</span>, subgr <span class="op">=</span> <span class="va">species</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                data <span class="op">=</span> <span class="va">all_dat</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                param_name param_length</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1                             (Intercept)            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2                        speciesspecies_2            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3                        speciesspecies_3            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 vector&lt;lower=-1,upper=1&gt;[n_series] ar1;            9</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5        vector&lt;lower=0&gt;[n_series] sigma;            9</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                      param_info                                  prior</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1                   (Intercept)  (Intercept) ~ student_t(3, 1.9, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 speciesspecies_2 fixed effect speciesspecies_2 ~ student_t(3, 0, 2);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 speciesspecies_3 fixed effect speciesspecies_3 ~ student_t(3, 0, 2);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4         trend AR1 coefficient                    ar1 ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5                      trend sd          sigma ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                     example_change new_lowerbound new_upperbound</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1      (Intercept) ~ normal(0, 1);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 speciesspecies_2 ~ normal(0, 1);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 speciesspecies_3 ~ normal(0, 1);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4       ar1 ~ normal(-0.79, 0.86);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5       sigma ~ exponential(0.37);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit the model</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="va">species</span>,</span></span>
 <span class="r-in"><span>            trend_model <span class="op">=</span> <span class="fu">AR</span><span class="op">(</span>gr <span class="op">=</span> <span class="va">region</span>, subgr <span class="op">=</span> <span class="va">species</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>            data <span class="op">=</span> <span class="va">all_dat</span><span class="op">)</span></span></span>
+<span class="r-in"><span>            data <span class="op">=</span> <span class="va">all_dat</span>,</span></span>
+<span class="r-in"><span>            chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>            silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Check standard outputs</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> y ~ species</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000002835ba2c4d0&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Link function:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> log</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Trend model:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> AR(gr = region, subgr = species)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> N series:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> N timepoints:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 75 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Status:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Fitted using Stan </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 chains, each with iter = 1000; warmup = 500; thin = 1 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total post-warmup draws = 1000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                  2.5%  50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)      0.90 1.10   1.3 1.01   187</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> speciesspecies_2 0.78 0.98   1.2 1.01   211</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> speciesspecies_3 1.60 1.90   2.1 1.01   152</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Latent trend parameter AR estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             2.5%    50%  97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]    0.2500  0.480  0.720 1.03   108</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[2]    0.1100  0.330  0.540 1.00   183</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[3]    0.0230  0.370  0.670 1.03    39</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[4]    0.2800  0.630  0.860 1.01   122</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[5]   -0.1600  0.069  0.310 1.01   141</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[6]   -0.4100 -0.210 -0.015 1.01   129</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[7]    0.0054  0.350  0.650 1.00   174</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[8]    0.5500  0.740  0.900 1.01   216</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[9]    0.3300  0.550  0.770 1.02    89</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.8000  1.000  1.300 1.00   507</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[2]  0.6600  0.800  0.990 1.00   555</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[3]  0.8200  0.970  1.200 1.00   518</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[4]  0.3000  0.480  0.710 1.02   130</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[5]  0.6300  0.750  0.920 1.00   785</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[6]  0.6900  0.810  0.960 1.00   852</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[7]  0.5900  0.780  0.990 1.00   366</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[8]  0.5600  0.700  0.890 1.00   597</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[9]  0.6900  0.830  1.000 1.00   970</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Hierarchical correlation weighting parameter (alpha_cor) estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            2.5%  50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> alpha_cor 0.013 0.07  0.22 1.01   524</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Rhat looks reasonable for all parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 of 1000 iterations ended with a divergence (0.2%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  *Try running with larger adapt_delta to remove the divergences</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 10 (0%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Tue Feb 18 10:45:45 AM 2025.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Use how_to_cite(mod) to get started describing this model</span>
+<span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> Unable to compute predicted values with this model. You can try to</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span>   supply a different dataset to the `newdata` argument. This error was</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span>   also raised:</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-err co"><span class="r-pr">#&gt;</span>   Variable "region" not found in data</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-err co"><span class="r-pr">#&gt;</span>   Bug Tracker:</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span>   https://github.com/vincentarelbundock/marginaleffects/issues</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect posterior estimates for process error and the</span></span></span>
 <span class="r-in"><span><span class="co"># correlation weighting parameter</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/mcmc_plot.brmsfit.html" class="external-link">mcmc_plot</a></span><span class="op">(</span><span class="va">mod</span>, variable <span class="op">=</span> <span class="st">'Sigma'</span>, regex <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
+<span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/mcmc_plot.brmsfit.html" class="external-link">mcmc_plot</a></span><span class="op">(</span><span class="va">mod</span>, variable <span class="op">=</span> <span class="st">'Sigma'</span>, regex <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
 <span class="r-in"><span>         type <span class="op">=</span> <span class="st">'hist'</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/mcmc_plot.brmsfit.html" class="external-link">mcmc_plot</a></span><span class="op">(</span><span class="va">mod</span>, variable <span class="op">=</span> <span class="st">'alpha_cor'</span>, type <span class="op">=</span> <span class="st">'hist'</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</span>
+<span class="r-plt img"><img src="RW-6.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/mcmc_plot.brmsfit.html" class="external-link">mcmc_plot</a></span><span class="op">(</span><span class="va">mod</span>, variable <span class="op">=</span> <span class="st">'alpha_cor'</span>, type <span class="op">=</span> <span class="st">'hist'</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</span>
+<span class="r-plt img"><img src="RW-7.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

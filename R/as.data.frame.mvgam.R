@@ -1,4 +1,4 @@
-#'@title Extract posterior draws from fitted `mvgam` objects
+#'@title Extract posterior draws from fitted \pkg{mvgam} objects
 #'@name mvgam_draws
 #'@description Extract posterior draws in conventional formats as data.frames, matrices, or arrays.
 #'@param x \code{list} object of class `mvgam`
@@ -32,14 +32,14 @@
 #'@param ... Ignored
 #'@return A `data.frame`, `matrix`, or `array` containing the posterior draws.
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'sim <- sim_mvgam(family = Gamma())
 #'mod1 <- mvgam(y ~ s(season, bs = 'cc'),
 #'              trend_model = 'AR1',
 #'              data = sim$data_train,
 #'              family = Gamma(),
 #'              chains = 2,
-#'              samples = 300)
+#'              silent = 2)
 #'beta_draws_df <- as.data.frame(mod1, variable = 'betas')
 #'head(beta_draws_df)
 #'str(beta_draws_df)

@@ -1,6 +1,6 @@
-#'@title Calculate randomized quantile residuals for 'mvgam' objects
+#'@title Calculate randomized quantile residuals for \pkg{mvgam} objects
 #'@name add_residuals.mvgam
-#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
+#'@param object \code{list} object of class \code{mvgam}. See [mvgam()]
 #'@param ... unused
 #'@details For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics
 #'If the fitted model is appropriate then Dunn-Smyth residuals will be standard normal in distribution and no

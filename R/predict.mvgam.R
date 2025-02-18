@@ -1,7 +1,7 @@
-#'Predict from the GAM component of an mvgam model
+#'Predict from a fitted \pkg{mvgam} model
 #'@importFrom stats predict
 #'@inheritParams brms::fitted.brmsfit
-#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
+#'@param object \code{list} object of class \code{mvgam} or \code{jsdgam}. See [mvgam()]
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing the same variables
 #'that were included in the original `data` used to fit the model. If not supplied,
 #'predictions are generated for the original observations used for the model fit.
@@ -75,7 +75,8 @@
 #'              family = gaussian(),
 #'              trend_model = AR(),
 #'              noncentred = TRUE,
-#'              chains = 2)
+#'              chains = 2,
+#'              silent = 2)
 #'
 #'# Generate predictions against observed data
 #'preds <- predict(mod1, summary = TRUE)

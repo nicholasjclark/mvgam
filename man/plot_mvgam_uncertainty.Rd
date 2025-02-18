@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_mvgam_uncertainty.R
 \name{plot_mvgam_uncertainty}
 \alias{plot_mvgam_uncertainty}
-\title{Plot mvgam forecast uncertainty contributions for a specified series}
+\title{Plot forecast uncertainty contributions from \pkg{mvgam} models}
 \usage{
 plot_mvgam_uncertainty(
   object,
@@ -35,7 +35,7 @@ This places the legend on the inside of the plot frame at the given location (if
 A base \code{R} graphics plot
 }
 \description{
-Plot mvgam forecast uncertainty contributions for a specified series
+Plot forecast uncertainty contributions from \pkg{mvgam} models
 }
 \details{
 The basic idea of this function is to compute forecasts by ignoring one of the

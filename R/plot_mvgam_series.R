@@ -1,4 +1,4 @@
-#'Plot observed time series used for mvgam modelling
+#'Plot observed time series used for \pkg{mvgam} modelling
 #'
 #'This function takes either a fitted \code{mvgam} object or a \code{data.frame} object
 #'and produces plots of observed time series, ACF, CDF and histograms for exploratory data analysis

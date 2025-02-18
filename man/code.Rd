@@ -5,7 +5,7 @@
 \alias{stancode.mvgam_prefit}
 \alias{stancode.mvgam}
 \alias{standata.mvgam_prefit}
-\title{Stan code and data objects for mvgam models}
+\title{Stan code and data objects for \pkg{mvgam} models}
 \usage{
 code(object)
 

@@ -1,4 +1,4 @@
-#' Monotonic splines in mvgam
+#' Monotonic splines in \pkg{mvgam} models
 #'
 #' Uses constructors from package \pkg{splines2} to build monotonically increasing
 #' or decreasing splines. Details also in Wang & Yan (2021).
@@ -73,7 +73,8 @@
 #' mod2 <- mvgam(y ~ s(x, bs = 'moi', k = 18),
 #'              data = mod_data,
 #'              family = gaussian(),
-#'              chains = 2)
+#'              chains = 2,
+#'              silent = 2)
 #'
 #' plot_predictions(mod2,
 #'                  by = 'x',
@@ -107,7 +108,8 @@
 #' mod <- mvgam(y ~ s(x, bs = 'moi', by = fac, k = 8),
 #'              data = mod_data,
 #'              family = gaussian(),
-#'              chains = 2)
+#'              chains = 2,
+#'              silent = 2)
 #'
 #' # Visualise the different monotonic functions
 #' plot_predictions(mod, condition = c('x', 'fac', 'fac'),

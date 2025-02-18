@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_mvgam_factors.R
 \name{plot_mvgam_factors}
 \alias{plot_mvgam_factors}
-\title{Latent factor summaries for a fitted mvgam object}
+\title{Latent factor summaries for a fitted \pkg{mvgam} object}
 \usage{
 plot_mvgam_factors(object, plot = TRUE)
 }

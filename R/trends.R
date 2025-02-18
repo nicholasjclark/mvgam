@@ -1,4 +1,4 @@
-#' Supported mvgam trend models
+#' Supported latent trend models in \pkg{mvgam}
 #' @importFrom utils tail
 #' @importFrom stats rnorm
 #' @details \code{mvgam} currently supports the following dynamic trend models:

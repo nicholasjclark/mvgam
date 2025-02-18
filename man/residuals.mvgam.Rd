@@ -2,7 +2,7 @@
 % Please edit documentation in R/residuals.mvgam.R
 \name{residuals.mvgam}
 \alias{residuals.mvgam}
-\title{Posterior draws of \code{mvgam} residuals}
+\title{Posterior draws of residuals from \pkg{mvgam} models}
 \usage{
 \method{residuals}{mvgam}(object, summary = TRUE, robust = FALSE, probs = c(0.025, 0.975), ...)
 }

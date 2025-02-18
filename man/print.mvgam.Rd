@@ -2,7 +2,7 @@
 % Please edit documentation in R/print.mvgam.R
 \name{print.mvgam}
 \alias{print.mvgam}
-\title{Summary for a fitted mvgam object}
+\title{Summary for a fitted \pkg{mvgam} object}
 \usage{
 \method{print}{mvgam}(x, ...)
 }
@@ -15,7 +15,7 @@
 A \code{list} is printed on-screen
 }
 \description{
-This function takes a fitted \code{mvgam} object and prints a quick summary
+This function takes a fitted \code{mvgam} or \code{jsdgam} object and prints a quick summary
 }
 \details{
 A brief summary of the model's call is printed

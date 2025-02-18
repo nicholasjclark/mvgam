@@ -1,4 +1,4 @@
-#' Generate a methods description for mvgam models
+#' Generate a methods description for \pkg{mvgam} models
 #'
 #' Create a brief but fully referenced methods description, along with a useful list of references,
 #' for fitted \code{mvgam} and \code{jsdgam} models
@@ -17,7 +17,7 @@
 #'@author Nicholas J Clark
 #'@seealso \code{\link[utils]{citation}}, \code{\link{mvgam}}, \code{\link{jsdgam}}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Simulate 4 time series with hierarchical seasonality
 #' # and a VAR(1) dynamic process
 #' set.seed(0)
@@ -30,7 +30,8 @@
 #'               data = simdat$data_train,
 #'               family = gaussian(),
 #'               trend_model = VAR(cor = TRUE),
-#'               chains = 2)
+#'               chains = 2,
+#'               silent = 2)
 #' how_to_cite(mod1)
 #'
 #' # For a GP example, simulate data using the mgcv package
@@ -40,15 +41,9 @@
 #' mod2 <- mvgam(y ~ gp(x2, k = 12),
 #'               data = dat,
 #'               family = gaussian(),
-#'               chains = 2)
+#'               chains = 2,
+#'               silent = 2)
 #' how_to_cite(mod2)
-#'
-#' # Repeat using meanfield variational inference
-#' mod3 <- mvgam(y ~ gp(x2, k = 12),
-#'               data = dat,
-#'               family = gaussian(),
-#'               algorithm = 'meanfield')
-#' how_to_cite(mod3)
 #' }
 #'@export
 how_to_cite <- function(object, ...){

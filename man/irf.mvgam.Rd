@@ -57,6 +57,7 @@ mod <- mvgam(y ~ -1,
              trend_model = VAR(cor = TRUE),
              family = gaussian(),
              data = simdat$data_train,
+             chains = 2,
              silent = 2)
 
 # Calulate Generalized IRFs for each series

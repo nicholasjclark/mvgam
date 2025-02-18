@@ -1,6 +1,7 @@
-#'Summary for a fitted mvgam object
+#'Summary for a fitted \pkg{mvgam} models
 #'
-#'These functions take a fitted \code{mvgam} object and return various useful summaries
+#'These functions take a fitted \code{mvgam} or \code{jsdgam} object and
+#'return various useful summaries
 #'@importFrom stats printCoefmat
 #'@param object \code{list} object of class `mvgam`
 #'@param include_betas Logical. Print a summary that includes posterior summaries

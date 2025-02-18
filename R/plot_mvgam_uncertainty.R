@@ -1,4 +1,4 @@
-#'Plot mvgam forecast uncertainty contributions for a specified series
+#'Plot forecast uncertainty contributions from \pkg{mvgam} models
 #'@importFrom graphics legend
 #'@importFrom stats predict
 #'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]

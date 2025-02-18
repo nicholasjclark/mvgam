@@ -6,7 +6,7 @@
 \alias{smooth.construct.mod.smooth.spec}
 \alias{Predict.matrix.moi.smooth}
 \alias{Predict.matrix.mod.smooth}
-\title{Monotonic splines in mvgam}
+\title{Monotonic splines in \pkg{mvgam} models}
 \usage{
 \method{smooth.construct}{moi.smooth.spec}(object, data, knots)
 
@@ -90,7 +90,8 @@ mod_data$time <- 1:NROW(mod_data)
 mod2 <- mvgam(y ~ s(x, bs = 'moi', k = 18),
              data = mod_data,
              family = gaussian(),
-             chains = 2)
+             chains = 2,
+             silent = 2)
 
 plot_predictions(mod2,
                  by = 'x',
@@ -124,7 +125,8 @@ mod_data$time <- 1:NROW(mod_data)
 mod <- mvgam(y ~ s(x, bs = 'moi', by = fac, k = 8),
              data = mod_data,
              family = gaussian(),
-             chains = 2)
+             chains = 2,
+             silent = 2)
 
 # Visualise the different monotonic functions
 plot_predictions(mod, condition = c('x', 'fac', 'fac'),

@@ -40,7 +40,7 @@
 #' arguments to be interpreted by the parsing functions in \pkg{mvgam}
 #' @rdname RW
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'# A short example to illustrate CAR(1) models
 #'# Function to simulate CAR1 data with seasonality
 #'sim_corcar1 = function(n = 120,
@@ -92,7 +92,8 @@
 #'             data = dat,
 #'             family = gaussian(),
 #'             samples = 300,
-#'             chains = 2)
+#'             chains = 2,
+#'             silent = 2)
 #'
 #'# View usual summaries and plots
 #'summary(mod)
@@ -140,7 +141,9 @@
 #'# Fit the model
 #'mod <- mvgam(formula = y ~ species,
 #'             trend_model = AR(gr = region, subgr = species),
-#'             data = all_dat)
+#'             data = all_dat,
+#'             chains = 2,
+#'             silent = 2)
 #'
 #'# Check standard outputs
 #'summary(mod)
@@ -276,7 +279,7 @@ VAR = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA){
                    class = 'mvgam_trend')
 }
 
-#' Specify dynamic Gaussian processes
+#' Specify dynamic Gaussian process trends in \pkg{mvgam} models
 #'
 #' Set up low-rank approximate Gaussian Process trend models using Hilbert
 #' basis expansions in \pkg{mvgam}. This function does not evaluate its arguments –
@@ -305,7 +308,7 @@ GP = function(...){
                    class = 'mvgam_trend')
 }
 
-#' Specify piecewise linear or logistic trends
+#' Specify piecewise linear or logistic trends in \pkg{mvgam} models
 #'
 #' Set up piecewise linear or logistic trend models
 #' in \code{mvgam}. These functions do not evaluate their arguments –
@@ -484,7 +487,7 @@ PW = function(n_changepoints = 10,
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #' arguments to be interpreted by the parsing functions in \pkg{mvgam}
 #' @examples
-#'\dontrun{
+#'\donttest{
 #'# Simulate counts of four species over ten sampling locations
 #'site_dat <- data.frame(site = rep(1:10, 4),
 #'                       species = as.factor(sort(rep(letters[1:4], 10))),

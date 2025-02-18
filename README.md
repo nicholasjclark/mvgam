@@ -123,11 +123,11 @@ As `mvgam` acts as an interface to `Stan`, please additionally cite:
 itself. To find out how to cite `R` and its packages, use the
 `citation()` function. There are some features of `mvgam` which
 specifically rely on certain packages. The most important of these is
-the generation of data necessary to estimate smoothing splines, which
-rely on `mgcv` and `splines2`. The `rstan` and `cmdstanr` packages
-together with `Rcpp` makes `Stan` conveniently accessible in `R`. If you
-use some of these features, please also consider citing the related
-packages.
+the generation of data necessary to estimate smoothing splines and
+Gaussian Processes, which rely on the `mgcv`, `brms` and `splines2`
+packages. The `rstan` and `cmdstanr` packages together with `Rcpp` makes
+`Stan` conveniently accessible in `R`. If you use some of these
+features, please also consider citing the related packages.
 
 ## Cheatsheet
 
@@ -190,8 +190,8 @@ Split the data into training (first 50 years) and testing (next 10 years
 of data) to evaluate forecasts
 
 ``` r
-lynx_train = lynx_full[1:50, ]
-lynx_test = lynx_full[51:60, ]
+lynx_train <- lynx_full[1:50, ]
+lynx_test <- lynx_full[51:60, ]
 ```
 
 Inspect the series in a bit more detail using `mvgam`’s plotting utility
@@ -251,37 +251,38 @@ summary(lynx_mvgam)
 #> 
 #> GAM coefficient (beta) estimates:
 #>                2.5%   50%  97.5% Rhat n_eff
-#> (Intercept)   6.400  6.60  6.900 1.00   837
-#> s(season).1  -0.620 -0.14  0.390 1.01   729
-#> s(season).2   0.740  1.30  1.900 1.00   902
-#> s(season).3   1.300  1.90  2.600 1.00   734
-#> s(season).4  -0.046  0.53  1.100 1.00   945
-#> s(season).5  -1.300 -0.70 -0.053 1.00   730
-#> s(season).6  -1.200 -0.57  0.160 1.00   876
-#> s(season).7   0.051  0.73  1.400 1.00   917
-#> s(season).8   0.610  1.40  2.100 1.00   753
-#> s(season).9  -0.380  0.22  0.840 1.00   717
-#> s(season).10 -1.400 -0.88 -0.390 1.00   985
+#> (Intercept)   6.400  6.60  6.900 1.01   879
+#> s(season).1  -0.650 -0.14  0.400 1.00  1197
+#> s(season).2   0.730  1.30  2.000 1.00  1057
+#> s(season).3   1.300  1.90  2.500 1.00   986
+#> s(season).4  -0.110  0.55  1.200 1.00  1042
+#> s(season).5  -1.300 -0.71 -0.064 1.00   991
+#> s(season).6  -1.200 -0.57  0.120 1.00   788
+#> s(season).7   0.065  0.73  1.400 1.00  1274
+#> s(season).8   0.630  1.40  2.000 1.00  1091
+#> s(season).9  -0.360  0.21  0.850 1.00   803
+#> s(season).10 -1.400 -0.88 -0.390 1.00  1135
 #> 
 #> Approximate significance of GAM smooths:
 #>            edf Ref.df Chi.sq p-value    
-#> s(season) 9.98     10   49.1  <2e-16 ***
+#> s(season) 9.97     10   50.1  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend parameter AR estimates:
 #>          2.5%  50% 97.5% Rhat n_eff
-#> ar1[1]   0.60 0.83  0.98    1   625
-#> sigma[1] 0.38 0.48  0.60    1   787
+#> ar1[1]   0.59 0.83  0.98    1   744
+#> sigma[1] 0.38 0.48  0.61    1   853
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
 #> 0 of 2000 iterations ended with a divergence (0%)
-#> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
+#> 12 of 2000 iterations saturated the maximum tree depth of 10 (0.6%)
+#>  *Run with max_treedepth set to a larger value to avoid saturation
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Mon Dec 16 10:06:22 AM 2024.
+#> Samples were drawn using NUTS(diag_e) at Tue Feb 18 9:41:04 AM 2025.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -425,7 +426,7 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample DRPS:
-    #> 2412.582034
+    #> 2475.4706345
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -484,7 +485,7 @@ description
     #> ctor effects in both the process and observation components by incorporating functionaliti
     #> es from the brms (Burkner 2017), mgcv (Wood 2017) and splines2 (Wang & Yan, 2023) packages
     #> . The mvgam-constructed model and observed data were passed to the probabilistic programmi
-    #> ng environment Stan (version 2.34.1; Carpenter et al. 2017, Stan Development Team 2024), s
+    #> ng environment Stan (version 2.34.1; Carpenter et al. 2017, Stan Development Team 2025), s
     #> pecifically through the cmdstanr interface (Gabry & Cesnovar, 2021). We ran 4 Hamiltonian 
     #> Monte Carlo chains for 500 warmup iterations and 500 sampling iterations for joint posteri
     #> or estimation. Rank normalized split Rhat (Vehtari et al. 2021) and effective sample sizes
@@ -497,7 +498,7 @@ description
     #> Wood, SN (2017). Generalized Additive Models: An Introduction with R (2nd edition). Chapman and Hall/CRC.
     #> Wang W and Yan J (2021). Shape-Restricted Regression Splines with R Package splines2. Journal of Data Science, 19(3), 498-517. doi:10.6339/21-JDS1020 https://doi.org/10.6339/21-JDS1020.
     #> Carpenter, B, Gelman, A, Hoffman, MD, Lee, D, Goodrich, B, Betancourt, M, Brubaker, M, Guo, J, Li, P and Riddell, A (2017). Stan: A probabilistic programming language. Journal of Statistical Software 76.
-    #> Gabry J, Cesnovar R, Johnson A, and Bronder S (2024). cmdstanr: R Interface to 'CmdStan'. https://mc-stan.org/cmdstanr/, https://discourse.mc-stan.org.
+    #> Gabry J, Cesnovar R, Johnson A, and Bronder S (2025). cmdstanr: R Interface to 'CmdStan'. https://mc-stan.org/cmdstanr/, https://discourse.mc-stan.org.
     #> Vehtari A, Gelman A, Simpson D, Carpenter B, and Burkner P (2021). Rank-normalization, folding, and localization: An improved Rhat for assessing convergence of MCMC (with discussion). Bayesian Analysis 16(2) 667-718. https://doi.org/10.1214/20-BA1221.
     #> 
     #> Other useful references
@@ -589,41 +590,41 @@ summary(mod, include_betas = FALSE)
 #> 
 #> Observation precision parameter estimates:
 #>        2.5%  50% 97.5% Rhat n_eff
-#> phi[1]  7.8 12.0  17.0    1  2422
-#> phi[2]  5.6  8.5  13.0    1  1701
-#> phi[3]  4.2  6.0   8.5    1  1694
+#> phi[1]  7.6 12.0  18.0    1  1220
+#> phi[2]  5.6  8.6  13.0    1  1685
+#> phi[3]  4.0  6.0   8.8    1  1577
 #> 
 #> GAM coefficient (beta) estimates:
-#>              2.5%  50% 97.5% Rhat n_eff
-#> (Intercept) 0.096 0.46   0.7 1.01   543
+#>             2.5%  50% 97.5% Rhat n_eff
+#> (Intercept) 0.11 0.46   0.7    1   978
 #> 
 #> Approximate significance of GAM smooths:
 #>                            edf Ref.df Chi.sq p-value  
-#> s(season)                4.338      5   6.27   0.069 .
-#> s(season):seriesseries_1 1.838      4   5.15   0.139  
-#> s(season):seriesseries_2 3.288      4   1.57   0.356  
-#> s(season):seriesseries_3 0.804      4   5.42   0.506  
+#> s(season)                3.757      5   8.68   0.049 *
+#> s(season):seriesseries_1 0.906      4   8.38   0.268  
+#> s(season):seriesseries_2 3.353      4   1.53   0.349  
+#> s(season):seriesseries_3 3.235      4   2.27   0.139  
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend marginal deviation (alpha) and length scale (rho) estimates:
 #>              2.5%   50% 97.5% Rhat n_eff
-#> alpha_gp[1] 0.140  0.39  0.81 1.00  1028
-#> alpha_gp[2] 0.550  0.92  1.50 1.00  1151
-#> alpha_gp[3] 0.047  0.39  0.93 1.00   829
-#> rho_gp[1]   1.100  3.80 11.00 1.00  1622
-#> rho_gp[2]   3.200 13.00 32.00 1.01   296
-#> rho_gp[3]   1.200  4.90 23.00 1.00   817
+#> alpha_gp[1] 0.110  0.40  0.82 1.00   819
+#> alpha_gp[2] 0.550  0.93  1.40 1.00  1748
+#> alpha_gp[3] 0.056  0.39  0.95 1.00   667
+#> rho_gp[1]   1.200  3.90 12.00 1.01   457
+#> rho_gp[2]   3.000 13.00 31.00 1.01   379
+#> rho_gp[3]   1.300  5.00 23.00 1.00   443
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
-#> 7 of 2000 iterations ended with a divergence (0.35%)
+#> 15 of 2000 iterations ended with a divergence (0.75%)
 #>  *Try running with larger adapt_delta to remove the divergences
 #> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Mon Dec 16 10:07:43 AM 2024.
+#> Samples were drawn using NUTS(diag_e) at Tue Feb 18 9:42:22 AM 2025.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)

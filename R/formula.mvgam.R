@@ -1,7 +1,7 @@
-#'Extract formulae from mvgam objects
+#'Extract formulae from \pkg{mvgam} objects
 #'
 #'@rdname formula.mvgam
-#'@param x `mvgam` or `mvgam_prefit` object
+#'@param x `mvgam`, `jsdgam` or `mvgam_prefit` object
 #'@param trend_effects \code{logical}, return the formula from the
 #'observation model (if \code{FALSE}) or from the underlying process
 #'model (if\code{TRUE})

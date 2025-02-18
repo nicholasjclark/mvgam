@@ -3,7 +3,7 @@
 \name{lfo_cv.mvgam}
 \alias{lfo_cv.mvgam}
 \alias{lfo_cv}
-\title{Approximate leave-future-out cross-validation of fitted \code{mvgam} objects}
+\title{Approximate leave-future-out cross-validation of fitted \pkg{mvgam} objects}
 \usage{
 lfo_cv(object, ...)
 
@@ -18,7 +18,7 @@ lfo_cv(object, ...)
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{\code{list} object of class \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{...}{Ignored}
 
@@ -52,7 +52,7 @@ A \code{list} of class \code{mvgam_lfo} containing the approximate ELPD scores,
 the Pareto-k shape values and 'the specified \code{pareto_k_threshold}
 }
 \description{
-Approximate leave-future-out cross-validation of fitted \code{mvgam} objects
+Approximate leave-future-out cross-validation of fitted \pkg{mvgam} objects
 }
 \details{
 Approximate leave-future-out cross-validation uses an expanding training window scheme
@@ -76,7 +76,7 @@ all of the observations up to the time of the failure. We then restart the proce
 until the next refit is triggered (Bürkner et al. 2020).
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate from a Poisson-AR2 model with a seasonal smooth
 set.seed(100)
 dat <- sim_mvgam(T = 75,
@@ -96,8 +96,6 @@ mod_ar2 <- mvgam(y ~ s(season, bs = 'cc', k = 6),
                family = poisson(),
                data = dat$data_train,
                newdata = dat$data_test,
-               burnin = 300,
-               samples = 300,
                chains = 2,
                silent = 2)
 
@@ -107,8 +105,6 @@ mod_rw <- mvgam(y ~ s(season, bs = 'cc', k = 6),
               family = poisson(),
               data = dat$data_train,
               newdata = dat$data_test,
-              burnin = 300,
-              samples = 300,
               chains = 2,
               silent = 2)
 

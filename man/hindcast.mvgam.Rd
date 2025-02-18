@@ -10,7 +10,7 @@ hindcast(object, ...)
 \method{hindcast}{mvgam}(object, type = "response", ...)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{...}{Ignored}
 
@@ -48,7 +48,8 @@ mod <- mvgam(y ~ s(season, bs = 'cc'),
             trend_model = AR(),
             noncentred = TRUE,
             data = simdat$data_train,
-            chains = 2)
+            chains = 2,
+            silent = 2)
 
 # Hindcasts on response scale
 hc <- hindcast(mod)

@@ -1,4 +1,4 @@
-#'@title Plot mvgam conditional posterior predictive checks for a specified series
+#'@title Plot conditional posterior predictive checks from \pkg{mvgam} models
 #'@importFrom stats quantile density ecdf formula terms
 #'@importFrom graphics hist abline box rect lines polygon par
 #'@importFrom grDevices rgb
@@ -55,7 +55,8 @@
 #' mod <- mvgam(y ~ s(x0) + s(x1) + s(x2) + s(x3),
 #'             data = dat,
 #'             family = gaussian(),
-#'             chains = 2)
+#'             chains = 2,
+#'             silent = 2)
 #'
 #' # Posterior checks
 #' ppc(mod, type = 'hist')
@@ -758,7 +759,7 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
   }
 }
 
-#' Posterior Predictive Checks for \code{mvgam} Objects
+#' Posterior Predictive Checks for \code{mvgam} models
 #'
 #' Perform unconditional posterior predictive checks with the help
 #' of the \pkg{bayesplot} package.
@@ -787,14 +788,14 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
 #' package.
 #' @seealso \code{\link{ppc}}, \code{\link{predict.mvgam}}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #'simdat <- sim_mvgam(seasonality = 'hierarchical')
 #'mod <- mvgam(y ~ series +
 #'               s(season, bs = 'cc', k = 6) +
 #'               s(season, series, bs = 'fs', k = 4),
 #'             data = simdat$data_train,
-#'             burnin = 300,
-#'             samples = 300)
+#'             chains = 2,
+#'             silent = 2)
 #'
 #'# Use pp_check(mod, type = "xyz") for a list of available plot types
 #'

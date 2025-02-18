@@ -6,7 +6,7 @@
 #' @name mvgam_diagnostics
 #' @aliases nuts_params rhat neff_ratio
 #'
-#' @param object,x A \code{mvgam} object.
+#' @param object,x A \code{mvgam} or \code{jsdgam} object.
 #' @param pars An optional character vector of parameter names.
 #'   For \code{nuts_params} these will be NUTS sampler parameter
 #'   names rather than model parameters. If pars is omitted

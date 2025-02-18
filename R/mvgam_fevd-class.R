@@ -10,8 +10,8 @@
 #' @name mvgam_fevd-class
 NULL
 
-#'Plot forecast error variance decompositions from an mvgam_fevd object
-
+#'Plot forecast error variance decompositions from an `mvgam_fevd` object
+#'
 #'This function takes an \code{mvgam_fevd} object and produces
 #'a plot of the posterior median contributions to forecast variance for each series
 #'in the fitted Vector Autoregression

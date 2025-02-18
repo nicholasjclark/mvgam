@@ -4,7 +4,7 @@
 \alias{plot_mvgam_forecasts}
 \alias{plot_mvgam_fc}
 \alias{plot.mvgam_forecast}
-\title{Plot mvgam posterior predictions for a specified series}
+\title{Plot posterior forecast predictions from \pkg{mvgam} models}
 \usage{
 plot_mvgam_fc(
   object,
@@ -37,7 +37,7 @@ plot_mvgam_fc(
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{\code{list} object of class \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
@@ -91,7 +91,7 @@ A base \code{R} graphics plot and an optional \code{list} containing the forecas
 and the out of sample probabilistic forecast score
 }
 \description{
-Plot mvgam posterior predictions for a specified series
+Plot posterior forecast predictions from \pkg{mvgam} models
 }
 \details{
 \code{plot_mvgam_fc} generates posterior predictions from an object of class \code{mvgam}, calculates posterior

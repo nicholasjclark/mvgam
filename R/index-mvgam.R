@@ -17,14 +17,13 @@ NULL
 #' @return a `list` object of the variables that can be extracted, along
 #' with their aliases
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 #' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
 #'              trend_model = AR(),
 #'              data = simdat$data_train,
-#'             burnin = 300,
-#'             samples = 300,
-#'             chains = 2)
+#'             chains = 2,
+#'             silent = 2)
 #' variables(mod)
 #' }
 #' @export

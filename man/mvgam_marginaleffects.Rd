@@ -10,7 +10,7 @@
 \alias{get_data.mvgam_prefit}
 \alias{find_predictors.mvgam}
 \alias{find_predictors.mvgam_prefit}
-\title{Helper functions for mvgam marginaleffects calculations}
+\title{Helper functions for \pkg{marginaleffects} calculations in \pkg{mvgam} models}
 \usage{
 \method{get_coef}{mvgam}(model, trend_effects = FALSE, ...)
 
@@ -164,11 +164,11 @@ See \code{\link[marginaleffects:get_coef]{marginaleffects::get_coef()}}, \code{\
 \code{\link[insight:get_data]{insight::get_data()}} and \code{\link[insight:find_predictors]{insight::find_predictors()}} for details
 }
 \description{
-Helper functions for mvgam marginaleffects calculations
+Helper functions for \pkg{marginaleffects} calculations in \pkg{mvgam} models
 
-Functions needed for working with marginaleffects
+Functions needed for working with \pkg{marginaleffects}
 
-Functions needed for getting data / objects with insight
+Functions needed for getting data / objects with \pkg{insight}
 }
 \author{
 Nicholas J Clark

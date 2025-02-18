@@ -1,14 +1,14 @@
-#'Calculate trend correlations based on mvgam latent factor loadings
+#'Calculate trend correlations based on latent factor loadings for \pkg{mvgam} models
 #'
 #'This function uses samples of latent trends for each series from a fitted
 #'mvgam model to calculates correlations among series' trends
 #'
 #'@importFrom stats cov2cor cov
-#'@param object \code{list} object returned from \code{mvgam}
+#'@param object \code{list} object of class \code{mvgam}
 #'@return A \code{list} object containing the mean posterior correlations
 #'and the full array of posterior correlations
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'simdat <- sim_mvgam()
 #'mod <- mvgam(y ~ s(season, bs = 'cc',
 #'                   k = 6),
@@ -18,7 +18,8 @@
 #'             data = simdat$data_train,
 #'             burnin = 300,
 #'             samples = 300,
-#'             chains = 2)
+#'             chains = 2,
+#'             silent = 2)
 #'lvcors <- lv_correlations(mod)
 #'names(lvcors)
 #'lapply(lvcors, class)

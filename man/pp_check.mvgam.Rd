@@ -3,7 +3,7 @@
 \name{pp_check.mvgam}
 \alias{pp_check.mvgam}
 \alias{pp_check}
-\title{Posterior Predictive Checks for \code{mvgam} Objects}
+\title{Posterior Predictive Checks for \code{mvgam} models}
 \usage{
 \method{pp_check}{mvgam}(
   object,
@@ -69,14 +69,14 @@ documentation of the \pkg{\link[bayesplot:bayesplot-package]{bayesplot}}
 package.
 }
 \examples{
-\dontrun{
+\donttest{
 simdat <- sim_mvgam(seasonality = 'hierarchical')
 mod <- mvgam(y ~ series +
               s(season, bs = 'cc', k = 6) +
               s(season, series, bs = 'fs', k = 4),
             data = simdat$data_train,
-            burnin = 300,
-            samples = 300)
+            chains = 2,
+            silent = 2)
 
 # Use pp_check(mod, type = "xyz") for a list of available plot types
 

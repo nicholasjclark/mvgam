@@ -3,7 +3,7 @@
 \name{ensemble.mvgam_forecast}
 \alias{ensemble.mvgam_forecast}
 \alias{ensemble}
-\title{Combine mvgam forecasts into evenly weighted ensembles}
+\title{Combine forecasts from \pkg{mvgam} models into evenly weighted ensembles}
 \usage{
 ensemble(object, ...)
 
@@ -51,13 +51,17 @@ m1 <- mvgam(y ~ 1,
             trend_model = AR(p = 1),
             noncentred = TRUE,
             data = simdat$data_train,
-            newdata = simdat$data_test)
+            newdata = simdat$data_test,
+            chains = 2,
+            silent = 2)
 
 m2 <- mvgam(y ~ time,
             trend_model = RW(),
             noncentred = TRUE,
             data = simdat$data_train,
-            newdata = simdat$data_test)
+            newdata = simdat$data_test,
+            chains = 2,
+            silent = 2)
 
 # Calculate forecast distributions for each model
 fc1 <- forecast(m1)

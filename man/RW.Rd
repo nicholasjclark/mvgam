@@ -64,7 +64,7 @@ they exist purely to help set up a model with particular autoregressive
 trend models.
 }
 \examples{
-\dontrun{
+\donttest{
 # A short example to illustrate CAR(1) models
 # Function to simulate CAR1 data with seasonality
 sim_corcar1 = function(n = 120,
@@ -116,7 +116,8 @@ mod <- mvgam(formula = y ~ 1,
             data = dat,
             family = gaussian(),
             samples = 300,
-            chains = 2)
+            chains = 2,
+            silent = 2)
 
 # View usual summaries and plots
 summary(mod)
@@ -164,7 +165,9 @@ get_mvgam_priors(formula = y ~ species,
 # Fit the model
 mod <- mvgam(formula = y ~ species,
             trend_model = AR(gr = region, subgr = species),
-            data = all_dat)
+            data = all_dat,
+            chains = 2,
+            silent = 2)
 
 # Check standard outputs
 summary(mod)

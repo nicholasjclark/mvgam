@@ -1,13 +1,13 @@
-#' Display Conditional Effects of Predictors
+#' Display conditional effects of predictors for \pkg{mvgam} models
 #'
 #' Display conditional effects of one or more numeric and/or categorical
-#' predictors in `mvgam` models, including two-way interaction effects.
+#' predictors in models of class `mvgam` and `jsdgam`, including two-way interaction effects.
 #' @importFrom ggplot2 scale_colour_discrete scale_fill_discrete theme_classic
 #' @importFrom graphics plot
 #' @importFrom grDevices devAskNewPage
 #' @inheritParams brms::conditional_effects.brmsfit
 #' @inheritParams brms::plot.brms_conditional_effects
-#' @param x Object of class `mvgam` or `mvgam_conditional_effects`
+#' @param x Object of class `mvgam`, `jsdgam` or `mvgam_conditional_effects`
 #' @param points `Logical`. Indicates if the original data points should be added,
 #' but only if `type == 'response'`. Default is `TRUE`.
 #' @param rug `Logical`. Indicates if displays tick marks should be plotted on the
@@ -73,7 +73,7 @@
 #' conditional_effects(mod)
 #' conditional_effects(mod, conf_level = 0.5, type = 'link')
 #'
-#' \dontrun{
+#' \donttest{
 #' # ggplot objects can be modified and combined with the help of many
 #' # additional packages. Here is an example using the patchwork package
 #'
@@ -82,7 +82,9 @@
 #' mod <- mvgam(y ~ s(x1, bs = 'moi') +
 #'                te(x0, x2),
 #'              data = dat,
-#'              family = gaussian())
+#'              family = gaussian(),
+#'              chains = 2,
+#'              silent = 2)
 #'
 #' # Extract the list of ggplot conditional_effect plots
 #' m <- plot(conditional_effects(mod), plot = FALSE)

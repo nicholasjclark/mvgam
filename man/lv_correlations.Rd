@@ -2,12 +2,12 @@
 % Please edit documentation in R/lv_correlations.R
 \name{lv_correlations}
 \alias{lv_correlations}
-\title{Calculate trend correlations based on mvgam latent factor loadings}
+\title{Calculate trend correlations based on latent factor loadings for \pkg{mvgam} models}
 \usage{
 lv_correlations(object)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}}
+\item{object}{\code{list} object of class \code{mvgam}}
 }
 \value{
 A \code{list} object containing the mean posterior correlations
@@ -18,7 +18,7 @@ This function uses samples of latent trends for each series from a fitted
 mvgam model to calculates correlations among series' trends
 }
 \examples{
-\dontrun{
+\donttest{
 simdat <- sim_mvgam()
 mod <- mvgam(y ~ s(season, bs = 'cc',
                   k = 6),
@@ -28,7 +28,8 @@ mod <- mvgam(y ~ s(season, bs = 'cc',
             data = simdat$data_train,
             burnin = 300,
             samples = 300,
-            chains = 2)
+            chains = 2,
+            silent = 2)
 lvcors <- lv_correlations(mod)
 names(lvcors)
 lapply(lvcors, class)

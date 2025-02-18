@@ -2,7 +2,7 @@
 #' @export
 generics::augment
 
-#' Augment an 'mvgam' object's data
+#' Augment an \pkg{mvgam} object's data
 #'
 #' Add fits and residuals to the data, implementing the generic `augment` from
 #' the package \pkg{broom}.
@@ -28,7 +28,7 @@ generics::augment
 #'
 #' @seealso \code{\link{residuals.mvgam}}, \code{\link{fitted.mvgam}}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' set.seed(0)
 #' dat <- sim_mvgam(T = 80,
 #'                  n_series = 3,

@@ -49,7 +49,7 @@ in \pkg{mvgam}. This function does not evaluate it's arguments –
 it exists purely to help set up a model with particular error processes.
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate counts of four species over ten sampling locations
 site_dat <- data.frame(site = rep(1:10, 4),
                       species = as.factor(sort(rep(letters[1:4], 10))),

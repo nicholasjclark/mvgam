@@ -1,4 +1,4 @@
-#' Stan code and data objects for mvgam models
+#' Stan code and data objects for \pkg{mvgam} models
 #'
 #' Generate Stan code and data objects for \pkg{mvgam} models
 #'

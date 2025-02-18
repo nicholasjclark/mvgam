@@ -1,4 +1,4 @@
-#' Helper functions for mvgam marginaleffects calculations
+#' Helper functions for \pkg{marginaleffects} calculations in \pkg{mvgam} models
 #' @importFrom stats coef model.frame
 #' @importFrom insight find_predictors get_data
 #' @importFrom marginaleffects get_coef set_coef get_vcov get_predict
@@ -24,6 +24,10 @@ NULL
 #' @export
 #' @importFrom marginaleffects predictions
 marginaleffects::predictions
+
+#' @export
+#' @importFrom marginaleffects avg_predictions
+marginaleffects::avg_predictions
 
 #' @export
 #' @importFrom marginaleffects plot_predictions
@@ -61,7 +65,7 @@ marginaleffects::get_predict
 #' @importFrom insight get_data
 insight::get_data
 
-#' Functions needed for working with marginaleffects
+#' Functions needed for working with \pkg{marginaleffects}
 #' @rdname mvgam_marginaleffects
 #' @export
 get_coef.mvgam <- function(model, trend_effects = FALSE, ...) {
@@ -141,7 +145,7 @@ get_predict.mvgam <- function(model, newdata,
   return(out)
 }
 
-#' Functions needed for getting data / objects with insight
+#' Functions needed for getting data / objects with \pkg{insight}
 #' @rdname mvgam_marginaleffects
 #' @export
 get_data.mvgam = function (x, source = "environment", verbose = TRUE, ...) {
