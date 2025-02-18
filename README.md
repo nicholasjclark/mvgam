@@ -22,7 +22,7 @@ highly flexible nonlinear predictor effects for both process and
 observation components by leveraging functionalities from the impressive
 <a href="https://paulbuerkner.com/brms/"
 target="_blank"><code>brms</code></a> and
-<a href="https://cran.r-project.org/web/packages/mgcv/index.html"
+<a href="https://cran.r-project.org/package=mgcv"
 target="_blank"><code>mgcv</code></a> packages. This allows `mvgam` to
 fit a wide range of models, including hierarchical ecological models
 such as N-mixture or Joint Species Distribution models, as well as
@@ -251,38 +251,38 @@ summary(lynx_mvgam)
 #> 
 #> GAM coefficient (beta) estimates:
 #>                2.5%   50% 97.5% Rhat n_eff
-#> (Intercept)   6.400  6.60  6.90 1.01   745
-#> s(season).1  -0.650 -0.14  0.36 1.00   957
-#> s(season).2   0.720  1.30  1.90 1.01   830
-#> s(season).3   1.200  1.90  2.50 1.00   803
-#> s(season).4  -0.064  0.54  1.10 1.00   976
-#> s(season).5  -1.300 -0.68 -0.05 1.00  1012
-#> s(season).6  -1.200 -0.56  0.13 1.00  1086
-#> s(season).7   0.040  0.71  1.40 1.00  1001
-#> s(season).8   0.580  1.30  2.10 1.00   792
-#> s(season).9  -0.370  0.22  0.83 1.00   729
-#> s(season).10 -1.400 -0.85 -0.34 1.00   792
+#> (Intercept)   6.400  6.60  6.90    1   965
+#> s(season).1  -0.640 -0.13  0.37    1  1069
+#> s(season).2   0.720  1.30  2.00    1  1005
+#> s(season).3   1.300  1.90  2.50    1   700
+#> s(season).4  -0.078  0.53  1.10    1   999
+#> s(season).5  -1.300 -0.69 -0.11    1  1052
+#> s(season).6  -1.300 -0.54  0.19    1  1089
+#> s(season).7   0.013  0.73  1.40    1  1102
+#> s(season).8   0.610  1.40  2.10    1   758
+#> s(season).9  -0.360  0.24  0.85    1   729
+#> s(season).10 -1.400 -0.87 -0.35    1  1149
 #> 
 #> Approximate significance of GAM smooths:
 #>            edf Ref.df Chi.sq p-value    
-#> s(season) 9.94     10   54.4  <2e-16 ***
+#> s(season) 9.98     10   46.7  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend parameter AR estimates:
 #>          2.5%  50% 97.5% Rhat n_eff
-#> ar1[1]   0.60 0.82  0.97    1   807
-#> sigma[1] 0.39 0.48  0.61    1   847
+#> ar1[1]   0.60 0.83  0.97 1.00   609
+#> sigma[1] 0.38 0.47  0.61 1.01   614
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
 #> 0 of 2000 iterations ended with a divergence (0%)
-#> 1 of 2000 iterations saturated the maximum tree depth of 10 (0.05%)
+#> 2 of 2000 iterations saturated the maximum tree depth of 10 (0.1%)
 #>  *Run with max_treedepth set to a larger value to avoid saturation
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Feb 18 3:14:04 PM 2025.
+#> Samples were drawn using NUTS(diag_e) at Tue Feb 18 9:28:11 PM 2025.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -425,8 +425,8 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
-    #> Out of sample DRPS:
-    #> 2360.4045065
+    #> Out of sample CRPS:
+    #> 2383.745918
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -624,7 +624,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Feb 18 3:15:47 PM 2025.
+#> Samples were drawn using NUTS(diag_e) at Tue Feb 18 9:30:17 PM 2025.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)

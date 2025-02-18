@@ -9,6 +9,7 @@
 #'   to fit the model in Stan.
 #' @export
 #' @examples
+#'\donttest{
 #' simdat <- sim_mvgam()
 #' mod <- mvgam(y ~ s(season) +
 #'                s(time, by = series),
@@ -22,6 +23,7 @@
 #' # View Stan model data
 #' sdata <- standata(mod)
 #' str(sdata)
+#' }
 #'
 code = function(object){
   if(!inherits(object, c('mvgam', 'mvgam_prefit'))){
