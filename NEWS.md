@@ -1,4 +1,4 @@
-# mvgam 1.1.4 (development version; not yet on CRAN)
+# mvgam 1.1.4
 ## New functionalities
 * Added the `how_to_cite.mvgam()` function to generate a scaffold methods description of fitted models, which can hopefully make it easier for users to fully describe their programming environment 
 * Improved various plotting functions by returning `ggplot` objects in place of base plots (thanks to @mhollanders #38)
