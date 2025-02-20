@@ -37,16 +37,53 @@
 #' empirical quantiles and plots them against the observed data. If `realisations = FALSE`, the returned plot shows
 #' 90, 60, 40 and 20 percent posterior quantiles (as ribbons of increasingly darker shades or red)
 #' as well as the posterior median (as a dark red line). If `realisations = FALSE`, a set of `n_realisations` posterior
-#' draws are shown.
+#' draws are shown. This function produces an older style base \code{R} plot, as opposed to `plot.mvgam_forecast`
 #'
 #'`plot.mvgam_forecast` takes an object of class `mvgam_forecast`, in which forecasts have already
-#'been computed, and plots the resulting forecast distribution.
+#'been computed, and plots the resulting forecast distribution as a `ggplot` object. This function is therefore more
+#'versatile and is recommended over the older and clunkier `plot_mvgam_fc` version
 #'
 #'If \code{realisations = FALSE}, these posterior quantiles are plotted along
 #'with the true observed data that was used to train the model. Otherwise, a spaghetti plot is returned
 #'to show possible forecast paths.
-#'@return A base \code{R} graphics plot and an optional \code{list} containing the forecast distribution
+#'@return A base \code{R} graphics plot (for `plot_mvgam_fc`) or a `ggplot` object (for `plot.mvgam_forecast`) and an optional \code{list} containing the forecast distribution
 #'and the out of sample probabilistic forecast score
+#' @examples
+#' \donttest{
+#' simdat <- sim_mvgam(n_series = 3, trend_model = AR())
+#' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
+#'             trend_model = AR(),
+#'             noncentred = TRUE,
+#'             data = simdat$data_train,
+#'             chains = 2,
+#'             silent = 2)
+#'
+#' # Hindcasts on response scale
+#' hc <- hindcast(mod)
+#' str(hc)
+#' plot(hc, series = 1)
+#' plot(hc, series = 2)
+#' plot(hc, series = 3)
+#'
+#' # Forecasts on response scale
+#' fc <- forecast(mod, newdata = simdat$data_test)
+#' str(fc)
+#' plot(fc, series = 1)
+#' plot(fc, series = 2)
+#' plot(fc, series = 3)
+#'
+#' # Forecasts as expectations
+#' fc <- forecast(mod, newdata = simdat$data_test, type = 'expected')
+#' plot(fc, series = 1)
+#' plot(fc, series = 2)
+#' plot(fc, series = 3)
+#'
+#' # Dynamic trend extrapolations
+#' fc <- forecast(mod, newdata = simdat$data_test, type = 'trend')
+#' plot(fc, series = 1)
+#' plot(fc, series = 2)
+#' plot(fc, series = 3)
+#' }
 #' @name plot_mvgam_forecasts
 NULL
 
@@ -480,24 +517,18 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
 #' @param x Object of class `mvgam_forecast`
 #' @method plot mvgam_forecast
 #' @export
-plot.mvgam_forecast = function(x, series = 1,
+plot.mvgam_forecast = function(x,
+                               series = 1,
                                realisations = FALSE,
                                n_realisations = 15,
-                               hide_xlabels = FALSE,
-                               xlab, ylab, ylim,
-                               return_score = FALSE,
+                               xlab,
+                               ylab,
+                               ylim,
                                ...){
 
   object <- x
-  if(sign(series) != 1){
-    stop('argument "series" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(series%%1 != 0){
-      stop('argument "series" must be a positive integer',
-           call. = FALSE)
-    }
-  }
+  validate_pos_integer(series)
+  validate_pos_integer(n_realisations)
 
   if(series > length(object$series_names)){
     stop(paste0('object only contains data / predictions for ',
@@ -518,49 +549,32 @@ plot.mvgam_forecast = function(x, series = 1,
                  object$forecasts[[which(names(object$forecasts) == s_name)]])
 
   # Plot quantiles of the forecast distribution
-  preds_last <- preds[1,]
-  probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+  probs <- c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
   cred <- sapply(1:NCOL(preds),
                  function(n) quantile(preds[,n],
                                       probs = probs, na.rm = TRUE))
-
-  c_light <- c("#DCBCBC")
-  c_light_highlight <- c("#C79999")
-  c_mid <- c("#B97C7C")
-  c_mid_highlight <- c("#A25050")
-  c_dark <- c("#8F2727")
-  c_dark_highlight <- c("#7C0000")
 
   if(type == 'trend'){
     if(missing(ylab)){
       ylab <- paste0('Estimated trend for ', s_name)
     }
-    ylim <- range(cred)
   }
 
   if(type == 'link'){
     if(missing(ylab)){
-      ylab <- paste0('linear predictions for ', s_name)
+      ylab <- paste0('Linear predictions for ', s_name)
     }
-    ylim <- range(cred)
   }
 
   if(type == 'expected'){
     if(missing(ylab)){
       ylab <- paste0('Expectations for ', s_name)
     }
-    ylim <- range(cred)
   }
 
   if(type == 'detection'){
     if(missing(ylab)){
       ylab <- paste0('Pr(detection) for ', s_name)
-    }
-    if(missing(ylim)){
-      ylim <- c(min(cred),
-                max(cred) * 1.1)
-      ylim <- c(max(0, ylim[1]),
-                min(1, ylim[2]))
     }
   }
 
@@ -568,33 +582,9 @@ plot.mvgam_forecast = function(x, series = 1,
     if(missing(ylab)){
       ylab <- paste0('Latent abundance for ', s_name)
     }
-    if(missing(ylim)){
-      ylim <- c(min(cred),
-                max(cred) * 1.1)
-      ylim <- c(max(0, ylim[1]),
-                ylim[2])
-    }
   }
 
   if(type == 'response'){
-
-    if(missing(ylim)){
-      ytrain <- object$train_observations[[which(names(object$train_observations) ==
-                                                   s_name)]]
-      ylim <- c(min(cred, min(ytrain, na.rm = TRUE)),
-                max(cred, max(ytrain, na.rm = TRUE)) * 1.1)
-
-      if(object$family %in% c('beta', 'bernoulli')){
-        ymin <- max(0, ylim[1])
-        ymax <- min(1, ylim[2])
-        ylim <- c(ymin, ymax)
-      }
-
-      if(object$family %in% c('lognormal', 'Gamma')){
-        ylim <- c(max(0, ylim[1]), ylim[2])
-      }
-    }
-
     if(missing(ylab)){
       ylab <- paste0('Predictions for ', s_name)
     }
@@ -604,92 +594,103 @@ plot.mvgam_forecast = function(x, series = 1,
     xlab <- 'Time'
   }
 
-  pred_vals <- seq(1:length(preds_last))
-  if(hide_xlabels){
-    plot(1, type = "n", bty = 'L',
-         xlab = '',
-         xaxt = 'n',
-         ylab = ylab,
-         xlim = c(0, length(preds_last)),
-         ylim = ylim, ...)
-  } else {
-    plot(1, type = "n", bty = 'L',
-         xlab = xlab,
-         xaxt = 'n',
-         ylab = ylab,
-         xlim = c(0, length(preds_last)),
-         ylim = ylim, ...)
-    if(is.null(object$test_times)){
-      axis(side = 1,
-           at = floor(seq(0, max(object$train_times) -
-                            (min(object$train_times)-1),
-                          length.out = 6)),
-           labels = floor(seq(min(object$train_times),
-                              max(object$train_times),
-                              length.out = 6)))
-    } else {
-      axis(side = 1,
-           at = floor(seq(0, max(object$test_times) -
-                            (min(object$train_times)-1),
-                          length.out = 6)),
-           labels = floor(seq(min(object$train_times),
-                              max(object$test_times),
-                              length.out = 6)))
-    }
+  # Create a base plot using posterior credible intervals and observations
+  # for the specified series
+  plot_dat <- data.frame(time = c(object$train_times,
+                                  object$test_times),
+                         med = cred[5,],
+                         lower1 = cred[1,],
+                         lower2 = cred[2,],
+                         lower3 = cred[3,],
+                         lower4 = cred[4,],
+                         upper1 = cred[9,],
+                         upper2 = cred[8,],
+                         upper3 = cred[7,],
+                         upper4 = cred[6,],
+                         truth = c(object$train_observations[[s_name]],
+                                   object$test_observations[[s_name]]))
 
-  }
+  base_plot <- ggplot2::ggplot(data = plot_dat,
+                               mapping = ggplot2::aes(x = time,
+                                                      y = truth)) +
+    ggplot2::theme_classic() +
+    ggplot2::labs(x = xlab,
+                  y = ylab)
 
+  # Add to the base plot accordingly
   if(realisations){
     for(i in 1:n_realisations){
-      lines(x = pred_vals,
-            y = preds[i,],
-            col = 'white',
-            lwd = 2.5)
-      lines(x = pred_vals,
-            y = preds[i,],
-            col = sample(c("#DCBCBC",
-                           "#C79999",
-                           "#B97C7C",
-                           "#A25050",
-                           "#7C0000"), 1),
-            lwd = 2.25)
+      base_plot <- base_plot +
+        ggplot2::geom_line(data = data.frame(y = preds[i,],
+                                             time = c(object$train_times,
+                                                      object$test_times)),
+                           mapping = ggplot2::aes(x = time,
+                                                  y = y),
+                           col = "white",
+                           linewidth = 1) +
+        ggplot2::geom_line(data = data.frame(y = preds[i,],
+                                             time = c(object$train_times,
+                                                      object$test_times)),
+                           mapping = ggplot2::aes(x = time,
+                                                  y = y),
+                           col = sample(c("#DCBCBC",
+                                          "#C79999",
+                                          "#B97C7C",
+                                          "#A25050",
+                                          "#7C0000"), 1),
+                           linewidth = 0.75)
     }
   } else {
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
-            col = c_light, border = NA)
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
-            col = c_light_highlight, border = NA)
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
-            col = c_mid, border = NA)
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
-            col = c_mid_highlight, border = NA)
-    lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+    base_plot <- base_plot +
+      ggplot2::geom_ribbon(mapping = ggplot2::aes(ymin = lower1,
+                                                  ymax = upper1),
+                           fill = "#DCBCBC") +
+      ggplot2::geom_ribbon(mapping = ggplot2::aes(ymin = lower2,
+                                                  ymax = upper2),
+                           fill = "#C79999") +
+      ggplot2::geom_ribbon(mapping = ggplot2::aes(ymin = lower3,
+                                                  ymax = upper3),
+                           fill = "#B97C7C") +
+      ggplot2::geom_ribbon(mapping = ggplot2::aes(ymin = lower4,
+                                                  ymax = upper4),
+                           fill = "#A25050") +
+      ggplot2::geom_line(mapping = ggplot2::aes(x = time,
+                                                y = med),
+                         col = "#8F2727",
+                         linewidth = 1)
   }
-  box(bty = 'L', lwd = 2)
-
-  last_train <- length(object$train_observations[[s_name]])
 
   # Show historical (hindcast) distribution in grey if this object
   # contains forecasts
+  last_train <- length(object$train_observations[[s_name]])
   if(type == 'response' & !is.null(object$forecasts)){
     if(!realisations){
-      polygon(c(pred_vals[1:last_train],
-                rev(pred_vals[1:last_train])),
-              c(cred[1,1:last_train],
-                rev(cred[9,1:last_train])),
-              col = 'grey70', border = NA)
-      lines(pred_vals[1:last_train],
-            cred[5,1:last_train],
-            col = 'grey70', lwd = 2.5)
+      base_plot <- base_plot +
+        ggplot2::geom_line(data = data.frame(time = 1:last_train,
+                                             lower1 = cred[1, 1:last_train],
+                                             upper1 = cred[9, 1:last_train],
+                                             med = cred[5, 1:last_train],
+                                             truth = 0),
+                           mapping = ggplot2::aes(x = time,
+                                                  y = med),
+                           col = "white",
+                           linewidth = 1) +
+        ggplot2::geom_ribbon(data = data.frame(time = 1:last_train,
+                                               lower1 = cred[1,1:last_train],
+                                               upper1 = cred[9,1:last_train],
+                                               truth = 0),
+                             mapping = ggplot2::aes(ymin = lower1,
+                                                    ymax = upper1),
+                             fill = "grey70")
     }
   }
 
   if(type == 'response' || c(type == 'expected' & object$family == 'bernoulli')){
     # Plot training and testing points
-    points(c(object$train_observations[[s_name]],
-             object$test_observations[[s_name]]), pch = 16, col = "white", cex = 0.8)
-    points(c(object$train_observations[[s_name]],
-             object$test_observations[[s_name]]), pch = 16, col = "black", cex = 0.65)
+    base_plot <- base_plot +
+      ggplot2::geom_point(pch = 21,
+                          col = 'white',
+                          fill = 'black')
 
     # Calculate out of sample probabilistic score
     fc <- object$forecasts[[s_name]]
@@ -713,10 +714,10 @@ plot.mvgam_forecast = function(x, series = 1,
 
       } else if(object$family == 'bernoulli'){
         score <- sum(brier_mcmc_object(as.vector(truth),
-                                      fc)[,1], na.rm = TRUE)
+                                       fc)[,1], na.rm = TRUE)
         message(paste0('Out of sample Brier:\n', score))
 
-        } else {
+      } else {
         score <- sum(crps_mcmc_object(as.vector(truth),
                                       fc)[,1], na.rm = TRUE)
         message(paste0('Out of sample CRPS:\n', score))
@@ -725,7 +726,16 @@ plot.mvgam_forecast = function(x, series = 1,
   }
 
   if(!is.null(object$forecasts)){
-    abline(v = last_train, col = '#FFFFFF60', lwd = 2.85)
-    abline(v = last_train, col = 'black', lwd = 2.5, lty = 'dashed')
+    base_plot <- base_plot +
+      ggplot2::geom_vline(xintercept = last_train,
+                          linetype = 'dashed')
   }
+
+  if(!missing(ylim)){
+   base_plot <- base_plot +
+      ggplot2::scale_y_continuous(limits = ylim)
+  }
+
+  base_plot
+
 }

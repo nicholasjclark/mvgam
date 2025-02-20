@@ -196,12 +196,14 @@ plot_predictions(lynx_mvgam, condition = 'season', points = 0.5) +
 
 We can also view the `mvgam`'s posterior predictions for the entire series (testing and training)
 ```{r, fig.alt = "Plotting forecast distributions using mvgam in R"}
-plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
+fc <- forecast(lynx_mvgam, newdata = lynx_test)
+plot(fc)
 ```
 
-And the estimated latent trend component, again using the more flexible `plot_mvgam_...()` option to show first derivatives of the estimated trend
+And the estimated latent trend component
 ```{r, fig.alt = "Plotting dynamic trend components using mvgam in R"}
-plot_mvgam_trend(lynx_mvgam, newdata = lynx_test, derivatives = TRUE)
+trend_fc <- forecast(lynx_mvgam, newdata = lynx_test, type = 'trend')
+plot(trend_fc)
 ```
 
 A key aspect of ecological forecasting is to understand [how different components of a model contribute to forecast uncertainty](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/eap.1589){target="_blank"}. We can estimate relative contributions to forecast uncertainty for the GAM component and the latent trend component using `mvgam`
@@ -302,20 +304,25 @@ summary(mod, include_betas = FALSE)
 
 Plot the hindcast and forecast distributions for each series
 ```{r eval=FALSE}
-layout(matrix(1:4, nrow = 2, byrow = TRUE))
-for(i in 1:3){
-  plot(mod, type = 'forecast', series = i)
-}
+library(patchwork)
+fc <- forecast(mod)
+wrap_plots(
+  plot(fc, series = 1), 
+  plot(fc, series = 2), 
+  plot(fc, series = 3), 
+  ncol = 2
+)
 ```
 
 ```{r beta_fc, echo=FALSE, message=FALSE}
-layout(matrix(1:4, nrow = 2, byrow = TRUE))
-par(mar=c(3, 3, 2, 2),
-    oma = c(2, 2, 0, 0),
-    mgp = c(2, 0.5, 0))
-for(i in 1:3){
-  plot(mod, type = 'forecast', series = i)
-}
+library(patchwork)
+fc <- forecast(mod)
+wrap_plots(
+  plot(fc, series = 1), 
+  plot(fc, series = 2), 
+  plot(fc, series = 3), 
+  ncol = 2
+)
 ```
 
 There are many more extended uses of `mvgam`, including the ability to fit hierarchical State-Space GAMs that include dynamic and spatially varying coefficient models, dynamic factors and Vector Autoregressive processes. See the [package documentation](https://nicholasjclark.github.io/mvgam/){target="_blank"} for more details. The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using `Stan`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals. The [Stan Discourse](https://discourse.mc-stan.org/){target="_blank"} is a helpful place to troubleshoot.

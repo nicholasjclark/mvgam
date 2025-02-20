@@ -250,39 +250,38 @@ summary(lynx_mvgam)
 #> 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                2.5%   50% 97.5% Rhat n_eff
-#> (Intercept)   6.400  6.60  6.90    1   965
-#> s(season).1  -0.640 -0.13  0.37    1  1069
-#> s(season).2   0.720  1.30  2.00    1  1005
-#> s(season).3   1.300  1.90  2.50    1   700
-#> s(season).4  -0.078  0.53  1.10    1   999
-#> s(season).5  -1.300 -0.69 -0.11    1  1052
-#> s(season).6  -1.300 -0.54  0.19    1  1089
-#> s(season).7   0.013  0.73  1.40    1  1102
-#> s(season).8   0.610  1.40  2.10    1   758
-#> s(season).9  -0.360  0.24  0.85    1   729
-#> s(season).10 -1.400 -0.87 -0.35    1  1149
+#>                2.5%   50%  97.5% Rhat n_eff
+#> (Intercept)   6.400  6.60  6.900 1.00   810
+#> s(season).1  -0.630 -0.13  0.350 1.00   987
+#> s(season).2   0.750  1.30  1.900 1.00   892
+#> s(season).3   1.200  1.90  2.500 1.01   700
+#> s(season).4  -0.053  0.54  1.100 1.00   866
+#> s(season).5  -1.300 -0.70 -0.075 1.01   926
+#> s(season).6  -1.300 -0.53  0.130 1.00  1224
+#> s(season).7   0.060  0.74  1.400 1.00   939
+#> s(season).8   0.600  1.40  2.100 1.00   910
+#> s(season).9  -0.370  0.21  0.830 1.00   722
+#> s(season).10 -1.400 -0.87 -0.390 1.00  1225
 #> 
 #> Approximate significance of GAM smooths:
 #>            edf Ref.df Chi.sq p-value    
-#> s(season) 9.98     10   46.7  <2e-16 ***
+#> s(season) 9.97     10   49.6  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend parameter AR estimates:
 #>          2.5%  50% 97.5% Rhat n_eff
-#> ar1[1]   0.60 0.83  0.97 1.00   609
-#> sigma[1] 0.38 0.47  0.61 1.01   614
+#> ar1[1]   0.60 0.83  0.98    1   492
+#> sigma[1] 0.39 0.47  0.61    1   585
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
 #> 0 of 2000 iterations ended with a divergence (0%)
-#> 2 of 2000 iterations saturated the maximum tree depth of 10 (0.1%)
-#>  *Run with max_treedepth set to a larger value to avoid saturation
+#> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Feb 18 9:28:11 PM 2025.
+#> Samples were drawn using NUTS(diag_e) at Thu Feb 20 3:41:48 PM 2025.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -420,20 +419,19 @@ We can also view the `mvgam`’s posterior predictions for the entire
 series (testing and training)
 
 ``` r
-plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
+fc <- forecast(lynx_mvgam, newdata = lynx_test)
+plot(fc)
+#> Out of sample DRPS:
+#> 2426.00328425
 ```
 
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
-    #> Out of sample CRPS:
-    #> 2383.745918
-
-And the estimated latent trend component, again using the more flexible
-`plot_mvgam_...()` option to show first derivatives of the estimated
-trend
+And the estimated latent trend component
 
 ``` r
-plot_mvgam_trend(lynx_mvgam, newdata = lynx_test, derivatives = TRUE)
+trend_fc <- forecast(lynx_mvgam, newdata = lynx_test, type = 'trend')
+plot(trend_fc)
 ```
 
 <img src="man/figures/README-unnamed-chunk-22-1.png" alt="Plotting dynamic trend components using mvgam in R" width="60%" style="display: block; margin: auto;" />
@@ -480,7 +478,7 @@ description
 ```
 
     #> Methods text skeleton
-    #> We used the R package mvgam (version 1.1.4; Clark & Wells, 2023) to construct, fit and int
+    #> We used the R package mvgam (version 1.1.5; Clark & Wells, 2023) to construct, fit and int
     #> errogate the model. mvgam fits Bayesian State-Space models that can include flexible predi
     #> ctor effects in both the process and observation components by incorporating functionaliti
     #> es from the brms (Burkner 2017), mgcv (Wood 2017) and splines2 (Wang & Yan, 2023) packages
@@ -624,7 +622,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Feb 18 9:30:17 PM 2025.
+#> Samples were drawn using NUTS(diag_e) at Thu Feb 20 3:43:51 PM 2025.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -635,10 +633,14 @@ summary(mod, include_betas = FALSE)
 Plot the hindcast and forecast distributions for each series
 
 ``` r
-layout(matrix(1:4, nrow = 2, byrow = TRUE))
-for(i in 1:3){
-  plot(mod, type = 'forecast', series = i)
-}
+library(patchwork)
+fc <- forecast(mod)
+wrap_plots(
+  plot(fc, series = 1), 
+  plot(fc, series = 2), 
+  plot(fc, series = 3), 
+  ncol = 2
+)
 ```
 
 <img src="man/figures/README-beta_fc-1.png" width="60%" style="display: block; margin: auto;" />

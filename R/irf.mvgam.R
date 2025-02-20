@@ -100,6 +100,9 @@ irf.mvgam <- function(object,
     gen_irf(x, h = h, cumulative = cumulative, orthogonal = orthogonal)
   })
   class(all_irfs) <- 'mvgam_irf'
+  attr(all_irfs, 'irf_type') <- ifelse(orthogonal,
+                                      'Orthogonalized',
+                                      'Generalized')
   return(all_irfs)
 }
 
@@ -168,7 +171,6 @@ gen_irf = function(x, h = 6, cumulative = TRUE, orthogonal = FALSE){
     }
   }
   names(irs) <- impulse
-  result <- irs
   return(irs)
 }
 

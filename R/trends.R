@@ -1460,7 +1460,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                                                   changepoint_ts = changepoint_ts))
 
         # Keep only the forecast horizon estimates
-        tail(draw, max(time) - min(time))
+        tail(draw, max(time) - min(time) + 1)
       }))
     }
 
@@ -1507,7 +1507,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                                    changepoint_ts = changepoint_ts)
 
         # Keep only the forecast horizon estimates
-        tail(draw, max(time) - min(time))
+        tail(draw, max(time) - min(time) + 1)
       }))
     }
   }

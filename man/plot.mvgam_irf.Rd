@@ -14,7 +14,8 @@
 \item{...}{ignored}
 }
 \value{
-A base R plot or set of plots
+A ggplot object showing the expected response of each latent time series to
+a shock of the focal \code{series}
 }
 \description{
 This function takes an \code{mvgam_irf} object and produces plots of Impulse Response Functions

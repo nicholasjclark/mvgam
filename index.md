@@ -131,10 +131,14 @@ Plot the estimated posterior hindcast and forecast distributions for
 each series
 
 ``` r
-layout(matrix(1:4, nrow = 2, byrow = TRUE))
-for(i in 1:3){
-  plot(mod, type = 'forecast', series = i)
-}
+library(patchwork)
+fc <- forecast(mod)
+wrap_plots(
+  plot(fc, series = 1), 
+  plot(fc, series = 2), 
+  plot(fc, series = 3), 
+  ncol = 2
+)
 ```
 
 <figure>

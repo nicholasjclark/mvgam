@@ -28,11 +28,9 @@ plot_mvgam_fc(
   series = 1,
   realisations = FALSE,
   n_realisations = 15,
-  hide_xlabels = FALSE,
   xlab,
   ylab,
   ylim,
-  return_score = FALSE,
   ...
 )
 }
@@ -87,7 +85,7 @@ returned is the \code{sum} of all scores within the out of sample forecast horiz
 \item{x}{Object of class \code{mvgam_forecast}}
 }
 \value{
-A base \code{R} graphics plot and an optional \code{list} containing the forecast distribution
+A base \code{R} graphics plot (for \code{plot_mvgam_fc}) or a \code{ggplot} object (for \code{plot.mvgam_forecast}) and an optional \code{list} containing the forecast distribution
 and the out of sample probabilistic forecast score
 }
 \description{
@@ -98,12 +96,50 @@ Plot posterior forecast predictions from \pkg{mvgam} models
 empirical quantiles and plots them against the observed data. If \code{realisations = FALSE}, the returned plot shows
 90, 60, 40 and 20 percent posterior quantiles (as ribbons of increasingly darker shades or red)
 as well as the posterior median (as a dark red line). If \code{realisations = FALSE}, a set of \code{n_realisations} posterior
-draws are shown.
+draws are shown. This function produces an older style base \code{R} plot, as opposed to \code{plot.mvgam_forecast}
 
 \code{plot.mvgam_forecast} takes an object of class \code{mvgam_forecast}, in which forecasts have already
-been computed, and plots the resulting forecast distribution.
+been computed, and plots the resulting forecast distribution as a \code{ggplot} object. This function is therefore more
+versatile and is recommended over the older and clunkier \code{plot_mvgam_fc} version
 
 If \code{realisations = FALSE}, these posterior quantiles are plotted along
 with the true observed data that was used to train the model. Otherwise, a spaghetti plot is returned
 to show possible forecast paths.
+}
+\examples{
+\donttest{
+simdat <- sim_mvgam(n_series = 3, trend_model = AR())
+mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
+            trend_model = AR(),
+            noncentred = TRUE,
+            data = simdat$data_train,
+            chains = 2,
+            silent = 2)
+
+# Hindcasts on response scale
+hc <- hindcast(mod)
+str(hc)
+plot(hc, series = 1)
+plot(hc, series = 2)
+plot(hc, series = 3)
+
+# Forecasts on response scale
+fc <- forecast(mod, newdata = simdat$data_test)
+str(fc)
+plot(fc, series = 1)
+plot(fc, series = 2)
+plot(fc, series = 3)
+
+# Forecasts as expectations
+fc <- forecast(mod, newdata = simdat$data_test, type = 'expected')
+plot(fc, series = 1)
+plot(fc, series = 2)
+plot(fc, series = 3)
+
+# Dynamic trend extrapolations
+fc <- forecast(mod, newdata = simdat$data_test, type = 'trend')
+plot(fc, series = 1)
+plot(fc, series = 2)
+plot(fc, series = 3)
+}
 }

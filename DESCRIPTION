@@ -1,7 +1,7 @@
 Package: mvgam
 Title: Multivariate (Dynamic) Generalized Additive Models
-Version: 1.1.4
-Date: 2025-02-18
+Version: 1.1.5
+Date: 2025-02-20
 Authors@R: c(person("Nicholas J", "Clark", , "nicholas.j.clark1214@gmail.com", 
                     role = c("aut", "cre"), comment = c(ORCID = "0000-0001-7131-3301")),
              person("Sarah", "Heaps", role = c("ctb"),

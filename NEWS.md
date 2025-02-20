@@ -1,3 +1,10 @@
+# mvgam 1.1.5 (not yet on CRAN)
+## New functionalities
+* Converted several more plotting functions to return `ggplot` objects in place of base R plots
+
+## Bug fixes
+* Bug fix to ensure piecewise trends are extrapolated the correct number of timepoints when forecasting using the `forecast()` function
+
 # mvgam 1.1.4
 ## New functionalities
 * Added the `how_to_cite.mvgam()` function to generate a scaffold methods description of fitted models, which can hopefully make it easier for users to fully describe their programming environment 

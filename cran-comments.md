@@ -1,4 +1,4 @@
-## Version 1.1.4
+## Version 1.1.5
 
 ## Summary of changes
 This version brings efficiency updates and added functionality to enhance the user interface. There are no major structural changes or modifications that would break pre-existing workflows
