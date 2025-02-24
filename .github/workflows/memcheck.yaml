@@ -59,17 +59,11 @@ jobs:
           echo "Formatting R code with $(air --version)"
           echo ""
 
-      - name: Check R code formatting
-        if: inputs.check == 'true'
-        shell: bash
-        run: air format --check .
-
-      - name: Format R code
-        if: inputs.check != 'true'
+      - name: Format R code using Air
         shell: bash
         run: air format .
 
-      - name: Commit changes
+      - name: Commit any Air formatting changes
         if: inputs.check != 'true'
         shell: bash
         run: |
