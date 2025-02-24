@@ -46,7 +46,38 @@ jobs:
           git config --global user.name "$GITHUB_ACTOR"
           git config --global user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
-      - name: Format R code using Air and push
-        uses: rstudio/shiny-workflows/format-r-code@v1
+
+      - name: Install air (latest, Mac/Linux)
+        if: inputs.version == 'latest' && runner.os != 'Windows'
+        shell: bash
         run: |
-          git push
+          curl -LsSf https://github.com/posit-dev/air/releases/latest/download/air-installer.sh | sh
+
+      - name: air version
+        shell: bash
+        run: |
+          echo ""
+          echo "Formatting R code with $(air --version)"
+          echo ""
+
+      - name: Check R code formatting
+        if: inputs.check == 'true'
+        shell: bash
+        run: air format --check .
+
+      - name: Format R code
+        if: inputs.check != 'true'
+        shell: bash
+        run: air format .
+
+      - name: Commit changes
+        if: inputs.check != 'true'
+        shell: bash
+        run: |
+          if find . -type f \( -name '*.r' -o -name '*.R' \) -exec git add -u {} +; then
+            echo "Staged modified R files"
+            git commit -m '`air format` (GitHub Actions)'
+            git push
+          else
+            echo "No changes found in any R files"
+          fi
