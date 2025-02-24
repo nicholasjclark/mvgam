@@ -19,7 +19,7 @@ compared with posterior predictive checks, forecast comparisons and leave-one-ou
 
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -670,12 +670,25 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span>              noncentred <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
 <span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>              silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpSCQd1V/model-f4202d5d57.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Extract the model summary</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000001d62e283108&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x0000027335508770&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -701,26 +714,26 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>               2.5%   50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)  1.900  2.00  2.10    1   546</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1  0.068  0.31  0.53    1   450</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2  0.600  0.82  1.10    1   436</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3 -0.075  0.17  0.41    1   563</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4 -0.670 -0.42 -0.19    1   712</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)  1.900  2.00  2.10 1.00   600</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1  0.078  0.31  0.54 1.00   597</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2  0.590  0.82  1.00 1.02   380</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3 -0.057  0.18  0.41 1.00   471</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4 -0.660 -0.42 -0.16 1.01   588</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM smooths:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>            edf Ref.df Chi.sq p-value    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 3.79      4   35.5  &lt;2e-16 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 3.58      4   37.9  &lt;2e-16 ***</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Latent trend parameter AR estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           2.5%   50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]    0.30  0.71 0.990 1.01   205</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[2]   -0.93 -0.42 0.038 1.01    69</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[3]    0.24  0.68 0.980 1.01   264</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.40  0.56 0.790 1.00   314</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[2]  0.34  0.50 0.700 1.01   119</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[3]  0.37  0.51 0.690 1.00   398</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]    0.29  0.72 0.990 1.00   241</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[2]   -0.96 -0.40 0.051 1.00   181</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[3]    0.22  0.69 0.980 1.01   233</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.42  0.57 0.770 1.00   367</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[2]  0.33  0.48 0.670 1.00   280</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[3]  0.38  0.51 0.710 1.01   302</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
@@ -729,7 +742,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 10 (0%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Wed Feb 19 11:50:17 AM 2025.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Mon Feb 24 1:23:55 PM 2025.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
@@ -747,7 +760,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-plt img"><img src="mvgam-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="va">resids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/residuals.html" class="external-link">residuals</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">resids</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  num [1:180, 1:4] -0.153 NaN -0.15 0.292 -0.819 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  num [1:180, 1:4] -0.134 NaN -0.14 0.284 -0.822 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ : chr [1:4] "Estimate" "Est.Error" "Q2.5" "Q97.5"</span>
@@ -755,27 +768,28 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="co"># Fitted values and residuals can also be added to training data</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://generics.r-lib.org/reference/augment.html" class="external-link">augment</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 180 × 14</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>        y season  year series    time .observed .fitted .fit.variability .fit.cred.low .fit.cred.high  .resid</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>            <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>         <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>     4      1     1 series_1     1         4    4.66             1.53          2.27           8.22  -<span style="color: #BB0000;">0.153</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>    <span style="color: #BB0000;">NA</span>      1     1 series_2     1        <span style="color: #BB0000;">NA</span>    6.82             3.79          2.25          16.8  <span style="color: #BB0000;">NaN</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>     4      1     1 series_3     1         4    4.61             1.49          2.23           8.14  -<span style="color: #BB0000;">0.150</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>     5      2     1 series_1     2         5    4.72             1.73          2.18           8.81   0.292</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>     2      2     1 series_2     2         2    3.79             1.50          1.61           7.34  -<span style="color: #BB0000;">0.819</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>    <span style="color: #BB0000;">NA</span>      2     1 series_3     2        <span style="color: #BB0000;">NA</span>    5.28             3.02          1.73          13.7  <span style="color: #BB0000;">NaN</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>     7      3     1 series_1     3         7    8.47             2.45          4.48          14.0   -<span style="color: #BB0000;">0.377</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>    12      3     1 series_2     3        12   11.5              2.97          6.59          18.0    0.275</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>     4      3     1 series_3     3         4    5.40             1.93          2.35           9.65  -<span style="color: #BB0000;">0.463</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>    39      4     1 series_1     4        39   36.1              5.72         25.8           47.6    0.551</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>        y season  year series    time .observed .fitted .fit.variability</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>            <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>     4      1     1 series_1     1         4    4.64             1.59</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>    <span style="color: #BB0000;">NA</span>      1     1 series_2     1        <span style="color: #BB0000;">NA</span>    6.88             3.47</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>     4      1     1 series_3     1         4    4.60             1.48</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>     5      2     1 series_1     2         5    4.72             1.65</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>     2      2     1 series_2     2         2    3.80             1.45</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>    <span style="color: #BB0000;">NA</span>      2     1 series_3     2        <span style="color: #BB0000;">NA</span>    5.34             3.20</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>     7      3     1 series_1     3         7    8.52             2.56</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>    12      3     1 series_2     3        12   11.4              2.99</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>     4      3     1 series_3     3         4    5.37             1.87</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>    39      4     1 series_1     4        39   35.9              5.83</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 170 more rows</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 3 more variables: .resid.variability &lt;dbl&gt;, .resid.cred.low &lt;dbl&gt;, .resid.cred.high &lt;dbl&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 6 more variables: .fit.cred.low &lt;dbl&gt;, .fit.cred.high &lt;dbl&gt;, .resid &lt;dbl&gt;,</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;">#   .resid.variability &lt;dbl&gt;, .resid.cred.low &lt;dbl&gt;, .resid.cred.high &lt;dbl&gt;</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Compute the forecast using covariate information in data_test</span></span></span>
 <span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod1</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 16</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x000001d62e283108&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x0000027335508770&gt; </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family_pars       : NULL</span>
@@ -804,26 +818,28 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:20] 6 8 5 5 19 14 1 1 7 0 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_times        : int [1:20] 61 62 63 64 65 66 67 68 69 70 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ hindcasts         :List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: num [1:1000, 1:60] 4 6 2 3 2 5 6 6 3 7 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: num [1:1000, 1:60] 3 3 13 3 5 11 7 3 6 7 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:60] "ypred[1,1]" "ypred[2,1]" "ypred[3,1]" "ypred[4,1]" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: num [1:1000, 1:60] 9 6 5 2 10 7 8 7 12 11 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: num [1:1000, 1:60] 6 6 6 4 21 9 6 7 4 1 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:60] "ypred[1,2]" "ypred[2,2]" "ypred[3,2]" "ypred[4,2]" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: num [1:1000, 1:60] 2 5 10 4 4 2 5 4 8 8 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: num [1:1000, 1:60] 3 1 6 5 5 4 4 5 5 8 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:60] "ypred[1,3]" "ypred[2,3]" "ypred[3,3]" "ypred[4,3]" ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ forecasts         :List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:1000, 1:20] 7 6 5 4 2 1 4 2 3 4 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:1000, 1:20] 1 5 1 10 5 1 5 12 3 8 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:1000, 1:20] 4 13 6 4 5 6 4 9 4 7 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:1000, 1:20] 5 10 2 6 11 5 8 1 10 3 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:1000, 1:20] 1 5 11 2 0 4 9 1 1 0 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:1000, 1:20] 5 13 1 28 6 11 12 14 5 1 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "class")= chr "mvgam_forecast"</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> 56.722263</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 58.715513</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Removed 8 rows containing missing values or values outside the scale range</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> (`geom_point()`).</span>
 <span class="r-plt img"><img src="mvgam-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot the estimated seasonal smooth function</span></span></span>
@@ -843,11 +859,11 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-plt img"><img src="mvgam-10.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot conditional response predictions using marginaleffects</span></span></span>
-<span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://marginaleffects.com/" class="external-link">marginaleffects</a></span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="mvgam-11.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod1</span>, condition <span class="op">=</span> <span class="st">'season'</span>, points <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Removed 16 rows containing missing values or values outside the scale range (`geom_point()`).</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Removed 16 rows containing missing values or values outside the scale range</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> (`geom_point()`).</span>
 <span class="r-plt img"><img src="mvgam-12.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Generate posterior predictive checks using bayesplot</span></span></span>
@@ -860,19 +876,19 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="va">beta_draws_df</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">mod1</span>, variable <span class="op">=</span> <span class="st">'betas'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">beta_draws_df</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   (Intercept) s(season).1 s(season).2 s(season).3 s(season).4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1     1.97989    0.169960    0.806367    0.139475   -0.618622</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2     2.02775    0.177445    0.813102    0.258775   -0.477719</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3     2.02934    0.247663    1.129330    0.180042   -0.551905</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4     2.07655    0.244567    0.947725    0.301944   -0.524609</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5     1.91523    0.369496    1.067790    0.424371   -0.490168</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     1.97633    0.347879    1.037050    0.228228   -0.525386</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1     1.99008    0.326531    0.697490  0.22160200   -0.519764</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2     2.02084    0.188496    0.735049  0.31336200   -0.485754</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3     2.01108    0.341243    0.809458 -0.00427346   -0.494183</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4     2.07568    0.208187    0.820695  0.32209500   -0.360335</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5     2.00345    0.134385    0.799658  0.43913900   -0.387645</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     2.01396    0.257945    0.837759  0.42171800   -0.435326</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">beta_draws_df</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 'data.frame':	1000 obs. of  5 variables:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ (Intercept): num  1.98 2.03 2.03 2.08 1.92 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).1: num  0.17 0.177 0.248 0.245 0.369 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).2: num  0.806 0.813 1.129 0.948 1.068 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).3: num  0.139 0.259 0.18 0.302 0.424 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).4: num  -0.619 -0.478 -0.552 -0.525 -0.49 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ (Intercept): num  1.99 2.02 2.01 2.08 2 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).1: num  0.327 0.188 0.341 0.208 0.134 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).2: num  0.697 0.735 0.809 0.821 0.8 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).3: num  0.2216 0.31336 -0.00427 0.3221 0.43914 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).4: num  -0.52 -0.486 -0.494 -0.36 -0.388 ...</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Investigate model fit</span></span></span>
 <span class="r-in"><span><span class="va">mc.cores.def</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">'mc.cores'</span><span class="op">)</span></span></span>
@@ -883,18 +899,18 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 164 log-likelihood matrix.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate   SE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo   -458.0  8.8</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo        88.2  4.9</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> looic       916.1 17.7</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo   -458.6  8.8</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo        88.3  5.0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> looic       917.3 17.6</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> MCSE of elpd_loo is NA.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.4, 2.0]).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.3, 1.6]).</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Pareto k diagnostic values:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                           Count Pct.    Min. ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.67]   (good)     85    51.8%   85      </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.67, 1]   (bad)      69    42.1%   &lt;NA&gt;    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     (1, Inf)   (very bad) 10     6.1%   &lt;NA&gt;    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.67]   (good)     69    42.1%   88      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.67, 1]   (bad)      88    53.7%   &lt;NA&gt;    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     (1, Inf)   (very bad)  7     4.3%   &lt;NA&gt;    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> See help('pareto-k-diagnostic') for details.</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>mc.cores <span class="op">=</span> <span class="va">mc.cores.def</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
@@ -910,7 +926,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span>                       trend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit the model using AR1 trends</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             trend_map <span class="op">=</span> <span class="va">trend_map</span>,</span></span>
 <span class="r-in"><span>             trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">mod_data</span>,</span></span>
@@ -924,7 +940,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpotLup8/model-9e8c67ec1dc3.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpSCQd1V/model-f46c141b36.hpp:2:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
@@ -992,7 +1008,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> model {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for (Intercept)...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[1] ~ student_t(3, 0, 3.1);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[1] ~ student_t(3, -2.3, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(season)...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[2 : 5] ~ multi_normal_prec(zero[2 : 5], S1[1 : 4, 1 : 4] * lambda[1]);</span>
@@ -1004,7 +1020,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(5, 30);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for factor SD parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ student_t(3, 0, 3.1);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // dynamic factor estimates</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   LV[1, 1 : n_lv] ~ normal(0, sigma);</span>
@@ -1073,15 +1089,18 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="va">data_test</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">[</span><span class="fl">181</span><span class="op">:</span><span class="fl">200</span>,<span class="op">]</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit the model using the dynamic() formula helper</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span><span class="va">out</span> <span class="op">~</span></span></span>
-<span class="r-in"><span>              <span class="fu"><a href="dynamic.html">dynamic</a></span><span class="op">(</span><span class="va">temp</span>,</span></span>
-<span class="r-in"><span>                      scale <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
-<span class="r-in"><span>                      k <span class="op">=</span> <span class="fl">40</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span></span></span>
+<span class="r-in"><span>              <span class="va">out</span> <span class="op">~</span> <span class="fu"><a href="dynamic.html">dynamic</a></span><span class="op">(</span><span class="va">temp</span>,</span></span>
+<span class="r-in"><span>                            scale <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
+<span class="r-in"><span>                            k <span class="op">=</span> <span class="fl">40</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>             newdata <span class="op">=</span> <span class="va">data_test</span>,</span></span>
 <span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>             silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>gp effects in mvgam cannot yet handle autogrouping</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> resetting all instances of 'gr = TRUE' to 'gr = FALSE'</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span style="color: #555555;">This warning is displayed once per session.</span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
@@ -1089,7 +1108,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpotLup8/model-9e8c6bf94d28.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpSCQd1V/model-f47f144e06.hpp:2:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
@@ -1100,7 +1119,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> out ~ gp(time, by = temp, c = 5/4, k = 40, scale = FALSE)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000001d62e283108&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x0000027335508770&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> gaussian</span>
@@ -1184,7 +1203,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 10 (0%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Wed Feb 19 11:51:19 AM 2025.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Mon Feb 24 1:25:26 PM 2025.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
@@ -1231,7 +1250,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpotLup8/model-9e8c78532279.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpSCQd1V/model-f4112023ad.hpp:2:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
@@ -1338,10 +1357,11 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span>, series <span class="op">=</span> <span class="fl">1</span>, ylim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">75</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> 26.719884</span>
+<span class="r-plt img"><img src="mvgam-21.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span>, series <span class="op">=</span> <span class="fl">2</span>, ylim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">75</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> 101.73232</span>
-<span class="r-plt img"><img src="mvgam-21.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="mvgam-22.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Changing the offset for the testing data should lead to changes in</span></span></span>
@@ -1351,7 +1371,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> 41.583918</span>
-<span class="r-plt img"><img src="mvgam-22.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="mvgam-23.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Relative Risks can be computed by fixing the offset to the same value</span></span></span>
 <span class="r-in"><span><span class="co"># for each series</span></span></span>
@@ -1376,7 +1396,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="kw">for</span><span class="op">(</span><span class="va">i</span> <span class="kw">in</span> <span class="fl">2</span><span class="op">:</span><span class="fl">50</span><span class="op">)</span><span class="op">{</span></span></span>
 <span class="r-in"><span> <span class="fu"><a href="https://rdrr.io/r/graphics/lines.html" class="external-link">lines</a></span><span class="op">(</span><span class="va">preds_rr</span><span class="op">[</span><span class="va">i</span>, <span class="va">series2_inds</span><span class="op">]</span>, col <span class="op">=</span> <span class="st">'darkred'</span><span class="op">)</span></span></span>
 <span class="r-in"><span> <span class="op">}</span></span></span>
-<span class="r-plt img"><img src="mvgam-23.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="mvgam-24.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span></span></span>
@@ -1399,11 +1419,12 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span><span class="va">dat</span>, series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">as.factor</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/arrange.html" class="external-link">arrange</a></span><span class="op">(</span><span class="va">dat</span>, <span class="va">time</span>, <span class="va">series</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">dat</span>, series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="mvgam-24.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="mvgam-25.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit a model using the binomial() family; must specify observations</span></span></span>
 <span class="r-in"><span><span class="co"># and number of trials in the cbind() wrapper</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span><span class="va">y</span>, <span class="va">ntrials</span><span class="op">)</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x</span>, by <span class="op">=</span> <span class="va">series</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span></span></span>
+<span class="r-in"><span>              <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span><span class="va">y</span>, <span class="va">ntrials</span><span class="op">)</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x</span>, by <span class="op">=</span> <span class="va">series</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">dat</span>,</span></span>
 <span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
@@ -1418,7 +1439,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpotLup8/model-9e8cabe1573.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpSCQd1V/model-f42ce5f61.hpp:2:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
@@ -1427,7 +1448,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> cbind(y, ntrials) ~ series + s(x, by = series)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000001d62e283108&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x0000027335508770&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> binomial</span>
@@ -1488,7 +1509,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 10 (0%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Wed Feb 19 11:52:17 AM 2025.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Mon Feb 24 1:26:48 PM 2025.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
@@ -1496,13 +1517,13 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Use how_to_cite(mod) to get started describing this model</span>
 <span class="r-in"><span><span class="fu"><a href="pp_check.mvgam.html">pp_check</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"bars_grouped"</span>,</span></span>
 <span class="r-in"><span>         group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="mvgam-25.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="mvgam-26.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="pp_check.mvgam.html">pp_check</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"ecdf_overlay_grouped"</span>,</span></span>
 <span class="r-in"><span>         group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="mvgam-26.png" alt="" width="700" height="433"></span>
-<span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="mvgam-27.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="mvgam-28.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="mvgam-29.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

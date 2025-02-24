@@ -30,11 +30,11 @@ forecast <- function(object, ...){
 #' \donttest{
 #' simdat <- sim_mvgam(n_series = 3, trend_model = AR())
 #' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-#'             trend_model = AR(),
-#'             noncentred = TRUE,
-#'             data = simdat$data_train,
-#'             chains = 2,
-#'             silent = 2)
+#'              trend_model = AR(),
+#'              noncentred = TRUE,
+#'              data = simdat$data_train,
+#'              chains = 2,
+#'              silent = 2)
 #'
 #' # Hindcasts on response scale
 #' hc <- hindcast(mod)
@@ -44,20 +44,25 @@ forecast <- function(object, ...){
 #' plot(hc, series = 3)
 #'
 #' # Forecasts on response scale
-#' fc <- forecast(mod, newdata = simdat$data_test)
+#' fc <- forecast(mod,
+#'                newdata = simdat$data_test)
 #' str(fc)
 #' plot(fc, series = 1)
 #' plot(fc, series = 2)
 #' plot(fc, series = 3)
 #'
 #' # Forecasts as expectations
-#' fc <- forecast(mod, newdata = simdat$data_test, type = 'expected')
+#' fc <- forecast(mod,
+#'                newdata = simdat$data_test,
+#'                type = 'expected')
 #' plot(fc, series = 1)
 #' plot(fc, series = 2)
 #' plot(fc, series = 3)
 #'
 #' # Dynamic trend extrapolations
-#' fc <- forecast(mod, newdata = simdat$data_test, type = 'trend')
+#' fc <- forecast(mod,
+#'                newdata = simdat$data_test,
+#'                type = 'trend')
 #' plot(fc, series = 1)
 #' plot(fc, series = 2)
 #' plot(fc, series = 3)

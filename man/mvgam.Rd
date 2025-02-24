@@ -473,7 +473,6 @@ plot(mod1, type = 'smooths', residuals = TRUE)
 plot(mod1, type = 'smooths', realisations = TRUE)
 
 # Plot conditional response predictions using marginaleffects
-library(marginaleffects)
 conditional_effects(mod1)
 plot_predictions(mod1, condition = 'season', points = 0.5)
 
@@ -503,7 +502,7 @@ trend_map <- data.frame(series = unique(mod_data$series),
                        trend = c(1, 1, 2))
 
 # Fit the model using AR1 trends
-mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
+mod <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
              trend_map = trend_map,
              trend_model = AR(),
              data = mod_data,
@@ -545,10 +544,10 @@ data_train <- data[1:180,]
 data_test <- data[181:200,]
 
 # Fit the model using the dynamic() formula helper
-mod <- mvgam(out ~
-              dynamic(temp,
-                      scale = FALSE,
-                      k = 40),
+mod <- mvgam(formula =
+              out ~ dynamic(temp,
+                            scale = FALSE,
+                            k = 40),
              family = gaussian(),
              data = data_train,
              newdata = data_test,
@@ -652,7 +651,8 @@ plot_mvgam_series(data = dat, series = 'all')
 
 # Fit a model using the binomial() family; must specify observations
 # and number of trials in the cbind() wrapper
-mod <- mvgam(cbind(y, ntrials) ~ series + s(x, by = series),
+mod <- mvgam(formula =
+              cbind(y, ntrials) ~ series + s(x, by = series),
              family = binomial(),
              data = dat,
              chains = 2,

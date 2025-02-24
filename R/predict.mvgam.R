@@ -79,11 +79,14 @@
 #'              silent = 2)
 #'
 #'# Generate predictions against observed data
-#'preds <- predict(mod1, summary = TRUE)
+#'preds <- predict(mod1,
+#'                 summary = TRUE)
 #'head(preds)
 #'
 #'# Generate predictions against test data
-#'preds <- predict(mod1, newdata = simdat$data_test, summary = TRUE)
+#'preds <- predict(mod1,
+#'                 newdata = simdat$data_test,
+#'                 summary = TRUE)
 #'head(preds)
 #'}
 #'@export

@@ -45,11 +45,11 @@ organized into a convenient format
 \donttest{
 simdat <- sim_mvgam(n_series = 3, trend_model = AR())
 mod <- mvgam(y ~ s(season, bs = 'cc'),
-            trend_model = AR(),
-            noncentred = TRUE,
-            data = simdat$data_train,
-            chains = 2,
-            silent = 2)
+             trend_model = AR(),
+             noncentred = TRUE,
+             data = simdat$data_train,
+             chains = 2,
+             silent = 2)
 
 # Hindcasts on response scale
 hc <- hindcast(mod)
