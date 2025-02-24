@@ -76,19 +76,20 @@
 #' 7, 549-555.
 #' @seealso [jsdgam()]
 #' @export
-residual_cor <- function(object, ...){
+residual_cor <- function(object, ...) {
   UseMethod("residual_cor", object)
 }
 
 #' @rdname residual_cor.jsdgam
 #' @method residual_cor jsdgam
 #' @export
-residual_cor.jsdgam <- function(object,
-                                summary = TRUE,
-                                robust = FALSE,
-                                probs = c(0.025, 0.975),
-                                ...) {
-
+residual_cor.jsdgam <- function(
+  object,
+  summary = TRUE,
+  robust = FALSE,
+  probs = c(0.025, 0.975),
+  ...
+) {
   insight::check_if_installed("corpcor")
 
   # Take draws of factor loadings
@@ -98,11 +99,14 @@ residual_cor.jsdgam <- function(object,
   loadings <- as.matrix(object$model_output, 'lv_coefs')
 
   # Initiate array to store all posterior correlation and covariance matrices
-  all_cormat <- all_covmat <- all_precmat <- array(0, dim = c(nrow(loadings), p, p))
+  all_cormat <- all_covmat <- all_precmat <- array(
+    0,
+    dim = c(nrow(loadings), p, p)
+  )
   all_trace_rescor <- numeric(NROW(loadings))
 
   # Calculate posterior covariance, correlation, precision and trace estimates
-  for(i in 1:NROW(loadings)){
+  for (i in 1:NROW(loadings)) {
     lv_coefs <- matrix(loadings[i, ], nrow = p, ncol = n_lv)
 
     lambdalambdaT <- tcrossprod(lv_coefs)
@@ -112,26 +116,33 @@ residual_cor.jsdgam <- function(object,
     all_precmat[i, , ] <- corpcor::cor2pcor(lambdalambdaT)
   }
 
-  if(!summary){
-    out <- list(all_cormat = all_cormat,
-                all_covmat = all_covmat,
-                all_precmat = all_precmat,
-                all_trace = all_trace_rescor)
+  if (!summary) {
+    out <- list(
+      all_cormat = all_cormat,
+      all_covmat = all_covmat,
+      all_precmat = all_precmat,
+      all_trace = all_trace_rescor
+    )
   } else {
-
     #### If summary, calculate summary statistics ####
     # Initiate summary correlation and covariance matrices
     sig_cormat <- cormat <- cormat_lower <- cormat_upper <-
       sig_precmat <- precmat <- precmat_lower <- precmat_upper <-
-      covmat <- matrix(0, nrow = p, ncol = p)
+        covmat <- matrix(0, nrow = p, ncol = p)
 
     rownames(cormat) <- rownames(cormat_lower) <- rownames(cormat_upper) <-
       rownames(sig_cormat) <- rownames(precmat) <- rownames(precmat_lower) <-
-      rownames(precmat_upper) <- rownames(sig_precmat) <- rownames(covmat) <-
-      colnames(cormat) <- colnames(cormat_lower) <- colnames(cormat_upper) <-
-      colnames(sig_cormat) <- colnames(precmat) <- colnames(precmat_lower) <-
-      colnames(precmat_upper) <- colnames(sig_precmat) <- colnames(covmat) <-
-      sp_names
+        rownames(precmat_upper) <- rownames(sig_precmat) <- rownames(covmat) <-
+          colnames(cormat) <- colnames(cormat_lower) <- colnames(
+            cormat_upper
+          ) <-
+            colnames(sig_cormat) <- colnames(precmat) <- colnames(
+              precmat_lower
+            ) <-
+              colnames(precmat_upper) <- colnames(sig_precmat) <- colnames(
+                covmat
+              ) <-
+                sp_names
 
     # Calculate posterior summaries
     for (j in 1:p) {
@@ -147,15 +158,31 @@ residual_cor.jsdgam <- function(object,
         }
 
         sig_cormat[j, j2] <- cormat[j, j2]
-        cormat_lower[j, j2] <- quantile(all_cormat[, j, j2], probs = min(probs), na.rm = TRUE)
-        cormat_upper[j, j2] <- quantile(all_cormat[, j, j2], probs = max(probs), na.rm = TRUE)
+        cormat_lower[j, j2] <- quantile(
+          all_cormat[, j, j2],
+          probs = min(probs),
+          na.rm = TRUE
+        )
+        cormat_upper[j, j2] <- quantile(
+          all_cormat[, j, j2],
+          probs = max(probs),
+          na.rm = TRUE
+        )
         if (0 > cormat_lower[j, j2] & 0 < cormat_upper[j, j2]) {
           sig_cormat[j, j2] <- 0
         }
 
         sig_precmat[j, j2] <- precmat[j, j2]
-        precmat_lower[j, j2] <- quantile(all_precmat[, j, j2], probs = min(probs), na.rm = TRUE)
-        precmat_upper[j, j2] <- quantile(all_precmat[, j, j2], probs = max(probs), na.rm = TRUE)
+        precmat_lower[j, j2] <- quantile(
+          all_precmat[, j, j2],
+          probs = min(probs),
+          na.rm = TRUE
+        )
+        precmat_upper[j, j2] <- quantile(
+          all_precmat[, j, j2],
+          probs = max(probs),
+          na.rm = TRUE
+        )
         if (0 > precmat_lower[j, j2] & 0 < precmat_upper[j, j2]) {
           sig_precmat[j, j2] <- 0
         }
@@ -168,16 +195,18 @@ residual_cor.jsdgam <- function(object,
       final_trace <- mean(all_trace_rescor)
     }
 
-    out <- list(cor = cormat,
-                cor_lower = cormat_lower,
-                cor_upper = cormat_upper,
-                sig_cor = sig_cormat,
-                cov = covmat,
-                prec = precmat,
-                prec_lower = precmat_lower,
-                prec_upper = precmat_upper,
-                sig_prec = sig_precmat,
-                trace = final_trace)
+    out <- list(
+      cor = cormat,
+      cor_lower = cormat_lower,
+      cor_upper = cormat_upper,
+      sig_cor = sig_cormat,
+      cov = covmat,
+      prec = precmat,
+      prec_lower = precmat_lower,
+      prec_upper = precmat_upper,
+      sig_prec = sig_precmat,
+      trace = final_trace
+    )
   }
   return(out)
 }

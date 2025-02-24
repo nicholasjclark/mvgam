@@ -115,55 +115,57 @@
 #'}
 #'@author Nicholas J Clark
 #'@export
-lfo_cv <- function(object, ...){
+lfo_cv <- function(object, ...) {
   UseMethod("lfo_cv", object)
 }
 
 #'@rdname lfo_cv.mvgam
 #'@method lfo_cv mvgam
 #'@export
-lfo_cv.mvgam = function(object,
-                        data,
-                        min_t,
-                        fc_horizon = 1,
-                        pareto_k_threshold = 0.7,
-                        silent = 1,
-                        ...){
-
+lfo_cv.mvgam = function(
+  object,
+  data,
+  min_t,
+  fc_horizon = 1,
+  pareto_k_threshold = 0.7,
+  silent = 1,
+  ...
+) {
   validate_proportional(pareto_k_threshold)
   validate_pos_integer(fc_horizon)
 
-  if(missing(data)){
+  if (missing(data)) {
     all_data <- object$obs_data
   } else {
-    all_data <- validate_series_time(data,
-                                     name = 'data',
-                                     trend_model = object$trend_model)
+    all_data <- validate_series_time(
+      data,
+      name = 'data',
+      trend_model = object$trend_model
+    )
   }
   N <- max(all_data$index..time..index)
   all_unique_times <- sort(unique(all_data$index..time..index))
 
   # Default minimum training time is the 30th timepoint, or
   # whatever training time allows for at least 10 lfo_cv calculations
-  if(missing(min_t)){
-    if(length(all_unique_times) > 30){
+  if (missing(min_t)) {
+    if (length(all_unique_times) > 30) {
       min_t <- pmin(max(1, N - 10 - fc_horizon), all_unique_times[30])
-    } else if(length(all_unique_times) < 30 & length(all_unique_times) > 20){
+    } else if (length(all_unique_times) < 30 & length(all_unique_times) > 20) {
       min_t <- pmin(max(1, N - 10 - fc_horizon), all_unique_times[20])
-    } else if(length(all_unique_times) < 20 & length(all_unique_times) > 10) {
+    } else if (length(all_unique_times) < 20 & length(all_unique_times) > 10) {
       min_t <- pmin(max(1, N - 10 - fc_horizon), all_unique_times[10])
     } else {
       min_t <- 1
     }
   }
 
-  if(min_t < 0){
+  if (min_t < 0) {
     min_t <- 1
   }
   validate_pos_integer(min_t)
-  if(min_t >= N){
-    stop('Argument "min_t" is >= the maximum training time',
-         call. = FALSE)
+  if (min_t >= N) {
+    stop('Argument "min_t" is >= the maximum training time', call. = FALSE)
   }
 
   # Store the Expected Log Predictive Density (EPLD) at each time point
@@ -171,52 +173,55 @@ lfo_cv.mvgam = function(object,
 
   # Initialize the process for i = min_t, generating a
   # conditional forecast for all of the future data
-  data_splits <- cv_split(all_data, last_train = min_t,
-                          fc_horizon = fc_horizon)
+  data_splits <- cv_split(all_data, last_train = min_t, fc_horizon = fc_horizon)
 
   # Fit model to training and forecast all remaining testing observations
-  noncentred <- if(is.null(attr(object$model_data, 'noncentred'))){
+  noncentred <- if (is.null(attr(object$model_data, 'noncentred'))) {
     FALSE
   } else {
     TRUE
   }
 
-  if(silent < 1L){
+  if (silent < 1L) {
     cat('Approximating elpd for training point', min_t, '...\n')
   }
 
-  fit_past <- update(object,
-                     data = data_splits$data_train,
-                     newdata = data_splits$data_test,
-                     lfo = TRUE,
-                     noncentred = noncentred,
-                     silent = silent)
+  fit_past <- update(
+    object,
+    data = data_splits$data_train,
+    newdata = data_splits$data_test,
+    lfo = TRUE,
+    noncentred = noncentred,
+    silent = silent
+  )
 
   # Calculate log likelihoods of forecast observations for the next
   # fc_horizon ahead observations
-  fc_indices <- which(c(data_splits$data_train$time,
-                        data_splits$data_test$time) %in%
-                        (min_t + 1):(min_t + fc_horizon))
+  fc_indices <- which(
+    c(data_splits$data_train$time, data_splits$data_test$time) %in%
+      (min_t + 1):(min_t + fc_horizon)
+  )
   loglik_past <- logLik(fit_past)
 
   # Store the EPLD estimate
-  approx_elpds[min_t + 1] <- log_mean_exp(sum_rows(loglik_past[,fc_indices]))
+  approx_elpds[min_t + 1] <- log_mean_exp(sum_rows(loglik_past[, fc_indices]))
 
   # Iterate over i > min_t
   i_refit <- min_t
   refits <- min_t
   ks <- 0
 
-  for(i in (min_t + 1):(N - fc_horizon)) {
-    if(silent < 1L){
+  for (i in (min_t + 1):(N - fc_horizon)) {
+    if (silent < 1L) {
       cat('Approximating elpd for training point', i, '...\n')
     }
 
     # Get log likelihoods of what would be the
     # last training observations for calculating Pareto k values
-    last_obs_indices <- which(c(data_splits$data_train$time,
-                                data_splits$data_test$time) %in%
-                                (i_refit + 1):i)
+    last_obs_indices <- which(
+      c(data_splits$data_train$time, data_splits$data_test$time) %in%
+        (i_refit + 1):i
+    )
     logratio <- sum_rows(loglik_past[, last_obs_indices])
 
     # Use PSIS to estimate whether the Pareto shape parameter of the
@@ -237,40 +242,49 @@ lfo_cv.mvgam = function(object,
       refits <- c(refits, i)
 
       # Subset the data to now include the last set of training observations
-      data_splits <- cv_split(all_data, last_train = i,
-                              fc_horizon = fc_horizon)
+      data_splits <- cv_split(all_data, last_train = i, fc_horizon = fc_horizon)
 
       # Re-fit the model
-      fit_past <- update(fit_past,
-                         data = data_splits$data_train,
-                         newdata = data_splits$data_test,
-                         lfo = TRUE,
-                         noncentred = noncentred,
-                         silent = silent)
+      fit_past <- update(
+        fit_past,
+        data = data_splits$data_train,
+        newdata = data_splits$data_test,
+        lfo = TRUE,
+        noncentred = noncentred,
+        silent = silent
+      )
 
       # Calculate ELPD as before
-      fc_indices <- which(c(data_splits$data_train$time,
-                            data_splits$data_test$time) %in%
-                            (i + 1):(i + fc_horizon))
+      fc_indices <- which(
+        c(data_splits$data_train$time, data_splits$data_test$time) %in%
+          (i + 1):(i + fc_horizon)
+      )
       loglik_past <- logLik(fit_past)
-      approx_elpds[i + 1] <- log_mean_exp(sum_rows(loglik_past[,fc_indices]))
+      approx_elpds[i + 1] <- log_mean_exp(sum_rows(loglik_past[, fc_indices]))
     } else {
       # If k below threshold, calculate log likelihoods for the
       # forecast observations using the normalised importance weights
       # to weight the posterior draws
-      fc_indices <- which(c(data_splits$data_train$time,
-                            data_splits$data_test$time) %in%
-                            (i + 1):(i + fc_horizon))
+      fc_indices <- which(
+        c(data_splits$data_train$time, data_splits$data_test$time) %in%
+          (i + 1):(i + fc_horizon)
+      )
       lw <- loo::weights.importance_sampling(psis_obj, normalize = TRUE)[, 1]
-      approx_elpds[i + 1] <- log_sum_exp(lw + sum_rows(loglik_past[,fc_indices]))
+      approx_elpds[i + 1] <- log_sum_exp(
+        lw + sum_rows(loglik_past[, fc_indices])
+      )
     }
   }
-  return(structure(list(elpds = approx_elpds[(min_t + 1):(N - fc_horizon)],
-                        sum_ELPD = sum(approx_elpds, na.rm = TRUE),
-                        pareto_ks = ks[-1],
-                        eval_timepoints = (min_t + 1):(N - fc_horizon),
-                        pareto_k_threshold = pareto_k_threshold),
-                   class = 'mvgam_lfo'))
+  return(structure(
+    list(
+      elpds = approx_elpds[(min_t + 1):(N - fc_horizon)],
+      sum_ELPD = sum(approx_elpds, na.rm = TRUE),
+      pareto_ks = ks[-1],
+      eval_timepoints = (min_t + 1):(N - fc_horizon),
+      pareto_k_threshold = pareto_k_threshold
+    ),
+    class = 'mvgam_lfo'
+  ))
 }
 
 #' Plot Pareto-k and ELPD values from a `mvgam_lfo` object
@@ -286,73 +300,88 @@ lfo_cv.mvgam = function(object,
 #' a dashed red line indicates the bottom 10% quantile of ELPD values. Points below
 #' this threshold may represent outliers that were more difficult to forecast
 #' @export
-plot.mvgam_lfo = function(x, ...){
-
+plot.mvgam_lfo = function(x, ...) {
   object <- x
 
   # Plot Pareto-k values over time
   object$pareto_ks[which(is.infinite(object$pareto_ks))] <-
     max(object$pareto_ks[which(!is.infinite(object$pareto_ks))])
 
-  dplyr::tibble(eval_timepoints = object$eval_timepoints,
-                elpds = object$elpds,
-                pareto_ks = object$pareto_ks) -> obj_tribble
+  dplyr::tibble(
+    eval_timepoints = object$eval_timepoints,
+    elpds = object$elpds,
+    pareto_ks = object$pareto_ks
+  ) -> obj_tribble
 
   # Hack so we don't have to import tidyr just to use pivot_longer once
-  dplyr::bind_rows(obj_tribble %>%
-                     dplyr::select(eval_timepoints, elpds) %>%
-                     dplyr::mutate(name = 'elpds', value = elpds) %>%
-                     dplyr::select(-elpds),
-                   obj_tribble %>%
-                     dplyr::select(eval_timepoints, pareto_ks) %>%
-                     dplyr::mutate(name = 'pareto_ks', value = pareto_ks) %>%
-                     dplyr::select(-pareto_ks)) %>%
+  dplyr::bind_rows(
+    obj_tribble %>%
+      dplyr::select(eval_timepoints, elpds) %>%
+      dplyr::mutate(name = 'elpds', value = elpds) %>%
+      dplyr::select(-elpds),
+    obj_tribble %>%
+      dplyr::select(eval_timepoints, pareto_ks) %>%
+      dplyr::mutate(name = 'pareto_ks', value = pareto_ks) %>%
+      dplyr::select(-pareto_ks)
+  ) %>%
     dplyr::left_join(
-      dplyr::tribble(~name, ~threshold,
-                     "elpds", quantile(object$elpds, probs = 0.15),
-                     "pareto_ks", object$pareto_k_threshold),
+      dplyr::tribble(
+        ~name,
+        ~threshold,
+        "elpds",
+        quantile(object$elpds, probs = 0.15),
+        "pareto_ks",
+        object$pareto_k_threshold
+      ),
       by = "name"
     ) %>%
     dplyr::rowwise() %>%
-    dplyr::mutate(colour = dplyr::case_when(
-      name == 'elpds' & value < threshold ~ "outlier",
-      name == 'pareto_ks' & value > threshold ~ "outlier",
-      TRUE ~ "inlier"
-    )) %>%
+    dplyr::mutate(
+      colour = dplyr::case_when(
+        name == 'elpds' & value < threshold ~ "outlier",
+        name == 'pareto_ks' & value > threshold ~ "outlier",
+        TRUE ~ "inlier"
+      )
+    ) %>%
     dplyr::ungroup() %>%
     ggplot2::ggplot(ggplot2::aes(eval_timepoints, value)) +
-    ggplot2::facet_wrap(~ factor(name,
-                                 levels = c("pareto_ks", "elpds"),
-                                 labels = c("Pareto K", "ELPD")),
-                        ncol = 1,
-                        scales = "free_y") +
-    ggplot2::geom_hline(ggplot2::aes(yintercept = threshold),
-                        colour = "#A25050",
-                        linetype = "dashed",
-                        linewidth = 1) +
-    ggplot2::geom_line(linewidth = 0.5,
-                       col = "grey30") +
-    ggplot2::geom_point(shape = 16,
-                        colour = 'white',
-                        size = 2) +
-    ggplot2::geom_point(ggplot2::aes(colour = colour),
-                        shape = 16,
-                        show.legend = F,
-                        size = 1.5) +
+    ggplot2::facet_wrap(
+      ~ factor(
+        name,
+        levels = c("pareto_ks", "elpds"),
+        labels = c("Pareto K", "ELPD")
+      ),
+      ncol = 1,
+      scales = "free_y"
+    ) +
+    ggplot2::geom_hline(
+      ggplot2::aes(yintercept = threshold),
+      colour = "#A25050",
+      linetype = "dashed",
+      linewidth = 1
+    ) +
+    ggplot2::geom_line(linewidth = 0.5, col = "grey30") +
+    ggplot2::geom_point(shape = 16, colour = 'white', size = 2) +
+    ggplot2::geom_point(
+      ggplot2::aes(colour = colour),
+      shape = 16,
+      show.legend = F,
+      size = 1.5
+    ) +
     ggplot2::scale_colour_manual(values = c("grey30", "#8F2727")) +
-    ggplot2::labs(x = "Evaluation time",
-                  y = NULL) +
+    ggplot2::labs(x = "Evaluation time", y = NULL) +
     ggplot2::theme_bw()
 }
 
 #' Function to generate training and testing splits
 #' @noRd
-cv_split = function(data, last_train, fc_horizon = 1){
-  if(inherits(data, 'list')){
-
+cv_split = function(data, last_train, fc_horizon = 1) {
+  if (inherits(data, 'list')) {
     # Find indices of training and testing splits
-    temp_dat = data.frame(time = data$index..time..index,
-                          series = data$series) %>%
+    temp_dat = data.frame(
+      time = data$index..time..index,
+      series = data$series
+    ) %>%
       dplyr::mutate(index = dplyr::row_number()) %>%
       dplyr::arrange(time, series)
 
@@ -365,22 +394,21 @@ cv_split = function(data, last_train, fc_horizon = 1){
       dplyr::pull(index)
 
     # Split
-    data_train <- lapply(data, function(x){
-      if(is.matrix(x)){
-        matrix(x[indices_train,], ncol = NCOL(x))
+    data_train <- lapply(data, function(x) {
+      if (is.matrix(x)) {
+        matrix(x[indices_train, ], ncol = NCOL(x))
       } else {
         x[indices_train]
       }
     })
 
-    data_test <- lapply(data, function(x){
-      if(is.matrix(x)){
-        matrix(x[indices_test,], ncol = NCOL(x))
+    data_test <- lapply(data, function(x) {
+      if (is.matrix(x)) {
+        matrix(x[indices_test, ], ncol = NCOL(x))
       } else {
         x[indices_test]
       }
     })
-
   } else {
     data_train <- data %>%
       dplyr::filter(index..time..index <= last_train) %>%
@@ -389,11 +417,9 @@ cv_split = function(data, last_train, fc_horizon = 1){
     data_test <- data %>%
       dplyr::filter(index..time..index > last_train) %>%
       dplyr::arrange(index..time..index, series)
-
   }
 
-  return(list(data_train = data_train,
-              data_test = data_test))
+  return(list(data_train = data_train, data_test = data_test))
 }
 
 #' More stable version of log(sum(exp(x)))
@@ -411,8 +437,8 @@ log_mean_exp <- function(x) {
 
 #' Summing without NAs
 #' @noRd
-sum_rows = function(x){
-  if(NCOL(x) > 1){
+sum_rows = function(x) {
+  if (NCOL(x) > 1) {
     out <- rowSums(x, na.rm = TRUE)
   } else {
     out <- x[!is.na(x)]

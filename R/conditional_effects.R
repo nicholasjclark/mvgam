@@ -97,20 +97,22 @@
 #' }
 #' }
 #' @export
-conditional_effects.mvgam = function(x,
-                                     effects = NULL,
-                                     type = 'response',
-                                     points = FALSE,
-                                     rug = FALSE,
-                                     ...){
-
+conditional_effects.mvgam = function(
+  x,
+  effects = NULL,
+  type = 'response',
+  points = FALSE,
+  rug = FALSE,
+  ...
+) {
   use_def_effects <- is.null(effects)
-  type <- match.arg(type, c('response', 'link',
-                            'detection', 'latent_N',
-                            'expected'))
+  type <- match.arg(
+    type,
+    c('response', 'link', 'detection', 'latent_N', 'expected')
+  )
 
-  if(type == 'response'){
-    if(points){
+  if (type == 'response') {
+    if (points) {
       points <- 0.5
     } else {
       points <- 0
@@ -122,94 +124,106 @@ conditional_effects.mvgam = function(x,
 
   # Can't plot points or rugs with binomial models due to the
   # cbind syntax
-  if(rug){
-    if(x$family %in% c('binomial', 'beta_binomial')){
+  if (rug) {
+    if (x$family %in% c('binomial', 'beta_binomial')) {
       rug <- FALSE
       message('Cannot show observation rug for binomial models')
     }
   }
 
-  if(points){
-    if(x$family %in% c('binomial', 'beta_binomial')){
+  if (points) {
+    if (x$family %in% c('binomial', 'beta_binomial')) {
       points <- 0
       message('Cannot show observation points for binomial models')
     }
   }
 
-  if(use_def_effects){
+  if (use_def_effects) {
     # Get all term labels in the model
-    termlabs <- attr(terms(formula(x),
-                           keep.order = TRUE), 'term.labels')
+    termlabs <- attr(terms(formula(x), keep.order = TRUE), 'term.labels')
     #termlabs <- unlist(find_predictors(x), use.names = FALSE)
-    if(!is.null(x$trend_call)){
-      termlabs <- c(termlabs,
-                    gsub('trend', 'series',
-                         attr(terms(formula(x, trend_effects = TRUE),
-                                    keep.order = TRUE), 'term.labels')))
+    if (!is.null(x$trend_call)) {
+      termlabs <- c(
+        termlabs,
+        gsub(
+          'trend',
+          'series',
+          attr(
+            terms(formula(x, trend_effects = TRUE), keep.order = TRUE),
+            'term.labels'
+          )
+        )
+      )
     }
 
     # Find all possible (up to 2-way) plot conditions
-    cond_labs <- purrr::flatten(lapply(termlabs, function(i){
+    cond_labs <- purrr::flatten(lapply(termlabs, function(i) {
       split_termlabs(i)
     }))
   } else {
     cond_labs <- strsplit(as.character(effects), split = ":")
   }
 
-  if(any(lengths(cond_labs) > 3L)) {
-    stop("To display interactions of order higher than 3 ",
-         "please use plot_predictions()",
-         call. = FALSE)
+  if (any(lengths(cond_labs) > 3L)) {
+    stop(
+      "To display interactions of order higher than 3 ",
+      "please use plot_predictions()",
+      call. = FALSE
+    )
   }
 
-  if(length(cond_labs) > 0){
+  if (length(cond_labs) > 0) {
     # Make the plot data with plot_predictions
     out <- list()
-    for(i in seq_along(cond_labs)){
-      if(length(cond_labs[[i]]) == 1){
-        out[[i]] <- plot_predictions(x,
-                                     condition = cond_labs[[i]],
-                                     draw = TRUE,
-                                     type = type,
-                                     points = points,
-                                     rug = rug,
-                                     ...) +
-          scale_fill_discrete(label = roundlabs) +
-          scale_colour_discrete(label = roundlabs) +
-          theme_classic()
-
-      }
-
-      if(length(cond_labs[[i]]) == 2){
-        out[[i]] <- plot_predictions(x,
-                                     condition = c(cond_labs[[i]][1],
-                                                   cond_labs[[i]][2]),
-                                     draw = TRUE,
-                                     type = type,
-                                     points = points,
-                                     rug = rug,
-                                     ...) +
+    for (i in seq_along(cond_labs)) {
+      if (length(cond_labs[[i]]) == 1) {
+        out[[i]] <- plot_predictions(
+          x,
+          condition = cond_labs[[i]],
+          draw = TRUE,
+          type = type,
+          points = points,
+          rug = rug,
+          ...
+        ) +
           scale_fill_discrete(label = roundlabs) +
           scale_colour_discrete(label = roundlabs) +
           theme_classic()
       }
 
-      if(length(cond_labs[[i]]) == 3){
-        out[[i]] <- plot_predictions(x,
-                                     condition = c(cond_labs[[i]][1],
-                                                   cond_labs[[i]][2],
-                                                   cond_labs[[i]][3]),
-                                     draw = TRUE,
-                                     type = type,
-                                     points = points,
-                                     rug = rug,
-                                     ...) +
+      if (length(cond_labs[[i]]) == 2) {
+        out[[i]] <- plot_predictions(
+          x,
+          condition = c(cond_labs[[i]][1], cond_labs[[i]][2]),
+          draw = TRUE,
+          type = type,
+          points = points,
+          rug = rug,
+          ...
+        ) +
           scale_fill_discrete(label = roundlabs) +
           scale_colour_discrete(label = roundlabs) +
           theme_classic()
       }
 
-
+      if (length(cond_labs[[i]]) == 3) {
+        out[[i]] <- plot_predictions(
+          x,
+          condition = c(
+            cond_labs[[i]][1],
+            cond_labs[[i]][2],
+            cond_labs[[i]][3]
+          ),
+          draw = TRUE,
+          type = type,
+          points = points,
+          rug = rug,
+          ...
+        ) +
+          scale_fill_discrete(label = roundlabs) +
+          scale_colour_discrete(label = roundlabs) +
+          theme_classic()
+      }
     }
   } else {
     out <- NULL
@@ -225,15 +239,12 @@ brms::conditional_effects
 
 #' @rdname conditional_effects.mvgam
 #' @export
-plot.mvgam_conditional_effects = function(x,
-                                          plot = TRUE,
-                                          ask = FALSE,
-                                          ...){
+plot.mvgam_conditional_effects = function(x, plot = TRUE, ask = FALSE, ...) {
   out <- x
-  for(i in seq_along(out)){
-    if(plot){
+  for (i in seq_along(out)) {
+    if (plot) {
       plot(out[[i]])
-      if(i == 1){
+      if (i == 1) {
         devAskNewPage(ask = ask)
       }
     }
@@ -247,8 +258,9 @@ plot.mvgam_conditional_effects = function(x,
 decimalplaces <- function(x) {
   x <- as.numeric(x)
   if (abs(x - round(x)) > .Machine$double.eps^0.5) {
-    nchar(strsplit(sub('0+$', '', as.character(x)), ".",
-                   fixed = TRUE)[[1]][[2]])
+    nchar(strsplit(sub('0+$', '', as.character(x)), ".", fixed = TRUE)[[1]][[
+      2
+    ]])
   } else {
     return(0)
   }
@@ -257,14 +269,14 @@ decimalplaces <- function(x) {
 #' A helper function so ggplot2 labels in the legend don't have
 #' ridiculous numbers of digits for numeric bins
 #' @noRd
-roundlabs = function(x){
-  if(all(suppressWarnings(is.na(as.numeric(x))))){
+roundlabs = function(x) {
+  if (all(suppressWarnings(is.na(as.numeric(x))))) {
     out <- x
-  } else if(all(sapply(x, decimalplaces) == 0)) {
+  } else if (all(sapply(x, decimalplaces) == 0)) {
     out <- x
-  }else if(all(sapply(x, decimalplaces) <= 1)) {
+  } else if (all(sapply(x, decimalplaces) <= 1)) {
     out <- sprintf("%.1f", as.numeric(x))
-    } else {
+  } else {
     out <- sprintf("%.4f", as.numeric(x))
   }
   out
@@ -277,50 +289,60 @@ print.mvgam_conditional_effects <- function(x, ...) {
 }
 
 #' @noRd
-split_termlabs = function(lab){
+split_termlabs = function(lab) {
   out <- list()
-  if(grepl(':', lab, fixed = TRUE)){
+  if (grepl(':', lab, fixed = TRUE)) {
     out[[1]] <- strsplit(lab, ':')[[1]]
-  } else if(grepl('*', lab, fixed = TRUE)){
+  } else if (grepl('*', lab, fixed = TRUE)) {
     out[[1]] <- strsplit(lab, '\\*')[[1]]
-  } else if(grepl('s(', lab, fixed = TRUE) |
-            grepl('gp(', lab, fixed = TRUE) |
-            grepl('te(', lab, fixed = TRUE) |
-            grepl('t2(', lab, fixed = TRUE) |
-            grepl('ti(', lab, fixed = TRUE)){
+  } else if (
+    grepl('s(', lab, fixed = TRUE) |
+      grepl('gp(', lab, fixed = TRUE) |
+      grepl('te(', lab, fixed = TRUE) |
+      grepl('t2(', lab, fixed = TRUE) |
+      grepl('ti(', lab, fixed = TRUE)
+  ) {
     term_struc <- eval(rlang::parse_expr(lab))
-    term_struc$by <- if(term_struc$by == 'NA'){
+    term_struc$by <- if (term_struc$by == 'NA') {
       NULL
     } else {
       term_struc$by
     }
-    if(length(term_struc$term) <= 2){
-      out[[1]] <- c(all.vars(parse(text = term_struc$term)),
-                    term_struc$by)
+    if (length(term_struc$term) <= 2) {
+      out[[1]] <- c(all.vars(parse(text = term_struc$term)), term_struc$by)
     }
-    if(length(term_struc$term) == 3){
-      out[[1]] <- c(all.vars(parse(text = term_struc$term[1:2])),
-                    term_struc$by)
-      out[[2]] <- c(all.vars(parse(text = term_struc$term[c(1, 3)])),
-                    term_struc$by)
-      out[[3]] <- c(all.vars(parse(text = term_struc$term[c(2, 3)])),
-                    term_struc$by)
-    }
-
-    if(length(term_struc$term) == 4){
-      out[[1]] <- c(all.vars(parse(text = term_struc$term[1:2])),
-                    term_struc$by)
-      out[[2]] <- c(all.vars(parse(text = term_struc$term[c(1, 3)])),
-                    term_struc$by)
-      out[[3]] <- c(all.vars(parse(text = term_struc$term[c(1, 4)])),
-                    term_struc$by)
-      out[[4]] <- c(all.vars(parse(text = term_struc$term[c(2, 3)])),
-                    term_struc$by)
-      out[[5]] <- c(all.vars(parse(text = term_struc$term[c(2, 4)])),
-                    term_struc$by)
+    if (length(term_struc$term) == 3) {
+      out[[1]] <- c(all.vars(parse(text = term_struc$term[1:2])), term_struc$by)
+      out[[2]] <- c(
+        all.vars(parse(text = term_struc$term[c(1, 3)])),
+        term_struc$by
+      )
+      out[[3]] <- c(
+        all.vars(parse(text = term_struc$term[c(2, 3)])),
+        term_struc$by
+      )
     }
 
-  } else if(grepl('dynamic(', lab, fixed = TRUE)){
+    if (length(term_struc$term) == 4) {
+      out[[1]] <- c(all.vars(parse(text = term_struc$term[1:2])), term_struc$by)
+      out[[2]] <- c(
+        all.vars(parse(text = term_struc$term[c(1, 3)])),
+        term_struc$by
+      )
+      out[[3]] <- c(
+        all.vars(parse(text = term_struc$term[c(1, 4)])),
+        term_struc$by
+      )
+      out[[4]] <- c(
+        all.vars(parse(text = term_struc$term[c(2, 3)])),
+        term_struc$by
+      )
+      out[[5]] <- c(
+        all.vars(parse(text = term_struc$term[c(2, 4)])),
+        term_struc$by
+      )
+    }
+  } else if (grepl('dynamic(', lab, fixed = TRUE)) {
     term_struc <- eval(rlang::parse_expr(lab))
     out[[1]] <- c('time', all.vars(parse(text = term_struc$term[c(2, 4)])))
   } else {

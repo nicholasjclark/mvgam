@@ -50,32 +50,36 @@ generics::augment
 #'
 #' @importFrom stats residuals
 #' @export
-augment.mvgam <- function(x,
-                          robust = FALSE,
-                          probs = c(0.025, 0.975),
-                          ...) {
+augment.mvgam <- function(x, robust = FALSE, probs = c(0.025, 0.975), ...) {
   obs_data <- x$obs_data
   obs_data$.observed <- obs_data$y
-  obs_data <- purrr::discard_at(obs_data,
-                                c("index..orig..order", "index..time..index"))
+  obs_data <- purrr::discard_at(
+    obs_data,
+    c("index..orig..order", "index..time..index")
+  )
 
   resids <- residuals(x, robust = robust, probs = probs) %>%
     tibble::as_tibble()
   fits <- fitted(x, robust = robust, probs = probs) %>%
     tibble::as_tibble()
   hc_fits <- fits %>%
-    dplyr::slice_head(n = NROW(resids))  # fits can include fcs
-  colnames(resids) <- c(".resid",
-                        ".resid.variability",
-                        ".resid.cred.low",
-                        ".resid.cred.high")
-  colnames(hc_fits) <- c(".fitted",
-                         ".fit.variability",
-                         ".fit.cred.low",
-                         ".fit.cred.high")
+    dplyr::slice_head(n = NROW(resids)) # fits can include fcs
+  colnames(resids) <- c(
+    ".resid",
+    ".resid.variability",
+    ".resid.cred.low",
+    ".resid.cred.high"
+  )
+  colnames(hc_fits) <- c(
+    ".fitted",
+    ".fit.variability",
+    ".fit.cred.low",
+    ".fit.cred.high"
+  )
 
-  augmented <- c(obs_data, hc_fits, resids)  # coerces to list
-  if (!identical(class(x$obs_data), "list")) {  # data.frame
+  augmented <- c(obs_data, hc_fits, resids) # coerces to list
+  if (!identical(class(x$obs_data), "list")) {
+    # data.frame
     augmented <- tibble::as_tibble(augmented)
   }
 

@@ -135,36 +135,38 @@ NULL
 
 #' @rdname evaluate_mvgams
 #' @export
-eval_mvgam = function(object,
-                      n_samples = 5000,
-                      eval_timepoint = 3,
-                      fc_horizon = 3,
-                      n_cores = 1,
-                      score = 'drps',
-                      log = FALSE,
-                      weights){
-
+eval_mvgam = function(
+  object,
+  n_samples = 5000,
+  eval_timepoint = 3,
+  fc_horizon = 3,
+  n_cores = 1,
+  score = 'drps',
+  log = FALSE,
+  weights
+) {
   # Check arguments
   if (!(inherits(object, 'mvgam'))) {
     stop('argument "object" must be of class "mvgam"')
   }
 
-  if(attr(object$model_data, 'trend_model') == 'None'){
-    stop('cannot compute rolling forecasts for mvgams that have no trend model',
-         call. = FALSE)
+  if (attr(object$model_data, 'trend_model') == 'None') {
+    stop(
+      'cannot compute rolling forecasts for mvgams that have no trend model',
+      call. = FALSE
+    )
   }
 
   validate_pos_integer(fc_horizon)
   validate_pos_integer(eval_timepoint)
   validate_pos_integer(n_cores)
-  if(n_cores > 1L){
+  if (n_cores > 1L) {
     message('argument "n_cores" is deprecated')
   }
   validate_pos_integer(n_samples)
 
-  if(eval_timepoint < 3){
-    stop('argument "eval_timepoint" must be >= 3',
-         call. = FALSE)
+  if (eval_timepoint < 3) {
+    stop('argument "eval_timepoint" must be >= 3', call. = FALSE)
   }
 
   #### 1. Prepare the data at the right timepoint ####
@@ -172,130 +174,144 @@ eval_mvgam = function(object,
   n_series <- NCOL(object$ytimes)
 
   # Check evaluation timepoint
-  if(inherits(object$obs_data, 'list')){
-    all_times <- (data.frame(time = object$obs_data$time)  %>%
-                         dplyr::select(time) %>%
-                         dplyr::distinct() %>%
-                         dplyr::arrange(time) %>%
-                         dplyr::mutate(time = dplyr::row_number())) %>%
+  if (inherits(object$obs_data, 'list')) {
+    all_times <- (data.frame(time = object$obs_data$time) %>%
+      dplyr::select(time) %>%
+      dplyr::distinct() %>%
+      dplyr::arrange(time) %>%
+      dplyr::mutate(time = dplyr::row_number())) %>%
       dplyr::pull(time)
-
   } else {
     all_times <- (object$obs_data %>%
-                         dplyr::select(time) %>%
-                         dplyr::distinct() %>%
-                         dplyr::arrange(time) %>%
-                         dplyr::mutate(time = dplyr::row_number())) %>%
+      dplyr::select(time) %>%
+      dplyr::distinct() %>%
+      dplyr::arrange(time) %>%
+      dplyr::mutate(time = dplyr::row_number())) %>%
       dplyr::pull(time)
   }
 
-  if(!eval_timepoint %in% all_times){
+  if (!eval_timepoint %in% all_times) {
     stop('Evaluation timepoint does not exist in original training data')
   }
 
   # Filter training data to correct point (just following evaluation timepoint)
-  data.frame(time = object$obs_data$time,
-             series = object$obs_data$series) %>%
+  data.frame(time = object$obs_data$time, series = object$obs_data$series) %>%
     dplyr::mutate(row_number = dplyr::row_number()) %>%
-    dplyr::left_join(data.frame(time = object$obs_data$time,
-                                series = object$obs_data$series),
-                     by = c('time', 'series')) %>%
+    dplyr::left_join(
+      data.frame(time = object$obs_data$time, series = object$obs_data$series),
+      by = c('time', 'series')
+    ) %>%
     dplyr::arrange(time, series) %>%
-    dplyr::filter(time > (eval_timepoint) &
-                    time <= (eval_timepoint + fc_horizon)) %>%
+    dplyr::filter(
+      time > (eval_timepoint) &
+        time <= (eval_timepoint + fc_horizon)
+    ) %>%
     dplyr::pull(row_number) -> assim_rows
 
-  if(inherits(object$obs_data, 'list')){
-    data_assim <- lapply(object$obs_data, function(x){
-      if(is.matrix(x)){
-        matrix(x[assim_rows, ],
-               ncol = NCOL(x))
+  if (inherits(object$obs_data, 'list')) {
+    data_assim <- lapply(object$obs_data, function(x) {
+      if (is.matrix(x)) {
+        matrix(x[assim_rows, ], ncol = NCOL(x))
       } else {
         x[assim_rows]
       }
-
     })
-
   } else {
     object$obs_data[assim_rows, ] -> data_assim
   }
 
-
   #### 2. Generate the forecast distribution ####
-  draw_fcs <- forecast_draws(object = object,
-                             type = 'response',
-                             series = 'all',
-                             data_test = data_assim,
-                             n_samples = n_samples,
-                             ending_time = eval_timepoint,
-                             n_cores = n_cores)
+  draw_fcs <- forecast_draws(
+    object = object,
+    type = 'response',
+    series = 'all',
+    data_test = data_assim,
+    n_samples = n_samples,
+    ending_time = eval_timepoint,
+    n_cores = n_cores
+  )
 
-  if(missing(weights)){
+  if (missing(weights)) {
     weights <- rep(1, NCOL(object$ytimes))
   }
 
   # Final forecast distribution
-  series_fcs <- lapply(seq_len(n_series), function(series){
-    indexed_forecasts <- do.call(rbind, lapply(seq_along(draw_fcs), function(x){
-      draw_fcs[[x]][[series]]
-    }))
+  series_fcs <- lapply(seq_len(n_series), function(series) {
+    indexed_forecasts <- do.call(
+      rbind,
+      lapply(seq_along(draw_fcs), function(x) {
+        draw_fcs[[x]][[series]]
+      })
+    )
     indexed_forecasts
   })
   names(series_fcs) <- levels(data_assim$series)
 
   # If variogram score is chosen
-  if(score == 'variogram'){
-
+  if (score == 'variogram') {
     # Get truths (out of sample) into correct format
-    truths <- do.call(rbind, lapply(seq_len(n_series), function(series){
-      s_name <- levels(data_assim$series)[series]
-      data.frame(series = data_assim$series,
-                 y = data_assim$y,
-                 time = data_assim$time) %>%
-        dplyr::filter(series == s_name) %>%
-        dplyr::select(time, y) %>%
-        dplyr::distinct() %>%
-        dplyr::arrange(time) %>%
-        dplyr::pull(y)
-    }))
+    truths <- do.call(
+      rbind,
+      lapply(seq_len(n_series), function(series) {
+        s_name <- levels(data_assim$series)[series]
+        data.frame(
+          series = data_assim$series,
+          y = data_assim$y,
+          time = data_assim$time
+        ) %>%
+          dplyr::filter(series == s_name) %>%
+          dplyr::select(time, y) %>%
+          dplyr::distinct() %>%
+          dplyr::arrange(time) %>%
+          dplyr::pull(y)
+      })
+    )
 
-    series_score <- variogram_mcmc_object(truths = truths,
-                                                    fcs = series_fcs,
-                                                    log = log,
-                                                  weights = weights)
+    series_score <- variogram_mcmc_object(
+      truths = truths,
+      fcs = series_fcs,
+      log = log,
+      weights = weights
+    )
   }
 
   # If not using variogram score
-  if(score != 'variogram'){
-
+  if (score != 'variogram') {
     # Evaluate against the truth
-    series_truths <- lapply(seq_len(n_series), function(series){
-      if(class(object$obs_data)[1] == 'list'){
+    series_truths <- lapply(seq_len(n_series), function(series) {
+      if (class(object$obs_data)[1] == 'list') {
         data_assim[['y']][which(as.numeric(data_assim$series) == series)]
       } else {
-        data_assim[which(as.numeric(data_assim$series) == series),'y']
+        data_assim[which(as.numeric(data_assim$series) == series), 'y']
       }
     })
 
     # Calculate score and interval coverage per series
-    if(object$family %in% c('poisson', 'negative binomial', 'binomial', 'beta_binomial')){
-      series_score <- lapply(seq_len(n_series), function(series){
-        DRPS <- data.frame(drps_mcmc_object(as.vector(as.matrix(series_truths[[series]])),
-                                              series_fcs[[series]],
-                                            log = log))
-        colnames(DRPS) <- c('score','in_interval')
+    if (
+      object$family %in%
+        c('poisson', 'negative binomial', 'binomial', 'beta_binomial')
+    ) {
+      series_score <- lapply(seq_len(n_series), function(series) {
+        DRPS <- data.frame(drps_mcmc_object(
+          as.vector(as.matrix(series_truths[[series]])),
+          series_fcs[[series]],
+          log = log
+        ))
+        colnames(DRPS) <- c('score', 'in_interval')
         DRPS$eval_horizon <- seq(1, fc_horizon)
         DRPS
       })
       names(series_score) <- levels(data_assim$series)
     } else {
-      series_score <- lapply(seq_len(n_series), function(series){
-      CRPS <- data.frame(crps_mcmc_object(as.vector(as.matrix(series_truths[[series]])),
-                                              series_fcs[[series]],
-                                          log = log))
+      series_score <- lapply(seq_len(n_series), function(series) {
+        CRPS <- data.frame(crps_mcmc_object(
+          as.vector(as.matrix(series_truths[[series]])),
+          series_fcs[[series]],
+          log = log
+        ))
 
-        colnames(CRPS) <- c('score','in_interval')
-        if(log){
+        colnames(CRPS) <- c('score', 'in_interval')
+        if (log) {
           CRPS$score <- log(CRPS$score + 0.0001)
         }
         CRPS$eval_horizon <- seq(1, fc_horizon)
@@ -321,27 +337,30 @@ eval_mvgam = function(object,
 #'@param n_cores Deprecated. Parallel processing is no longer supported
 #'@rdname evaluate_mvgams
 #'@export
-roll_eval_mvgam = function(object,
-                           n_evaluations = 5,
-                           evaluation_seq,
-                           n_samples = 5000,
-                           fc_horizon = 3,
-                           n_cores = 1,
-                           score = 'drps',
-                           log = FALSE,
-                           weights){
-
+roll_eval_mvgam = function(
+  object,
+  n_evaluations = 5,
+  evaluation_seq,
+  n_samples = 5000,
+  fc_horizon = 3,
+  n_cores = 1,
+  score = 'drps',
+  log = FALSE,
+  weights
+) {
   # Check arguments
   if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
 
-  if(attr(object$model_data, 'trend_model') == 'None'){
-    stop('cannot compute rolling forecasts for mvgams that have no trend model',
-         call. = FALSE)
+  if (attr(object$model_data, 'trend_model') == 'None') {
+    stop(
+      'cannot compute rolling forecasts for mvgams that have no trend model',
+      call. = FALSE
+    )
   }
   validate_pos_integer(n_cores)
-  if(n_cores > 1L){
+  if (n_cores > 1L) {
     message('argument "n_cores" is deprecated')
   }
   validate_pos_integer(n_evaluations)
@@ -349,120 +368,144 @@ roll_eval_mvgam = function(object,
   validate_pos_integer(fc_horizon)
 
   # Generate time variable from training data
-  if(inherits(object$obs_data, 'list')){
+  if (inherits(object$obs_data, 'list')) {
     all_timepoints <- (data.frame(time = object$obs_data$index..time..index) %>%
-                         dplyr::select(time) %>%
-                         dplyr::distinct() %>%
-                         dplyr::arrange(time) %>%
-                         dplyr::mutate(time = dplyr::row_number())) %>%
+      dplyr::select(time) %>%
+      dplyr::distinct() %>%
+      dplyr::arrange(time) %>%
+      dplyr::mutate(time = dplyr::row_number())) %>%
       dplyr::pull(time)
-
   } else {
     all_timepoints <- (object$obs_data %>%
-                         dplyr::select(index..time..index) %>%
-                         dplyr::distinct() %>%
-                         dplyr::arrange(index..time..index) %>%
-                         dplyr::mutate(time = dplyr::row_number())) %>%
+      dplyr::select(index..time..index) %>%
+      dplyr::distinct() %>%
+      dplyr::arrange(index..time..index) %>%
+      dplyr::mutate(time = dplyr::row_number())) %>%
       dplyr::pull(time)
   }
 
-
   # Generate evaluation sequence if not supplied
-  if(missing(evaluation_seq)){
-    evaluation_seq <- floor(seq(from = 3, to = (max(all_timepoints) - fc_horizon),
-                                length.out = n_evaluations))
+  if (missing(evaluation_seq)) {
+    evaluation_seq <- floor(seq(
+      from = 3,
+      to = (max(all_timepoints) - fc_horizon),
+      length.out = n_evaluations
+    ))
   }
 
   # Check evaluation sequence
-  if(min(evaluation_seq) < 3){
+  if (min(evaluation_seq) < 3) {
     stop('Evaluation sequence cannot start before timepoint 3')
   }
 
-  if(max(evaluation_seq) > (max(all_timepoints) - fc_horizon)){
-    stop('Maximum of evaluation sequence is too large for fc_horizon evaluations')
+  if (max(evaluation_seq) > (max(all_timepoints) - fc_horizon)) {
+    stop(
+      'Maximum of evaluation sequence is too large for fc_horizon evaluations'
+    )
   }
 
   # Loop across evaluation sequence and calculate evaluation metrics
-  if(missing(weights)){
+  if (missing(weights)) {
     weights <- rep(1, NCOL(object$ytimes))
   }
 
-  evals <- lapply(evaluation_seq, function(timepoint){
-    eval_mvgam(object = object,
-               n_samples = n_samples,
-               n_cores = 1,
-               eval_timepoint = timepoint,
-               fc_horizon = fc_horizon,
-               score = score,
-               log = log,
-               weights = weights)
+  evals <- lapply(evaluation_seq, function(timepoint) {
+    eval_mvgam(
+      object = object,
+      n_samples = n_samples,
+      n_cores = 1,
+      eval_timepoint = timepoint,
+      fc_horizon = fc_horizon,
+      score = score,
+      log = log,
+      weights = weights
+    )
   })
 
   # Take sum of score at each evaluation point for multivariate models
-  sum_or_na = function(x){
-    if(all(is.na(x))){
+  sum_or_na = function(x) {
+    if (all(is.na(x))) {
       NA
     } else {
       sum(x, na.rm = T)
     }
   }
 
-  if(score == 'variogram'){
-    eval_horizons <- do.call(rbind, lapply(seq_along(evals), function(x){
-      data.frame(seq_along(evals[[x]]))
-    }))
+  if (score == 'variogram') {
+    eval_horizons <- do.call(
+      rbind,
+      lapply(seq_along(evals), function(x) {
+        data.frame(seq_along(evals[[x]]))
+      })
+    )
 
-    scores <- do.call(rbind, lapply(seq_along(evals), function(x){
-      data.frame(evals[[x]])
-    }))
+    scores <- do.call(
+      rbind,
+      lapply(seq_along(evals), function(x) {
+        data.frame(evals[[x]])
+      })
+    )
 
-    evals_df <- data.frame(score = scores,
-                           eval_horizon = eval_horizons,
-                           in_interval = NA)
+    evals_df <- data.frame(
+      score = scores,
+      eval_horizon = eval_horizons,
+      in_interval = NA
+    )
     colnames(evals_df) <- c('score', 'eval_horizon', 'in_interval')
 
     # Calculate summary statistics for each series
-    out <- list(sum_score = sum_or_na(evals_df$score),
-                score_summary = summary(evals_df$score),
-                score_horizon_summary = evals_df %>%
-                  dplyr::group_by(eval_horizon) %>%
-                  dplyr::summarise(median_score = median(score, na.rm = T)),
-                interval_coverage = NA,
-                series_evals = NA,
-                all_scores = evals_df)
-
+    out <- list(
+      sum_score = sum_or_na(evals_df$score),
+      score_summary = summary(evals_df$score),
+      score_horizon_summary = evals_df %>%
+        dplyr::group_by(eval_horizon) %>%
+        dplyr::summarise(median_score = median(score, na.rm = T)),
+      interval_coverage = NA,
+      series_evals = NA,
+      all_scores = evals_df
+    )
   } else {
     evals_df <- do.call(rbind, do.call(rbind, evals)) %>%
       dplyr::group_by(eval_horizon) %>%
-      dplyr::summarise(score = sum_or_na(score),
-                       in_interval = mean(in_interval, na.rm = T))
+      dplyr::summarise(
+        score = sum_or_na(score),
+        in_interval = mean(in_interval, na.rm = T)
+      )
 
     # Calculate summary statistics for each series
-    tidy_evals <- lapply(seq_len(length(levels(object$obs_data$series))), function(series){
-      all_evals <- do.call(rbind, purrr::map(evals, levels(object$obs_data$series)[series]))
-      list(sum_drps = sum_or_na(all_evals$score),
-           score_summary = summary(all_evals$score),
-           score_horizon_summary = all_evals %>%
-             dplyr::group_by(eval_horizon) %>%
-             dplyr::summarise(median_score = mean(score, na.rm = T)),
-           interval_coverage = mean(all_evals$in_interval, na.rm = T),
-           all_scores = all_evals)
-
-    })
+    tidy_evals <- lapply(
+      seq_len(length(levels(object$obs_data$series))),
+      function(series) {
+        all_evals <- do.call(
+          rbind,
+          purrr::map(evals, levels(object$obs_data$series)[series])
+        )
+        list(
+          sum_drps = sum_or_na(all_evals$score),
+          score_summary = summary(all_evals$score),
+          score_horizon_summary = all_evals %>%
+            dplyr::group_by(eval_horizon) %>%
+            dplyr::summarise(median_score = mean(score, na.rm = T)),
+          interval_coverage = mean(all_evals$in_interval, na.rm = T),
+          all_scores = all_evals
+        )
+      }
+    )
     names(tidy_evals) <- levels(object$obs_data$series)
 
-    out <- list(sum_score = sum_or_na(evals_df$score),
-                score_summary = summary(evals_df$score),
-                score_horizon_summary = evals_df %>%
-                  dplyr::group_by(eval_horizon) %>%
-                  dplyr::summarise(median_score = median(score, na.rm = T)),
-                interval_coverage = mean(evals_df$in_interval, na.rm = T),
-                series_evals = tidy_evals)
+    out <- list(
+      sum_score = sum_or_na(evals_df$score),
+      score_summary = summary(evals_df$score),
+      score_horizon_summary = evals_df %>%
+        dplyr::group_by(eval_horizon) %>%
+        dplyr::summarise(median_score = median(score, na.rm = T)),
+      interval_coverage = mean(evals_df$in_interval, na.rm = T),
+      series_evals = tidy_evals
+    )
   }
 
   # Return score summary statistics
   return(out)
-
 }
 
 
@@ -477,16 +520,17 @@ roll_eval_mvgam = function(object,
 #'@param n_cores Deprecated. Parallel processing is no longer supported
 #'@rdname evaluate_mvgams
 #'@export
-compare_mvgams = function(model1,
-                          model2,
-                          n_samples = 1000,
-                          fc_horizon = 3,
-                          n_evaluations = 10,
-                          n_cores = 1,
-                          score = 'drps',
-                          log = FALSE,
-                          weights){
-
+compare_mvgams = function(
+  model1,
+  model2,
+  n_samples = 1000,
+  fc_horizon = 3,
+  n_evaluations = 10,
+  n_cores = 1,
+  score = 'drps',
+  log = FALSE,
+  weights
+) {
   # Check arguments
   if (!(inherits(model1, "mvgam"))) {
     stop('argument "model1" must be of class "mvgam"')
@@ -496,45 +540,53 @@ compare_mvgams = function(model1,
     stop('argument "model2" must be of class "mvgam"')
   }
 
-  if(attr(model2$model_data, 'trend_model') == 'None'){
-    stop('cannot compare rolling forecasts for mvgams that have no trend model',
-         call. = FALSE)
+  if (attr(model2$model_data, 'trend_model') == 'None') {
+    stop(
+      'cannot compare rolling forecasts for mvgams that have no trend model',
+      call. = FALSE
+    )
   }
 
-  if(attr(model1$model_data, 'trend_model') == 'None'){
-    stop('cannot compare rolling forecasts for mvgams that have no trend model',
-         call. = FALSE)
+  if (attr(model1$model_data, 'trend_model') == 'None') {
+    stop(
+      'cannot compare rolling forecasts for mvgams that have no trend model',
+      call. = FALSE
+    )
   }
 
   validate_pos_integer(n_evaluations)
   validate_pos_integer(fc_horizon)
   validate_pos_integer(n_cores)
-  if(n_cores > 1L){
+  if (n_cores > 1L) {
     message('argument "n_cores" is deprecated')
   }
   validate_pos_integer(n_samples)
 
   # Evaluate the two models
-  if(missing(weights)){
+  if (missing(weights)) {
     weights <- rep(1, NCOL(model1$ytimes))
   }
 
-  mod1_eval <- roll_eval_mvgam(model1,
-                               n_samples = n_samples,
-                               fc_horizon = fc_horizon,
-                               n_cores = n_cores,
-                               n_evaluations = n_evaluations,
-                               score = score,
-                               log = log,
-                               weights = weights)
-  mod2_eval <- roll_eval_mvgam(model2,
-                               n_samples = n_samples,
-                               fc_horizon = fc_horizon,
-                               n_cores = n_cores,
-                               n_evaluations = n_evaluations,
-                               score = score,
-                               log = log,
-                               weights = weights)
+  mod1_eval <- roll_eval_mvgam(
+    model1,
+    n_samples = n_samples,
+    fc_horizon = fc_horizon,
+    n_cores = n_cores,
+    n_evaluations = n_evaluations,
+    score = score,
+    log = log,
+    weights = weights
+  )
+  mod2_eval <- roll_eval_mvgam(
+    model2,
+    n_samples = n_samples,
+    fc_horizon = fc_horizon,
+    n_cores = n_cores,
+    n_evaluations = n_evaluations,
+    score = score,
+    log = log,
+    weights = weights
+  )
 
   # Generate a simple summary of forecast scores for each model
   model_summary <- rbind(mod1_eval$score_summary, mod2_eval$score_summary)
@@ -543,7 +595,7 @@ compare_mvgams = function(model1,
   print(model_summary)
 
   # Print 90% interval coverages for each model
-  if(score != 'variogram'){
+  if (score != 'variogram') {
     cat('\n90% interval coverages per model (closer to 0.9 is better)\n')
     cat('Model 1', mod1_eval$interval_coverage, '\n')
     cat('Model 2', mod2_eval$interval_coverage)
@@ -552,47 +604,58 @@ compare_mvgams = function(model1,
   # Set up plotting loop and return summary plots of DRPS
   ask <- TRUE
 
-  for(i in 1:3) {
-    if(i == 1){
-      barplot(c('model 1' = mod1_eval$sum_score,
-                'model 2' = mod2_eval$sum_score),
-              col = c("#B97C7C",  "#7C0000"),
-              border = NA,
-              ylab = 'Sum RPS (lower is better)',
-              lwd = 2)
-    } else if(i == 2){
-      boxplot(list('model 1' = mod1_eval$score_summary,
-                   'model 2' = mod2_eval$score_summary),
-              border = c("#B97C7C",  "#7C0000"),
-              ylab = 'Sum RPS per evaluation', axes = FALSE)
+  for (i in 1:3) {
+    if (i == 1) {
+      barplot(
+        c('model 1' = mod1_eval$sum_score, 'model 2' = mod2_eval$sum_score),
+        col = c("#B97C7C", "#7C0000"),
+        border = NA,
+        ylab = 'Sum RPS (lower is better)',
+        lwd = 2
+      )
+    } else if (i == 2) {
+      boxplot(
+        list(
+          'model 1' = mod1_eval$score_summary,
+          'model 2' = mod2_eval$score_summary
+        ),
+        border = c("#B97C7C", "#7C0000"),
+        ylab = 'Sum RPS per evaluation',
+        axes = FALSE
+      )
       axis(side = 2, lwd = 2)
       axis(side = 1, at = c(1, 2), labels = c('model 1', 'model 2'), lwd = 0)
     } else {
-      plot_dat <- rbind(mod1_eval$score_horizon_summary$median_score,
-                        mod2_eval$score_horizon_summary$median_score)
+      plot_dat <- rbind(
+        mod1_eval$score_horizon_summary$median_score,
+        mod2_eval$score_horizon_summary$median_score
+      )
       colnames(plot_dat) <- seq(1:NCOL(plot_dat))
 
-      ylim = c(min(0, min(plot_dat, na.rm = TRUE)), max(plot_dat, na.rm = T) * 1.4)
+      ylim = c(
+        min(0, min(plot_dat, na.rm = TRUE)),
+        max(plot_dat, na.rm = T) * 1.4
+      )
 
-      barplot(plot_dat,
-              ylim = ylim,
-              beside = T,
-              xlab = 'Forecast horizon',
-              ylab = 'Median RPS',
-              col = c("#B97C7C",  "#7C0000"),
-              lwd = 2,
-              border = NA,
-              legend.text = c('Model 1', 'Model 2'),
-              args.legend = list(x = "top", ncol = 2, border = NA,
-                                 bty = 'n'))
+      barplot(
+        plot_dat,
+        ylim = ylim,
+        beside = T,
+        xlab = 'Forecast horizon',
+        ylab = 'Median RPS',
+        col = c("#B97C7C", "#7C0000"),
+        lwd = 2,
+        border = NA,
+        legend.text = c('Model 1', 'Model 2'),
+        args.legend = list(x = "top", ncol = 2, border = NA, bty = 'n')
+      )
     }
 
-    if(ask){
+    if (ask) {
       oask <- devAskNewPage(TRUE)
       on.exit(devAskNewPage(oask))
       ask <- FALSE
     }
-
   }
   invisible()
 }
@@ -622,10 +685,15 @@ crps_edf <- function(y, dat, w = NULL) {
 # Compute CRPS
 # code borrowed from scoringRules: https://github.com/FK83/scoringRules/blob/master/R/scores_sample_univ.R
 #' @noRd
-crps_score <- function(truth, fc, method = "edf", w = NULL,
-                       interval_width = 0.9, log = FALSE){
-
-  if(log){
+crps_score <- function(
+  truth,
+  fc,
+  method = "edf",
+  w = NULL,
+  interval_width = 0.9,
+  log = FALSE
+) {
+  if (log) {
     truth <- log(truth + 0.001)
     fc <- log(fc + 0.001)
   }
@@ -633,14 +701,21 @@ crps_score <- function(truth, fc, method = "edf", w = NULL,
   if (identical(length(truth), 1L) && is.vector(fc)) {
     score <- crps_edf(truth, fc, w)
   } else {
-    score <- sapply(seq_along(truth),
-                    function(i) crps_edf(truth[i], fc[i, ], w[i, ]))
+    score <- sapply(
+      seq_along(truth),
+      function(i) crps_edf(truth[i], fc[i, ], w[i, ])
+    )
   }
 
   # Is value within empirical interval?
-  interval <- quantile(fc, probs = c((1-interval_width)/2,
-                                     (interval_width + (1-interval_width)/2)),
-                       na.rm = TRUE)
+  interval <- quantile(
+    fc,
+    probs = c(
+      (1 - interval_width) / 2,
+      (interval_width + (1 - interval_width) / 2)
+    ),
+    na.rm = TRUE
+  )
   in_interval <- ifelse(truth <= interval[2] & truth >= interval[1], 1, 0)
   return(c(score, in_interval))
 }
@@ -648,15 +723,13 @@ crps_score <- function(truth, fc, method = "edf", w = NULL,
 
 # Compute DRPS
 #' @noRd
-drps_score <- function(truth, fc, interval_width = 0.9,
-                       log = FALSE){
-  if(log){
+drps_score <- function(truth, fc, interval_width = 0.9, log = FALSE) {
+  if (log) {
     truth <- log(truth + 0.001)
     fc <- log(fc + 0.001)
     nsum <- max(c(truth, fc), na.rm = TRUE) + 5
   } else {
-    nsum <- max(c(truth,
-                  quantile(fc, probs = 0.99)), na.rm = TRUE) + 1000
+    nsum <- max(c(truth, quantile(fc, probs = 0.99)), na.rm = TRUE) + 1000
   }
 
   Fy = ecdf(fc)
@@ -665,18 +738,22 @@ drps_score <- function(truth, fc, interval_width = 0.9,
   score <- sum((indicator - Fy(ysum))^2)
 
   # Is value within empirical interval?
-  interval <- quantile(fc, probs = c((1-interval_width)/2,
-                                     (interval_width + (1-interval_width)/2)),
-                       na.rm = TRUE)
+  interval <- quantile(
+    fc,
+    probs = c(
+      (1 - interval_width) / 2,
+      (interval_width + (1 - interval_width) / 2)
+    ),
+    na.rm = TRUE
+  )
   in_interval <- ifelse(truth <= interval[2] & truth >= interval[1], 1, 0)
   return(c(score, in_interval))
 }
 
 # Compute the scaled interval score
 #' @noRd
-sis_score <- function(truth, fc, interval_width = 0.9,
-                       log = FALSE){
-  if(log){
+sis_score <- function(truth, fc, interval_width = 0.9, log = FALSE) {
+  if (log) {
     truth <- log(truth + 0.001)
     fc <- log(fc + 0.001)
   }
@@ -684,30 +761,36 @@ sis_score <- function(truth, fc, interval_width = 0.9,
   lower_prob <- (1 - interval_width) / 2
   upper_prob <- 1 - lower_prob
   creds <- quantile(fc, probs = c(lower_prob, upper_prob), na.rm = TRUE)
-  cred_lower <- creds[1]; cred_upper <- creds[2]; alpha <- 2 / (2 * lower_prob)
+  cred_lower <- creds[1]
+  cred_upper <- creds[2]
+  alpha <- 2 / (2 * lower_prob)
   cred_interval <- (cred_upper - cred_lower) / 2
   err_up <- truth - cred_upper
   err_low <- cred_lower - truth
 
   # SIS
-  score <- 2 * cred_interval + alpha * err_up * (err_up > 0) +
+  score <- 2 *
+    cred_interval +
+    alpha * err_up * (err_up > 0) +
     alpha * err_low * (err_low > 0)
 
   # Is value within empirical interval?
-  interval <- quantile(fc, probs = c((1-interval_width)/2,
-                                     (interval_width + (1-interval_width)/2)),
-                       na.rm = TRUE)
+  interval <- quantile(
+    fc,
+    probs = c(
+      (1 - interval_width) / 2,
+      (interval_width + (1 - interval_width) / 2)
+    ),
+    na.rm = TRUE
+  )
   in_interval <- ifelse(truth <= interval[2] & truth >= interval[1], 1, 0)
   return(c(score, in_interval))
 }
 
 # Compute the Brier score
 #' @noRd
-brier_score <- function(truth,
-                        fc,
-                        interval_width = 0.9){
-
-  score <- (truth - fc) ^ 2
+brier_score <- function(truth, fc, interval_width = 0.9) {
+  score <- (truth - fc)^2
   score <- sum(score) / length(score)
 
   # Cannot evaluate coverage for binary truths
@@ -718,13 +801,15 @@ brier_score <- function(truth,
 #' Compute the multivariate energy score
 #' @noRd
 energy_score <- function(truth, fc, log = FALSE) {
-  insight::check_if_installed("scoringRules",
-                              reason = 'to calculate energy scores')
+  insight::check_if_installed(
+    "scoringRules",
+    reason = 'to calculate energy scores'
+  )
 
   # es_sample can't handle any NAs
   has_nas <- apply(fc, 2, function(x) any(is.na(x)))
-  fc <- fc[,!has_nas]
-  if(log){
+  fc <- fc[, !has_nas]
+  if (log) {
     truth <- log(truth + 0.001)
     fc <- log(fc + 0.001)
   }
@@ -736,74 +821,74 @@ energy_score <- function(truth, fc, log = FALSE) {
 #' from the forecast distribution (scoringRules::vs_sample uses the
 #' mean, which is not appropriate for skewed distributions)
 #' @noRd
-variogram_score = function(truth, fc, log = FALSE, weights){
-  if(log){
+variogram_score = function(truth, fc, log = FALSE, weights) {
+  if (log) {
     truth <- log(truth + 0.001)
     fc <- log(fc + 0.001)
   }
 
   # Use weight of 1 for each pairwise combination if no weights
   # are supplied; else take the product of each pair of weights
-  if(missing(weights)){
+  if (missing(weights)) {
     weights <- matrix(1, nrow = length(truth), ncol = length(truth))
   } else {
-    weights <- outer(weights, weights, FUN = function(X, Y){
+    weights <- outer(weights, weights, FUN = function(X, Y) {
       (X + Y) / 2
     })
   }
 
   out <- matrix(NA, length(truth), length(truth))
-  for(i in 1:length(truth)){
-    for(j in 1:length(truth)){
-      if(i == j){
-        out[i,j] <- 0
+  for (i in 1:length(truth)) {
+    for (j in 1:length(truth)) {
+      if (i == j) {
+        out[i, j] <- 0
       } else {
-        v_fc <- quantile(abs(fc[i,] - fc[j,]) ^ 0.5, 0.5, na.rm = TRUE)
-        v_dat <- abs(truth[i] - truth[j]) ^ 0.5
-        out[i,j] <- 2 * weights[i, j] * ((v_dat - v_fc) ^ 2)
+        v_fc <- quantile(abs(fc[i, ] - fc[j, ])^0.5, 0.5, na.rm = TRUE)
+        v_dat <- abs(truth[i] - truth[j])^0.5
+        out[i, j] <- 2 * weights[i, j] * ((v_dat - v_fc)^2)
       }
     }
   }
   # Divide by two as we have (inefficiently) computed each pairwise
   # comparison twice
   score <- sum(out) / 2
-
 }
 
 #' Compute the energy score on all observations in fc_horizon
 #' @noRd
-energy_mcmc_object <- function(truths, fcs, log = FALSE,
-                                  weights){
-  fc_horizon <- length(fcs[[1]][1,])
-  fcs_per_horizon <- lapply(seq_len(fc_horizon), function(horizon){
-    do.call(rbind, lapply(seq_along(fcs), function(fc){
-      fcs[[fc]][,horizon]
-    }))
+energy_mcmc_object <- function(truths, fcs, log = FALSE, weights) {
+  fc_horizon <- length(fcs[[1]][1, ])
+  fcs_per_horizon <- lapply(seq_len(fc_horizon), function(horizon) {
+    do.call(
+      rbind,
+      lapply(seq_along(fcs), function(fc) {
+        fcs[[fc]][, horizon]
+      })
+    )
   })
 
-  unlist(lapply(seq_len(fc_horizon), function(horizon){
-    energy_score(truth = truths[,horizon],
-                 fc = fcs_per_horizon[[horizon]],
-                 log = log)
+  unlist(lapply(seq_len(fc_horizon), function(horizon) {
+    energy_score(
+      truth = truths[, horizon],
+      fc = fcs_per_horizon[[horizon]],
+      log = log
+    )
   }))
 }
 
 #' Compute the Brier score on all observations in fc_horizon
 #' @noRd
-brier_mcmc_object <- function(truth,
-                              fc,
-                              log = FALSE,
-                              weights){
-
+brier_mcmc_object <- function(truth, fc, log = FALSE, weights) {
   indices_keep <- which(!is.na(truth))
-  if(length(indices_keep) == 0){
-    scores = data.frame('brier' = rep(NA, length(truth)),
-                        'interval' = rep(NA, length(truth)))
+  if (length(indices_keep) == 0) {
+    scores = data.frame(
+      'brier' = rep(NA, length(truth)),
+      'interval' = rep(NA, length(truth))
+    )
   } else {
     scores <- matrix(NA, nrow = length(truth), ncol = 2)
-    for(i in indices_keep){
-      scores[i,] <- brier_score(truth = as.vector(truth)[i],
-                                fc = fc[,i])
+    for (i in indices_keep) {
+      scores[i, ] <- brier_score(truth = as.vector(truth)[i], fc = fc[, i])
     }
   }
   scores
@@ -811,37 +896,45 @@ brier_mcmc_object <- function(truth,
 
 #' Wrapper to calculate variogram score on all observations in fc_horizon
 #' @noRd
-variogram_mcmc_object <- function(truths, fcs, log = FALSE,
-                                  weights){
-  fc_horizon <- length(fcs[[1]][1,])
-  fcs_per_horizon <- lapply(seq_len(fc_horizon), function(horizon){
-    do.call(rbind, lapply(seq_along(fcs), function(fc){
-      fcs[[fc]][,horizon]
-    }))
+variogram_mcmc_object <- function(truths, fcs, log = FALSE, weights) {
+  fc_horizon <- length(fcs[[1]][1, ])
+  fcs_per_horizon <- lapply(seq_len(fc_horizon), function(horizon) {
+    do.call(
+      rbind,
+      lapply(seq_along(fcs), function(fc) {
+        fcs[[fc]][, horizon]
+      })
+    )
   })
 
-  unlist(lapply(seq_len(fc_horizon), function(horizon){
-    variogram_score(truth = truths[,horizon],
-                    fc = fcs_per_horizon[[horizon]],
-                    log = log,
-                    weights = weights)
+  unlist(lapply(seq_len(fc_horizon), function(horizon) {
+    variogram_score(
+      truth = truths[, horizon],
+      fc = fcs_per_horizon[[horizon]],
+      log = log,
+      weights = weights
+    )
   }))
 }
 
 # Wrapper to calculate DRPS scores on all observations in fc_horizon
 #' @noRd
-drps_mcmc_object <- function(truth, fc, interval_width = 0.9,
-                             log = FALSE){
+drps_mcmc_object <- function(truth, fc, interval_width = 0.9, log = FALSE) {
   indices_keep <- which(!is.na(truth))
-  if(length(indices_keep) == 0){
-    scores = data.frame('drps' = rep(NA, length(truth)),
-                        'interval' = rep(NA, length(truth)))
+  if (length(indices_keep) == 0) {
+    scores = data.frame(
+      'drps' = rep(NA, length(truth)),
+      'interval' = rep(NA, length(truth))
+    )
   } else {
     scores <- matrix(NA, nrow = length(truth), ncol = 2)
-    for(i in indices_keep){
-      scores[i,] <- drps_score(truth = as.vector(truth)[i],
-                               fc = fc[,i], interval_width,
-                               log = log)
+    for (i in indices_keep) {
+      scores[i, ] <- drps_score(
+        truth = as.vector(truth)[i],
+        fc = fc[, i],
+        interval_width,
+        log = log
+      )
     }
   }
   scores
@@ -849,18 +942,22 @@ drps_mcmc_object <- function(truth, fc, interval_width = 0.9,
 
 # Wrapper to calculate <SIS scores on all observations in fc_horizon
 #' @noRd
-sis_mcmc_object <- function(truth, fc, interval_width = 0.9,
-                             log = FALSE){
+sis_mcmc_object <- function(truth, fc, interval_width = 0.9, log = FALSE) {
   indices_keep <- which(!is.na(truth))
-  if(length(indices_keep) == 0){
-    scores = data.frame('sis' = rep(NA, length(truth)),
-                        'interval' = rep(NA, length(truth)))
+  if (length(indices_keep) == 0) {
+    scores = data.frame(
+      'sis' = rep(NA, length(truth)),
+      'interval' = rep(NA, length(truth))
+    )
   } else {
     scores <- matrix(NA, nrow = length(truth), ncol = 2)
-    for(i in indices_keep){
-      scores[i,] <- sis_score(truth = as.vector(truth)[i],
-                               fc = fc[,i], interval_width,
-                               log = log)
+    for (i in indices_keep) {
+      scores[i, ] <- sis_score(
+        truth = as.vector(truth)[i],
+        fc = fc[, i],
+        interval_width,
+        log = log
+      )
     }
   }
   scores
@@ -868,19 +965,22 @@ sis_mcmc_object <- function(truth, fc, interval_width = 0.9,
 
 # Wrapper to calculate CRPS scores on all observations in fc_horizon
 #' @noRd
-crps_mcmc_object <- function(truth, fc, interval_width = 0.9,
-                             log = FALSE){
+crps_mcmc_object <- function(truth, fc, interval_width = 0.9, log = FALSE) {
   indices_keep <- which(!is.na(truth))
-  if(length(indices_keep) == 0){
-    scores = data.frame('drps' = rep(NA, length(truth)),
-                        'interval' = rep(NA, length(truth)))
+  if (length(indices_keep) == 0) {
+    scores = data.frame(
+      'drps' = rep(NA, length(truth)),
+      'interval' = rep(NA, length(truth))
+    )
   } else {
     scores <- matrix(NA, nrow = length(truth), ncol = 2)
-    for(i in indices_keep){
-      scores[i,] <- crps_score(truth = as.vector(truth)[i],
-                               fc = fc[,i],
-                               interval_width = interval_width,
-                               log = log)
+    for (i in indices_keep) {
+      scores[i, ] <- crps_score(
+        truth = as.vector(truth)[i],
+        fc = fc[, i],
+        interval_width = interval_width,
+        log = log
+      )
     }
   }
   scores

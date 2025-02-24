@@ -72,203 +72,270 @@
 #'@method score mvgam_forecast
 #'@seealso \code{\link{forecast.mvgam}}, \code{\link{ensemble}}
 #'@export
-score.mvgam_forecast = function(object,
-                                score = 'crps',
-                                log = FALSE,
-                                weights,
-                                interval_width = 0.9,
-                                n_cores = 1,
-                                ...){
+score.mvgam_forecast = function(
+  object,
+  score = 'crps',
+  log = FALSE,
+  weights,
+  interval_width = 0.9,
+  n_cores = 1,
+  ...
+) {
+  score <- match.arg(
+    arg = score,
+    choices = c('crps', 'drps', 'brier', 'elpd', 'sis', 'energy', 'variogram')
+  )
 
-  score <- match.arg(arg = score,
-                           choices = c('crps',
-                                       'drps',
-                                       'brier',
-                                       'elpd',
-                                       'sis',
-                                       'energy',
-                                       'variogram'))
-
-  if(object$type == 'trend'){
-    stop('cannot evaluate accuracy of latent trend forecasts. Use "type == response" when forecasting instead',
-         call. = FALSE)
+  if (object$type == 'trend') {
+    stop(
+      'cannot evaluate accuracy of latent trend forecasts. Use "type == response" when forecasting instead',
+      call. = FALSE
+    )
   }
 
-  if(object$type != 'link' & score == 'elpd'){
-    stop('cannot evaluate elpd scores unless linear predictors are supplied. Use "type == link" when forecasting instead',
-         call. = FALSE)
+  if (object$type != 'link' & score == 'elpd') {
+    stop(
+      'cannot evaluate elpd scores unless linear predictors are supplied. Use "type == link" when forecasting instead',
+      call. = FALSE
+    )
   }
 
-  if(object$type != 'expected' & score == 'brier'){
-    stop('cannot evaluate brier scores unless probability predictions are supplied. Use "type == expected" when forecasting instead',
-         call. = FALSE)
+  if (object$type != 'expected' & score == 'brier') {
+    stop(
+      'cannot evaluate brier scores unless probability predictions are supplied. Use "type == expected" when forecasting instead',
+      call. = FALSE
+    )
   }
 
   validate_pos_integer(n_cores)
   validate_proportional(interval_width)
-  if(interval_width < 0.05 || interval_width > 0.95){
+  if (interval_width < 0.05 || interval_width > 0.95) {
     stop('interval width must be between 0.05 and 0.95, inclusive')
   }
 
   # Get truths (out of sample) into correct format
   n_series <- length(object$series_names)
-  truths <- do.call(rbind, lapply(seq_len(n_series), function(series){
-    object$test_observations[[series]]
-  }))
+  truths <- do.call(
+    rbind,
+    lapply(seq_len(n_series), function(series) {
+      object$test_observations[[series]]
+    })
+  )
 
-  if(score == 'elpd'){
+  if (score == 'elpd') {
     # Get linear predictor forecasts into the correct format
     linpreds <- do.call(cbind, object$forecasts)
 
     # Build a dataframe for indexing which series each observation belongs to
-    newdata <- data.frame(series = factor(sort(rep(object$series_names,
-                                                   NCOL(object$forecasts[[1]]))),
-                                          levels = levels(object$series_names)),
-                          y = unname(unlist(object$test_observations)))
+    newdata <- data.frame(
+      series = factor(
+        sort(rep(object$series_names, NCOL(object$forecasts[[1]]))),
+        levels = levels(object$series_names)
+      ),
+      y = unname(unlist(object$test_observations))
+    )
 
     class(object) <- c('mvgam', class(object))
 
     # Calculate log-likelihoods
-    elpd_score <- logLik(object = object,
-                         linpreds = linpreds,
-                         newdata = newdata,
-                         family_pars = object$family_pars,
-                         n_cores = n_cores)
+    elpd_score <- logLik(
+      object = object,
+      linpreds = linpreds,
+      newdata = newdata,
+      family_pars = object$family_pars,
+      n_cores = n_cores
+    )
     elpd_score <- apply(elpd_score, 2, log_mean_exp)
 
     # Construct series-level score dataframes
-    series_score <- lapply(seq_len(n_series), function(series){
-      DRPS <- data.frame(drps_mcmc_object(truths[series,],
-                                          object$forecasts[[series]],
-                                          log = log,
-                                          interval_width = interval_width))
-      data.frame(score = elpd_score[which(newdata$series ==
-                                            levels(object$series_names)[series])],
-                 eval_horizon = seq(1, NCOL(object$forecasts[[1]])),
-                 score_type = 'elpd')
+    series_score <- lapply(seq_len(n_series), function(series) {
+      DRPS <- data.frame(drps_mcmc_object(
+        truths[series, ],
+        object$forecasts[[series]],
+        log = log,
+        interval_width = interval_width
+      ))
+      data.frame(
+        score = elpd_score[which(
+          newdata$series == levels(object$series_names)[series]
+        )],
+        eval_horizon = seq(1, NCOL(object$forecasts[[1]])),
+        score_type = 'elpd'
+      )
     })
     names(series_score) <- object$series_names
-    all_scores <- data.frame(score = rowSums(do.call(cbind, lapply(seq_len(n_series), function(series){
-      series_score[[series]]$score
-    }))), eval_horizon = seq(1, NCOL(object$forecasts[[1]])), score_type = 'sum_elpd')
+    all_scores <- data.frame(
+      score = rowSums(do.call(
+        cbind,
+        lapply(seq_len(n_series), function(series) {
+          series_score[[series]]$score
+        })
+      )),
+      eval_horizon = seq(1, NCOL(object$forecasts[[1]])),
+      score_type = 'sum_elpd'
+    )
     series_score$all_series <- all_scores
   }
 
-  if(score %in% c('energy', 'variogram')){
-
-    if(missing(weights)){
+  if (score %in% c('energy', 'variogram')) {
+    if (missing(weights)) {
       weights <- rep(1, length(object$series_names))
     }
 
     # Calculate coverage using one of the univariate scores
-    series_score <- lapply(seq_len(n_series), function(series){
-      DRPS <- data.frame(drps_mcmc_object(truths[series,],
-                                                  object$forecasts[[series]],
-                                                  log = log,
-                                                  interval_width = interval_width))
-      colnames(DRPS) <- c('score','in_interval')
+    series_score <- lapply(seq_len(n_series), function(series) {
+      DRPS <- data.frame(drps_mcmc_object(
+        truths[series, ],
+        object$forecasts[[series]],
+        log = log,
+        interval_width = interval_width
+      ))
+      colnames(DRPS) <- c('score', 'in_interval')
       DRPS$interval_width <- interval_width
       DRPS$eval_horizon <- seq(1, NCOL(object$forecasts[[1]]))
-      DRPS[,2:4]
+      DRPS[, 2:4]
     })
     names(series_score) <- object$series_names
 
-    if(score == 'variogram'){
-      var_score <- variogram_mcmc_object(truths = truths,
-                                         fcs = object$forecasts,
-                                         log = log,
-                                         weights = weights)
-      series_score$all_series <- data.frame(score = var_score,
-                                            eval_horizon = 1:NCOL(object$forecasts[[1]]),
-                                            score_type = 'variogram')
+    if (score == 'variogram') {
+      var_score <- variogram_mcmc_object(
+        truths = truths,
+        fcs = object$forecasts,
+        log = log,
+        weights = weights
+      )
+      series_score$all_series <- data.frame(
+        score = var_score,
+        eval_horizon = 1:NCOL(object$forecasts[[1]]),
+        score_type = 'variogram'
+      )
     }
 
-    if(score == 'energy'){
-      en_score <- energy_mcmc_object(truths = truths,
-                                     fcs = object$forecasts,
-                                     log = log)
-      series_score$all_series <- data.frame(score = en_score,
-                                            eval_horizon = 1:NCOL(object$forecasts[[1]]),
-                                            score_type = 'energy')
+    if (score == 'energy') {
+      en_score <- energy_mcmc_object(
+        truths = truths,
+        fcs = object$forecasts,
+        log = log
+      )
+      series_score$all_series <- data.frame(
+        score = en_score,
+        eval_horizon = 1:NCOL(object$forecasts[[1]]),
+        score_type = 'energy'
+      )
     }
   }
 
-  if(score == 'sis'){
-    series_score <- lapply(seq_len(n_series), function(series){
-      SIS <- data.frame(sis_mcmc_object(truths[series,],
-                                          object$forecasts[[series]],
-                                          log = log,
-                                          interval_width = interval_width))
-      colnames(SIS) <- c('score','in_interval')
+  if (score == 'sis') {
+    series_score <- lapply(seq_len(n_series), function(series) {
+      SIS <- data.frame(sis_mcmc_object(
+        truths[series, ],
+        object$forecasts[[series]],
+        log = log,
+        interval_width = interval_width
+      ))
+      colnames(SIS) <- c('score', 'in_interval')
       SIS$interval_width <- interval_width
       SIS$eval_horizon <- seq(1, NCOL(object$forecasts[[1]]))
       SIS$score_type <- 'sis'
       SIS
     })
     names(series_score) <- object$series_names
-    all_scores <- data.frame(score = rowSums(do.call(cbind, lapply(seq_len(n_series), function(series){
-      series_score[[series]]$score
-    }))), eval_horizon = seq(1, NCOL(object$forecasts[[1]])), score_type = 'sum_sis')
+    all_scores <- data.frame(
+      score = rowSums(do.call(
+        cbind,
+        lapply(seq_len(n_series), function(series) {
+          series_score[[series]]$score
+        })
+      )),
+      eval_horizon = seq(1, NCOL(object$forecasts[[1]])),
+      score_type = 'sum_sis'
+    )
     series_score$all_series <- all_scores
   }
 
-  if(score == 'drps'){
-    series_score <- lapply(seq_len(n_series), function(series){
-      DRPS <- data.frame(drps_mcmc_object(truths[series,],
-                                          object$forecasts[[series]],
-                                          log = log,
-                                          interval_width = interval_width))
-      colnames(DRPS) <- c('score','in_interval')
+  if (score == 'drps') {
+    series_score <- lapply(seq_len(n_series), function(series) {
+      DRPS <- data.frame(drps_mcmc_object(
+        truths[series, ],
+        object$forecasts[[series]],
+        log = log,
+        interval_width = interval_width
+      ))
+      colnames(DRPS) <- c('score', 'in_interval')
       DRPS$interval_width <- interval_width
       DRPS$eval_horizon <- seq(1, NCOL(object$forecasts[[1]]))
       DRPS$score_type <- 'drps'
       DRPS
     })
     names(series_score) <- object$series_names
-    all_scores <- data.frame(score = rowSums(do.call(cbind, lapply(seq_len(n_series), function(series){
-      series_score[[series]]$score
-    }))), eval_horizon = seq(1, NCOL(object$forecasts[[1]])), score_type = 'sum_drps')
+    all_scores <- data.frame(
+      score = rowSums(do.call(
+        cbind,
+        lapply(seq_len(n_series), function(series) {
+          series_score[[series]]$score
+        })
+      )),
+      eval_horizon = seq(1, NCOL(object$forecasts[[1]])),
+      score_type = 'sum_drps'
+    )
     series_score$all_series <- all_scores
   }
 
-  if(score == 'crps'){
-    series_score <- lapply(seq_len(n_series), function(series){
-      CRPS <- data.frame(crps_mcmc_object(truths[series,],
-                                                  object$forecasts[[series]],
-                                                  log = log,
-                                                  interval_width = interval_width))
-      colnames(CRPS) <- c('score','in_interval')
+  if (score == 'crps') {
+    series_score <- lapply(seq_len(n_series), function(series) {
+      CRPS <- data.frame(crps_mcmc_object(
+        truths[series, ],
+        object$forecasts[[series]],
+        log = log,
+        interval_width = interval_width
+      ))
+      colnames(CRPS) <- c('score', 'in_interval')
       CRPS$interval_width <- interval_width
       CRPS$eval_horizon <- seq(1, NCOL(object$forecasts[[1]]))
       CRPS$score_type <- 'crps'
       CRPS
     })
     names(series_score) <- object$series_names
-    all_scores <- data.frame(score = rowSums(do.call(cbind, lapply(seq_len(n_series), function(series){
-      series_score[[series]]$score
-    }))), eval_horizon = seq(1, NCOL(object$forecasts[[1]])), score_type = 'sum_crps')
+    all_scores <- data.frame(
+      score = rowSums(do.call(
+        cbind,
+        lapply(seq_len(n_series), function(series) {
+          series_score[[series]]$score
+        })
+      )),
+      eval_horizon = seq(1, NCOL(object$forecasts[[1]])),
+      score_type = 'sum_crps'
+    )
     series_score$all_series <- all_scores
   }
 
-  if(score == 'brier'){
-    if(object$family != 'bernoulli'){
-      stop('brier score only applicable for Bernoulli forecasts',
-           call. = FALSE)
+  if (score == 'brier') {
+    if (object$family != 'bernoulli') {
+      stop('brier score only applicable for Bernoulli forecasts', call. = FALSE)
     }
-    series_score <- lapply(seq_len(n_series), function(series){
-      BRIER <- data.frame(brier_mcmc_object(truths[series,],
-                                          object$forecasts[[series]],
-                                          log = log))
-      colnames(BRIER) <- c('score','in_interval')
+    series_score <- lapply(seq_len(n_series), function(series) {
+      BRIER <- data.frame(brier_mcmc_object(
+        truths[series, ],
+        object$forecasts[[series]],
+        log = log
+      ))
+      colnames(BRIER) <- c('score', 'in_interval')
       BRIER$interval_width <- interval_width
       BRIER$eval_horizon <- seq(1, NCOL(object$forecasts[[1]]))
       BRIER$score_type <- 'brier'
       BRIER
     })
     names(series_score) <- object$series_names
-    all_scores <- data.frame(score = rowSums(do.call(cbind, lapply(seq_len(n_series), function(series){
-      series_score[[series]]$score
-    }))), eval_horizon = seq(1, NCOL(object$forecasts[[1]])), score_type = 'sum_brier')
+    all_scores <- data.frame(
+      score = rowSums(do.call(
+        cbind,
+        lapply(seq_len(n_series), function(series) {
+          series_score[[series]]$score
+        })
+      )),
+      eval_horizon = seq(1, NCOL(object$forecasts[[1]])),
+      score_type = 'sum_brier'
+    )
     series_score$all_series <- all_scores
   }
 

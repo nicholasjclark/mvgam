@@ -20,4 +20,3 @@ SM <- suppressMessages
 SW <- suppressWarnings
 
 context("local tests")
-

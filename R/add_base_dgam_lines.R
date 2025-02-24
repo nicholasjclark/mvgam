@@ -6,10 +6,9 @@
 #' @param stan Logical (convert existing model to a Stan model?)
 #' @param offset Logical (include an offset in the linear predictor?)
 #' @return A character string to add to the mgcv jagam model file
-add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
-
-  if(stan){
-    if(use_lv){
+add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE) {
+  if (stan) {
+    if (use_lv) {
       add <- "
     ##insert data
     transformed data {
@@ -126,7 +125,6 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     }
     }
     "
-
     } else {
       add <- "
     ##insert data
@@ -199,10 +197,10 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     }
     "
     }
-
   } else {
-    if(use_lv){
-      add <- c("
+    if (use_lv) {
+      add <- c(
+        "
                #### Begin model ####
                model {
 
@@ -339,9 +337,11 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                }
                }
 
-               ## GAM-specific priors")
+               ## GAM-specific priors"
+      )
     } else {
-      add <- c("
+      add <- c(
+        "
                           #### Begin model ####
                           model {
 
@@ -408,10 +408,10 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                           }
                           }
 
-                          ## GAM-specific priors")
-
+                          ## GAM-specific priors"
+      )
     }
   }
 
   return(add)
-    }
+}

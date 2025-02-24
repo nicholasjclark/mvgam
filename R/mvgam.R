@@ -596,56 +596,55 @@
 #' }
 #'@export
 
-mvgam = function(formula,
-                 trend_formula,
-                 knots,
-                 trend_knots,
-                 trend_model = 'None',
-                 noncentred = FALSE,
-                 family = poisson(),
-                 share_obs_params = FALSE,
-                 data,
-                 newdata,
-                 use_lv = FALSE,
-                 n_lv,
-                 trend_map,
-                 priors,
-                 run_model = TRUE,
-                 prior_simulation = FALSE,
-                 residuals = TRUE,
-                 return_model_data = FALSE,
-                 backend = getOption("brms.backend", "cmdstanr"),
-                 algorithm = getOption("brms.algorithm", "sampling"),
-                 control = list(max_treedepth = 10,
-                                adapt_delta = 0.8),
-                 chains = 4,
-                 burnin = 500,
-                 samples = 500,
-                 thin = 1,
-                 parallel = TRUE,
-                 threads = 1,
-                 save_all_pars = FALSE,
-                 silent = 1,
-                 autoformat = TRUE,
-                 refit = FALSE,
-                 lfo = FALSE,
-                 ...){
-
+mvgam = function(
+  formula,
+  trend_formula,
+  knots,
+  trend_knots,
+  trend_model = 'None',
+  noncentred = FALSE,
+  family = poisson(),
+  share_obs_params = FALSE,
+  data,
+  newdata,
+  use_lv = FALSE,
+  n_lv,
+  trend_map,
+  priors,
+  run_model = TRUE,
+  prior_simulation = FALSE,
+  residuals = TRUE,
+  return_model_data = FALSE,
+  backend = getOption("brms.backend", "cmdstanr"),
+  algorithm = getOption("brms.algorithm", "sampling"),
+  control = list(max_treedepth = 10, adapt_delta = 0.8),
+  chains = 4,
+  burnin = 500,
+  samples = 500,
+  thin = 1,
+  parallel = TRUE,
+  threads = 1,
+  save_all_pars = FALSE,
+  silent = 1,
+  autoformat = TRUE,
+  refit = FALSE,
+  lfo = FALSE,
+  ...
+) {
   # Check data arguments
   dots <- list(...)
-  if(missing("data")){
-    if('data_train' %in% names(dots)){
+  if (missing("data")) {
+    if ('data_train' %in% names(dots)) {
       message('argument "data_train" is deprecated; supply as "data" instead')
       data <- dots$data_train
       dots$data_train <- NULL
     } else {
-      stop('Argument "data" is missing with no default',
-           call. = FALSE)
+      stop('Argument "data" is missing with no default', call. = FALSE)
     }
   }
 
-  if(missing("newdata")){
-    if('data_test' %in% names(dots)){
+  if (missing("newdata")) {
+    if ('data_test' %in% names(dots)) {
       message('argument "data_test" is deprecated; supply as "newdata" instead')
       data_test <- dots$data_train
       dots$data_test <- NULL
@@ -654,55 +653,67 @@ mvgam = function(formula,
     }
   }
 
-  if(!missing("data")) data_train <- data
-  if(!missing("newdata")) data_test <- newdata
+  if (!missing("data")) data_train <- data
+  if (!missing("newdata")) data_test <- newdata
   orig_data <- data_train
 
   # Check sampler arguments
   use_stan <- TRUE
-  if('adapt_delta' %in% names(dots)){
-    message('argument "adapt_delta" should be supplied as an element in "control"')
+  if ('adapt_delta' %in% names(dots)) {
+    message(
+      'argument "adapt_delta" should be supplied as an element in "control"'
+    )
     adapt_delta <- dots$adapt_delta
     dots$adapt_delta <- NULL
   } else {
     adapt_delta <- control$adapt_delta
-    if(is.null(adapt_delta)) adapt_delta  <- 0.8
+    if (is.null(adapt_delta)) adapt_delta <- 0.8
   }
 
-  if('max_treedepth' %in% names(dots)){
-    message('argument "max_treedepth" should be supplied as an element in "control"')
+  if ('max_treedepth' %in% names(dots)) {
+    message(
+      'argument "max_treedepth" should be supplied as an element in "control"'
+    )
     max_treedepth <- dots$max_treedepth
     dots$max_treedepth <- NULL
   } else {
     max_treedepth <- control$max_treedepth
-    if(is.null(max_treedepth)) max_treedepth  <- 10
+    if (is.null(max_treedepth)) max_treedepth <- 10
   }
 
   # Validate trend_model
-  if('drift' %in% names(dots) & silent < 2L){
-    message('The "drift" argument is deprecated; use fixed effects of "time" instead')
+  if ('drift' %in% names(dots) & silent < 2L) {
+    message(
+      'The "drift" argument is deprecated; use fixed effects of "time" instead'
+    )
     dots$drift <- NULL
   }
   drift <- FALSE
   orig_trend_model <- trend_model
-  trend_model <- validate_trend_model(orig_trend_model,
-                                      drift = drift,
-                                      noncentred = noncentred)
+  trend_model <- validate_trend_model(
+    orig_trend_model,
+    drift = drift,
+    noncentred = noncentred
+  )
 
   # Cannot yet map observations to trends that evolve as CAR1
-  if(trend_model == 'CAR1' & !missing(trend_map)){
-    stop('cannot yet use trend mapping for CAR1 dynamics',
-         call. = FALSE)
+  if (trend_model == 'CAR1' & !missing(trend_map)) {
+    stop('cannot yet use trend mapping for CAR1 dynamics', call. = FALSE)
   }
 
   # Ensure series and time variables are present
-  data_train <- validate_series_time(data_train, name = 'data',
-                                     trend_model = orig_trend_model)
+  data_train <- validate_series_time(
+    data_train,
+    name = 'data',
+    trend_model = orig_trend_model
+  )
 
   # Validate the formula to convert any dynamic() terms
-  formula <- interpret_mvgam(formula,
-                             N = max(data_train$index..time..index),
-                             family = family)
+  formula <- interpret_mvgam(
+    formula,
+    N = max(data_train$index..time..index),
+    family = family
+  )
 
   # Check sampler arguments
   validate_pos_integer(chains)
@@ -716,107 +727,120 @@ mvgam = function(formula,
   upper_bounds <- rlang::missing_arg()
 
   # Check for gp terms in the validated formula
-  list2env(check_gp_terms(formula, data_train, family = family),
-           envir = environment())
+  list2env(
+    check_gp_terms(formula, data_train, family = family),
+    envir = environment()
+  )
 
   # Check for missing rhs in formula
-  list2env(check_obs_intercept(formula, orig_formula),
-           envir = environment())
+  list2env(check_obs_intercept(formula, orig_formula), envir = environment())
 
   # Check for brmspriors
-  if(!missing(priors)){
-    if(inherits(priors, 'brmsprior') & !lfo & use_stan){
-      priors <- adapt_brms_priors(priors = priors,
-                                  formula = orig_formula,
-                                  trend_formula = trend_formula,
-                                  data = data_train,
-                                  family = family,
-                                  use_lv = use_lv,
-                                  n_lv = n_lv,
-                                  trend_model = orig_trend_model,
-                                  trend_map = trend_map,
-                                  drift = drift,
-                                  warnings = TRUE,
-                                  knots = knots)
+  if (!missing(priors)) {
+    if (inherits(priors, 'brmsprior') & !lfo & use_stan) {
+      priors <- adapt_brms_priors(
+        priors = priors,
+        formula = orig_formula,
+        trend_formula = trend_formula,
+        data = data_train,
+        family = family,
+        use_lv = use_lv,
+        n_lv = n_lv,
+        trend_model = orig_trend_model,
+        trend_map = trend_map,
+        drift = drift,
+        warnings = TRUE,
+        knots = knots
+      )
     }
   }
 
   # Ensure series and time variables are present
-  data_train <- validate_series_time(data_train, name = 'data',
-                                     trend_model = orig_trend_model)
-  if(!missing(data_test)){
-    data_test <- validate_series_time(data_test,
-                                      name = 'newdata',
-                                      trend_model = orig_trend_model)
-    if(trend_model == 'CAR1'){
+  data_train <- validate_series_time(
+    data_train,
+    name = 'data',
+    trend_model = orig_trend_model
+  )
+  if (!missing(data_test)) {
+    data_test <- validate_series_time(
+      data_test,
+      name = 'newdata',
+      trend_model = orig_trend_model
+    )
+    if (trend_model == 'CAR1') {
       data_test$index..time..index <- data_test$index..time..index +
         max(data_train$index..time..index)
     }
   }
 
   # Lighten the final object if this is an lfo run
-  if(lfo) return_model_data <- FALSE
+  if (lfo) return_model_data <- FALSE
 
   # Validate observation formula
   formula <- interpret_mvgam(formula, N = max(data_train$index..time..index))
-  data_train <- validate_obs_formula(formula,
-                                     data = data_train,
-                                     refit = refit)
+  data_train <- validate_obs_formula(formula, data = data_train, refit = refit)
 
-  if(!missing(data_test)){
-    data_test <- validate_obs_formula(formula,
-                                      data = data_test,
-                                      refit = refit)
+  if (!missing(data_test)) {
+    data_test <- validate_obs_formula(formula, data = data_test, refit = refit)
   }
-  if(is.null(attr(terms(formula(formula)), 'offset'))){
+  if (is.null(attr(terms(formula(formula)), 'offset'))) {
     offset <- FALSE
   } else {
     offset <- TRUE
   }
 
   # Ensure fitting software can be located
-  if(!use_stan & run_model) find_jags()
-  if(use_stan & run_model) find_stan()
+  if (!use_stan & run_model) find_jags()
+  if (use_stan & run_model) find_stan()
 
   # Validate the family and threads arguments
   family <- validate_family(family, use_stan = use_stan)
-  family_char <- match.arg(arg = family$family,
-                           choices = family_char_choices())
+  family_char <- match.arg(arg = family$family, choices = family_char_choices())
   threads <- validate_threads(family_char, threads)
 
   # Nmixture additions?
-  list2env(check_nmix(family, family_char,
-                      trend_formula, trend_model,
-                      trend_map, data_train), envir = environment())
+  list2env(
+    check_nmix(
+      family,
+      family_char,
+      trend_formula,
+      trend_model,
+      trend_map,
+      data_train
+    ),
+    envir = environment()
+  )
 
   # Validate remaining trend arguments
-  trend_val <- validate_trend_restrictions(trend_model = trend_model,
-                                           formula = formula,
-                                           trend_formula = trend_formula,
-                                           trend_map = trend_map,
-                                           drift = drift,
-                                           drop_obs_intercept = drop_obs_intercept,
-                                           use_lv = use_lv,
-                                           n_lv = n_lv,
-                                           data_train = data_train,
-                                           use_stan = use_stan)
+  trend_val <- validate_trend_restrictions(
+    trend_model = trend_model,
+    formula = formula,
+    trend_formula = trend_formula,
+    trend_map = trend_map,
+    drift = drift,
+    drop_obs_intercept = drop_obs_intercept,
+    use_lv = use_lv,
+    n_lv = n_lv,
+    data_train = data_train,
+    use_stan = use_stan
+  )
   list2env(trend_val, envir = environment())
-  if(is.null(trend_map)) trend_map <- rlang::missing_arg()
-  if(is.null(n_lv)) n_lv <- rlang::missing_arg()
+  if (is.null(trend_map)) trend_map <- rlang::missing_arg()
+  if (is.null(n_lv)) n_lv <- rlang::missing_arg()
 
   # Some general family-level restrictions can now be checked
   orig_y <- data_train$y
-  if(any(!is.na(orig_y))){
+  if (any(!is.na(orig_y))) {
     validate_family_restrictions(response = orig_y, family = family)
   }
 
   # Fill in missing observations in data_train so the size of the dataset is correct when
   # building the initial JAGS model
   resp_terms <- as.character(terms(formula(formula))[[2]])
-  if(length(resp_terms) == 1){
+  if (length(resp_terms) == 1) {
     out_name <- as.character(terms(formula(formula))[[2]])
   } else {
-    if(any(grepl('cbind', resp_terms))){
+    if (any(grepl('cbind', resp_terms))) {
       resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
       out_name <- resp_terms[1]
     }
@@ -824,81 +848,100 @@ mvgam = function(formula,
   data_train[[out_name]] <- replace_nas(data_train[[out_name]])
 
   # Compute default priors
-  if(use_stan){
-    def_priors <- adapt_brms_priors(c(make_default_scales(orig_y,
-                                                          family),
-                                              make_default_int(orig_y,
-                                                       family = if(add_nmix){
-                                                         nmix()
-                                                       } else {
-                                                         family
-                                                       })),
-                                    formula = orig_formula,
-                                    trend_formula = trend_formula,
-                                    data = orig_data,
-                                    family = family,
-                                    use_lv = use_lv,
-                                    n_lv = n_lv,
-                                    trend_model = orig_trend_model,
-                                    trend_map = trend_map,
-                                    drift = drift,
-                                    knots = knots)
+  if (use_stan) {
+    def_priors <- adapt_brms_priors(
+      c(
+        make_default_scales(orig_y, family),
+        make_default_int(
+          orig_y,
+          family = if (add_nmix) {
+            nmix()
+          } else {
+            family
+          }
+        )
+      ),
+      formula = orig_formula,
+      trend_formula = trend_formula,
+      data = orig_data,
+      family = family,
+      use_lv = use_lv,
+      n_lv = n_lv,
+      trend_model = orig_trend_model,
+      trend_map = trend_map,
+      drift = drift,
+      knots = knots
+    )
   }
 
   # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
   # when simulating from the Bayesian model later on;
-  ss_gam <- try(mvgam_setup(formula = formula,
-                            knots = knots,
-                            family = family_to_mgcvfam(family),
-                            dat = data_train),
-                silent = TRUE)
-  if(inherits(ss_gam, 'try-error')){
-    if(grepl('missing values', ss_gam[1])){
-      stop(paste('Missing values found in data predictors:\n',
-                 attr(ss_gam, 'condition')),
-           call. = FALSE)
+  ss_gam <- try(
+    mvgam_setup(
+      formula = formula,
+      knots = knots,
+      family = family_to_mgcvfam(family),
+      dat = data_train
+    ),
+    silent = TRUE
+  )
+  if (inherits(ss_gam, 'try-error')) {
+    if (grepl('missing values', ss_gam[1])) {
+      stop(
+        paste(
+          'Missing values found in data predictors:\n',
+          attr(ss_gam, 'condition')
+        ),
+        call. = FALSE
+      )
     } else {
-      stop(paste(ss_gam[1]),
-           call. = FALSE)
+      stop(paste(ss_gam[1]), call. = FALSE)
     }
   }
 
   # Check the test data for NAs as well using predict.gam
-  testdat_pred <- try(predict(ss_gam,
-                              newdata = data_test,
-                              na.action = na.fail),
-                      silent = TRUE)
-  if(inherits(testdat_pred, 'try-error')){
-    if(grepl('missing values', testdat_pred[1])){
-      stop(paste('Missing values found in newdata predictors:\n',
-                 attr(testdat_pred, 'condition')),
-           call. = FALSE)
+  testdat_pred <- try(
+    predict(ss_gam, newdata = data_test, na.action = na.fail),
+    silent = TRUE
+  )
+  if (inherits(testdat_pred, 'try-error')) {
+    if (grepl('missing values', testdat_pred[1])) {
+      stop(
+        paste(
+          'Missing values found in newdata predictors:\n',
+          attr(testdat_pred, 'condition')
+        ),
+        call. = FALSE
+      )
     }
   }
 
   # Make JAGS file and appropriate data structures
-  list2env(jagam_setup(ss_gam = ss_gam,
-                       formula = formula,
-                       data_train = data_train,
-                       family = family,
-                       family_char = family_char,
-                       knots = knots), envir = environment())
+  list2env(
+    jagam_setup(
+      ss_gam = ss_gam,
+      formula = formula,
+      data_train = data_train,
+      family = family,
+      family_char = family_char,
+      knots = knots
+    ),
+    envir = environment()
+  )
 
   # Update initial values of lambdas using the full estimates from the
   # fitted gam model to speed convergence; remove initial betas so that the
   # chains can start in very different regions of the parameter space
   ss_jagam$jags.ini$b <- NULL
-  if(length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)){
+  if (length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)) {
     ss_jagam$jags.ini$lambda <- ss_gam$sp
     ss_jagam$jags.ini$lambda[log(ss_jagam$jags.ini$lambda) > 10] <- exp(10)
   }
-  if(length(ss_gam$smooth) == 0) ss_jagam$jags.ini$lambda <- NULL
+  if (length(ss_gam$smooth) == 0) ss_jagam$jags.ini$lambda <- NULL
 
   # Fill y with NAs if this is a simulation from the priors;
   # otherwise replace with the original supplied values
-  data_train <- check_priorsim(prior_simulation,
-                               data_train, orig_y,
-                               formula)
+  data_train <- check_priorsim(prior_simulation, data_train, orig_y, formula)
 
   # Read in the base (unmodified) jags model file
   base_model <- suppressWarnings(readLines(file_name))
@@ -907,64 +950,77 @@ mvgam = function(formula,
   lines_remove <- c(1:grep('## response', base_model))
   base_model <- base_model[-lines_remove]
 
-  if(any(grepl('scale <- 1/tau', base_model, fixed = TRUE))){
-    base_model <- base_model[-grep('scale <- 1/tau',
-                                   base_model, fixed = TRUE)]
+  if (any(grepl('scale <- 1/tau', base_model, fixed = TRUE))) {
+    base_model <- base_model[-grep('scale <- 1/tau', base_model, fixed = TRUE)]
   }
 
-  if(any(grepl('tau ~ dgamma(.05,.005)', base_model, fixed = TRUE))){
-    base_model <- base_model[-grep('tau ~ dgamma(.05,.005)',
-                                   base_model, fixed = TRUE)]
+  if (any(grepl('tau ~ dgamma(.05,.005)', base_model, fixed = TRUE))) {
+    base_model <- base_model[
+      -grep('tau ~ dgamma(.05,.005)', base_model, fixed = TRUE)
+    ]
   }
 
   # Any parametric effects in the gam (particularly the intercept) need sensible priors to ensure they
   # do not directly compete with the latent trends
-  if(any(grepl('Parametric effect priors', base_model))){
-
-    in_parenth <- regmatches(base_model[grep('Parametric effect priors',
-                               base_model) + 1],
-               gregexpr( "(?<=\\().+?(?=\\))", base_model[grep('Parametric effect priors',
-                                                               base_model) + 1], perl = T))[[1]][1]
+  if (any(grepl('Parametric effect priors', base_model))) {
+    in_parenth <- regmatches(
+      base_model[grep('Parametric effect priors', base_model) + 1],
+      gregexpr(
+        "(?<=\\().+?(?=\\))",
+        base_model[grep('Parametric effect priors', base_model) + 1],
+        perl = T
+      )
+    )[[1]][1]
     n_terms <- as.numeric(sub(".*:", "", in_parenth))
     ss_jagam$jags.data$p_coefs <- coef(ss_gam)[1:n_terms]
 
     # Use the initialised GAM's estimates for parametric effects, but widen them
     # substantially to allow for better exploration
     beta_sims <- rmvn(100, coef(ss_gam), ss_gam$Vp)
-    ss_jagam$jags.data$p_taus <- apply(as.matrix(beta_sims[,1:n_terms]),
-                                       2, function(x) 1 / (sd(x) ^ 2))
+    ss_jagam$jags.data$p_taus <- apply(
+      as.matrix(beta_sims[, 1:n_terms]),
+      2,
+      function(x) 1 / (sd(x)^2)
+    )
 
-    base_model[grep('Parametric effect priors',
-                      base_model) + 1] <- paste0('  for (i in 1:',
-                                                 n_terms,
-                                                 ') { b[i] ~ dnorm(p_coefs[i], p_taus[i]) }')
-    base_model[grep('Parametric effect priors',
-                    base_model)] <- c('  ## parametric effect priors (regularised for identifiability)')
+    base_model[grep('Parametric effect priors', base_model) + 1] <- paste0(
+      '  for (i in 1:',
+      n_terms,
+      ') { b[i] ~ dnorm(p_coefs[i], p_taus[i]) }'
+    )
+    base_model[grep('Parametric effect priors', base_model)] <- c(
+      '  ## parametric effect priors (regularised for identifiability)'
+    )
   }
 
   # For any random effect smooths, use non-centred parameterisation to avoid degeneracies
   # For monotonic smooths, need to determine which direction to place
   # coefficient constraints
-  smooth_labs <- do.call(rbind, lapply(seq_along(ss_gam$smooth), function(x){
-    data.frame(label = ss_gam$smooth[[x]]$label,
-               class = class(ss_gam$smooth[[x]])[1],
-               id = ifelse(is.null(ss_gam$smooth[[x]]$id),
-                           NA, ss_gam$smooth[[x]]$id))
-  }))
+  smooth_labs <- do.call(
+    rbind,
+    lapply(seq_along(ss_gam$smooth), function(x) {
+      data.frame(
+        label = ss_gam$smooth[[x]]$label,
+        class = class(ss_gam$smooth[[x]])[1],
+        id = ifelse(is.null(ss_gam$smooth[[x]]$id), NA, ss_gam$smooth[[x]]$id)
+      )
+    })
+  )
 
   # Check for 'id' arguments, which are not yet supported
-  if(any(!is.na(smooth_labs$id))){
-    stop('smooth terms with the "id" argument not yet supported by mvgam',
-         call. = FALSE)
+  if (any(!is.na(smooth_labs$id))) {
+    stop(
+      'smooth terms with the "id" argument not yet supported by mvgam',
+      call. = FALSE
+    )
   }
 
-  if(any(smooth_labs$class == 'random.effect')){
+  if (any(smooth_labs$class == 'random.effect')) {
     re_smooths <- smooth_labs %>%
       dplyr::filter(class == 'random.effect') %>%
       dplyr::pull(label)
 
-    for(i in 1:length(re_smooths)){
-
+    for (i in 1:length(re_smooths)) {
       # If there are multiple smooths with this label, find out where the random effect
       # smooth sits
       smooth_labs %>%
@@ -973,147 +1029,203 @@ mvgam = function(formula,
         dplyr::filter(class == 'random.effect') %>%
         dplyr::pull(smooth_number) -> smooth_number
 
-      in_parenth <- regmatches(base_model[grep(re_smooths[i],
-                                               base_model, fixed = T)[smooth_number] + 1],
-                               gregexpr( "(?<=\\().+?(?=\\))",
-                                         base_model[grep(re_smooths[i],
-                                                         base_model, fixed = T)[smooth_number] + 1],
-                                         perl = T))[[1]][1]
+      in_parenth <- regmatches(
+        base_model[
+          grep(re_smooths[i], base_model, fixed = T)[smooth_number] + 1
+        ],
+        gregexpr(
+          "(?<=\\().+?(?=\\))",
+          base_model[
+            grep(re_smooths[i], base_model, fixed = T)[smooth_number] + 1
+          ],
+          perl = T
+        )
+      )[[1]][1]
       n_terms <- as.numeric(sub(".*:", "", in_parenth))
       n_start <- as.numeric(strsplit(sub(".*\\(", "", in_parenth), ':')[[1]][1])
-      base_model[grep(re_smooths[i],
-                      base_model, fixed = T)[smooth_number] + 1] <- paste0('  for (i in ', n_start, ':',
-                                                            n_terms,
-                                                            ') {\n   b_raw[i] ~ dnorm(0, 1)\n',
-                                                            'b[i] <- ',
-                                                            paste0('mu_raw', i), ' + b_raw[i] * ',
-                                                            paste0('sigma_raw', i), '\n  }\n  ',
-                                                            paste0('sigma_raw', i), ' ~ dexp(0.5)\n',
-                                                            paste0('mu_raw', i), ' ~ dnorm(0, 1)')
-      base_model[grep(re_smooths[i],
-                      base_model, fixed = T)[smooth_number]] <- paste0('  ## prior (non-centred) for ', re_smooths[i], '...')
+      base_model[
+        grep(re_smooths[i], base_model, fixed = T)[smooth_number] + 1
+      ] <- paste0(
+        '  for (i in ',
+        n_start,
+        ':',
+        n_terms,
+        ') {\n   b_raw[i] ~ dnorm(0, 1)\n',
+        'b[i] <- ',
+        paste0('mu_raw', i),
+        ' + b_raw[i] * ',
+        paste0('sigma_raw', i),
+        '\n  }\n  ',
+        paste0('sigma_raw', i),
+        ' ~ dexp(0.5)\n',
+        paste0('mu_raw', i),
+        ' ~ dnorm(0, 1)'
+      )
+      base_model[grep(re_smooths[i], base_model, fixed = T)[
+        smooth_number
+      ]] <- paste0('  ## prior (non-centred) for ', re_smooths[i], '...')
     }
   }
 
-  base_model[grep('smoothing parameter priors',
-                  base_model)] <- c('   ## smoothing parameter priors...')
+  base_model[grep('smoothing parameter priors', base_model)] <- c(
+    '   ## smoothing parameter priors...'
+  )
 
   # Remove the fakery lines if they were added
-  if(!smooths_included){
-    base_model <- base_model[-c(grep('## prior for s(fakery)',
-                                     trimws(base_model), fixed = TRUE):
-                                  (grep('## prior for s(fakery)',
-                                        trimws(base_model), fixed = TRUE) + 7))]
+  if (!smooths_included) {
+    base_model <- base_model[
+      -c(
+        grep('## prior for s(fakery)', trimws(base_model), fixed = TRUE):(grep(
+          '## prior for s(fakery)',
+          trimws(base_model),
+          fixed = TRUE
+        ) +
+          7)
+      )
+    ]
   }
 
   # Add replacement lines for priors, trends and the linear predictor
   fil <- tempfile(fileext = ".xt")
   modification <- add_base_dgam_lines(use_lv)
-  cat(c(readLines(textConnection(modification)), base_model), file = fil,
-      sep = "\n")
+  cat(
+    c(readLines(textConnection(modification)), base_model),
+    file = fil,
+    sep = "\n"
+  )
   model_file <- trimws(readLines(fil, n = -1))
 
   # Modify observation distribution lines
-  if(family_char == 'tweedie'){
+  if (family_char == 'tweedie') {
     model_file <- add_tweedie_lines(model_file, upper_bounds = upper_bounds)
-
-  } else if(family_char == 'poisson'){
+  } else if (family_char == 'poisson') {
     model_file <- add_poisson_lines(model_file, upper_bounds = upper_bounds)
-
   } else {
-    if(missing(upper_bounds)){
-      model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dnegbin(rate[i, s], phi[s])'
-      model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dnegbin(rate[i, s], phi[s])'
+    if (missing(upper_bounds)) {
+      model_file[grep(
+        'y\\[i, s\\] ~',
+        model_file
+      )] <- '  y[i, s] ~ dnegbin(rate[i, s], phi[s])'
+      model_file[grep(
+        'ypred\\[i, s\\] ~',
+        model_file
+      )] <- '  ypred[i, s] ~ dnegbin(rate[i, s], phi[s])'
     }
   }
 
   # Modify lines needed for the specified trend model
-  model_file <- add_trend_lines(model_file, stan = FALSE,
-                                use_lv = use_lv,
-                                trend_model = if(trend_model %in%
-                                                 c('RW', 'VAR1',
-                                                   'PWlinear', 'PWlogistic',
-                                                   'ZMVN')){'RW'} else {trend_model},
-                                drift = drift)
+  model_file <- add_trend_lines(
+    model_file,
+    stan = FALSE,
+    use_lv = use_lv,
+    trend_model = if (
+      trend_model %in%
+        c('RW', 'VAR1', 'PWlinear', 'PWlogistic', 'ZMVN')
+    ) {
+      'RW'
+    } else {
+      trend_model
+    },
+    drift = drift
+  )
 
   # Use informative priors based on the fitted mgcv model to speed convergence
   # and eliminate searching over strange parameter spaces
-  if(length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)){
-    model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(1/sp[i])'
+  if (length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)) {
+    model_file[grep(
+      'lambda\\[i\\] ~',
+      model_file
+    )] <- '   lambda[i] ~ dexp(1/sp[i])'
   } else {
-    model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(0.05)'
+    model_file[grep(
+      'lambda\\[i\\] ~',
+      model_file
+    )] <- '   lambda[i] ~ dexp(0.05)'
   }
 
   # Final tidying of the JAGS model for readability
   clean_up <- vector()
-  for(x in 1:length(model_file)){
-    clean_up[x] <- model_file[x-1] == "" & model_file[x] == ""
+  for (x in 1:length(model_file)) {
+    clean_up[x] <- model_file[x - 1] == "" & model_file[x] == ""
   }
   clean_up[is.na(clean_up)] <- FALSE
   model_file <- model_file[!clean_up]
 
   # Add in the offset if needed
-  if(offset){
+  if (offset) {
     model_file[grep('eta <- X %*% b', model_file, fixed = TRUE)] <-
       "eta <- X %*% b + offset"
     model_file[grep('eta <- X * b', model_file, fixed = TRUE)] <-
       "eta <- X * b + offset"
-    if(!missing(data_test) & !prior_simulation){
-      ss_jagam$jags.data$offset <- c(ss_jagam$jags.data$offset,
-                                     data_test[[get_offset(ss_gam)]])
+    if (!missing(data_test) & !prior_simulation) {
+      ss_jagam$jags.data$offset <- c(
+        ss_jagam$jags.data$offset,
+        data_test[[get_offset(ss_gam)]]
+      )
     }
   }
 
   model_file_jags <- textConnection(model_file)
 
   # Covariate dataframe including training and testing observations
-  if(!missing(data_test) & !prior_simulation){
-    suppressWarnings(lp_test  <- try(predict(ss_gam,
-                                             newdata = data_test,
-                                             type = 'lpmatrix'),
-                                     silent = TRUE))
+  if (!missing(data_test) & !prior_simulation) {
+    suppressWarnings(
+      lp_test <- try(
+        predict(ss_gam, newdata = data_test, type = 'lpmatrix'),
+        silent = TRUE
+      )
+    )
 
-    if(inherits(lp_test, 'try-error')){
+    if (inherits(lp_test, 'try-error')) {
       testdat <- data.frame(time = data_test$index..time..index)
 
-      terms_include <- names(ss_gam$coefficients)[which(!names(ss_gam$coefficients)
-                                                        %in% '(Intercept)')]
-      if(length(terms_include) > 0){
+      terms_include <- names(ss_gam$coefficients)[which(
+        !names(ss_gam$coefficients) %in% '(Intercept)'
+      )]
+      if (length(terms_include) > 0) {
         newnames <- vector()
         newnames[1] <- 'time'
-        for(i in 1:length(terms_include)){
+        for (i in 1:length(terms_include)) {
           testdat <- cbind(testdat, data.frame(data_test[[terms_include[i]]]))
-          newnames[i+1] <- terms_include[i]
+          newnames[i + 1] <- terms_include[i]
         }
         colnames(testdat) <- newnames
       }
-      suppressWarnings(lp_test  <- predict(ss_gam,
-                                           newdata = testdat,
-                                           type = 'lpmatrix'))
+      suppressWarnings(
+        lp_test <- predict(ss_gam, newdata = testdat, type = 'lpmatrix')
+      )
     }
 
     # Remove fakery columns from design matrix if no smooth terms were included
-    if(!smooths_included){
-      ss_jagam$jags.data$X <- as.matrix(ss_jagam$jags.data$X[,-c(xcols_drop)],
-                                        ncol = NCOL(lp_test))
+    if (!smooths_included) {
+      ss_jagam$jags.data$X <- as.matrix(
+        ss_jagam$jags.data$X[, -c(xcols_drop)],
+        ncol = NCOL(lp_test)
+      )
     }
 
     X <- data.frame(rbind(ss_jagam$jags.data$X, lp_test))
 
     # Add a time variable
-    if(inherits(data_train, 'list')){
-      temp_dat_train <- data.frame(index..time..index = data_train$index..time..index,
-                                   series = data_train$series)
-      temp_dat_test <- data.frame(index..time..index = data_test$index..time..index,
-                                  series = data_test$series)
+    if (inherits(data_train, 'list')) {
+      temp_dat_train <- data.frame(
+        index..time..index = data_train$index..time..index,
+        series = data_train$series
+      )
+      temp_dat_test <- data.frame(
+        index..time..index = data_test$index..time..index,
+        series = data_test$series
+      )
 
       X$index..time..index <- rbind(temp_dat_train, temp_dat_test) %>%
-        dplyr::left_join(rbind(temp_dat_train, temp_dat_test) %>%
-                           dplyr::select(index..time..index) %>%
-                           dplyr::distinct() %>%
-                           dplyr::arrange(index..time..index) %>%
-                           dplyr::mutate(index..time..index = dplyr::row_number()),
-                         by = c('index..time..index')) %>%
+        dplyr::left_join(
+          rbind(temp_dat_train, temp_dat_test) %>%
+            dplyr::select(index..time..index) %>%
+            dplyr::distinct() %>%
+            dplyr::arrange(index..time..index) %>%
+            dplyr::mutate(index..time..index = dplyr::row_number()),
+          by = c('index..time..index')
+        ) %>%
         dplyr::pull(index..time..index)
 
       # Add a series identifier variable
@@ -1121,56 +1233,61 @@ mvgam = function(formula,
 
       # Add an outcome variable
       X$outcome <- c(orig_y, rep(NA, NROW(temp_dat_test)))
-
     } else {
-
-      if(NCOL(data_train) != NCOL(data_test)){
-        stop('"data" and "newdata" have different numbers of columns',
-             call. = FALSE)
+      if (NCOL(data_train) != NCOL(data_test)) {
+        stop(
+          '"data" and "newdata" have different numbers of columns',
+          call. = FALSE
+        )
       }
 
       X$index..time..index <- dplyr::bind_rows(data_train, data_test) %>%
-        dplyr::left_join(dplyr::bind_rows(data_train, data_test) %>%
-                           dplyr::select(index..time..index) %>%
-                           dplyr::distinct() %>%
-                           dplyr::arrange(index..time..index) %>%
-                           dplyr::mutate(index..time..index = dplyr::row_number()),
-                         by = c('index..time..index')) %>%
+        dplyr::left_join(
+          dplyr::bind_rows(data_train, data_test) %>%
+            dplyr::select(index..time..index) %>%
+            dplyr::distinct() %>%
+            dplyr::arrange(index..time..index) %>%
+            dplyr::mutate(index..time..index = dplyr::row_number()),
+          by = c('index..time..index')
+        ) %>%
         dplyr::pull(index..time..index)
 
-    # Add a series identifier variable
-    X$series <- as.numeric(dplyr::bind_rows(data_train, data_test)$series)
+      # Add a series identifier variable
+      X$series <- as.numeric(dplyr::bind_rows(data_train, data_test)$series)
 
-    # Add an outcome variable
-    X$outcome <- c(data_train$y, rep(NA, NROW(data_test)))
+      # Add an outcome variable
+      X$outcome <- c(data_train$y, rep(NA, NROW(data_test)))
     }
-
   } else {
     X <- data.frame(ss_jagam$jags.data$X)
 
     # Remove fakery columns from design matrix if no smooth terms were included
-    if(!smooths_included){
-      X[,xcols_drop] <- NULL
+    if (!smooths_included) {
+      X[, xcols_drop] <- NULL
     }
 
-    if(inherits(data_train, 'list')){
+    if (inherits(data_train, 'list')) {
       temp_dat <- data.frame(index..time..index = data_train$index..time..index)
       X$index..time..index <- temp_dat %>%
-        dplyr::left_join(temp_dat %>%
-                           dplyr::select(index..time..index) %>%
-                           dplyr::distinct() %>%
-                           dplyr::arrange(index..time..index) %>%
-                           dplyr::mutate(index..time..index = dplyr::row_number()),
-                         by = c('index..time..index')) %>%
+        dplyr::left_join(
+          temp_dat %>%
+            dplyr::select(index..time..index) %>%
+            dplyr::distinct() %>%
+            dplyr::arrange(index..time..index) %>%
+            dplyr::mutate(index..time..index = dplyr::row_number()),
+          by = c('index..time..index')
+        ) %>%
         dplyr::pull(index..time..index)
     } else {
       X$index..time..index <- data_train %>%
-        dplyr::left_join(data_train %>%
-                           dplyr::select(index..time..index) %>%
-                           dplyr::distinct() %>%
-                           dplyr::arrange(index..time..index) %>%
-                           dplyr::mutate(index..time..index = dplyr::row_number()),
-                         by = c('index..time..index')) %>%
+        dplyr::left_join(
+          data_train %>%
+            dplyr::select(index..time..index) %>%
+            dplyr::distinct() %>%
+            dplyr::arrange(index..time..index) %>%
+            dplyr::mutate(index..time..index = dplyr::row_number()),
+          by = c('index..time..index')
+        ) %>%
         dplyr::pull(index..time..index)
     }
 
@@ -1182,74 +1299,83 @@ mvgam = function(formula,
   X %>% dplyr::arrange(index..time..index, series) -> X
 
   # Matrix of indices in X that correspond to timepoints for each series
-  ytimes <- matrix(NA, nrow = length(unique(X$index..time..index)),
-                   ncol = length(unique(X$series)))
-  for(i in 1:length(unique(X$series))){
-    ytimes[,i] <- which(X$series == i)
+  ytimes <- matrix(
+    NA,
+    nrow = length(unique(X$index..time..index)),
+    ncol = length(unique(X$series))
+  )
+  for (i in 1:length(unique(X$series))) {
+    ytimes[, i] <- which(X$series == i)
   }
   ss_jagam$jags.data$ytimes <- ytimes
 
   # Matrix of outcomes in X that correspond to each series at each timepoint
   ys_mat <- matrix(NA, nrow = NROW(ytimes), ncol = NCOL(ytimes))
-  for(i in 1:length(unique(X$series))){
-    ys_mat[,i] <- X$outcome[which(X$series == i)]
+  for (i in 1:length(unique(X$series))) {
+    ys_mat[, i] <- X$outcome[which(X$series == i)]
   }
   ss_jagam$jags.data$y <- ys_mat
 
   # Other necessary variables
   ss_jagam$jags.data$n <- NROW(ytimes)
   ss_jagam$jags.data$n_series <- NCOL(ytimes)
-  ss_jagam$jags.data$X <- as.matrix(X %>%
-                                     dplyr::select(-index..time..index, -series, -outcome))
-  if(NCOL(ss_jagam$jags.data$X) == 1){
-    if(offset){
-      model_file[grep('eta <-', model_file, fixed = TRUE)] <- 'eta <- X * b + offset'
-    } else{
+  ss_jagam$jags.data$X <- as.matrix(
+    X %>%
+      dplyr::select(-index..time..index, -series, -outcome)
+  )
+  if (NCOL(ss_jagam$jags.data$X) == 1) {
+    if (offset) {
+      model_file[grep(
+        'eta <-',
+        model_file,
+        fixed = TRUE
+      )] <- 'eta <- X * b + offset'
+    } else {
       model_file[grep('eta <-', model_file, fixed = TRUE)] <- 'eta <- X * b'
     }
   }
 
-  if(!missing(upper_bounds)){
+  if (!missing(upper_bounds)) {
     ss_jagam$jags.data$upper_bound <- upper_bounds
   }
 
-  if(length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)){
+  if (length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)) {
     ss_jagam$jags.data$sp <- ss_gam$sp
   }
 
   # Machine epsilon for minimum allowable non-zero rate
-  if(family_char == 'negative binomial')
+  if (family_char == 'negative binomial')
     ss_jagam$jags.data$min_eps <- .Machine$double.eps
 
   # Number of latent variables to use
-  if(use_lv){
-      if(missing(n_lv)){
-        ss_jagam$jags.data$n_lv <- min(2, floor(ss_jagam$jags.data$n_series / 2))
-      } else {
-        ss_jagam$jags.data$n_lv <- n_lv
-        ss_jagam$jags.ini$X1 <- rep(1, n_lv)
-        ss_jagam$jags.ini$X2 <- 1
-      }
-      if(ss_jagam$jags.data$n_lv > ss_jagam$jags.data$n_series){
-        stop('Number of latent variables cannot be greater than number of series')
-      }
+  if (use_lv) {
+    if (missing(n_lv)) {
+      ss_jagam$jags.data$n_lv <- min(2, floor(ss_jagam$jags.data$n_series / 2))
+    } else {
+      ss_jagam$jags.data$n_lv <- n_lv
+      ss_jagam$jags.ini$X1 <- rep(1, n_lv)
+      ss_jagam$jags.ini$X2 <- 1
+    }
+    if (ss_jagam$jags.data$n_lv > ss_jagam$jags.data$n_series) {
+      stop('Number of latent variables cannot be greater than number of series')
+    }
   }
 
-  if(missing(upper_bounds)) upper_bounds <- NULL
+  if (missing(upper_bounds)) upper_bounds <- NULL
 
-  if(use_lv){
+  if (use_lv) {
     n_lv <- ss_jagam$jags.data$n_lv
   } else {
-    if(missing(trend_map)){
+    if (missing(trend_map)) {
       n_lv <- NULL
     }
   }
 
-  if(missing(data_test)) data_test <- NULL
+  if (missing(data_test)) data_test <- NULL
 
   # Remove Smooth penalty matrix if no smooths were used in the formula
-  if(!smooths_included){
-    if(any(grepl('S.*', names(ss_jagam$jags.data)))){
+  if (!smooths_included) {
+    if (any(grepl('S.*', names(ss_jagam$jags.data)))) {
       ss_jagam$jags.data[[grep('S.*', names(ss_jagam$jags.data))]] <- NULL
       ss_jagam$jags.data$sp <- NULL
     }
@@ -1259,144 +1385,161 @@ mvgam = function(formula,
   # Add information about the call and necessary data structures to the model file
   # Get dimensions and numbers of smooth terms
   snames <- names(ss_jagam$jags.data)[grep('S.*', names(ss_jagam$jags.data))]
-  if(length(snames) == 0){
+  if (length(snames) == 0) {
     smooth_penalty_data <- NULL
   } else {
     smooth_dims <- matrix(NA, ncol = 2, nrow = length(snames))
-    for(i in 1:length(snames)){
-      smooth_dims[i,] <- dim(ss_jagam$jags.data[[snames[i]]])
+    for (i in 1:length(snames)) {
+      smooth_dims[i, ] <- dim(ss_jagam$jags.data[[snames[i]]])
     }
     smooth_penalty_data <- vector()
-    for(i in 1:length(snames)){
-      smooth_penalty_data[i] <- paste0('matrix ',
-                                       snames[i],
-                                       ';  mgcv smooth penalty matrix ', snames[i])
+    for (i in 1:length(snames)) {
+      smooth_penalty_data[i] <- paste0(
+        'matrix ',
+        snames[i],
+        ';  mgcv smooth penalty matrix ',
+        snames[i]
+      )
     }
   }
 
-  if('sp' %in% names(ss_jagam$jags.data)){
-    if(length(ss_jagam$jags.data$sp) == 1){
-      sp_data <- c(paste0('real sp;  inverse exponential location prior for smoothing parameter ',
-                        paste0(names(ss_jagam$jags.data$sp))),
-                   '___________values ranging 5 - 50 are a good start')
+  if ('sp' %in% names(ss_jagam$jags.data)) {
+    if (length(ss_jagam$jags.data$sp) == 1) {
+      sp_data <- c(
+        paste0(
+          'real sp;  inverse exponential location prior for smoothing parameter ',
+          paste0(names(ss_jagam$jags.data$sp))
+        ),
+        '___________values ranging 5 - 50 are a good start'
+      )
     } else {
-      sp_data <- c(paste0('vector sp;  inverse exponential location priors for smoothing parameters: ',
-                        paste0(names(ss_jagam$jags.data$sp), collapse = '; ')),
-                   '___________values ranging 5 - 50 are a good start')
+      sp_data <- c(
+        paste0(
+          'vector sp;  inverse exponential location priors for smoothing parameters: ',
+          paste0(names(ss_jagam$jags.data$sp), collapse = '; ')
+        ),
+        '___________values ranging 5 - 50 are a good start'
+      )
     }
-
   } else {
     sp_data <- NULL
   }
 
-  if('p_coefs' %in% names(ss_jagam$jags.data)){
-    parametric_ldata <- paste0('vector p_coefs;  vector (length = ',
-                               length(ss_jagam$jags.data$p_coefs),
-                               ') of prior Gaussian means for parametric effects')
+  if ('p_coefs' %in% names(ss_jagam$jags.data)) {
+    parametric_ldata <- paste0(
+      'vector p_coefs;  vector (length = ',
+      length(ss_jagam$jags.data$p_coefs),
+      ') of prior Gaussian means for parametric effects'
+    )
   } else {
     parametric_ldata <- NULL
   }
 
-  if('p_taus' %in% names(ss_jagam$jags.data)){
-    parametric_tdata <- paste0('vector p_taus;  vector (length = ',
-                               length(ss_jagam$jags.data$p_coefs),
-                               ') of prior Gaussian precisions for parametric effects')
+  if ('p_taus' %in% names(ss_jagam$jags.data)) {
+    parametric_tdata <- paste0(
+      'vector p_taus;  vector (length = ',
+      length(ss_jagam$jags.data$p_coefs),
+      ') of prior Gaussian precisions for parametric effects'
+    )
   } else {
     parametric_tdata <- NULL
   }
 
   # A second check for any smooth parameters
-  if(any(grep('lambda', model_file, fixed = TRUE))){
+  if (any(grep('lambda', model_file, fixed = TRUE))) {
     smooths_included <- TRUE
   } else {
     smooths_included <- smooths_included
   }
 
-  if(any(grep('K.* <- ', model_file))){
+  if (any(grep('K.* <- ', model_file))) {
     smooths_included <- TRUE
   } else {
     smooths_included <- smooths_included
   }
 
   # Add in additional data structure information for the model file heading
-  if(family_char == 'negative binomial'){
-    min_eps <- paste0('min_eps; .Machine$double.eps (smallest floating-point number x such that 1 + x != 1)\n')
+  if (family_char == 'negative binomial') {
+    min_eps <- paste0(
+      'min_eps; .Machine$double.eps (smallest floating-point number x such that 1 + x != 1)\n'
+    )
   } else {
     min_eps <- NULL
   }
 
-  if(smooths_included){
-    zeros <- paste0('vector zero;  prior basis coefficient locations vector of length ncol(X)\n')
+  if (smooths_included) {
+    zeros <- paste0(
+      'vector zero;  prior basis coefficient locations vector of length ncol(X)\n'
+    )
   } else {
     zeros <- NULL
   }
 
-  if(offset){
+  if (offset) {
     offset_line <- paste0('offset; offset vector of length (n x n_series)\n')
   } else {
     offset_line <- NULL
   }
 
-  model_file <- c('JAGS model code generated by package mvgam',
-                       '\n',
-                       'GAM formula:',
-                  gsub('\"', '', paste(formula[2],formula[3],sep=' ~ ')),
-                       '\n',
-                  'Trend model:',
-                  trend_model,
-                  '\n',
-                  'Required data:',
-                  'integer n;  number of timepoints per series\n',
-                  'integer n_series;  number of series\n',
-                  'matrix y;  time-ordered observations of dimension n x n_series (missing values allowed)\n',
-                  'matrix ytimes;  time-ordered n x n_series matrix (which row in X belongs to each [time, series] observation?)\n',
-                  'matrix X;  mgcv GAM design matrix of dimension (n x n_series) x basis dimension\n',
-                  paste0(smooth_penalty_data),
-                  offset_line,
-                  zeros,
-                  paste0(parametric_ldata),
-                  paste0(parametric_tdata),
-                  sp_data,
-                  min_eps,
-                  '\n',
-                  model_file)
+  model_file <- c(
+    'JAGS model code generated by package mvgam',
+    '\n',
+    'GAM formula:',
+    gsub('\"', '', paste(formula[2], formula[3], sep = ' ~ ')),
+    '\n',
+    'Trend model:',
+    trend_model,
+    '\n',
+    'Required data:',
+    'integer n;  number of timepoints per series\n',
+    'integer n_series;  number of series\n',
+    'matrix y;  time-ordered observations of dimension n x n_series (missing values allowed)\n',
+    'matrix ytimes;  time-ordered n x n_series matrix (which row in X belongs to each [time, series] observation?)\n',
+    'matrix X;  mgcv GAM design matrix of dimension (n x n_series) x basis dimension\n',
+    paste0(smooth_penalty_data),
+    offset_line,
+    zeros,
+    paste0(parametric_ldata),
+    paste0(parametric_tdata),
+    sp_data,
+    min_eps,
+    '\n',
+    model_file
+  )
 
   # Get names of smoothing parameters
-  if(smooths_included){
+  if (smooths_included) {
     ss_gam$off <- ss_jagam$pregam$off
     ss_gam$S <- ss_jagam$pregam$S
     name_starts <- unlist(purrr::map(ss_jagam$pregam$smooth, 'first.sp'))
     name_ends <- unlist(purrr::map(ss_jagam$pregam$smooth, 'last.sp'))
 
-    rho_names <- unlist(lapply(seq(1:length(ss_gam$smooth)), function(i){
-
+    rho_names <- unlist(lapply(seq(1:length(ss_gam$smooth)), function(i) {
       number_seq <- seq(1:(1 + name_ends[i] - name_starts[i]))
       number_seq[1] <- ''
 
-      paste0(rep(ss_gam$smooth[[i]]$label,
-                 length(number_seq)),
-             number_seq)
+      paste0(rep(ss_gam$smooth[[i]]$label, length(number_seq)), number_seq)
     }))
   } else {
     rho_names <- NA
   }
 
   #### Set up model file and modelling data ####
-  if(use_stan){
-    algorithm <- match.arg(algorithm, c('sampling',
-                                        'meanfield',
-                                        'fullrank',
-                                        'pathfinder',
-                                        'laplace'))
-    backend <- match.arg(backend, c('rstan',
-                                    'cmdstanr'))
+  if (use_stan) {
+    algorithm <- match.arg(
+      algorithm,
+      c('sampling', 'meanfield', 'fullrank', 'pathfinder', 'laplace')
+    )
+    backend <- match.arg(backend, c('rstan', 'cmdstanr'))
 
-    cmdstan_avail <- insight::check_if_installed('cmdstanr',
-                                                 stop = FALSE,
-                                                 quietly = TRUE)
+    cmdstan_avail <- insight::check_if_installed(
+      'cmdstanr',
+      stop = FALSE,
+      quietly = TRUE
+    )
 
-    if(isTRUE(cmdstan_avail)){
-      if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE))){
+    if (isTRUE(cmdstan_avail)) {
+      if (is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE))) {
         backend <- 'rstan'
       }
     }
@@ -1413,42 +1556,50 @@ mvgam = function(formula,
     unlink(stanfile_name)
 
     # Add necessary trend structure
-    base_stan_model <- add_trend_lines(model_file = base_stan_model,
-                                       stan = TRUE,
-                                       trend_model = if(trend_model %in% c('RW',
-                                                                           'VAR1',
-                                                                           'PWlinear',
-                                                                           'PWlogistic',
-                                                                           'ZMVN')){'RW'} else {trend_model},
-                                       use_lv = use_lv,
-                                       drift = drift)
+    base_stan_model <- add_trend_lines(
+      model_file = base_stan_model,
+      stan = TRUE,
+      trend_model = if (
+        trend_model %in% c('RW', 'VAR1', 'PWlinear', 'PWlogistic', 'ZMVN')
+      ) {
+        'RW'
+      } else {
+        trend_model
+      },
+      use_lv = use_lv,
+      drift = drift
+    )
 
     # Add remaining data, model and parameters blocks to the Stan model file;
     # gather Stan data structure
-    stan_objects <- add_stan_data(jags_file = trimws(model_file),
-                                  stan_file = base_stan_model,
-                                  ss_gam = ss_gam,
-                                  use_lv = use_lv,
-                                  n_lv = n_lv,
-                                  jags_data = ss_jagam$jags.data,
-                                  family = ifelse(family_char %in% c('binomial',
-                                                                     'bernoulli',
-                                                                     'beta_binomial'),
-                                                  'poisson',
-                                                  family_char),
-                                  upper_bounds = upper_bounds)
+    stan_objects <- add_stan_data(
+      jags_file = trimws(model_file),
+      stan_file = base_stan_model,
+      ss_gam = ss_gam,
+      use_lv = use_lv,
+      n_lv = n_lv,
+      jags_data = ss_jagam$jags.data,
+      family = ifelse(
+        family_char %in% c('binomial', 'bernoulli', 'beta_binomial'),
+        'poisson',
+        family_char
+      ),
+      upper_bounds = upper_bounds
+    )
 
-    if(use_lv || !missing(trend_map)){
+    if (use_lv || !missing(trend_map)) {
       stan_objects$model_data$n_lv <- n_lv
     }
 
     # Set monitor parameters
-    param <- get_monitor_pars(family = family_char,
-                              use_lv = use_lv,
-                              trend_model = trend_model,
-                              smooths_included = stan_objects$smooths_included,
-                              drift = drift)
-    if(any(smooth_labs$class == 'random.effect')){
+    param <- get_monitor_pars(
+      family = family_char,
+      use_lv = use_lv,
+      trend_model = trend_model,
+      smooths_included = stan_objects$smooths_included,
+      drift = drift
+    )
+    if (any(smooth_labs$class == 'random.effect')) {
       param <- c(param, 'mu_raw', 'sigma_raw')
     }
 
@@ -1457,36 +1608,41 @@ mvgam = function(formula,
     inits <- NULL
 
     # Include any GP term updates
-    if(!is.null(gp_terms)){
-      gp_additions <- make_gp_additions(gp_details = gp_details,
-                                        orig_formula = orig_formula,
-                                        data = data_train,
-                                        newdata = data_test,
-                                        model_data = stan_objects$model_data,
-                                        mgcv_model = ss_gam,
-                                        gp_terms = gp_terms,
-                                        family = family,
-                                        rho_names = rho_names)
+    if (!is.null(gp_terms)) {
+      gp_additions <- make_gp_additions(
+        gp_details = gp_details,
+        orig_formula = orig_formula,
+        data = data_train,
+        newdata = data_test,
+        model_data = stan_objects$model_data,
+        mgcv_model = ss_gam,
+        gp_terms = gp_terms,
+        family = family,
+        rho_names = rho_names
+      )
       stan_objects$model_data <- gp_additions$model_data
       ss_gam <- gp_additions$mgcv_model
       rho_names <- gp_additions$rho_names
     }
 
     # Vectorise likelihoods
-    vectorised <- vectorise_stan_lik(model_file = stan_objects$stan_file,
-                                     model_data = stan_objects$model_data,
-                                     family = family_char,
-                                     threads = threads,
-                                     trend_model = trend_model,
-                                     use_lv = use_lv,
-                                     offset = offset,
-                                     drift = drift)
+    vectorised <- vectorise_stan_lik(
+      model_file = stan_objects$stan_file,
+      model_data = stan_objects$model_data,
+      family = family_char,
+      threads = threads,
+      trend_model = trend_model,
+      use_lv = use_lv,
+      offset = offset,
+      drift = drift
+    )
 
     # If a VAR model is used, enforce stationarity using methods described by
     # Heaps 2022 (Enforcing stationarity through the prior in vector autoregressions)
-    if(use_var1) vectorised$model_file <- stationarise_VAR(vectorised$model_file)
+    if (use_var1)
+      vectorised$model_file <- stationarise_VAR(vectorised$model_file)
 
-    if(use_var1cor){
+    if (use_var1cor) {
       param <- c(param, 'L_Omega')
       vectorised$model_file <- stationarise_VARcor(vectorised$model_file)
     }
@@ -1494,25 +1650,28 @@ mvgam = function(formula,
     # Add modifications for trend mapping and trend predictors, if
     # supplied
     trend_sp_names <- NA
-    if(!missing(trend_map)){
-      trend_map_setup <- trend_map_mods(model_file = vectorised$model_file,
-                                        model_data = vectorised$model_data,
-                                        trend_map = trend_map,
-                                        data_train = data_train,
-                                        ytimes = ytimes,
-                                        n_lv = n_lv,
-                                        trend_model = trend_model)
+    if (!missing(trend_map)) {
+      trend_map_setup <- trend_map_mods(
+        model_file = vectorised$model_file,
+        model_data = vectorised$model_data,
+        trend_map = trend_map,
+        data_train = data_train,
+        ytimes = ytimes,
+        n_lv = n_lv,
+        trend_model = trend_model
+      )
       vectorised$model_file <- trend_map_setup$model_file
       vectorised$model_data <- trend_map_setup$model_data
 
-      if(trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'CAR1', 'ZMVN')){
+      if (
+        trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'CAR1', 'ZMVN')
+      ) {
         param <- unique(c(param, 'trend', 'sigma'))
       }
 
       # If trend formula specified, add the predictors for the trend models
-      if(!missing(trend_formula)){
-
-        if(missing(trend_knots)) trend_knots <- missing_arg()
+      if (!missing(trend_formula)) {
+        if (missing(trend_knots)) trend_knots <- missing_arg()
 
         trend_pred_setup <- add_trend_predictors(
           trend_formula = trend_formula,
@@ -1520,7 +1679,7 @@ mvgam = function(formula,
           trend_map = trend_map,
           trend_model = trend_model,
           data_train = data_train,
-          data_test = if(missing(data_test)){
+          data_test = if (missing(data_test)) {
             NULL
           } else {
             data_test
@@ -1528,7 +1687,8 @@ mvgam = function(formula,
           model_file = vectorised$model_file,
           model_data = vectorised$model_data,
           drop_trend_int = FALSE,
-          drift = drift)
+          drift = drift
+        )
 
         vectorised$model_file <- trend_pred_setup$model_file
         vectorised$model_data <- trend_pred_setup$model_data
@@ -1536,11 +1696,11 @@ mvgam = function(formula,
 
         param <- unique(c(param, 'trend', 'b_trend', 'trend_mus'))
 
-        if(trend_pred_setup$trend_smooths_included){
+        if (trend_pred_setup$trend_smooths_included) {
           param <- c(param, 'rho_trend', 'lambda_trend')
         }
 
-        if(trend_pred_setup$trend_random_included){
+        if (trend_pred_setup$trend_random_included) {
           param <- c(param, 'mu_raw_trend', 'sigma_raw_trend')
         }
 
@@ -1548,87 +1708,146 @@ mvgam = function(formula,
       } else {
       }
 
-      if(trend_model == 'VAR1'){
+      if (trend_model == 'VAR1') {
         param <- c(param, 'lv_coefs', 'LV')
         use_lv <- TRUE
       }
     }
 
     # Update default priors
-    vectorised$model_file <- suppressWarnings(update_priors(vectorised$model_file,
-                                                            def_priors,
-                                                            use_stan = TRUE))
+    vectorised$model_file <- suppressWarnings(update_priors(
+      vectorised$model_file,
+      def_priors,
+      use_stan = TRUE
+    ))
 
     # Drop observation intercept if specified
-    if(drop_obs_intercept){
-      if(any(grepl('// observation model basis coefficients',
-                  vectorised$model_file,
-                  fixed = TRUE))){
-        vectorised$model_file[grep('// observation model basis coefficients',
-                                   vectorised$model_file,
-                                   fixed = TRUE) + 1] <-
-          paste0(vectorised$model_file[grep('// observation model basis coefficients',
-                                            vectorised$model_file,
-                                            fixed = TRUE) + 1],
-                 '\n', '// (Intercept) fixed at zero\n', "b[1] = 0;")
+    if (drop_obs_intercept) {
+      if (
+        any(grepl(
+          '// observation model basis coefficients',
+          vectorised$model_file,
+          fixed = TRUE
+        ))
+      ) {
+        vectorised$model_file[
+          grep(
+            '// observation model basis coefficients',
+            vectorised$model_file,
+            fixed = TRUE
+          ) +
+            1
+        ] <-
+          paste0(
+            vectorised$model_file[
+              grep(
+                '// observation model basis coefficients',
+                vectorised$model_file,
+                fixed = TRUE
+              ) +
+                1
+            ],
+            '\n',
+            '// (Intercept) fixed at zero\n',
+            "b[1] = 0;"
+          )
       } else {
-        vectorised$model_file[grep('b[1:num_basis] = b_raw[1:num_basis]',
-                                   vectorised$model_file,
-                                   fixed = TRUE)] <-
-          paste0('b[1:num_basis] = b_raw[1:num_basis];\n',
-                 '// (Intercept) fixed at zero\n', "b[1] = 0;")
+        vectorised$model_file[grep(
+          'b[1:num_basis] = b_raw[1:num_basis]',
+          vectorised$model_file,
+          fixed = TRUE
+        )] <-
+          paste0(
+            'b[1:num_basis] = b_raw[1:num_basis];\n',
+            '// (Intercept) fixed at zero\n',
+            "b[1] = 0;"
+          )
       }
 
-      vectorised$model_file <- readLines(textConnection(vectorised$model_file), n = -1)
+      vectorised$model_file <- readLines(
+        textConnection(vectorised$model_file),
+        n = -1
+      )
       attr(ss_gam, 'drop_obs_intercept') <- TRUE
     } else {
       attr(ss_gam, 'drop_obs_intercept') <- FALSE
     }
 
     # Remaining model file updates for any GP terms
-    if(!is.null(gp_terms)){
-     final_gp_updates <- add_gp_model_file(model_file = vectorised$model_file,
-                                           model_data = vectorised$model_data,
-                                           mgcv_model = ss_gam,
-                                           gp_additions = gp_additions)
-     vectorised$model_file <- final_gp_updates$model_file
-     vectorised$model_data <- final_gp_updates$model_data
+    if (!is.null(gp_terms)) {
+      final_gp_updates <- add_gp_model_file(
+        model_file = vectorised$model_file,
+        model_data = vectorised$model_data,
+        mgcv_model = ss_gam,
+        gp_additions = gp_additions
+      )
+      vectorised$model_file <- final_gp_updates$model_file
+      vectorised$model_data <- final_gp_updates$model_data
     }
 
     # Update monitor pars for any GP terms
-    if(any(grepl('real<lower=0> alpha_gp',
-                vectorised$model_file, fixed = TRUE)) &
-       !lfo){
-      alpha_params <- trimws(gsub(';', '', gsub('real<lower=0> ',
-                                                '',
-                                                grep('real<lower=0> alpha_gp',
-                                                     vectorised$model_file, fixed = TRUE,
-                                                     value = TRUE), fixed = TRUE)))
-      rho_params <- trimws(gsub(';', '', gsub('real<lower=0> ',
-                                              '',
-                                              grep('real<lower=0> rho_gp',
-                                                   vectorised$model_file, fixed = TRUE,
-                                                   value = TRUE), fixed = TRUE)))
+    if (
+      any(grepl(
+        'real<lower=0> alpha_gp',
+        vectorised$model_file,
+        fixed = TRUE
+      )) &
+        !lfo
+    ) {
+      alpha_params <- trimws(gsub(
+        ';',
+        '',
+        gsub(
+          'real<lower=0> ',
+          '',
+          grep(
+            'real<lower=0> alpha_gp',
+            vectorised$model_file,
+            fixed = TRUE,
+            value = TRUE
+          ),
+          fixed = TRUE
+        )
+      ))
+      rho_params <- trimws(gsub(
+        ';',
+        '',
+        gsub(
+          'real<lower=0> ',
+          '',
+          grep(
+            'real<lower=0> rho_gp',
+            vectorised$model_file,
+            fixed = TRUE,
+            value = TRUE
+          ),
+          fixed = TRUE
+        )
+      ))
       param <- c(param, alpha_params, rho_params)
     }
 
     # Update for any monotonic term updates
-    if(any(smooth_labs$class %in% c('moi.smooth', 'mod.smooth'))){
-      final_mono_updates <- add_mono_model_file(model_file = vectorised$model_file,
-                                                model_data = vectorised$model_data,
-                                                mgcv_model = ss_gam)
+    if (any(smooth_labs$class %in% c('moi.smooth', 'mod.smooth'))) {
+      final_mono_updates <- add_mono_model_file(
+        model_file = vectorised$model_file,
+        model_data = vectorised$model_data,
+        mgcv_model = ss_gam
+      )
       vectorised$model_file <- final_mono_updates$model_file
       vectorised$model_data <- final_mono_updates$model_data
     }
 
     # Update for any piecewise trends
-    if(trend_model %in% c('PWlinear', 'PWlogistic')){
-      pw_additions <- add_piecewise(vectorised$model_file,
-                                    vectorised$model_data,
-                                    data_train,
-                                    data_test,
-                                    orig_trend_model,
-                                    family)
+    if (trend_model %in% c('PWlinear', 'PWlogistic')) {
+      pw_additions <- add_piecewise(
+        vectorised$model_file,
+        vectorised$model_data,
+        data_train,
+        data_test,
+        orig_trend_model,
+        family
+      )
       vectorised$model_file <- pw_additions$model_file
       vectorised$model_data <- pw_additions$model_data
       orig_trend_model$changepoints <- pw_additions$model_data$t_change
@@ -1637,325 +1856,398 @@ mvgam = function(formula,
     }
 
     # Update for CAR1 trends
-    if(trend_model == 'CAR1'){
-      vectorised$model_data <- add_corcar(vectorised$model_data,
-                                          data_train, data_test)
+    if (trend_model == 'CAR1') {
+      vectorised$model_data <- add_corcar(
+        vectorised$model_data,
+        data_train,
+        data_test
+      )
     }
 
     # Updates for Binomial and Bernoulli families
-    if(family_char %in% c('binomial', 'bernoulli', 'beta_binomial')){
-      bin_additions <- add_binomial(formula,
-                                    vectorised$model_file,
-                                    vectorised$model_data,
-                                    data_train,
-                                    data_test,
-                                    family_char)
+    if (family_char %in% c('binomial', 'bernoulli', 'beta_binomial')) {
+      bin_additions <- add_binomial(
+        formula,
+        vectorised$model_file,
+        vectorised$model_data,
+        data_train,
+        data_test,
+        family_char
+      )
       vectorised$model_file <- bin_additions$model_file
       vectorised$model_data <- bin_additions$model_data
       attr(ss_gam, 'trials') <- bin_additions$trials
     }
 
     # Add in any user-specified priors
-    if(!missing(priors)){
-      vectorised$model_file <- update_priors(vectorised$model_file,
-                                             priors,
-                                             use_stan = TRUE)
+    if (!missing(priors)) {
+      vectorised$model_file <- update_priors(
+        vectorised$model_file,
+        priors,
+        use_stan = TRUE
+      )
     } else {
       priors <- NULL
     }
 
     # Check if non-centering can be used
-    nc_check <- check_noncent(model_file = vectorised$model_file,
-                              noncentred = noncentred,
-                              use_lv = use_lv,
-                              trend_map = trend_map,
-                              add_ma = add_ma,
-                              add_cor = add_cor,
-                              trend_model = trend_model,
-                              drift = drift,
-                              silent = silent)
-    vectorised$model_file <- nc_check$model_file; noncentred <- nc_check$noncentred
+    nc_check <- check_noncent(
+      model_file = vectorised$model_file,
+      noncentred = noncentred,
+      use_lv = use_lv,
+      trend_map = trend_map,
+      add_ma = add_ma,
+      add_cor = add_cor,
+      trend_model = trend_model,
+      drift = drift,
+      silent = silent
+    )
+    vectorised$model_file <- nc_check$model_file
+    noncentred <- nc_check$noncentred
 
     # Add any correlated error or moving average processes; this comes after
     # priors as currently there is no option to change priors on these parameters
-    if(add_ma | add_cor){
-      MaCor_additions <- add_MaCor(model_file = vectorised$model_file,
-                                         model_data = vectorised$model_data,
-                                         data_train = data_train,
-                                         data_test = data_test,
-                                         add_ma = add_ma,
-                                         add_cor = add_cor,
-                                         trend_model = orig_trend_model)
+    if (add_ma | add_cor) {
+      MaCor_additions <- add_MaCor(
+        model_file = vectorised$model_file,
+        model_data = vectorised$model_data,
+        data_train = data_train,
+        data_test = data_test,
+        add_ma = add_ma,
+        add_cor = add_cor,
+        trend_model = orig_trend_model
+      )
       vectorised$model_file <- MaCor_additions$model_file
       vectorised$model_data <- MaCor_additions$model_data
     }
 
     # Add updates for an N-mixture model
-    if(add_nmix){
-      nmix_additions <- add_nmixture(vectorised$model_file,
-                                     vectorised$model_data,
-                                     orig_trend_model = orig_trend_model,
-                                     data_train = data_train,
-                                     data_test = data_test,
-                                     trend_map = trend_map,
-                                     nmix_trendmap = nmix_trendmap)
+    if (add_nmix) {
+      nmix_additions <- add_nmixture(
+        vectorised$model_file,
+        vectorised$model_data,
+        orig_trend_model = orig_trend_model,
+        data_train = data_train,
+        data_test = data_test,
+        trend_map = trend_map,
+        nmix_trendmap = nmix_trendmap
+      )
       vectorised$model_file <- nmix_additions$model_file
       vectorised$model_data <- nmix_additions$model_data
-      family <- nmix(); family_char <- 'nmix'
+      family <- nmix()
+      family_char <- 'nmix'
 
       # Nmixtures don't use generated quantities because it is faster
       # to produce these in R after sampling has finished
       param <- c(param, 'p')
-      param <- param[!param %in% c('ypred', 'mus', 'theta',
-                                   'detprob', 'latent_ypred',
-                                   'lv_coefs', 'error')]
+      param <- param[
+        !param %in%
+          c(
+            'ypred',
+            'mus',
+            'theta',
+            'detprob',
+            'latent_ypred',
+            'lv_coefs',
+            'error'
+          )
+      ]
     }
 
     # Updates for sharing of observation params
-    if(share_obs_params){
-      vectorised$model_file <- shared_obs_params(vectorised$model_file,
-                                                 family_char)
+    if (share_obs_params) {
+      vectorised$model_file <- shared_obs_params(
+        vectorised$model_file,
+        family_char
+      )
     }
 
     # Tidy the representation
     vectorised$model_file <- sanitise_modelfile(vectorised$model_file)
 
-    if(requireNamespace('cmdstanr', quietly = TRUE) & backend == 'cmdstanr'){
+    if (requireNamespace('cmdstanr', quietly = TRUE) & backend == 'cmdstanr') {
       # Replace new syntax if this is an older version of Stan
-      if(cmdstanr::cmdstan_version() < "2.26"){
-        warning('Your version of CmdStan is out of date. Some features of mvgam may not work')
+      if (cmdstanr::cmdstan_version() < "2.26") {
+        warning(
+          'Your version of CmdStan is out of date. Some features of mvgam may not work'
+        )
         vectorised$model_file <-
-          gsub('array[n, n_series] int ypred;',
-               'int ypred[n, n_series];',
-               vectorised$model_file, fixed = TRUE)
+          gsub(
+            'array[n, n_series] int ypred;',
+            'int ypred[n, n_series];',
+            vectorised$model_file,
+            fixed = TRUE
+          )
         vectorised$model_file <-
-          gsub('array[n, n_series] real ypred;',
-               'real ypred[n, n_series];',
-               vectorised$model_file, fixed = TRUE)
+          gsub(
+            'array[n, n_series] real ypred;',
+            'real ypred[n, n_series];',
+            vectorised$model_file,
+            fixed = TRUE
+          )
       }
 
       # Auto-format the model file
-      if(autoformat){
-        if(requireNamespace('cmdstanr') &
-           cmdstanr::cmdstan_version() >= "2.29.0") {
-          vectorised$model_file <- .autoformat(vectorised$model_file,
-                                               overwrite_file = FALSE,
-                                               backend = 'cmdstanr',
-                                               silent = silent >= 1L)
+      if (autoformat) {
+        if (
+          requireNamespace('cmdstanr') &
+            cmdstanr::cmdstan_version() >= "2.29.0"
+        ) {
+          vectorised$model_file <- .autoformat(
+            vectorised$model_file,
+            overwrite_file = FALSE,
+            backend = 'cmdstanr',
+            silent = silent >= 1L
+          )
         }
-        vectorised$model_file <- readLines(textConnection(vectorised$model_file),
-                                           n = -1)
+        vectorised$model_file <- readLines(
+          textConnection(vectorised$model_file),
+          n = -1
+        )
       }
-
-      } else {
-        if(autoformat){
-          vectorised$model_file <- .autoformat(vectorised$model_file,
-                                               overwrite_file = FALSE,
-                                               backend = 'rstan',
-                                               silent = silent >= 1L)
-          vectorised$model_file <- readLines(textConnection(vectorised$model_file),
-                                             n = -1)
-        }
+    } else {
+      if (autoformat) {
+        vectorised$model_file <- .autoformat(
+          vectorised$model_file,
+          overwrite_file = FALSE,
+          backend = 'rstan',
+          silent = silent >= 1L
+        )
+        vectorised$model_file <- readLines(
+          textConnection(vectorised$model_file),
+          n = -1
+        )
+      }
 
       # Replace new syntax if this is an older version of Stan
-      if(rstan::stan_version() < "2.26"){
-        warning('Your version of rstan is out of date. Some features of mvgam may not work')
+      if (rstan::stan_version() < "2.26") {
+        warning(
+          'Your version of rstan is out of date. Some features of mvgam may not work'
+        )
         vectorised$model_file <-
-          gsub('array[n, n_series] int ypred;',
-               'int ypred[n, n_series];',
-               vectorised$model_file, fixed = TRUE)
+          gsub(
+            'array[n, n_series] int ypred;',
+            'int ypred[n, n_series];',
+            vectorised$model_file,
+            fixed = TRUE
+          )
       }
-      }
+    }
     attr(vectorised$model_data, 'trend_model') <- trend_model
 
     # Remove data likelihood if this is a prior sampling run
-    if(prior_simulation){
+    if (prior_simulation) {
       vectorised$model_file <- remove_likelihood(vectorised$model_file)
     }
-
   } else {
     # Set up data and model file for JAGS
     attr(ss_jagam$jags.data, 'trend_model') <- trend_model
     trend_sp_names <- NA
-    if(!smooths_included){
+    if (!smooths_included) {
       inits <- NULL
     } else {
       inits <- ss_jagam$jags.ini
     }
-    initlist <- replicate(chains, inits,
-                          simplify = FALSE)
+    initlist <- replicate(chains, inits, simplify = FALSE)
     inits <- initlist
 
-    if(!missing(priors)){
+    if (!missing(priors)) {
       model_file <- update_priors(model_file, priors, use_stan = FALSE)
     } else {
       priors <- NULL
     }
 
     # Set monitor parameters and initial values
-    param <- get_monitor_pars(family_char,
-                              smooths_included = smooths_included,
-                              use_lv, trend_model, drift)
+    param <- get_monitor_pars(
+      family_char,
+      smooths_included = smooths_included,
+      use_lv,
+      trend_model,
+      drift
+    )
 
     # Add random effect parameters for monitoring
-    if(any(smooth_labs$class == 'random.effect')){
+    if (any(smooth_labs$class == 'random.effect')) {
       param <- c(param, paste0('mu_raw', 1:length(re_smooths)))
       param <- c(param, paste0('sigma_raw', 1:length(re_smooths)))
     }
-
   }
 
   # Remove lp__ from monitor params if VB is to be used
-  if(algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')){
+  if (algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')) {
     param <- param[!param %in% 'lp__']
   }
 
   # Lighten up the mgcv model(s) to reduce size of the returned object
   ss_gam <- trim_mgcv(ss_gam)
-  if(!missing(trend_formula)){
+  if (!missing(trend_formula)) {
     trend_mgcv_model <- trim_mgcv(trend_mgcv_model)
   }
 
   #### Return only the model file and all data / inits needed to run the model
   # outside of mvgam ####
-  if(!run_model){
+  if (!run_model) {
     unlink('base_gam.txt')
-      output <- structure(list(call = orig_formula,
-                               trend_call = if(!missing(trend_formula)){
-                                 trend_formula
-                               } else {
-                                 NULL
-                               },
-                               family = family_char,
-                               share_obs_params = share_obs_params,
-                               trend_model = orig_trend_model,
-                               trend_map = if(!missing(trend_map)){
-                                 trend_map
-                               } else {
-                                 NULL
-                               },
-                               drift = FALSE,
-                               priors = priors,
-                               model_file = if(use_stan){
-                                 vectorised$model_file
-                               } else {
-                                 trimws(model_file)
-                               },
-                               model_data = if(use_stan){
-                                 vectorised$model_data
-                               } else {
-                                 ss_jagam$jags.data
-                               },
-                               inits = inits,
-                               monitor_pars = param,
-                               mgcv_model = ss_gam,
-                               trend_mgcv_model = if(!missing(trend_formula)){
-                                 trend_mgcv_model
-                               } else {
-                                 NULL
-                               },
-                               sp_names = rho_names,
-                               trend_sp_names = trend_sp_names,
-                               ytimes = ytimes,
-                               use_lv = use_lv,
-                               n_lv = n_lv,
-                               upper_bounds = upper_bounds,
-                               obs_data = data_train,
-                               test_data = data_test,
-                               fit_engine = if(use_stan){
-                                 'stan'
-                               } else {
-                                 'jags'
-                               },
-                               backend = if(use_stan){
-                                 backend
-                               } else {
-                                 'rjags'
-                               },
-                               algorithm = if(use_stan){
-                                 algorithm
-                               } else {
-                                 'sampling'
-                               },
-                               max_treedepth = NULL,
-                               adapt_delta = NULL),
-                          class = 'mvgam_prefit')
+    output <- structure(
+      list(
+        call = orig_formula,
+        trend_call = if (!missing(trend_formula)) {
+          trend_formula
+        } else {
+          NULL
+        },
+        family = family_char,
+        share_obs_params = share_obs_params,
+        trend_model = orig_trend_model,
+        trend_map = if (!missing(trend_map)) {
+          trend_map
+        } else {
+          NULL
+        },
+        drift = FALSE,
+        priors = priors,
+        model_file = if (use_stan) {
+          vectorised$model_file
+        } else {
+          trimws(model_file)
+        },
+        model_data = if (use_stan) {
+          vectorised$model_data
+        } else {
+          ss_jagam$jags.data
+        },
+        inits = inits,
+        monitor_pars = param,
+        mgcv_model = ss_gam,
+        trend_mgcv_model = if (!missing(trend_formula)) {
+          trend_mgcv_model
+        } else {
+          NULL
+        },
+        sp_names = rho_names,
+        trend_sp_names = trend_sp_names,
+        ytimes = ytimes,
+        use_lv = use_lv,
+        n_lv = n_lv,
+        upper_bounds = upper_bounds,
+        obs_data = data_train,
+        test_data = data_test,
+        fit_engine = if (use_stan) {
+          'stan'
+        } else {
+          'jags'
+        },
+        backend = if (use_stan) {
+          backend
+        } else {
+          'rjags'
+        },
+        algorithm = if (use_stan) {
+          algorithm
+        } else {
+          'sampling'
+        },
+        max_treedepth = NULL,
+        adapt_delta = NULL
+      ),
+      class = 'mvgam_prefit'
+    )
 
-  #### Else if running the model, complete the setup for fitting ####
+    #### Else if running the model, complete the setup for fitting ####
   } else {
-
     # If this is a lfo_cv run, trim down parameters to monitor so post-processing
     # is faster
-    if(lfo){
-      to_remove <- c('trend', 'b_trend', 'b', 'b_raw', 'rho', 'sigma',
-                     'alpha_gp', 'rho_gp', 'ar1', 'ar2', 'ar3',
-                     'LV', 'lv_coefs', 'penalty', 'Sigma', 'theta',
-                     'error')
+    if (lfo) {
+      to_remove <- c(
+        'trend',
+        'b_trend',
+        'b',
+        'b_raw',
+        'rho',
+        'sigma',
+        'alpha_gp',
+        'rho_gp',
+        'ar1',
+        'ar2',
+        'ar3',
+        'LV',
+        'lv_coefs',
+        'penalty',
+        'Sigma',
+        'theta',
+        'error'
+      )
       param <- param[!param %in% to_remove]
     }
 
-    if(use_stan){
-
+    if (use_stan) {
       model_data <- vectorised$model_data
 
       # Check if cmdstan is accessible; if not, use rstan
-      if(backend == 'cmdstanr'){
-        if(!requireNamespace('cmdstanr', quietly = TRUE)){
+      if (backend == 'cmdstanr') {
+        if (!requireNamespace('cmdstanr', quietly = TRUE)) {
           warning('cmdstanr library not found. Defaulting to rstan')
           use_cmdstan <- FALSE
         } else {
           use_cmdstan <- TRUE
-          if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE))){
-            warning('cmdstanr library found but Cmdstan not found. Defaulting to rstan')
+          if (is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE))) {
+            warning(
+              'cmdstanr library found but Cmdstan not found. Defaulting to rstan'
+            )
             use_cmdstan <- FALSE
           }
         }
       }
 
-      if(use_cmdstan){
+      if (use_cmdstan) {
         # Prepare threading and generate the model
-        cmd_mod <- .model_cmdstanr(vectorised$model_file,
-                                   threads = threads,
-                                   silent = silent)
+        cmd_mod <- .model_cmdstanr(
+          vectorised$model_file,
+          threads = threads,
+          silent = silent
+        )
 
         # Condition the model using Cmdstan
-        out_gam_mod <- .sample_model_cmdstanr(model = cmd_mod,
-                                              algorithm = algorithm,
-                                              prior_simulation = prior_simulation,
-                                              data = model_data,
-                                              chains = chains,
-                                              parallel = parallel,
-                                              silent = silent,
-                                              max_treedepth = max_treedepth,
-                                              adapt_delta = adapt_delta,
-                                              threads = threads,
-                                              burnin = burnin,
-                                              samples = samples,
-                                              param = param,
-                                              save_all_pars = save_all_pars,
-                                              dots)
-
+        out_gam_mod <- .sample_model_cmdstanr(
+          model = cmd_mod,
+          algorithm = algorithm,
+          prior_simulation = prior_simulation,
+          data = model_data,
+          chains = chains,
+          parallel = parallel,
+          silent = silent,
+          max_treedepth = max_treedepth,
+          adapt_delta = adapt_delta,
+          threads = threads,
+          burnin = burnin,
+          samples = samples,
+          param = param,
+          save_all_pars = save_all_pars,
+          dots
+        )
       } else {
         # Condition the model using rstan
         requireNamespace('rstan', quietly = TRUE)
-        out_gam_mod <- .sample_model_rstan(model = vectorised$model_file,
-                                           algorithm = algorithm,
-                                           prior_simulation = prior_simulation,
-                                           data = model_data,
-                                           chains = chains,
-                                           parallel = parallel,
-                                           silent = silent,
-                                           max_treedepth = max_treedepth,
-                                           adapt_delta = adapt_delta,
-                                           threads = threads,
-                                           burnin = burnin,
-                                           samples = samples,
-                                           thin = thin,
-                                           dots)
+        out_gam_mod <- .sample_model_rstan(
+          model = vectorised$model_file,
+          algorithm = algorithm,
+          prior_simulation = prior_simulation,
+          data = model_data,
+          chains = chains,
+          parallel = parallel,
+          silent = silent,
+          max_treedepth = max_treedepth,
+          adapt_delta = adapt_delta,
+          threads = threads,
+          burnin = burnin,
+          samples = samples,
+          thin = thin,
+          dots
+        )
       }
     }
 
-    if(!use_stan){
+    if (!use_stan) {
       requireNamespace('runjags', quietly = TRUE)
       fit_engine <- 'jags'
       model_data <- ss_jagam$jags.data
@@ -1970,7 +2262,7 @@ mvgam = function(formula,
       message("Compiling the JAGS program...")
       message()
 
-      if(prior_simulation){
+      if (prior_simulation) {
         n_adapt <- 500
         n_burn <- 0
         samples <- 1000
@@ -1981,197 +2273,211 @@ mvgam = function(formula,
         n_adapt <- max(1000, n_burn - 1000)
       }
 
-      if(parallel){
-        cl <- parallel::makePSOCKcluster(min(c(chains, parallel::detectCores() - 1)))
+      if (parallel) {
+        cl <- parallel::makePSOCKcluster(min(c(
+          chains,
+          parallel::detectCores() - 1
+        )))
         setDefaultCluster(cl)
-        gam_mod <- runjags::run.jags(model = 'base_gam.txt',
-                                     data = ss_jagam$jags.data,
-                                     modules = 'glm',
-                                     inits = initlist,
-                                     n.chains = chains,
-                                     adapt = n_adapt,
-                                     burnin = n_burn,
-                                     sample = samples,
-                                     jags = jags_path,
-                                     thin = thin,
-                                     method = "rjparallel",
-                                     monitor = param,
-                                     silent.jags = TRUE,
-                                     cl = cl)
+        gam_mod <- runjags::run.jags(
+          model = 'base_gam.txt',
+          data = ss_jagam$jags.data,
+          modules = 'glm',
+          inits = initlist,
+          n.chains = chains,
+          adapt = n_adapt,
+          burnin = n_burn,
+          sample = samples,
+          jags = jags_path,
+          thin = thin,
+          method = "rjparallel",
+          monitor = param,
+          silent.jags = TRUE,
+          cl = cl
+        )
         stopCluster(cl)
-
       } else {
-        gam_mod <- runjags::run.jags(model = 'base_gam.txt',
-                                     data = ss_jagam$jags.data,
-                                     modules = 'glm',
-                                     inits = initlist,
-                                     n.chains = chains,
-                                     adapt = n_adapt,
-                                     burnin = n_burn,
-                                     sample = samples,
-                                     jags = jags_path,
-                                     thin = thin,
-                                     method = "rjags",
-                                     monitor = param,
-                                     silent.jags = TRUE)
+        gam_mod <- runjags::run.jags(
+          model = 'base_gam.txt',
+          data = ss_jagam$jags.data,
+          modules = 'glm',
+          inits = initlist,
+          n.chains = chains,
+          adapt = n_adapt,
+          burnin = n_burn,
+          sample = samples,
+          jags = jags_path,
+          thin = thin,
+          method = "rjags",
+          monitor = param,
+          silent.jags = TRUE
+        )
       }
       out_gam_mod <- coda::as.mcmc.list(gam_mod)
     }
 
-  unlink(file_name)
-  unlink(fil)
+    unlink(file_name)
+    unlink(fil)
 
-  # Add generated quantities for N-mixture models
-  if(family_char == 'nmix'){
-    out_gam_mod <- add_nmix_posterior(model_output = out_gam_mod,
-                                      obs_data = data_train,
-                                      test_data = data_test,
-                                      mgcv_model = trend_mgcv_model,
-                                      Z = model_data$Z,
-                                      n_lv = n_lv,
-                                      K_inds = model_data$K_inds_all)
-  }
-
-  # Get Dunn-Smyth Residual distributions for each series if this
-  # is not a prior simulation or an lfo fit
-  if(prior_simulation || lfo || !residuals){
-    series_resids <- NULL
-  } else {
-    object = list(
-      model_output = out_gam_mod,
-      call = orig_formula,
-      mgcv_model = ss_gam,
-      model_data = if(use_stan){
-        vectorised$model_data
-      } else {
-        ss_jagam$jags.data
-      },
-      fit_engine = fit_engine,
-      family = family_char,
-      share_obs_params = share_obs_params,
-      obs_data = data_train,
-      test_data = data_test,
-      ytimes = ytimes)
-    class(object) <- 'mvgam'
-    # Use the much faster vectorized residual
-    # calculation function now
-    series_resids <- dsresids_vec(object)
-  }
-
-  if(prior_simulation){
-    data_train$y <- orig_y
-  }
-
-  # Add Bayesian coefficients to the mgcv model to help with plotting of
-  # smooths that aren't yet supported by mvgam plotting functions; this is
-  # also necessary for computing EDFs and approximate p-values of smooths
-  if(!lfo){
-    V <- cov(mcmc_chains(out_gam_mod, 'b'))
-    ss_gam$Vp <- ss_gam$Vc <- V
-
-    # Add the posterior median coefficients
-    p <- mcmc_summary(out_gam_mod, 'b',
-                      variational = algorithm %in% c('meanfield',
-                                                     'fullrank',
-                                                     'pathfinder',
-                                                     'laplace'))[,c(4)]
-    names(p) <- names(ss_gam$coefficients)
-    ss_gam$coefficients <- p
-
-    # Repeat for any trend-specific mgcv model
-    if(!missing(trend_formula)){
-      V <- cov(mcmc_chains(out_gam_mod, 'b_trend'))
-      trend_mgcv_model$Vp <- trend_mgcv_model$Vc <- V
-      p <- mcmc_summary(out_gam_mod, 'b_trend',
-                        variational = algorithm %in% c('meanfield',
-                                                       'fullrank',
-                                                       'pathfinder',
-                                                       'laplace'))[,c(4)]
-      names(p) <- names(trend_mgcv_model$coefficients)
-      trend_mgcv_model$coefficients <- p
+    # Add generated quantities for N-mixture models
+    if (family_char == 'nmix') {
+      out_gam_mod <- add_nmix_posterior(
+        model_output = out_gam_mod,
+        obs_data = data_train,
+        test_data = data_test,
+        mgcv_model = trend_mgcv_model,
+        Z = model_data$Z,
+        n_lv = n_lv,
+        K_inds = model_data$K_inds_all
+      )
     }
-  }
 
-  #### Return the output as class mvgam ####
-  trim_data <- list()
-  attr(model_data, 'trend_model') <- trend_model
-  attr(trim_data, 'trend_model') <- trend_model
-  attr(model_data, 'noncentred') <- if(noncentred) TRUE else NULL
-  attr(trim_data, 'noncentred') <- if(noncentred) TRUE else NULL
-  attr(model_data, 'threads') <- threads
-  attr(trim_data, 'threads') <- threads
+    # Get Dunn-Smyth Residual distributions for each series if this
+    # is not a prior simulation or an lfo fit
+    if (prior_simulation || lfo || !residuals) {
+      series_resids <- NULL
+    } else {
+      object = list(
+        model_output = out_gam_mod,
+        call = orig_formula,
+        mgcv_model = ss_gam,
+        model_data = if (use_stan) {
+          vectorised$model_data
+        } else {
+          ss_jagam$jags.data
+        },
+        fit_engine = fit_engine,
+        family = family_char,
+        share_obs_params = share_obs_params,
+        obs_data = data_train,
+        test_data = data_test,
+        ytimes = ytimes
+      )
+      class(object) <- 'mvgam'
+      # Use the much faster vectorized residual
+      # calculation function now
+      series_resids <- dsresids_vec(object)
+    }
 
-  output <- structure(list(call = orig_formula,
-                           trend_call = if(!missing(trend_formula)){
-                             trend_formula
-                           } else {
-                             NULL
-                           },
-                           family = family_char,
-                           share_obs_params = share_obs_params,
-                           trend_model = orig_trend_model,
-                           trend_map = if(!missing(trend_map)){
-                             trend_map
-                           } else {
-                             NULL
-                           },
-                           drift = FALSE,
-                           priors = priors,
-                           model_output = out_gam_mod,
-                           model_file = if(use_stan){
-                             vectorised$model_file
-                           } else {
-                             trimws(model_file)
-                           },
-                           model_data = if(return_model_data){
-                             model_data
-                           } else {
-                             trim_data
-                           },
-                           inits = if(return_model_data){
-                             inits
-                           } else {
-                             NULL
-                           },
-                           monitor_pars = param,
-                           sp_names = rho_names,
-                           trend_sp_names = trend_sp_names,
-                           mgcv_model = ss_gam,
-                           trend_mgcv_model = if(!missing(trend_formula)){
-                             trend_mgcv_model
-                           } else {
-                             NULL
-                           },
-                           ytimes = ytimes,
-                           resids = series_resids,
-                           use_lv = use_lv,
-                           n_lv = n_lv,
-                           upper_bounds = upper_bounds,
-                           obs_data = data_train,
-                           test_data = data_test,
-                           fit_engine = fit_engine,
-                           backend = if(use_stan){
-                             backend
-                           } else {
-                             'rjags'
-                           },
-                           algorithm = if(use_stan){
-                             algorithm
-                           } else {
-                             'sampling'
-                           },
-                           max_treedepth = if(use_stan & algorithm == 'sampling'){
-                             max_treedepth
-                           } else {
-                             NULL
-                           },
-                           adapt_delta = if(use_stan & algorithm == 'sampling'){
-                             adapt_delta
-                           } else {
-                             NULL
-                           }),
-                      class = 'mvgam')
+    if (prior_simulation) {
+      data_train$y <- orig_y
+    }
 
+    # Add Bayesian coefficients to the mgcv model to help with plotting of
+    # smooths that aren't yet supported by mvgam plotting functions; this is
+    # also necessary for computing EDFs and approximate p-values of smooths
+    if (!lfo) {
+      V <- cov(mcmc_chains(out_gam_mod, 'b'))
+      ss_gam$Vp <- ss_gam$Vc <- V
+
+      # Add the posterior median coefficients
+      p <- mcmc_summary(
+        out_gam_mod,
+        'b',
+        variational = algorithm %in%
+          c('meanfield', 'fullrank', 'pathfinder', 'laplace')
+      )[, c(4)]
+      names(p) <- names(ss_gam$coefficients)
+      ss_gam$coefficients <- p
+
+      # Repeat for any trend-specific mgcv model
+      if (!missing(trend_formula)) {
+        V <- cov(mcmc_chains(out_gam_mod, 'b_trend'))
+        trend_mgcv_model$Vp <- trend_mgcv_model$Vc <- V
+        p <- mcmc_summary(
+          out_gam_mod,
+          'b_trend',
+          variational = algorithm %in%
+            c('meanfield', 'fullrank', 'pathfinder', 'laplace')
+        )[, c(4)]
+        names(p) <- names(trend_mgcv_model$coefficients)
+        trend_mgcv_model$coefficients <- p
+      }
+    }
+
+    #### Return the output as class mvgam ####
+    trim_data <- list()
+    attr(model_data, 'trend_model') <- trend_model
+    attr(trim_data, 'trend_model') <- trend_model
+    attr(model_data, 'noncentred') <- if (noncentred) TRUE else NULL
+    attr(trim_data, 'noncentred') <- if (noncentred) TRUE else NULL
+    attr(model_data, 'threads') <- threads
+    attr(trim_data, 'threads') <- threads
+
+    output <- structure(
+      list(
+        call = orig_formula,
+        trend_call = if (!missing(trend_formula)) {
+          trend_formula
+        } else {
+          NULL
+        },
+        family = family_char,
+        share_obs_params = share_obs_params,
+        trend_model = orig_trend_model,
+        trend_map = if (!missing(trend_map)) {
+          trend_map
+        } else {
+          NULL
+        },
+        drift = FALSE,
+        priors = priors,
+        model_output = out_gam_mod,
+        model_file = if (use_stan) {
+          vectorised$model_file
+        } else {
+          trimws(model_file)
+        },
+        model_data = if (return_model_data) {
+          model_data
+        } else {
+          trim_data
+        },
+        inits = if (return_model_data) {
+          inits
+        } else {
+          NULL
+        },
+        monitor_pars = param,
+        sp_names = rho_names,
+        trend_sp_names = trend_sp_names,
+        mgcv_model = ss_gam,
+        trend_mgcv_model = if (!missing(trend_formula)) {
+          trend_mgcv_model
+        } else {
+          NULL
+        },
+        ytimes = ytimes,
+        resids = series_resids,
+        use_lv = use_lv,
+        n_lv = n_lv,
+        upper_bounds = upper_bounds,
+        obs_data = data_train,
+        test_data = data_test,
+        fit_engine = fit_engine,
+        backend = if (use_stan) {
+          backend
+        } else {
+          'rjags'
+        },
+        algorithm = if (use_stan) {
+          algorithm
+        } else {
+          'sampling'
+        },
+        max_treedepth = if (use_stan & algorithm == 'sampling') {
+          max_treedepth
+        } else {
+          NULL
+        },
+        adapt_delta = if (use_stan & algorithm == 'sampling') {
+          adapt_delta
+        } else {
+          NULL
+        }
+      ),
+      class = 'mvgam'
+    )
   }
 
   return(output)

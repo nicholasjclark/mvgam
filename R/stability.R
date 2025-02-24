@@ -172,20 +172,21 @@
 #' abline(v = 0, lwd = 2.5)
 #' }
 #'@export
-stability <- function(object, ...){
+stability <- function(object, ...) {
   UseMethod("stability", object)
 }
 
 #'@rdname stability.mvgam
 #'@method stability mvgam
 #'@export
-stability.mvgam = function(object, ...){
-
+stability.mvgam = function(object, ...) {
   # Check trend_model
   trend_model <- attr(object$model_data, 'trend_model')
-  if(!trend_model %in% c('VAR', 'VARcor', 'VAR1', 'VAR1cor')){
-    stop('Only VAR(1) models currently supported for calculating stability metrics',
-         call. = FALSE)
+  if (!trend_model %in% c('VAR', 'VARcor', 'VAR1', 'VAR1cor')) {
+    stop(
+      'Only VAR(1) models currently supported for calculating stability metrics',
+      call. = FALSE
+    )
   }
 
   # Take posterior draws of the interaction matrix
@@ -197,88 +198,91 @@ stability.mvgam = function(object, ...){
   # Number of series in the VAR process
   n_series <- object$n_lv
 
-  if(is.null(n_series)){
+  if (is.null(n_series)) {
     n_series <- nlevels(object$obs_data$series)
   }
 
-  metrics <- do.call(rbind, lapply(seq_len(NROW(B_post)), function(i){
+  metrics <- do.call(
+    rbind,
+    lapply(seq_len(NROW(B_post)), function(i) {
+      B <- matrix(B_post[i, ], nrow = n_series, ncol = n_series, byrow = TRUE)
+      p <- dim(B)[1]
 
-    B <- matrix(B_post[i,],
-                nrow = n_series,
-                ncol = n_series,
-                byrow = TRUE)
-    p <- dim(B)[1]
+      # If we want to get the variance of the stationary distribution (Sigma_inf)
+      Sigma <- matrix(
+        Sigma_post[i, ],
+        nrow = n_series,
+        ncol = n_series,
+        byrow = TRUE
+      )
+      vecS_inf <- solve(diag(p * p) - kronecker(B, B)) %*% as.vector(Sigma)
+      Sigma_inf <- matrix(vecS_inf, nrow = p)
 
-    # If we want to get the variance of the stationary distribution (Sigma_inf)
-    Sigma <- matrix(Sigma_post[i,],
-                    nrow = n_series,
-                    ncol = n_series,
-                    byrow = TRUE)
-    vecS_inf <- solve(diag(p * p) - kronecker(B, B)) %*% as.vector(Sigma)
-    Sigma_inf <- matrix(vecS_inf, nrow = p)
+      # The difference in volume between Sigma_inf and Sigma is:
+      # det(Sigma_inf - Sigma) = det(Sigma_inf) * det(B) ^ 2
+      # according to Ives et al 2003 (eqn 24)
 
-    # The difference in volume between Sigma_inf and Sigma is:
-    # det(Sigma_inf - Sigma) = det(Sigma_inf) * det(B) ^ 2
-    # according to Ives et al 2003 (eqn 24)
+      # We can take partial derivatives to determine which elements of
+      # Sigma_inf contribute most to rates of change in the
+      # proportion of Sigma_inf that is due to process error
+      # Thanks to Mark Scheuerell for providing inspirational code
+      # https://github.com/mdscheuerell/safs-quant-sem-2022/blob/main/lwa_analysis.R
+      int_env <- det(Sigma_inf) * t(solve(Sigma_inf))
 
-    # We can take partial derivatives to determine which elements of
-    # Sigma_inf contribute most to rates of change in the
-    # proportion of Sigma_inf that is due to process error
-    # Thanks to Mark Scheuerell for providing inspirational code
-    # https://github.com/mdscheuerell/safs-quant-sem-2022/blob/main/lwa_analysis.R
-    int_env <- det(Sigma_inf) * t(solve(Sigma_inf))
+      # Proportion of inter-series covariance to
+      # to overall environmental variation contribution (i.e. how important are
+      # correlated errors for controlling the shape of the stationary forecast
+      # distribution?)
+      dat <- data.frame(
+        prop_cov_offdiag = mean(abs(int_env[lower.tri(int_env)])) /
+          (mean(abs(diag(int_env))) + mean(abs(int_env[lower.tri(int_env)])))
+      )
 
-    # Proportion of inter-series covariance to
-    # to overall environmental variation contribution (i.e. how important are
-    # correlated errors for controlling the shape of the stationary forecast
-    # distribution?)
-    dat <- data.frame(prop_cov_offdiag = mean(abs(int_env[lower.tri(int_env)])) /
-                        (mean(abs(diag(int_env))) + mean(abs(int_env[lower.tri(int_env)]))))
+      # Proportion of error variances to stationary forecast distribution
+      dat$prop_cov_diag <- 1 - dat$prop_cov_offdiag
 
-    # Proportion of error variances to stationary forecast distribution
-    dat$prop_cov_diag <- 1 - dat$prop_cov_offdiag
+      # Proportion of volume of Sigma_inf attributable to series interactions,
+      # measuring the degree to which interactions increase
+      # the variance of the stationary distribution (Sigma_inf) relative
+      # to the variance of the process error (Sigma)
+      # lower values = more stability
+      dat$prop_int = abs(det(B))^2
 
-    # Proportion of volume of Sigma_inf attributable to series interactions,
-    # measuring the degree to which interactions increase
-    # the variance of the stationary distribution (Sigma_inf) relative
-    # to the variance of the process error (Sigma)
-    # lower values = more stability
-    dat$prop_int = abs(det(B)) ^ 2
+      # Ives et al 2003 suggest to scale this by the number of series for more direct
+      # comparisons among different studies
+      dat$prop_int_adj <- abs(det(B))^(2 / p)
 
-    # Ives et al 2003 suggest to scale this by the number of series for more direct
-    # comparisons among different studies
-    dat$prop_int_adj <- abs(det(B)) ^ (2 / p)
+      # Sensitivity of the species interaction proportion to particular
+      # interactions is also calculated using partial derivatives
+      # (note the use of 2 here because we squared det(B) in the above eqn)
+      int_sens <- 2 * det(B) * t(solve(B))
 
-    # Sensitivity of the species interaction proportion to particular
-    # interactions is also calculated using partial derivatives
-    # (note the use of 2 here because we squared det(B) in the above eqn)
-    int_sens <- 2 * det(B) * t(solve(B))
+      # Proportion of interspecific contributions to
+      # to overall interaction contribution
+      dat$prop_int_offdiag <- mean(abs(int_sens[lower.tri(int_sens)])) /
+        (mean(abs(diag(int_sens))) + mean(abs(int_sens[lower.tri(int_sens)])))
 
-    # Proportion of interspecific contributions to
-    # to overall interaction contribution
-    dat$prop_int_offdiag <- mean(abs(int_sens[lower.tri(int_sens)])) /
-      (mean(abs(diag(int_sens))) + mean(abs(int_sens[lower.tri(int_sens)])))
+      # Proportion of density dependent contributions to
+      # to overall interaction contribution
+      dat$prop_int_diag <- 1 - dat$prop_int_offdiag
 
-    # Proportion of density dependent contributions to
-    # to overall interaction contribution
-    dat$prop_int_diag <- 1 - dat$prop_int_offdiag
+      # Reactivity, measuring the degree to which the system moves
+      # away from a stable equilibrium following a perturbation
+      # values > 0 suggest the system is reactive, whereby a
+      # perturbation of the system in one period can be amplified in the next period
+      # Following Neubert et al 2009 Ecology (Detecting reactivity)
+      dat$reactivity <- log(max(svd(B)$d))
 
-    # Reactivity, measuring the degree to which the system moves
-    # away from a stable equilibrium following a perturbation
-    # values > 0 suggest the system is reactive, whereby a
-    # perturbation of the system in one period can be amplified in the next period
-    # Following Neubert et al 2009 Ecology (Detecting reactivity)
-    dat$reactivity <- log(max(svd(B)$d))
+      # Return rate of transition distribution to the stationary distribution
+      # Asymptotic return rate of the mean
+      # lower values = more stability
+      dat$mean_return_rate <- max(abs(eigen(B)$values))
 
-    # Return rate of transition distribution to the stationary distribution
-    # Asymptotic return rate of the mean
-    # lower values = more stability
-    dat$mean_return_rate <- max(abs(eigen(B)$values))
-
-    # Asymptotic return rate of the variance
-    # lower values = more stability
-    dat$var_return_rate <- max(abs(eigen(B %x% B)$values))
-    dat
-  }))
+      # Asymptotic return rate of the variance
+      # lower values = more stability
+      dat$var_return_rate <- max(abs(eigen(B %x% B)$values))
+      dat
+    })
+  )
   return(metrics)
 }

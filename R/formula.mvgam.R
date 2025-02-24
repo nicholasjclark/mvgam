@@ -9,15 +9,15 @@
 #'@author Nicholas J Clark
 #'@return A \code{formula} object
 #'@export
-formula.mvgam = function(x, trend_effects = FALSE, ...){
+formula.mvgam = function(x, trend_effects = FALSE, ...) {
   # Check trend_effects
-  if(trend_effects){
-    if(is.null(x$trend_call)){
+  if (trend_effects) {
+    if (is.null(x$trend_call)) {
       stop('no trend_formula exists so there is no trend-level model.frame')
     }
   }
 
-  if(!trend_effects){
+  if (!trend_effects) {
     out <- x$call
   } else {
     out <- x$trend_call
@@ -28,15 +28,15 @@ formula.mvgam = function(x, trend_effects = FALSE, ...){
 
 #'@rdname formula.mvgam
 #'@export
-formula.mvgam_prefit = function(x, trend_effects = FALSE, ...){
+formula.mvgam_prefit = function(x, trend_effects = FALSE, ...) {
   # Check trend_effects
-  if(trend_effects){
-    if(is.null(x$trend_call)){
+  if (trend_effects) {
+    if (is.null(x$trend_call)) {
       stop('no trend_formula exists so there is no trend-level model.frame')
     }
   }
 
-  if(!trend_effects){
+  if (!trend_effects) {
     out <- x$call
   } else {
     out <- x$trend_call

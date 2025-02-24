@@ -44,31 +44,37 @@
 #' augment(mod, robust = FALSE, probs = c(0.25, 0.75))
 #'}
 #' @export
-residuals.mvgam <- function(object,
-                            summary = TRUE,
-                            robust = FALSE,
-                            probs = c(0.025, 0.975),
-                            ...) {
-
+residuals.mvgam <- function(
+  object,
+  summary = TRUE,
+  robust = FALSE,
+  probs = c(0.025, 0.975),
+  ...
+) {
   # What was the original time / series order?
-  orig_order <- data.frame(series = object$obs_data$series,
-                           time = object$obs_data$index..time..index)
+  orig_order <- data.frame(
+    series = object$obs_data$series,
+    time = object$obs_data$index..time..index
+  )
 
   series_numeric <- as.numeric(orig_order$series)
   time_numeric <- match(orig_order$time, unique(orig_order$time))
 
   # Build a matrix to return residuals in this order
-  resid_matrix <- matrix(NA, nrow = NROW(orig_order),
-                         ncol = NROW(object$resids[[1]]))
-  for(i in 1:NROW(resid_matrix)){
-    resid_matrix[i,] <- object$resids[[series_numeric[i]]][,time_numeric[i]]
+  resid_matrix <- matrix(
+    NA,
+    nrow = NROW(orig_order),
+    ncol = NROW(object$resids[[1]])
+  )
+  for (i in 1:NROW(resid_matrix)) {
+    resid_matrix[i, ] <- object$resids[[series_numeric[i]]][, time_numeric[i]]
   }
 
-  if(summary){
+  if (summary) {
     Qupper <- apply(resid_matrix, 1, quantile, probs = max(probs), na.rm = TRUE)
     Qlower <- apply(resid_matrix, 1, quantile, probs = min(probs), na.rm = TRUE)
 
-    if(robust){
+    if (robust) {
       estimates <- apply(resid_matrix, 1, median, na.rm = TRUE)
       errors <- apply(abs(resid_matrix - estimates), 1, median, na.rm = TRUE)
     } else {
@@ -77,9 +83,12 @@ residuals.mvgam <- function(object,
     }
 
     out <- cbind(estimates, errors, Qlower, Qupper)
-    colnames(out) <- c('Estimate', 'Est.Error',
-                       paste0('Q', 100 * min(probs)),
-                       paste0('Q', 100 * max(probs)))
+    colnames(out) <- c(
+      'Estimate',
+      'Est.Error',
+      paste0('Q', 100 * min(probs)),
+      paste0('Q', 100 * max(probs))
+    )
   } else {
     out <- resid_matrix
   }

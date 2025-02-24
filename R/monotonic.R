@@ -123,62 +123,54 @@
 #'                  type = 'link'))
 #' all(derivs$estimate > 0)
 #' }
-smooth.construct.moi.smooth.spec <- function(object, data, knots){
-
+smooth.construct.moi.smooth.spec <- function(object, data, knots) {
   insight::check_if_installed("splines2")
 
   # Check arguments
   object$p.order <- 1
-  if(object$bs.dim < 0)
-    object$bs.dim <- 10
+  if (object$bs.dim < 0) object$bs.dim <- 10
   `k(bs = 'moi')` <- object$bs.dim
-  if(`k(bs = 'moi')` <= 1)
-    stop("Basis dimension is too small",
-         call. = FALSE)
+  if (`k(bs = 'moi')` <= 1) stop("Basis dimension is too small", call. = FALSE)
   validate_pos_integer(`k(bs = 'moi')`)
   validate_even(`k(bs = 'moi')`)
 
   # Number of knots must be k / 2
   nk <- object$bs.dim / 2L
 
-  if(!is.null(object$id))
-    stop("Monotonic splines don't work with ids",
-         call. = FALSE)
+  if (!is.null(object$id))
+    stop("Monotonic splines don't work with ids", call. = FALSE)
 
   # Check basis dimension
-  if(length(object$term) != 1)
-    stop("Monotonic basis only handles 1D smooths",
-         call. = FALSE)
+  if (length(object$term) != 1)
+    stop("Monotonic basis only handles 1D smooths", call. = FALSE)
 
   # Find the data and specified knots
   x <- data[[object$term]]
   k <- knots[[object$term]]
-  if(length(unique(x)) < nk)
+  if (length(unique(x)) < nk)
     warning("basis dimension is larger than number of unique covariates")
 
   # Checks on knots
-  if(is.null(k)) {
-    xl <- min(x); xu <- max(x)
+  if (is.null(k)) {
+    xl <- min(x)
+    xu <- max(x)
   } else {
-    xl <- min(k); xu <- max(k);
-    if(xl > min(x) || xu < max(x))
-      stop("knot range does not include data",
-           call. = FALSE)
-    if(length(k) != nk)
-      stop(paste("there should be ", nk - 1, " supplied knots"),
-           call. = FALSE)
+    xl <- min(k)
+    xu <- max(k)
+    if (xl > min(x) || xu < max(x))
+      stop("knot range does not include data", call. = FALSE)
+    if (length(k) != nk)
+      stop(paste("there should be ", nk - 1, " supplied knots"), call. = FALSE)
   }
 
-  if(!is.null(k)){
-    if(sum(colSums(object$X) == 0) > 0)
+  if (!is.null(k)) {
+    if (sum(colSums(object$X) == 0) > 0)
       warning("there is *no* information about some basis coefficients")
   }
 
-  if(is.null(k)){
-
+  if (is.null(k)) {
     # Generate knots if missing
-    k <- seq(xl, xu,
-             length.out = nk + 2)[2 : nk + 1]
+    k <- seq(xl, xu, length.out = nk + 2)[2:nk + 1]
   }
 
   # Set anchor points beyond which extrapolation will occur
@@ -186,11 +178,13 @@ smooth.construct.moi.smooth.spec <- function(object, data, knots){
   boundary <- c(xl - xr * 0.01, xu + xr * 0.01)
 
   # Generate basis functions
-  i_spline_basis <- splines2::iSpline(x,
-                                      knots = k,
-                                      degree = nk,
-                                      Boundary.knots = boundary,
-                                      intercept = TRUE)
+  i_spline_basis <- splines2::iSpline(
+    x,
+    knots = k,
+    degree = nk,
+    Boundary.knots = boundary,
+    intercept = TRUE
+  )
 
   nbasis <- dim(i_spline_basis)[2]
 
@@ -200,9 +194,11 @@ smooth.construct.moi.smooth.spec <- function(object, data, knots){
   object$knots <- k
   class(object) <- c("moi.smooth")
   object$X <- i_spline_basis
-  if(!is.null(object$xt$S))
-    stop('Cannot accept supplied penalty matrices for monotonic splines',
-         call. = FALSE)
+  if (!is.null(object$xt$S))
+    stop(
+      'Cannot accept supplied penalty matrices for monotonic splines',
+      call. = FALSE
+    )
   object$S <- list(diag(object$bs.dim))
   object$rank <- object$bs.dim
   object$null.space.dim <- 0
@@ -214,62 +210,54 @@ smooth.construct.moi.smooth.spec <- function(object, data, knots){
 #' @export
 #' @author Nicholas J Clark
 #' @rdname monotonic
-smooth.construct.mod.smooth.spec <- function(object, data, knots){
-
+smooth.construct.mod.smooth.spec <- function(object, data, knots) {
   insight::check_if_installed("splines2")
 
   # Check arguments
   object$p.order <- 1
-  if(object$bs.dim < 0)
-    object$bs.dim <- 10
+  if (object$bs.dim < 0) object$bs.dim <- 10
   `k(bs = 'moi')` <- object$bs.dim
-  if(`k(bs = 'moi')` <= 1)
-    stop("Basis dimension is too small",
-         call. = FALSE)
+  if (`k(bs = 'moi')` <= 1) stop("Basis dimension is too small", call. = FALSE)
   validate_pos_integer(`k(bs = 'moi')`)
   validate_even(`k(bs = 'moi')`)
 
   # Number of knots must be k / 2
   nk <- object$bs.dim / 2L
 
-  if(!is.null(object$id))
-    stop("Monotonic splines don't work with ids",
-         call. = FALSE)
+  if (!is.null(object$id))
+    stop("Monotonic splines don't work with ids", call. = FALSE)
 
   # Check basis dimension
-  if(length(object$term) != 1)
-    stop("Monotonic basis only handles 1D smooths",
-         call. = FALSE)
+  if (length(object$term) != 1)
+    stop("Monotonic basis only handles 1D smooths", call. = FALSE)
 
   # Find the data and specified knots
   x <- data[[object$term]]
   k <- knots[[object$term]]
-  if(length(unique(x)) < nk)
+  if (length(unique(x)) < nk)
     warning("basis dimension is larger than number of unique covariates")
 
   # Checks on knots
-  if(is.null(k)) {
-    xl <- min(x); xu <- max(x)
+  if (is.null(k)) {
+    xl <- min(x)
+    xu <- max(x)
   } else {
-    xl <- min(k); xu <- max(k);
-    if(xl > min(x) || xu < max(x))
-      stop("knot range does not include data",
-           call. = FALSE)
-    if(length(k) != nk)
-      stop(paste("there should be ", nk - 1, " supplied knots"),
-           call. = FALSE)
+    xl <- min(k)
+    xu <- max(k)
+    if (xl > min(x) || xu < max(x))
+      stop("knot range does not include data", call. = FALSE)
+    if (length(k) != nk)
+      stop(paste("there should be ", nk - 1, " supplied knots"), call. = FALSE)
   }
 
-  if(!is.null(k)){
-    if(sum(colSums(object$X) == 0) > 0)
+  if (!is.null(k)) {
+    if (sum(colSums(object$X) == 0) > 0)
       warning("there is *no* information about some basis coefficients")
   }
 
-  if(is.null(k)){
-
+  if (is.null(k)) {
     # Generate knots if missing
-    k <- seq(xl, xu,
-             length.out = nk + 2)[2 : nk + 1]
+    k <- seq(xl, xu, length.out = nk + 2)[2:nk + 1]
   }
 
   # Set anchor points beyond which extrapolation will occur
@@ -277,11 +265,13 @@ smooth.construct.mod.smooth.spec <- function(object, data, knots){
   boundary <- c(xl - xr * 0.01, xu + xr * 0.01)
 
   # Generate basis functions
-  i_spline_basis <- splines2::iSpline(x,
-                            knots = k,
-                            degree = nk,
-                            Boundary.knots = boundary,
-                            intercept = TRUE)
+  i_spline_basis <- splines2::iSpline(
+    x,
+    knots = k,
+    degree = nk,
+    Boundary.knots = boundary,
+    intercept = TRUE
+  )
 
   nbasis <- dim(i_spline_basis)[2]
 
@@ -291,9 +281,11 @@ smooth.construct.mod.smooth.spec <- function(object, data, knots){
   object$knots <- k
   class(object) <- c("mod.smooth")
   object$X <- i_spline_basis
-  if(!is.null(object$xt$S))
-    stop('Cannot accept supplied penalty matrices for monotonic splines',
-         call. = FALSE)
+  if (!is.null(object$xt$S))
+    stop(
+      'Cannot accept supplied penalty matrices for monotonic splines',
+      call. = FALSE
+    )
   object$S <- list(diag(object$bs.dim))
   object$rank <- object$bs.dim
   object$null.space.dim <- 0
@@ -306,8 +298,7 @@ smooth.construct.mod.smooth.spec <- function(object, data, knots){
 #' @rdname monotonic
 #' @importFrom mgcv Predict.matrix
 #' @export
-Predict.matrix.moi.smooth <- function(object, data){
-
+Predict.matrix.moi.smooth <- function(object, data) {
   insight::check_if_installed("splines2")
 
   # Ensure extrapolation is flat (1st degree penalty behaviour)
@@ -315,11 +306,13 @@ Predict.matrix.moi.smooth <- function(object, data){
   boundary <- object$boundary
   x[x > max(boundary)] <- max(boundary)
   x[x < min(boundary)] <- min(boundary)
-  Xp <- suppressWarnings(splines2::iSpline(x,
-                                           knots = object$knots,
-                                           degree = object$bs.dim / 2,
-                                           Boundary.knots = boundary,
-                                           intercept = TRUE))
+  Xp <- suppressWarnings(splines2::iSpline(
+    x,
+    knots = object$knots,
+    degree = object$bs.dim / 2,
+    Boundary.knots = boundary,
+    intercept = TRUE
+  ))
   return(as.matrix(Xp))
 }
 
@@ -327,8 +320,7 @@ Predict.matrix.moi.smooth <- function(object, data){
 #' @rdname monotonic
 #' @importFrom mgcv Predict.matrix
 #' @export
-Predict.matrix.mod.smooth <- function(object, data){
-
+Predict.matrix.mod.smooth <- function(object, data) {
   insight::check_if_installed("splines2")
 
   # Ensure extrapolation is flat (1st degree penalty behaviour)
@@ -336,81 +328,103 @@ Predict.matrix.mod.smooth <- function(object, data){
   boundary <- object$boundary
   x[x > max(boundary)] <- max(boundary)
   x[x < min(boundary)] <- min(boundary)
-  Xp <- suppressWarnings(splines2::iSpline(x,
-                                           knots = object$knots,
-                                           degree = object$bs.dim / 2,
-                                           Boundary.knots = boundary,
-                                           intercept = TRUE))
+  Xp <- suppressWarnings(splines2::iSpline(
+    x,
+    knots = object$knots,
+    degree = object$bs.dim / 2,
+    Boundary.knots = boundary,
+    intercept = TRUE
+  ))
   return(as.matrix(Xp))
 }
 
-add_mono_model_file = function(model_file,
-                               model_data,
-                               mgcv_model){
-
+add_mono_model_file = function(model_file, model_data, mgcv_model) {
   # Which smooths are monotonic?
-  smooth_labs <- do.call(rbind, lapply(seq_along(mgcv_model$smooth), function(x){
-    data.frame(label = mgcv_model$smooth[[x]]$label,
-               class = class(mgcv_model$smooth[[x]])[1])
-  }))
+  smooth_labs <- do.call(
+    rbind,
+    lapply(seq_along(mgcv_model$smooth), function(x) {
+      data.frame(
+        label = mgcv_model$smooth[[x]]$label,
+        class = class(mgcv_model$smooth[[x]])[1]
+      )
+    })
+  )
 
   # Clean labels for inclusion in Stan code
-  mono_names <- smooth_labs$label[which(smooth_labs$class %in% c('moi.smooth',
-                                                                 'mod.smooth'))]
+  mono_names <- smooth_labs$label[which(
+    smooth_labs$class %in% c('moi.smooth', 'mod.smooth')
+  )]
   mono_names_clean <- clean_gpnames(mono_names)
 
   # What directions are the constraints?
   mono_directions <- smooth_labs %>%
-    dplyr::filter(class %in% c('moi.smooth',
-                               'mod.smooth')) %>%
-    dplyr::mutate(direction = dplyr::case_when(
-      class == 'moi.smooth' ~ 1,
-      class == 'mod.smooth' ~ -1,
-      TRUE ~ -1
-    )) %>%
+    dplyr::filter(class %in% c('moi.smooth', 'mod.smooth')) %>%
+    dplyr::mutate(
+      direction = dplyr::case_when(
+        class == 'moi.smooth' ~ 1,
+        class == 'mod.smooth' ~ -1,
+        TRUE ~ -1
+      )
+    ) %>%
     dplyr::pull(direction)
 
   # Update model file to include constrained coefficients
   b_line <- max(grep('b[', model_file, fixed = TRUE))
-  b_edits <- paste0('b[b_idx_',
-                    mono_names_clean,
-                    '] = abs(b_raw[b_idx_',
-                    mono_names_clean,
-                    ']) * ', mono_directions,
-                    ';',
-                    collapse = '\n')
-  model_file[b_line] <- paste0(model_file[b_line],
-                               '\n',
-                               b_edits)
+  b_edits <- paste0(
+    'b[b_idx_',
+    mono_names_clean,
+    '] = abs(b_raw[b_idx_',
+    mono_names_clean,
+    ']) * ',
+    mono_directions,
+    ';',
+    collapse = '\n'
+  )
+  model_file[b_line] <- paste0(model_file[b_line], '\n', b_edits)
   model_file <- readLines(textConnection(model_file), n = -1)
 
   # Add the necessary indices to the model_data and data block
   mono_stan_lines <- ''
-  for(covariate in seq_along(mono_names)){
-
-    coef_indices <- which(grepl(mono_names[covariate],
-                                names(coef(mgcv_model)), fixed = TRUE) &
-                            !grepl(paste0(mono_names[covariate],':'),
-                                   names(coef(mgcv_model)), fixed = TRUE) == TRUE)
-    mono_stan_lines <- paste0(mono_stan_lines,
-                            paste0('array[',  length(coef_indices),
-                                   '] int b_idx_',
-                                   mono_names_clean[covariate],
-                                   '; // monotonic basis coefficient indices\n'))
+  for (covariate in seq_along(mono_names)) {
+    coef_indices <- which(
+      grepl(mono_names[covariate], names(coef(mgcv_model)), fixed = TRUE) &
+        !grepl(
+          paste0(mono_names[covariate], ':'),
+          names(coef(mgcv_model)),
+          fixed = TRUE
+        ) ==
+          TRUE
+    )
+    mono_stan_lines <- paste0(
+      mono_stan_lines,
+      paste0(
+        'array[',
+        length(coef_indices),
+        '] int b_idx_',
+        mono_names_clean[covariate],
+        '; // monotonic basis coefficient indices\n'
+      )
+    )
     mono_idx_data <- list(coef_indices)
-    names(mono_idx_data) <- paste0('b_idx_',
-                                   mono_names_clean[covariate])
+    names(mono_idx_data) <- paste0('b_idx_', mono_names_clean[covariate])
     model_data <- append(model_data, mono_idx_data)
   }
 
-  model_file[grep('int<lower=0> ytimes[n, n_series];',
-                  model_file, fixed = TRUE)] <-
-    paste0(model_file[grep('int<lower=0> ytimes[n, n_series];',
-                           model_file, fixed = TRUE)],
-           '\n',
-           mono_stan_lines)
+  model_file[grep(
+    'int<lower=0> ytimes[n, n_series];',
+    model_file,
+    fixed = TRUE
+  )] <-
+    paste0(
+      model_file[grep(
+        'int<lower=0> ytimes[n, n_series];',
+        model_file,
+        fixed = TRUE
+      )],
+      '\n',
+      mono_stan_lines
+    )
   model_file <- readLines(textConnection(model_file), n = -1)
 
-  return(list(model_file = model_file,
-              model_data = model_data))
+  return(list(model_file = model_file, model_data = model_data))
 }

@@ -82,51 +82,57 @@
 #'plot_mvgam_series(data = sim_data$data_train, series = 'all')
 #'@export
 
-sim_mvgam = function(T = 100,
-                     n_series = 3,
-                     seasonality = 'shared',
-                     use_lv = FALSE,
-                     n_lv = 0,
-                     trend_model = RW(),
-                     drift = FALSE,
-                     prop_trend = 0.2,
-                     trend_rel,
-                     freq = 12,
-                     family = poisson(),
-                     phi,
-                     shape,
-                     sigma,
-                     nu,
-                     mu,
-                     prop_missing = 0,
-                     prop_train = 0.85){
-
+sim_mvgam = function(
+  T = 100,
+  n_series = 3,
+  seasonality = 'shared',
+  use_lv = FALSE,
+  n_lv = 0,
+  trend_model = RW(),
+  drift = FALSE,
+  prop_trend = 0.2,
+  trend_rel,
+  freq = 12,
+  family = poisson(),
+  phi,
+  shape,
+  sigma,
+  nu,
+  mu,
+  prop_missing = 0,
+  prop_train = 0.85
+) {
   # Validate the family argument
   family <- validate_family(family)
-  family_char <- match.arg(arg = family$family,
-                           choices = c('negative binomial',
-                                       "poisson",
-                                       "bernoulli",
-                                       "tweedie",
-                                       "beta",
-                                       "gaussian",
-                                       "lognormal",
-                                       "student",
-                                       "Gamma"))
+  family_char <- match.arg(
+    arg = family$family,
+    choices = c(
+      'negative binomial',
+      "poisson",
+      "bernoulli",
+      "tweedie",
+      "beta",
+      "gaussian",
+      "lognormal",
+      "student",
+      "Gamma"
+    )
+  )
 
   # Validate the trend arguments
-  trend_model <- validate_trend_model(trend_model, drift = drift,
-                                      warn = FALSE)
-  if(trend_model %in% c('VAR1', 'VAR1cor')){
+  trend_model <- validate_trend_model(trend_model, drift = drift, warn = FALSE)
+  if (trend_model %in% c('VAR1', 'VAR1cor')) {
     use_lv <- FALSE
   }
 
-  if(trend_model %in% c('RWcor', 'AR1cor', 'AR2cor', 'AR3cor')){
-    warning(paste0('Simulation of correlated AR or RW trends not yet supported.\n',
-                   'Reverting to uncorrelated trends'))
+  if (trend_model %in% c('RWcor', 'AR1cor', 'AR2cor', 'AR3cor')) {
+    warning(paste0(
+      'Simulation of correlated AR or RW trends not yet supported.\n',
+      'Reverting to uncorrelated trends'
+    ))
   }
 
-  if(missing(trend_rel)){
+  if (missing(trend_rel)) {
     trend_rel <- prop_trend
   }
   validate_proportional(trend_rel)
@@ -138,7 +144,7 @@ sim_mvgam = function(T = 100,
   validate_proportional(prop_missing)
 
   # Check n_lv
-  if(n_lv == 0){
+  if (n_lv == 0) {
     use_lv <- FALSE
     n_lv <- n_series
   } else {
@@ -146,152 +152,157 @@ sim_mvgam = function(T = 100,
     use_lv <- TRUE
   }
 
-  if(use_lv){
-    if(n_lv > n_series){
-      warning('Argument "n_lv" cannot be greater than n_series; changing n_lv to match n_series')
+  if (use_lv) {
+    if (n_lv > n_series) {
+      warning(
+        'Argument "n_lv" cannot be greater than n_series; changing n_lv to match n_series'
+      )
       n_lv <- n_series
     }
   }
 
   # Check seasonality
-  if(!seasonality %in% c('shared', 'hierarchical')){
+  if (!seasonality %in% c('shared', 'hierarchical')) {
     stop('seasonality must be either shared or hierarchical')
   }
 
   # Check family-specific parameters
-  if(missing(phi)){
-    if(family_char == 'beta'){
+  if (missing(phi)) {
+    if (family_char == 'beta') {
       phi <- rep(10, n_series)
     } else {
       phi <- rep(5, n_series)
     }
   }
 
-  if(any(phi <= 0)){
-    stop('Argument "phi" must be a non-negative real number',
-         call. = FALSE)
+  if (any(phi <= 0)) {
+    stop('Argument "phi" must be a non-negative real number', call. = FALSE)
   }
 
-  if(missing(shape)){
+  if (missing(shape)) {
     shape <- rep(1, n_series)
   }
 
-  if(any(shape <= 0)){
-    stop('Argument "shape" must be a non-negative real number',
-         call. = FALSE)
+  if (any(shape <= 0)) {
+    stop('Argument "shape" must be a non-negative real number', call. = FALSE)
   }
 
-  if(missing(sigma)){
-    if(family_char == 'lognormal'){
+  if (missing(sigma)) {
+    if (family_char == 'lognormal') {
       sigma <- rep(0.2, n_series)
     } else {
       sigma <- rep(0.5, n_series)
     }
   }
 
-  if(any(sigma <= 0)){
-    stop('Argument "sigma" must be a non-negative real number',
-         call. = FALSE)
+  if (any(sigma <= 0)) {
+    stop('Argument "sigma" must be a non-negative real number', call. = FALSE)
   }
 
-  if(missing(nu)){
+  if (missing(nu)) {
     nu <- rep(3, n_series)
   }
 
-  if(any(nu <= 0)){
-    stop('Argument "nu" must be a non-negative real number',
-         call. = FALSE)
+  if (any(nu <= 0)) {
+    stop('Argument "nu" must be a non-negative real number', call. = FALSE)
   }
 
-  if(missing(mu)){
+  if (missing(mu)) {
     mu <- sample(seq(-0.5, 0.5), n_series, TRUE)
   }
 
-  if(length(phi) < n_series){
+  if (length(phi) < n_series) {
     phi <- rep(phi[1], n_series)
   }
 
-  if(length(shape) < n_series){
+  if (length(shape) < n_series) {
     shape <- rep(shape[1], n_series)
   }
 
-  if(length(sigma) < n_series){
+  if (length(sigma) < n_series) {
     sigma <- rep(sigma[1], n_series)
   }
 
-  if(length(nu) < n_series){
+  if (length(nu) < n_series) {
     nu <- rep(nu[1], n_series)
   }
 
-  if(length(mu) < n_series){
+  if (length(mu) < n_series) {
     mu <- rep(mu[1], n_series)
   }
 
   # Check data splitting
-  if(missing(prop_train)){
+  if (missing(prop_train)) {
     prop_train <- 0.75
   }
-  if(prop_train < 0.2 || prop_train > 1){
-    stop('Argument "prop_train" must be a proportion ranging from 0.2 to 1, inclusive',
-         call. = FALSE)
+  if (prop_train < 0.2 || prop_train > 1) {
+    stop(
+      'Argument "prop_train" must be a proportion ranging from 0.2 to 1, inclusive',
+      call. = FALSE
+    )
   }
 
   # Set trend parameters
-  if(trend_model %in% c('RW', 'RWcor')){
+  if (trend_model %in% c('RW', 'RWcor')) {
     ar1s <- rep(1, n_lv)
     ar2s <- rep(0, n_lv)
     ar3s <- rep(0, n_lv)
   }
 
-  if(trend_model %in% c('AR1', 'AR1cor')){
+  if (trend_model %in% c('AR1', 'AR1cor')) {
     ar1s <- rnorm(n_lv, sd = 0.5)
     ar2s <- rep(0, n_lv)
     ar3s <- rep(0, n_lv)
   }
 
-  if(trend_model %in% c('AR2', 'AR2cor')){
+  if (trend_model %in% c('AR2', 'AR2cor')) {
     ar1s <- rnorm(n_lv, sd = 0.5)
     ar2s <- rnorm(n_lv, sd = 0.5)
     ar3s <- rep(0, n_lv)
   }
 
-  if(trend_model %in% c('AR3', 'AR3cor')){
+  if (trend_model %in% c('AR3', 'AR3cor')) {
     ar1s <- rnorm(n_lv, sd = 0.5)
     ar2s <- rnorm(n_lv, sd = 0.5)
     ar3s <- rnorm(n_lv, sd = 0.5)
   }
 
-  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3',
-                        'VAR1', 'VAR1cor')){
+  if (trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'VAR1', 'VAR1cor')) {
     # Sample trend drift terms so they are (hopefully) not too correlated
-    if(drift){
+    if (drift) {
       trend_alphas <- rnorm(n_lv, sd = 0.5)
     } else {
       trend_alphas <- rep(0, n_lv)
     }
 
     # Simulate latent trends
-    if(!trend_model %in% c('VAR1', 'VAR1cor')){
-      trends <- do.call(cbind, lapply(seq_len(n_lv), function(x){
-        sim_ar3(drift = 0,
-                ar1 = ar1s[x],
-                ar2 = ar2s[x],
-                ar3 = ar3s[x],
-                tau = 1,
-                last_trends = rnorm(3),
-                h = T) + trend_alphas[x] * 1:T
-      }))
+    if (!trend_model %in% c('VAR1', 'VAR1cor')) {
+      trends <- do.call(
+        cbind,
+        lapply(seq_len(n_lv), function(x) {
+          sim_ar3(
+            drift = 0,
+            ar1 = ar1s[x],
+            ar2 = ar2s[x],
+            ar3 = ar3s[x],
+            tau = 1,
+            last_trends = rnorm(3),
+            h = T
+          ) +
+            trend_alphas[x] * 1:T
+        })
+      )
     }
 
-    if(trend_model %in% c('VAR1', 'VAR1cor')){
-      if(trend_model == 'VAR1'){
+    if (trend_model %in% c('VAR1', 'VAR1cor')) {
+      if (trend_model == 'VAR1') {
         # Simulate the Sigma matrix (contemporaneously uncorrelated)
         Sigma <- matrix(0, n_lv, n_lv)
         sigma <- runif(n_lv, 0.4, 1.2)
         diag(Sigma) <- sigma
       }
 
-      if(trend_model == 'VAR1cor'){
+      if (trend_model == 'VAR1cor') {
         # Use the LKJ distribution to sample correlation matrices
         # with nice properties
         # Sample trend SD parameters and construct Sigma
@@ -303,42 +314,39 @@ sim_mvgam = function(T = 100,
       A <- stationary_VAR_phi(p = 1, n_series = n_lv)[[1]]
 
       # Simulate the VAR trends
-      trends <- sim_var1(drift = trend_alphas,
-                         A = A,
-                         Sigma = Sigma,
-                         last_trends = mvnfast::rmvn(n = 1,
-                                                     mu = rep(0, n_lv),
-                                                     sigma = Sigma),
-                         h = T)
+      trends <- sim_var1(
+        drift = trend_alphas,
+        A = A,
+        Sigma = Sigma,
+        last_trends = mvnfast::rmvn(n = 1, mu = rep(0, n_lv), sigma = Sigma),
+        h = T
+      )
     }
-
   }
 
-  if(trend_model == 'GP'){
-
+  if (trend_model == 'GP') {
     # Sample alpha and rho parameters
     trend_alphas <- runif(n_lv, 0.75, 1.25)
     trend_rhos <- runif(n_lv, 3, 8)
 
     # Generate latent GP trends
-    trends <- do.call(cbind, lapply(seq_len(n_lv), function(lv){
-
-      Sigma <- trend_alphas[lv]^2 *
-        exp(-0.5 * ((outer(1:T, 1:T, "-") / trend_rhos[lv]) ^ 2)) +
-        diag(1e-9, T)
-      mvnfast::rmvn(1,
-                    mu = rep(0, T),
-                    sigma = Sigma)[1,]
-    }))
-
+    trends <- do.call(
+      cbind,
+      lapply(seq_len(n_lv), function(lv) {
+        Sigma <- trend_alphas[lv]^2 *
+          exp(-0.5 * ((outer(1:T, 1:T, "-") / trend_rhos[lv])^2)) +
+          diag(1e-9, T)
+        mvnfast::rmvn(1, mu = rep(0, T), sigma = Sigma)[1, ]
+      })
+    )
   }
 
-  if(use_lv){
-     Sigma <- random_Sigma(n_series)
-    loadings <- as.matrix(matrix(mvnfast::rmvn(n = n_lv, mu = rep(0, n_series),
-                                     sigma = Sigma),
-                       ncol = n_series))
-
+  if (use_lv) {
+    Sigma <- random_Sigma(n_series)
+    loadings <- as.matrix(matrix(
+      mvnfast::rmvn(n = n_lv, mu = rep(0, n_series), sigma = Sigma),
+      ncol = n_series
+    ))
   } else {
     # Else use independent trend loadings
     loadings <- diag(n_lv)
@@ -349,91 +357,103 @@ sim_mvgam = function(T = 100,
 
   # Simulate observed series as dependent on seasonality and trend
   obs_trends <- matrix(NA, nrow = T, ncol = n_series)
-   for(s in 1:n_series){
-      obs_trends[,s] <- as.vector(scale(as.vector(loadings[,s] %*% t(trends))))
-   }
+  for (s in 1:n_series) {
+    obs_trends[, s] <- as.vector(scale(as.vector(loadings[, s] %*% t(trends))))
+  }
 
-  obs_ys <- c(unlist(lapply(seq_len(n_series), function(x){
-    if(seasonality == 'shared'){
-
+  obs_ys <- c(unlist(lapply(seq_len(n_series), function(x) {
+    if (seasonality == 'shared') {
       dynamics <- (glob_season * (1 - trend_rel)) +
-        (obs_trends[,x] * trend_rel)
-
+        (obs_trends[, x] * trend_rel)
     } else {
-      yseason <- as.vector(scale(stats::stl(ts(rnorm(T, glob_season, sd = 2),
-                                        frequency = freq), 'periodic')$time.series[,1]))
+      yseason <- as.vector(scale(stats::stl(
+        ts(rnorm(T, glob_season, sd = 2), frequency = freq),
+        'periodic'
+      )$time.series[, 1]))
       dynamics <- (yseason * (1 - trend_rel)) +
-        (obs_trends[,x] * trend_rel)
+        (obs_trends[, x] * trend_rel)
     }
 
-    if(family_char == 'negative binomial'){
-      out <- rnbinom(length(dynamics), size = phi[x],
-                     mu = exp(mu[x] + dynamics))
+    if (family_char == 'negative binomial') {
+      out <- rnbinom(
+        length(dynamics),
+        size = phi[x],
+        mu = exp(mu[x] + dynamics)
+      )
     }
 
-    if(family_char == 'poisson'){
-      out <- rpois(length(dynamics),
-                   lambda = exp(mu[x] + dynamics))
+    if (family_char == 'poisson') {
+      out <- rpois(length(dynamics), lambda = exp(mu[x] + dynamics))
     }
 
-    if(family_char == 'bernoulli'){
-      out <- rbinom(length(dynamics),
-                    size = 1,
-                    prob = plogis(mu[x] + dynamics))
+    if (family_char == 'bernoulli') {
+      out <- rbinom(length(dynamics), size = 1, prob = plogis(mu[x] + dynamics))
     }
 
-    if(family_char == 'tweedie'){
-      out <- rpois(n = length(dynamics),
-                   lambda = tweedie::rtweedie(length(dynamics),
-                                              mu = exp(mu[x] + dynamics),
-                                              power = 1.5, phi = phi[x]))
+    if (family_char == 'tweedie') {
+      out <- rpois(
+        n = length(dynamics),
+        lambda = tweedie::rtweedie(
+          length(dynamics),
+          mu = exp(mu[x] + dynamics),
+          power = 1.5,
+          phi = phi[x]
+        )
+      )
     }
 
-    if(family_char == 'gaussian'){
-      out <- rnorm(length(dynamics),
-                   mean = mu[x] + dynamics,
-                   sd = sigma[x])
+    if (family_char == 'gaussian') {
+      out <- rnorm(length(dynamics), mean = mu[x] + dynamics, sd = sigma[x])
     }
 
-    if(family_char == 'student'){
-      out <- rstudent_t(n = length(dynamics),
-                        df = nu[x],
-                        mu = mu[x] + dynamics,
-                        sigma = sigma[x])
+    if (family_char == 'student') {
+      out <- rstudent_t(
+        n = length(dynamics),
+        df = nu[x],
+        mu = mu[x] + dynamics,
+        sigma = sigma[x]
+      )
     }
 
-    if(family_char == 'lognormal'){
-      out <- rlnorm(length(dynamics),
-                   meanlog = mu[x] + (dynamics * 0.3),
-                   sdlog = sigma[x])
+    if (family_char == 'lognormal') {
+      out <- rlnorm(
+        length(dynamics),
+        meanlog = mu[x] + (dynamics * 0.3),
+        sdlog = sigma[x]
+      )
     }
 
-    if(family_char == 'Gamma'){
-      out <- rgamma(length(dynamics),
-                    rate = shape[x] / exp(mu[x] + dynamics),
-                    shape = shape[x])
+    if (family_char == 'Gamma') {
+      out <- rgamma(
+        length(dynamics),
+        rate = shape[x] / exp(mu[x] + dynamics),
+        shape = shape[x]
+      )
     }
 
-    if(family_char == 'beta'){
-      shape_pars <- beta_shapes(mu = plogis(mu[x] + dynamics),
-                                     phi = phi[x])
-      out <- rbeta(length(dynamics),
-                   shape1 = shape_pars$shape1,
-                   shape2 = shape_pars$shape2)
+    if (family_char == 'beta') {
+      shape_pars <- beta_shapes(mu = plogis(mu[x] + dynamics), phi = phi[x])
+      out <- rbeta(
+        length(dynamics),
+        shape1 = shape_pars$shape1,
+        shape2 = shape_pars$shape2
+      )
     }
 
     out[is.infinite(out)] <- NA
-    if(prop_missing > 0){
+    if (prop_missing > 0) {
       out[sample(seq(1, length(out)), floor(length(out) * prop_missing))] <- NA
     }
     out
   })))
 
   # Return simulated data in the format that is ready for mvgam analysis
-  sim_data = data.frame(y = obs_ys,
-                        season = rep(rep(seq(1, freq), ceiling(T/freq))[1:T], n_series),
-                        year = rep(sort(rep(seq(1, ceiling(T/freq)), freq))[1:T], n_series),
-                        series = as.factor(paste0('series_', sort(rep(seq(1, n_series), T))))) %>%
+  sim_data = data.frame(
+    y = obs_ys,
+    season = rep(rep(seq(1, freq), ceiling(T / freq))[1:T], n_series),
+    year = rep(sort(rep(seq(1, ceiling(T / freq)), freq))[1:T], n_series),
+    series = as.factor(paste0('series_', sort(rep(seq(1, n_series), T))))
+  ) %>%
     dplyr::group_by(series) %>%
     dplyr::arrange(year, season) %>%
     dplyr::mutate(time = 1:dplyr::n()) %>%
@@ -451,71 +471,68 @@ sim_mvgam = function(T = 100,
     dplyr::group_by(series) %>%
     dplyr::arrange(time)
 
-
-  if(!use_lv){
-
-    if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
-      trend_params = list(ar1 = ar1s,
-                          ar2 = ar2s,
-                          ar3 = ar3s)
+  if (!use_lv) {
+    if (trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')) {
+      trend_params = list(ar1 = ar1s, ar2 = ar2s, ar3 = ar3s)
     }
 
-    if(trend_model %in% c('VAR1', 'VAR1cor')){
-      trend_params = list(var1 = A,
-                          Sigma = Sigma)
+    if (trend_model %in% c('VAR1', 'VAR1cor')) {
+      trend_params = list(var1 = A, Sigma = Sigma)
     }
 
-    if(trend_model == 'GP'){
-      trend_params = list(alpha = trend_alphas,
-                          rho = trend_rhos)
+    if (trend_model == 'GP') {
+      trend_params = list(alpha = trend_alphas, rho = trend_rhos)
     }
 
-    out <- list(data_train = data.frame(data_train),
-                data_test = data.frame(data_test),
-                true_corrs = cov2cor(cov(obs_trends)),
-                true_trends = obs_trends,
-                global_seasonality = glob_season,
-                trend_params = trend_params)
+    out <- list(
+      data_train = data.frame(data_train),
+      data_test = data.frame(data_test),
+      true_corrs = cov2cor(cov(obs_trends)),
+      true_trends = obs_trends,
+      global_seasonality = glob_season,
+      trend_params = trend_params
+    )
   } else {
-    out <- list(data_train = data.frame(data_train),
-                data_test = data.frame(data_test),
-                true_corrs = cov2cor(cov(obs_trends)),
-                true_trends = obs_trends,
-                global_seasonality = glob_season)
+    out <- list(
+      data_train = data.frame(data_train),
+      data_test = data.frame(data_test),
+      true_corrs = cov2cor(cov(obs_trends)),
+      true_trends = obs_trends,
+      global_seasonality = glob_season
+    )
   }
 
-return(out)
-
+  return(out)
 }
 
 #' Simulate a fixed seasonal pattern
 #' @noRd
-sim_seasonal = function(T, freq = 12){
+sim_seasonal = function(T, freq = 12) {
   beta1 <- runif(1, 0.2, 0.6)
   beta2 <- runif(1, -0.5, 0.5)
   cov1 <- sin(2 * pi * (1:T) / freq)
   cov2 <- cos(2 * pi * (1:T) / freq)
-  rnorm(T,
-        mean = beta1 * cov1 + beta2 * cov2,
-        sd = 0.1)
+  rnorm(T, mean = beta1 * cov1 + beta2 * cov2, sd = 0.1)
 }
 
 #' Simulate from a periodic GP
 #' @noRd
-periodic_gp <- function(T, period = 12, rho = 1){
+periodic_gp <- function(T, period = 12, rho = 1) {
   time <- 1:T
-  cov_matrix = array(0, c(length(time), length(time)));
-  for(i in 1:length(time))  {
-    cov_matrix[i, i] = 1 + 0.00000001;
+  cov_matrix = array(0, c(length(time), length(time)))
+  for (i in 1:length(time)) {
+    cov_matrix[i, i] = 1 + 0.00000001
     if (i < length(time)) {
-      for(j in (i+1):length(time)) {
-        covariance = exp(-2*(sin(pi * abs(time[i] - time[j]) / period)^2) / (rho ^ 2))
+      for (j in (i + 1):length(time)) {
+        covariance = exp(
+          -2 * (sin(pi * abs(time[i] - time[j]) / period)^2) / (rho^2)
+        )
         cov_matrix[i, j] = covariance
         cov_matrix[j, i] = covariance
       }
     }
   }
-  chol_cov <- t(chol(cov_matrix));
+  chol_cov <- t(chol(cov_matrix))
   values <- as.vector(scale(chol_cov %*% rnorm(length(time))))
   return(values)
 }
@@ -526,37 +543,39 @@ lkj_corr <- function(n_series, eta = 0.8) {
   alpha <- eta + (n_series - 2) / 2
   r12 <- 2 * rbeta(1, alpha, alpha) - 1
   R <- matrix(0, n_series, n_series)
-  R[1, 1] <- 1; R[1, 2] <- r12
-  R[2, 2] <- sqrt(1 - r12 ^ 2)
-  if(n_series > 2) for (m in 2:(n_series - 1)){
-    alpha <- alpha - 0.5
-    y <- rbeta(1, m / 2, alpha)
-    z <- rnorm(m, 0, 1)
-    z <- z / sqrt(crossprod(z)[1])
-    R[1 : m, m + 1] <- sqrt(y) * z
-    R[m + 1, m + 1] <- sqrt(1 - y)
-  }
+  R[1, 1] <- 1
+  R[1, 2] <- r12
+  R[2, 2] <- sqrt(1 - r12^2)
+  if (n_series > 2)
+    for (m in 2:(n_series - 1)) {
+      alpha <- alpha - 0.5
+      y <- rbeta(1, m / 2, alpha)
+      z <- rnorm(m, 0, 1)
+      z <- z / sqrt(crossprod(z)[1])
+      R[1:m, m + 1] <- sqrt(y) * z
+      R[m + 1, m + 1] <- sqrt(1 - y)
+    }
   return(crossprod(R))
 }
 
 #' Generate a random covariance matrix
 #' @noRd
-random_Sigma = function(N){
-  L_Omega <- matrix(0, N, N);
-  L_Omega[1, 1] <- 1;
-  for (i in 2 : N) {
-    bound <- 1;
-    for (j in 1 : (i - 1)) {
+random_Sigma = function(N) {
+  L_Omega <- matrix(0, N, N)
+  L_Omega[1, 1] <- 1
+  for (i in 2:N) {
+    bound <- 1
+    for (j in 1:(i - 1)) {
       is_sparse <- rbinom(1, 1, 0.6)
-      if(is_sparse){
-        L_Omega[i, j] <- runif(1, -0.05, 0.05);
+      if (is_sparse) {
+        L_Omega[i, j] <- runif(1, -0.05, 0.05)
       } else {
-        L_Omega[i, j] <- runif(1, -sqrt(bound), sqrt(bound));
+        L_Omega[i, j] <- runif(1, -sqrt(bound), sqrt(bound))
       }
-      bound <- bound - L_Omega[i, j] ^ 2;
+      bound <- bound - L_Omega[i, j]^2
     }
-    L_Omega[i, i] <- sqrt(bound);
+    L_Omega[i, i] <- sqrt(bound)
   }
-  Sigma <- L_Omega %*% t(L_Omega);
+  Sigma <- L_Omega %*% t(L_Omega)
   return(Sigma)
 }

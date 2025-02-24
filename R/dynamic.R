@@ -107,36 +107,41 @@
 #'}
 #' @author Nicholas J Clark
 #' @export
-dynamic = function(variable, k, rho = 5, stationary = TRUE, scale = TRUE){
+dynamic = function(variable, k, rho = 5, stationary = TRUE, scale = TRUE) {
   # Check that only one variable is supplied
   vars <- as.list(substitute(list(variable)))[-1]
-  if(length(vars) > 1) stop("dynamic() can only handle one term at a time.")
+  if (length(vars) > 1) stop("dynamic() can only handle one term at a time.")
   term <- deparse(vars[[1]])
-  if (term[1]==".") stop("dynamic(.) not supported.")
+  if (term[1] == ".") stop("dynamic(.) not supported.")
 
   # Check rho
-  if(missing(rho)){
+  if (missing(rho)) {
     rho <- NULL
   } else {
-    if(rho <= 0){
-      stop('Argument "rho" in dynamic() must be a positive value',
-           call. = FALSE)
+    if (rho <= 0) {
+      stop(
+        'Argument "rho" in dynamic() must be a positive value',
+        call. = FALSE
+      )
     }
   }
 
   # Check k
-  if(missing(k)){
+  if (missing(k)) {
     k <- NULL
   } else {
     validate_pos_integer(k)
   }
 
   # Gather into a structured list and return
-  term <- attr(terms(reformulate(term)),"term.labels")
-  out <- list(term = term, rho = rho, k = k,
-              stationary = stationary,
-              scale = scale)
+  term <- attr(terms(reformulate(term)), "term.labels")
+  out <- list(
+    term = term,
+    rho = rho,
+    k = k,
+    stationary = stationary,
+    scale = scale
+  )
   class(out) <- "dyncoef.spec"
   return(out)
 }
-

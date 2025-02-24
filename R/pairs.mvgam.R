@@ -26,30 +26,38 @@
 #' }
 #'
 #' @export
-pairs.mvgam <- function(x, variable = NULL, regex = FALSE,
-                       use_alias = TRUE, ...) {
-
+pairs.mvgam <- function(
+  x,
+  variable = NULL,
+  regex = FALSE,
+  use_alias = TRUE,
+  ...
+) {
   # Set red colour scheme
-  col_scheme <- attr(color_scheme_get(),
-                     'scheme_name')
+  col_scheme <- attr(color_scheme_get(), 'scheme_name')
   color_scheme_set('red')
 
   # Set default params to plot
   # By default, don't plot the Betas as there can be hundreds
   # of them in spline models
-  if(is.null(variable)) {
+  if (is.null(variable)) {
     all_pars <- variables(x)
-    variable <- c(all_pars$observation_pars[,1],
-                  all_pars$observation_smoothpars[,1],
-                  all_pars$observation_re_params[,1],
-                  all_pars$trend_pars[,1],
-                  all_pars$trend_smoothpars[,1],
-                  all_pars$trend_re_params[,1])
+    variable <- c(
+      all_pars$observation_pars[, 1],
+      all_pars$observation_smoothpars[, 1],
+      all_pars$observation_re_params[, 1],
+      all_pars$trend_pars[, 1],
+      all_pars$trend_smoothpars[, 1],
+      all_pars$trend_re_params[, 1]
+    )
     regex <- FALSE
   }
-  draws <- as.array(x, variable = variable,
-                    regex = regex,
-                    use_alias = use_alias)
+  draws <- as.array(
+    x,
+    variable = variable,
+    regex = regex,
+    use_alias = use_alias
+  )
 
   # Generate plot and reset colour scheme
   out_plot <- bayesplot::mcmc_pairs(draws, ...)

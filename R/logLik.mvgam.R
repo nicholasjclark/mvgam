@@ -34,31 +34,32 @@
 #'str(lls)
 #'}
 #'@export
-logLik.mvgam = function(object,
-                        linpreds,
-                        newdata,
-                        family_pars,
-                        include_forecast = TRUE,
-                        ...){
-
-  if(!missing(linpreds) & missing(newdata)){
+logLik.mvgam = function(
+  object,
+  linpreds,
+  newdata,
+  family_pars,
+  include_forecast = TRUE,
+  ...
+) {
+  if (!missing(linpreds) & missing(newdata)) {
     stop('argument "newdata" must be supplied when "linpreds" is supplied')
   }
 
-  if(!missing(linpreds) & missing(family_pars)){
+  if (!missing(linpreds) & missing(family_pars)) {
     stop('argument "family_pars" must be supplied when "linpreds" is supplied')
   }
 
-  if(!missing(newdata) & missing(linpreds)){
+  if (!missing(newdata) & missing(linpreds)) {
     stop('argument "linpreds" must be supplied when "newdata" is supplied')
   }
 
-  if(!missing(family_pars) & missing(linpreds)){
+  if (!missing(family_pars) & missing(linpreds)) {
     stop('argument "linpreds" must be supplied when "family_pars" is supplied')
   }
 
   # Extract the linear predictor draws
-  if(missing(linpreds)){
+  if (missing(linpreds)) {
     mus <- mcmc_chains(object$model_output, 'mus')
   } else {
     mus <- linpreds
@@ -66,51 +67,49 @@ logLik.mvgam = function(object,
 
   # Need to know which series each observation belongs to so we can
   # pull out appropriate family-level parameters (overdispersions, shapes, etc...)
-  if(!missing(newdata)){
-    all_dat <- data.frame(series = newdata$series,
-                          y = newdata$y)
+  if (!missing(newdata)) {
+    all_dat <- data.frame(series = newdata$series, y = newdata$y)
 
-    if(object$family == 'nmix'){
+    if (object$family == 'nmix') {
       all_dat$cap <- newdata$cap
     }
-
   } else {
-    if(is.null(object$test_data)){
-      all_dat <- data.frame(series = object$obs_data$series,
-                            time = object$obs_data$time,
-                            y = object$obs_data$y) %>%
+    if (is.null(object$test_data)) {
+      all_dat <- data.frame(
+        series = object$obs_data$series,
+        time = object$obs_data$time,
+        y = object$obs_data$y
+      ) %>%
         dplyr::arrange(time, series)
 
-      if(object$family == 'nmix'){
-        all_dat$cap <- data.frame(series = object$obs_data$series,
-                                  time = object$obs_data$time,
-                                  cap = object$obs_data$cap) %>%
+      if (object$family == 'nmix') {
+        all_dat$cap <- data.frame(
+          series = object$obs_data$series,
+          time = object$obs_data$time,
+          cap = object$obs_data$cap
+        ) %>%
           dplyr::select(series, time, cap) %>%
           dplyr::arrange(time, series) %>%
           dplyr::pull(cap)
       }
-
     } else {
-      all_dat <- data.frame(series = c(object$obs_data$series,
-                                       object$test_data$series),
-                            time = c(object$obs_data$time,
-                                     object$test_data$time),
-                            y = c(object$obs_data$y,
-                                  object$test_data$y)) %>%
+      all_dat <- data.frame(
+        series = c(object$obs_data$series, object$test_data$series),
+        time = c(object$obs_data$time, object$test_data$time),
+        y = c(object$obs_data$y, object$test_data$y)
+      ) %>%
         dplyr::arrange(time, series)
 
-      if(object$family == 'nmix'){
-        all_dat$cap <- data.frame(series =  c(object$obs_data$series,
-                                              object$test_data$series),
-                                  time = c(object$obs_data$time,
-                                           object$test_data$time),
-                                  cap = c(object$obs_data$cap,
-                                          object$test_data$cap)) %>%
+      if (object$family == 'nmix') {
+        all_dat$cap <- data.frame(
+          series = c(object$obs_data$series, object$test_data$series),
+          time = c(object$obs_data$time, object$test_data$time),
+          cap = c(object$obs_data$cap, object$test_data$cap)
+        ) %>%
           dplyr::select(series, time, cap) %>%
           dplyr::arrange(time, series) %>%
           dplyr::pull(cap)
       }
-
     }
   }
 
@@ -118,7 +117,7 @@ logLik.mvgam = function(object,
   series_obs <- as.numeric(all_dat$series)
 
   # Supply forecast NAs if include_forecast is FALSE
-  if(!is.null(object$test_data) & !include_forecast & missing(newdata)){
+  if (!is.null(object$test_data) & !include_forecast & missing(newdata)) {
     n_fc_obs <- length(object$test_data$y)
     n_obs <- length(obs)
     obs[((n_obs - n_fc_obs) + 1):n_obs] <- NA
@@ -127,7 +126,7 @@ logLik.mvgam = function(object,
   # Family-specific parameters
   family <- object$family
 
-  if(missing(family_pars)){
+  if (missing(family_pars)) {
     family_pars <- extract_family_pars(object = object)
     n_series <- NCOL(object$ytimes)
   } else {
@@ -135,57 +134,64 @@ logLik.mvgam = function(object,
   }
 
   # Family parameters spread into a vector
-  family_extracts <- lapply(seq_along(family_pars), function(j){
-    if(is.matrix(family_pars[[j]])){
+  family_extracts <- lapply(seq_along(family_pars), function(j) {
+    if (is.matrix(family_pars[[j]])) {
       as.vector(family_pars[[j]][, series_obs])
     } else {
-      as.vector(matrix(rep(family_pars[[j]],
-                           NCOL(mus)),
-                       nrow = NROW(mus),
-                       byrow = FALSE))
+      as.vector(matrix(
+        rep(family_pars[[j]], NCOL(mus)),
+        nrow = NROW(mus),
+        byrow = FALSE
+      ))
     }
   })
   names(family_extracts) <- names(family_pars)
 
   # Add trial information if this is a Binomial model
-  if(object$family %in% c('binomial', 'beta_binomial')){
-    trials <- as.vector(matrix(rep(as.vector(attr(object$mgcv_model, 'trials')),
-                                   NROW(mus)),
-                               nrow = NROW(mus),
-                               byrow = TRUE))
+  if (object$family %in% c('binomial', 'beta_binomial')) {
+    trials <- as.vector(matrix(
+      rep(as.vector(attr(object$mgcv_model, 'trials')), NROW(mus)),
+      nrow = NROW(mus),
+      byrow = TRUE
+    ))
     family_extracts$trials <- trials
   }
 
   # Create a truth matrix that can also be spread to a vector
-  truth_mat <- matrix(rep(obs, NROW(mus)),
-                      nrow = NROW(mus),
-                      byrow = TRUE)
+  truth_mat <- matrix(rep(obs, NROW(mus)), nrow = NROW(mus), byrow = TRUE)
 
   # Log-likelihood as a vector
   Xp <- as.matrix(as.vector(mus))
   attr(Xp, 'model.offset') <- 0
 
-  if(family == 'nmix'){
-    Xp <- as.matrix(qlogis(as.vector(mcmc_chains(object$model_output, 'detprob'))))
+  if (family == 'nmix') {
+    Xp <- as.matrix(qlogis(as.vector(mcmc_chains(
+      object$model_output,
+      'detprob'
+    ))))
     attr(Xp, 'model.offset') <- 0
     latent_lambdas <- exp(as.vector(mcmc_chains(object$model_output, 'trend')))
-    cap_mat <- matrix(rep(all_dat$cap, NROW(mus)),
-                        nrow = NROW(mus),
-                        byrow = TRUE)
+    cap_mat <- matrix(
+      rep(all_dat$cap, NROW(mus)),
+      nrow = NROW(mus),
+      byrow = TRUE
+    )
     cap <- as.vector(cap_mat)
   } else {
     latent_lambdas <- NULL
     cap <- NULL
   }
-  log_lik_vec <- mvgam_predict(family = family,
-                               family_pars = family_extracts,
-                               truth = as.vector(truth_mat),
-                               latent_lambdas = latent_lambdas,
-                               cap = cap,
-                               type = 'link',
-                               Xp = Xp,
-                               betas = 1,
-                               density = TRUE)
+  log_lik_vec <- mvgam_predict(
+    family = family,
+    family_pars = family_extracts,
+    truth = as.vector(truth_mat),
+    latent_lambdas = latent_lambdas,
+    cap = cap,
+    type = 'link',
+    Xp = Xp,
+    betas = 1,
+    density = TRUE
+  )
 
   # Convert back to matrix and return
   log_lik_mat <- matrix(log_lik_vec, nrow = NROW(mus))

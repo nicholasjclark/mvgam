@@ -4,23 +4,31 @@
 # Add eval_smooth and draw methods to gratia namespace
 # on load
 .onLoad <- function(libname, pkgname) {
-  if(requireNamespace("gratia", quietly = TRUE)){
-    registerS3method("eval_smooth",
-                     "moi.smooth",
-                     eval_smoothDotmoiDotsmooth,
-                     envir = asNamespace("gratia"))
-    registerS3method("eval_smooth",
-                     "mod.smooth",
-                     eval_smoothDotmodDotsmooth,
-                     envir = asNamespace("gratia"))
-    registerS3method("eval_smooth",
-                     "hilbert.smooth",
-                     eval_smoothDothilbertDotsmooth,
-                     envir = asNamespace("gratia"))
-    registerS3method("draw",
-                     "mvgam",
-                     drawDotmvgam,
-                     envir = asNamespace("gratia"))
+  if (requireNamespace("gratia", quietly = TRUE)) {
+    registerS3method(
+      "eval_smooth",
+      "moi.smooth",
+      eval_smoothDotmoiDotsmooth,
+      envir = asNamespace("gratia")
+    )
+    registerS3method(
+      "eval_smooth",
+      "mod.smooth",
+      eval_smoothDotmodDotsmooth,
+      envir = asNamespace("gratia")
+    )
+    registerS3method(
+      "eval_smooth",
+      "hilbert.smooth",
+      eval_smoothDothilbertDotsmooth,
+      envir = asNamespace("gratia")
+    )
+    registerS3method(
+      "draw",
+      "mvgam",
+      drawDotmvgam,
+      envir = asNamespace("gratia")
+    )
   }
 }
 
@@ -172,152 +180,158 @@
 NULL
 
 
-
 #' @rdname gratia_mvgam_enhancements
 #' @aliases draw.mvgam
 #' @export
 #'
 `drawDotmvgam` <- function(
-    object,
-    trend_effects = FALSE,
-    data = NULL,
-    select = NULL,
-    parametric = FALSE,
-    terms = NULL,
-    residuals = FALSE,
-    scales = c("free", "fixed"),
-    ci_level = 0.95,
-    n = 100,
-    n_3d = 16,
-    n_4d = 4,
-    unconditional = FALSE,
-    overall_uncertainty = TRUE,
-    constant = NULL,
-    fun = NULL,
-    dist = 0.1,
-    rug = TRUE,
-    contour = TRUE,
-    grouped_by = FALSE,
-    ci_alpha = 0.2,
-    ci_col = "black",
-    smooth_col = "black",
-    resid_col = "steelblue3",
-    contour_col = "black",
-    n_contour = NULL,
-    partial_match = FALSE,
-    discrete_colour = NULL,
-    discrete_fill = NULL,
-    continuous_colour = NULL,
-    continuous_fill = NULL,
-    position = "identity",
-    angle = NULL,
-    ncol = NULL, nrow = NULL,
-    guides = "keep", widths = NULL, heights = NULL,
-    crs = NULL,
-    default_crs = NULL,
-    lims_method = "cross",
-    wrap = TRUE,
-    envir = environment(formula(object)),
-    ...
+  object,
+  trend_effects = FALSE,
+  data = NULL,
+  select = NULL,
+  parametric = FALSE,
+  terms = NULL,
+  residuals = FALSE,
+  scales = c("free", "fixed"),
+  ci_level = 0.95,
+  n = 100,
+  n_3d = 16,
+  n_4d = 4,
+  unconditional = FALSE,
+  overall_uncertainty = TRUE,
+  constant = NULL,
+  fun = NULL,
+  dist = 0.1,
+  rug = TRUE,
+  contour = TRUE,
+  grouped_by = FALSE,
+  ci_alpha = 0.2,
+  ci_col = "black",
+  smooth_col = "black",
+  resid_col = "steelblue3",
+  contour_col = "black",
+  n_contour = NULL,
+  partial_match = FALSE,
+  discrete_colour = NULL,
+  discrete_fill = NULL,
+  continuous_colour = NULL,
+  continuous_fill = NULL,
+  position = "identity",
+  angle = NULL,
+  ncol = NULL,
+  nrow = NULL,
+  guides = "keep",
+  widths = NULL,
+  heights = NULL,
+  crs = NULL,
+  default_crs = NULL,
+  lims_method = "cross",
+  wrap = TRUE,
+  envir = environment(formula(object)),
+  ...
 ) {
-  if(trend_effects){
-    if(is.null(object$trend_call)){
+  if (trend_effects) {
+    if (is.null(object$trend_call)) {
       stop('no trend_formula exists so there are no trend-level terms to plot')
     }
 
     object$trend_mgcv_model <- relabel_gps(object$trend_mgcv_model)
     object$trend_mgcv_model$call$data <- NULL
     object$trend_mgcv_model$cmX <- object$trend_mgcv_model$coefficients
-    sm_plots <- gratia::draw(object = object$trend_mgcv_model,
-                             data = data,
-                             select = select,
-                             parametric = parametric,
-                             terms = terms,
-                             residuals = FALSE,
-                             scales = scales,
-                             ci_level = ci_level,
-                             n = n,
-                             n_3d = n_3d,
-                             n_4d = n_4d,
-                             unconditional = FALSE,
-                             overall_uncertainty = FALSE,
-                             constant = constant,
-                             fun = fun,
-                             dist = dist,
-                             rug = rug,
-                             contour = contour,
-                             grouped_by = grouped_by,
-                             ci_alpha = ci_alpha,
-                             ci_col = ci_col,
-                             smooth_col = smooth_col,
-                             resid_col = "steelblue3",
-                             contour_col = contour_col,
-                             n_contour = n_contour,
-                             partial_match = partial_match,
-                             discrete_colour = discrete_colour,
-                             discrete_fill = discrete_fill,
-                             continuous_colour = continuous_colour,
-                             continuous_fill = continuous_fill,
-                             position = position,
-                             angle = angle,
-                             ncol = ncol,
-                             nrow = nrow,
-                             guides = guides,
-                             widths = widths,
-                             heights = heights,
-                             crs = crs,
-                             default_crs = default_crs,
-                             lims_method = lims_method,
-                             wrap = wrap,
-                             envir = envir,
-                             ...)
+    sm_plots <- gratia::draw(
+      object = object$trend_mgcv_model,
+      data = data,
+      select = select,
+      parametric = parametric,
+      terms = terms,
+      residuals = FALSE,
+      scales = scales,
+      ci_level = ci_level,
+      n = n,
+      n_3d = n_3d,
+      n_4d = n_4d,
+      unconditional = FALSE,
+      overall_uncertainty = FALSE,
+      constant = constant,
+      fun = fun,
+      dist = dist,
+      rug = rug,
+      contour = contour,
+      grouped_by = grouped_by,
+      ci_alpha = ci_alpha,
+      ci_col = ci_col,
+      smooth_col = smooth_col,
+      resid_col = "steelblue3",
+      contour_col = contour_col,
+      n_contour = n_contour,
+      partial_match = partial_match,
+      discrete_colour = discrete_colour,
+      discrete_fill = discrete_fill,
+      continuous_colour = continuous_colour,
+      continuous_fill = continuous_fill,
+      position = position,
+      angle = angle,
+      ncol = ncol,
+      nrow = nrow,
+      guides = guides,
+      widths = widths,
+      heights = heights,
+      crs = crs,
+      default_crs = default_crs,
+      lims_method = lims_method,
+      wrap = wrap,
+      envir = envir,
+      ...
+    )
   } else {
     object$mgcv_model <- relabel_gps(object$mgcv_model)
     object$mgcv_model$call$data <- NULL
     object$mgcv_model$cmX <- object$mgcv_model$coefficients
-    sm_plots <- gratia::draw(object = object$mgcv_model,
-                             data = data,
-                             select = select,
-                             parametric = parametric,
-                             terms = terms,
-                             residuals = FALSE,
-                             scales = scales,
-                             ci_level = ci_level,
-                             n = n,
-                             n_3d = n_3d,
-                             n_4d = n_4d,
-                             unconditional = FALSE,
-                             overall_uncertainty = FALSE,
-                             constant = constant,
-                             fun = fun,
-                             dist = dist,
-                             rug = rug,
-                             contour = contour,
-                             grouped_by = grouped_by,
-                             ci_alpha = ci_alpha,
-                             ci_col = ci_col,
-                             smooth_col = smooth_col,
-                             resid_col = "steelblue3",
-                             contour_col = contour_col,
-                             n_contour = n_contour,
-                             partial_match = partial_match,
-                             discrete_colour = discrete_colour,
-                             discrete_fill = discrete_fill,
-                             continuous_colour = continuous_colour,
-                             continuous_fill = continuous_fill,
-                             position = position,
-                             angle = angle,
-                             ncol = ncol,
-                             nrow = nrow,
-                             guides = guides,
-                             widths = widths,
-                             heights = heights,
-                             crs = crs,
-                             default_crs = default_crs,
-                             lims_method = lims_method,
-                             wrap = wrap,
-                             envir = envir,
-                             ...)
+    sm_plots <- gratia::draw(
+      object = object$mgcv_model,
+      data = data,
+      select = select,
+      parametric = parametric,
+      terms = terms,
+      residuals = FALSE,
+      scales = scales,
+      ci_level = ci_level,
+      n = n,
+      n_3d = n_3d,
+      n_4d = n_4d,
+      unconditional = FALSE,
+      overall_uncertainty = FALSE,
+      constant = constant,
+      fun = fun,
+      dist = dist,
+      rug = rug,
+      contour = contour,
+      grouped_by = grouped_by,
+      ci_alpha = ci_alpha,
+      ci_col = ci_col,
+      smooth_col = smooth_col,
+      resid_col = "steelblue3",
+      contour_col = contour_col,
+      n_contour = n_contour,
+      partial_match = partial_match,
+      discrete_colour = discrete_colour,
+      discrete_fill = discrete_fill,
+      continuous_colour = continuous_colour,
+      continuous_fill = continuous_fill,
+      position = position,
+      angle = angle,
+      ncol = ncol,
+      nrow = nrow,
+      guides = guides,
+      widths = widths,
+      heights = heights,
+      crs = crs,
+      default_crs = default_crs,
+      lims_method = lims_method,
+      wrap = wrap,
+      envir = envir,
+      ...
+    )
   }
   sm_plots
 }
@@ -325,24 +339,28 @@ NULL
 #' @rdname gratia_mvgam_enhancements
 #' @aliases eval_smooth.hilbert.smooth
 #' @export
-eval_smoothDothilbertDotsmooth = function(smooth,
-                                          model,
-                                          n = 100,
-                                          n_3d = NULL,
-                                          n_4d = NULL,
-                                          data = NULL,
-                                          unconditional = FALSE,
-                                          overall_uncertainty = TRUE,
-                                          dist = NULL,
-                                          ...) {
+eval_smoothDothilbertDotsmooth = function(
+  smooth,
+  model,
+  n = 100,
+  n_3d = NULL,
+  n_4d = NULL,
+  data = NULL,
+  unconditional = FALSE,
+  overall_uncertainty = TRUE,
+  dist = NULL,
+  ...
+) {
   insight::check_if_installed("gratia")
   model$cmX <- model$coefficients
 
-
   # deal with data if supplied
   data <- process_user_data_for_eval(
-    data = data, model = model,
-    n = n, n_3d = n_3d, n_4d = n_4d,
+    data = data,
+    model = model,
+    n = n,
+    n_3d = n_3d,
+    n_4d = n_4d,
     id = which_smooth(
       model,
       gratia::smooth_label(smooth)
@@ -363,10 +381,9 @@ eval_smoothDothilbertDotsmooth = function(smooth,
   # Only use actual values of those covariates needed for this smooth
   terms_smooth <- intersect(terms_needed, colnames(data))
   newdata_mock <- data.frame(data[[terms_smooth[1]]])
-  if(length(terms_smooth) > 1L){
-    for(i in 2:length(terms_smooth)){
-      newdata_mock <- cbind(newdata_mock,
-                            data.frame(data[[terms_smooth[i]]]))
+  if (length(terms_smooth) > 1L) {
+    for (i in 2:length(terms_smooth)) {
+      newdata_mock <- cbind(newdata_mock, data.frame(data[[terms_smooth[i]]]))
     }
   }
   colnames(newdata_mock) <- terms_smooth
@@ -374,43 +391,55 @@ eval_smoothDothilbertDotsmooth = function(smooth,
 
   # Fill in other covariates as fixed values from the original data
   other_terms <- setdiff(terms_needed, colnames(data))
-  if(length(other_terms) > 0){
-    newdata_mock <- cbind(newdata_mock,
-                          do.call(cbind, lapply(seq_along(other_terms), function(x){
-                            df <- data.frame(var = rep(model$model[[other_terms[x]]][1],
-                                                       NROW(newdata_mock)))
-                            colnames(df) <- other_terms[x]
-                            df
-                          })))
+  if (length(other_terms) > 0) {
+    newdata_mock <- cbind(
+      newdata_mock,
+      do.call(
+        cbind,
+        lapply(seq_along(other_terms), function(x) {
+          df <- data.frame(
+            var = rep(model$model[[other_terms[x]]][1], NROW(newdata_mock))
+          )
+          colnames(df) <- other_terms[x]
+          df
+        })
+      )
+    )
   }
 
-  brms_mock_data <- brms::standata(attr(model, 'brms_mock'),
-                                   newdata = newdata_mock,
-                                   internal = TRUE)
+  brms_mock_data <- brms::standata(
+    attr(model, 'brms_mock'),
+    newdata = newdata_mock,
+    internal = TRUE
+  )
 
   # Extract GP attributes
   gp_att_table <- attr(model, 'gp_att_table')
-  bys <- unlist(purrr::map(gp_att_table, 'by'),
-                use.names = FALSE)
-  lvls <- unlist(purrr::map(gp_att_table, 'level'),
-                 use.names = FALSE)
+  bys <- unlist(purrr::map(gp_att_table, 'by'), use.names = FALSE)
+  lvls <- unlist(purrr::map(gp_att_table, 'level'), use.names = FALSE)
 
   # Extract eigenfunctions for each gp effect
-  eigenfuncs <- eigenfunc_list(stan_data = brms_mock_data,
-                               mock_df = newdata_mock,
-                               by = bys,
-                               level = lvls)
+  eigenfuncs <- eigenfunc_list(
+    stan_data = brms_mock_data,
+    mock_df = newdata_mock,
+    by = bys,
+    level = lvls
+  )
 
   # Which GP term are we plotting?
   gp_covariate <- smooth$term
   level <- ifelse(is.null(smooth$by.level), NA, smooth$by.level)
   gp_names <- gsub(' ', '', unlist(purrr::map(gp_att_table, 'name')))
-  if(!is.na(level)){
-    gp_select <- which(gp_names == smooth$label &
-                         unlist(purrr::map(gp_att_table, 'level')) == level)
+  if (!is.na(level)) {
+    gp_select <- which(
+      gp_names == smooth$label &
+        unlist(purrr::map(gp_att_table, 'level')) == level
+    )
   } else {
-    gp_select <- which(gp_names == smooth$label &
-                         which(bys %in% by_var))
+    gp_select <- which(
+      gp_names == smooth$label &
+        which(bys %in% by_var)
+    )
   }
 
   # Compute eigenfunctions for this GP term
@@ -444,12 +473,18 @@ eval_smoothDothilbertDotsmooth = function(smooth,
     Xcm[, para.seq] <- X
     # only apply the uncertainty from linear predictors of which this smooth
     # is a part of
-    idx <- vapply(eta_idx, function(i, beta) any(beta %in% i),
-                  FUN.VALUE = logical(1L), beta = para.seq
+    idx <- vapply(
+      eta_idx,
+      function(i, beta) any(beta %in% i),
+      FUN.VALUE = logical(1L),
+      beta = para.seq
     )
     idx <- unlist(eta_idx[idx])
-    rs <- rowSums((Xcm[, idx, drop = FALSE] %*%
-                     V[idx, idx, drop = FALSE]) * Xcm[, idx, drop = FALSE])
+    rs <- rowSums(
+      (Xcm[, idx, drop = FALSE] %*%
+        V[idx, idx, drop = FALSE]) *
+        Xcm[, idx, drop = FALSE]
+    )
   } else {
     rs <- rowSums((X %*% V[para.seq, para.seq, drop = FALSE]) * X)
   }
@@ -468,13 +503,20 @@ eval_smoothDothilbertDotsmooth = function(smooth,
   data <- dplyr::select(data, dplyr::all_of(keep_vars))
 
   ## tibble object
-  tbl <- tibble::tibble(.smooth = rep(label, nrow(X)), .estimate = fit, .se = se.fit)
+  tbl <- tibble::tibble(
+    .smooth = rep(label, nrow(X)),
+    .estimate = fit,
+    .se = se.fit
+  )
 
   ## bind on the data
   tbl <- dplyr::bind_cols(tbl, data)
 
   ## nest all columns with varying data
-  eval_sm <- tidyr::nest(tbl, data = tidyr::all_of(c(".estimate", ".se", names(data))))
+  eval_sm <- tidyr::nest(
+    tbl,
+    data = tidyr::all_of(c(".estimate", ".se", names(data)))
+  )
 
   ## add on info regarding by variable
   eval_sm <- add_by_var_column(eval_sm, by_var = by_var)
@@ -484,11 +526,12 @@ eval_smoothDothilbertDotsmooth = function(smooth,
 
   # set some values to NA if too far from the data
   if (gratia::smooth_dim(smooth) == 2L && (!is.null(dist) && dist > 0)) {
-    eval_sm <- gratia::too_far_to_na(smooth,
-                                     input = eval_sm,
-                                     reference = model[["model"]],
-                                     cols = c(".estimate", ".se"),
-                                     dist = dist
+    eval_sm <- gratia::too_far_to_na(
+      smooth,
+      input = eval_sm,
+      reference = model[["model"]],
+      cols = c(".estimate", ".se"),
+      dist = dist
     )
   }
 
@@ -498,23 +541,28 @@ eval_smoothDothilbertDotsmooth = function(smooth,
 #' @rdname gratia_mvgam_enhancements
 #' @aliases eval_smooth.mod.smooth
 #' @export
-eval_smoothDotmodDotsmooth = function(smooth,
-                                      model,
-                                      n = 100,
-                                      n_3d = NULL,
-                                      n_4d = NULL,
-                                      data = NULL,
-                                      unconditional = FALSE,
-                                      overall_uncertainty = TRUE,
-                                      dist = NULL,
-                                      ...) {
+eval_smoothDotmodDotsmooth = function(
+  smooth,
+  model,
+  n = 100,
+  n_3d = NULL,
+  n_4d = NULL,
+  data = NULL,
+  unconditional = FALSE,
+  overall_uncertainty = TRUE,
+  dist = NULL,
+  ...
+) {
   insight::check_if_installed("gratia")
   model$cmX <- model$coefficients
 
   ## deal with data if supplied
   data <- process_user_data_for_eval(
-    data = data, model = model,
-    n = n, n_3d = n_3d, n_4d = n_4d,
+    data = data,
+    model = model,
+    n = n,
+    n_3d = n_3d,
+    n_4d = n_4d,
     id = which_smooth(
       model,
       gratia::smooth_label(smooth)
@@ -527,11 +575,12 @@ eval_smoothDotmodDotsmooth = function(smooth,
   }
 
   ## values of spline at data
-  eval_sm <- gratia::spline_values(smooth,
-                                   data = data,
-                                   unconditional = unconditional,
-                                   model = model,
-                                   overall_uncertainty = overall_uncertainty
+  eval_sm <- gratia::spline_values(
+    smooth,
+    data = data,
+    unconditional = unconditional,
+    model = model,
+    overall_uncertainty = overall_uncertainty
   )
 
   ## add on info regarding by variable
@@ -541,11 +590,12 @@ eval_smoothDotmodDotsmooth = function(smooth,
 
   # set some values to NA if too far from the data
   if (gratia::smooth_dim(smooth) == 2L && (!is.null(dist) && dist > 0)) {
-    eval_sm <- gratia::too_far_to_na(smooth,
-                                     input = eval_sm,
-                                     reference = model[["model"]],
-                                     cols = c(".estimate", ".se"),
-                                     dist = dist
+    eval_sm <- gratia::too_far_to_na(
+      smooth,
+      input = eval_sm,
+      reference = model[["model"]],
+      cols = c(".estimate", ".se"),
+      dist = dist
     )
   }
   ## return
@@ -555,24 +605,28 @@ eval_smoothDotmodDotsmooth = function(smooth,
 #' @rdname gratia_mvgam_enhancements
 #' @aliases eval_smooth.moi.smooth
 #' @export
-eval_smoothDotmoiDotsmooth = function(smooth,
-                                      model,
-                                      n = 100,
-                                      n_3d = NULL,
-                                      n_4d = NULL,
-                                      data = NULL,
-                                      unconditional = FALSE,
-                                      overall_uncertainty = TRUE,
-                                      dist = NULL,
-                                      ...) {
-
+eval_smoothDotmoiDotsmooth = function(
+  smooth,
+  model,
+  n = 100,
+  n_3d = NULL,
+  n_4d = NULL,
+  data = NULL,
+  unconditional = FALSE,
+  overall_uncertainty = TRUE,
+  dist = NULL,
+  ...
+) {
   insight::check_if_installed("gratia")
   model$cmX <- model$coefficients
 
   ## deal with data if supplied
   data <- process_user_data_for_eval(
-    data = data, model = model,
-    n = n, n_3d = n_3d, n_4d = n_4d,
+    data = data,
+    model = model,
+    n = n,
+    n_3d = n_3d,
+    n_4d = n_4d,
     id = which_smooth(
       model,
       gratia::smooth_label(smooth)
@@ -585,11 +639,12 @@ eval_smoothDotmoiDotsmooth = function(smooth,
   }
 
   ## values of spline at data
-  eval_sm <- gratia::spline_values(smooth,
-                                   data = data,
-                                   unconditional = unconditional,
-                                   model = model,
-                                   overall_uncertainty = overall_uncertainty
+  eval_sm <- gratia::spline_values(
+    smooth,
+    data = data,
+    unconditional = unconditional,
+    model = model,
+    overall_uncertainty = overall_uncertainty
   )
 
   ## add on info regarding by variable
@@ -599,11 +654,12 @@ eval_smoothDotmoiDotsmooth = function(smooth,
 
   # set some values to NA if too far from the data
   if (gratia::smooth_dim(smooth) == 2L && (!is.null(dist) && dist > 0)) {
-    eval_sm <- gratia::too_far_to_na(smooth,
-                                     input = eval_sm,
-                                     reference = model[["model"]],
-                                     cols = c(".estimate", ".se"),
-                                     dist = dist
+    eval_sm <- gratia::too_far_to_na(
+      smooth,
+      input = eval_sm,
+      reference = model[["model"]],
+      cols = c(".estimate", ".se"),
+      dist = dist
     )
   }
   ## return
@@ -643,8 +699,14 @@ eval_smoothDotmoiDotsmooth = function(smooth,
 
 #' @noRd
 `process_user_data_for_eval` <- function(
-    data, model, n, n_3d, n_4d, id,
-    var_order = NULL) {
+  data,
+  model,
+  n,
+  n_3d,
+  n_4d,
+  id,
+  var_order = NULL
+) {
   if (is.null(data)) {
     data <- gratia::smooth_data(
       model = model,
@@ -664,7 +726,8 @@ eval_smoothDotmoiDotsmooth = function(smooth,
     ## if this is a by variable, filter the by variable for the required
     ## level now
     if (gratia::is_factor_by_smooth(smooth)) {
-      data <- data %>% dplyr::filter(.data[[by_var]] == gratia::by_level(smooth))
+      data <- data %>%
+        dplyr::filter(.data[[by_var]] == gratia::by_level(smooth))
     }
   }
   data
@@ -689,9 +752,8 @@ eval_smoothDotmoiDotsmooth = function(smooth,
 }
 
 #' @noRd
-lss_eta_index <- function(object){
-  function (object)
-  {
+lss_eta_index <- function(object) {
+  function(object) {
     lpi <- attr(formula(object), "lpi")
     if (is.null(lpi)) {
       lpi <- list(seq_along(coef(object)))
@@ -702,7 +764,7 @@ lss_eta_index <- function(object){
 }
 
 #' @noRd
-smooth_variable <- function (smooth) {
+smooth_variable <- function(smooth) {
   gratia::check_is_mgcv_smooth(smooth)
   smooth[["term"]]
 }

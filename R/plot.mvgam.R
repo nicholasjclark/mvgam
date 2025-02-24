@@ -92,83 +92,101 @@
 #'
 #'}
 #'@export
-plot.mvgam = function(x, type = 'residuals',
-                      series = 1, residuals = FALSE,
-                      newdata, data_test, trend_effects = FALSE,
-                      ...){
-
+plot.mvgam = function(
+  x,
+  type = 'residuals',
+  series = 1,
+  residuals = FALSE,
+  newdata,
+  data_test,
+  trend_effects = FALSE,
+  ...
+) {
   object <- x
 
   # Argument checks
-  type <- match.arg(arg = type, choices = c("residuals", "smooths", "re",
-                                            "pterms", "forecast", "trend",
-                                            "uncertainty", "factors", "series"))
+  type <- match.arg(
+    arg = type,
+    choices = c(
+      "residuals",
+      "smooths",
+      "re",
+      "pterms",
+      "forecast",
+      "trend",
+      "uncertainty",
+      "factors",
+      "series"
+    )
+  )
 
   if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
 
-  if(!missing("newdata")){
+  if (!missing("newdata")) {
     data_test <- newdata
   }
 
   # Other errors and warnings will propagate from individual functions below
-  if(type == 'series'){
+  if (type == 'series') {
     print(plot_mvgam_series(object, series = series, newdata = data_test, ...))
   }
 
-  if(type == 're'){
-    plot_mvgam_randomeffects(object, trend_effects = trend_effects,
-                             ...)
+  if (type == 're') {
+    plot_mvgam_randomeffects(object, trend_effects = trend_effects, ...)
   }
 
-  if(type == 'pterms'){
-    plot_mvgam_pterms(object, trend_effects = trend_effects,
-                      ...)
+  if (type == 'pterms') {
+    plot_mvgam_pterms(object, trend_effects = trend_effects, ...)
   }
 
-  if(type == 'residuals'){
+  if (type == 'residuals') {
     print(plot_mvgam_resids(object, series = series, ...))
   }
 
-  if(type == 'factors'){
-    if(!object$use_lv){
+  if (type == 'factors') {
+    if (!object$use_lv) {
       stop('no latent variables were fitted in the model')
     } else {
       plot_mvgam_factors(object)
     }
   }
 
-  if(type == 'forecast'){
-    if(missing(data_test)){
+  if (type == 'forecast') {
+    if (missing(data_test)) {
       plot_mvgam_fc(object, series = series, ...)
     } else {
       plot_mvgam_fc(object, series = series, data_test = data_test, ...)
     }
   }
 
-  if(type == 'trend'){
-    if(missing(data_test)){
+  if (type == 'trend') {
+    if (missing(data_test)) {
       plot_mvgam_trend(object, series = series, ...)
     } else {
       plot_mvgam_trend(object, series = series, data_test = data_test, ...)
     }
   }
 
-  if(type == 'uncertainty'){
-    if(missing(data_test)){
+  if (type == 'uncertainty') {
+    if (missing(data_test)) {
       stop('data_test is required for plotting uncertainty contributions')
     } else {
-      plot_mvgam_uncertainty(object, series = series, data_test = data_test, ...)
+      plot_mvgam_uncertainty(
+        object,
+        series = series,
+        data_test = data_test,
+        ...
+      )
     }
   }
 
-  if(type == 'smooths'){
-
+  if (type == 'smooths') {
     object2 <- object
 
-    if(trend_effects){
-      if(is.null(object$trend_call)){
+    if (trend_effects) {
+      if (is.null(object$trend_call)) {
         stop('no trend_formula exists so there no trend-level smooths to plot')
       }
 
@@ -176,15 +194,23 @@ plot.mvgam = function(x, type = 'residuals',
     }
 
     # Get labels of all included smooths from the object2
-    smooth_labs <- do.call(rbind, lapply(seq_along(object2$mgcv_model$smooth), function(x){
-      data.frame(label = object2$mgcv_model$smooth[[x]]$label,
-                 class = class(object2$mgcv_model$smooth[[x]])[1],
-                 mgcv_plottable = object2$mgcv_model$smooth[[x]]$plot.me)
-    }))
+    smooth_labs <- do.call(
+      rbind,
+      lapply(seq_along(object2$mgcv_model$smooth), function(x) {
+        data.frame(
+          label = object2$mgcv_model$smooth[[x]]$label,
+          class = class(object2$mgcv_model$smooth[[x]])[1],
+          mgcv_plottable = object2$mgcv_model$smooth[[x]]$plot.me
+        )
+      })
+    )
 
     n_smooths <- NROW(smooth_labs)
-    if(n_smooths == 0) stop("No smooth terms to plot. Use plot_predictions() to visualise other effects",
-                            call. = FALSE)
+    if (n_smooths == 0)
+      stop(
+        "No smooth terms to plot. Use plot_predictions() to visualise other effects",
+        call. = FALSE
+      )
     smooth_labs$smooth_index <- 1:NROW(smooth_labs)
 
     # Leave out random effects and MRF smooths, and any others that are not
@@ -194,53 +220,65 @@ plot.mvgam = function(x, type = 'residuals',
       dplyr::filter(class != 'mrf.smooth') %>%
       dplyr::filter(mgcv_plottable) -> smooth_labs
 
-    if(length(smooth_labs$label) == 0){
+    if (length(smooth_labs$label) == 0) {
       stop("No terms to plot - nothing for plot.mvgam() to do.")
     }
 
     # Check which ones plot_mvgam_smooth can handle (no more than 3 dimensions)
-    plottable = function(x){
+    plottable = function(x) {
       length(unlist(strsplit(x, ','))) <= 3 &
         length(unlist(strsplit(x, ':'))) <= 3
     }
-    which_to_plot <- (smooth_labs$smooth_index)[sapply(as.character(smooth_labs$label), plottable)]
+    which_to_plot <- (smooth_labs$smooth_index)[sapply(
+      as.character(smooth_labs$label),
+      plottable
+    )]
     n_smooths <- length(which_to_plot)
 
     # For remaining plots, get the needed page numbers
     n_plots <- n_smooths
-    if (n_plots==0) stop("No suitable terms to plot - plot.mvgam() only handles smooths of 2 or fewer dimensions.")
+    if (n_plots == 0)
+      stop(
+        "No suitable terms to plot - plot.mvgam() only handles smooths of 2 or fewer dimensions."
+      )
     pages <- 1
 
     if (n_plots > 4) pages <- 2
     if (n_plots > 8) pages <- 3
     if (n_plots > 12) pages <- 4
-    if (pages != 0)  {
+    if (pages != 0) {
       ppp <- n_plots %/% pages
 
       if (n_plots %% pages != 0) {
-        ppp<-ppp+1
-        while (ppp*(pages-1)>=n_plots) pages<-pages-1
-        }
+        ppp <- ppp + 1
+        while (ppp * (pages - 1) >= n_plots) pages <- pages - 1
+      }
 
-    # Configure layout matrix
-    c <- r <- trunc(sqrt(ppp))
-    if (c<1) r <- c <- 1
-    if (c*r < ppp) c <- c + 1
-    if (c*r < ppp) r <- r + 1
+      # Configure layout matrix
+      c <- r <- trunc(sqrt(ppp))
+      if (c < 1) r <- c <- 1
+      if (c * r < ppp) c <- c + 1
+      if (c * r < ppp) r <- r + 1
 
-    .pardefault <- par(no.readonly=T)
-    on.exit(par(.pardefault))
-    oldpar<-par(mfrow=c(r,c))
-
-    } else { ppp<-1;oldpar<-par()}
+      .pardefault <- par(no.readonly = T)
+      on.exit(par(.pardefault))
+      oldpar <- par(mfrow = c(r, c))
+    } else {
+      ppp <- 1
+      oldpar <- par()
+    }
 
     # Plot the smooths
-    for(i in which_to_plot){
-      plot_mvgam_smooth(object = object2, smooth = i, series = series,
-                        residuals = residuals, trend_effects = trend_effects,
-                        ...)
+    for (i in which_to_plot) {
+      plot_mvgam_smooth(
+        object = object2,
+        smooth = i,
+        series = series,
+        residuals = residuals,
+        trend_effects = trend_effects,
+        ...
+      )
     }
     layout(1)
   }
-
 }
