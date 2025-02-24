@@ -177,7 +177,7 @@ validate_series_time = function(
     attr(data, 'implicit_vars') <- 'time'
   }
 
-  if (!implicit_time & !implicit_series)  {
+  if (!implicit_time & !implicit_series) {
     attr(data, 'implicit_vars') <- NULL
   }
 
@@ -188,7 +188,6 @@ validate_series_time = function(
 # and formatted properly for mvgam processing and modelling
 #'@noRd
 validate_series_groups = function(data, trend_model, name = 'data') {
-
   implicit_series <- implicit_time <- FALSE
 
   # Checks only needed if trend_model isn't 'None'
@@ -297,10 +296,10 @@ validate_series_groups = function(data, trend_model, name = 'data') {
           )
         ) -> gr_dat
     } else {
-      if( trend_model$unit != 'time'){
+      if (trend_model$unit != 'time') {
         implicit_time <- TRUE
       }
-      if( trend_model$subgr != 'series'){
+      if (trend_model$subgr != 'series') {
         implicit_series <- TRUE
       }
       gr_dat <- data.frame(
@@ -328,7 +327,7 @@ validate_series_groups = function(data, trend_model, name = 'data') {
     attr(data, 'implicit_vars') <- 'time'
   }
 
-  if (!implicit_time & !implicit_series)  {
+  if (!implicit_time & !implicit_series) {
     attr(data, 'implicit_vars') <- NULL
   }
 
