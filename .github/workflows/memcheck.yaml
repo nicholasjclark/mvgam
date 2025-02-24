@@ -64,12 +64,11 @@ jobs:
         run: air format .
 
       - name: Commit any Air formatting changes
-        if: inputs.check != 'true'
         shell: bash
         run: |
           if find . -type f \( -name '*.r' -o -name '*.R' \) -exec git add -u {} +; then
             echo "Staged modified R files"
-            git commit -m '`air format` (GitHub Actions)'
+            git commit -a -m '`air format` (GitHub Actions)'
             git push
           else
             echo "No changes found in any R files"
