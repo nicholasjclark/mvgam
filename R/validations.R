@@ -1,5 +1,5 @@
 #'Argument validation functions
-#'@param data Data to be validated (list or dataframe)
+#'@param data Data to be validated (list or data.frame)
 #'@noRd
 validate_series_time = function(data,
                                 name = 'data',
@@ -35,7 +35,7 @@ validate_series_time = function(data,
 
     # Series factor must have all unique levels present
     if(!is.factor(data$series)){
-      stop('Variable "series" must be a factor',
+      stop('Variable "series" must be a factor type',
            call. = FALSE)
     }
 
@@ -60,7 +60,7 @@ validate_series_time = function(data,
 
     # Series factor must have all unique levels present
     if(!is.factor(data$series)){
-      stop('Variable "series" must be a factor',
+      stop('Variable "series" must be a factor type',
            call. = FALSE)
     }
 

@@ -40,3 +40,11 @@ jobs:
       - name: Memory check
         run: |
           R -d valgrind -f memcheck.R
+
+      - name: Commit changes
+        run: |
+          git config --global user.name "$GITHUB_ACTOR"
+          git config --global user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Format R code using Air
+        uses: rstudio/shiny-workflows/format-r-code@v1
