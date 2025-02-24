@@ -115,7 +115,7 @@ predict.mvgam = function(
     object,
     component = "all"
   )$conditional
-  required_vars <- setdiff(required_vars, c('series', 'time'))
+  required_vars <- setdiff(required_vars, attr(object$obs_data, 'implicit_vars'))
 
   if (length(required_vars)) {
     if (any(required_vars %in% names(newdata) == FALSE)) {

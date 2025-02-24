@@ -73,7 +73,6 @@
 #' conditional_effects(mod)
 #' conditional_effects(mod, conf_level = 0.5, type = 'link')
 #'
-#' \donttest{
 #' # ggplot objects can be modified and combined with the help of many
 #' # additional packages. Here is an example using the patchwork package
 #'
@@ -94,7 +93,6 @@
 #' library(ggplot2)
 #' wrap_plots(m[[1]] + labs(title = 's(x1, bs = "moi")'),
 #'            m[[2]] + labs(title = 'te(x0, x2)'))
-#' }
 #' }
 #' @export
 conditional_effects.mvgam = function(

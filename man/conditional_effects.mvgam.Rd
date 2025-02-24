@@ -108,7 +108,6 @@ mod <- mvgam(y ~ te(x0, x1, k = 5) + s(x2, k = 6) + s(x3, k = 6),
 conditional_effects(mod)
 conditional_effects(mod, conf_level = 0.5, type = 'link')
 
-\donttest{
 # ggplot objects can be modified and combined with the help of many
 # additional packages. Here is an example using the patchwork package
 
@@ -129,7 +128,6 @@ library(patchwork)
 library(ggplot2)
 wrap_plots(m[[1]] + labs(title = 's(x1, bs = "moi")'),
            m[[2]] + labs(title = 'te(x0, x2)'))
-}
 }
 }
 \seealso{

@@ -246,15 +246,6 @@ test_that("JAGS setups should work", {
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(mod$drift == FALSE)
 
-  # mod <- mvgam(y ~ s(season),
-  #              trend_model = AR(),
-  #              data = simdat$data_train,
-  #              family = tweedie(),
-  #              use_stan = FALSE,
-  #              run_model = FALSE)
-  # expect_true(inherits(mod, 'mvgam_prefit'))
-  # expect_true(mod$drift == FALSE)
-
   mod <- mvgam(
     y ~ s(season),
     trend_model = AR(p = 3),
@@ -286,6 +277,32 @@ test_that("JAGS setups should work", {
   )
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(mod$drift == FALSE)
+})
+
+test_that("implicit_vars are added correctly", {
+  simdat <- sim_mvgam(n_series = 1)
+  no_series <- simdat$data_train
+  no_series$series <- NULL
+
+  mod <- mvgam(y ~ s(season, bs = 'cc'),
+               data = no_series,
+               run_model = FALSE)
+  expect_equal('series',
+               attr(mod$obs_data, 'implicit_vars'))
+
+  mod <- SM(mvgam(y ~ 1,
+                  trend_formula = ~ s(season),
+                  data = no_series,
+                  run_model = FALSE))
+  expect_equal('series',
+               attr(mod$obs_data, 'implicit_vars'))
+
+  no_series$time <- NULL
+  mod <- mvgam(y ~ s(season, bs = 'cc'),
+               data = no_series,
+               run_model = FALSE)
+  expect_equal(c('series', 'time'),
+               attr(mod$obs_data, 'implicit_vars'))
 })
 
 test_that("trend = 'None' works for State Space", {
@@ -581,7 +598,7 @@ test_that("prior_only works", {
 })
 
 test_that("time not required in data if this is a no trend model", {
-  data = data.frame(out = rnorm(100), temp = rnorm(100))
+  data <- data.frame(out = rnorm(100), temp = rnorm(100))
   mod <- mvgam(
     formula = out ~ dynamic(temp, rho = 20),
     data = data,
@@ -589,6 +606,7 @@ test_that("time not required in data if this is a no trend model", {
     run_model = FALSE
   )
   expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_equal(attr(mod$obs_data, 'implicit_vars'), c('series', 'time'))
 })
 
 test_that("median coefs should be stored in the mgcv object", {

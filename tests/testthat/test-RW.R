@@ -334,6 +334,7 @@ test_that("Each subgroup must exist within each site for ZMVN", {
     data = site_dat,
     run_model = FALSE
   )
+  expect_equal(attr(mod$obs_data, 'implicit_vars'), c('series', 'time'))
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(any(grepl(
     'trend_raw[i] ~ multi_normal_cholesky(trend_zeros, L_Sigma);',

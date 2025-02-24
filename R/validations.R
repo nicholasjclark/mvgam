@@ -18,12 +18,23 @@ validate_series_time = function(
     )
   }
 
+  # Respect any original additions of implicit_vars
+  implicit_series <- implicit_time <- FALSE
+  if (!is.null(attr(data, 'implicit_vars'))) {
+    implicit_series <- 'series' %in% attr(data, 'implicit_vars')
+    implicit_time <- 'time' %in% attr(data, 'implicit_vars')
+  }
+
   # Validate any grouping structure and update the data accordingly
   data <- validate_series_groups(
     data = data,
     trend_model = trend_model,
     name = name
   )
+  if (!is.null(attr(data, 'implicit_vars'))) {
+    implicit_series <- 'series' %in% attr(data, 'implicit_vars')
+    implicit_time <- 'time' %in% attr(data, 'implicit_vars')
+  }
 
   # Now we only need the character trend_model string
   trend_model <- trend_model$trend_model
@@ -36,6 +47,7 @@ validate_series_time = function(
 
     if (!'series' %in% colnames(data)) {
       data$series <- factor('series1')
+      implicit_series <- TRUE
     }
 
     # Series factor must have all unique levels present
@@ -50,6 +62,7 @@ validate_series_time = function(
           dplyr::group_by(series) %>%
           dplyr::mutate(time = dplyr::row_number()) %>%
           dplyr::ungroup() -> data
+        implicit_time <- TRUE
       } else {
         stop(name, " does not contain a 'time' variable", call. = FALSE)
       }
@@ -59,6 +72,7 @@ validate_series_time = function(
   if (inherits(data, 'list')) {
     if (!'series' %in% names(data)) {
       data$series <- factor('series1')
+      implicit_series <- TRUE
     }
 
     # Series factor must have all unique levels present
@@ -73,6 +87,7 @@ validate_series_time = function(
           dplyr::group_by(series) %>%
           dplyr::mutate(time = dplyr::row_number()) %>%
           dplyr::pull(time) -> times
+        implicit_time <- TRUE
         data$time <- times
       } else {
         stop(name, " does not contain a 'time' variable", call. = FALSE)
@@ -150,6 +165,22 @@ validate_series_time = function(
     }
   }
 
+  if (implicit_series & implicit_time) {
+    attr(data, 'implicit_vars') <- c('series', 'time')
+  }
+
+  if (implicit_series & !implicit_time) {
+    attr(data, 'implicit_vars') <- 'series'
+  }
+
+  if (implicit_time & !implicit_series) {
+    attr(data, 'implicit_vars') <- 'time'
+  }
+
+  if (!implicit_time & !implicit_series)  {
+    attr(data, 'implicit_vars') <- NULL
+  }
+
   return(data)
 }
 
@@ -157,6 +188,9 @@ validate_series_time = function(
 # and formatted properly for mvgam processing and modelling
 #'@noRd
 validate_series_groups = function(data, trend_model, name = 'data') {
+
+  implicit_series <- implicit_time <- FALSE
+
   # Checks only needed if trend_model isn't 'None'
   if (trend_model$trend_model != 'None') {
     # Check that unit and subgr exist in data and are the correct type
@@ -171,6 +205,7 @@ validate_series_groups = function(data, trend_model, name = 'data') {
     ) {
       if (!'series' %in% names(data)) {
         data$series <- factor('series1')
+        implicit_series <- TRUE
       }
 
       if (!'time' %in% names(data)) {
@@ -180,6 +215,7 @@ validate_series_groups = function(data, trend_model, name = 'data') {
             dplyr::group_by(series) %>%
             dplyr::mutate(time = dplyr::row_number()) %>%
             dplyr::pull(time) -> times
+          implicit_time <- TRUE
           data$time <- times
         } else {
           stop(name, " does not contain a 'time' variable", call. = FALSE)
@@ -204,6 +240,7 @@ validate_series_groups = function(data, trend_model, name = 'data') {
 
     # If gr is supplied, check it exists and is the correct type
     if (trend_model$gr != 'NA') {
+      implicit_series <- implicit_time <- TRUE
       validate_var_exists(
         data = data,
         variable = trend_model$gr,
@@ -260,6 +297,12 @@ validate_series_groups = function(data, trend_model, name = 'data') {
           )
         ) -> gr_dat
     } else {
+      if( trend_model$unit != 'time'){
+        implicit_time <- TRUE
+      }
+      if( trend_model$subgr != 'series'){
+        implicit_series <- TRUE
+      }
       gr_dat <- data.frame(
         time = data[[trend_model$unit]],
         subgr = data[[trend_model$subgr]]
@@ -271,6 +314,22 @@ validate_series_groups = function(data, trend_model, name = 'data') {
     # the data and return
     data$series <- gr_dat$series
     data$time <- gr_dat$time
+  }
+
+  if (implicit_series & implicit_time) {
+    attr(data, 'implicit_vars') <- c('series', 'time')
+  }
+
+  if (implicit_series & !implicit_time) {
+    attr(data, 'implicit_vars') <- 'series'
+  }
+
+  if (implicit_time & !implicit_series) {
+    attr(data, 'implicit_vars') <- 'time'
+  }
+
+  if (!implicit_time & !implicit_series)  {
+    attr(data, 'implicit_vars') <- NULL
   }
 
   return(data)
