@@ -8,14 +8,14 @@
 #'draws from the model's posterior distribution
 #'@return A list object of class `mvgam` with residuals included in the `'resids'` slot
 #'@export
-add_residuals <- function(object, ...){
+add_residuals <- function(object, ...) {
   UseMethod("add_residuals", object)
 }
 
 #'@rdname add_residuals.mvgam
 #'@method add_residuals mvgam
 #'@export
-add_residuals.mvgam = function(object, ...){
+add_residuals.mvgam = function(object, ...) {
   resids <- dsresids_vec(object)
   object$resids <- resids
   return(object)

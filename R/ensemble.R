@@ -62,7 +62,7 @@
 #' score(ensemble_fc)
 #' }
 #'@export
-ensemble <- function(object, ...){
+ensemble <- function(object, ...) {
   UseMethod("ensemble", object)
 }
 
@@ -73,32 +73,36 @@ ensemble <- function(object, ...){
 #'fewer draws than `ndraws`, their forecast distributions will be resampled with replacement
 #'to achieve the correct number of draws
 #'@export
-ensemble.mvgam_forecast <- function(object, ..., ndraws = 5000){
+ensemble.mvgam_forecast <- function(object, ..., ndraws = 5000) {
   models <- split_fc_dots(object, ..., model_names = NULL)
   n_models <- length(models)
 
   # Check that series names and key dimensions match for all forecasts
   allsame <- function(x) length(unique(x)) == 1
-  if(!allsame(purrr::map(models, 'series_names'))){
-    stop('Names of series must match for all forecast objects.',
-         call. = FALSE)
+  if (!allsame(purrr::map(models, 'series_names'))) {
+    stop('Names of series must match for all forecast objects.', call. = FALSE)
   }
 
-  if(!allsame(lapply(models, function(x) length(x$forecasts)))){
-    stop('The number of forecast distributions must match for all forecast objects.',
-         call. = FALSE)
+  if (!allsame(lapply(models, function(x) length(x$forecasts)))) {
+    stop(
+      'The number of forecast distributions must match for all forecast objects.',
+      call. = FALSE
+    )
   }
 
-  if(!allsame(lapply(models, function(x) length(x$test_observations)))){
-    stop('Validation data must match for all forecast objects.',
-         call. = FALSE)
+  if (!allsame(lapply(models, function(x) length(x$test_observations)))) {
+    stop('Validation data must match for all forecast objects.', call. = FALSE)
   }
 
-  if(!allsame(lapply(models, function(x) {
-    unlist(lapply(x$forecasts, function(y) dim(y)[2]),
-           use.names = FALSE) }))){
-    stop('Forecast horizons must match for all forecast objects.',
-         call. = FALSE)
+  if (
+    !allsame(lapply(models, function(x) {
+      unlist(lapply(x$forecasts, function(y) dim(y)[2]), use.names = FALSE)
+    }))
+  ) {
+    stop(
+      'Forecast horizons must match for all forecast objects.',
+      call. = FALSE
+    )
   }
 
   validate_pos_integer(ndraws)
@@ -107,16 +111,17 @@ ensemble.mvgam_forecast <- function(object, ..., ndraws = 5000){
   n_series <- length(models[[1]]$series_names)
 
   # Calculate total number of forecast draws to sample from for each model
-  n_mod_draws <- lapply(seq_len(n_models), function(x){
+  n_mod_draws <- lapply(seq_len(n_models), function(x) {
     NROW(models[[x]]$forecasts[[1]])
   })
 
   # Calculate model weights (only option at the moment is even weighting,
   # but this may be relaxed in future)
-  mod_weights <- data.frame(mod = paste0('mod', 1:n_models),
-                            orig_weight = 1 / n_models,
-                            ndraws = unlist(n_mod_draws,
-                                            use.names = FALSE)) %>%
+  mod_weights <- data.frame(
+    mod = paste0('mod', 1:n_models),
+    orig_weight = 1 / n_models,
+    ndraws = unlist(n_mod_draws, use.names = FALSE)
+  ) %>%
     # Adjust weights by the number of draws available per
     # forecast, ensuring that models with fewer draws aren't
     # under-represented in the final weighted ensemble
@@ -125,36 +130,35 @@ ensemble.mvgam_forecast <- function(object, ..., ndraws = 5000){
     dplyr::select(mod, weight)
 
   # Create draw indices
-  mod_inds <- as.factor(unlist(lapply(seq_len(n_models), function(x){
-    rep(paste0('mod', x), NROW(models[[x]]$forecasts[[1]]))
-  }), use.names = FALSE))
-  all_draw_inds <- 1:sum(unlist(n_mod_draws,
-                                use.names = FALSE))
+  mod_inds <- as.factor(unlist(
+    lapply(seq_len(n_models), function(x) {
+      rep(paste0('mod', x), NROW(models[[x]]$forecasts[[1]]))
+    }),
+    use.names = FALSE
+  ))
+  all_draw_inds <- 1:sum(unlist(n_mod_draws, use.names = FALSE))
   mod_inds_draws <- split(all_draw_inds, mod_inds)
 
   # Add model-specific weights to the draw indices
-  draw_weights <- data.frame(draw = all_draw_inds,
-                             mod = mod_inds) %>%
+  draw_weights <- data.frame(draw = all_draw_inds, mod = mod_inds) %>%
     dplyr::left_join(mod_weights, by = 'mod')
 
   # Perform multinomial sampling using draw-specific weights
-  fc_draws <- sample(all_draw_inds,
-                     size = ndraws,
-                     replace = max(all_draw_inds) < ndraws,
-                     prob = draw_weights$weight)
+  fc_draws <- sample(
+    all_draw_inds,
+    size = ndraws,
+    replace = max(all_draw_inds) < ndraws,
+    prob = draw_weights$weight
+  )
 
   # Create weighted ensemble hindcasts and forecasts
-  ens_hcs <- lapply(seq_len(n_series), function(series){
-    all_hcs <- do.call(rbind,
-                       lapply(models,
-                              function(x) x$hindcasts[[series]]))
+  ens_hcs <- lapply(seq_len(n_series), function(series) {
+    all_hcs <- do.call(rbind, lapply(models, function(x) x$hindcasts[[series]]))
     all_hcs[fc_draws, ]
   })
 
-  ens_fcs <- lapply(seq_len(n_series), function(series){
-    all_fcs <- do.call(rbind,
-                       lapply(models,
-                              function(x) x$forecasts[[series]]))
+  ens_fcs <- lapply(seq_len(n_series), function(series) {
+    all_fcs <- do.call(rbind, lapply(models, function(x) x$forecasts[[series]]))
     all_fcs[fc_draws, ]
   })
 
@@ -173,21 +177,19 @@ ensemble.mvgam_forecast <- function(object, ..., ndraws = 5000){
 
 
 #'@noRd
-split_fc_dots = function (x, ..., model_names = NULL, other = TRUE) {
-
+split_fc_dots = function(x, ..., model_names = NULL, other = TRUE) {
   dots <- list(x, ...)
   names <- substitute(list(x, ...), env = parent.frame())[-1]
   names <- ulapply(names, deparse)
 
-  if(!is.null(model_names)){
+  if (!is.null(model_names)) {
     names <- model_names
   }
 
   if (length(names)) {
     if (!length(names(dots))) {
       names(dots) <- names
-    }
-    else {
+    } else {
       has_no_name <- !nzchar(names(dots))
       names(dots)[has_no_name] <- names[has_no_name]
     }
@@ -197,10 +199,10 @@ split_fc_dots = function (x, ..., model_names = NULL, other = TRUE) {
   out <- dots[!is_mvgam_fc]
 
   if (length(out)) {
-    stop("Only mvgam_forecast objects can be passed to '...' for this method.",
-         call. = FALSE)
+    stop(
+      "Only mvgam_forecast objects can be passed to '...' for this method.",
+      call. = FALSE
+    )
   }
   models
 }
-
-

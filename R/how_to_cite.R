@@ -46,13 +46,13 @@
 #' how_to_cite(mod2)
 #' }
 #'@export
-how_to_cite <- function(object, ...){
+how_to_cite <- function(object, ...) {
   UseMethod("how_to_cite", object)
 }
 
 #'@export
 #'@export
-print.how_to_cite = function(x, ...){
+print.how_to_cite = function(x, ...) {
   cat('Methods text skeleton\n')
   cat(x$methods_text, sep = '\n')
   cat('\nPrimary references\n')
@@ -65,7 +65,7 @@ print.how_to_cite = function(x, ...){
 #'@rdname how_to_cite.mvgam
 #'@method how_to_cite mvgam
 #'@export
-how_to_cite.mvgam <- function(object, ...){
+how_to_cite.mvgam <- function(object, ...) {
   current_year <- format(Sys.Date(), "%Y")
   citations <- vector(mode = 'list')
 
@@ -80,48 +80,72 @@ how_to_cite.mvgam <- function(object, ...){
     " mgcv (Wood 2017) and splines2 (Wang & Yan, 2023) packages."
   )
 
-  citations[[1]] <- "Clark, NJ and Wells K (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. Methods in Ecology and Evolution, 14, 771-784. doi.org/10.1111/2041-210X.13974"
-  citations[[2]] <- "Burkner, PC (2017). brms: An R Package for Bayesian Multilevel Models Using Stan. Journal of Statistical Software, 80(1), 1-28. doi:10.18637/jss.v080.i01"
-  citations[[3]] <- "Wood, SN (2017). Generalized Additive Models: An Introduction with R (2nd edition). Chapman and Hall/CRC."
-  citations[[4]] <- "Wang W and Yan J (2021). Shape-Restricted Regression Splines with R Package splines2. Journal of Data Science, 19(3), 498-517. doi:10.6339/21-JDS1020 https://doi.org/10.6339/21-JDS1020."
+  citations[[
+    1
+  ]] <- "Clark, NJ and Wells K (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. Methods in Ecology and Evolution, 14, 771-784. doi.org/10.1111/2041-210X.13974"
+  citations[[
+    2
+  ]] <- "Burkner, PC (2017). brms: An R Package for Bayesian Multilevel Models Using Stan. Journal of Statistical Software, 80(1), 1-28. doi:10.18637/jss.v080.i01"
+  citations[[
+    3
+  ]] <- "Wood, SN (2017). Generalized Additive Models: An Introduction with R (2nd edition). Chapman and Hall/CRC."
+  citations[[
+    4
+  ]] <- "Wang W and Yan J (2021). Shape-Restricted Regression Splines with R Package splines2. Journal of Data Science, 19(3), 498-517. doi:10.6339/21-JDS1020 https://doi.org/10.6339/21-JDS1020."
 
   # Any specials; first check whether this model used a VAR / VARMA process
   specials_text <- NULL
   trend_model <- attr(object$model_data, 'trend_model')
-  if(trend_model %in% c('VAR',
-                        'VARcor',
-                        'VARhiercor',
-                        'VAR1',
-                        'VAR1cor',
-                        'VAR1hiercor',
-                        'VARMA',
-                        'VARMAcor',
-                        'VARMA1,1cor')){
+  if (
+    trend_model %in%
+      c(
+        'VAR',
+        'VARcor',
+        'VARhiercor',
+        'VAR1',
+        'VAR1cor',
+        'VAR1hiercor',
+        'VARMA',
+        'VARMAcor',
+        'VARMA1,1cor'
+      )
+  ) {
     specials_text <- c(
       specials_text,
       " To encourage stability and prevent forecast variance from increasing indefinitely, we enforced stationarity of the Vector Autoregressive process following methods described by Heaps (2023)."
     )
     citations <- append(
       citations,
-      list("Heaps, SE (2023). Enforcing stationarity through the prior in vector autoregressions. Journal of Computational and Graphical Statistics 32, 74-83.")
+      list(
+        "Heaps, SE (2023). Enforcing stationarity through the prior in vector autoregressions. Journal of Computational and Graphical Statistics 32, 74-83."
+      )
     )
   }
 
   # Check for approximate GPs
-  if(!is.null(attr(object$mgcv_model, 'gp_att_table')) |
-     !is.null(attr(object$trend_mgcv_model, 'gp_att_table'))){
+  if (
+    !is.null(attr(object$mgcv_model, 'gp_att_table')) |
+      !is.null(attr(object$trend_mgcv_model, 'gp_att_table'))
+  ) {
     specials_text <- c(
       specials_text,
       " Gaussian Process functional effects were estimated using a low-rank Hilbert space approximation following methods described by Riutort-Mayol et al. (2023)."
     )
     citations <- append(
       citations,
-      list("Riutort-Mayol, G, Burkner, PC, Andersen, MR, Solin, A and Vehtari, A (2023). Practical Hilbert space approximate Bayesian Gaussian processes for probabilistic programming. Statistics and Computing 33, 1. https://doi.org/10.1007/s11222-022-10167-2")
+      list(
+        "Riutort-Mayol, G, Burkner, PC, Andersen, MR, Solin, A and Vehtari, A (2023). Practical Hilbert space approximate Bayesian Gaussian processes for probabilistic programming. Statistics and Computing 33, 1. https://doi.org/10.1007/s11222-022-10167-2"
+      )
     )
   }
 
   # Stan-specific methods
-  citations <- append(citations, list("Carpenter, B, Gelman, A, Hoffman, MD, Lee, D, Goodrich, B, Betancourt, M, Brubaker, M, Guo, J, Li, P and Riddell, A (2017). Stan: A probabilistic programming language. Journal of Statistical Software 76."))
+  citations <- append(
+    citations,
+    list(
+      "Carpenter, B, Gelman, A, Hoffman, MD, Lee, D, Goodrich, B, Betancourt, M, Brubaker, M, Guo, J, Li, P and Riddell, A (2017). Stan: A probabilistic programming language. Journal of Statistical Software 76."
+    )
+  )
 
   stan_text <-
     paste0(
@@ -129,7 +153,7 @@ how_to_cite.mvgam <- function(object, ...){
       " were passed to the probabilistic programming environment Stan"
     )
 
-  if(object$backend == 'cmdstanr'){
+  if (object$backend == 'cmdstanr') {
     stan_text <- paste0(
       stan_text,
       " (version ",
@@ -144,8 +168,7 @@ how_to_cite.mvgam <- function(object, ...){
         "Gabry J, Cesnovar R, Johnson A, and Bronder S (",
         current_year,
         "). cmdstanr: R Interface to 'CmdStan'. https://mc-stan.org/cmdstanr/, https://discourse.mc-stan.org."
-      )
-      )
+      ))
     )
   } else {
     stan_text <- paste0(
@@ -165,11 +188,11 @@ how_to_cite.mvgam <- function(object, ...){
         "). RStan: the R interface to Stan. R package version ",
         utils::packageVersion("rstan"),
         ". https://mc-stan.org/."
-      )
       ))
+    )
   }
 
-  if(object$algorithm == 'sampling'){
+  if (object$algorithm == 'sampling') {
     stan_text <- paste0(
       stan_text,
       " We ran ",
@@ -184,11 +207,13 @@ how_to_cite.mvgam <- function(object, ...){
     )
     citations <- append(
       citations,
-      list("Vehtari A, Gelman A, Simpson D, Carpenter B, and Burkner P (2021). Rank-normalization, folding, and localization: An improved Rhat for assessing convergence of MCMC (with discussion). Bayesian Analysis 16(2) 667-718. https://doi.org/10.1214/20-BA1221.")
+      list(
+        "Vehtari A, Gelman A, Simpson D, Carpenter B, and Burkner P (2021). Rank-normalization, folding, and localization: An improved Rhat for assessing convergence of MCMC (with discussion). Bayesian Analysis 16(2) 667-718. https://doi.org/10.1214/20-BA1221."
+      )
     )
   }
 
-  if(object$algorithm %in% c('meanfield', 'fullrank')){
+  if (object$algorithm %in% c('meanfield', 'fullrank')) {
     stan_text <- paste0(
       stan_text,
       " We used Stan's Automatic Differentiation Variational Inference algorithm",
@@ -200,11 +225,13 @@ how_to_cite.mvgam <- function(object, ...){
     )
     citations <- append(
       citations,
-      list("Kucukelbir, A, Tran, D, Ranganath, R, Gelman, A, and Blei, DM (2017). Automatic Differentiation Variational Inference. Journal of Machine Learning Research 18 1-45.")
+      list(
+        "Kucukelbir, A, Tran, D, Ranganath, R, Gelman, A, and Blei, DM (2017). Automatic Differentiation Variational Inference. Journal of Machine Learning Research 18 1-45."
+      )
     )
   }
 
-  if(object$algorithm == c('laplace')){
+  if (object$algorithm == c('laplace')) {
     stan_text <- paste0(
       stan_text,
       " We used Stan's Laplace approximation algorithm",
@@ -212,10 +239,9 @@ how_to_cite.mvgam <- function(object, ...){
       object$model_output@sim$iter,
       " samples from the approximate joint posterior."
     )
-
   }
 
-  if(object$algorithm == c('pathfinder')){
+  if (object$algorithm == c('pathfinder')) {
     stan_text <- paste0(
       stan_text,
       " We used Stan's Pathfinder variational approximation algorithm (Zhang et al. 2022)",
@@ -226,7 +252,9 @@ how_to_cite.mvgam <- function(object, ...){
 
     citations <- append(
       citations,
-      list("Zhang, L, Carpenter, B, Gelman, A, and Vehtari, A (2022). Pathfinder: parallel Quasi-Newton variational inference. Journal of Machine Learning Research 23(306), 1-49. http://jmlr.org/papers/v23/21-0889.html.")
+      list(
+        "Zhang, L, Carpenter, B, Gelman, A, and Vehtari, A (2022). Pathfinder: parallel Quasi-Newton variational inference. Journal of Machine Learning Research 23(306), 1-49. http://jmlr.org/papers/v23/21-0889.html."
+      )
     )
   }
   # Append texts
@@ -234,10 +262,18 @@ how_to_cite.mvgam <- function(object, ...){
 
   # List of additional, possibly very useful references
   other_citations <- vector(mode = 'list')
-  other_citations[[1]] <- "Arel-Bundock, V, Greifer, N, and Heiss, A (2024). How to interpret statistical models using marginaleffects for R and Python. Journal of Statistical Software, 111(9), 1-32. https://doi.org/10.18637/jss.v111.i09"
-  other_citations[[2]] <- "Gabry J, Simpson D, Vehtari A, Betancourt M, and Gelman A (2019). Visualization in Bayesian workflow. Journal of the Royal Statatistical Society A, 182, 389-402. doi:10.1111/rssa.12378."
-  other_citations[[3]] <- "Vehtari A, Gelman A, and Gabry J (2017). Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Statistics and Computing, 27, 1413-1432. doi:10.1007/s11222-016-9696-4."
-  other_citations[[4]] <- "Burkner, PC, Gabry, J, and Vehtari, A. (2020). Approximate leave-future-out cross-validation for Bayesian time series models. Journal of Statistical Computation and Simulation, 90(14), 2499-2523. https://doi.org/10.1080/00949655.2020.1783262"
+  other_citations[[
+    1
+  ]] <- "Arel-Bundock, V, Greifer, N, and Heiss, A (2024). How to interpret statistical models using marginaleffects for R and Python. Journal of Statistical Software, 111(9), 1-32. https://doi.org/10.18637/jss.v111.i09"
+  other_citations[[
+    2
+  ]] <- "Gabry J, Simpson D, Vehtari A, Betancourt M, and Gelman A (2019). Visualization in Bayesian workflow. Journal of the Royal Statatistical Society A, 182, 389-402. doi:10.1111/rssa.12378."
+  other_citations[[
+    3
+  ]] <- "Vehtari A, Gelman A, and Gabry J (2017). Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Statistics and Computing, 27, 1413-1432. doi:10.1007/s11222-016-9696-4."
+  other_citations[[
+    4
+  ]] <- "Burkner, PC, Gabry, J, and Vehtari, A. (2020). Approximate leave-future-out cross-validation for Bayesian time series models. Journal of Statistical Computation and Simulation, 90(14), 2499-2523. https://doi.org/10.1080/00949655.2020.1783262"
 
   out <- structure(
     list(
@@ -250,7 +286,3 @@ how_to_cite.mvgam <- function(object, ...){
 
   return(out)
 }
-
-
-
-

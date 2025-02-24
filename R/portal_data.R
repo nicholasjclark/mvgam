@@ -17,4 +17,3 @@
 #' }
 #' @source \url{https://github.com/weecology/PortalData/blob/main/SiteandMethods/Methods.md}
 "portal_data"
-

@@ -46,85 +46,86 @@
 #' conditional_effects(updated_mod, type = 'link')
 #'}
 #'@export
-update.mvgam = function(object,
-                        formula,
-                        trend_formula,
-                        knots,
-                        trend_knots,
-                        trend_model,
-                        family,
-                        share_obs_params,
-                        data,
-                        newdata,
-                        trend_map,
-                        use_lv,
-                        n_lv,
-                        priors,
-                        chains,
-                        burnin,
-                        samples,
-                        threads,
-                        algorithm,
-                        lfo = FALSE,
-                        ...){
-
-  if(missing(chains)){
+update.mvgam = function(
+  object,
+  formula,
+  trend_formula,
+  knots,
+  trend_knots,
+  trend_model,
+  family,
+  share_obs_params,
+  data,
+  newdata,
+  trend_map,
+  use_lv,
+  n_lv,
+  priors,
+  chains,
+  burnin,
+  samples,
+  threads,
+  algorithm,
+  lfo = FALSE,
+  ...
+) {
+  if (missing(chains)) {
     chains <- object$model_output@sim$chains
   }
 
-  if(missing(burnin)){
+  if (missing(burnin)) {
     burnin <- object$model_output@sim$warmup
-    if(is.null(burnin)) burnin <- 0
+    if (is.null(burnin)) burnin <- 0
   }
 
-  if(missing(samples)){
+  if (missing(samples)) {
     samples <- object$model_output@sim$iter - burnin
   }
 
-  if(missing(threads)){
+  if (missing(threads)) {
     threads <- attr(object$model_data, 'threads')
-    if(is.null(threads)) threads <- 1
+    if (is.null(threads)) threads <- 1
   }
 
-  if(missing(algorithm)){
+  if (missing(algorithm)) {
     algorithm <- object$algorithm
   }
 
-  if(!algorithm %in% 'sampling'){
+  if (!algorithm %in% 'sampling') {
     burnin <- 1
   }
 
-  if(missing(formula)){
+  if (missing(formula)) {
     formula <- object$call
 
-    if(attr(object$mgcv_model, 'drop_obs_intercept')){
-      formula <- update(formula, ~ . -1)
+    if (attr(object$mgcv_model, 'drop_obs_intercept')) {
+      formula <- update(formula, ~ . - 1)
     }
   }
 
-  if(missing(knots)){
-    if(is.null(attr(object$mgcv_model, 'knots'))){
+  if (missing(knots)) {
+    if (is.null(attr(object$mgcv_model, 'knots'))) {
       knots <- missing_arg()
     } else {
       knots <- attr(object$mgcv_model, 'knots')
     }
   }
 
-  if(missing(share_obs_params)){
+  if (missing(share_obs_params)) {
     share_obs_params <- object$share_obs_params
   }
 
-  if(missing(trend_formula)){
-    if(is.null(object$trend_call)){
+  if (missing(trend_formula)) {
+    if (is.null(object$trend_call)) {
       trend_formula <- missing_arg()
     } else {
       trend_formula <- object$trend_call
     }
   }
 
-  if(!missing(trend_formula)){
-    if(missing(trend_knots)){
-      if(is.null(attr(object$trend_mgcv_model, 'knots'))){
+  if (!missing(trend_formula)) {
+    if (missing(trend_knots)) {
+      if (is.null(attr(object$trend_mgcv_model, 'knots'))) {
         trend_knots <- missing_arg()
       } else {
         trend_knots <- attr(object$trend_mgcv_model, 'knots')
@@ -132,35 +133,35 @@ update.mvgam = function(object,
     }
   }
 
-  if(missing(trend_map)){
-    if(is.null(object$trend_map)){
+  if (missing(trend_map)) {
+    if (is.null(object$trend_map)) {
       trend_map <- missing_arg()
     } else {
       trend_map <- object$trend_map
     }
   }
 
-  if(missing(data)){
+  if (missing(data)) {
     data_train <- object$obs_data
   } else {
     data_train <- data
   }
 
-  if(missing(priors)){
-    if(!is.null(object$priors)){
+  if (missing(priors)) {
+    if (!is.null(object$priors)) {
       priors <- object$priors
     } else {
       priors <- rlang::missing_arg()
     }
   }
 
-  if(!missing(newdata)){
+  if (!missing(newdata)) {
     # If new  testing data supplied, include as the test data
     data_test <- newdata
     include_fc <- TRUE
-  } else if(!is.null(object$test_data)){
+  } else if (!is.null(object$test_data)) {
     # only include test data when no new training data is supplied
-    if(missing(data)){
+    if (missing(data)) {
       include_fc <- TRUE
       data_test <- object$test_data
     } else {
@@ -170,83 +171,84 @@ update.mvgam = function(object,
     include_fc <- FALSE
   }
 
-  if(missing(trend_model)){
+  if (missing(trend_model)) {
     trend_model <- object$trend_model
   }
 
-  if(missing(use_lv)){
+  if (missing(use_lv)) {
     use_lv <- object$use_lv
   }
 
-  if(missing(n_lv)){
+  if (missing(n_lv)) {
     n_lv <- object$n_lv
   }
 
-  if(missing(family)){
+  if (missing(family)) {
     family_char <- object$family
     family <- family_char
-    if(family_char == 'negative binomial'){
+    if (family_char == 'negative binomial') {
       family <- nb()
     }
-    if(family_char == 'beta'){
+    if (family_char == 'beta') {
       family <- betar()
     }
-    if(family_char == 'student'){
+    if (family_char == 'student') {
       family <- student_t()
     }
   }
 
-  if(include_fc){
-    updated_mod <- mvgam(formula = formula,
-                         trend_formula = trend_formula,
-                         trend_map = trend_map,
-                         knots = knots,
-                         trend_knots = trend_knots,
-                         data = data_train,
-                         newdata = data_test,
-                         trend_model = trend_model,
-                         use_lv = use_lv,
-                         n_lv = n_lv,
-                         family = family,
-                         share_obs_params = share_obs_params,
-                         refit = TRUE,
-                         lfo = lfo,
-                         use_stan = ifelse(object$fit_engine == 'stan', TRUE,
-                                           FALSE),
-                         priors = priors,
-                         chains = chains,
-                         burnin = burnin,
-                         samples = samples,
-                         algorithm = algorithm,
-                         threads = threads,
-                         ...)
+  if (include_fc) {
+    updated_mod <- mvgam(
+      formula = formula,
+      trend_formula = trend_formula,
+      trend_map = trend_map,
+      knots = knots,
+      trend_knots = trend_knots,
+      data = data_train,
+      newdata = data_test,
+      trend_model = trend_model,
+      use_lv = use_lv,
+      n_lv = n_lv,
+      family = family,
+      share_obs_params = share_obs_params,
+      refit = TRUE,
+      lfo = lfo,
+      use_stan = ifelse(object$fit_engine == 'stan', TRUE, FALSE),
+      priors = priors,
+      chains = chains,
+      burnin = burnin,
+      samples = samples,
+      algorithm = algorithm,
+      threads = threads,
+      ...
+    )
   } else {
-    updated_mod <- mvgam(formula = formula,
-                         trend_formula = trend_formula,
-                         trend_map = trend_map,
-                         knots = knots,
-                         trend_knots = trend_knots,
-                         data = data_train,
-                         trend_model = trend_model,
-                         use_lv = use_lv,
-                         n_lv = n_lv,
-                         family = family,
-                         share_obs_params = share_obs_params,
-                         refit = TRUE,
-                         lfo = lfo,
-                         use_stan = ifelse(object$fit_engine == 'stan', TRUE,
-                                           FALSE),
-                         priors = priors,
-                         chains = chains,
-                         burnin = burnin,
-                         samples = samples,
-                         algorithm = algorithm,
-                         threads = threads,
-                         ...)
+    updated_mod <- mvgam(
+      formula = formula,
+      trend_formula = trend_formula,
+      trend_map = trend_map,
+      knots = knots,
+      trend_knots = trend_knots,
+      data = data_train,
+      trend_model = trend_model,
+      use_lv = use_lv,
+      n_lv = n_lv,
+      family = family,
+      share_obs_params = share_obs_params,
+      refit = TRUE,
+      lfo = lfo,
+      use_stan = ifelse(object$fit_engine == 'stan', TRUE, FALSE),
+      priors = priors,
+      chains = chains,
+      burnin = burnin,
+      samples = samples,
+      algorithm = algorithm,
+      threads = threads,
+      ...
+    )
   }
 
   return(updated_mod)
-
 }
 
 
@@ -264,104 +266,105 @@ update.mvgam = function(object,
 #' Use `methods(class = "mvgam")` for an overview on available methods.
 #' @author Nicholas J Clark
 #'@export
-update.jsdgam = function(object,
-                        formula,
-                        factor_formula,
-                        knots,
-                        factor_knots,
-                        data,
-                        newdata,
-                        n_lv,
-                        family,
-                        share_obs_params,
-                        priors,
-                        chains,
-                        burnin,
-                        samples,
-                        threads,
-                        algorithm,
-                        lfo = FALSE,
-                        ...){
-
-  if(missing(chains)){
+update.jsdgam = function(
+  object,
+  formula,
+  factor_formula,
+  knots,
+  factor_knots,
+  data,
+  newdata,
+  n_lv,
+  family,
+  share_obs_params,
+  priors,
+  chains,
+  burnin,
+  samples,
+  threads,
+  algorithm,
+  lfo = FALSE,
+  ...
+) {
+  if (missing(chains)) {
     chains <- object$model_output@sim$chains
   }
 
-  if(missing(burnin)){
+  if (missing(burnin)) {
     burnin <- object$model_output@sim$warmup
-    if(is.null(burnin)) burnin <- 0
+    if (is.null(burnin)) burnin <- 0
   }
 
-  if(missing(samples)){
+  if (missing(samples)) {
     samples <- object$model_output@sim$iter - burnin
   }
 
-  if(missing(threads)){
+  if (missing(threads)) {
     threads <- attr(object$model_data, 'threads')
-    if(is.null(threads)) threads <- 1
+    if (is.null(threads)) threads <- 1
   }
 
-  if(missing(algorithm)){
+  if (missing(algorithm)) {
     algorithm <- object$algorithm
   }
 
-  if(!algorithm %in% 'sampling'){
+  if (!algorithm %in% 'sampling') {
     burnin <- 1
   }
 
-  if(missing(formula)){
+  if (missing(formula)) {
     formula <- object$call
 
-    if(attr(object$mgcv_model, 'drop_obs_intercept')){
-      formula <- update(formula, ~ . -1)
+    if (attr(object$mgcv_model, 'drop_obs_intercept')) {
+      formula <- update(formula, ~ . - 1)
     }
   }
 
-  if(missing(factor_formula)){
+  if (missing(factor_formula)) {
     factor_formula <- object$trend_call
   }
 
-  if(missing(knots)){
-    if(is.null(attr(object$mgcv_model, 'knots'))){
+  if (missing(knots)) {
+    if (is.null(attr(object$mgcv_model, 'knots'))) {
       knots <- missing_arg()
     } else {
       knots <- attr(object$mgcv_model, 'knots')
     }
   }
 
-  if(missing(factor_knots)){
-    if(is.null(attr(object$trend_mgcv_model, 'knots'))){
+  if (missing(factor_knots)) {
+    if (is.null(attr(object$trend_mgcv_model, 'knots'))) {
       factor_knots <- missing_arg()
     } else {
       factor_knots <- attr(object$trend_mgcv_model, 'knots')
     }
   }
 
-  if(missing(share_obs_params)){
+  if (missing(share_obs_params)) {
     share_obs_params <- object$share_obs_params
   }
 
-  if(missing(data)){
+  if (missing(data)) {
     data_train <- object$obs_data
   } else {
     data_train <- data
   }
 
-  if(missing(priors)){
-    if(!is.null(object$priors)){
+  if (missing(priors)) {
+    if (!is.null(object$priors)) {
       priors <- object$priors
     } else {
       priors <- rlang::missing_arg()
     }
   }
 
-  if(!missing(newdata)){
+  if (!missing(newdata)) {
     # If new testing data supplied, include as the test data
     data_test <- newdata
     include_fc <- TRUE
-  } else if(!is.null(object$test_data)){
+  } else if (!is.null(object$test_data)) {
     # only include test data when no new training data is supplied
-    if(missing(data)){
+    if (missing(data)) {
       include_fc <- TRUE
       data_test <- object$test_data
     } else {
@@ -371,70 +374,70 @@ update.jsdgam = function(object,
     include_fc <- FALSE
   }
 
-  if(missing(n_lv)){
+  if (missing(n_lv)) {
     n_lv <- object$n_lv
   }
 
-  if(missing(family)){
+  if (missing(family)) {
     family_char <- object$family
     family <- family_char
-    if(family_char == 'negative binomial'){
+    if (family_char == 'negative binomial') {
       family <- nb()
     }
-    if(family_char == 'beta'){
+    if (family_char == 'beta') {
       family <- betar()
     }
-    if(family_char == 'student'){
+    if (family_char == 'student') {
       family <- student_t()
     }
   }
 
-  if(include_fc){
-    updated_mod <- jsdgam(formula = formula,
-                          factor_formula = factor_formula,
-                          knots = knots,
-                          factor_knots = factor_knots,
-                          data = data_train,
-                          newdata = data_test,
-                          trend_model = trend_model,
-                          n_lv = n_lv,
-                          family = family,
-                          share_obs_params = share_obs_params,
-                          refit = TRUE,
-                          lfo = lfo,
-                          use_stan = ifelse(object$fit_engine == 'stan', TRUE,
-                                            FALSE),
-                          priors = priors,
-                          chains = chains,
-                          burnin = burnin,
-                          samples = samples,
-                          algorithm = algorithm,
-                          threads = threads,
-                          ...)
+  if (include_fc) {
+    updated_mod <- jsdgam(
+      formula = formula,
+      factor_formula = factor_formula,
+      knots = knots,
+      factor_knots = factor_knots,
+      data = data_train,
+      newdata = data_test,
+      trend_model = trend_model,
+      n_lv = n_lv,
+      family = family,
+      share_obs_params = share_obs_params,
+      refit = TRUE,
+      lfo = lfo,
+      use_stan = ifelse(object$fit_engine == 'stan', TRUE, FALSE),
+      priors = priors,
+      chains = chains,
+      burnin = burnin,
+      samples = samples,
+      algorithm = algorithm,
+      threads = threads,
+      ...
+    )
   } else {
-    updated_mod <- mvgam(formula = formula,
-                         factor_formula = factor_formula,
-                         knots = knots,
-                         factor_knots = factor_knots,
-                         data = data_train,
-                         trend_model = trend_model,
-                         n_lv = n_lv,
-                         family = family,
-                         share_obs_params = share_obs_params,
-                         refit = TRUE,
-                         lfo = lfo,
-                         use_stan = ifelse(object$fit_engine == 'stan', TRUE,
-                                           FALSE),
-                         priors = priors,
-                         chains = chains,
-                         burnin = burnin,
-                         samples = samples,
-                         algorithm = algorithm,
-                         threads = threads,
-                         ...)
+    updated_mod <- mvgam(
+      formula = formula,
+      factor_formula = factor_formula,
+      knots = knots,
+      factor_knots = factor_knots,
+      data = data_train,
+      trend_model = trend_model,
+      n_lv = n_lv,
+      family = family,
+      share_obs_params = share_obs_params,
+      refit = TRUE,
+      lfo = lfo,
+      use_stan = ifelse(object$fit_engine == 'stan', TRUE, FALSE),
+      priors = priors,
+      chains = chains,
+      burnin = burnin,
+      samples = samples,
+      algorithm = algorithm,
+      threads = threads,
+      ...
+    )
   }
 
   return(updated_mod)
-
 }
-

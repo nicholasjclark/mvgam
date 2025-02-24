@@ -102,26 +102,34 @@
 #'}
 #' @export
 loo.mvgam <- function(x, incl_dynamics = TRUE, ...) {
-  if(x$family == 'nmix' | incl_dynamics){
+  if (x$family == 'nmix' | incl_dynamics) {
     logliks <- logLik(x, include_forecast = FALSE)
   } else {
     x$series_names <- levels(x$obs_data$series)
-    logliks <- logLik(x,
-                      linpreds = predict(x,
-                                         newdata = x$obs_data,
-                                         type = 'link',
-                                         summary = FALSE,
-                                         process_error = FALSE),
-                      newdata = x$obs_data,
-                      family_pars = extract_family_pars(x),
-                      include_forecast = FALSE)
+    logliks <- logLik(
+      x,
+      linpreds = predict(
+        x,
+        newdata = x$obs_data,
+        type = 'link',
+        summary = FALSE,
+        process_error = FALSE
+      ),
+      newdata = x$obs_data,
+      family_pars = extract_family_pars(x),
+      include_forecast = FALSE
+    )
   }
 
   logliks <- clean_ll(x, logliks)
-  releffs <- loo::relative_eff(exp(logliks),
-                               chain_id = sort(rep(1:x$model_output@sim$chains,
-                                                   (NROW(logliks) /
-                                                      x$model_output@sim$chains))))
+  releffs <- loo::relative_eff(
+    exp(logliks),
+    chain_id = sort(rep(
+      1:x$model_output@sim$chains,
+      (NROW(logliks) /
+        x$model_output@sim$chains)
+    ))
+  )
   loo::loo(logliks, r_eff = releffs, ...)
 }
 
@@ -135,10 +143,12 @@ loo.mvgam <- function(x, incl_dynamics = TRUE, ...) {
 #' log-likelihoods. Defaults to `TRUE`
 #' @rdname loo.mvgam
 #' @export
-loo_compare.mvgam <- function(x, ...,
-                              model_names = NULL,
-                              incl_dynamics = TRUE) {
-
+loo_compare.mvgam <- function(
+  x,
+  ...,
+  model_names = NULL,
+  incl_dynamics = TRUE
+) {
   models <- split_mod_dots(x, ..., model_names = model_names)
   loos <- named_list(names(models))
   for (i in seq_along(models)) {
@@ -156,21 +166,19 @@ loo::loo
 loo::loo_compare
 
 #'@noRd
-split_mod_dots = function (x, ..., model_names = NULL, other = TRUE) {
-
+split_mod_dots = function(x, ..., model_names = NULL, other = TRUE) {
   dots <- list(x, ...)
   names <- substitute(list(x, ...), env = parent.frame())[-1]
   names <- ulapply(names, deparse)
 
-  if(!is.null(model_names)){
+  if (!is.null(model_names)) {
     names <- model_names
   }
 
   if (length(names)) {
     if (!length(names(dots))) {
       names(dots) <- names
-    }
-    else {
+    } else {
       has_no_name <- !nzchar(names(dots))
       names(dots)[has_no_name] <- names[has_no_name]
     }
@@ -180,38 +188,42 @@ split_mod_dots = function (x, ..., model_names = NULL, other = TRUE) {
   out <- dots[!is_mvgam]
 
   if (length(out)) {
-    stop("Only model objects can be passed to '...' for this method.",
-         call. = FALSE)
+    stop(
+      "Only model objects can be passed to '...' for this method.",
+      call. = FALSE
+    )
   }
   models
 }
 
 #'@noRd
-named_list = function (names, values = NULL) {
+named_list = function(names, values = NULL) {
   if (!is.null(values)) {
     if (length(values) <= 1L) {
       values <- replicate(length(names), values)
     }
     values <- as.list(values)
     stopifnot(length(values) == length(names))
-  }
-  else {
+  } else {
     values <- vector("list", length(names))
   }
   setNames(values, names)
 }
 
 #'@noRd
-clean_ll = function(x, logliks){
-
+clean_ll = function(x, logliks) {
   # First remove any columns that are all NA (these had missing observations)
-  logliks <- logliks[,!apply(logliks, 2, function(x) all(!is.finite(x)))]
+  logliks <- logliks[, !apply(logliks, 2, function(x) all(!is.finite(x)))]
 
   # Next resample any remaining non-finite values (occasionally happens with
   # some observation families)
-  samp_noinf = function(x){
+  samp_noinf = function(x) {
     x_finite <- x[is.finite(x)]
-    x[!is.finite(x)] <- sample(x_finite, length(x[!is.finite(x)]), replace = TRUE)
+    x[!is.finite(x)] <- sample(
+      x_finite,
+      length(x[!is.finite(x)]),
+      replace = TRUE
+    )
     x
   }
   logliks <- apply(logliks, 2, samp_noinf)

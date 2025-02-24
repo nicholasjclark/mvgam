@@ -17,6 +17,8 @@ test_that("augment returns correct types", {
   expect_equal(length(out4$y), length(mvgam:::mvgam_example4$obs_data$y))
 
   # NAs in obs data should equal NAs in residuals
-  expect_true(all(which(is.na(mvgam:::mvgam_example1$obs_data$y)) %in%
-                 which(is.na(out1$.resid))))
+  expect_true(all(
+    which(is.na(mvgam:::mvgam_example1$obs_data$y)) %in%
+      which(is.na(out1$.resid))
+  ))
 })

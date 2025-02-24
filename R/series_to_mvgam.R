@@ -31,28 +31,27 @@
 #'
 #'@export
 #'
-series_to_mvgam <- function(series, freq, train_prop = 0.85){
-
+series_to_mvgam <- function(series, freq, train_prop = 0.85) {
   # Check for xts and lubridate packages
   insight::check_if_installed("xts")
   insight::check_if_installed("lubridate")
 
   # Check series format
   type <- 'wrong'
-  if(is.ts(series)) {
+  if (is.ts(series)) {
     type <- 'ts'
   }
 
-  if(xts::is.xts(series)) {
+  if (xts::is.xts(series)) {
     type <- 'xts'
   }
 
-  if(type == 'wrong'){
+  if (type == 'wrong') {
     stop("series must be either a ts or xts object")
   }
 
   # Extract information on years and seasons from the series object
-  if(type == 'ts'){
+  if (type == 'ts') {
     dates <- lubridate::date_decimal(as.numeric(time(series)))
     years <- lubridate::year(dates)
     seasons <- as.vector(1 + ((time(series) %% 1) * frequency(series)))
@@ -60,51 +59,69 @@ series_to_mvgam <- function(series, freq, train_prop = 0.85){
 
   # Function to convert xts to ts object
   xts.to.ts <- function(x, freq = 52) {
-    start_time <-  head(1 +
-                          (round((lubridate::yday(lubridate::date(time(series))) / 365) *
-                                   freq, 0)), 1)
-    ts(as.numeric(x),
-       start = c(lubridate::year(start(x)),
-                 start_time), frequency = freq)
+    start_time <- head(
+      1 +
+        (round(
+          (lubridate::yday(lubridate::date(time(series))) / 365) *
+            freq,
+          0
+        )),
+      1
+    )
+    ts(
+      as.numeric(x),
+      start = c(lubridate::year(start(x)), start_time),
+      frequency = freq
+    )
   }
 
-  if(type == 'xts'){
+  if (type == 'xts') {
     dates <- lubridate::date(time(series))
     years <- lubridate::year(time(series))
-    seasons <- as.vector(1 + ((time(xts.to.ts(series[,1], freq = freq)) %% 1) *
-                                freq))
+    seasons <- as.vector(
+      1 +
+        ((time(xts.to.ts(series[, 1], freq = freq)) %% 1) *
+          freq)
+    )
   }
 
   # Extract remaining information and put into correct format
   n_series <- NCOL(series)
   T <- NROW(series)
   series_names <- factor(colnames(series), levels = colnames(series))
-  if(length(levels(series_names)) == 0){
-    series_names <- factor(paste0('series_', seq(1, n_series)),
-                           levels = paste0('series_', seq(1, n_series)))
+  if (length(levels(series_names)) == 0) {
+    series_names <- factor(
+      paste0('series_', seq(1, n_series)),
+      levels = paste0('series_', seq(1, n_series))
+    )
   }
 
-  mvgam_data = data.frame(y = as.vector(series),
-                          season = rep(seasons, n_series),
-                          year = rep(years, n_series),
-                          date = rep(dates, n_series),
-                          series = as.factor(sort(rep(series_names, T)))) %>%
+  mvgam_data = data.frame(
+    y = as.vector(series),
+    season = rep(seasons, n_series),
+    year = rep(years, n_series),
+    date = rep(dates, n_series),
+    series = as.factor(sort(rep(series_names, T)))
+  ) %>%
     dplyr::arrange(year, season, series)
 
-
   mvgam_data %>%
-    dplyr::left_join(mvgam_data %>%
-                       dplyr::select(year, season) %>%
-                       dplyr::distinct() %>%
-                       dplyr::arrange(year, season) %>%
-                       dplyr::mutate(time = dplyr::row_number()),
-                     by = c('season', 'year')) -> mvgam_data
+    dplyr::left_join(
+      mvgam_data %>%
+        dplyr::select(year, season) %>%
+        dplyr::distinct() %>%
+        dplyr::arrange(year, season) %>%
+        dplyr::mutate(time = dplyr::row_number()),
+      by = c('season', 'year')
+    ) -> mvgam_data
 
   # Split into training and testing and return
   last_time <- floor(max(mvgam_data$time) * train_prop)
 
-  return(list(data_train = mvgam_data %>%
-                dplyr::filter(time <= last_time),
-              data_test = mvgam_data %>%
-                dplyr::filter(time > last_time)))
+  return(list(
+    data_train = mvgam_data %>%
+      dplyr::filter(time <= last_time),
+    data_test = mvgam_data %>%
+      dplyr::filter(time > last_time)
+  ))
 }

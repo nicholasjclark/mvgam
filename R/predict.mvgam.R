@@ -87,37 +87,43 @@
 #'head(preds)
 #'}
 #'@export
-predict.mvgam = function(object,
-                         newdata,
-                         data_test,
-                         type = 'link',
-                         process_error = TRUE,
-                         summary = TRUE,
-                         robust = FALSE,
-                         probs = c(0.025, 0.975),
-                         ...){
-
+predict.mvgam = function(
+  object,
+  newdata,
+  data_test,
+  type = 'link',
+  process_error = TRUE,
+  summary = TRUE,
+  robust = FALSE,
+  probs = c(0.025, 0.975),
+  ...
+) {
   # Argument checks
-  if(!missing("data_test")){
+  if (!missing("data_test")) {
     newdata <- data_test
   }
-  if(missing(newdata)){
+  if (missing(newdata)) {
     newdata <- object$obs_data
   }
 
   # Check names of supplied variables against those required
   # for prediction
-  required_vars <- insight::find_predictors(object,
-                                            component = "all")$conditional
-  required_vars <- setdiff(required_vars,
-                           c('series', 'time'))
+  required_vars <- insight::find_predictors(
+    object,
+    component = "all"
+  )$conditional
+  required_vars <- setdiff(required_vars, c('series', 'time'))
 
-  if(length(required_vars)){
-    if(any(required_vars %in% names(newdata) == FALSE)){
+  if (length(required_vars)) {
+    if (any(required_vars %in% names(newdata) == FALSE)) {
       stop(
-        paste0('the following required variables are missing from newdata:\n ',
-               paste(required_vars[which(!required_vars %in% names(newdata))],
-                     collapse = ', ')),
+        paste0(
+          'the following required variables are missing from newdata:\n ',
+          paste(
+            required_vars[which(!required_vars %in% names(newdata))],
+            collapse = ', '
+          )
+        ),
         call. = FALSE
       )
     }
@@ -125,105 +131,117 @@ predict.mvgam = function(object,
 
   # newdata needs to have a 'series' indicator in it for integrating
   # over the trend uncertainties
-  if(inherits(object, 'jsdgam')){
-    newdata <- validate_series_time(data = newdata,
-                                    trend_model = attr(object$model_data, 'prepped_trend_model'),
-                                    check_levels = FALSE,
-                                    check_times = FALSE)
+  if (inherits(object, 'jsdgam')) {
+    newdata <- validate_series_time(
+      data = newdata,
+      trend_model = attr(object$model_data, 'prepped_trend_model'),
+      check_levels = FALSE,
+      check_times = FALSE
+    )
   } else {
-    newdata <- validate_series_time(data = newdata,
-                                    trend_model = object$trend_model,
-                                    check_levels = FALSE,
-                                    check_times = FALSE)
+    newdata <- validate_series_time(
+      data = newdata,
+      trend_model = object$trend_model,
+      check_levels = FALSE,
+      check_times = FALSE
+    )
   }
 
-  type <- match.arg(arg = type, choices = c("link",
-                                            "expected",
-                                            "response",
-                                            "variance",
-                                            "latent_N",
-                                            "detection",
-                                            "terms"))
+  type <- match.arg(
+    arg = type,
+    choices = c(
+      "link",
+      "expected",
+      "response",
+      "variance",
+      "latent_N",
+      "detection",
+      "terms"
+    )
+  )
 
-  if(type == 'latent_N' & object$family != 'nmix'){
-    stop('"latent_N" type only available for N-mixture models',
-         call. = FALSE)
+  if (type == 'latent_N' & object$family != 'nmix') {
+    stop('"latent_N" type only available for N-mixture models', call. = FALSE)
   }
 
-  if(type == 'detection' & object$family != 'nmix'){
-    stop('"detection" type only available for N-mixture models',
-         call. = FALSE)
+  if (type == 'detection' & object$family != 'nmix') {
+    stop('"detection" type only available for N-mixture models', call. = FALSE)
   }
 
   # terms is the easiest return type, so evaluate it first
-  if(type == 'terms'){
+  if (type == 'terms') {
     out <- list()
-    out$obs_effects <- terms_preds(object = object,
-                                   newdata = newdata,
-                                   summary = summary,
-                                   robust = robust,
-                                   probs = probs,
-                                   trend_effects = FALSE)
-    if(!is.null(object$trend_call)){
-      out$process_effects <- terms_preds(object = object,
-                                         newdata = newdata,
-                                         summary = summary,
-                                         robust = robust,
-                                         probs = probs,
-                                         trend_effects = TRUE)
+    out$obs_effects <- terms_preds(
+      object = object,
+      newdata = newdata,
+      summary = summary,
+      robust = robust,
+      probs = probs,
+      trend_effects = FALSE
+    )
+    if (!is.null(object$trend_call)) {
+      out$process_effects <- terms_preds(
+        object = object,
+        newdata = newdata,
+        summary = summary,
+        robust = robust,
+        probs = probs,
+        trend_effects = TRUE
+      )
     }
   } else {
-
-
     # If a linear predictor was supplied for the latent process models, calculate
     # predictions by assuming the trend is stationary (this is basically what brms
     # does when predicting for autocor() models)
-    if(!is.null(object$trend_call)){
-
+    if (!is.null(object$trend_call)) {
       # Linear predictor matrix for the latent process models
-      Xp <- trend_Xp_matrix(newdata = newdata,
-                            trend_map = object$trend_map,
-                            series = 'all',
-                            mgcv_model = object$trend_mgcv_model)
+      Xp <- trend_Xp_matrix(
+        newdata = newdata,
+        trend_map = object$trend_map,
+        series = 'all',
+        mgcv_model = object$trend_mgcv_model
+      )
 
       # Extract process error estimates
-      if(attr(object$model_data, 'trend_model') %in%
-         c('None', 'RW', 'AR1', 'AR2',
-           'AR3', 'CAR1', 'ZMVN')){
-        if(object$family == 'nmix'){
+      if (
+        attr(object$model_data, 'trend_model') %in%
+          c('None', 'RW', 'AR1', 'AR2', 'AR3', 'CAR1', 'ZMVN')
+      ) {
+        if (object$family == 'nmix') {
           family_pars <- list(sigma_obs = .Machine$double.eps)
         } else {
-          family_pars <- list(sigma_obs = mcmc_chains(object$model_output,
-                                                      'sigma'))
+          family_pars <- list(
+            sigma_obs = mcmc_chains(object$model_output, 'sigma')
+          )
         }
       }
 
-      if(attr(object$model_data, 'trend_model') %in% c('VAR1')){
-        if(object$use_lv){
-          family_pars <- list(sigma_obs =
-                                mcmc_chains(object$model_output, 'Sigma')[ ,
-                                                                           seq(1, object$n_lv^2,
-                                                                               by = object$n_lv+1)])
+      if (attr(object$model_data, 'trend_model') %in% c('VAR1')) {
+        if (object$use_lv) {
+          family_pars <- list(
+            sigma_obs = mcmc_chains(object$model_output, 'Sigma')[,
+              seq(1, object$n_lv^2, by = object$n_lv + 1)
+            ]
+          )
         } else {
-          family_pars <- list(sigma_obs =
-                                mcmc_chains(object$model_output, 'Sigma')[ ,
-                                                                           seq(1, NCOL(object$ytimes)^2,
-                                                                               by = NCOL(object$ytimes)+1)])
+          family_pars <- list(
+            sigma_obs = mcmc_chains(object$model_output, 'Sigma')[,
+              seq(1, NCOL(object$ytimes)^2, by = NCOL(object$ytimes) + 1)
+            ]
+          )
         }
       }
 
       # Indicators of which trend to use for each observation
-      if(inherits(newdata, 'list')){
+      if (inherits(newdata, 'list')) {
         data.frame(series = newdata$series) %>%
-          dplyr::left_join(object$trend_map,
-                           by = 'series') %>%
+          dplyr::left_join(object$trend_map, by = 'series') %>%
           dplyr::pull(trend) -> trend_inds
         newdata_trend <- newdata
         newdata_trend$trend <- trend_inds
       } else {
         newdata %>%
-          dplyr::left_join(object$trend_map,
-                           by = 'series') -> newdata_trend
+          dplyr::left_join(object$trend_map, by = 'series') -> newdata_trend
       }
       trend_ind <- as.numeric(newdata_trend$trend)
 
@@ -231,8 +249,8 @@ predict.mvgam = function(object,
       betas <- mcmc_chains(object$model_output, 'b_trend')
 
       # Family parameters spread into a vector
-      family_extracts <- lapply(seq_along(family_pars), function(j){
-        if(is.matrix(family_pars[[j]])){
+      family_extracts <- lapply(seq_along(family_pars), function(j) {
+        if (is.matrix(family_pars[[j]])) {
           as.vector(family_pars[[j]][, trend_ind])
         } else {
           family_pars[[j]]
@@ -241,77 +259,88 @@ predict.mvgam = function(object,
       names(family_extracts) <- names(family_pars)
 
       # Trend stationary predictions
-      if(!process_error){
+      if (!process_error) {
         family_extracts <- list(sigma_obs = .Machine$double.eps)
       }
-      if(inherits(object, 'jsdgam')){
+      if (inherits(object, 'jsdgam')) {
         # JSDMs should generate one set of predictions per latent variable and then
         # create a weighted set of predictions based on the loading estimates
         lv_coefs <- mcmc_chains(object$model_output, 'lv_coefs')
         n_draws <- dim(mcmc_chains(object$model_output, 'b'))[1]
         series_ind <- as.numeric(newdata$series)
 
-        trend_predictions_raw <- lapply(1:object$n_lv, function(x){
+        trend_predictions_raw <- lapply(1:object$n_lv, function(x) {
           # Linear predictor matrix for the latent process models
-          Xp <- trend_Xp_matrix(newdata = newdata,
-                                trend_map = data.frame(
-                                  trend = x,
-                                  series = unique(object$trend_map$series)
-                                  ),
-                                series = 'all',
-                                mgcv_model = object$trend_mgcv_model)
-          all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
-                                                      function(row) Xp %*% row +
-                                                        attr(Xp, 'model.offset')))))
+          Xp <- trend_Xp_matrix(
+            newdata = newdata,
+            trend_map = data.frame(
+              trend = x,
+              series = unique(object$trend_map$series)
+            ),
+            series = 'all',
+            mgcv_model = object$trend_mgcv_model
+          )
+          all_linpreds <- as.matrix(as.vector(t(apply(
+            as.matrix(betas),
+            1,
+            function(row) Xp %*% row + attr(Xp, 'model.offset')
+          ))))
           attr(all_linpreds, 'model.offset') <- 0
-          pred_vec <- mvgam_predict(family = 'gaussian',
-                                    Xp = all_linpreds,
-                                    type = 'response',
-                                    betas = 1,
-                                    family_pars = family_extracts)
+          pred_vec <- mvgam_predict(
+            family = 'gaussian',
+            Xp = all_linpreds,
+            type = 'response',
+            betas = 1,
+            family_pars = family_extracts
+          )
           matrix(pred_vec, nrow = NROW(betas))
         })
 
         # Create weighted set of predictions using the loadings
-        weighted_mat = function(pred_matrices,
-                                weights,
-                                draw = 1,
-                                obs = 1){
-          lv_draws <- unlist(lapply(pred_matrices,
-                                    function(x) x[draw, obs]),
-                             use.names = FALSE)
+        weighted_mat = function(pred_matrices, weights, draw = 1, obs = 1) {
+          lv_draws <- unlist(
+            lapply(pred_matrices, function(x) x[draw, obs]),
+            use.names = FALSE
+          )
           as.vector(lv_draws %*% weights)
         }
 
-        trend_predictions <- matrix(NA, nrow = n_draws,
-                                    ncol = length(newdata[[1]]))
+        trend_predictions <- matrix(
+          NA,
+          nrow = n_draws,
+          ncol = length(newdata[[1]])
+        )
         n_lv <- object$n_lv
-        for(i in 1:n_draws){
-          for(x in 1:length(newdata[[1]])){
-            trend_predictions[i, x] <- weighted_mat(trend_predictions_raw,
-                                                    matrix(lv_coefs[i,],
-                                                           nrow = n_lv)[,series_ind[x]],
-                                                    draw = i,
-                                                    obs = x)
+        for (i in 1:n_draws) {
+          for (x in 1:length(newdata[[1]])) {
+            trend_predictions[i, x] <- weighted_mat(
+              trend_predictions_raw,
+              matrix(lv_coefs[i, ], nrow = n_lv)[, series_ind[x]],
+              draw = i,
+              obs = x
+            )
           }
         }
         trend_predictions <- as.vector(trend_predictions)
-
       } else {
         # Pre-multiply the linear predictors
-        all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
-                                                    function(row) Xp %*% row +
-                                                      attr(Xp, 'model.offset')))))
+        all_linpreds <- as.matrix(as.vector(t(apply(
+          as.matrix(betas),
+          1,
+          function(row) Xp %*% row + attr(Xp, 'model.offset')
+        ))))
         attr(all_linpreds, 'model.offset') <- 0
-        trend_predictions <- mvgam_predict(family = 'gaussian',
-                                           Xp = all_linpreds,
-                                           type = 'response',
-                                           betas = 1,
-                                           family_pars = family_extracts)
+        trend_predictions <- mvgam_predict(
+          family = 'gaussian',
+          Xp = all_linpreds,
+          type = 'response',
+          betas = 1,
+          family_pars = family_extracts
+        )
       }
-
-
-    } else if(attr(object$model_data, 'trend_model') != 'None' & process_error){
+    } else if (
+      attr(object$model_data, 'trend_model') != 'None' & process_error
+    ) {
       # If no linear predictor for the trends but a dynamic trend model was used,
       # and the process_error flag is set to TRUE,
       # simulate from stationary time series to capture uncertainty
@@ -321,65 +350,79 @@ predict.mvgam = function(object,
       series_ind <- as.numeric(newdata$series)
 
       # Draw from fixed sigma for latent variable models
-      if(object$use_lv & is.null(object$trend_map)){
-        if(attr(object$model_data, 'trend_model') != 'GP'){
-          trends <- array(rnorm(n_draws * object$n_lv * length(newdata[[1]]),
-                                mean = 0,
-                                sd = 0.1),
-                          dim = c(n_draws, object$n_lv, length(newdata[[1]])))
+      if (object$use_lv & is.null(object$trend_map)) {
+        if (attr(object$model_data, 'trend_model') != 'GP') {
+          trends <- array(
+            rnorm(
+              n_draws * object$n_lv * length(newdata[[1]]),
+              mean = 0,
+              sd = 0.1
+            ),
+            dim = c(n_draws, object$n_lv, length(newdata[[1]]))
+          )
         } else {
-          trends <- array(rnorm(n_draws * object$n_lv * length(newdata[[1]]),
-                                mean = 0,
-                                sd = 0.25),
-                          dim = c(n_draws, object$n_lv, length(newdata[[1]])))
+          trends <- array(
+            rnorm(
+              n_draws * object$n_lv * length(newdata[[1]]),
+              mean = 0,
+              sd = 0.25
+            ),
+            dim = c(n_draws, object$n_lv, length(newdata[[1]]))
+          )
         }
 
         lv_coefs <- mcmc_chains(object$model_output, 'lv_coefs')
 
-        trend_predictions <- matrix(NA, nrow = n_draws,
-                                    ncol = length(newdata[[1]]))
-        for(i in 1:n_draws){
-          for(x in 1:length(newdata[[1]])){
-            trend_predictions[i, x] <- t(trends[i,,series_ind[x]]) %*%
-              matrix(lv_coefs[i,], nrow = object$n_lv)[,series_ind[x]]
+        trend_predictions <- matrix(
+          NA,
+          nrow = n_draws,
+          ncol = length(newdata[[1]])
+        )
+        for (i in 1:n_draws) {
+          for (x in 1:length(newdata[[1]])) {
+            trend_predictions[i, x] <- t(trends[i, , series_ind[x]]) %*%
+              matrix(lv_coefs[i, ], nrow = object$n_lv)[, series_ind[x]]
           }
         }
         trend_predictions <- as.vector(trend_predictions)
-
       }
 
-      if(!object$use_lv){
-
-        if(attr(object$model_data, 'trend_model') %in%
-           c('RW','AR1','AR2','AR3','VAR1','CAR1','ZMVN')){
-          family_pars <- list(sigma_obs = mcmc_chains(object$model_output,
-                                                      'sigma'))
+      if (!object$use_lv) {
+        if (
+          attr(object$model_data, 'trend_model') %in%
+            c('RW', 'AR1', 'AR2', 'AR3', 'VAR1', 'CAR1', 'ZMVN')
+        ) {
+          family_pars <- list(
+            sigma_obs = mcmc_chains(object$model_output, 'sigma')
+          )
         }
-        if(attr(object$model_data, 'trend_model') %in% c('GP')){
-          family_pars <- list(sigma_obs = mcmc_chains(object$model_output,
-                                                      'alpha_gp'))
+        if (attr(object$model_data, 'trend_model') %in% c('GP')) {
+          family_pars <- list(
+            sigma_obs = mcmc_chains(object$model_output, 'alpha_gp')
+          )
         }
 
         # Indicators of which trend to use for each observation
-        if(!is.null(object$trend_map)){
+        if (!is.null(object$trend_map)) {
           newdata %>%
-            dplyr::left_join(object$trend_map,
-                             by = 'series') -> newdata_trend
+            dplyr::left_join(object$trend_map, by = 'series') -> newdata_trend
           trend_ind <- as.numeric(newdata_trend$trend)
         } else {
           trend_ind <- as.numeric(newdata$series)
         }
 
         # Create a fake design matrix of 1s
-        betas <- matrix(0,
-                        ncol = 1,
-                        nrow = dim(mcmc_chains(object$model_output, 'b'))[1])
+        betas <- matrix(
+          0,
+          ncol = 1,
+          nrow = dim(mcmc_chains(object$model_output, 'b'))[1]
+        )
         Xp <- matrix(1, ncol = 1, nrow = length(newdata$time))
         attr(Xp, 'model.offset') <- 0
 
         # Family parameters spread into a vector
-        family_extracts <- lapply(seq_along(family_pars), function(j){
-          if(is.matrix(family_pars[[j]])){
+        family_extracts <- lapply(seq_along(family_pars), function(j) {
+          if (is.matrix(family_pars[[j]])) {
             as.vector(family_pars[[j]][, trend_ind])
           } else {
             family_pars[[j]]
@@ -388,18 +431,21 @@ predict.mvgam = function(object,
         names(family_extracts) <- names(family_pars)
 
         # Pre-multiply the linear predictors
-        all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
-                                                    function(row) Xp %*% row +
-                                                      attr(Xp, 'model.offset')))))
+        all_linpreds <- as.matrix(as.vector(t(apply(
+          as.matrix(betas),
+          1,
+          function(row) Xp %*% row + attr(Xp, 'model.offset')
+        ))))
         attr(all_linpreds, 'model.offset') <- 0
 
         # Trend stationary predictions
-        trend_predictions <- mvgam_predict(family = 'gaussian',
-                                           Xp = all_linpreds,
-                                           type = 'response',
-                                           betas = 1,
-                                           family_pars = family_extracts)
-
+        trend_predictions <- mvgam_predict(
+          family = 'gaussian',
+          Xp = all_linpreds,
+          type = 'response',
+          betas = 1,
+          family_pars = family_extracts
+        )
       }
     } else {
       # If no trend_model was used, or if process_error == FALSE,
@@ -409,8 +455,7 @@ predict.mvgam = function(object,
 
     #### Once trend predictions are made, calculate observation predictions ####
     # Generate linear predictor matrix from the mgcv observation model
-    Xp <- obs_Xp_matrix(newdata = newdata,
-                        mgcv_model = object$mgcv_model)
+    Xp <- obs_Xp_matrix(newdata = newdata, mgcv_model = object$mgcv_model)
 
     # Beta coefficients for GAM component
     betas <- mcmc_chains(object$model_output, 'b')
@@ -425,62 +470,75 @@ predict.mvgam = function(object,
     series_ind <- as.numeric(newdata$series)
 
     # Family parameters spread into long vectors
-    family_extracts <- lapply(seq_along(family_pars), function(j){
-      if(is.matrix(family_pars[[j]])){
+    family_extracts <- lapply(seq_along(family_pars), function(j) {
+      if (is.matrix(family_pars[[j]])) {
         as.vector(family_pars[[j]][, series_ind])
       } else {
-        as.vector(matrix(rep(family_pars[[j]],
-                             NROW(Xp)),
-                         nrow = NROW(betas),
-                         byrow = FALSE))
+        as.vector(matrix(
+          rep(family_pars[[j]], NROW(Xp)),
+          nrow = NROW(betas),
+          byrow = FALSE
+        ))
       }
     })
     names(family_extracts) <- names(family_pars)
 
     # Add trial information if this is a Binomial model
-    if(object$family %in% c('binomial', 'beta_binomial')){
+    if (object$family %in% c('binomial', 'beta_binomial')) {
       resp_terms <- as.character(terms(formula(object))[[2]])
       resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
       trial_name <- resp_terms[2]
-      if(!trial_name %in% names(newdata)){
-        stop(paste0('variable ', trial_name, ' not found in newdata'),
-             call. = FALSE)
+      if (!trial_name %in% names(newdata)) {
+        stop(
+          paste0('variable ', trial_name, ' not found in newdata'),
+          call. = FALSE
+        )
       }
 
       trials <- newdata[[trial_name]]
-      trials <- as.vector(matrix(rep(as.vector(trials),
-                                     NROW(betas)),
-                                 nrow = NROW(betas),
-                                 byrow = TRUE))
+      trials <- as.vector(matrix(
+        rep(as.vector(trials), NROW(betas)),
+        nrow = NROW(betas),
+        byrow = TRUE
+      ))
       family_extracts$trials <- trials
     }
 
     # Pre-multiply the linear predictors, including any offset and trend
     # predictions if applicable
-    if(family == 'nmix'){
-      all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
-                                                  function(row) Xp %*% row +
-                                                    attr(Xp, 'model.offset')))))
+    if (family == 'nmix') {
+      all_linpreds <- as.matrix(as.vector(t(apply(
+        as.matrix(betas),
+        1,
+        function(row) Xp %*% row + attr(Xp, 'model.offset')
+      ))))
       latent_lambdas <- exp(trend_predictions)
 
-      if(!(exists('cap', where = newdata))) {
-        stop('Max abundances must be supplied as a variable named "cap" for N-mixture models',
-             call. = FALSE)
+      if (!(exists('cap', where = newdata))) {
+        stop(
+          'Max abundances must be supplied as a variable named "cap" for N-mixture models',
+          call. = FALSE
+        )
       }
 
       validate_pos_integers(newdata$cap)
 
-      if(any(is.na(newdata$cap)) | any(is.infinite(newdata$cap))){
-        stop(paste0('Missing or infinite values found for some "cap" terms'),
-             call. = FALSE)
+      if (any(is.na(newdata$cap)) | any(is.infinite(newdata$cap))) {
+        stop(
+          paste0('Missing or infinite values found for some "cap" terms'),
+          call. = FALSE
+        )
       }
       cap <- as.vector(t(replicate(NROW(betas), newdata$cap)))
-
     } else {
-      all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
-                                                  function(row) Xp %*% row +
-                                                    attr(Xp, 'model.offset')))) +
-                                  trend_predictions)
+      all_linpreds <- as.matrix(
+        as.vector(t(apply(
+          as.matrix(betas),
+          1,
+          function(row) Xp %*% row + attr(Xp, 'model.offset')
+        ))) +
+          trend_predictions
+      )
       latent_lambdas <- NULL
       cap <- NULL
     }
@@ -488,22 +546,24 @@ predict.mvgam = function(object,
     attr(all_linpreds, 'model.offset') <- 0
 
     # Calculate vectorized predictions
-    predictions_vec <- mvgam_predict(family = family,
-                                     Xp = all_linpreds,
-                                     latent_lambdas = latent_lambdas,
-                                     cap = cap,
-                                     type = type,
-                                     betas = 1,
-                                     family_pars = family_extracts)
+    predictions_vec <- mvgam_predict(
+      family = family,
+      Xp = all_linpreds,
+      latent_lambdas = latent_lambdas,
+      cap = cap,
+      type = type,
+      betas = 1,
+      family_pars = family_extracts
+    )
 
     # Convert back to matrix
     preds <- matrix(predictions_vec, nrow = NROW(betas))
 
-    if(summary){
+    if (summary) {
       Qupper <- apply(preds, 2, quantile, probs = max(probs), na.rm = TRUE)
       Qlower <- apply(preds, 2, quantile, probs = min(probs), na.rm = TRUE)
 
-      if(robust){
+      if (robust) {
         estimates <- apply(preds, 2, median, na.rm = TRUE)
         errors <- apply(abs(preds - estimates), 2, median, na.rm = TRUE)
       } else {
@@ -512,8 +572,12 @@ predict.mvgam = function(object,
       }
 
       out <- cbind(estimates, errors, Qlower, Qupper)
-      colnames(out) <- c('Estimate', 'Est.Error', paste0('Q', 100*min(probs)),
-                         paste0('Q', 100*max(probs)))
+      colnames(out) <- c(
+        'Estimate',
+        'Est.Error',
+        paste0('Q', 100 * min(probs)),
+        paste0('Q', 100 * max(probs))
+      )
     } else {
       out <- preds
     }
@@ -523,58 +587,75 @@ predict.mvgam = function(object,
 
 #' Term-specific predictions and uncertainties
 #' @noRd
-terms_preds = function(object, newdata, summary = TRUE,
-                       robust = FALSE, probs = c(0.025, 0.975),
-                       trend_effects = FALSE){
-
-  if(trend_effects){
-    Xp <- trend_Xp_matrix(newdata = newdata,
-                          trend_map = object$trend_map,
-                          series = 'all',
-                          mgcv_model = object$trend_mgcv_model)
+terms_preds = function(
+  object,
+  newdata,
+  summary = TRUE,
+  robust = FALSE,
+  probs = c(0.025, 0.975),
+  trend_effects = FALSE
+) {
+  if (trend_effects) {
+    Xp <- trend_Xp_matrix(
+      newdata = newdata,
+      trend_map = object$trend_map,
+      series = 'all',
+      mgcv_model = object$trend_mgcv_model
+    )
     betas <- mcmc_chains(object$model_output, 'b_trend')
-    effect_names <- colnames(predict(relabel_gps(object$trend_mgcv_model),
-                                     type = 'terms',
-                                     se.fit = FALSE))
-    effect_names <- gsub('series', 'trend',
-                         effect_names, fixed = TRUE)
+    effect_names <- colnames(predict(
+      relabel_gps(object$trend_mgcv_model),
+      type = 'terms',
+      se.fit = FALSE
+    ))
+    effect_names <- gsub('series', 'trend', effect_names, fixed = TRUE)
     coef_names <- names(coef(object$trend_mgcv_model))
-    coef_names <- gsub('series', 'trend',
-                       coef_names, fixed = TRUE)
+    coef_names <- gsub('series', 'trend', coef_names, fixed = TRUE)
   } else {
-    Xp <- obs_Xp_matrix(newdata = newdata,
-                        mgcv_model = object$mgcv_model)
+    Xp <- obs_Xp_matrix(newdata = newdata, mgcv_model = object$mgcv_model)
     betas <- mcmc_chains(object$model_output, 'b')
-    effect_names <- colnames(predict(relabel_gps(object$mgcv_model),
-                                     type = 'terms',
-                                     se.fit = FALSE))
+    effect_names <- colnames(predict(
+      relabel_gps(object$mgcv_model),
+      type = 'terms',
+      se.fit = FALSE
+    ))
     coef_names <- names(coef(object$mgcv_model))
   }
 
   # Contributions considering full uncertainties
-  contributions <- serrors <- vector(mode = 'list',
-                                     length = length(effect_names))
-  for(i in seq_along(effect_names)){
-    effect_idxs <- grep(effect_names[i],
-                        coef_names, fixed = TRUE)
-    linpred <- as.matrix(as.vector(t(apply(as.matrix(betas[, effect_idxs, drop = FALSE]), 1,
-                                           function(row) Xp[, effect_idxs, drop = FALSE]
-                                           %*% row))))
+  contributions <- serrors <- vector(
+    mode = 'list',
+    length = length(effect_names)
+  )
+  for (i in seq_along(effect_names)) {
+    effect_idxs <- grep(effect_names[i], coef_names, fixed = TRUE)
+    linpred <- as.matrix(as.vector(t(apply(
+      as.matrix(betas[, effect_idxs, drop = FALSE]),
+      1,
+      function(row) Xp[, effect_idxs, drop = FALSE] %*% row
+    ))))
     contributions[[i]] <- matrix(linpred, nrow = NROW(betas))
 
-    if(summary){
-      serrors[[i]] <- (apply(contributions[[i]], 2,
-                             function(x) quantile(x, probs = max(probs))) -
-                         apply(contributions[[i]], 2,
-                               function(x) quantile(x, probs = min(probs)))) / 2
-      if(robust){
+    if (summary) {
+      serrors[[i]] <- (apply(
+        contributions[[i]],
+        2,
+        function(x) quantile(x, probs = max(probs))
+      ) -
+        apply(
+          contributions[[i]],
+          2,
+          function(x) quantile(x, probs = min(probs))
+        )) /
+        2
+      if (robust) {
         contributions[[i]] <- apply(contributions[[i]], 2, median)
       } else {
         contributions[[i]] <- apply(contributions[[i]], 2, mean)
       }
     }
   }
-  if(summary){
+  if (summary) {
     out <- list()
     contributions <- do.call(cbind, contributions)
     serrors <- do.call(cbind, serrors)

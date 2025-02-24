@@ -1,5 +1,5 @@
 params <-
-list(EVAL = TRUE)
+  list(EVAL = TRUE)
 
 ## ----echo = FALSE----------------------------------------------------------------------------
 knitr::opts_chunk$set(
@@ -13,12 +13,13 @@ knitr::opts_chunk$set(
 
 ## ----setup, include=FALSE--------------------------------------------------------------------
 knitr::opts_chunk$set(
-  echo = TRUE,   
+  echo = TRUE,
   dpi = 100,
   fig.asp = 0.8,
   fig.width = 6,
   out.width = "60%",
-  fig.align = "center")
+  fig.align = "center"
+)
 library(mvgam)
 library(ggplot2)
 theme_set(theme_bw(base_size = 12, base_family = 'serif'))
@@ -27,16 +28,19 @@ theme_set(theme_bw(base_size = 12, base_family = 'serif'))
 ## --------------------------------------------------------------------------------------------
 set.seed(1111)
 N <- 200
-beta_temp <- mvgam:::sim_gp(rnorm(1),
-                            alpha_gp = 0.75,
-                            rho_gp = 10,
-                            h = N) + 0.5
+beta_temp <- mvgam:::sim_gp(rnorm(1), alpha_gp = 0.75, rho_gp = 10, h = N) + 0.5
 
 
 ## ----fig.alt = "Simulating time-varying effects in mvgam and R"------------------------------
-plot(beta_temp, type = 'l', lwd = 3, 
-     bty = 'l', xlab = 'Time', ylab = 'Coefficient',
-     col = 'darkred')
+plot(
+  beta_temp,
+  type = 'l',
+  lwd = 3,
+  bty = 'l',
+  xlab = 'Time',
+  ylab = 'Coefficient',
+  col = 'darkred'
+)
 box(bty = 'l', lwd = 2)
 
 
@@ -45,26 +49,33 @@ temp <- rnorm(N, sd = 1)
 
 
 ## ----fig.alt = "Simulating time-varying effects in mvgam and R"------------------------------
-out <- rnorm(N, mean = 4 + beta_temp * temp,
-             sd = 0.25)
+out <- rnorm(N, mean = 4 + beta_temp * temp, sd = 0.25)
 time <- seq_along(temp)
-plot(out,  type = 'l', lwd = 3, 
-     bty = 'l', xlab = 'Time', ylab = 'Outcome',
-     col = 'darkred')
+plot(
+  out,
+  type = 'l',
+  lwd = 3,
+  bty = 'l',
+  xlab = 'Time',
+  ylab = 'Outcome',
+  col = 'darkred'
+)
 box(bty = 'l', lwd = 2)
 
 
 ## --------------------------------------------------------------------------------------------
 data <- data.frame(out, temp, time)
-data_train <- data[1:190,]
-data_test <- data[191:200,]
+data_train <- data[1:190, ]
+data_test <- data[191:200, ]
 
 
 ## ----include=FALSE---------------------------------------------------------------------------
-mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE, k = 40),
-             family = gaussian(),
-             data = data_train,
-             silent = 2)
+mod <- mvgam(
+  out ~ dynamic(temp, rho = 8, stationary = TRUE, k = 40),
+  family = gaussian(),
+  data = data_train,
+  silent = 2
+)
 
 
 ## ----eval=FALSE------------------------------------------------------------------------------
@@ -72,7 +83,6 @@ mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE, k = 40),
 #              family = gaussian(),
 #              data = data_train,
 #              silent = 2)
-
 
 ## --------------------------------------------------------------------------------------------
 summary(mod, include_betas = FALSE)
@@ -87,14 +97,15 @@ lines(beta_temp, lwd = 2)
 
 ## --------------------------------------------------------------------------------------------
 require(marginaleffects)
-range_round = function(x){
+range_round = function(x) {
   round(range(x, na.rm = TRUE), 2)
 }
-plot_predictions(mod, 
-                 newdata = datagrid(time = unique,
-                                    temp = range_round),
-                 by = c('time', 'temp', 'temp'),
-                 type = 'link')
+plot_predictions(
+  mod,
+  newdata = datagrid(time = unique, temp = range_round),
+  by = c('time', 'temp', 'temp'),
+  type = 'link'
+)
 
 
 ## --------------------------------------------------------------------------------------------
@@ -103,10 +114,12 @@ plot(fc)
 
 
 ## ----include=FALSE---------------------------------------------------------------------------
-mod <- mvgam(out ~ dynamic(temp, k = 40),
-             family = gaussian(),
-             data = data_train,
-             silent = 2)
+mod <- mvgam(
+  out ~ dynamic(temp, k = 40),
+  family = gaussian(),
+  data = data_train,
+  silent = 2
+)
 
 
 ## ----eval=FALSE------------------------------------------------------------------------------
@@ -114,7 +127,6 @@ mod <- mvgam(out ~ dynamic(temp, k = 40),
 #              family = gaussian(),
 #              data = data_train,
 #              silent = 2)
-
 
 ## --------------------------------------------------------------------------------------------
 summary(mod, include_betas = FALSE)
@@ -156,13 +168,15 @@ plot_mvgam_series(data = model_data, y = 'survival')
 
 
 ## ----include = FALSE-------------------------------------------------------------------------
-mod0 <- mvgam(formula = survival ~ 1,
-             trend_model = AR(),
-             noncentred = TRUE,
-             priors = prior(normal(-3.5, 0.5), class = Intercept),
-             family = betar(),
-             data = model_data,
-             silent = 2)
+mod0 <- mvgam(
+  formula = survival ~ 1,
+  trend_model = AR(),
+  noncentred = TRUE,
+  priors = prior(normal(-3.5, 0.5), class = Intercept),
+  family = betar(),
+  data = model_data,
+  silent = 2
+)
 
 
 ## ----eval = FALSE----------------------------------------------------------------------------
@@ -174,7 +188,6 @@ mod0 <- mvgam(formula = survival ~ 1,
 #               data = model_data,
 #               silent = 2)
 
-
 ## --------------------------------------------------------------------------------------------
 summary(mod0)
 
@@ -184,15 +197,17 @@ plot(mod0, type = 'trend')
 
 
 ## ----include=FALSE---------------------------------------------------------------------------
-mod1 <- mvgam(formula = survival ~ 1,
-              trend_formula = ~ dynamic(CUI.apr, k = 25, scale = FALSE) - 1,
-              trend_model = AR(),
-              noncentred = TRUE,
-              priors = prior(normal(-3.5, 0.5), class = Intercept),
-              family = betar(),
-              data = model_data,
-              control = list(adapt_delta = 0.99),
-              silent = 2)
+mod1 <- mvgam(
+  formula = survival ~ 1,
+  trend_formula = ~ dynamic(CUI.apr, k = 25, scale = FALSE) - 1,
+  trend_model = AR(),
+  noncentred = TRUE,
+  priors = prior(normal(-3.5, 0.5), class = Intercept),
+  family = betar(),
+  data = model_data,
+  control = list(adapt_delta = 0.99),
+  silent = 2
+)
 
 
 ## ----eval=FALSE------------------------------------------------------------------------------
@@ -204,7 +219,6 @@ mod1 <- mvgam(formula = survival ~ 1,
 #               family = betar(),
 #               data = model_data,
 #               silent = 2)
-
 
 ## --------------------------------------------------------------------------------------------
 summary(mod1, include_betas = FALSE)
@@ -250,19 +264,19 @@ lfo_mod1 <- lfo_cv(mod1, min_t = 30)
 # lfo_mod0 <- lfo_cv(mod0, min_t = 30)
 # lfo_mod1 <- lfo_cv(mod1, min_t = 30)
 
-
 ## --------------------------------------------------------------------------------------------
 sum(lfo_mod0$elpds)
 sum(lfo_mod1$elpds)
 
 
 ## ----fig.alt = "Comparing forecast skill for dynamic beta regression models in mvgam and R"----
-plot(x = 1:length(lfo_mod0$elpds) + 30,
-     y = lfo_mod0$elpds - lfo_mod1$elpds,
-     ylab = 'ELPDmod0 - ELPDmod1',
-     xlab = 'Evaluation time point',
-     pch = 16,
-     col = 'darkred',
-     bty = 'l')
+plot(
+  x = 1:length(lfo_mod0$elpds) + 30,
+  y = lfo_mod0$elpds - lfo_mod1$elpds,
+  ylab = 'ELPDmod0 - ELPDmod1',
+  xlab = 'Evaluation time point',
+  pch = 16,
+  col = 'darkred',
+  bty = 'l'
+)
 abline(h = 0, lty = 'dashed')
-

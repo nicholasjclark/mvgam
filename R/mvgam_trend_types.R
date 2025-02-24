@@ -153,127 +153,151 @@
 #'mcmc_plot(mod, variable = 'alpha_cor', type = 'hist')
 #'}
 #' @export
-RW = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA){
-
+RW = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA) {
   # Validate the supplied groupings and correlation argument
   gr <- deparse0(substitute(gr))
   subgr <- deparse0(substitute(subgr))
 
-  if(gr == 'NA'){
+  if (gr == 'NA') {
     subgr <- 'series'
   }
 
-  if(gr != 'NA'){
-    if(subgr == 'NA'){
-      stop('argument "subgr" must be supplied if "gr" is also supplied',
-           call. = FALSE)
-    } else if(subgr == 'series'){
-      stop('argument "subgr" cannot be set to "series" if "gr" is also supplied',
-           call. = FALSE)
-      } else {
-        cor <- TRUE
-      }
-    }
-
-  out <- structure(list(trend_model = 'RW',
-                        ma = ma,
-                        cor = cor,
-                        unit = 'time',
-                        gr = gr,
-                        subgr = subgr,
-                        label = match.call()),
-                   class = 'mvgam_trend')
-}
-
-#' @rdname RW
-#' @export
-AR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA){
-  validate_pos_integer(p)
-  if(p > 3){
-    stop("Argument 'p' must be <= 3",
-         call. = FALSE)
-  }
-
-  # Validate the supplied groupings and correlation argument
-  gr <- deparse0(substitute(gr))
-  subgr <- deparse0(substitute(subgr))
-
-  if(gr == 'NA'){
-    subgr <- 'series'
-  }
-
-  if(gr != 'NA'){
-    if(subgr == 'NA'){
-      stop('argument "subgr" must be supplied if "gr" is also supplied',
-           call. = FALSE)
-    } else if(subgr == 'series'){
-      stop('argument "subgr" cannot be set to "series" if "gr" is also supplied',
-           call. = FALSE)
+  if (gr != 'NA') {
+    if (subgr == 'NA') {
+      stop(
+        'argument "subgr" must be supplied if "gr" is also supplied',
+        call. = FALSE
+      )
+    } else if (subgr == 'series') {
+      stop(
+        'argument "subgr" cannot be set to "series" if "gr" is also supplied',
+        call. = FALSE
+      )
     } else {
       cor <- TRUE
     }
   }
 
-  out <- structure(list(trend_model = paste0('AR', p),
-                        ma = ma,
-                        cor = cor,
-                        unit = 'time',
-                        gr = gr,
-                        subgr = subgr,
-                        label = match.call()),
-                   class = 'mvgam_trend')
+  out <- structure(
+    list(
+      trend_model = 'RW',
+      ma = ma,
+      cor = cor,
+      unit = 'time',
+      gr = gr,
+      subgr = subgr,
+      label = match.call()
+    ),
+    class = 'mvgam_trend'
+  )
 }
 
 #' @rdname RW
 #' @export
-CAR = function(p = 1){
+AR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA) {
   validate_pos_integer(p)
-  if(p > 1){
-    stop("Argument 'p' must be = 1",
-         call. = FALSE)
+  if (p > 3) {
+    stop("Argument 'p' must be <= 3", call. = FALSE)
   }
-  out <- structure(list(trend_model = paste0('CAR', p),
-                        ma = FALSE,
-                        cor = FALSE,
-                        unit = 'time',
-                        gr = 'NA',
-                        subgr = 'series',
-                        label = match.call()),
-                   class = 'mvgam_trend')
-}
-
-#' @rdname RW
-#' @export
-VAR = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA){
 
   # Validate the supplied groupings and correlation argument
   gr <- deparse0(substitute(gr))
   subgr <- deparse0(substitute(subgr))
 
-  if(gr == 'NA'){
+  if (gr == 'NA') {
     subgr <- 'series'
   }
 
-  if(gr != 'NA'){
-    if(subgr == 'NA'){
-      stop('argument "subgr" must be supplied if "gr" is also supplied',
-           call. = FALSE)
-    } else if(subgr == 'series'){
-      stop('argument "subgr" cannot be set to "series" if "gr" is also supplied',
-           call. = FALSE)
+  if (gr != 'NA') {
+    if (subgr == 'NA') {
+      stop(
+        'argument "subgr" must be supplied if "gr" is also supplied',
+        call. = FALSE
+      )
+    } else if (subgr == 'series') {
+      stop(
+        'argument "subgr" cannot be set to "series" if "gr" is also supplied',
+        call. = FALSE
+      )
     } else {
       cor <- TRUE
     }
   }
 
-  out <- structure(list(trend_model = 'VAR',
-                        ma = ma,
-                        cor = cor,
-                        unit = 'time',
-                        gr = gr,
-                        subgr = subgr,
-                        label = match.call()),
-                   class = 'mvgam_trend')
+  out <- structure(
+    list(
+      trend_model = paste0('AR', p),
+      ma = ma,
+      cor = cor,
+      unit = 'time',
+      gr = gr,
+      subgr = subgr,
+      label = match.call()
+    ),
+    class = 'mvgam_trend'
+  )
+}
+
+#' @rdname RW
+#' @export
+CAR = function(p = 1) {
+  validate_pos_integer(p)
+  if (p > 1) {
+    stop("Argument 'p' must be = 1", call. = FALSE)
+  }
+  out <- structure(
+    list(
+      trend_model = paste0('CAR', p),
+      ma = FALSE,
+      cor = FALSE,
+      unit = 'time',
+      gr = 'NA',
+      subgr = 'series',
+      label = match.call()
+    ),
+    class = 'mvgam_trend'
+  )
+}
+
+#' @rdname RW
+#' @export
+VAR = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA) {
+  # Validate the supplied groupings and correlation argument
+  gr <- deparse0(substitute(gr))
+  subgr <- deparse0(substitute(subgr))
+
+  if (gr == 'NA') {
+    subgr <- 'series'
+  }
+
+  if (gr != 'NA') {
+    if (subgr == 'NA') {
+      stop(
+        'argument "subgr" must be supplied if "gr" is also supplied',
+        call. = FALSE
+      )
+    } else if (subgr == 'series') {
+      stop(
+        'argument "subgr" cannot be set to "series" if "gr" is also supplied',
+        call. = FALSE
+      )
+    } else {
+      cor <- TRUE
+    }
+  }
+
+  out <- structure(
+    list(
+      trend_model = 'VAR',
+      ma = ma,
+      cor = cor,
+      unit = 'time',
+      gr = gr,
+      subgr = subgr,
+      label = match.call()
+    ),
+    class = 'mvgam_trend'
+  )
 }
 
 #' Specify dynamic Gaussian process trends in \pkg{mvgam} models
@@ -294,15 +318,19 @@ VAR = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA){
 #' @rdname GP
 #' @seealso \code{\link[brms]{gp}}
 #' @export
-GP = function(...){
-  out <- structure(list(trend_model = 'GP',
-                        ma = FALSE,
-                        cor = FALSE,
-                        unit = 'time',
-                        gr = 'NA',
-                        subgr = 'series',
-                        label = match.call()),
-                   class = 'mvgam_trend')
+GP = function(...) {
+  out <- structure(
+    list(
+      trend_model = 'GP',
+      ma = FALSE,
+      cor = FALSE,
+      unit = 'time',
+      gr = 'NA',
+      subgr = 'series',
+      label = match.call()
+    ),
+    class = 'mvgam_trend'
+  )
 }
 
 #' Specify piecewise linear or logistic trends in \pkg{mvgam} models
@@ -419,31 +447,36 @@ GP = function(...){
 #'      x = 'Rate change')
 #' }
 #' @export
-PW = function(n_changepoints = 10,
-              changepoint_range = 0.8,
-              changepoint_scale = 0.05,
-              growth = 'linear'){
-
+PW = function(
+  n_changepoints = 10,
+  changepoint_range = 0.8,
+  changepoint_scale = 0.05,
+  growth = 'linear'
+) {
   growth <- match.arg(growth, choices = c('linear', 'logistic'))
   validate_proportional(changepoint_range)
   validate_pos_integer(n_changepoints)
   validate_pos_real(changepoint_scale)
 
   trend_model <- 'PWlinear'
-  if(growth == 'logistic'){
+  if (growth == 'logistic') {
     trend_model = 'PWlogistic'
   }
-  out <- structure(list(trend_model = trend_model,
-                        n_changepoints = n_changepoints,
-                        changepoint_range = changepoint_range,
-                        changepoint_scale = changepoint_scale,
-                        ma = FALSE,
-                        cor = FALSE,
-                        unit = 'time',
-                        gr = 'NA',
-                        subgr = 'series',
-                        label = match.call()),
-                   class = 'mvgam_trend')
+  out <- structure(
+    list(
+      trend_model = trend_model,
+      n_changepoints = n_changepoints,
+      changepoint_range = changepoint_range,
+      changepoint_scale = changepoint_scale,
+      ma = FALSE,
+      cor = FALSE,
+      unit = 'time',
+      gr = 'NA',
+      subgr = 'series',
+      label = match.call()
+    ),
+    class = 'mvgam_trend'
+  )
 }
 
 #' Specify correlated residual processes in \pkg{mvgam}
@@ -546,28 +579,29 @@ PW = function(n_changepoints = 10,
 #'}
 #'
 #' @export
-ZMVN = function(unit = time, gr = NA, subgr = series){
-
+ZMVN = function(unit = time, gr = NA, subgr = series) {
   # Validate the supplied groupings and correlation argument
   unit <- deparse0(substitute(unit))
   gr <- deparse0(substitute(gr))
   subgr <- deparse0(substitute(subgr))
-  if(subgr == 'NA'){
-    stop('argument "subgr" cannot be NA',
-         call. = FALSE)
+  if (subgr == 'NA') {
+    stop('argument "subgr" cannot be NA', call. = FALSE)
   }
 
-  if(unit == 'NA'){
-    stop('argument "unit" cannot be NA',
-         call. = FALSE)
+  if (unit == 'NA') {
+    stop('argument "unit" cannot be NA', call. = FALSE)
   }
 
-  out <- structure(list(trend_model = 'ZMVN',
-                        ma = FALSE,
-                        cor = TRUE,
-                        unit = unit,
-                        gr = gr,
-                        subgr = subgr,
-                        label = match.call()),
-                   class = 'mvgam_trend')
+  out <- structure(
+    list(
+      trend_model = 'ZMVN',
+      ma = FALSE,
+      cor = TRUE,
+      unit = unit,
+      gr = gr,
+      subgr = subgr,
+      label = match.call()
+    ),
+    class = 'mvgam_trend'
+  )
 }

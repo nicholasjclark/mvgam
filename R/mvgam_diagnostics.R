@@ -57,14 +57,15 @@ log_posterior.mvgam <- function(object, ...) {
 rhat.mvgam <- function(x, pars = NULL, ...) {
   # bayesplot uses outdated rhat code from rstan
   # bayesplot::rhat(object$fit, pars = pars, ...)
-  if(is.null(pars)){
+  if (is.null(pars)) {
     vars_extract <- variables(x)
-    draws <- as_draws_array(x,
-                            variable = unlist(purrr::map(vars_extract, 'orig_name')),
-                            use_alias = FALSE)
+    draws <- as_draws_array(
+      x,
+      variable = unlist(purrr::map(vars_extract, 'orig_name')),
+      use_alias = FALSE
+    )
   } else {
-    draws <- as_draws_array(x,
-                            variable = pars)
+    draws <- as_draws_array(x, variable = pars)
   }
 
   tmp <- posterior::summarise_draws(draws, rhat = posterior::rhat)
@@ -79,22 +80,23 @@ rhat.mvgam <- function(x, pars = NULL, ...) {
 #' @export neff_ratio
 #' @export
 neff_ratio.mvgam <- function(object, pars = NULL, ...) {
-  insight::check_if_installed("matrixStats",
-                              reason = 'to calculate effective sample sizes')
+  insight::check_if_installed(
+    "matrixStats",
+    reason = 'to calculate effective sample sizes'
+  )
   # bayesplot uses outdated ess code from rstan
   # bayesplot::neff_ratio(object$fit, pars = pars, ...)
-  if(is.null(pars)){
+  if (is.null(pars)) {
     vars_extract <- unlist(purrr::map(variables(object), 'orig_name'))
     vars_extract <- vars_extract[-grep('ypred', vars_extract)]
-    draws <- as_draws_array(object,
-                            variable = vars_extract,
-                            use_alias = FALSE)
+    draws <- as_draws_array(object, variable = vars_extract, use_alias = FALSE)
   } else {
-    draws <- as_draws_array(object,
-                            variable = pars)
+    draws <- as_draws_array(object, variable = pars)
   }
   tmp <- posterior::summarise_draws(
-    draws, ess_bulk = posterior::ess_bulk, ess_tail = posterior::ess_tail
+    draws,
+    ess_bulk = posterior::ess_bulk,
+    ess_tail = posterior::ess_tail
   )
   # min of ess_bulk and ess_tail mimics definition of posterior::rhat.default
   ess <- matrixStats::rowMins(cbind(tmp$ess_bulk, tmp$ess_tail))

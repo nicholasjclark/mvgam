@@ -57,43 +57,48 @@
 #' plot(fevds)
 #' }
 #'@export
-fevd <- function(object, ...){
+fevd <- function(object, ...) {
   UseMethod("fevd", object)
 }
 
 #'@rdname fevd.mvgam
 #'@method fevd mvgam
 #'@export
-fevd.mvgam <- function(object,
-                      h = 1,
-                      ...){
+fevd.mvgam <- function(object, h = 1, ...) {
   validate_pos_integer(h)
   trend_model <- attr(object$model_data, 'trend_model')
-  if(!trend_model %in% c('VAR', 'VARcor', 'VAR1', 'VAR1cor')){
-    stop('Only VAR(1) models currently supported for calculating FEVDs',
-         call. = FALSE)
+  if (!trend_model %in% c('VAR', 'VARcor', 'VAR1', 'VAR1cor')) {
+    stop(
+      'Only VAR(1) models currently supported for calculating FEVDs',
+      call. = FALSE
+    )
   }
   beta_vars <- mcmc_chains(object$model_output, 'A')
   sigmas <- mcmc_chains(object$model_output, 'Sigma')
   n_series <- object$n_lv
 
-  if(is.null(n_series)){
+  if (is.null(n_series)) {
     n_series <- nlevels(object$obs_data$series)
   }
 
-  all_fevds <- lapply(seq_len(NROW(beta_vars)), function(draw){
-
+  all_fevds <- lapply(seq_len(NROW(beta_vars)), function(draw) {
     # Get necessary VAR parameters into a simple list format
-    x <- list(K = n_series,
-              A = matrix(beta_vars[draw,],
-                         nrow = n_series,
-                         ncol = n_series,
-                         byrow = TRUE),
-              Sigma = matrix(sigmas[draw,],
-                             nrow = n_series,
-                             ncol = n_series,
-                             byrow = TRUE),
-              p = 1)
+    x <- list(
+      K = n_series,
+      A = matrix(
+        beta_vars[draw, ],
+        nrow = n_series,
+        ncol = n_series,
+        byrow = TRUE
+      ),
+      Sigma = matrix(
+        sigmas[draw, ],
+        nrow = n_series,
+        ncol = n_series,
+        byrow = TRUE
+      ),
+      p = 1
+    )
 
     # Calculate the IRF
     gen_fevd(x, h = h)
@@ -107,31 +112,31 @@ fevd.mvgam <- function(object,
 # package https://github.com/cran/vars ####
 #' Forecast error variance decomposition
 #' @noRd
-gen_fevd <- function(x, h = 6, ...){
+gen_fevd <- function(x, h = 6, ...) {
   K <- x$K
   ynames <- paste0('process_', 1:K)
   msey <- var_fecov(x, h = h)
   Psi <- var_psi(x, h = h)
   mse <- matrix(NA, nrow = h, ncol = K)
   Omega <- array(0, dim = c(h, K, K))
-  for(i in 1 : h){
-    mse[i, ] <- diag(msey[, , i])
+  for (i in 1:h) {
+    mse[i, ] <- diag(msey[,, i])
     temp <- matrix(0, K, K)
-    for(l in 1 : K){
-      for(m in 1 : K){
-        for(j in 1 : i){
-          temp[l, m] <- temp[l, m] + Psi[l , m, j]^2
+    for (l in 1:K) {
+      for (m in 1:K) {
+        for (j in 1:i) {
+          temp[l, m] <- temp[l, m] + Psi[l, m, j]^2
         }
       }
     }
     temp <- temp / mse[i, ]
-    for(j in 1 : K){
-      Omega[i, ,j] <- temp[j, ]
+    for (j in 1:K) {
+      Omega[i, , j] <- temp[j, ]
     }
   }
   result <- list()
-  for(i in 1 : K){
-    result[[i]] <- matrix(Omega[, , i], nrow = h, ncol = K)
+  for (i in 1:K) {
+    result[[i]] <- matrix(Omega[,, i], nrow = h, ncol = K)
     colnames(result[[i]]) <- ynames
   }
   names(result) <- ynames
@@ -144,14 +149,14 @@ gen_fevd <- function(x, h = 6, ...){
 var_fecov = function(x, h) {
   sigma_yh <- array(NA, dim = c(x$K, x$K, h))
   Phi <- var_phi(x, h = h)
-  sigma_yh[, , 1] <- Phi[, , 1] %*% t(Phi[, , 1])
+  sigma_yh[,, 1] <- Phi[,, 1] %*% t(Phi[,, 1])
   if (h > 1) {
     for (i in 2:h) {
       temp <- matrix(0, nrow = x$K, ncol = x$K)
       for (j in 2:i) {
-        temp <- temp + Phi[, , j] %*% t(Phi[, , j])
+        temp <- temp + Phi[,, j] %*% t(Phi[,, j])
       }
-      sigma_yh[, , i] <- temp + sigma_yh[, , 1]
+      sigma_yh[,, i] <- temp + sigma_yh[,, 1]
     }
   }
   return(sigma_yh)
