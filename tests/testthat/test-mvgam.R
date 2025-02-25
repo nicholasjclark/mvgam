@@ -284,25 +284,20 @@ test_that("implicit_vars are added correctly", {
   no_series <- simdat$data_train
   no_series$series <- NULL
 
-  mod <- mvgam(y ~ s(season, bs = 'cc'),
-               data = no_series,
-               run_model = FALSE)
-  expect_equal('series',
-               attr(mod$obs_data, 'implicit_vars'))
+  mod <- mvgam(y ~ s(season, bs = 'cc'), data = no_series, run_model = FALSE)
+  expect_equal('series', attr(mod$obs_data, 'implicit_vars'))
 
-  mod <- SM(mvgam(y ~ 1,
-                  trend_formula = ~ s(season),
-                  data = no_series,
-                  run_model = FALSE))
-  expect_equal('series',
-               attr(mod$obs_data, 'implicit_vars'))
+  mod <- SM(mvgam(
+    y ~ 1,
+    trend_formula = ~ s(season),
+    data = no_series,
+    run_model = FALSE
+  ))
+  expect_equal('series', attr(mod$obs_data, 'implicit_vars'))
 
   no_series$time <- NULL
-  mod <- mvgam(y ~ s(season, bs = 'cc'),
-               data = no_series,
-               run_model = FALSE)
-  expect_equal(c('series', 'time'),
-               attr(mod$obs_data, 'implicit_vars'))
+  mod <- mvgam(y ~ s(season, bs = 'cc'), data = no_series, run_model = FALSE)
+  expect_equal(c('series', 'time'), attr(mod$obs_data, 'implicit_vars'))
 })
 
 test_that("trend = 'None' works for State Space", {
