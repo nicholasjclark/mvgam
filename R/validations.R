@@ -774,7 +774,6 @@ validate_pos_integers = function(x) {
 
 #'@noRd
 validate_predictors = function(object, newdata) {
-
   # Check names of supplied variables against those required
   # for prediction
   required_vars <- insight::find_predictors(
@@ -791,7 +790,6 @@ validate_predictors = function(object, newdata) {
   # no trend_model
   if (!inherits(object$trend_model, 'mvgam_trend')) {
     if (object$trend_model == 'None') {
-
       # Find all predictor terms that were used by the model
       obs_preds <- insight::find_predictors(
         object$mgcv_model,
@@ -816,14 +814,16 @@ validate_predictors = function(object, newdata) {
 
       # If time and series not used as predictors, no need for them
       # to be in required_vars
-      if ('time' %in% required_vars &
-          !'time' %in% preds) {
+      if ('time' %in% required_vars & !'time' %in% preds) {
         required_vars <- setdiff(required_vars, 'time')
       }
 
-      if ('series' %in% required_vars &
+      if (
+        'series' %in%
+          required_vars &
           !'series' %in% preds &
-          (!object$use_lv | is.null(object$trend_call))) {
+          (!object$use_lv | is.null(object$trend_call))
+      ) {
         required_vars <- setdiff(required_vars, 'series')
       }
     }
