@@ -1052,11 +1052,14 @@ pp_check.mvgam <- function(
   if (prefix == "ppc") {
     # No type checking for prefix 'ppd' yet
     valid_types <- sort(
-      c(as.character(bayesplot::available_ppc("")),
+      c(
+        as.character(bayesplot::available_ppc("")),
         'ppc_resid_hist',
         'ppc_resid_hist_grouped',
         'ppc_resid_ribbon',
-        'ppc_resid_ribbon_grouped'))
+        'ppc_resid_ribbon_grouped'
+      )
+    )
     valid_types <- sub("^ppc_", "", valid_types)
     if (!type %in% valid_types) {
       stop(
@@ -1072,24 +1075,21 @@ pp_check.mvgam <- function(
 
   bptype <- type
 
-  if(bptype %in% c('resid_hist',
-                   'resid_hist_grouped')){
+  if (bptype %in% c('resid_hist', 'resid_hist_grouped')) {
     if (is.null(object$resids)) {
       object <- add_residuals(object)
     }
     bptype <- sub('resid', 'error', bptype)
   }
 
-  if(bptype %in% c('resid_ribbon',
-                   'resid_ribbon_grouped')){
+  if (bptype %in% c('resid_ribbon', 'resid_ribbon_grouped')) {
     if (is.null(object$resids)) {
       object <- add_residuals(object)
     }
     bptype <- sub('resid_', '', bptype)
   }
 
-  ppc_fun <- get(paste0(prefix, "_", bptype),
-                 asNamespace("bayesplot"))
+  ppc_fun <- get(paste0(prefix, "_", bptype), asNamespace("bayesplot"))
 
   family <- object$family
   if (family == 'nmix') {
@@ -1179,7 +1179,7 @@ pp_check.mvgam <- function(
     y[!is.na(y)] <- 0
     yrep <- t(-1 * residuals(object, summary = FALSE))
 
-    if (!is.null(ndraws)){
+    if (!is.null(ndraws)) {
       yrep <- yrep[1:ndraws, ]
     }
   } else {
@@ -1191,7 +1191,6 @@ pp_check.mvgam <- function(
     )
     yrep <- do_call(method, pred_args)
   }
-
 
   if (anyNA(y)) {
     warning("NA responses are not shown in 'pp_check'.")
@@ -1263,14 +1262,12 @@ pp_check.mvgam <- function(
   }
 
   # Improve labels for residual plots
-  if(type %in% c('resid_hist',
-                 'resid_hist_grouped')) {
+  if (type %in% c('resid_hist', 'resid_hist_grouped')) {
     out_plot <- out_plot +
       ggplot2::labs(x = 'DS residuals')
   }
 
-  if(type %in% c('resid_ribbon',
-                 'resid_ribbon_grouped')) {
+  if (type %in% c('resid_ribbon', 'resid_ribbon_grouped')) {
     out_plot <- out_plot +
       ggplot2::theme(legend.position = 'none') +
       ggplot2::labs(y = 'DS residuals')
