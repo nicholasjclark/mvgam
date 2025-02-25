@@ -101,5 +101,16 @@ utils::globalVariables(c(
   "yhigh",
   "ylow",
   "weight",
-  "orig_weight"
+  "orig_weight",
+  "imp_resp",
+  "lower1",
+  "lower2",
+  "lower3",
+  "lower4",
+  "med",
+  "resp_var",
+  "upper1",
+  "upper2",
+  "upper3",
+  "upper4"
 ))

@@ -773,6 +773,79 @@ validate_pos_integers = function(x) {
 }
 
 #'@noRd
+validate_predictors = function(object, newdata) {
+
+  # Check names of supplied variables against those required
+  # for prediction
+  required_vars <- insight::find_predictors(
+    object,
+    component = "all"
+  )$conditional
+  required_vars <- setdiff(
+    required_vars,
+    attr(object$obs_data, 'implicit_vars')
+  )
+
+  # If time and / or series were in original data but not used,
+  # there is no need for them in the newdata for models with
+  # no trend_model
+  if (!inherits(object$trend_model, 'mvgam_trend')) {
+    if (object$trend_model == 'None') {
+
+      # Find all predictor terms that were used by the model
+      obs_preds <- insight::find_predictors(
+        object$mgcv_model,
+        effects = 'all',
+        component = 'all',
+        flatten = TRUE
+      )
+
+      trend_preds <- vector()
+      if (!is.null(object$trend_call)) {
+        trend_preds <- insight::find_predictors(
+          object$trend_mgcv_model,
+          effects = 'all',
+          component = 'all',
+          flatten = TRUE
+        )
+
+        preds <- unique(c(obs_preds, trend_preds))
+      } else {
+        preds <- obs_preds
+      }
+
+      # If time and series not used as predictors, no need for them
+      # to be in required_vars
+      if ('time' %in% required_vars &
+          !'time' %in% preds) {
+        required_vars <- setdiff(required_vars, 'time')
+      }
+
+      if ('series' %in% required_vars &
+          !'series' %in% preds &
+          (!object$use_lv | is.null(object$trend_call))) {
+        required_vars <- setdiff(required_vars, 'series')
+      }
+    }
+  }
+
+  if (length(required_vars)) {
+    if (any(required_vars %in% names(newdata) == FALSE)) {
+      stop(
+        paste0(
+          'the following required variables are missing from newdata:\n ',
+          paste(
+            required_vars[which(!required_vars %in% names(newdata))],
+            collapse = ', '
+          )
+        ),
+        call. = FALSE
+      )
+    }
+  }
+}
+
+#'@noRd
 validate_even <- function(x) {
   s <- substitute(x)
   x <- base::suppressWarnings(as.numeric(x))

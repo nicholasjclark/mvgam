@@ -111,29 +111,7 @@ predict.mvgam = function(
 
   # Check names of supplied variables against those required
   # for prediction
-  required_vars <- insight::find_predictors(
-    object,
-    component = "all"
-  )$conditional
-  required_vars <- setdiff(
-    required_vars,
-    attr(object$obs_data, 'implicit_vars')
-  )
-
-  if (length(required_vars)) {
-    if (any(required_vars %in% names(newdata) == FALSE)) {
-      stop(
-        paste0(
-          'the following required variables are missing from newdata:\n ',
-          paste(
-            required_vars[which(!required_vars %in% names(newdata))],
-            collapse = ', '
-          )
-        ),
-        call. = FALSE
-      )
-    }
-  }
+  validate_predictors(object, newdata)
 
   # newdata needs to have a 'series' indicator in it for integrating
   # over the trend uncertainties
