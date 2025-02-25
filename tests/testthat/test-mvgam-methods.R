@@ -134,6 +134,12 @@ test_that("pp_check and ppc work properly", {
   ))))
   expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example2, "stat", ndraws = 5))))
   expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example3, "error_binned"))))
+  expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example3, "resid_hist",
+                               ndraws = 5))))
+  expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example1,
+                               ndraws = 5,
+                               type = 'resid_hist_grouped',
+                               group = 'series'))))
   pp <- SW(SM(pp_check(
     object = mvgam:::mvgam_example4,
     type = "ribbon_grouped",

@@ -946,6 +946,7 @@ ppc.mvgam = function(
 #' @param newdata Optional \code{dataframe} or \code{list} of test data containing the
 #' variables included in the linear predictor of \code{formula}. If not supplied,
 #' predictions are generated for the original observations used for the model fit.
+#' Ignored if using one of the residual plots (i.e. 'resid_hist')
 #' @param ... Further arguments passed to \code{\link{predict.mvgam}}
 #'   as well as to the PPC function specified in \code{type}.
 #' @inheritParams brms::prepare_predictions.brmsfit
@@ -987,11 +988,24 @@ ppc.mvgam = function(
 #'pp_check(mod, type = "stat_freqpoly_grouped",
 #'         group = "series", ndraws = 50)
 #'
+#'# Several types can be used to plot distributions of randomized
+#'# quantile residuals
+#'pp_check(object = mod,
+#'         x = 'season',
+#'         type = "resid_ribbon")
+#'pp_check(object = mod,
+#'         x = 'season',
+#'         group = 'series',
+#'         type = "resid_ribbon_grouped")
+#'pp_check(mod,
+#'         ndraws = 5,
+#'         type = 'resid_hist_grouped',
+#'         group = 'series')
+#'
 #'# Custom functions accepted
-#'prop_zero <- function(x) mean(x == 0)
-#'pp_check(mod, type = "stat", stat = "prop_zero")
+#'pp_check(mod, type = "stat", stat = function(x) mean(x == 0))
 #'pp_check(mod, type = "stat_grouped",
-#'         stat = "prop_zero",
+#'         stat = function(x) mean(x == 0),
 #'         group = "series")
 #'
 #'# Some functions accept covariates to set the x-axes
@@ -1037,7 +1051,12 @@ pp_check.mvgam <- function(
 
   if (prefix == "ppc") {
     # No type checking for prefix 'ppd' yet
-    valid_types <- as.character(bayesplot::available_ppc(""))
+    valid_types <- sort(
+      c(as.character(bayesplot::available_ppc("")),
+        'ppc_resid_hist',
+        'ppc_resid_hist_grouped',
+        'ppc_resid_ribbon',
+        'ppc_resid_ribbon_grouped'))
     valid_types <- sub("^ppc_", "", valid_types)
     if (!type %in% valid_types) {
       stop(
@@ -1050,7 +1069,27 @@ pp_check.mvgam <- function(
       )
     }
   }
-  ppc_fun <- get(paste0(prefix, "_", type), asNamespace("bayesplot"))
+
+  bptype <- type
+
+  if(bptype %in% c('resid_hist',
+                   'resid_hist_grouped')){
+    if (is.null(object$resids)) {
+      object <- add_residuals(object)
+    }
+    bptype <- sub('resid', 'error', bptype)
+  }
+
+  if(bptype %in% c('resid_ribbon',
+                   'resid_ribbon_grouped')){
+    if (is.null(object$resids)) {
+      object <- add_residuals(object)
+    }
+    bptype <- sub('resid_', '', bptype)
+  }
+
+  ppc_fun <- get(paste0(prefix, "_", bptype),
+                 asNamespace("bayesplot"))
 
   family <- object$family
   if (family == 'nmix') {
@@ -1134,13 +1173,25 @@ pp_check.mvgam <- function(
     y <- newdata[[out_name]]
   }
 
-  pred_args <- list(
-    object,
-    newdata = newdata,
-    ndraws = ndraws,
-    ...
-  )
-  yrep <- do_call(method, pred_args)
+  # For plotting DS residuals, set y to zero and take
+  # -1 * residual so that errors are in the correct direction
+  if (grepl('resid', type)) {
+    y[!is.na(y)] <- 0
+    yrep <- t(-1 * residuals(object, summary = FALSE))
+
+    if (!is.null(ndraws)){
+      yrep <- yrep[1:ndraws, ]
+    }
+  } else {
+    pred_args <- list(
+      object,
+      newdata = newdata,
+      ndraws = ndraws,
+      ...
+    )
+    yrep <- do_call(method, pred_args)
+  }
+
 
   if (anyNA(y)) {
     warning("NA responses are not shown in 'pp_check'.")
@@ -1203,10 +1254,29 @@ pp_check.mvgam <- function(
   for_pred <- names(dots) %in% names(formals(posterior_predict.mvgam))
   ppc_args <- c(ppc_args, dots[!for_pred])
 
-  # Generate plot and reset colour scheme
+  # Generate plot
   out_plot <- do_call(ppc_fun, ppc_args)
-  color_scheme_set(col_scheme)
 
-  # Return the plot
+  if ("x" %in% names(formals(ppc_fun)) && !is.null(x)) {
+    out_plot <- out_plot +
+      ggplot2::labs(x = x)
+  }
+
+  # Improve labels for residual plots
+  if(type %in% c('resid_hist',
+                 'resid_hist_grouped')) {
+    out_plot <- out_plot +
+      ggplot2::labs(x = 'DS residuals')
+  }
+
+  if(type %in% c('resid_ribbon',
+                 'resid_ribbon_grouped')) {
+    out_plot <- out_plot +
+      ggplot2::theme(legend.position = 'none') +
+      ggplot2::labs(y = 'DS residuals')
+  }
+
+  # Reset color scheme and return the plot
+  color_scheme_set(col_scheme)
   return(out_plot)
 }

@@ -46,7 +46,8 @@ and ignored otherwise.}
 
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the
 variables included in the linear predictor of \code{formula}. If not supplied,
-predictions are generated for the original observations used for the model fit.}
+predictions are generated for the original observations used for the model fit.
+Ignored if using one of the residual plots (i.e. 'resid_hist')}
 
 \item{...}{Further arguments passed to \code{\link{predict.mvgam}}
 as well as to the PPC function specified in \code{type}.}
@@ -94,11 +95,24 @@ pp_check(mod, type = "ecdf_overlay_grouped",
 pp_check(mod, type = "stat_freqpoly_grouped",
         group = "series", ndraws = 50)
 
+# Several types can be used to plot distributions of randomized
+# quantile residuals
+pp_check(object = mod,
+        x = 'season',
+        type = "resid_ribbon")
+pp_check(object = mod,
+        x = 'season',
+        group = 'series',
+        type = "resid_ribbon_grouped")
+pp_check(mod,
+        ndraws = 5,
+        type = 'resid_hist_grouped',
+        group = 'series')
+
 # Custom functions accepted
-prop_zero <- function(x) mean(x == 0)
-pp_check(mod, type = "stat", stat = "prop_zero")
+pp_check(mod, type = "stat", stat = function(x) mean(x == 0))
 pp_check(mod, type = "stat_grouped",
-        stat = "prop_zero",
+        stat = function(x) mean(x == 0),
         group = "series")
 
 # Some functions accept covariates to set the x-axes

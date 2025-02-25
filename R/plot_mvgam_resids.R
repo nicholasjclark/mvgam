@@ -74,7 +74,9 @@ plot_mvgam_resids = function(
   resid_df <- do.call(
     rbind,
     lapply(seq_len(n_samps), function(x) {
-      data.frame(preds = hcs[x, ], resids = resids[x, ], .draw = x) %>%
+      data.frame(preds = hcs[x, ],
+                 resids = resids[x, ],
+                 .draw = x) %>%
         dplyr::filter(!is.na(resids))
     })
   )
@@ -82,12 +84,21 @@ plot_mvgam_resids = function(
   # Plot predictions and residuals (but limit number of points to n_points to
   # speed up plotting)
   if (NROW(resid_df) > n_points) {
-    resid_df <- resid_df[sample(1:NROW(resid_df), n_points, replace = FALSE), ]
+    resid_df <- resid_df[sample(1:NROW(resid_df),
+                                n_points,
+                                replace = FALSE), ]
   }
 
-  fvr_plot <- ggplot2::ggplot(resid_df, ggplot2::aes(preds, resids)) +
-    ggplot2::geom_point(shape = 16, col = 'white', size = 1.25, alpha = 0.4) +
-    ggplot2::geom_point(shape = 16, col = 'black', size = 1, alpha = 0.4) +
+  fvr_plot <- ggplot2::ggplot(resid_df,
+                              ggplot2::aes(preds, resids)) +
+    ggplot2::geom_point(shape = 16,
+                        col = 'white',
+                        size = 1.25,
+                        alpha = 0.4) +
+    ggplot2::geom_point(shape = 16,
+                        col = 'black',
+                        size = 1,
+                        alpha = 0.4) +
     ggplot2::geom_smooth(
       method = "gam",
       formula = y ~ s(x, bs = "cs"),
@@ -102,10 +113,18 @@ plot_mvgam_resids = function(
     ggplot2::theme_bw()
 
   # Q-Q plot
-  qq_plot <- ggplot2::ggplot(resid_df, ggplot2::aes(sample = resids)) +
-    ggplot2::stat_qq_line(colour = "#8F2727", linewidth = 1) +
-    ggplot2::stat_qq(shape = 16, col = 'white', size = 1.25, alpha = 0.4) +
-    ggplot2::stat_qq(shape = 16, col = 'black', size = 1, alpha = 0.4) +
+  qq_plot <- ggplot2::ggplot(resid_df,
+                             ggplot2::aes(sample = resids)) +
+    ggplot2::stat_qq_line(colour = "#8F2727",
+                          linewidth = 1) +
+    ggplot2::stat_qq(shape = 16,
+                     col = 'white',
+                     size = 1.25,
+                     alpha = 0.4) +
+    ggplot2::stat_qq(shape = 16,
+                     col = 'black',
+                     size = 1,
+                     alpha = 0.4) +
     ggplot2::labs(
       title = "Normal Q-Q Plot",
       x = "Theoretical Quantiles",
@@ -117,7 +136,9 @@ plot_mvgam_resids = function(
   acf_stats <- do.call(
     rbind,
     lapply(seq_len(n_samps), function(x) {
-      acf_calc <- acf(resids[x, ], plot = FALSE, na.action = na.pass)
+      acf_calc <- acf(resids[x, ],
+                      plot = FALSE,
+                      na.action = na.pass)
       data.frame(
         acf = acf_calc$acf[,, 1],
         lag = acf_calc$lag[, 1, 1],
@@ -137,14 +158,18 @@ plot_mvgam_resids = function(
     ) %>%
     dplyr::select(-acf) %>%
     dplyr::distinct()
-  acf_plot <- ggplot2::ggplot(acf_stats, ggplot2::aes(x = lag)) +
+
+  acf_plot <- ggplot2::ggplot(acf_stats,
+                              ggplot2::aes(x = lag)) +
     ggplot2::geom_hline(
       yintercept = c(-1, 1) *
         qnorm((1 + 0.95) / 2) /
         acf_stats$denom[1],
       linetype = "dashed"
     ) +
-    ggplot2::geom_hline(yintercept = 0, colour = "#7C0000", linewidth = 0.25) +
+    ggplot2::geom_hline(yintercept = 0,
+                        colour = "#7C0000",
+                        linewidth = 0.25) +
     ggplot2::geom_segment(
       colour = "#DCBCBC",
       linewidth = 1.5,
@@ -160,7 +185,9 @@ plot_mvgam_resids = function(
       linewidth = 1.5,
       ggplot2::aes(y = ymidlow, yend = ymidhigh)
     ) +
-    ggplot2::labs(title = "ACF", x = "Lag", y = "Autocorrelation") +
+    ggplot2::labs(title = "ACF",
+                  x = "Lag",
+                  y = "Autocorrelation") +
     ggplot2::theme_bw()
 
   # PACF plot
@@ -188,14 +215,17 @@ plot_mvgam_resids = function(
     dplyr::select(-pacf) %>%
     dplyr::distinct()
 
-  pacf_plot <- ggplot2::ggplot(pacf_stats, ggplot2::aes(x = lag)) +
+  pacf_plot <- ggplot2::ggplot(pacf_stats,
+                               ggplot2::aes(x = lag)) +
     ggplot2::geom_hline(
       yintercept = c(-1, 1) *
         qnorm((1 + 0.95) / 2) /
         pacf_stats$denom[1],
       linetype = "dashed"
     ) +
-    ggplot2::geom_hline(yintercept = 0, colour = "#7C0000", linewidth = 0.25) +
+    ggplot2::geom_hline(yintercept = 0,
+                        colour = "#7C0000",
+                        linewidth = 0.25) +
     ggplot2::geom_segment(
       colour = "#DCBCBC",
       linewidth = 1.5,
@@ -211,7 +241,9 @@ plot_mvgam_resids = function(
       linewidth = 1.5,
       ggplot2::aes(y = ymidlow, yend = ymidhigh)
     ) +
-    ggplot2::labs(title = "pACF", x = "Lag", y = "Partial autocorrelation") +
+    ggplot2::labs(title = "pACF",
+                  x = "Lag",
+                  y = "Partial autocorrelation") +
     ggplot2::theme_bw()
 
   # return
@@ -222,6 +254,6 @@ plot_mvgam_resids = function(
     pacf_plot,
     ncol = 2,
     nrow = 2,
-    byrow = T
+    byrow = TRUE
   )
 }
