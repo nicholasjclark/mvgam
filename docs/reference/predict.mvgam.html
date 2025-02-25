@@ -69,7 +69,7 @@
 <span>  <span class="va">newdata</span>,</span>
 <span>  <span class="va">data_test</span>,</span>
 <span>  type <span class="op">=</span> <span class="st">"link"</span>,</span>
-<span>  process_error <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  process_error <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  summary <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  robust <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  probs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.025</span>, <span class="fl">0.975</span><span class="op">)</span>,</span>
@@ -216,26 +216,26 @@ that respect the temporal dynamics of estimated latent trends.</p>
 <span class="r-in"><span><span class="va">preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">mod1</span>,</span></span>
 <span class="r-in"><span>                summary <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">preds</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           Estimate Est.Error       Q2.5     Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,]  0.0002906938 0.3705704 -0.7611124 0.8041771</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,]  0.0036924887 0.8284110 -1.5735094 1.7219618</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.0201577509 0.4199981 -0.8843191 0.8698579</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -0.2239473539 0.3626919 -1.0379353 0.5618885</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,] -0.1851818303 0.8774613 -1.8794285 1.6717419</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,] -0.2275220269 0.4284804 -1.0421689 0.6681596</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate Est.Error       Q2.5       Q97.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] -0.004792439 0.1100971 -0.2554910  0.20130427</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] -0.004792439 0.1100971 -0.2554910  0.20130427</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.004792439 0.1100971 -0.2554910  0.20130427</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -0.217605056 0.1047161 -0.4358171 -0.03374743</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,] -0.217605056 0.1047161 -0.4358171 -0.03374743</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,] -0.217605056 0.1047161 -0.4358171 -0.03374743</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Generate predictions against test data</span></span></span>
 <span class="r-in"><span><span class="va">preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">mod1</span>,</span></span>
 <span class="r-in"><span>                newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
 <span class="r-in"><span>                summary <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">preds</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>        Estimate Est.Error       Q2.5     Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] -0.1621517 0.3789487 -0.9799020 0.6337092</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] -0.1583889 0.8513174 -2.0373712 1.5500787</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.1530323 0.4133948 -0.9513051 0.7316484</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  0.2887284 0.3632889 -0.4414749 1.0365701</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  0.3179825 0.8652411 -1.3531590 1.9728915</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  0.2899913 0.4352916 -0.5540418 1.2478948</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>        Estimate Est.Error        Q2.5      Q97.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] -0.1711986 0.1085784 -0.38794662 0.02847842</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] -0.1711986 0.1085784 -0.38794662 0.02847842</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.1711986 0.1085784 -0.38794662 0.02847842</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  0.2894259 0.1312018  0.03487911 0.54980798</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  0.2894259 0.1312018  0.03487911 0.54980798</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  0.2894259 0.1312018  0.03487911 0.54980798</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

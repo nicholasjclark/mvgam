@@ -9,7 +9,7 @@
   newdata,
   data_test,
   type = "link",
-  process_error = TRUE,
+  process_error = FALSE,
   summary = TRUE,
   robust = FALSE,
   probs = c(0.025, 0.975),

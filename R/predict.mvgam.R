@@ -95,7 +95,7 @@ predict.mvgam = function(
   newdata,
   data_test,
   type = 'link',
-  process_error = TRUE,
+  process_error = FALSE,
   summary = TRUE,
   robust = FALSE,
   probs = c(0.025, 0.975),
@@ -390,7 +390,7 @@ predict.mvgam = function(
         trend_predictions <- as.vector(trend_predictions)
       }
 
-      if (!object$use_lv) {
+      if (!object$use_lv | !is.null(object$trend_map)) {
         if (
           attr(object$model_data, 'trend_model') %in%
             c('RW', 'AR1', 'AR2', 'AR3', 'VAR1', 'CAR1', 'ZMVN')
