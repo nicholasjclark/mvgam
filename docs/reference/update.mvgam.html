@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -111,36 +111,55 @@ to be supplied</p></dd>
 
 
 <dt id="arg-trend-formula">trend_formula<a class="anchor" aria-label="anchor" href="#arg-trend-formula"></a></dt>
-<dd><p>An optional <code>formula</code> object specifying the GAM process model formula. If
-supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
-separately from the observation model. Should not have a response variable specified on the left-hand side
-of the formula (i.e. a valid option would be <code>~ season + s(year)</code>). Also note that you should not use
-the identifier <code>series</code> in this formula to specify effects that vary across time series. Instead you should use
-<code>trend</code>. This will ensure that models in which a <code>trend_map</code> is supplied will still work consistently
-(i.e. by allowing effects to vary across process models, even when some time series share the same underlying
-process model). This feature is only currently available for <code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code> and <code><a href="RW.html">VAR()</a></code> trend models.
-In <code><a href="mvgam_families.html">nmix()</a></code> family models, the <code>trend_formula</code> is used to set up a linear predictor for the underlying
-latent abundance. Be aware that it can be very challenging to simultaneously estimate intercept parameters
-for both the observation mode (captured by <code>formula</code>) and the process model (captured by <code>trend_formula</code>).
-Users are recommended to drop one of these using the <code>- 1</code> convention in the formula right hand side.</p></dd>
+<dd><p>An optional <code>formula</code> object specifying the GAM
+process model formula. If
+supplied, a linear predictor will be modelled for the latent trends to capture
+process model evolution
+separately from the observation model. Should not have a response variable
+specified on the left-hand side
+of the formula (i.e. a valid option would be <code>~ season + s(year)</code>). Also note
+that you should not use
+the identifier <code>series</code> in this formula to specify effects that vary across
+time series. Instead you should use
+<code>trend</code>. This will ensure that models in which a <code>trend_map</code> is supplied will
+still work consistently
+(i.e. by allowing effects to vary across process models, even when some time
+series share the same underlying
+process model). This feature is only currently available for <code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code>
+and <code><a href="RW.html">VAR()</a></code> trend models.
+In <code><a href="mvgam_families.html">nmix()</a></code> family models, the <code>trend_formula</code> is used to set up a linear
+predictor for the underlying
+latent abundance. Be aware that it can be very challenging to simultaneously
+estimate intercept parameters
+for both the observation mode (captured by <code>formula</code>) and the process model
+(captured by <code>trend_formula</code>).
+Users are recommended to drop one of these using the <code>- 1</code> convention in the
+formula right hand side.</p></dd>
 
 
 <dt id="arg-knots">knots<a class="anchor" aria-label="anchor" href="#arg-knots"></a></dt>
-<dd><p>An optional <code>list</code> containing user specified knot values to be used for basis construction.
-For most bases the user simply supplies the knots to be used, which must match up with the <code>k</code> value supplied
-(note that the number of knots is not always just <code>k</code>). Different terms can use different numbers of knots,
+<dd><p>An optional <code>list</code> containing user specified knot values to
+be used for basis construction.
+For most bases the user simply supplies the knots to be used, which must match
+up with the <code>k</code> value supplied
+(note that the number of knots is not always just <code>k</code>). Different terms can
+use different numbers of knots,
 unless they share a covariate</p></dd>
 
 
 <dt id="arg-trend-knots">trend_knots<a class="anchor" aria-label="anchor" href="#arg-trend-knots"></a></dt>
-<dd><p>As for <code>knots</code> above, this is an optional <code>list</code> of knot values for smooth
+<dd><p>As for <code>knots</code> above, this is an optional <code>list</code> of
+knot values for smooth
 functions within the <code>trend_formula</code></p></dd>
 
 
 <dt id="arg-trend-model">trend_model<a class="anchor" aria-label="anchor" href="#arg-trend-model"></a></dt>
-<dd><p><code>character</code> or  <code>function</code> specifying the time series dynamics for the latent trend. Options are:</p><ul><li><p><code>None</code> (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-and the observation process is the only source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>)</p></li>
-<li><p><code>ZMVN</code> or <code><a href="ZMVN.html">ZMVN()</a></code> (Zero-Mean Multivariate Normal; only available in <code>Stan</code>)</p></li>
+<dd><p><code>character</code> or  <code>function</code> specifying the time
+series dynamics for the latent trend. Options are:</p><ul><li><p><code>None</code> (no latent trend component; i.e. the GAM component is all that
+contributes to the linear predictor, and the observation process is the only
+source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>)</p></li>
+<li><p><code>ZMVN</code> or <code><a href="ZMVN.html">ZMVN()</a></code> (Zero-Mean Multivariate Normal; only available in
+<code>Stan</code>)</p></li>
 <li><p><code>'RW'</code> or <code><a href="RW.html">RW()</a></code></p></li>
 <li><p><code>'AR1'</code> or <code>AR(p = 1)</code></p></li>
 <li><p><code>'AR2'</code> or <code>AR(p = 2)</code></p></li>
@@ -150,15 +169,17 @@ and the observation process is the only source of error; similarly to what is es
 <li><p><code>'PWlogistic</code>, <code>'PWlinear'</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
 <li><p><code>'GP'</code> or <code><a href="GP.html">GP()</a></code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
-</ul><p>For all trend types apart from <code><a href="ZMVN.html">ZMVN()</a></code>, <code><a href="GP.html">GP()</a></code>, <code><a href="RW.html">CAR()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
-process error terms can also be estimated (for example, <code>RW(cor = TRUE)</code> will set up a
-multivariate Random Walk if <code>n_series &gt; 1</code>). It is also possible for many multivariate trends
-to estimate hierarchical correlations if the data are structured among levels of
-a relevant grouping factor. See <a href="mvgam_trends.html">mvgam_trends</a> for more details and see <a href="ZMVN.html">ZMVN</a> for an example.</p></dd>
+</ul><p>For all trend types apart from <code><a href="ZMVN.html">ZMVN()</a></code>, <code><a href="GP.html">GP()</a></code>, <code><a href="RW.html">CAR()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving
+average and/or correlated process error terms can also be estimated (for
+example, <code>RW(cor = TRUE)</code> will set up a multivariate Random Walk if <code>n_series &gt; 1</code>).
+It is also possible for many multivariate trends to estimate hierarchical
+correlations if the data are structured among levels of a relevant grouping
+factor. See <a href="mvgam_trends.html">mvgam_trends</a> for more details and see <a href="ZMVN.html">ZMVN</a> for an example.</p></dd>
 
 
 <dt id="arg-family">family<a class="anchor" aria-label="anchor" href="#arg-family"></a></dt>
-<dd><p><code>family</code> specifying the exponential observation family for the series. Currently supported
+<dd><p><code>family</code> specifying the exponential observation family for
+the series. Currently supported
 families are:</p><ul><li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code> for real-valued data</p></li>
 <li><p><code><a href="mvgam_families.html">betar()</a></code> for proportional data on <code>(0,1)</code></p></li>
 <li><p><code><a href="mvgam_families.html">lognormal()</a></code> for non-negative real-valued data</p></li>
@@ -167,12 +188,14 @@ families are:</p><ul><li><p><code><a href="https://rdrr.io/r/stats/family.html" 
 <li><p><code><a href="mvgam_families.html">bernoulli()</a></code> for binary data</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> for count data</p></li>
 <li><p><code><a href="mvgam_families.html">nb()</a></code> for overdispersed count data</p></li>
-<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> for count data with imperfect detection when the number of trials is known;
-note that the <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind()</a></code> function must be used to bind the discrete observations and the discrete number
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> for count data with imperfect detection when the number
+of trials is known;
+note that the <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind()</a></code> function must be used to bind the discrete
+observations and the discrete number
 of trials</p></li>
 <li><p><code><a href="mvgam_families.html">beta_binomial()</a></code> as for <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> but allows for overdispersion</p></li>
-<li><p><code><a href="mvgam_families.html">nmix()</a></code> for count data with imperfect detection when the number of trials
-is unknown and should be modeled via a State-Space N-Mixture model.
+<li><p><code><a href="mvgam_families.html">nmix()</a></code> for count data with imperfect detection when the number of
+trials is unknown and should be modeled via a State-Space N-Mixture model.
 The latent states are Poisson, capturing the 'true' latent
 abundance, while the observation process is Binomial to account for
 imperfect detection.
@@ -183,48 +206,69 @@ See <code><a href="mvgam_families.html">mvgam_families</a></code> for more detai
 
 <dt id="arg-share-obs-params">share_obs_params<a class="anchor" aria-label="anchor" href="#arg-share-obs-params"></a></dt>
 <dd><p><code>logical</code>. If <code>TRUE</code> and the <code>family</code>
-has additional family-specific observation parameters (e.g. variance components in
-<code><a href="mvgam_families.html">student_t()</a></code> or <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>, or dispersion parameters in <code><a href="mvgam_families.html">nb()</a></code> or <code><a href="mvgam_families.html">betar()</a></code>),
-these parameters will be shared across all outcome variables. This is handy if you have multiple
-outcomes (time series in most <code>mvgam</code> models) that you believe share some properties,
-such as being from the same species over different spatial units. Default is <code>FALSE</code>.</p></dd>
+has additional family-specific observation parameters (e.g. variance
+components in
+<code><a href="mvgam_families.html">student_t()</a></code> or <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>, or dispersion parameters in <code><a href="mvgam_families.html">nb()</a></code> or
+<code><a href="mvgam_families.html">betar()</a></code>), these parameters will be shared across all outcome variables. This is handy
+if you have multiple outcomes (time series in most <code>mvgam</code> models) that you
+believe share some properties,
+such as being from the same species over different spatial units. Default is
+<code>FALSE</code>.</p></dd>
 
 
 <dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
-<dd><p>A <code>dataframe</code> or <code>list</code> containing the model response variable and covariates
-required by the GAM <code>formula</code> and optional <code>trend_formula</code>. Most models should include columns:</p><ul><li><p><code>series</code> (a <code>factor</code> index of the series IDs; the number of levels should be identical
+<dd><p>A <code>dataframe</code> or <code>list</code> containing the model response
+variable and covariates
+required by the GAM <code>formula</code> and optional <code>trend_formula</code>. Most
+models should include columns:</p><ul><li><p><code>series</code> (a <code>factor</code> index of the series IDs; the number of
+levels should be identical
 to the number of unique series labels (i.e. <code>n_series = length(levels(data$series))</code>))</p></li>
-<li><p><code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for each observation).
-For most dynamic trend types available in <code>mvgam</code> (see argument <code>trend_model</code>), time should be
-measured in discrete, regularly spaced intervals (i.e. <code>c(1, 2, 3, ...)</code>). However you can
-use irregularly spaced intervals if using <code>trend_model = CAR(1)</code>, though note that any
+<li><p><code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for
+each observation).
+For most dynamic trend types available in <code>mvgam</code> (see argument <code>trend_model</code>),
+time should be
+measured in discrete, regularly spaced intervals (i.e. <code>c(1, 2, 3, ...)</code>).
+However you can
+use irregularly spaced intervals if using <code>trend_model = CAR(1)</code>, though
+note that any
 temporal intervals that are exactly <code>0</code> will be adjusted to a very small number
-(<code>1e-12</code>) to prevent sampling errors. See an example of <code><a href="RW.html">CAR()</a></code> trends in <code><a href="RW.html">CAR</a></code></p></li>
-</ul><p>Note however that there are special cases where these identifiers are not needed. For
-example, models with hierarchical temporal correlation processes (e.g. <code>AR(gr = region, subgr = species)</code>)
-should NOT include a <code>series</code> identifier, as this will be constructed internally (see
-<code><a href="mvgam_trends.html">mvgam_trends</a></code> and <code><a href="RW.html">AR</a></code> for details). <code>mvgam</code> can also fit models that do not
-include a <code>time</code> variable if there are no temporal dynamic structures included (i.e. <code>trend_model = 'None'</code> or
-<code>trend_model = ZMVN()</code>). <code>data</code> should also include any other variables to be included in
+(<code>1e-12</code>) to prevent sampling errors. See an example of <code><a href="RW.html">CAR()</a></code> trends in
+<code><a href="RW.html">CAR</a></code></p></li>
+</ul><p>Note however that there are special cases where these identifiers are not
+needed. For
+example, models with hierarchical temporal correlation processes (e.g.
+<code>AR(gr = region, subgr = species)</code>)
+should NOT include a <code>series</code> identifier, as this will be constructed
+internally (see
+<code><a href="mvgam_trends.html">mvgam_trends</a></code> and <code><a href="RW.html">AR</a></code> for details). <code>mvgam</code> can also
+fit models that do not
+include a <code>time</code> variable if there are no temporal dynamic structures included
+(i.e. <code>trend_model = 'None'</code> or
+<code>trend_model = ZMVN()</code>). <code>data</code> should also include any other variables to be
+included in
 the linear predictor of <code>formula</code></p></dd>
 
 
 <dt id="arg-newdata">newdata<a class="anchor" aria-label="anchor" href="#arg-newdata"></a></dt>
-<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data containing the same variables
+<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data containing
+the same variables
 as in <code>data</code>. If included, the
-observations in variable <code>y</code> will be set to <code>NA</code> when fitting the model so that posterior
+observations in variable <code>y</code> will be set to <code>NA</code> when fitting the
+model so that posterior
 simulations can be obtained</p></dd>
 
 
 <dt id="arg-trend-map">trend_map<a class="anchor" aria-label="anchor" href="#arg-trend-map"></a></dt>
-<dd><p>Optional <code>data.frame</code> specifying which series should depend on which latent
-trends. Useful for allowing multiple series to depend on the same latent trend process, but with
-different observation processes. If supplied, a latent factor model is set up by setting
-<code>use_lv = TRUE</code> and using the mapping to set up the shared trends. Needs to have column names
-<code>series</code> and <code>trend</code>, with integer values in the <code>trend</code> column to state which trend each series
-should depend on. The <code>series</code> column should have a single unique entry for each series in the
-data (names should perfectly match factor levels of the <code>series</code> variable in <code>data</code>). Note that
-if this is supplied, the intercept parameter in the process model will NOT be automatically suppressed.
+<dd><p>Optional <code>data.frame</code> specifying which series should depend
+on which latent trends. Useful for allowing multiple series to depend on the
+same latent trend process, but with different observation processes. If
+supplied, a latent factor model is set up by setting <code>use_lv = TRUE</code> and
+using the mapping to set up the shared trends. Needs to have column names
+<code>series</code> and <code>trend</code>, with integer values in the <code>trend</code> column to state which
+trend each series should depend on. The <code>series</code> column should have a single
+unique entry for each series in the data (names should perfectly match factor
+levels of the <code>series</code> variable in <code>data</code>). Note that if this is supplied,
+the intercept parameter in the process model will NOT be automatically suppressed.
 Not yet supported for models in wich the latent factors evolve in continuous time (<code><a href="RW.html">CAR()</a></code>).
 See examples for details</p></dd>
 
@@ -236,8 +280,9 @@ latent trends in a reduced dimension format. Only available for
 
 
 <dt id="arg-n-lv">n_lv<a class="anchor" aria-label="anchor" href="#arg-n-lv"></a></dt>
-<dd><p><code>integer</code> the number of latent dynamic factors to use if <code>use_lv == TRUE</code>.
-Cannot be <code>&gt; n_series</code>. Defaults arbitrarily to <code>min(2, floor(n_series / 2))</code></p></dd>
+<dd><p><code>integer</code> the number of latent dynamic factors to use if
+<code>use_lv == TRUE</code>. Cannot be <code>&gt; n_series</code>. Defaults arbitrarily to
+<code>min(2, floor(n_series / 2))</code></p></dd>
 
 
 <dt id="arg-priors">priors<a class="anchor" aria-label="anchor" href="#arg-priors"></a></dt>
@@ -340,57 +385,217 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/lib/tbb_2020.3/include/tbb/tbb_profiling.h:123,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/tbb_2020.3/include/tbb/task.h:36,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/tbb_2020.3/include/tbb/task_arena.h:23,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/core/init_threadpool_tbb.hpp:18,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/core.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev/core/Eigen_NumTraits.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev/core/typedefs.hpp:7,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev/core/chainable_object.hpp:6,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev/core.hpp:10,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:10,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpotLup8/model-9e8c71904cf2.hpp:2:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/Rtmpodm0uo/model-1618324c4194.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:422:24: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   422 |     constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs): internal::atomic_impl&lt;T&gt;(rhs) {}</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                        ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:422:24: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:454:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   454 | __TBB_DECL_ATOMIC(__TBB_LONG_LONG)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:454:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   454 | __TBB_DECL_ATOMIC(__TBB_LONG_LONG)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:455:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   455 | __TBB_DECL_ATOMIC(unsigned __TBB_LONG_LONG)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:455:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   455 | __TBB_DECL_ATOMIC(unsigned __TBB_LONG_LONG)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:459:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   459 | __TBB_DECL_ATOMIC(long)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:459:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   459 | __TBB_DECL_ATOMIC(long)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:460:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   460 | __TBB_DECL_ATOMIC(unsigned long)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:460:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   460 | __TBB_DECL_ATOMIC(unsigned long)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:491:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   491 | __TBB_DECL_ATOMIC(unsigned)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:491:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   491 | __TBB_DECL_ATOMIC(unsigned)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:492:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   492 | __TBB_DECL_ATOMIC(int)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:492:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   492 | __TBB_DECL_ATOMIC(int)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                                 ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:495:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   495 | __TBB_DECL_ATOMIC(unsigned short)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:495:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   495 | __TBB_DECL_ATOMIC(unsigned short)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:496:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   496 | __TBB_DECL_ATOMIC(short)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:496:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   496 | __TBB_DECL_ATOMIC(short)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:497:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   497 | __TBB_DECL_ATOMIC(char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:497:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   497 | __TBB_DECL_ATOMIC(char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:498:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   498 | __TBB_DECL_ATOMIC(signed char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:498:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   498 | __TBB_DECL_ATOMIC(signed char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:499:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   499 | __TBB_DECL_ATOMIC(unsigned char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:499:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   499 | __TBB_DECL_ATOMIC(unsigned char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                             </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:502:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   502 | __TBB_DECL_ATOMIC(wchar_t)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:502:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   502 | __TBB_DECL_ATOMIC(wchar_t)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/normal_ccdf_log.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:243,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/normal_lccdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::normal_lccdf(const T_y&amp;, const T_loc&amp;, const T_scale&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/normal_lccdf.hpp:68: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>    68 |     } else if (scaled_diff &gt; 8.25 * INV_SQRT_TWO) {</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/normal_lccdf.hpp:68: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.3 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.4 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.4 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.4 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.3 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 0.5 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000001d630997108&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x0000019b13fe8088&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -415,27 +620,27 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>               2.5%   50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept) -1.100 -0.65 -0.32    1   793</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1 -0.230  0.33  0.88    1  1336</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2  0.610  1.20  1.80    1   963</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3  0.920  1.50  2.00    1   850</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4  0.660  1.20  1.90    1   753</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).5 -0.054  0.56  1.20    1  1079</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).6 -1.300 -0.51  0.24    1  1122</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).7 -2.400 -1.30 -0.43    1   765</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).8 -2.000 -1.10 -0.48    1   812</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>               2.5%    50%  97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept) -0.900 -0.550 -0.220 1.01   563</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1 -0.410  0.170  0.710 1.02   190</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2 -0.045  0.540  1.100 1.00   675</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3  0.280  0.810  1.400 1.00   721</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4  0.570  1.100  1.700 1.01   398</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).5  0.190  0.730  1.300 1.01   519</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).6 -0.780 -0.095  0.560 1.00   548</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).7 -1.300 -0.550  0.093 1.00   260</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).8 -1.300 -0.690 -0.160 1.00   524</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM smooths:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            edf Ref.df Chi.sq p-value    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 3.07      8     69 0.00012 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            edf Ref.df Chi.sq p-value  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 2.62      8   33.4   0.049 *</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Latent trend parameter AR estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            2.5%   50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]   -0.910 0.065  0.96    1   846</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.017 0.260  0.71    1   381</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           2.5%   50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]   -0.92 0.045  0.88 1.00   623</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.01 0.250  0.69 1.01   164</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
@@ -444,7 +649,7 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 10 (0%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Wed Feb 19 12:02:55 PM 2025.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Wed Feb 26 9:36:53 AM 2025.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
@@ -458,19 +663,180 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-in"><span>                      noncentred <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/lib/tbb_2020.3/include/tbb/tbb_profiling.h:123,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/tbb_2020.3/include/tbb/task.h:36,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/tbb_2020.3/include/tbb/task_arena.h:23,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/core/init_threadpool_tbb.hpp:18,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/core.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev/core/Eigen_NumTraits.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev/core/typedefs.hpp:7,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev/core/chainable_object.hpp:6,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev/core.hpp:10,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:10,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpotLup8/model-9e8c1de31249.hpp:2:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/Rtmpodm0uo/model-161848cf2c24.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:422:24: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   422 |     constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs): internal::atomic_impl&lt;T&gt;(rhs) {}</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                        ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:422:24: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:454:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   454 | __TBB_DECL_ATOMIC(__TBB_LONG_LONG)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:454:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   454 | __TBB_DECL_ATOMIC(__TBB_LONG_LONG)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:455:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   455 | __TBB_DECL_ATOMIC(unsigned __TBB_LONG_LONG)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:455:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   455 | __TBB_DECL_ATOMIC(unsigned __TBB_LONG_LONG)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:459:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   459 | __TBB_DECL_ATOMIC(long)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:459:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   459 | __TBB_DECL_ATOMIC(long)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:460:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   460 | __TBB_DECL_ATOMIC(unsigned long)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:460:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   460 | __TBB_DECL_ATOMIC(unsigned long)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:491:1: note: in e</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> xpansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   491 | __TBB_DECL_ATOMIC(unsigned)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:491:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   491 | __TBB_DECL_ATOMIC(unsigned)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:492:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   492 | __TBB_DECL_ATOMIC(int)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:492:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   492 | __TBB_DECL_ATOMIC(int)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:495:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   495 | __TBB_DECL_ATOMIC(unsigned short)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:495:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   495 | __TBB_DECL_ATOMIC(unsigned short)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                           </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>    \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:496:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   496 | __TBB_DECL_ATOMIC(short)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:496:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   496 | __TBB_DECL_ATOMIC(short)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:497:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   497 | __TBB_DECL_ATOMIC(char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:497:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   497 | __TBB_DECL_ATOMIC(char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:498:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   498 | __TBB_DECL_ATOMIC(signed char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/t</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> bb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:498:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   498 | __TBB_DECL_ATOMIC(signed char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:499:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   499 | __TBB_DECL_ATOMIC(unsigned char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:499:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   499 | __TBB_DECL_ATOMIC(unsigned char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:502:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   502 | __TBB_DECL_ATOMIC(wchar_t)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> b/atomic.h:502:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   502 | __TBB_DECL_ATOMIC(wchar_t)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/normal_ccdf_log.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:243,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/normal_lccdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::normal_lccdf(const T_y&amp;, const T_loc&amp;, const T_scale&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/normal_lccdf.hpp:68: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>    68 |     } else if (scaled_diff &gt; 8.25 * INV_SQRT_TWO) {</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/normal_lccdf.hpp:68: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -491,15 +857,15 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.3 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.4 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.4 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.4 seconds.</span>
@@ -508,7 +874,7 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">updated_mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000001d630997108&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x0000019b13fe8088&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -533,28 +899,28 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>               2.5%   50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept) -1.100 -0.66 -0.33 1.00   380</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1 -0.190  0.34  0.84 1.00   735</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2  0.610  1.20  1.80 1.00   390</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3  0.890  1.40  2.00 1.01   306</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4  0.670  1.20  1.90 1.01   409</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).5 -0.034  0.56  1.20 1.00   667</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).6 -1.300 -0.51  0.19 1.00   810</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).7 -2.200 -1.20 -0.55 1.00   477</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).8 -1.900 -1.10 -0.51 1.00   438</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>               2.5%   50%  97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept) -0.910 -0.53 -0.240    1   623</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1 -0.330  0.18  0.720    1   895</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2 -0.037  0.55  1.100    1   931</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3  0.250  0.81  1.400    1   902</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4  0.630  1.10  1.700    1   957</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).5  0.230  0.72  1.300    1  1065</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).6 -0.780 -0.11  0.490    1  1053</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).7 -1.300 -0.60  0.065    1   885</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).8 -1.300 -0.71 -0.150    1   966</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM smooths:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            edf Ref.df Chi.sq p-value    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 2.67      8   69.9 0.00011 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            edf Ref.df Chi.sq p-value   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 3.01      8   31.2  0.0036 **</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Latent trend AR parameter estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             2.5%    50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]   -0.8900  0.047  0.91    1   730</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar2[1]   -0.9700 -0.098  0.91    1   576</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.0097  0.220  0.63    1   244</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]   -0.9100 -0.014  0.90    1  1066</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar2[1]   -0.9000 -0.037  0.89    1  1032</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.0086  0.180  0.58    1   370</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
@@ -563,7 +929,7 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 10 (0%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Wed Feb 19 12:03:24 PM 2025.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Wed Feb 26 9:37:24 AM 2025.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
@@ -582,19 +948,178 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-in"><span>                      family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/lib/tbb_2020.3/include/tbb/tbb_profiling.h:123,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/tbb_2020.3/include/tbb/task.h:36,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/tbb_2020.3/include/tbb/task_arena.h:23,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/core/init_threadpool_tbb.hpp:18,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/core.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev/core/Eigen_NumTraits.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev/core/typedefs.hpp:7,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev/core/chainable_object.hpp:6,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev/core.hpp:10,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:10,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpotLup8/model-9e8c2e8149d5.hpp:2:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/Rtmpodm0uo/model-16184b0a5512.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:422:24: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   422 |     constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs): internal::atomic_impl&lt;T&gt;(rhs) {}</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                        ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:422:24: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:454:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   454 | __TBB_DECL_ATOMIC(__TBB_LONG_LONG)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:454:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   454 | __TBB_DECL_ATOMIC(__TBB_LONG_LONG)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:455:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   455 | __TBB_DECL_ATOMIC(unsigned __TBB_LONG_LONG)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:455:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   455 | __TBB_DECL_ATOMIC(unsigned __TBB_LONG_LONG)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:459:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   459 | __TBB_DECL_ATOMIC(long)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:459:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   459 | __TBB_DECL_ATOMIC(long)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:460:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   460 | __TBB_DECL_ATOMIC(unsigned long)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:460:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   460 | __TBB_DECL_ATOMIC(unsigned long)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:491:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   491 | __TBB_DECL_ATOMIC(unsigned)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:491:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   491 | __TBB_DECL_ATOMIC(unsigned)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:492:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   492 | __TBB_DECL_ATOMIC(int)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:492:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   492 | __TBB_DECL_ATOMIC(int)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                                 ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:495:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   495 | __TBB_DECL_ATOMIC(unsigned short)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:495:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   495 | __TBB_DECL_ATOMIC(unsigned short)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:496:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   496 | __TBB_DECL_ATOMIC(short)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:496:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   496 | __TBB_DECL_ATOMIC(short)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:497:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   497 | __TBB_DECL_ATOMIC(char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:497:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   497 | __TBB_DECL_ATOMIC(char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:498:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   498 | __TBB_DECL_ATOMIC(signed char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:498:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   498 | __TBB_DECL_ATOMIC(signed char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:499:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   499 | __TBB_DECL_ATOMIC(unsigned char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:499:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   499 | __TBB_DECL_ATOMIC(unsigned char)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: warning: template-id not allowed for constructor in C++20 [-Wtemplate-id-cdtor]</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:502:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   502 | __TBB_DECL_ATOMIC(wchar_t)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:437:32: note: remove the '&lt; &gt;'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   437 |             constexpr atomic&lt;T&gt;(const atomic&lt;T&gt;&amp; rhs):                                              \</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                ^</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/tbb_2020.3/include/tbb/atomic.h:502:1: note: in expansion of macro '__TBB_DECL_ATOMIC'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   502 | __TBB_DECL_ATOMIC(wchar_t)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | ^~~~~~~~~~~~~~~~~</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/normal_ccdf_log.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:243,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/normal_lccdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::normal_lccdf(const T_y&amp;, const T_loc&amp;, const T_scale&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/normal_lccdf.hpp:68: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>    68 |     } else if (scaled_diff &gt; 8.25 * INV_SQRT_TWO) {</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/normal_lccdf.hpp:68: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -603,36 +1128,36 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.3 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.5 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.4 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.3 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 0.5 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">updated_mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> cbind(y, trials) ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000001d630997108&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x0000019b13fe8088&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> binomial</span>
@@ -657,37 +1182,36 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>               2.5%   50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept) -4.200 -3.70 -3.30 1.00   353</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1 -0.220  0.35  0.89 1.00   984</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2  0.670  1.20  1.80 1.00   702</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3  0.940  1.50  2.10 1.00   599</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4  0.700  1.30  1.90 1.00   713</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).5 -0.068  0.59  1.30 1.00   991</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).6 -1.300 -0.51  0.19 1.00   766</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).7 -2.400 -1.30 -0.54 1.01   355</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).8 -2.000 -1.20 -0.49 1.01   569</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>               2.5%   50%  97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept) -3.800 -3.40 -3.100    1   555</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1 -0.360  0.19  0.740    1   476</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2  0.024  0.55  1.100    1   598</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3  0.230  0.83  1.400    1   672</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4  0.530  1.10  1.700    1   499</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).5  0.140  0.75  1.300    1   576</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).6 -0.780 -0.11  0.470    1   828</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).7 -1.300 -0.59  0.025    1   677</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).8 -1.400 -0.70 -0.094    1   520</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM smooths:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            edf Ref.df Chi.sq p-value    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 4.16      8     70   2e-05 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            edf Ref.df Chi.sq p-value  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 2.56      8   34.8   0.019 *</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Latent trend parameter AR estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>            2.5%   50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]   -0.860 0.093  0.93 1.00   770</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.011 0.310  0.77 1.01   152</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]   -0.900 0.019  0.93    1   569</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.012 0.250  0.73    1   269</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Rhat looks reasonable for all parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 of 1000 iterations ended with a divergence (0.1%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  *Try running with larger adapt_delta to remove the divergences</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations ended with a divergence (0%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 10 (0%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Wed Feb 19 12:03:54 PM 2025.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Wed Feb 26 9:37:54 AM 2025.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>

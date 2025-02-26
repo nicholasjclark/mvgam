@@ -9,7 +9,7 @@ changed for a given model, as well listing their default distributions"><meta pr
 
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -74,29 +74,42 @@ changed for a given model, as well listing their default distributions</p>
 
 
 <dl><dt id="arg-formula">formula<a class="anchor" aria-label="anchor" href="#arg-formula"></a></dt>
-<dd><p>A <code>formula</code> object specifying the GAM observation model formula. These are exactly like the formula
-for a GLM except that smooth terms, <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/t2.html" class="external-link">t2()</a></code>, as well as time-varying
-<code><a href="dynamic.html">dynamic()</a></code> terms, nonparametric <code><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp()</a></code> terms and offsets using <code><a href="https://rdrr.io/r/stats/offset.html" class="external-link">offset()</a></code>,
-can be added to the right hand side
-to specify that the linear predictor depends on smooth functions of predictors
-(or linear functionals of these). In <code><a href="mvgam_families.html">nmix()</a></code> family models, the <code>formula</code> is used to
-set up a linear predictor for the detection probability. Details of the formula syntax used by <span class="pkg">mvgam</span>
-can be found in <code><a href="mvgam_formulae.html">mvgam_formulae</a></code></p></dd>
+<dd><p>A <code>formula</code> object specifying the GAM observation model
+formula. These are exactly like the formula
+for a GLM except that smooth terms, <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/t2.html" class="external-link">t2()</a></code>, as well
+as time-varying <code><a href="dynamic.html">dynamic()</a></code> terms, nonparametric <code><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp()</a></code> terms and offsets using <code><a href="https://rdrr.io/r/stats/offset.html" class="external-link">offset()</a></code>,
+can be added to the right hand side to specify that the linear predictor
+depends on smooth functions of predictors (or linear functionals of these).
+In <code><a href="mvgam_families.html">nmix()</a></code> family models, the <code>formula</code> is used to set up a linear predictor
+for the detection probability. Details of the formula
+syntax used by <span class="pkg">mvgam</span> can be found in <code><a href="mvgam_formulae.html">mvgam_formulae</a></code></p></dd>
 
 
 <dt id="arg-trend-formula">trend_formula<a class="anchor" aria-label="anchor" href="#arg-trend-formula"></a></dt>
-<dd><p>An optional <code>formula</code> object specifying the GAM process model formula. If
-supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
-separately from the observation model. Should not have a response variable specified on the left-hand side
-of the formula (i.e. a valid option would be <code>~ season + s(year)</code>). Also note that you should not use
-the identifier <code>series</code> in this formula to specify effects that vary across time series. Instead you should use
-<code>trend</code>. This will ensure that models in which a <code>trend_map</code> is supplied will still work consistently
-(i.e. by allowing effects to vary across process models, even when some time series share the same underlying
-process model). This feature is only currently available for <code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code> and <code><a href="RW.html">VAR()</a></code> trend models.
-In <code><a href="mvgam_families.html">nmix()</a></code> family models, the <code>trend_formula</code> is used to set up a linear predictor for the underlying
-latent abundance. Be aware that it can be very challenging to simultaneously estimate intercept parameters
-for both the observation mode (captured by <code>formula</code>) and the process model (captured by <code>trend_formula</code>).
-Users are recommended to drop one of these using the <code>- 1</code> convention in the formula right hand side.</p></dd>
+<dd><p>An optional <code>formula</code> object specifying the GAM
+process model formula. If
+supplied, a linear predictor will be modelled for the latent trends to capture
+process model evolution
+separately from the observation model. Should not have a response variable
+specified on the left-hand side
+of the formula (i.e. a valid option would be <code>~ season + s(year)</code>). Also note
+that you should not use
+the identifier <code>series</code> in this formula to specify effects that vary across
+time series. Instead you should use
+<code>trend</code>. This will ensure that models in which a <code>trend_map</code> is supplied will
+still work consistently
+(i.e. by allowing effects to vary across process models, even when some time
+series share the same underlying
+process model). This feature is only currently available for <code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code>
+and <code><a href="RW.html">VAR()</a></code> trend models.
+In <code><a href="mvgam_families.html">nmix()</a></code> family models, the <code>trend_formula</code> is used to set up a linear
+predictor for the underlying
+latent abundance. Be aware that it can be very challenging to simultaneously
+estimate intercept parameters
+for both the observation mode (captured by <code>formula</code>) and the process model
+(captured by <code>trend_formula</code>).
+Users are recommended to drop one of these using the <code>- 1</code> convention in the
+formula right hand side.</p></dd>
 
 
 <dt id="arg-factor-formula">factor_formula<a class="anchor" aria-label="anchor" href="#arg-factor-formula"></a></dt>
@@ -105,21 +118,28 @@ Users are recommended to drop one of these using the <code>- 1</code> convention
 
 
 <dt id="arg-knots">knots<a class="anchor" aria-label="anchor" href="#arg-knots"></a></dt>
-<dd><p>An optional <code>list</code> containing user specified knot values to be used for basis construction.
-For most bases the user simply supplies the knots to be used, which must match up with the <code>k</code> value supplied
-(note that the number of knots is not always just <code>k</code>). Different terms can use different numbers of knots,
+<dd><p>An optional <code>list</code> containing user specified knot values to
+be used for basis construction.
+For most bases the user simply supplies the knots to be used, which must match
+up with the <code>k</code> value supplied
+(note that the number of knots is not always just <code>k</code>). Different terms can
+use different numbers of knots,
 unless they share a covariate</p></dd>
 
 
 <dt id="arg-trend-knots">trend_knots<a class="anchor" aria-label="anchor" href="#arg-trend-knots"></a></dt>
-<dd><p>As for <code>knots</code> above, this is an optional <code>list</code> of knot values for smooth
+<dd><p>As for <code>knots</code> above, this is an optional <code>list</code> of
+knot values for smooth
 functions within the <code>trend_formula</code></p></dd>
 
 
 <dt id="arg-trend-model">trend_model<a class="anchor" aria-label="anchor" href="#arg-trend-model"></a></dt>
-<dd><p><code>character</code> or  <code>function</code> specifying the time series dynamics for the latent trend. Options are:</p><ul><li><p><code>None</code> (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-and the observation process is the only source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>)</p></li>
-<li><p><code>ZMVN</code> or <code><a href="ZMVN.html">ZMVN()</a></code> (Zero-Mean Multivariate Normal; only available in <code>Stan</code>)</p></li>
+<dd><p><code>character</code> or  <code>function</code> specifying the time
+series dynamics for the latent trend. Options are:</p><ul><li><p><code>None</code> (no latent trend component; i.e. the GAM component is all that
+contributes to the linear predictor, and the observation process is the only
+source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>)</p></li>
+<li><p><code>ZMVN</code> or <code><a href="ZMVN.html">ZMVN()</a></code> (Zero-Mean Multivariate Normal; only available in
+<code>Stan</code>)</p></li>
 <li><p><code>'RW'</code> or <code><a href="RW.html">RW()</a></code></p></li>
 <li><p><code>'AR1'</code> or <code>AR(p = 1)</code></p></li>
 <li><p><code>'AR2'</code> or <code>AR(p = 2)</code></p></li>
@@ -129,15 +149,17 @@ and the observation process is the only source of error; similarly to what is es
 <li><p><code>'PWlogistic</code>, <code>'PWlinear'</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
 <li><p><code>'GP'</code> or <code><a href="GP.html">GP()</a></code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
-</ul><p>For all trend types apart from <code><a href="ZMVN.html">ZMVN()</a></code>, <code><a href="GP.html">GP()</a></code>, <code><a href="RW.html">CAR()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
-process error terms can also be estimated (for example, <code>RW(cor = TRUE)</code> will set up a
-multivariate Random Walk if <code>n_series &gt; 1</code>). It is also possible for many multivariate trends
-to estimate hierarchical correlations if the data are structured among levels of
-a relevant grouping factor. See <a href="mvgam_trends.html">mvgam_trends</a> for more details and see <a href="ZMVN.html">ZMVN</a> for an example.</p></dd>
+</ul><p>For all trend types apart from <code><a href="ZMVN.html">ZMVN()</a></code>, <code><a href="GP.html">GP()</a></code>, <code><a href="RW.html">CAR()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving
+average and/or correlated process error terms can also be estimated (for
+example, <code>RW(cor = TRUE)</code> will set up a multivariate Random Walk if <code>n_series &gt; 1</code>).
+It is also possible for many multivariate trends to estimate hierarchical
+correlations if the data are structured among levels of a relevant grouping
+factor. See <a href="mvgam_trends.html">mvgam_trends</a> for more details and see <a href="ZMVN.html">ZMVN</a> for an example.</p></dd>
 
 
 <dt id="arg-family">family<a class="anchor" aria-label="anchor" href="#arg-family"></a></dt>
-<dd><p><code>family</code> specifying the exponential observation family for the series. Currently supported
+<dd><p><code>family</code> specifying the exponential observation family for
+the series. Currently supported
 families are:</p><ul><li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code> for real-valued data</p></li>
 <li><p><code><a href="mvgam_families.html">betar()</a></code> for proportional data on <code>(0,1)</code></p></li>
 <li><p><code><a href="mvgam_families.html">lognormal()</a></code> for non-negative real-valued data</p></li>
@@ -146,12 +168,14 @@ families are:</p><ul><li><p><code><a href="https://rdrr.io/r/stats/family.html" 
 <li><p><code><a href="mvgam_families.html">bernoulli()</a></code> for binary data</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> for count data</p></li>
 <li><p><code><a href="mvgam_families.html">nb()</a></code> for overdispersed count data</p></li>
-<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> for count data with imperfect detection when the number of trials is known;
-note that the <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind()</a></code> function must be used to bind the discrete observations and the discrete number
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> for count data with imperfect detection when the number
+of trials is known;
+note that the <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind()</a></code> function must be used to bind the discrete
+observations and the discrete number
 of trials</p></li>
 <li><p><code><a href="mvgam_families.html">beta_binomial()</a></code> as for <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> but allows for overdispersion</p></li>
-<li><p><code><a href="mvgam_families.html">nmix()</a></code> for count data with imperfect detection when the number of trials
-is unknown and should be modeled via a State-Space N-Mixture model.
+<li><p><code><a href="mvgam_families.html">nmix()</a></code> for count data with imperfect detection when the number of
+trials is unknown and should be modeled via a State-Space N-Mixture model.
 The latent states are Poisson, capturing the 'true' latent
 abundance, while the observation process is Binomial to account for
 imperfect detection.
@@ -161,21 +185,35 @@ See <code><a href="mvgam_families.html">mvgam_families</a></code> for more detai
 
 
 <dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
-<dd><p>A <code>dataframe</code> or <code>list</code> containing the model response variable and covariates
-required by the GAM <code>formula</code> and optional <code>trend_formula</code>. Most models should include columns:</p><ul><li><p><code>series</code> (a <code>factor</code> index of the series IDs; the number of levels should be identical
+<dd><p>A <code>dataframe</code> or <code>list</code> containing the model response
+variable and covariates
+required by the GAM <code>formula</code> and optional <code>trend_formula</code>. Most
+models should include columns:</p><ul><li><p><code>series</code> (a <code>factor</code> index of the series IDs; the number of
+levels should be identical
 to the number of unique series labels (i.e. <code>n_series = length(levels(data$series))</code>))</p></li>
-<li><p><code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for each observation).
-For most dynamic trend types available in <code>mvgam</code> (see argument <code>trend_model</code>), time should be
-measured in discrete, regularly spaced intervals (i.e. <code>c(1, 2, 3, ...)</code>). However you can
-use irregularly spaced intervals if using <code>trend_model = CAR(1)</code>, though note that any
+<li><p><code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for
+each observation).
+For most dynamic trend types available in <code>mvgam</code> (see argument <code>trend_model</code>),
+time should be
+measured in discrete, regularly spaced intervals (i.e. <code>c(1, 2, 3, ...)</code>).
+However you can
+use irregularly spaced intervals if using <code>trend_model = CAR(1)</code>, though
+note that any
 temporal intervals that are exactly <code>0</code> will be adjusted to a very small number
-(<code>1e-12</code>) to prevent sampling errors. See an example of <code><a href="RW.html">CAR()</a></code> trends in <code><a href="RW.html">CAR</a></code></p></li>
-</ul><p>Note however that there are special cases where these identifiers are not needed. For
-example, models with hierarchical temporal correlation processes (e.g. <code>AR(gr = region, subgr = species)</code>)
-should NOT include a <code>series</code> identifier, as this will be constructed internally (see
-<code><a href="mvgam_trends.html">mvgam_trends</a></code> and <code><a href="RW.html">AR</a></code> for details). <code>mvgam</code> can also fit models that do not
-include a <code>time</code> variable if there are no temporal dynamic structures included (i.e. <code>trend_model = 'None'</code> or
-<code>trend_model = ZMVN()</code>). <code>data</code> should also include any other variables to be included in
+(<code>1e-12</code>) to prevent sampling errors. See an example of <code><a href="RW.html">CAR()</a></code> trends in
+<code><a href="RW.html">CAR</a></code></p></li>
+</ul><p>Note however that there are special cases where these identifiers are not
+needed. For
+example, models with hierarchical temporal correlation processes (e.g.
+<code>AR(gr = region, subgr = species)</code>)
+should NOT include a <code>series</code> identifier, as this will be constructed
+internally (see
+<code><a href="mvgam_trends.html">mvgam_trends</a></code> and <code><a href="RW.html">AR</a></code> for details). <code>mvgam</code> can also
+fit models that do not
+include a <code>time</code> variable if there are no temporal dynamic structures included
+(i.e. <code>trend_model = 'None'</code> or
+<code>trend_model = ZMVN()</code>). <code>data</code> should also include any other variables to be
+included in
 the linear predictor of <code>formula</code></p></dd>
 
 
@@ -201,19 +239,22 @@ latent trends in a reduced dimension format. Only available for
 
 
 <dt id="arg-n-lv">n_lv<a class="anchor" aria-label="anchor" href="#arg-n-lv"></a></dt>
-<dd><p><code>integer</code> the number of latent dynamic factors to use if <code>use_lv == TRUE</code>.
-Cannot be <code>&gt; n_series</code>. Defaults arbitrarily to <code>min(2, floor(n_series / 2))</code></p></dd>
+<dd><p><code>integer</code> the number of latent dynamic factors to use if
+<code>use_lv == TRUE</code>. Cannot be <code>&gt; n_series</code>. Defaults arbitrarily to
+<code>min(2, floor(n_series / 2))</code></p></dd>
 
 
 <dt id="arg-trend-map">trend_map<a class="anchor" aria-label="anchor" href="#arg-trend-map"></a></dt>
-<dd><p>Optional <code>data.frame</code> specifying which series should depend on which latent
-trends. Useful for allowing multiple series to depend on the same latent trend process, but with
-different observation processes. If supplied, a latent factor model is set up by setting
-<code>use_lv = TRUE</code> and using the mapping to set up the shared trends. Needs to have column names
-<code>series</code> and <code>trend</code>, with integer values in the <code>trend</code> column to state which trend each series
-should depend on. The <code>series</code> column should have a single unique entry for each series in the
-data (names should perfectly match factor levels of the <code>series</code> variable in <code>data</code>). Note that
-if this is supplied, the intercept parameter in the process model will NOT be automatically suppressed.
+<dd><p>Optional <code>data.frame</code> specifying which series should depend
+on which latent trends. Useful for allowing multiple series to depend on the
+same latent trend process, but with different observation processes. If
+supplied, a latent factor model is set up by setting <code>use_lv = TRUE</code> and
+using the mapping to set up the shared trends. Needs to have column names
+<code>series</code> and <code>trend</code>, with integer values in the <code>trend</code> column to state which
+trend each series should depend on. The <code>series</code> column should have a single
+unique entry for each series in the data (names should perfectly match factor
+levels of the <code>series</code> variable in <code>data</code>). Note that if this is supplied,
+the intercept parameter in the process model will NOT be automatically suppressed.
 Not yet supported for models in wich the latent factors evolve in continuous time (<code><a href="RW.html">CAR()</a></code>).
 See examples for details</p></dd>
 
@@ -418,22 +459,30 @@ example)</p>
 <span class="r-in"><span>                              data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>                              trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">test_priors</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                param_name param_length                  param_info</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1           vector&lt;lower=0&gt;[n_sp] lambda;            2 s(season) smooth parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2                       vector[1] mu_raw;            1          s(series) pop mean</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3           vector&lt;lower=0&gt;[1] sigma_raw;            1            s(series) pop sd</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 vector&lt;lower=-1,upper=1&gt;[n_series] ar1;            3       trend AR1 coefficient</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 vector&lt;lower=-1,upper=1&gt;[n_series] ar2;            3       trend AR2 coefficient</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6        vector&lt;lower=0&gt;[n_series] sigma;            3                    trend sd</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7      vector&lt;lower=0&gt;[n_series] phi_inv;            3   inverse of NB dispsersion</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                               prior                 example_change new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1           lambda ~ normal(5, 30);    lambda ~ exponential(0.16);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2            mu_raw ~ std_normal();    mu_raw ~ normal(0.35, 0.2);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ student_t(3, 0, 2.5); sigma_raw ~ exponential(0.11);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4               ar1 ~ std_normal();      ar1 ~ normal(0.24, 0.49);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5               ar2 ~ std_normal();      ar2 ~ normal(0.02, 0.45);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ student_t(3, 0, 2.5);     sigma ~ exponential(0.36);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7   phi_inv ~ student_t(3, 0, 0.1); phi_inv ~ normal(-0.29, 0.86);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                param_name param_length</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1           vector&lt;lower=0&gt;[n_sp] lambda;            2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2                       vector[1] mu_raw;            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3           vector&lt;lower=0&gt;[1] sigma_raw;            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 vector&lt;lower=-1,upper=1&gt;[n_series] ar1;            3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 vector&lt;lower=-1,upper=1&gt;[n_series] ar2;            3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6        vector&lt;lower=0&gt;[n_series] sigma;            3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7      vector&lt;lower=0&gt;[n_series] phi_inv;            3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                    param_info                             prior</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 s(season) smooth parameters           lambda ~ normal(5, 30);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2          s(series) pop mean            mu_raw ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3            s(series) pop sd sigma_raw ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4       trend AR1 coefficient               ar1 ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5       trend AR2 coefficient               ar2 ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion   phi_inv ~ student_t(3, 0, 0.1);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                  example_change new_lowerbound new_upperbound</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1   lambda ~ exponential(0.78);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  mu_raw ~ normal(0.08, 0.87);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.5);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(0.17, 0.9);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5    ar2 ~ normal(-0.21, 0.98);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6    sigma ~ exponential(0.11);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7 phi_inv ~ normal(-0.98, 0.7);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>

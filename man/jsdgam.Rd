@@ -45,9 +45,12 @@ effects for the latent factors. Use \code{by = trend} within calls to functional
 (i.e. \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, \code{dynamic()}, or \code{gp()}) to ensure that each factor
 captures a different axis of variation. See the example below as an illustration}
 
-\item{knots}{An optional \code{list} containing user specified knot values to be used for basis construction.
-For most bases the user simply supplies the knots to be used, which must match up with the \code{k} value supplied
-(note that the number of knots is not always just \code{k}). Different terms can use different numbers of knots,
+\item{knots}{An optional \code{list} containing user specified knot values to
+be used for basis construction.
+For most bases the user simply supplies the knots to be used, which must match
+up with the \code{k} value supplied
+(note that the number of knots is not always just \code{k}). Different terms can
+use different numbers of knots,
 unless they share a covariate}
 
 \item{factor_knots}{An optional \code{list} containing user specified knot values to
@@ -59,9 +62,11 @@ unless they share a covariate}
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula} and \code{factor_formula} objects}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same variables
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing
+the same variables
 as in \code{data}. If included, the
-observations in variable \code{y} will be set to \code{NA} when fitting the model so that posterior
+observations in variable \code{y} will be set to \code{NA} when fitting the
+model so that posterior
 simulations can be obtained}
 
 \item{family}{\code{family} specifying the observation family for the outcomes. Currently supported
@@ -93,11 +98,14 @@ the different response units in \code{data} (usually \code{'species'} in a JSDM)
 Defaults to \code{series} to be consistent with other \code{mvgam} models}
 
 \item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family}
-has additional family-specific observation parameters (e.g. variance components in
-\code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or \code{betar()}),
-these parameters will be shared across all outcome variables. This is handy if you have multiple
-outcomes (time series in most \code{mvgam} models) that you believe share some properties,
-such as being from the same species over different spatial units. Default is \code{FALSE}.}
+has additional family-specific observation parameters (e.g. variance
+components in
+\code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or
+\code{betar()}), these parameters will be shared across all outcome variables. This is handy
+if you have multiple outcomes (time series in most \code{mvgam} models) that you
+believe share some properties,
+such as being from the same species over different spatial units. Default is
+\code{FALSE}.}
 
 \item{priors}{An optional \code{data.frame} with prior
 definitions (in Stan syntax) or, preferentially, a vector containing
@@ -128,8 +136,8 @@ dynamic GAMs, possibly because of the difficulties estimating covariances among 
 many spline parameters and latent trend parameters. But rigorous testing has not
 been carried out}
 
-\item{control}{A named \code{list} for controlling the sampler's behaviour. Valid elements include
-\code{max_treedepth}, \code{adapt_delta} and \code{init}}
+\item{control}{A named \code{list} for controlling the sampler's behaviour. Valid
+elements include \code{max_treedepth}, \code{adapt_delta} and \code{init}}
 
 \item{chains}{\code{integer} specifying the number of parallel chains for the model. Ignored
 if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}
@@ -154,17 +162,21 @@ parallelisation in \code{Stan}. We recommend its use only if you are experienced
 up by any other means. Currently works for all families when using \code{Cmdstan}
 as the backend}
 
-\item{silent}{Verbosity level between \code{0} and \code{2}. If \code{1} (the default), most of the informational
-messages of compiler and sampler are suppressed. If \code{2}, even more messages are suppressed. The
-actual sampling progress is still printed. Set \code{refresh = 0} to turn this off as well. If using
-\code{backend = "rstan"} you can also set open_progress = FALSE to prevent opening additional
-progress bars.}
+\item{silent}{Verbosity level between \code{0} and \code{2}. If \code{1} (the default), most
+of the informational messages of compiler and sampler are suppressed. If \code{2},
+even more messages are suppressed. The actual sampling progress is still printed.
+Set \code{refresh = 0} to turn this off as well. If using \code{backend = "rstan"} you
+can also set open_progress = FALSE to prevent opening additional progress bars.}
 
-\item{run_model}{\code{logical}. If \code{FALSE}, the model is not fitted but instead the function will
-return the model file and the data / initial values that are needed to fit the model outside of \code{mvgam}}
+\item{run_model}{\code{logical}. If \code{FALSE}, the model is not fitted but
+instead the function will
+return the model file and the data / initial values that are needed to fit the
+model outside of \code{mvgam}}
 
-\item{return_model_data}{\code{logical}. If \code{TRUE}, the list of data that is needed to fit the
-model is returned, along with the initial values for smooth and AR parameters, once the model is fitted.
+\item{return_model_data}{\code{logical}. If \code{TRUE}, the list of data that
+is needed to fit the
+model is returned, along with the initial values for smooth and AR parameters,
+once the model is fitted.
 This will be helpful if users wish to modify the model file to add
 other stochastic elements that are not currently available in \code{mvgam}.
 Default is \code{FALSE} to reduce

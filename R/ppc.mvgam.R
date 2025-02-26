@@ -1,93 +1,93 @@
-#'@title Plot conditional posterior predictive checks from \pkg{mvgam} models
-#'@importFrom stats quantile density ecdf formula terms
-#'@importFrom graphics hist abline box rect lines polygon par
-#'@importFrom grDevices rgb
-#'@name ppc.mvgam
-#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
-#'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
-#'for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
-#'included, the observed values in the test data are compared to the model's forecast distribution for exploring
-#'biases in model predictions.
-#'Note this is only useful if the same \code{newdata} was also included when fitting the original model.
-#'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
-#'\code{newdata} instead for more seamless integration into `R` workflows
-#'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param type \code{character} specifying the type of posterior predictive check to calculate and plot.
-#'Valid options are: 'rootogram', 'mean', 'hist', 'density', 'prop_zero', 'pit' and 'cdf'
-#'@param n_bins \code{integer} specifying the number of bins to use for binning observed values when plotting
-#'a rootogram or histogram. Default is `50` bins for a rootogram, which means that if
-#'there are `>50` unique observed values, bins will
-#'be used to prevent overplotting and facilitate interpretation. Default for a histogram is to use the
-#'number of bins returned by a call to `hist` in base `R`
-#'@param legend_position The location may also be specified by setting x to a single keyword from the
-#'list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
-#'This places the legend on the inside of the plot frame at the given location. Or alternatively,
-#'use "none" to hide the legend.
-#'@param xlab label for x axis.
-#'@param ylab label for y axis.
-#'@param ... further \code{\link[graphics]{par}} graphical parameters.
-#'@details Conditional posterior predictions are drawn from the fitted \code{mvgam} and compared against
-#'the empirical distribution of the observed data for a specified series to help evaluate the model's
-#'ability to generate unbiased predictions. For all plots apart from `type = 'rootogram'`, posterior predictions
-#'can also be compared to out of sample observations as long as these observations were included as
-#''data_test' in the original model fit and supplied here. Rootograms are currently only plotted using the
-#''hanging' style.
-#'\cr
-#'Note that the predictions used for these plots are *conditional on the observed data*, i.e. they
-#'are those predictions that have been generated directly within
-#'the `mvgam()` model. They can be misleading if the model included flexible dynamic trend components. For
-#'a broader range of posterior checks that are created using *unconditional* "new data" predictions, see
-#'\code{\link{pp_check.mvgam}}
-#'@return A base \code{R} graphics plot showing either a posterior rootogram (for \code{type == 'rootogram'}),
-#'the predicted vs observed mean for the
-#'series (for \code{type == 'mean'}), predicted vs observed proportion of zeroes for the
-#'series (for \code{type == 'prop_zero'}),predicted vs observed histogram for the
-#'series (for \code{type == 'hist'}), kernel density or empirical CDF estimates for
-#'posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or a Probability
-#'Integral Transform histogram (for \code{type == 'pit'}).
-#'@author Nicholas J Clark
-#'@seealso \code{\link{pp_check.mvgam}}, \code{\link{predict.mvgam}}
+#' @title Plot conditional posterior predictive checks from \pkg{mvgam} models
+#' @importFrom stats quantile density ecdf formula terms
+#' @importFrom graphics hist abline box rect lines polygon par
+#' @importFrom grDevices rgb
+#' @name ppc.mvgam
+#' @param object \code{list} object returned from \code{mvgam}. See [mvgam()]
+#' @param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+#' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
+#' included, the observed values in the test data are compared to the model's forecast distribution for exploring
+#' biases in model predictions.
+#' Note this is only useful if the same \code{newdata} was also included when fitting the original model.
+#' @param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
+#' \code{newdata} instead for more seamless integration into `R` workflows
+#' @param series \code{integer} specifying which series in the set is to be plotted
+#' @param type \code{character} specifying the type of posterior predictive check to calculate and plot.
+#' Valid options are: 'rootogram', 'mean', 'hist', 'density', 'prop_zero', 'pit' and 'cdf'
+#' @param n_bins \code{integer} specifying the number of bins to use for binning observed values when plotting
+#' a rootogram or histogram. Default is `50` bins for a rootogram, which means that if
+#' there are `>50` unique observed values, bins will
+#' be used to prevent overplotting and facilitate interpretation. Default for a histogram is to use the
+#' number of bins returned by a call to `hist` in base `R`
+#' @param legend_position The location may also be specified by setting x to a single keyword from the
+#' list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
+#' This places the legend on the inside of the plot frame at the given location. Or alternatively,
+#' use "none" to hide the legend.
+#' @param xlab label for x axis.
+#' @param ylab label for y axis.
+#' @param ... further \code{\link[graphics]{par}} graphical parameters.
+#' @details Conditional posterior predictions are drawn from the fitted \code{mvgam} and compared against
+#' the empirical distribution of the observed data for a specified series to help evaluate the model's
+#' ability to generate unbiased predictions. For all plots apart from `type = 'rootogram'`, posterior predictions
+#' can also be compared to out of sample observations as long as these observations were included as
+#'' data_test' in the original model fit and supplied here. Rootograms are currently only plotted using the
+#'' hanging' style.
+#' \cr
+#' Note that the predictions used for these plots are *conditional on the observed data*, i.e. they
+#' are those predictions that have been generated directly within
+#' the `mvgam()` model. They can be misleading if the model included flexible dynamic trend components. For
+#' a broader range of posterior checks that are created using *unconditional* "new data" predictions, see
+#' \code{\link{pp_check.mvgam}}
+#' @return A base \code{R} graphics plot showing either a posterior rootogram (for \code{type == 'rootogram'}),
+#' the predicted vs observed mean for the
+#' series (for \code{type == 'mean'}), predicted vs observed proportion of zeroes for the
+#' series (for \code{type == 'prop_zero'}),predicted vs observed histogram for the
+#' series (for \code{type == 'hist'}), kernel density or empirical CDF estimates for
+#' posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or a Probability
+#' Integral Transform histogram (for \code{type == 'pit'}).
+#' @author Nicholas J Clark
+#' @seealso \code{\link{pp_check.mvgam}}, \code{\link{predict.mvgam}}
 #' @examples
 #' \donttest{
 #' # Simulate some smooth effects and fit a model
 #' set.seed(0)
 #' dat <- mgcv::gamSim(1, n = 200, scale = 2)
 #' mod <- mvgam(y ~ s(x0) + s(x1) + s(x2) + s(x3),
-#'             data = dat,
-#'             family = gaussian(),
-#'             chains = 2,
-#'             silent = 2)
+#'   data = dat,
+#'   family = gaussian(),
+#'   chains = 2,
+#'   silent = 2
+#' )
 #'
 #' # Posterior checks
-#' ppc(mod, type = 'hist')
-#' ppc(mod, type = 'density')
-#' ppc(mod, type = 'cdf')
+#' ppc(mod, type = "hist")
+#' ppc(mod, type = "density")
+#' ppc(mod, type = "cdf")
 #'
 #' # Many more options are available with pp_check()
 #' pp_check(mod)
 #' pp_check(mod, type = "ecdf_overlay")
-#' pp_check(mod, type = 'freqpoly')
+#' pp_check(mod, type = "freqpoly")
 #' }
-#'@export
+#' @export
 ppc <- function(object, ...) {
   UseMethod("ppc", object)
 }
 
-#'@rdname ppc.mvgam
-#'@method ppc mvgam
-#'@export
-ppc.mvgam = function(
-  object,
-  newdata,
-  data_test,
-  series = 1,
-  type = 'hist',
-  n_bins,
-  legend_position,
-  xlab,
-  ylab,
-  ...
-) {
+#' @rdname ppc.mvgam
+#' @method ppc mvgam
+#' @export
+ppc.mvgam <- function(
+    object,
+    newdata,
+    data_test,
+    series = 1,
+    type = "hist",
+    n_bins,
+    legend_position,
+    xlab,
+    ylab,
+    ...) {
   # Check arguments
   type <- match.arg(
     arg = type,
@@ -101,22 +101,22 @@ ppc.mvgam = function(
       "prop_zero"
     )
   )
-  if (type == 'histogram') type = 'hist'
+  if (type == "histogram") type <- "hist"
 
-  if (type == 'rootogram') {
+  if (type == "rootogram") {
     if (
       !object$family %in%
         c(
-          'poisson',
-          'negative binomial',
-          'tweedie',
-          'nmix',
-          'binomial',
-          'beta_binomial'
+          "poisson",
+          "negative binomial",
+          "tweedie",
+          "nmix",
+          "binomial",
+          "beta_binomial"
         )
     ) {
       stop(
-        'Rootograms not supported for checking non-count data',
+        "Rootograms not supported for checking non-count data",
         call. = FALSE
       )
     }
@@ -139,15 +139,15 @@ ppc.mvgam = function(
   if (series > NCOL(object$ytimes)) {
     stop(
       paste0(
-        'object only contains data / predictions for ',
+        "object only contains data / predictions for ",
         NCOL(object$ytimes),
-        ' series'
+        " series"
       ),
       call. = FALSE
     )
   }
 
-  if (type == 'rootogram' & missing(n_bins)) {
+  if (type == "rootogram" & missing(n_bins)) {
     n_bins <- 50
 
     if (sign(n_bins) != 1) {
@@ -163,7 +163,7 @@ ppc.mvgam = function(
     data_test <- newdata
 
     # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
-    if (terms(formula(object$call))[[2]] != 'y') {
+    if (terms(formula(object$call))[[2]] != "y") {
       data_test$y <- data_test[[terms(formula(object$call))[[2]]]]
     }
   }
@@ -172,7 +172,7 @@ ppc.mvgam = function(
   data_train <- object$obs_data
   ends <- seq(
     0,
-    dim(mcmc_chains(object$model_output, 'ypred'))[2],
+    dim(mcmc_chains(object$model_output, "ypred"))[2],
     length.out = NCOL(object$ytimes) + 1
   )
   starts <- ends + 1
@@ -189,25 +189,25 @@ ppc.mvgam = function(
   s_name <- levels(data_train$series)[series]
 
   if (!missing(data_test)) {
-    if (class(data_test)[1] == 'list') {
-      if (!'time' %in% names(data_test)) {
+    if (class(data_test)[1] == "list") {
+      if (!"time" %in% names(data_test)) {
         stop('data_test does not contain a "time" column')
       }
 
-      if (!'series' %in% names(data_test)) {
-        data_test$series <- factor('series1')
+      if (!"series" %in% names(data_test)) {
+        data_test$series <- factor("series1")
       }
     } else {
-      if (!'time' %in% colnames(data_test)) {
+      if (!"time" %in% colnames(data_test)) {
         stop('data_test does not contain a "time" column')
       }
 
-      if (!'series' %in% colnames(data_test)) {
-        data_test$series <- factor('series1')
+      if (!"series" %in% colnames(data_test)) {
+        data_test$series <- factor("series1")
       }
     }
 
-    if (class(object$obs_data)[1] == 'list') {
+    if (class(object$obs_data)[1] == "list") {
       truths <- data.frame(
         y = data_test$y,
         time = data_test$time,
@@ -217,20 +217,22 @@ ppc.mvgam = function(
         dplyr::filter(series == s_name) %>%
         dplyr::pull(y)
 
-      if (object$fit_engine == 'stan') {
+      if (object$fit_engine == "stan") {
         # For stan objects, ypred is stored as a vector in column-major order
-        preds <- mcmc_chains(object$model_output, 'ypred')[, seq(
+        preds <- mcmc_chains(object$model_output, "ypred")[, seq(
           series,
-          dim(mcmc_chains(object$model_output, 'ypred'))[2],
+          dim(mcmc_chains(object$model_output, "ypred"))[2],
           by = NCOL(object$ytimes)
         )]
       } else {
-        preds <- mcmc_chains(object$model_output, 'ypred')[,
+        preds <- mcmc_chains(object$model_output, "ypred")[
+          ,
           starts[series]:ends[series]
         ]
       }
 
-      preds <- preds[,
+      preds <- preds[
+        ,
         ((length(data_train$y) / NCOL(object$ytimes)) + 1):((length(
           data_train$y
         ) /
@@ -245,20 +247,22 @@ ppc.mvgam = function(
         dplyr::arrange(time) %>%
         dplyr::pull(y)
 
-      if (object$fit_engine == 'stan') {
+      if (object$fit_engine == "stan") {
         # For stan objects, ypred is stored as a vector in column-major order
-        preds <- mcmc_chains(object$model_output, 'ypred')[, seq(
+        preds <- mcmc_chains(object$model_output, "ypred")[, seq(
           series,
-          dim(mcmc_chains(object$model_output, 'ypred'))[2],
+          dim(mcmc_chains(object$model_output, "ypred"))[2],
           by = NCOL(object$ytimes)
         )]
       } else {
-        preds <- mcmc_chains(object$model_output, 'ypred')[,
+        preds <- mcmc_chains(object$model_output, "ypred")[
+          ,
           starts[series]:ends[series]
         ]
       }
 
-      preds <- preds[,
+      preds <- preds[
+        ,
         ((NROW(data_train) / NCOL(object$ytimes)) + 1):((NROW(data_train) /
           NCOL(object$ytimes)) +
           length(truths))
@@ -269,7 +273,7 @@ ppc.mvgam = function(
       preds <- preds[sample(1:NROW(preds), 4000, F), ]
     }
   } else {
-    if (class(object$obs_data)[1] == 'list') {
+    if (class(object$obs_data)[1] == "list") {
       truths <- data.frame(
         y = data_train$y,
         time = data_train$time,
@@ -287,15 +291,16 @@ ppc.mvgam = function(
         dplyr::pull(y)
     }
 
-    if (object$fit_engine == 'stan') {
+    if (object$fit_engine == "stan") {
       # For stan objects, ypred is stored as a vector in column-major order
-      preds <- mcmc_chains(object$model_output, 'ypred')[, seq(
+      preds <- mcmc_chains(object$model_output, "ypred")[, seq(
         series,
-        dim(mcmc_chains(object$model_output, 'ypred'))[2],
+        dim(mcmc_chains(object$model_output, "ypred"))[2],
         by = NCOL(object$ytimes)
       )]
     } else {
-      preds <- mcmc_chains(object$model_output, 'ypred')[,
+      preds <- mcmc_chains(object$model_output, "ypred")[
+        ,
         starts[series]:ends[series]
       ]
     }
@@ -311,15 +316,15 @@ ppc.mvgam = function(
   preds[is.nan(preds)] <- NA
   preds <- preds[, !is.na(truths)]
   truths <- truths[!is.na(truths)]
-  probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+  probs <- c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
 
-  if (type == 'prop_zero') {
+  if (type == "prop_zero") {
     pred_props <- apply(preds, 1, function(x) length(which(x == 0)) / length(x))
     lower <- quantile(pred_props, probs = 0.01, na.rm = TRUE)
     upper <- quantile(pred_props, probs = 0.99, na.rm = TRUE)
 
     if (lower == 0 & upper == 0) {
-      stop('No predictions covered zero')
+      stop("No predictions covered zero")
     }
 
     pred_props <- pred_props[-which(pred_props > upper)]
@@ -329,12 +334,12 @@ ppc.mvgam = function(
     obs_prop <- length(which(truths == 0)) / length(truths)
 
     if (missing(ylab)) {
-      ylab <- 'Density'
+      ylab <- "Density"
     }
 
     if (missing(xlab)) {
       xlab <- paste0(
-        'Predicted proportion of zeroes for ',
+        "Predicted proportion of zeroes for ",
         levels(data_train$series)[series]
       )
     }
@@ -346,7 +351,7 @@ ppc.mvgam = function(
         min(min(pred_props), min(obs_prop)),
         max(max(pred_props), max(obs_prop))
       ),
-      main = '',
+      main = "",
       breaks = seq(min(pred_props), max(pred_props), length.out = 15),
       border = "#B97C7C",
       col = "#C79999",
@@ -354,28 +359,28 @@ ppc.mvgam = function(
       xlab = xlab,
       ...
     )
-    abline(v = obs_prop, lwd = 3, col = 'white')
-    abline(v = obs_prop, lwd = 2.5, col = 'black')
-    box(bty = 'L', lwd = 2)
+    abline(v = obs_prop, lwd = 3, col = "white")
+    abline(v = obs_prop, lwd = 2.5, col = "black")
+    box(bty = "L", lwd = 2)
 
     if (missing(legend_position)) {
-      legend_position = 'topright'
+      legend_position <- "topright"
     }
 
-    if (legend_position != 'none') {
+    if (legend_position != "none") {
       legend(
         legend_position,
         legend = c(expression(hat(y)[propzero]), expression(y[propzero])),
-        bg = 'white',
-        col = c(c_mid, 'black'),
+        bg = "white",
+        col = c(c_mid, "black"),
         lty = 1,
         lwd = 2,
-        bty = 'n'
+        bty = "n"
       )
     }
   }
 
-  if (type == 'rootogram') {
+  if (type == "rootogram") {
     ymax <- floor(max(max(truths), quantile(preds, prob = 0.99, na.rm = TRUE)))
     ymin <- 0L
     xpos <- ymin:ymax
@@ -436,9 +441,13 @@ ppc.mvgam = function(
     repped_x <- rep(xpos, each = 2)
     x <- sapply(
       1:length(idx),
-      function(k)
-        if (k %% 2 == 0) repped_x[k] + min(diff(xpos)) / 2 else
+      function(k) {
+        if (k %% 2 == 0) {
+          repped_x[k] + min(diff(xpos)) / 2
+        } else {
           repped_x[k] - min(diff(xpos)) / 2
+        }
+      }
     )
 
     if (missing(xlab)) {
@@ -453,7 +462,7 @@ ppc.mvgam = function(
     plot(
       1,
       type = "n",
-      bty = 'L',
+      bty = "L",
       xlab = xlab,
       ylab = ylab,
       xlim = range(xpos),
@@ -465,8 +474,8 @@ ppc.mvgam = function(
       xright = x[seq(2, N * 2, by = 2)],
       ytop = data$tyexp,
       ybottom = data$tyexp - data$ty,
-      col = 'grey80',
-      border = 'grey10',
+      col = "grey80",
+      border = "grey10",
       lwd = 2
     )
     rect(
@@ -475,7 +484,7 @@ ppc.mvgam = function(
       ytop = data[, 13],
       ybottom = data[, 5],
       col = "#DCBCBC85",
-      border = 'transparent'
+      border = "transparent"
     )
     rect(
       xleft = x[seq(1, N * 2, by = 2)],
@@ -483,7 +492,7 @@ ppc.mvgam = function(
       ytop = data[, 12],
       ybottom = data[, 6],
       col = "#C7999985",
-      border = 'transparent'
+      border = "transparent"
     )
     rect(
       xleft = x[seq(1, N * 2, by = 2)],
@@ -491,7 +500,7 @@ ppc.mvgam = function(
       ytop = data[, 11],
       ybottom = data[, 7],
       col = "#B97C7C85",
-      border = 'transparent'
+      border = "transparent"
     )
     rect(
       xleft = x[seq(1, N * 2, by = 2)],
@@ -499,10 +508,10 @@ ppc.mvgam = function(
       ytop = data[, 10],
       ybottom = data[, 8],
       col = "#A2505085",
-      border = 'transparent'
+      border = "transparent"
     )
-    abline(h = 0, col = 'white', lwd = 3)
-    abline(h = 0, col = 'black', lwd = 2.5)
+    abline(h = 0, col = "white", lwd = 3)
+    abline(h = 0, col = "black", lwd = 2.5)
     for (k in 1:N) {
       lines(
         x = c(x[seq(1, N * 2, by = 2)][k], x[seq(2, N * 2, by = 2)][k]),
@@ -511,10 +520,10 @@ ppc.mvgam = function(
         lwd = 3
       )
     }
-    box(bty = 'L', lwd = 2)
+    box(bty = "L", lwd = 2)
   }
 
-  if (type == 'mean') {
+  if (type == "mean") {
     # Plot observed and predicted means
     pred_means <- apply(preds, 1, mean, na.rm = TRUE)
     lower <- quantile(pred_means, probs = 0.01, na.rm = TRUE)
@@ -526,11 +535,11 @@ ppc.mvgam = function(
     obs_mean <- mean(truths)
 
     if (missing(ylab)) {
-      ylab <- 'Density'
+      ylab <- "Density"
     }
 
     if (missing(xlab)) {
-      xlab <- paste0('Predicted mean for ', levels(data_train$series)[series])
+      xlab <- paste0("Predicted mean for ", levels(data_train$series)[series])
     }
 
     hist(
@@ -540,7 +549,7 @@ ppc.mvgam = function(
         max(max(pred_means, na.rm = TRUE), max(obs_mean, na.rm = TRUE))
       ),
       lwd = 2,
-      main = '',
+      main = "",
       breaks = seq(
         min(pred_means, na.rm = TRUE),
         max(pred_means, na.rm = TRUE),
@@ -552,29 +561,29 @@ ppc.mvgam = function(
       xlab = xlab,
       ...
     )
-    abline(v = obs_mean, lwd = 3, col = 'white')
-    abline(v = obs_mean, lwd = 2.5, col = 'black')
-    box(bty = 'L', lwd = 2)
+    abline(v = obs_mean, lwd = 3, col = "white")
+    abline(v = obs_mean, lwd = 2.5, col = "black")
+    box(bty = "L", lwd = 2)
 
     if (missing(legend_position)) {
-      legend_position = 'topright'
+      legend_position <- "topright"
     }
 
-    if (legend_position != 'none') {
+    if (legend_position != "none") {
       legend(
         legend_position,
         legend = c(expression(hat(mu)), expression(mu)),
-        bg = 'white',
-        col = c(c_mid, 'black'),
+        bg = "white",
+        col = c(c_mid, "black"),
         lty = 1,
         lwd = 2,
-        bty = 'n'
+        bty = "n"
       )
     }
   }
 
   # Generate a sample sequence and plot
-  if (type == 'density') {
+  if (type == "density") {
     max_x <- max(
       max(density(preds[1, ], na.rm = TRUE)$x),
       max(density(truths, na.rm = TRUE)$x)
@@ -607,19 +616,19 @@ ppc.mvgam = function(
 
     if (missing(ylab)) {
       ylab <- paste0(
-        'Predictive density for ',
+        "Predictive density for ",
         levels(data_train$series)[series]
       )
     }
 
     if (missing(xlab)) {
-      xlab <- ''
+      xlab <- ""
     }
 
-    if (object$family == 'beta') {
+    if (object$family == "beta") {
       xlimits <- c(0, 1)
     } else if (
-      object$family %in% c('poisson', 'negative binomial', 'lognormal', 'Gamma')
+      object$family %in% c("poisson", "negative binomial", "lognormal", "Gamma")
     ) {
       xlimits <- c(0, max_x)
     } else {
@@ -629,7 +638,7 @@ ppc.mvgam = function(
     plot(
       1,
       type = "n",
-      bty = 'L',
+      bty = "L",
       xlab = xlab,
       ylab = ylab,
       xlim = xlimits,
@@ -663,28 +672,28 @@ ppc.mvgam = function(
     )
     lines(true_dens$x, cred[5, ], col = c_dark, lwd = 2.5)
 
-    lines(x = true_dens$x, y = true_dens$y, lwd = 3, col = 'white')
-    lines(x = true_dens$x, y = true_dens$y, lwd = 2.5, col = 'black')
+    lines(x = true_dens$x, y = true_dens$y, lwd = 3, col = "white")
+    lines(x = true_dens$x, y = true_dens$y, lwd = 2.5, col = "black")
 
     if (missing(legend_position)) {
-      legend_position = 'topright'
+      legend_position <- "topright"
     }
 
-    if (legend_position != 'none') {
+    if (legend_position != "none") {
       legend(
         legend_position,
-        legend = c(expression(hat(y)), 'y'),
-        bg = 'white',
+        legend = c(expression(hat(y)), "y"),
+        bg = "white",
         col = c(c_mid, "black"),
         lty = 1,
         lwd = 2,
-        bty = 'n'
+        bty = "n"
       )
     }
-    box(bty = 'L', lwd = 2)
+    box(bty = "L", lwd = 2)
   }
 
-  if (type == 'hist') {
+  if (type == "hist") {
     if (missing(n_bins)) {
       n_bins <- max(c(
         length(hist(c(truths, as.vector(preds)), plot = F)$breaks),
@@ -711,10 +720,10 @@ ppc.mvgam = function(
       )
     )
 
-    if (object$family == 'beta') {
+    if (object$family == "beta") {
       xlim <- c(0, 1)
     } else if (
-      object$family %in% c('poisson', 'negative binomial', 'lognormal', 'Gamma')
+      object$family %in% c("poisson", "negative binomial", "lognormal", "Gamma")
     ) {
       xlim <- c(0, xlim[2])
     } else {
@@ -739,18 +748,18 @@ ppc.mvgam = function(
     )
 
     if (missing(xlab)) {
-      xlab <- paste0('Count')
+      xlab <- paste0("Count")
     }
 
     if (missing(ylab)) {
-      ylab = ''
+      ylab <- ""
     }
 
     hist(
       preds,
       breaks = breaks,
       lwd = 2,
-      main = '',
+      main = "",
       xlab = xlab,
       ylab = ylab,
       ylim = ylim,
@@ -765,39 +774,39 @@ ppc.mvgam = function(
     hist(
       truths,
       breaks = breaks,
-      main = '',
-      xlab = '',
+      main = "",
+      xlab = "",
       ylim = ylim,
       xlim = xlim,
-      ylab = '',
-      yaxt = 'n',
+      ylab = "",
+      yaxt = "n",
       col = rgb(red = 0, green = 0, blue = 0, alpha = 0),
       border = "black",
       add = T,
       freq = F
     )
     par(lwd = 1)
-    box(bty = 'L', lwd = 2)
+    box(bty = "L", lwd = 2)
 
     if (missing(legend_position)) {
-      legend_position = 'topright'
+      legend_position <- "topright"
     }
 
-    if (legend_position != 'none') {
+    if (legend_position != "none") {
       legend(
         legend_position,
-        legend = c(expression(hat(y)), 'y'),
-        bg = 'white',
+        legend = c(expression(hat(y)), "y"),
+        bg = "white",
         col = c(c_mid, "black"),
         lty = 1,
         lwd = 2,
-        bty = 'n'
+        bty = "n"
       )
     }
   }
 
-  if (type == 'cdf') {
-    ecdf_plotdat = function(vals, x) {
+  if (type == "cdf") {
+    ecdf_plotdat <- function(vals, x) {
       if (length(which(is.na(vals))) > (length(vals) - 3)) {
       } else {
         func <- ecdf(vals)
@@ -818,24 +827,24 @@ ppc.mvgam = function(
       }))
     )
 
-    probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+    probs <- c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
     cred <- sapply(
       1:NCOL(pred_cdfs),
       function(n) quantile(pred_cdfs[, n], probs = probs, na.rm = TRUE)
     )
 
     if (missing(ylab)) {
-      ylab = paste0('Predictive CDF for ', levels(data_train$series)[series])
+      ylab <- paste0("Predictive CDF for ", levels(data_train$series)[series])
     }
 
     if (missing(xlab)) {
-      xlab = ''
+      xlab <- ""
     }
 
     plot(
       1,
       type = "n",
-      bty = 'L',
+      bty = "L",
       xlab = xlab,
       ylab = ylab,
       xlim = c(min(plot_x, na.rm = TRUE), max(plot_x, na.rm = TRUE)),
@@ -869,33 +878,33 @@ ppc.mvgam = function(
     )
     lines(plot_x, cred[5, ], col = c_dark, lwd = 2.5)
 
-    lines(x = plot_x, y = ecdf_plotdat(truths, plot_x), col = 'white', lwd = 3)
+    lines(x = plot_x, y = ecdf_plotdat(truths, plot_x), col = "white", lwd = 3)
     lines(
       x = plot_x,
       y = ecdf_plotdat(truths, plot_x),
-      col = 'black',
+      col = "black",
       lwd = 2.5
     )
 
     if (missing(legend_position)) {
-      legend_position = 'bottomright'
+      legend_position <- "bottomright"
     }
 
-    if (legend_position != 'none') {
+    if (legend_position != "none") {
       legend(
         legend_position,
-        legend = c(expression(hat(y)), 'y'),
-        bg = 'white',
-        col = c(c_mid, 'black'),
+        legend = c(expression(hat(y)), "y"),
+        bg = "white",
+        col = c(c_mid, "black"),
         lty = 1,
         lwd = 2,
-        bty = 'n'
+        bty = "n"
       )
     }
-    box(bty = 'L', lwd = 2)
+    box(bty = "L", lwd = 2)
   }
 
-  if (type == 'pit') {
+  if (type == "pit") {
     # Calculate emipirical cumulative distribution function as the
     # portion of (y_predicted <= y_true)
     n_pred <- ncol(preds)
@@ -923,13 +932,13 @@ ppc.mvgam = function(
       pit_hist,
       lwd = 2,
       col = "#B97C7C",
-      xlab = paste0('Predictive PIT for ', levels(data_train$series)[series]),
+      xlab = paste0("Predictive PIT for ", levels(data_train$series)[series]),
       border = NA,
       ...
     )
-    abline(h = 1, col = '#FFFFFF60', lwd = 2.85)
-    abline(h = 1, col = 'black', lwd = 2.5, lty = 'dashed')
-    box(bty = 'L', lwd = 2)
+    abline(h = 1, col = "#FFFFFF60", lwd = 2.85)
+    abline(h = 1, col = "black", lwd = 2.5, lty = "dashed")
+    box(bty = "L", lwd = 2)
   }
 }
 
@@ -964,59 +973,76 @@ ppc.mvgam = function(
 #' @seealso \code{\link{ppc}}, \code{\link{predict.mvgam}}
 #' @examples
 #' \donttest{
-#'simdat <- sim_mvgam(seasonality = 'hierarchical')
-#'mod <- mvgam(y ~ series +
-#'               s(season, bs = 'cc', k = 6) +
-#'               s(season, series, bs = 'fs', k = 4),
-#'             data = simdat$data_train,
-#'             chains = 2,
-#'             silent = 2)
+#' simdat <- sim_mvgam(seasonality = "hierarchical")
+#' mod <- mvgam(
+#'   y ~ series +
+#'     s(season, bs = "cc", k = 6) +
+#'     s(season, series, bs = "fs", k = 4),
+#'   data = simdat$data_train,
+#'   chains = 2,
+#'   silent = 2
+#' )
 #'
-#'# Use pp_check(mod, type = "xyz") for a list of available plot types
+#' # Use pp_check(mod, type = "xyz") for a list of available plot types
 #'
-#'# Default is a density overlay for all observations
-#'pp_check(mod)
+#' # Default is a density overlay for all observations
+#' pp_check(mod)
 #'
-#'# Rootograms particularly useful for count data
-#'pp_check(mod, type = "rootogram")
+#' # Rootograms particularly useful for count data
+#' pp_check(mod, type = "rootogram")
 #'
-#'# Grouping plots by series is useful
-#'pp_check(mod, type = "bars_grouped",
-#'         group = "series", ndraws = 50)
-#'pp_check(mod, type = "ecdf_overlay_grouped",
-#'         group = "series", ndraws = 50)
-#'pp_check(mod, type = "stat_freqpoly_grouped",
-#'         group = "series", ndraws = 50)
+#' # Grouping plots by series is useful
+#' pp_check(mod,
+#'   type = "bars_grouped",
+#'   group = "series", ndraws = 50
+#' )
+#' pp_check(mod,
+#'   type = "ecdf_overlay_grouped",
+#'   group = "series", ndraws = 50
+#' )
+#' pp_check(mod,
+#'   type = "stat_freqpoly_grouped",
+#'   group = "series", ndraws = 50
+#' )
 #'
-#'# Several types can be used to plot distributions of randomized
-#'# quantile residuals
-#'pp_check(object = mod,
-#'         x = 'season',
-#'         type = "resid_ribbon")
-#'pp_check(object = mod,
-#'         x = 'season',
-#'         group = 'series',
-#'         type = "resid_ribbon_grouped")
-#'pp_check(mod,
-#'         ndraws = 5,
-#'         type = 'resid_hist_grouped',
-#'         group = 'series')
+#' # Several types can be used to plot distributions of randomized
+#' # quantile residuals
+#' pp_check(
+#'   object = mod,
+#'   x = "season",
+#'   type = "resid_ribbon"
+#' )
+#' pp_check(
+#'   object = mod,
+#'   x = "season",
+#'   group = "series",
+#'   type = "resid_ribbon_grouped"
+#' )
+#' pp_check(mod,
+#'   ndraws = 5,
+#'   type = "resid_hist_grouped",
+#'   group = "series"
+#' )
 #'
-#'# Custom functions accepted
-#'pp_check(mod, type = "stat", stat = function(x) mean(x == 0))
-#'pp_check(mod, type = "stat_grouped",
-#'         stat = function(x) mean(x == 0),
-#'         group = "series")
+#' # Custom functions accepted
+#' pp_check(mod, type = "stat", stat = function(x) mean(x == 0))
+#' pp_check(mod,
+#'   type = "stat_grouped",
+#'   stat = function(x) mean(x == 0),
+#'   group = "series"
+#' )
 #'
-#'# Some functions accept covariates to set the x-axes
-#'pp_check(mod, x = "season",
-#'         type = "ribbon_grouped",
-#'         prob = 0.5,
-#'         prob_outer = 0.8,
-#'         group = "series")
+#' # Some functions accept covariates to set the x-axes
+#' pp_check(mod,
+#'   x = "season",
+#'   type = "ribbon_grouped",
+#'   prob = 0.5,
+#'   prob_outer = 0.8,
+#'   group = "series"
+#' )
 #'
-#'# Many plots can be made without the observed data
-#'pp_check(mod, prefix = "ppd")
+#' # Many plots can be made without the observed data
+#' pp_check(mod, prefix = "ppd")
 #' }
 #'
 #' @importFrom bayesplot pp_check
@@ -1024,18 +1050,17 @@ ppc.mvgam = function(
 #' @author Nicholas J Clark
 #' @export
 pp_check.mvgam <- function(
-  object,
-  type,
-  ndraws = NULL,
-  prefix = c("ppc", "ppd"),
-  group = NULL,
-  x = NULL,
-  newdata = NULL,
-  ...
-) {
+    object,
+    type,
+    ndraws = NULL,
+    prefix = c("ppc", "ppd"),
+    group = NULL,
+    x = NULL,
+    newdata = NULL,
+    ...) {
   # Set red colour scheme
-  col_scheme <- attr(color_scheme_get(), 'scheme_name')
-  color_scheme_set('red')
+  col_scheme <- attr(color_scheme_get(), "scheme_name")
+  color_scheme_set("red")
 
   dots <- list(...)
   if (missing(type)) {
@@ -1054,10 +1079,10 @@ pp_check.mvgam <- function(
     valid_types <- sort(
       c(
         as.character(bayesplot::available_ppc("")),
-        'ppc_resid_hist',
-        'ppc_resid_hist_grouped',
-        'ppc_resid_ribbon',
-        'ppc_resid_ribbon_grouped'
+        "ppc_resid_hist",
+        "ppc_resid_hist_grouped",
+        "ppc_resid_ribbon",
+        "ppc_resid_ribbon_grouped"
       )
     )
     valid_types <- sub("^ppc_", "", valid_types)
@@ -1075,24 +1100,24 @@ pp_check.mvgam <- function(
 
   bptype <- type
 
-  if (bptype %in% c('resid_hist', 'resid_hist_grouped')) {
+  if (bptype %in% c("resid_hist", "resid_hist_grouped")) {
     if (is.null(object$resids)) {
       object <- add_residuals(object)
     }
-    bptype <- sub('resid', 'error', bptype)
+    bptype <- sub("resid", "error", bptype)
   }
 
-  if (bptype %in% c('resid_ribbon', 'resid_ribbon_grouped')) {
+  if (bptype %in% c("resid_ribbon", "resid_ribbon_grouped")) {
     if (is.null(object$resids)) {
       object <- add_residuals(object)
     }
-    bptype <- sub('resid_', '', bptype)
+    bptype <- sub("resid_", "", bptype)
   }
 
   ppc_fun <- get(paste0(prefix, "_", bptype), asNamespace("bayesplot"))
 
   family <- object$family
-  if (family == 'nmix') {
+  if (family == "nmix") {
     stop("'pp_check' is not implemented for this family.", call. = FALSE)
   }
   valid_vars <- names(get_predictors(object))
@@ -1135,8 +1160,8 @@ pp_check.mvgam <- function(
       "loo_pit_overlay",
       "loo_pit_qq",
       "loo_ribbon",
-      'pit_ecdf',
-      'pit_ecdf_grouped',
+      "pit_ecdf",
+      "pit_ecdf_grouped",
       "ribbon",
       "ribbon_grouped",
       "rootogram",
@@ -1165,8 +1190,8 @@ pp_check.mvgam <- function(
     if (length(resp_terms) == 1) {
       out_name <- as.character(terms(object$call)[[2]])
     } else {
-      if (any(grepl('cbind', resp_terms))) {
-        resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
+      if (any(grepl("cbind", resp_terms))) {
+        resp_terms <- resp_terms[-grepl("cbind", resp_terms)]
         out_name <- resp_terms[1]
       }
     }
@@ -1175,7 +1200,7 @@ pp_check.mvgam <- function(
 
   # For plotting DS residuals, set y to zero and take
   # -1 * residual so that errors are in the correct direction
-  if (grepl('resid', type)) {
+  if (grepl("resid", type)) {
     y[!is.na(y)] <- 0
     yrep <- t(-1 * residuals(object, summary = FALSE))
 
@@ -1210,8 +1235,9 @@ pp_check.mvgam <- function(
     ppc_args$ypred <- yrep
   }
   if (!is.null(group)) {
-    if (!exists(group, newdata))
-      stop(paste0('Variable ', group, ' not in newdata'), call. = FALSE)
+    if (!exists(group, newdata)) {
+      stop(paste0("Variable ", group, " not in newdata"), call. = FALSE)
+    }
     ppc_args$group <- newdata[[group]]
 
     if (!is.null(take)) {
@@ -1219,7 +1245,7 @@ pp_check.mvgam <- function(
     }
   }
 
-  is_like_factor = function(x) {
+  is_like_factor <- function(x) {
     is.factor(x) || is.character(x) || is.logical(x)
   }
 
@@ -1262,15 +1288,15 @@ pp_check.mvgam <- function(
   }
 
   # Improve labels for residual plots
-  if (type %in% c('resid_hist', 'resid_hist_grouped')) {
+  if (type %in% c("resid_hist", "resid_hist_grouped")) {
     out_plot <- out_plot +
-      ggplot2::labs(x = 'DS residuals')
+      ggplot2::labs(x = "DS residuals")
   }
 
-  if (type %in% c('resid_ribbon', 'resid_ribbon_grouped')) {
+  if (type %in% c("resid_ribbon", "resid_ribbon_grouped")) {
     out_plot <- out_plot +
-      ggplot2::theme(legend.position = 'none') +
-      ggplot2::labs(y = 'DS residuals')
+      ggplot2::theme(legend.position = "none") +
+      ggplot2::labs(y = "DS residuals")
   }
 
   # Reset color scheme and return the plot

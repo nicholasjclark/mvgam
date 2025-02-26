@@ -41,41 +41,61 @@ mvgam(
 )
 }
 \arguments{
-\item{formula}{A \code{formula} object specifying the GAM observation model formula. These are exactly like the formula
-for a GLM except that smooth terms, \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, as well as time-varying
-\code{dynamic()} terms, nonparametric \code{gp()} terms and offsets using \code{offset()},
-can be added to the right hand side
-to specify that the linear predictor depends on smooth functions of predictors
-(or linear functionals of these). In \code{nmix()} family models, the \code{formula} is used to
-set up a linear predictor for the detection probability. Details of the formula syntax used by \pkg{mvgam}
-can be found in \code{\link{mvgam_formulae}}}
+\item{formula}{A \code{formula} object specifying the GAM observation model
+formula. These are exactly like the formula
+for a GLM except that smooth terms, \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, as well
+as time-varying \code{dynamic()} terms, nonparametric \code{gp()} terms and offsets using \code{offset()},
+can be added to the right hand side to specify that the linear predictor
+depends on smooth functions of predictors (or linear functionals of these).
+In \code{nmix()} family models, the \code{formula} is used to set up a linear predictor
+for the detection probability. Details of the formula
+syntax used by \pkg{mvgam} can be found in \code{\link{mvgam_formulae}}}
 
-\item{trend_formula}{An optional \code{formula} object specifying the GAM process model formula. If
-supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
-separately from the observation model. Should not have a response variable specified on the left-hand side
-of the formula (i.e. a valid option would be \code{~ season + s(year)}). Also note that you should not use
-the identifier \code{series} in this formula to specify effects that vary across time series. Instead you should use
-\code{trend}. This will ensure that models in which a \code{trend_map} is supplied will still work consistently
-(i.e. by allowing effects to vary across process models, even when some time series share the same underlying
-process model). This feature is only currently available for \code{RW()}, \code{AR()} and \code{VAR()} trend models.
-In \code{nmix()} family models, the \code{trend_formula} is used to set up a linear predictor for the underlying
-latent abundance. Be aware that it can be very challenging to simultaneously estimate intercept parameters
-for both the observation mode (captured by \code{formula}) and the process model (captured by \code{trend_formula}).
-Users are recommended to drop one of these using the \code{- 1} convention in the formula right hand side.}
+\item{trend_formula}{An optional \code{formula} object specifying the GAM
+process model formula. If
+supplied, a linear predictor will be modelled for the latent trends to capture
+process model evolution
+separately from the observation model. Should not have a response variable
+specified on the left-hand side
+of the formula (i.e. a valid option would be \code{~ season + s(year)}). Also note
+that you should not use
+the identifier \code{series} in this formula to specify effects that vary across
+time series. Instead you should use
+\code{trend}. This will ensure that models in which a \code{trend_map} is supplied will
+still work consistently
+(i.e. by allowing effects to vary across process models, even when some time
+series share the same underlying
+process model). This feature is only currently available for \code{RW()}, \code{AR()}
+and \code{VAR()} trend models.
+In \code{nmix()} family models, the \code{trend_formula} is used to set up a linear
+predictor for the underlying
+latent abundance. Be aware that it can be very challenging to simultaneously
+estimate intercept parameters
+for both the observation mode (captured by \code{formula}) and the process model
+(captured by \code{trend_formula}).
+Users are recommended to drop one of these using the \code{- 1} convention in the
+formula right hand side.}
 
-\item{knots}{An optional \code{list} containing user specified knot values to be used for basis construction.
-For most bases the user simply supplies the knots to be used, which must match up with the \code{k} value supplied
-(note that the number of knots is not always just \code{k}). Different terms can use different numbers of knots,
+\item{knots}{An optional \code{list} containing user specified knot values to
+be used for basis construction.
+For most bases the user simply supplies the knots to be used, which must match
+up with the \code{k} value supplied
+(note that the number of knots is not always just \code{k}). Different terms can
+use different numbers of knots,
 unless they share a covariate}
 
-\item{trend_knots}{As for \code{knots} above, this is an optional \code{list} of knot values for smooth
+\item{trend_knots}{As for \code{knots} above, this is an optional \code{list} of
+knot values for smooth
 functions within the \code{trend_formula}}
 
-\item{trend_model}{\code{character} or  \code{function} specifying the time series dynamics for the latent trend. Options are:
+\item{trend_model}{\code{character} or  \code{function} specifying the time
+series dynamics for the latent trend. Options are:
 \itemize{
-\item \code{None} (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
-\item \code{ZMVN} or \code{ZMVN()} (Zero-Mean Multivariate Normal; only available in \code{Stan})
+\item \code{None} (no latent trend component; i.e. the GAM component is all that
+contributes to the linear predictor, and the observation process is the only
+source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+\item \code{ZMVN} or \code{ZMVN()} (Zero-Mean Multivariate Normal; only available in
+\code{Stan})
 \item \code{'RW'} or \code{RW()}
 \item \code{'AR1'} or \code{AR(p = 1)}
 \item \code{'AR2'} or \code{AR(p = 2)}
@@ -86,11 +106,12 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{'GP'} or \code{GP()} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
-For all trend types apart from \code{ZMVN()}, \code{GP()}, \code{CAR()} and \code{PW()}, moving average and/or correlated
-process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
-multivariate Random Walk if \code{n_series > 1}). It is also possible for many multivariate trends
-to estimate hierarchical correlations if the data are structured among levels of
-a relevant grouping factor. See \link{mvgam_trends} for more details and see \link{ZMVN} for an example.}
+For all trend types apart from \code{ZMVN()}, \code{GP()}, \code{CAR()} and \code{PW()}, moving
+average and/or correlated process error terms can also be estimated (for
+example, \code{RW(cor = TRUE)} will set up a multivariate Random Walk if \code{n_series > 1}).
+It is also possible for many multivariate trends to estimate hierarchical
+correlations if the data are structured among levels of a relevant grouping
+factor. See \link{mvgam_trends} for more details and see \link{ZMVN} for an example.}
 
 \item{noncentred}{\code{logical} Use the non-centred parameterisation for autoregressive
 trend models? Setting to \code{TRUE} will reparameterise the model to avoid possible
@@ -103,7 +124,8 @@ performance. Only available for certain trend models
 \code{trend = 'None'} when using a \code{trend_formula}). Not yet available for moving average or
 correlated error models}
 
-\item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
+\item{family}{\code{family} specifying the exponential observation family for
+the series. Currently supported
 families are:
 \itemize{
 \item\code{gaussian()} for real-valued data
@@ -114,12 +136,14 @@ families are:
 \item\code{bernoulli()} for binary data
 \item\code{poisson()} for count data
 \item\code{nb()} for overdispersed count data
-\item\code{binomial()} for count data with imperfect detection when the number of trials is known;
-note that the \code{cbind()} function must be used to bind the discrete observations and the discrete number
+\item\code{binomial()} for count data with imperfect detection when the number
+of trials is known;
+note that the \code{cbind()} function must be used to bind the discrete
+observations and the discrete number
 of trials
 \item\code{beta_binomial()} as for \code{binomial()} but allows for overdispersion
-\item\code{nmix()} for count data with imperfect detection when the number of trials
-is unknown and should be modeled via a State-Space N-Mixture model.
+\item\code{nmix()} for count data with imperfect detection when the number of
+trials is unknown and should be modeled via a State-Space N-Mixture model.
 The latent states are Poisson, capturing the 'true' latent
 abundance, while the observation process is Binomial to account for
 imperfect detection.
@@ -128,52 +152,74 @@ Default is \code{poisson()}.
 See \code{\link{mvgam_families}} for more details}
 
 \item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family}
-has additional family-specific observation parameters (e.g. variance components in
-\code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or \code{betar()}),
-these parameters will be shared across all outcome variables. This is handy if you have multiple
-outcomes (time series in most \code{mvgam} models) that you believe share some properties,
-such as being from the same species over different spatial units. Default is \code{FALSE}.}
+has additional family-specific observation parameters (e.g. variance
+components in
+\code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or
+\code{betar()}), these parameters will be shared across all outcome variables. This is handy
+if you have multiple outcomes (time series in most \code{mvgam} models) that you
+believe share some properties,
+such as being from the same species over different spatial units. Default is
+\code{FALSE}.}
 
-\item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
-required by the GAM \code{formula} and optional \code{trend_formula}. Most models should include columns:
+\item{data}{A \code{dataframe} or \code{list} containing the model response
+variable and covariates
+required by the GAM \code{formula} and optional \code{trend_formula}. Most
+models should include columns:
 \itemize{
-\item\code{series} (a \code{factor} index of the series IDs; the number of levels should be identical
+\item\code{series} (a \code{factor} index of the series IDs; the number of
+levels should be identical
 to the number of unique series labels (i.e. \code{n_series = length(levels(data$series))}))
-\item\code{time} (\code{numeric} or \code{integer} index of the time point for each observation).
-For most dynamic trend types available in \code{mvgam} (see argument \code{trend_model}), time should be
-measured in discrete, regularly spaced intervals (i.e. \code{c(1, 2, 3, ...)}). However you can
-use irregularly spaced intervals if using \code{trend_model = CAR(1)}, though note that any
+\item\code{time} (\code{numeric} or \code{integer} index of the time point for
+each observation).
+For most dynamic trend types available in \code{mvgam} (see argument \code{trend_model}),
+time should be
+measured in discrete, regularly spaced intervals (i.e. \code{c(1, 2, 3, ...)}).
+However you can
+use irregularly spaced intervals if using \code{trend_model = CAR(1)}, though
+note that any
 temporal intervals that are exactly \code{0} will be adjusted to a very small number
-(\code{1e-12}) to prevent sampling errors. See an example of \code{CAR()} trends in \code{\link{CAR}}
+(\code{1e-12}) to prevent sampling errors. See an example of \code{CAR()} trends in
+\code{\link{CAR}}
 }
-Note however that there are special cases where these identifiers are not needed. For
-example, models with hierarchical temporal correlation processes (e.g. \code{AR(gr = region, subgr = species)})
-should NOT include a \code{series} identifier, as this will be constructed internally (see
-\code{\link{mvgam_trends}} and \code{\link{AR}} for details). \code{mvgam} can also fit models that do not
-include a \code{time} variable if there are no temporal dynamic structures included (i.e. \code{trend_model = 'None'} or
-\code{trend_model = ZMVN()}). \code{data} should also include any other variables to be included in
+Note however that there are special cases where these identifiers are not
+needed. For
+example, models with hierarchical temporal correlation processes (e.g.
+\code{AR(gr = region, subgr = species)})
+should NOT include a \code{series} identifier, as this will be constructed
+internally (see
+\code{\link{mvgam_trends}} and \code{\link{AR}} for details). \code{mvgam} can also
+fit models that do not
+include a \code{time} variable if there are no temporal dynamic structures included
+(i.e. \code{trend_model = 'None'} or
+\code{trend_model = ZMVN()}). \code{data} should also include any other variables to be
+included in
 the linear predictor of \code{formula}}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same variables
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing
+the same variables
 as in \code{data}. If included, the
-observations in variable \code{y} will be set to \code{NA} when fitting the model so that posterior
+observations in variable \code{y} will be set to \code{NA} when fitting the
+model so that posterior
 simulations can be obtained}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 latent trends in a reduced dimension format. Only available for
 \code{RW()}, \code{AR()} and \code{GP()} trend models. Defaults to \code{FALSE}}
 
-\item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
-Cannot be \code{> n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}}
+\item{n_lv}{\code{integer} the number of latent dynamic factors to use if
+\code{use_lv == TRUE}. Cannot be \code{> n_series}. Defaults arbitrarily to
+\code{min(2, floor(n_series / 2))}}
 
-\item{trend_map}{Optional \code{data.frame} specifying which series should depend on which latent
-trends. Useful for allowing multiple series to depend on the same latent trend process, but with
-different observation processes. If supplied, a latent factor model is set up by setting
-\code{use_lv = TRUE} and using the mapping to set up the shared trends. Needs to have column names
-\code{series} and \code{trend}, with integer values in the \code{trend} column to state which trend each series
-should depend on. The \code{series} column should have a single unique entry for each series in the
-data (names should perfectly match factor levels of the \code{series} variable in \code{data}). Note that
-if this is supplied, the intercept parameter in the process model will NOT be automatically suppressed.
+\item{trend_map}{Optional \code{data.frame} specifying which series should depend
+on which latent trends. Useful for allowing multiple series to depend on the
+same latent trend process, but with different observation processes. If
+supplied, a latent factor model is set up by setting \code{use_lv = TRUE} and
+using the mapping to set up the shared trends. Needs to have column names
+\code{series} and \code{trend}, with integer values in the \code{trend} column to state which
+trend each series should depend on. The \code{series} column should have a single
+unique entry for each series in the data (names should perfectly match factor
+levels of the \code{series} variable in \code{data}). Note that if this is supplied,
+the intercept parameter in the process model will NOT be automatically suppressed.
 Not yet supported for models in wich the latent factors evolve in continuous time (\code{CAR()}).
 See examples for details}
 
@@ -182,10 +228,13 @@ definitions or, preferentially, a vector containing
 objects of class \code{brmsprior} (see. \code{\link[brms]{prior}} for details).
 See \link{get_mvgam_priors} and Details' for more information on changing default prior distributions}
 
-\item{run_model}{\code{logical}. If \code{FALSE}, the model is not fitted but instead the function will
-return the model file and the data / initial values that are needed to fit the model outside of \code{mvgam}}
+\item{run_model}{\code{logical}. If \code{FALSE}, the model is not fitted but
+instead the function will
+return the model file and the data / initial values that are needed to fit the
+model outside of \code{mvgam}}
 
-\item{prior_simulation}{\code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
+\item{prior_simulation}{\code{logical}. If \code{TRUE}, no observations are
+fed to the model, and instead
 simulations from prior distributions are returned}
 
 \item{residuals}{Logical indicating whether to compute series-level randomized quantile residuals and include
@@ -193,8 +242,10 @@ them as part of the returned object. Defaults to \code{TRUE}, but you can set to
 computational time and reduce the size of the returned object (users can always add residuals to
 an object of class \code{mvgam} using \link{add_residuals})}
 
-\item{return_model_data}{\code{logical}. If \code{TRUE}, the list of data that is needed to fit the
-model is returned, along with the initial values for smooth and AR parameters, once the model is fitted.
+\item{return_model_data}{\code{logical}. If \code{TRUE}, the list of data that
+is needed to fit the
+model is returned, along with the initial values for smooth and AR parameters,
+once the model is fitted.
 This will be helpful if users wish to modify the model file to add
 other stochastic elements that are not currently available in \code{mvgam}.
 Default is \code{FALSE} to reduce
@@ -220,8 +271,8 @@ dynamic GAMs, possibly because of the difficulties estimating covariances among 
 many spline parameters and latent trend parameters. But rigorous testing has not
 been carried out}
 
-\item{control}{A named \code{list} for controlling the sampler's behaviour. Valid elements include
-\code{max_treedepth}, \code{adapt_delta} and \code{init}}
+\item{control}{A named \code{list} for controlling the sampler's behaviour. Valid
+elements include \code{max_treedepth}, \code{adapt_delta} and \code{init}}
 
 \item{chains}{\code{integer} specifying the number of parallel chains for the model. Ignored
 if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}
@@ -250,11 +301,11 @@ when using \code{Cmdstan} as the backend}
 variables defined in Stan's \code{parameters} block should be saved
 (default is \code{FALSE}).}
 
-\item{silent}{Verbosity level between \code{0} and \code{2}. If \code{1} (the default), most of the informational
-messages of compiler and sampler are suppressed. If \code{2}, even more messages are suppressed. The
-actual sampling progress is still printed. Set \code{refresh = 0} to turn this off as well. If using
-\code{backend = "rstan"} you can also set open_progress = FALSE to prevent opening additional
-progress bars.}
+\item{silent}{Verbosity level between \code{0} and \code{2}. If \code{1} (the default), most
+of the informational messages of compiler and sampler are suppressed. If \code{2},
+even more messages are suppressed. The actual sampling progress is still printed.
+Set \code{refresh = 0} to turn this off as well. If using \code{backend = "rstan"} you
+can also set open_progress = FALSE to prevent opening additional progress bars.}
 
 \item{autoformat}{\code{Logical}. Use the \code{stanc} parser to automatically format the
 \code{Stan} code and check for deprecations. Only for development purposes, so leave to \code{TRUE}}
@@ -283,13 +334,16 @@ for other functions in the package. See \code{\link{mvgam-class}} for details.
 Use \code{methods(class = "mvgam")} for an overview on available methods.
 }
 \description{
-This function estimates the posterior distribution for Generalised Additive Models (GAMs) that can include
-smooth spline functions, specified in the GAM formula, as well as latent temporal processes,
-specified by \code{trend_model}. Further modelling options include State-Space representations to allow covariates
-and dynamic processes to occur on the latent 'State' level while also capturing observation-level effects.
-Prior specifications are flexible and explicitly encourage users to apply
-prior distributions that actually reflect their beliefs. In addition, model fits can easily be assessed and
-compared with posterior predictive checks, forecast comparisons and leave-one-out / leave-future-out cross-validation.
+This function estimates the posterior distribution for Generalised Additive
+Models (GAMs) that can include smooth spline functions, specified in the GAM
+formula, as well as latent temporal processes, specified by \code{trend_model}.
+Further modelling options include State-Space representations to allow covariates
+and dynamic processes to occur on the latent 'State' level while also capturing
+observation-level effects. Prior specifications are flexible and explicitly
+encourage users to apply prior distributions that actually reflect their beliefs.
+In addition, model fits can easily be assessed and
+compared with posterior predictive checks, forecast comparisons and
+leave-one-out / leave-future-out cross-validation.
 }
 \details{
 Dynamic GAMs are useful when we wish to predict future values from time series that show temporal dependence
@@ -311,24 +365,24 @@ the variation in the dynamic trend controls the average expectation, and/or wher
 are non-identifiable (as in piecewise trends, see examples below)
 \cr
 \cr
-\emph{Families and link functions}: Details of families supported by \pkg{mvgam} can be found in
-\code{\link{mvgam_families}}.
+\emph{Families and link functions}: Details of families supported by \pkg{mvgam}
+can be found in \code{\link{mvgam_families}}.
 \cr
 \cr
-\emph{Trend models}: Details of latent error process models supported by \pkg{mvgam} can be found in
-\code{\link{mvgam_trends}}.
+\emph{Trend models}: Details of latent error process models supported by \pkg{mvgam}
+can be found in \code{\link{mvgam_trends}}.
 \cr
 \cr
 \emph{Priors}: Default priors for intercepts and any scale parameters are generated
-using the same practice as \pkg{brms}. Prior distributions for most important model parameters can be
-altered by the user to inspect model
+using the same practice as \pkg{brms}. Prior distributions for most important
+model parameters can be altered by the user to inspect model
 sensitivities to given priors (see \code{\link{get_mvgam_priors}} for details).
 Note that latent trends are estimated on the link scale so choose priors
-accordingly. However more control over the model specification can be accomplished by first using \code{mvgam} as a
-baseline, then editing the returned model accordingly. The model file can be edited and run outside
-of \code{mvgam} by setting \code{run_model = FALSE} and this is encouraged for complex
-modelling tasks. Note, no priors are
-formally checked to ensure they are in the right syntax so it is
+accordingly. However more control over the model specification can be accomplished
+by first using \code{mvgam} as a baseline, then editing the returned model accordingly.
+The model file can be edited and run outside of \code{mvgam} by setting
+\code{run_model = FALSE} and this is encouraged for complex modelling tasks.
+Note, no priors are formally checked to ensure they are in the right syntax so it is
 up to the user to ensure these are correct
 \cr
 \cr
@@ -400,29 +454,33 @@ more targeted inferences (see \href{https://ecogambler.netlify.app/blog/interpre
 # Simulate a collection of three time series that have shared seasonal dynamics
 # and independent AR1 trends, with a Poisson observation process
 set.seed(0)
-dat <- sim_mvgam(T = 80,
-                n_series = 3,
-                mu = 2,
-                trend_model = AR(p = 1),
-                prop_missing = 0.1,
-                prop_trend = 0.6)
+dat <- sim_mvgam(
+  T = 80,
+  n_series = 3,
+  mu = 2,
+  trend_model = AR(p = 1),
+  prop_missing = 0.1,
+  prop_trend = 0.6
+)
 
 # Plot key summary statistics for a single series
 plot_mvgam_series(data = dat$data_train, series = 1)
 
 # Plot all series together
-plot_mvgam_series(data = dat$data_train, series = 'all')
+plot_mvgam_series(data = dat$data_train, series = "all")
 
 # Formulate a model using Stan where series share a cyclic smooth for
 # seasonality and each series has an independent AR1 temporal process.
 # Note that 'noncentred = TRUE' will likely give performance gains.
 # Set run_model = FALSE to inspect the returned objects
-mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
-             data = dat$data_train,
-             trend_model = AR(),
-             family = poisson(),
-             noncentred = TRUE,
-             run_model = FALSE)
+mod1 <- mvgam(
+  formula = y ~ s(season, bs = "cc", k = 6),
+  data = dat$data_train,
+  trend_model = AR(),
+  family = poisson(),
+  noncentred = TRUE,
+  run_model = FALSE
+)
 
 # View the model code in Stan language
 stancode(mod1)
@@ -432,23 +490,25 @@ sdata1 <- standata(mod1)
 str(sdata1)
 
 # Now fit the model
-mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
-              data = dat$data_train,
-              trend_model = AR(),
-              family = poisson(),
-              noncentred = TRUE,
-              chains = 2,
-              silent = 2)
+mod1 <- mvgam(
+  formula = y ~ s(season, bs = "cc", k = 6),
+  data = dat$data_train,
+  trend_model = AR(),
+  family = poisson(),
+  noncentred = TRUE,
+  chains = 2,
+  silent = 2
+)
 
 # Extract the model summary
 summary(mod1)
 
 # Plot the estimated historical trend and forecast for one series
-plot(mod1, type = 'trend', series = 1)
-plot(mod1, type = 'forecast', series = 1)
+plot(mod1, type = "trend", series = 1)
+plot(mod1, type = "forecast", series = 1)
 
 # Residual diagnostics
-plot(mod1, type = 'residuals', series = 1)
+plot(mod1, type = "residuals", series = 1)
 resids <- residuals(mod1)
 str(resids)
 
@@ -461,31 +521,31 @@ str(fc)
 plot(fc)
 
 # Plot the estimated seasonal smooth function
-plot(mod1, type = 'smooths')
+plot(mod1, type = "smooths")
 
 # Plot estimated first derivatives of the smooth
-plot(mod1, type = 'smooths', derivatives = TRUE)
+plot(mod1, type = "smooths", derivatives = TRUE)
 
 # Plot partial residuals of the smooth
-plot(mod1, type = 'smooths', residuals = TRUE)
+plot(mod1, type = "smooths", residuals = TRUE)
 
 # Plot posterior realisations for the smooth
-plot(mod1, type = 'smooths', realisations = TRUE)
+plot(mod1, type = "smooths", realisations = TRUE)
 
 # Plot conditional response predictions using marginaleffects
 conditional_effects(mod1)
-plot_predictions(mod1, condition = 'season', points = 0.5)
+plot_predictions(mod1, condition = "season", points = 0.5)
 
 # Generate posterior predictive checks using bayesplot
 pp_check(mod1)
 
 # Extract observation model beta coefficient draws as a data.frame
-beta_draws_df <- as.data.frame(mod1, variable = 'betas')
+beta_draws_df <- as.data.frame(mod1, variable = "betas")
 head(beta_draws_df)
 str(beta_draws_df)
 
 # Investigate model fit
-mc.cores.def <- getOption('mc.cores')
+mc.cores.def <- getOption("mc.cores")
 options(mc.cores = 1)
 loo(mod1)
 options(mc.cores = mc.cores.def)
@@ -498,26 +558,30 @@ mod_data <- sim$data_train
 
 # Here, we specify only two latent trends; series 1 and 2 share a trend,
 # while series 3 has it's own unique latent trend
-trend_map <- data.frame(series = unique(mod_data$series),
-                       trend = c(1, 1, 2))
+trend_map <- data.frame(
+  series = unique(mod_data$series),
+  trend = c(1, 1, 2)
+)
 
 # Fit the model using AR1 trends
-mod <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
-             trend_map = trend_map,
-             trend_model = AR(),
-             data = mod_data,
-             return_model_data = TRUE,
-             chains = 2,
-             silent = 2)
+mod <- mvgam(
+  formula = y ~ s(season, bs = "cc", k = 6),
+  trend_map = trend_map,
+  trend_model = AR(),
+  data = mod_data,
+  return_model_data = TRUE,
+  chains = 2,
+  silent = 2
+)
 
 # The mapping matrix is now supplied as data to the model in the 'Z' element
 mod$model_data$Z
 code(mod)
 
 # The first two series share an identical latent trend; the third is different
-plot(mod, type = 'trend', series = 1)
-plot(mod, type = 'trend', series = 2)
-plot(mod, type = 'trend', series = 3)
+plot(mod, type = "trend", series = 1)
+plot(mod, type = "trend", series = 2)
+plot(mod, type = "trend", series = 3)
 
 
 # Example of how to use dynamic coefficients
@@ -526,8 +590,8 @@ set.seed(123)
 N <- 200
 beta_temp <- vector(length = N)
 beta_temp[1] <- 0.4
-for(i in 2:N){
- beta_temp[i] <- rnorm(1, mean = beta_temp[i - 1] - 0.0025, sd = 0.05)
+for (i in 2:N) {
+  beta_temp[i] <- rnorm(1, mean = beta_temp[i - 1] - 0.0025, sd = 0.05)
 }
 plot(beta_temp)
 
@@ -535,42 +599,49 @@ plot(beta_temp)
 temp <- rnorm(N, sd = 1)
 
 # Simulate some noisy Gaussian observations
-out <- rnorm(N, mean = 4 + beta_temp * temp,
-             sd = 0.5)
+out <- rnorm(N,
+  mean = 4 + beta_temp * temp,
+  sd = 0.5
+)
 
 # Gather necessary data into a data.frame; split into training / testing
-data = data.frame(out, temp, time = seq_along(temp))
-data_train <- data[1:180,]
-data_test <- data[181:200,]
+data <- data.frame(out, temp, time = seq_along(temp))
+data_train <- data[1:180, ]
+data_test <- data[181:200, ]
 
 # Fit the model using the dynamic() formula helper
-mod <- mvgam(formula =
-              out ~ dynamic(temp,
-                            scale = FALSE,
-                            k = 40),
-             family = gaussian(),
-             data = data_train,
-             newdata = data_test,
-             chains = 2,
-             silent = 2)
+mod <- mvgam(
+  formula =
+    out ~ dynamic(temp,
+      scale = FALSE,
+      k = 40
+    ),
+  family = gaussian(),
+  data = data_train,
+  newdata = data_test,
+  chains = 2,
+  silent = 2
+)
 
 # Inspect the model summary, forecast and time-varying coefficient distribution
 summary(mod)
-plot(mod, type = 'smooths')
+plot(mod, type = "smooths")
 fc <- forecast(mod, newdata = data_test)
 plot(fc)
 
 # Propagating the smooth term shows how the coefficient is expected to evolve
 plot_mvgam_smooth(mod, smooth = 1, newdata = data)
-abline(v = 180, lty = 'dashed', lwd = 2)
+abline(v = 180, lty = "dashed", lwd = 2)
 points(beta_temp, pch = 16)
 
 
 # Example showing how to incorporate an offset; simulate some count data
 # with different means per series
 set.seed(100)
-dat <- sim_mvgam(prop_trend = 0, mu = c(0, 2, 2),
-                 seasonality = 'hierarchical')
+dat <- sim_mvgam(
+  prop_trend = 0, mu = c(0, 2, 2),
+  seasonality = "hierarchical"
+)
 
 # Add offset terms to the training and testing data
 dat$data_train$offset <- 0.5 * as.numeric(dat$data_train$series)
@@ -578,13 +649,15 @@ dat$data_test$offset <- 0.5 * as.numeric(dat$data_test$series)
 
 # Fit a model that includes the offset in the linear predictor as well as
 # hierarchical seasonal smooths
-mod <- mvgam(formula = y ~ offset(offset) +
-              s(series, bs = 're') +
-              s(season, bs = 'cc') +
-              s(season, by = series, m = 1, k = 5),
-             data = dat$data_train,
-             chains = 2,
-             silent = 2)
+mod <- mvgam(
+  formula = y ~ offset(offset) +
+    s(series, bs = "re") +
+    s(season, bs = "cc") +
+    s(season, by = series, m = 1, k = 5),
+  data = dat$data_train,
+  chains = 2,
+  silent = 2
+)
 
 # Inspect the model file to see the modification to the linear predictor
 # (eta)
@@ -606,26 +679,32 @@ plot(fc)
 # Relative Risks can be computed by fixing the offset to the same value
 # for each series
 dat$data_test$offset <- rep(1, NROW(dat$data_test))
-preds_rr <- predict(mod, type = 'link', newdata = dat$data_test,
-                    summary = FALSE)
-series1_inds <- which(dat$data_test$series == 'series_1')
-series2_inds <- which(dat$data_test$series == 'series_2')
+preds_rr <- predict(mod,
+  type = "link", newdata = dat$data_test,
+  summary = FALSE
+)
+series1_inds <- which(dat$data_test$series == "series_1")
+series2_inds <- which(dat$data_test$series == "series_2")
 
 # Relative Risks are now more comparable among series
 layout(matrix(1:2, ncol = 2))
-plot(preds_rr[1, series1_inds], type = 'l', col = 'grey75',
-     ylim = range(preds_rr),
-     ylab = 'Series1 Relative Risk', xlab = 'Time')
-for(i in 2:50){
- lines(preds_rr[i, series1_inds], col = 'grey75')
+plot(preds_rr[1, series1_inds],
+  type = "l", col = "grey75",
+  ylim = range(preds_rr),
+  ylab = "Series1 Relative Risk", xlab = "Time"
+)
+for (i in 2:50) {
+  lines(preds_rr[i, series1_inds], col = "grey75")
 }
 
-plot(preds_rr[1, series2_inds], type = 'l', col = 'darkred',
-     ylim = range(preds_rr),
-     ylab = 'Series2 Relative Risk', xlab = 'Time')
-for(i in 2:50){
- lines(preds_rr[i, series2_inds], col = 'darkred')
- }
+plot(preds_rr[1, series2_inds],
+  type = "l", col = "darkred",
+  ylim = range(preds_rr),
+  ylab = "Series2 Relative Risk", xlab = "Time"
+)
+for (i in 2:50) {
+  lines(preds_rr[i, series2_inds], col = "darkred")
+}
 layout(1)
 
 
@@ -633,41 +712,59 @@ layout(1)
 # Simulate two time series of Binomial trials
 trials <- sample(c(20:25), 50, replace = TRUE)
 x <- rnorm(50)
-detprob1 <- plogis(-0.5 + 0.9*x)
-detprob2 <- plogis(-0.1 -0.7*x)
-dat <- rbind(data.frame(y = rbinom(n = 50, size = trials, prob = detprob1),
-                        time = 1:50,
-                        series = 'series1',
-                        x = x,
-                        ntrials = trials),
-             data.frame(y = rbinom(n = 50, size = trials, prob = detprob2),
-                        time = 1:50,
-                        series = 'series2',
-                        x = x,
-                        ntrials = trials))
+detprob1 <- plogis(-0.5 + 0.9 * x)
+detprob2 <- plogis(-0.1 - 0.7 * x)
+dat <- rbind(
+  data.frame(
+    y = rbinom(n = 50, size = trials, prob = detprob1),
+    time = 1:50,
+    series = "series1",
+    x = x,
+    ntrials = trials
+  ),
+  data.frame(
+    y = rbinom(n = 50, size = trials, prob = detprob2),
+    time = 1:50,
+    series = "series2",
+    x = x,
+    ntrials = trials
+  )
+)
 dat <- dplyr::mutate(dat, series = as.factor(series))
 dat <- dplyr::arrange(dat, time, series)
-plot_mvgam_series(data = dat, series = 'all')
+plot_mvgam_series(data = dat, series = "all")
 
 # Fit a model using the binomial() family; must specify observations
 # and number of trials in the cbind() wrapper
-mod <- mvgam(formula =
-              cbind(y, ntrials) ~ series + s(x, by = series),
-             family = binomial(),
-             data = dat,
-             chains = 2,
-             silent = 2)
+mod <- mvgam(
+  formula =
+    cbind(y, ntrials) ~ series + s(x, by = series),
+  family = binomial(),
+  data = dat,
+  chains = 2,
+  silent = 2
+)
 summary(mod)
-pp_check(mod, type = "bars_grouped",
-         group = "series", ndraws = 50)
-pp_check(mod, type = "ecdf_overlay_grouped",
-         group = "series", ndraws = 50)
-conditional_effects(mod, type = 'link')
+pp_check(mod,
+  type = "bars_grouped",
+  group = "series", ndraws = 50
+)
+pp_check(mod,
+  type = "ecdf_overlay_grouped",
+  group = "series", ndraws = 50
+)
+conditional_effects(mod, type = "link")
 }
 }
 \references{
 Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
 Methods in Ecology and Evolution. 14:3, 771-784.
+\cr
+\cr
+Nicholas J Clark, SK Morgan Ernest, Henry Senyondo, Juniper Simonis, Ethan P White,
+Glenda M Yenni, KANK Karunarathna (2025). Beyond single-species models: leveraging
+multispecies forecasts to navigate the dynamics of ecological predictability. PeerJ.
+13:e18929 https://doi.org/10.7717/peerj.18929
 }
 \seealso{
 \code{\link[mgcv]{jagam}}, \code{\link[mgcv]{gam}}, \code{\link[mgcv]{gam.models}},

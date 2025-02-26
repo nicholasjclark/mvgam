@@ -71,8 +71,8 @@ Conditional posterior predictions are drawn from the fitted \code{mvgam} and com
 the empirical distribution of the observed data for a specified series to help evaluate the model's
 ability to generate unbiased predictions. For all plots apart from \code{type = 'rootogram'}, posterior predictions
 can also be compared to out of sample observations as long as these observations were included as
-'data_test' in the original model fit and supplied here. Rootograms are currently only plotted using the
-'hanging' style.
+' data_test' in the original model fit and supplied here. Rootograms are currently only plotted using the
+' hanging' style.
 \cr
 Note that the predictions used for these plots are \emph{conditional on the observed data}, i.e. they
 are those predictions that have been generated directly within
@@ -86,20 +86,21 @@ a broader range of posterior checks that are created using \emph{unconditional} 
 set.seed(0)
 dat <- mgcv::gamSim(1, n = 200, scale = 2)
 mod <- mvgam(y ~ s(x0) + s(x1) + s(x2) + s(x3),
-            data = dat,
-            family = gaussian(),
-            chains = 2,
-            silent = 2)
+  data = dat,
+  family = gaussian(),
+  chains = 2,
+  silent = 2
+)
 
 # Posterior checks
-ppc(mod, type = 'hist')
-ppc(mod, type = 'density')
-ppc(mod, type = 'cdf')
+ppc(mod, type = "hist")
+ppc(mod, type = "density")
+ppc(mod, type = "cdf")
 
 # Many more options are available with pp_check()
 pp_check(mod)
 pp_check(mod, type = "ecdf_overlay")
-pp_check(mod, type = 'freqpoly')
+pp_check(mod, type = "freqpoly")
 }
 }
 \seealso{
