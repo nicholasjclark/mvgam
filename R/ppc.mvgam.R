@@ -78,16 +78,17 @@ ppc <- function(object, ...) {
 #' @method ppc mvgam
 #' @export
 ppc.mvgam <- function(
-    object,
-    newdata,
-    data_test,
-    series = 1,
-    type = "hist",
-    n_bins,
-    legend_position,
-    xlab,
-    ylab,
-    ...) {
+  object,
+  newdata,
+  data_test,
+  series = 1,
+  type = "hist",
+  n_bins,
+  legend_position,
+  xlab,
+  ylab,
+  ...
+) {
   # Check arguments
   type <- match.arg(
     arg = type,
@@ -225,14 +226,12 @@ ppc.mvgam <- function(
           by = NCOL(object$ytimes)
         )]
       } else {
-        preds <- mcmc_chains(object$model_output, "ypred")[
-          ,
+        preds <- mcmc_chains(object$model_output, "ypred")[,
           starts[series]:ends[series]
         ]
       }
 
-      preds <- preds[
-        ,
+      preds <- preds[,
         ((length(data_train$y) / NCOL(object$ytimes)) + 1):((length(
           data_train$y
         ) /
@@ -255,14 +254,12 @@ ppc.mvgam <- function(
           by = NCOL(object$ytimes)
         )]
       } else {
-        preds <- mcmc_chains(object$model_output, "ypred")[
-          ,
+        preds <- mcmc_chains(object$model_output, "ypred")[,
           starts[series]:ends[series]
         ]
       }
 
-      preds <- preds[
-        ,
+      preds <- preds[,
         ((NROW(data_train) / NCOL(object$ytimes)) + 1):((NROW(data_train) /
           NCOL(object$ytimes)) +
           length(truths))
@@ -299,8 +296,7 @@ ppc.mvgam <- function(
         by = NCOL(object$ytimes)
       )]
     } else {
-      preds <- mcmc_chains(object$model_output, "ypred")[
-        ,
+      preds <- mcmc_chains(object$model_output, "ypred")[,
         starts[series]:ends[series]
       ]
     }
@@ -1050,14 +1046,15 @@ ppc.mvgam <- function(
 #' @author Nicholas J Clark
 #' @export
 pp_check.mvgam <- function(
-    object,
-    type,
-    ndraws = NULL,
-    prefix = c("ppc", "ppd"),
-    group = NULL,
-    x = NULL,
-    newdata = NULL,
-    ...) {
+  object,
+  type,
+  ndraws = NULL,
+  prefix = c("ppc", "ppd"),
+  group = NULL,
+  x = NULL,
+  newdata = NULL,
+  ...
+) {
   # Set red colour scheme
   col_scheme <- attr(color_scheme_get(), "scheme_name")
   color_scheme_set("red")
