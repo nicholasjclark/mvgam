@@ -434,7 +434,12 @@ Because Vector Autoregressions can capture complex lagged dependencies, it is of
 irfs <- irf(varcor_mod, h = 12)
 ```
 
-Plot the expected responses of the remaining series to a positive shock for series 3 (Greens)
+A summary of the IRFs can be computed using the `summary()` function:
+```{r}
+summary(irfs)
+```
+
+But it is easier to understand these responses using plots. For example, we can plot the expected responses of the remaining series to a positive shock for series 3 (Greens) using the `plot()` function:
 ```{r}
 plot(irfs, series = 3)
 ```

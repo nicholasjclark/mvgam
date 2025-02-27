@@ -69,6 +69,9 @@ test_that("irf() gives correct outputs", {
   expect_true(length(irfs) == 5)
   expect_true(NROW(irfs[[1]]$process_1) == 6)
   expect_no_error(plot(irfs))
+  expect_s3_class(summary(irfs), 'tbl_df')
+  expect_error(summary(irfs, probs = c(1)),
+               "argument 'probs' must be a vector of length 2")
 })
 
 test_that("fevd() gives correct outputs", {

@@ -2,12 +2,82 @@
 #'
 #' A \code{mvgam_irf} object returned by function \code{\link{irf}}.
 #' Run `methods(class = "mvgam_irf")` to see an overview of available methods.
-#' @details A `mvgam_irf` object contains a list of posterior IRFs, each stored as
-#' its own list
+#' @details A `mvgam_irf` object contains a `list` of posterior impulse response
+#' functions, each stored as its own `list`
 #' @seealso [mvgam], [VAR]
 #' @author Nicholas J Clark
 #' @name mvgam_irf-class
 NULL
+
+#' @title Posterior summary of impulse responses
+#'
+#' @description This function takes an \code{mvgam_irf} object and
+#' calculates a posterior summary of the impulse responses of each
+#' series to shocks from each of the other series, at all horizons
+#'
+#' @param object an object of class `mvgam_irf` obtained using the
+#' \code{irf()} function containing. This object will contain draws from the posterior
+#' distribution of the impulse responses.
+#' @param probs The upper and lower percentiles to be computed by the `quantile` function,
+#' in addition to the median
+#' @param ... ignored
+#'
+#' @return A long-format `tibble` reporting the posterior median,
+#' upper and lower percentiles of the impulse responses of each series to shocks
+#' from each of the other series at all horizons.
+#'
+#' @method summary mvgam_irf
+#'
+#' @seealso \code{\link{irf}}, \code{\link{plot.mvgam_irf}}
+#'
+#' @author Nicholas J Clark
+#'
+#' @export
+summary.mvgam_irf = function(object,
+                             probs = c(0.025, 0.975),
+                             ...){
+  n_processes <- dim(object[[1]][[1]])[2]
+  h <- dim(object[[1]][[1]])[1]
+  n_draws <- length(object)
+  if(length(probs) != 2L) {
+    stop("argument 'probs' must be a vector of length 2",
+         call. = FALSE)
+  }
+
+  out <- do.call(rbind, lapply(1:n_processes, function(series){
+    # Extract IRFs for the specific series
+    impulse_responses <- lapply(seq_along(object), function(j) {
+      object[[j]][series]
+    })
+
+    responses <- do.call(
+      rbind,
+      lapply(seq_along(impulse_responses), function(j) {
+        data.frame(
+          horizon = 1:h,
+          imp_resp = as.vector(impulse_responses[[j]][[1]]),
+          resp_var = sort(rep(
+            paste0('Process', 1:n_processes),
+            NROW(impulse_responses[[j]][[1]])
+          ))
+        )
+      })
+    ) %>%
+      dplyr::mutate(shock = paste0('Process', series, ' -> ', resp_var)) %>%
+
+      # Calculate posterior empirical quantiles of impulse responses
+      dplyr::group_by(shock, horizon) %>%
+      dplyr::summarise(
+        median = median(imp_resp),
+        Qlower = quantile(imp_resp, min(probs)),
+        Qupper = quantile(imp_resp, max(probs)),
+        .groups = 'keep'
+      ) %>%
+      dplyr::ungroup()
+  }))
+
+  return(out)
+}
 
 #'Plot impulse responses from an `mvgam_irf` object
 #'
@@ -24,6 +94,10 @@ plot.mvgam_irf = function(x, series = 1, ...) {
   all_irfs <- x
   validate_pos_integer(series)
   n_processes <- dim(all_irfs[[1]][[1]])[2]
+  if (series > n_processes) {
+    stop(paste0("argument 'series' must be <= ", n_processes),
+         call. = FALSE)
+  }
   h <- dim(all_irfs[[1]][[1]])[1]
 
   # Extract IRFs for the specific series

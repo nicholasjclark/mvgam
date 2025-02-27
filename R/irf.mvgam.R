@@ -54,6 +54,10 @@
 #' plot(irfs, series = 1)
 #' plot(irfs, series = 2)
 #' plot(irfs, series = 3)
+#'
+#' # Calculate posterior median, upper and lower 90th quantiles
+#' # of the impulse responses
+#' summary(irfs)
 #' }
 #'@export
 irf <- function(object, ...) {
