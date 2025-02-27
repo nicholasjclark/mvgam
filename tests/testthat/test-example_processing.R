@@ -249,6 +249,18 @@ test_that("predict() works correctly", {
       process_error = FALSE
     ))
   )
+
+  expect_error(
+    predict(mvgam:::mvgam_example1,
+            newdata = data.frame(time = 1)
+            ),
+    "the following required variables are missing from newdata:\n season, series")
+
+  expect_error(
+    predict(mvgam:::mvgam_example2,
+            newdata = data.frame(season = 1)
+    ),
+    "the following required variables are missing from newdata:\n time, series")
 })
 
 test_that("mcmc_plot() works correctly", {
@@ -385,6 +397,31 @@ test_that("plot_mvgam... functions work properly", {
     n_realisations = 2
   ))
   expect_ggplot(plot_mvgam_series(object = mvgam:::mvgam_example4))
+  expect_ggplot(
+    SW(pp_check(
+      object = mvgam:::mvgam_example1,
+      x = "season",
+      type = "resid_ribbon",
+      ndraws = 3
+    ))
+  )
+  expect_ggplot(
+    SW(pp_check(
+      object = mvgam:::mvgam_example2,
+      x = "season",
+      type = "resid_ribbon",
+      ndraws = 3
+    ))
+  )
+  expect_ggplot(
+    SW(pp_check(
+      object = mvgam:::mvgam_example2,
+      x = "season",
+      group = "series",
+      type = "resid_ribbon_grouped",
+      ndraws = 3
+    ))
+  )
 })
 
 test_that("dynamic factor investigations work", {

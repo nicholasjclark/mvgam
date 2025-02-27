@@ -30,9 +30,6 @@ jobs:
         with:
           use-public-rspm: true
 
-      # As cmdstanr is not yet on CRAN, configure the action to only install the
-      # 'Depends' packages by default and then manually specify the 'Suggests'
-      # packages that are needed for R CMD CHECK
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           dependencies: NA
@@ -56,10 +53,11 @@ jobs:
               stan-dev/cmdstanr
               usethis
 
-      - name: Build Cmdstan
+      - name: Build Cmdstan and install development brms version
         run: |
           cmdstanr::check_cmdstan_toolchain(fix = TRUE)
           cmdstanr::install_cmdstan()
+          remotes::install_github(paul-buerkner/brms)
         shell: Rscript {0}
 
       - name: Build site
