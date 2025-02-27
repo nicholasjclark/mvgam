@@ -57,7 +57,7 @@ jobs:
         run: |
           cmdstanr::check_cmdstan_toolchain(fix = TRUE)
           cmdstanr::install_cmdstan()
-          remotes::install_github(paul-buerkner/brms)
+          remotes::install_github('paul-buerkner/brms')
         shell: Rscript {0}
 
       - name: Build site

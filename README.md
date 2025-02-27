@@ -142,19 +142,25 @@ series as well as its autocorrelation function
 
 ``` r
 data(lynx)
-lynx_full <- data.frame(year = 1821:1934, 
-                        population = as.numeric(lynx))
-plot(lynx_full$population, type = 'l', ylab = 'Lynx trappings',
-     xlab = 'Time', bty = 'l', lwd = 2)
-box(bty = 'l', lwd  = 2)
+lynx_full <- data.frame(
+  year = 1821:1934,
+  population = as.numeric(lynx)
+)
+plot(lynx_full$population,
+  type = "l", ylab = "Lynx trappings",
+  xlab = "Time", bty = "l", lwd = 2
+)
+box(bty = "l", lwd = 2)
 ```
 
 <img src="man/figures/README-unnamed-chunk-4-1.png" alt="Visualizing the lynx time series in R" width="60%" style="display: block; margin: auto;" />
 
 ``` r
-acf(lynx_full$population, main = '', bty = 'l', lwd = 2,
-    ci.col = 'darkred')
-box(bty = 'l', lwd  = 2)
+acf(lynx_full$population,
+  main = "", bty = "l", lwd = 2,
+  ci.col = "darkred"
+)
+box(bty = "l", lwd = 2)
 ```
 
 <img src="man/figures/README-unnamed-chunk-4-2.png" alt="Visualizing the lynx time series in R" width="60%" style="display: block; margin: auto;" />
@@ -165,14 +171,15 @@ and give a better representation of the data generating process than we
 would likely get with a linear model
 
 ``` r
-plot(stl(ts(lynx_full$population, frequency = 19), s.window = 'periodic'),
-     lwd = 2, col.range = 'darkred')
+plot(stl(ts(lynx_full$population, frequency = 19), s.window = "periodic"),
+  lwd = 2, col.range = "darkred"
+)
 ```
 
 <img src="man/figures/README-unnamed-chunk-5-1.png" alt="Visualizing and decomposing the lynx time series in R" width="60%" style="display: block; margin: auto;" />
 
 ``` r
-lynx_full$season <- (lynx_full$year%%19) + 1
+lynx_full$season <- (lynx_full$year %% 19) + 1
 ```
 
 For most `mvgam` models, we need an indicator of the series name as a
@@ -183,7 +190,7 @@ Models](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html))
 
 ``` r
 lynx_full$time <- 1:NROW(lynx_full)
-lynx_full$series <- factor('series1')
+lynx_full$series <- factor("series1")
 ```
 
 Split the data into training (first 50 years) and testing (next 10 years
@@ -197,7 +204,7 @@ lynx_test <- lynx_full[51:60, ]
 Inspect the series in a bit more detail using `mvgam`’s plotting utility
 
 ``` r
-plot_mvgam_series(data = lynx_train, y = 'population')
+plot_mvgam_series(data = lynx_train, y = "population")
 ```
 
 <img src="man/figures/README-unnamed-chunk-8-1.png" alt="Plotting time series features with the mvgam R package" width="60%" style="display: block; margin: auto;" />
@@ -209,13 +216,14 @@ We assume the outcome follows a Poisson distribution and will condition
 the model in `Stan` using MCMC sampling with the `Cmdstan` interface:
 
 ``` r
-lynx_mvgam <- mvgam(population ~ s(season, bs = 'cc', k = 12),
-                    knots = list(season = c(0.5, 19.5)),
-                    data = lynx_train,
-                    newdata = lynx_test,
-                    family = poisson(),
-                    trend_model = AR(p = 1),
-                    backend = 'cmdstanr')
+lynx_mvgam <- mvgam(population ~ s(season, bs = "cc", k = 12),
+  knots = list(season = c(0.5, 19.5)),
+  data = lynx_train,
+  newdata = lynx_test,
+  family = poisson(),
+  trend_model = AR(p = 1),
+  backend = "cmdstanr"
+)
 ```
 
 Have a look at this model’s summary to see what is being estimated. Note
@@ -251,37 +259,38 @@ summary(lynx_mvgam)
 #> 
 #> GAM coefficient (beta) estimates:
 #>                2.5%   50%  97.5% Rhat n_eff
-#> (Intercept)   6.400  6.60  6.900 1.01   835
-#> s(season).1  -0.600 -0.14  0.370 1.00   883
-#> s(season).2   0.740  1.30  2.000 1.00   780
-#> s(season).3   1.300  1.90  2.600 1.00   785
-#> s(season).4  -0.033  0.55  1.100 1.00   955
-#> s(season).5  -1.300 -0.71 -0.130 1.00   953
-#> s(season).6  -1.300 -0.57  0.099 1.00  1001
-#> s(season).7   0.035  0.74  1.400 1.00   961
-#> s(season).8   0.610  1.40  2.100 1.00   769
-#> s(season).9  -0.380  0.23  0.820 1.00   832
-#> s(season).10 -1.400 -0.87 -0.390 1.00   844
+#> (Intercept)   6.400  6.60  6.900 1.00   646
+#> s(season).1  -0.630 -0.12  0.390 1.00   938
+#> s(season).2   0.720  1.30  1.900 1.00   967
+#> s(season).3   1.200  1.90  2.500 1.00   845
+#> s(season).4  -0.078  0.52  1.100 1.00   833
+#> s(season).5  -1.300 -0.70 -0.026 1.01   793
+#> s(season).6  -1.300 -0.55  0.130 1.01   891
+#> s(season).7   0.011  0.71  1.400 1.00   895
+#> s(season).8   0.550  1.40  2.100 1.00   801
+#> s(season).9  -0.410  0.22  0.840 1.00   781
+#> s(season).10 -1.400 -0.87 -0.350 1.00   873
 #> 
 #> Approximate significance of GAM smooths:
 #>            edf Ref.df Chi.sq p-value    
-#> s(season) 9.98     10   48.8  <2e-16 ***
+#> s(season) 9.96     10   51.2  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend parameter AR estimates:
 #>          2.5%  50% 97.5% Rhat n_eff
-#> ar1[1]   0.60 0.83  0.98 1.01   710
-#> sigma[1] 0.39 0.48  0.60 1.00   699
+#> ar1[1]   0.59 0.84  0.99    1   688
+#> sigma[1] 0.38 0.48  0.61    1   571
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
 #> 0 of 2000 iterations ended with a divergence (0%)
-#> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
+#> 14 of 2000 iterations saturated the maximum tree depth of 10 (0.7%)
+#>  *Run with max_treedepth set to a larger value to avoid saturation
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Feb 25 4:09:24 PM 2025.
+#> Samples were drawn using NUTS(diag_e) at Thu Feb 27 3:28:11 PM 2025.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -294,7 +303,7 @@ smoothing parameters, using `mvgam`’s reliance on the excellent
 `bayesplot` library:
 
 ``` r
-mcmc_plot(lynx_mvgam, variable = 'rho', regex = TRUE, type = 'trace')
+mcmc_plot(lynx_mvgam, variable = "rho", regex = TRUE, type = "trace")
 #> No divergences to plot.
 ```
 
@@ -303,7 +312,7 @@ mcmc_plot(lynx_mvgam, variable = 'rho', regex = TRUE, type = 'trace')
 and for the latent trend parameters
 
 ``` r
-mcmc_plot(lynx_mvgam, variable = 'trend_params', regex = TRUE, type = 'trace')
+mcmc_plot(lynx_mvgam, variable = "trend_params", regex = TRUE, type = "trace")
 #> No divergences to plot.
 ```
 
@@ -365,7 +374,7 @@ left unexplained in the model *if* we were to drop this term, giving us
 further confidence that this function is important in the model
 
 ``` r
-plot(lynx_mvgam, type = 'smooths', residuals = TRUE)
+plot(lynx_mvgam, type = "smooths", residuals = TRUE)
 ```
 
 <img src="man/figures/README-unnamed-chunk-17-1.png" alt="Plotting GAM smooth functions in mvgam and R" width="60%" style="display: block; margin: auto;" />
@@ -375,9 +384,11 @@ the function changes. To plot these we use the more flexible
 `plot_mvgam_smooth()` function
 
 ``` r
-plot_mvgam_smooth(lynx_mvgam, series = 1, 
-                  smooth = 'season', 
-                  derivatives = TRUE)
+plot_mvgam_smooth(lynx_mvgam,
+  series = 1,
+  smooth = "season",
+  derivatives = TRUE
+)
 ```
 
 <img src="man/figures/README-unnamed-chunk-18-1.png" alt="Plotting GAM smooth functions in mvgam and R" width="60%" style="display: block; margin: auto;" />
@@ -406,7 +417,7 @@ be calculated and plotted. Below is the conditional effect of season
 plotted on the outcome scale, for example:
 
 ``` r
-plot_predictions(lynx_mvgam, condition = 'season', points = 0.5) +
+plot_predictions(lynx_mvgam, condition = "season", points = 0.5) +
   theme_classic()
 ```
 
@@ -418,8 +429,8 @@ series (testing and training)
 ``` r
 fc <- forecast(lynx_mvgam, newdata = lynx_test)
 plot(fc)
-#> Out of sample CRPS:
-#> 2468.68933975
+#> Out of sample DRPS:
+#> 2449.876256
 ```
 
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
@@ -427,7 +438,7 @@ plot(fc)
 And the estimated latent trend component
 
 ``` r
-trend_fc <- forecast(lynx_mvgam, newdata = lynx_test, type = 'trend')
+trend_fc <- forecast(lynx_mvgam, newdata = lynx_test, type = "trend")
 plot(trend_fc)
 ```
 
@@ -441,11 +452,15 @@ forecast uncertainty for the GAM component and the latent trend
 component using `mvgam`
 
 ``` r
-plot_mvgam_uncertainty(lynx_mvgam, newdata = lynx_test, legend_position = 'none')
-text(1, 0.2, cex = 1.5, label = "GAM component", 
-     pos = 4, col = "white", family = 'serif')
-text(1, 0.8, cex = 1.5, label = "Trend component", 
-     pos = 4, col = "#7C0000", family = 'serif')
+plot_mvgam_uncertainty(lynx_mvgam, newdata = lynx_test, legend_position = "none")
+text(1, 0.2,
+  cex = 1.5, label = "GAM component",
+  pos = 4, col = "white", family = "serif"
+)
+text(1, 0.8,
+  cex = 1.5, label = "Trend component",
+  pos = 4, col = "#7C0000", family = "serif"
+)
 ```
 
 <img src="man/figures/README-unnamed-chunk-23-1.png" alt="Decomposing uncertainty contributions to forecasts in mvgam in R" width="60%" style="display: block; margin: auto;" />
@@ -458,7 +473,7 @@ primarily looking for a lack of autocorrelation, which would suggest our
 AR1 model is appropriate for the latent trend
 
 ``` r
-plot(lynx_mvgam, type = 'residuals')
+plot(lynx_mvgam, type = "residuals")
 ```
 
 <img src="man/figures/README-unnamed-chunk-24-1.png" alt="Plotting Dunn-Smyth residuals for time series analysis in mvgam and R" width="60%" style="display: block; margin: auto;" />
@@ -468,10 +483,11 @@ For example, we can plot them against `season` to look for any
 systematic patterns in the model’s errors
 
 ``` r
-pp_check(lynx_mvgam, 
-         x = "season",
-         type = "resid_ribbon",
-         ndraws = 100)
+pp_check(lynx_mvgam,
+  x = "season",
+  type = "resid_ribbon",
+  ndraws = 100
+)
 ```
 
 <img src="man/figures/README-unnamed-chunk-25-1.png" alt="Plotting Dunn-Smyth residuals for time series analysis in mvgam and R" width="60%" style="display: block; margin: auto;" />
@@ -479,10 +495,11 @@ pp_check(lynx_mvgam,
 Or we can also plot them against `time`
 
 ``` r
-pp_check(lynx_mvgam, 
-         x = "time",
-         type = "resid_ribbon",
-         ndraws = 100)
+pp_check(lynx_mvgam,
+  x = "time",
+  type = "resid_ribbon",
+  ndraws = 100
+)
 ```
 
 <img src="man/figures/README-unnamed-chunk-26-1.png" alt="Plotting Dunn-Smyth residuals for time series analysis in mvgam and R" width="60%" style="display: block; margin: auto;" />
@@ -555,23 +572,27 @@ trends:
 
 ``` r
 set.seed(100)
-data <- sim_mvgam(family = betar(),
-                  T = 80,
-                  trend_model = GP(),
-                  prop_trend = 0.5, 
-                  seasonality = 'shared')
-plot_mvgam_series(data = data$data_train, series = 'all')
+data <- sim_mvgam(
+  family = betar(),
+  T = 80,
+  trend_model = GP(),
+  prop_trend = 0.5,
+  seasonality = "shared"
+)
+plot_mvgam_series(data = data$data_train, series = "all")
 ```
 
 <img src="man/figures/README-beta_sim-1.png" width="60%" style="display: block; margin: auto;" />
 
 ``` r
-mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
-               s(season, by = series, m = 1, k = 5),
-             trend_model = GP(),
-             data = data$data_train,
-             newdata = data$data_test,
-             family = betar())
+mod <- mvgam(
+  y ~ s(season, bs = "cc", k = 7) +
+    s(season, by = series, m = 1, k = 5),
+  trend_model = GP(),
+  data = data$data_train,
+  newdata = data$data_test,
+  family = betar()
+)
 ```
 
 Inspect the summary to see that the posterior now also contains
@@ -642,7 +663,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Feb 25 4:10:23 PM 2025.
+#> Samples were drawn using NUTS(diag_e) at Thu Feb 27 3:29:11 PM 2025.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -656,9 +677,9 @@ Plot the hindcast and forecast distributions for each series
 library(patchwork)
 fc <- forecast(mod)
 wrap_plots(
-  plot(fc, series = 1), 
-  plot(fc, series = 2), 
-  plot(fc, series = 3), 
+  plot(fc, series = 1),
+  plot(fc, series = 2),
+  plot(fc, series = 3),
   ncol = 2
 )
 ```
