@@ -16,7 +16,7 @@ NULL
 #' series to shocks from each of the other series, at all horizons
 #'
 #' @param object an object of class `mvgam_irf` obtained using the
-#' \code{irf()} function containing. This object will contain draws from the posterior
+#' \code{irf()} function. This object will contain draws from the posterior
 #' distribution of the impulse responses.
 #' @param probs The upper and lower percentiles to be computed by the `quantile` function,
 #' in addition to the median
@@ -67,9 +67,9 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
         # Calculate posterior empirical quantiles of impulse responses
         dplyr::group_by(shock, horizon) %>%
         dplyr::summarise(
-          median = median(imp_resp),
-          Qlower = quantile(imp_resp, min(probs)),
-          Qupper = quantile(imp_resp, max(probs)),
+          irf_median = median(imp_resp),
+          irf_Qlower = quantile(imp_resp, min(probs)),
+          irf_Qupper = quantile(imp_resp, max(probs)),
           .groups = 'keep'
         ) %>%
         dplyr::ungroup()

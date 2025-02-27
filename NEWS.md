@@ -2,6 +2,7 @@
 ## New functionalities
 * Converted several more plotting functions to return `ggplot` objects in place of base R plots
 * Added four new `type`s to the `pp_check()` function to allow more targeted investigations of randomized quantile residual distributions
+* Added `summary()` functions to calculate useful posterior summaries from objects of class `mvgam_irf` and `mvgam_fevd` (see `?irf` and `fevd` for examples)
 
 ## Bug fixes
 * Bug fix to ensure piecewise trends are extrapolated the correct number of timepoints when forecasting using the `forecast()` function

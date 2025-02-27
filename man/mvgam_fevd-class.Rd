@@ -8,9 +8,9 @@ A \code{mvgam_fevd} object returned by function \code{\link{fevd}}.
 Run \code{methods(class = "mvgam_fevd")} to see an overview of available methods.
 }
 \details{
-A \code{mvgam_fevd} object contains a list of posterior forecast
+A \code{mvgam_fevd} object contains a \code{list} of posterior forecast
 error variance decompositions, each stored as
-its own list
+its own \code{list}
 }
 \seealso{
 \link{mvgam}, \link{VAR}

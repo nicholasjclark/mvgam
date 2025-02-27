@@ -8,7 +8,7 @@
 }
 \arguments{
 \item{object}{an object of class \code{mvgam_irf} obtained using the
-\code{irf()} function containing. This object will contain draws from the posterior
+\code{irf()} function. This object will contain draws from the posterior
 distribution of the impulse responses.}
 
 \item{probs}{The upper and lower percentiles to be computed by the \code{quantile} function,

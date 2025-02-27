@@ -444,7 +444,13 @@ But it is easier to understand these responses using plots. For example, we can 
 plot(irfs, series = 3)
 ```
 
-This series of plots makes it clear that some of the other series would be expected to show both instantaneous responses to a shock for the Greens (due to their correlated process errors) as well as delayed and nonlinear responses over time (due to the complex lagged dependence structure captured by the $A$ matrix). This hopefully makes it clear why IRFs are an important tool in the analysis of multivariate autoregressive models.
+This series of plots makes it clear that some of the other series would be expected to show both instantaneous responses to a shock for the Greens (due to their correlated process errors) as well as delayed and nonlinear responses over time (due to the complex lagged dependence structure captured by the $A$ matrix). This hopefully makes it clear why IRFs are an important tool in the analysis of multivariate autoregressive models. You can also use these IRFs to calculate a relative contribution from each shock to the forecast error variance for a focal series. This method, known as a [Forecast Error Variance Decomposition](https://en.wikipedia.org/wiki/Variance_decomposition_of_forecast_errors) (FEVD), is useful to get an idea about the amount of information that each series contributes to the evolution of all other series in a Vector Autoregression:
+```{r}
+fevds <- fevd(varcor_mod, h = 12)
+plot(fevds)
+```
+
+The plot above shows the median contribution to forecast error variance for each series.
 
 ### Comparing forecast scores
 
