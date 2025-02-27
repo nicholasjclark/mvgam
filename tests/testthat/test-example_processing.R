@@ -251,16 +251,14 @@ test_that("predict() works correctly", {
   )
 
   expect_error(
-    predict(mvgam:::mvgam_example1,
-            newdata = data.frame(time = 1)
-            ),
-    "the following required variables are missing from newdata:\n season, series")
+    predict(mvgam:::mvgam_example1, newdata = data.frame(time = 1)),
+    "the following required variables are missing from newdata:\n season, series"
+  )
 
   expect_error(
-    predict(mvgam:::mvgam_example2,
-            newdata = data.frame(season = 1)
-    ),
-    "the following required variables are missing from newdata:\n time, series")
+    predict(mvgam:::mvgam_example2, newdata = data.frame(season = 1)),
+    "the following required variables are missing from newdata:\n time, series"
+  )
 })
 
 test_that("mcmc_plot() works correctly", {
