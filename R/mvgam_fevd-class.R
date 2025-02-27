@@ -35,7 +35,6 @@ NULL
 #'
 #' @export
 summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
-
   # Calculate posterior quantiles of error variance contributions
   ynames <- names(object[[1]])
   out <- do.call(
@@ -56,10 +55,10 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
       fevd_Qupper = quantile(evd, max(probs))
     ) %>%
     dplyr::ungroup() %>%
-    dplyr::mutate(shock = gsub('process', 'Process',
-                               paste0(Series, ' -> ', target))) %>%
-    dplyr::select(shock, horizon,
-                  fevd_median, fevd_Qlower, fevd_Qupper) %>%
+    dplyr::mutate(
+      shock = gsub('process', 'Process', paste0(Series, ' -> ', target))
+    ) %>%
+    dplyr::select(shock, horizon, fevd_median, fevd_Qlower, fevd_Qupper) %>%
     dplyr::distinct()
 
   return(out)
@@ -79,7 +78,6 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
 #'@author Nicholas J Clark
 #'@export
 plot.mvgam_fevd = function(x, ...) {
-
   # Calculate posterior median error variance contributions
   ynames <- names(x[[1]])
   do.call(
@@ -97,8 +95,10 @@ plot.mvgam_fevd = function(x, ...) {
       mean_evd = mean_evd / total_evd
     ) %>%
     dplyr::ungroup() %>%
-    dplyr::mutate(Series = gsub('process', 'Process', Series),
-                  target = gsub('process', 'Process', target)) -> mean_evds
+    dplyr::mutate(
+      Series = gsub('process', 'Process', Series),
+      target = gsub('process', 'Process', target)
+    ) -> mean_evds
 
   # Plot as a ggplot object
   ggplot2::ggplot(
@@ -116,7 +116,6 @@ plot.mvgam_fevd = function(x, ...) {
 
 #'@noRd
 fevd_df = function(x, ynames) {
-
   do.call(
     rbind,
     lapply(seq_len(length(x)), function(process) {
