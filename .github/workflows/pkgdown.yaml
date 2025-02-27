@@ -37,6 +37,7 @@ jobs:
         with:
           dependencies: NA
           extra-packages: |
+              local::.
               pkgdown
               remotes
               knitr
