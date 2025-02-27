@@ -40,7 +40,7 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
   ynames <- names(object[[1]])
   out <- do.call(
     rbind,
-    lapply(seq_len(length(x)), function(draw) {
+    lapply(seq_len(length(object)), function(draw) {
       fevd_df(object[[draw]], ynames = ynames) %>%
         dplyr::mutate(draw = draw)
     })

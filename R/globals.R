@@ -112,5 +112,13 @@ utils::globalVariables(c(
   "upper1",
   "upper2",
   "upper3",
-  "upper4"
+  "upper4",
+  "draw",
+  "fevd_Qlower",
+  "fevd_Qupper",
+  "fevd_median",
+  "shock",
+  "irf_median",
+  "irf_Qlower",
+  "irf_Qupper"
 ))
