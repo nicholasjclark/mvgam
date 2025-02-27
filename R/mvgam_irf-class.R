@@ -33,48 +33,48 @@ NULL
 #' @author Nicholas J Clark
 #'
 #' @export
-summary.mvgam_irf = function(object,
-                             probs = c(0.025, 0.975),
-                             ...){
+summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
   n_processes <- dim(object[[1]][[1]])[2]
   h <- dim(object[[1]][[1]])[1]
   n_draws <- length(object)
-  if(length(probs) != 2L) {
-    stop("argument 'probs' must be a vector of length 2",
-         call. = FALSE)
+  if (length(probs) != 2L) {
+    stop("argument 'probs' must be a vector of length 2", call. = FALSE)
   }
 
-  out <- do.call(rbind, lapply(1:n_processes, function(series){
-    # Extract IRFs for the specific series
-    impulse_responses <- lapply(seq_along(object), function(j) {
-      object[[j]][series]
-    })
-
-    responses <- do.call(
-      rbind,
-      lapply(seq_along(impulse_responses), function(j) {
-        data.frame(
-          horizon = 1:h,
-          imp_resp = as.vector(impulse_responses[[j]][[1]]),
-          resp_var = sort(rep(
-            paste0('Process', 1:n_processes),
-            NROW(impulse_responses[[j]][[1]])
-          ))
-        )
+  out <- do.call(
+    rbind,
+    lapply(1:n_processes, function(series) {
+      # Extract IRFs for the specific series
+      impulse_responses <- lapply(seq_along(object), function(j) {
+        object[[j]][series]
       })
-    ) %>%
-      dplyr::mutate(shock = paste0('Process', series, ' -> ', resp_var)) %>%
 
-      # Calculate posterior empirical quantiles of impulse responses
-      dplyr::group_by(shock, horizon) %>%
-      dplyr::summarise(
-        median = median(imp_resp),
-        Qlower = quantile(imp_resp, min(probs)),
-        Qupper = quantile(imp_resp, max(probs)),
-        .groups = 'keep'
+      responses <- do.call(
+        rbind,
+        lapply(seq_along(impulse_responses), function(j) {
+          data.frame(
+            horizon = 1:h,
+            imp_resp = as.vector(impulse_responses[[j]][[1]]),
+            resp_var = sort(rep(
+              paste0('Process', 1:n_processes),
+              NROW(impulse_responses[[j]][[1]])
+            ))
+          )
+        })
       ) %>%
-      dplyr::ungroup()
-  }))
+        dplyr::mutate(shock = paste0('Process', series, ' -> ', resp_var)) %>%
+
+        # Calculate posterior empirical quantiles of impulse responses
+        dplyr::group_by(shock, horizon) %>%
+        dplyr::summarise(
+          median = median(imp_resp),
+          Qlower = quantile(imp_resp, min(probs)),
+          Qupper = quantile(imp_resp, max(probs)),
+          .groups = 'keep'
+        ) %>%
+        dplyr::ungroup()
+    })
+  )
 
   return(out)
 }
@@ -95,8 +95,7 @@ plot.mvgam_irf = function(x, series = 1, ...) {
   validate_pos_integer(series)
   n_processes <- dim(all_irfs[[1]][[1]])[2]
   if (series > n_processes) {
-    stop(paste0("argument 'series' must be <= ", n_processes),
-         call. = FALSE)
+    stop(paste0("argument 'series' must be <= ", n_processes), call. = FALSE)
   }
   h <- dim(all_irfs[[1]][[1]])[1]
 
