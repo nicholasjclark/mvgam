@@ -155,61 +155,81 @@ without adding too much computational cost:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">999</span><span class="op">)</span></span>
 <span><span class="co"># Simulate observations for species 1, which shows a declining trend and 0.7 detection probability</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>site <span class="op">=</span> <span class="fl">1</span>,</span>
-<span>           <span class="co"># five replicates per year; six years</span></span>
-<span>           replicate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">6</span><span class="op">)</span>,</span>
-<span>           time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>           species <span class="op">=</span> <span class="st">'sp_1'</span>,</span>
-<span>           <span class="co"># true abundance declines nonlinearly</span></span>
-<span>           truth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">28</span>, <span class="fl">5</span><span class="op">)</span>,</span>
-<span>                     <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">26</span>, <span class="fl">5</span><span class="op">)</span>,</span>
-<span>                     <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">23</span>, <span class="fl">5</span><span class="op">)</span>,</span>
-<span>                     <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">16</span>, <span class="fl">5</span><span class="op">)</span>,</span>
-<span>                     <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">14</span>, <span class="fl">5</span><span class="op">)</span>,</span>
-<span>                     <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">14</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>           <span class="co"># observations are taken with detection prob = 0.7</span></span>
-<span>           obs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">28</span>, <span class="fl">0.7</span><span class="op">)</span>,</span>
-<span>                   <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">26</span>, <span class="fl">0.7</span><span class="op">)</span>,</span>
-<span>                   <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">23</span>, <span class="fl">0.7</span><span class="op">)</span>,</span>
-<span>                   <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">15</span>, <span class="fl">0.7</span><span class="op">)</span>,</span>
-<span>                   <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">14</span>, <span class="fl">0.7</span><span class="op">)</span>,</span>
-<span>                   <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">14</span>, <span class="fl">0.7</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  site <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  <span class="co"># five replicates per year; six years</span></span>
+<span>  replicate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">6</span><span class="op">)</span>,</span>
+<span>  time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  species <span class="op">=</span> <span class="st">"sp_1"</span>,</span>
+<span>  <span class="co"># true abundance declines nonlinearly</span></span>
+<span>  truth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">28</span>, <span class="fl">5</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">26</span>, <span class="fl">5</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">23</span>, <span class="fl">5</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">16</span>, <span class="fl">5</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">14</span>, <span class="fl">5</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">14</span>, <span class="fl">5</span><span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  <span class="co"># observations are taken with detection prob = 0.7</span></span>
+<span>  obs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">28</span>, <span class="fl">0.7</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">26</span>, <span class="fl">0.7</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">23</span>, <span class="fl">0.7</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">15</span>, <span class="fl">0.7</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">14</span>, <span class="fl">0.7</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">14</span>, <span class="fl">0.7</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>  <span class="co"># add 'series' information, which is an identifier of site, replicate and species</span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">'site_'</span>, <span class="va">site</span>,</span>
-<span>                                <span class="st">'_'</span>, <span class="va">species</span>,</span>
-<span>                                <span class="st">'_rep_'</span>, <span class="va">replicate</span><span class="op">)</span>,</span>
-<span>                time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">time</span><span class="op">)</span>,</span>
-<span>                <span class="co"># add a 'cap' variable that defines the maximum latent N to </span></span>
-<span>                <span class="co"># marginalize over when estimating latent abundance; in other words</span></span>
-<span>                <span class="co"># how large do we realistically think the true abundance could be?</span></span>
-<span>                cap <span class="op">=</span> <span class="fl">100</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span> <span class="va">replicate</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">testdat</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
+<span>    series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span></span>
+<span>      <span class="st">"site_"</span>, <span class="va">site</span>,</span>
+<span>      <span class="st">"_"</span>, <span class="va">species</span>,</span>
+<span>      <span class="st">"_rep_"</span>, <span class="va">replicate</span></span>
+<span>    <span class="op">)</span>,</span>
+<span>    time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">time</span><span class="op">)</span>,</span>
+<span>    <span class="co"># add a 'cap' variable that defines the maximum latent N to</span></span>
+<span>    <span class="co"># marginalize over when estimating latent abundance; in other words</span></span>
+<span>    <span class="co"># how large do we realistically think the true abundance could be?</span></span>
+<span>    cap <span class="op">=</span> <span class="fl">100</span></span>
+<span>  <span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">replicate</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">testdat</span></span>
 <span></span>
-<span><span class="co"># Now add another species that has a different temporal trend and a smaller </span></span>
+<span><span class="co"># Now add another species that has a different temporal trend and a smaller</span></span>
 <span><span class="co"># detection probability (0.45 for this species)</span></span>
-<span><span class="va">testdat</span> <span class="op">=</span> <span class="va">testdat</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>site <span class="op">=</span> <span class="fl">1</span>,</span>
-<span>                              replicate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">6</span><span class="op">)</span>,</span>
-<span>                              time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>                              species <span class="op">=</span> <span class="st">'sp_2'</span>,</span>
-<span>                              truth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">5</span><span class="op">)</span>,</span>
-<span>                                        <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">7</span>, <span class="fl">5</span><span class="op">)</span>,</span>
-<span>                                        <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">15</span>, <span class="fl">5</span><span class="op">)</span>,</span>
-<span>                                        <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">16</span>, <span class="fl">5</span><span class="op">)</span>,</span>
-<span>                                        <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">19</span>, <span class="fl">5</span><span class="op">)</span>,</span>
-<span>                                        <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">18</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>                              obs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">4</span>, <span class="fl">0.45</span><span class="op">)</span>,</span>
-<span>                                      <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">7</span>, <span class="fl">0.45</span><span class="op">)</span>,</span>
-<span>                                      <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">15</span>, <span class="fl">0.45</span><span class="op">)</span>,</span>
-<span>                                      <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">16</span>, <span class="fl">0.45</span><span class="op">)</span>,</span>
-<span>                                      <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">19</span>, <span class="fl">0.45</span><span class="op">)</span>,</span>
-<span>                                      <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">18</span>, <span class="fl">0.45</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>                     <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">'site_'</span>, <span class="va">site</span>,</span>
-<span>                                                   <span class="st">'_'</span>, <span class="va">species</span>,</span>
-<span>                                                   <span class="st">'_rep_'</span>, <span class="va">replicate</span><span class="op">)</span>,</span>
-<span>                                   time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">time</span><span class="op">)</span>,</span>
-<span>                                   cap <span class="op">=</span> <span class="fl">50</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>                     <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">replicate</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span><span class="va">testdat</span> <span class="op">&lt;-</span> <span class="va">testdat</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>    site <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>    replicate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">6</span><span class="op">)</span>,</span>
+<span>    time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    species <span class="op">=</span> <span class="st">"sp_2"</span>,</span>
+<span>    truth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">5</span><span class="op">)</span>,</span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">7</span>, <span class="fl">5</span><span class="op">)</span>,</span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">15</span>, <span class="fl">5</span><span class="op">)</span>,</span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">16</span>, <span class="fl">5</span><span class="op">)</span>,</span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">19</span>, <span class="fl">5</span><span class="op">)</span>,</span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">18</span>, <span class="fl">5</span><span class="op">)</span></span>
+<span>    <span class="op">)</span>,</span>
+<span>    obs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">4</span>, <span class="fl">0.45</span><span class="op">)</span>,</span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">7</span>, <span class="fl">0.45</span><span class="op">)</span>,</span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">15</span>, <span class="fl">0.45</span><span class="op">)</span>,</span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">16</span>, <span class="fl">0.45</span><span class="op">)</span>,</span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">19</span>, <span class="fl">0.45</span><span class="op">)</span>,</span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">18</span>, <span class="fl">0.45</span><span class="op">)</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
+<span>      series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span></span>
+<span>        <span class="st">"site_"</span>, <span class="va">site</span>,</span>
+<span>        <span class="st">"_"</span>, <span class="va">species</span>,</span>
+<span>        <span class="st">"_rep_"</span>, <span class="va">replicate</span></span>
+<span>      <span class="op">)</span>,</span>
+<span>      time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">time</span><span class="op">)</span>,</span>
+<span>      cap <span class="op">=</span> <span class="fl">50</span></span>
+<span>    <span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">replicate</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>This data format isn’t too difficult to set up, but it does differ
 from the traditional multidimensional array setup that is commonly used
 for fitting N-mixture models in other software packages. Next we ensure
@@ -217,9 +237,11 @@ that species and series IDs are included as factor variables, in case
 we’d like to allow certain effects to vary by species</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">testdat</span><span class="op">$</span><span class="va">species</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">species</span>,</span>
-<span>                          levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">species</span><span class="op">)</span><span class="op">)</span></span>
+<span>  levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">species</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
 <span><span class="va">testdat</span><span class="op">$</span><span class="va">series</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">series</span>,</span>
-<span>                         levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span>  levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">series</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p>Preview the dataset to get an idea of how it is structured:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://pillar.r-lib.org/reference/glimpse.html" class="external-link">glimpse</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">)</span></span>
@@ -290,22 +312,25 @@ Bayesian inference</p>
 <span>  <span class="co"># the observation formula sets up linear predictors for</span></span>
 <span>  <span class="co"># detection probability on the logit scale</span></span>
 <span>  formula <span class="op">=</span> <span class="va">obs</span> <span class="op">~</span> <span class="va">species</span> <span class="op">-</span> <span class="fl">1</span>,</span>
-<span>  </span>
-<span>  <span class="co"># the trend_formula sets up the linear predictors for </span></span>
+<span></span>
+<span>  <span class="co"># the trend_formula sets up the linear predictors for</span></span>
 <span>  <span class="co"># the latent abundance processes on the log scale</span></span>
 <span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">trend</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span> <span class="op">+</span> <span class="va">species</span>,</span>
-<span>  </span>
+<span></span>
 <span>  <span class="co"># the trend_map takes care of the mapping</span></span>
 <span>  trend_map <span class="op">=</span> <span class="va">trend_map</span>,</span>
-<span>  </span>
+<span></span>
 <span>  <span class="co"># nmix() family and data</span></span>
 <span>  family <span class="op">=</span> <span class="fu"><a href="../reference/mvgam_families.html">nmix</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">testdat</span>,</span>
-<span>  </span>
+<span></span>
 <span>  <span class="co"># priors can be set in the usual way</span></span>
-<span>  priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">b</span><span class="op">)</span>,</span>
-<span>             <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">Intercept_trend</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  samples <span class="op">=</span> <span class="fl">1000</span><span class="op">)</span></span></code></pre></div>
+<span>  priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>    <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">b</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">Intercept_trend</span><span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  samples <span class="op">=</span> <span class="fl">1000</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p>View the automatically-generated <code>Stan</code> code to get a
 sense of how the marginalization over latent N works</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
@@ -527,7 +552,7 @@ nicely</p>
 <span><span class="co">#&gt; 0 of 4000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Thu Feb 27 03:01:54 2025.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Thu Feb 27 06:19:59 2025.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
@@ -559,7 +584,7 @@ these may not be too helpful)</p>
 <p>Plot the estimated smooths of time from each species’ latent
 abundance process (on the log scale)</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'smooths'</span>, trend_effects <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"smooths"</span>, trend_effects <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-11-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p><code>marginaleffects</code> support allows for more useful
 prediction-based interrogations on different scales (though note that at
@@ -574,26 +599,28 @@ For example, here are the estimated detection probabilities per species,
 which show that the model has done a nice job of estimating these
 parameters:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">'species'</span>,</span>
-<span>                 type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span> <span class="op">+</span></span>
+<code class="sourceCode R"><span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>,</span>
+<span>  condition <span class="op">=</span> <span class="st">"species"</span>,</span>
+<span>  type <span class="op">=</span> <span class="st">"detection"</span></span>
+<span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">"Pr(detection)"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/lims.html" class="external-link">ylim</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_classic</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">'none'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">"none"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-12-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>A common goal in N-mixture modelling is to estimate the true latent
 abundance. The model has automatically generated predictions for the
 unknown latent abundance that are conditional on the observations. We
 can extract these and produce decent plots using a small function</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hindcast.mvgam.html">hindcast</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'latent_N'</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hindcast.mvgam.html">hindcast</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"latent_N"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Function to plot latent abundance estimates vs truth</span></span>
-<span><span class="va">plot_latentN</span> <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">hindcasts</span>, <span class="va">data</span>, <span class="va">species</span> <span class="op">=</span> <span class="st">'sp_1'</span><span class="op">)</span><span class="op">{</span></span>
+<span><span class="va">plot_latentN</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">hindcasts</span>, <span class="va">data</span>, <span class="va">species</span> <span class="op">=</span> <span class="st">"sp_1"</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">all_series</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">data</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>                         <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">species</span> <span class="op">==</span> <span class="op">!</span><span class="op">!</span><span class="va">species</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>                         <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/pull.html" class="external-link">pull</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span>
-<span>  </span>
+<span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">species</span> <span class="op">==</span> <span class="op">!</span><span class="op">!</span><span class="va">species</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/pull.html" class="external-link">pull</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
 <span>  <span class="co"># Grab the first replicate that represents this series</span></span>
 <span>  <span class="co"># so we can get the true simulated values</span></span>
 <span>  <span class="va">series</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">all_series</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span><span class="op">)</span></span>
@@ -601,51 +628,60 @@ can extract these and produce decent plots using a small function</p>
 <span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/arrange.html" class="external-link">arrange</a></span><span class="op">(</span><span class="va">time</span>, <span class="va">series</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">series</span> <span class="op">==</span> <span class="op">!</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">data</span><span class="op">$</span><span class="va">series</span><span class="op">)</span><span class="op">[</span><span class="va">series</span><span class="op">]</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/pull.html" class="external-link">pull</a></span><span class="op">(</span><span class="va">truth</span><span class="op">)</span></span>
-<span>  </span>
+<span></span>
 <span>  <span class="co"># In case some replicates have missing observations,</span></span>
 <span>  <span class="co"># pull out predictions for ALL replicates and average over them</span></span>
-<span>  <span class="va">hcs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">all_series</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">{</span></span>
+<span>  <span class="va">hcs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">all_series</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="va">ind</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="fu"><a href="../reference/index-mvgam.html">names</a></span><span class="op">(</span><span class="va">hindcasts</span><span class="op">$</span><span class="va">hindcasts</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span></span>
 <span>    <span class="va">hindcasts</span><span class="op">$</span><span class="va">hindcasts</span><span class="op">[[</span><span class="va">ind</span><span class="op">]</span><span class="op">]</span></span>
 <span>  <span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
-<span>  </span>
+<span></span>
 <span>  <span class="co"># Calculate posterior empirical quantiles of predictions</span></span>
-<span>  <span class="va">pred_quantiles</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/apply.html" class="external-link">apply</a></span><span class="op">(</span><span class="va">hcs</span>, <span class="fl">2</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> </span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/stats/quantile.html" class="external-link">quantile</a></span><span class="op">(</span><span class="va">x</span>, probs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.05</span>, <span class="fl">0.2</span>, <span class="fl">0.3</span>, <span class="fl">0.4</span>, </span>
-<span>                          <span class="fl">0.5</span>, <span class="fl">0.6</span>, <span class="fl">0.7</span>, <span class="fl">0.8</span>, <span class="fl">0.95</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="va">pred_quantiles</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/apply.html" class="external-link">apply</a></span><span class="op">(</span><span class="va">hcs</span>, <span class="fl">2</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/stats/quantile.html" class="external-link">quantile</a></span><span class="op">(</span><span class="va">x</span>, probs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>      <span class="fl">0.05</span>, <span class="fl">0.2</span>, <span class="fl">0.3</span>, <span class="fl">0.4</span>,</span>
+<span>      <span class="fl">0.5</span>, <span class="fl">0.6</span>, <span class="fl">0.7</span>, <span class="fl">0.8</span>, <span class="fl">0.95</span></span>
+<span>    <span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">}</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span>  <span class="va">pred_quantiles</span><span class="op">$</span><span class="va">time</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">NROW</a></span><span class="op">(</span><span class="va">pred_quantiles</span><span class="op">)</span></span>
 <span>  <span class="va">pred_quantiles</span><span class="op">$</span><span class="va">truth</span> <span class="op">&lt;-</span> <span class="va">truths</span></span>
-<span>  </span>
+<span></span>
 <span>  <span class="co"># Grab observations</span></span>
 <span>  <span class="va">data</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">series</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="va">all_series</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">time</span>, <span class="va">obs</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">observations</span></span>
-<span>  </span>
+<span></span>
 <span>  <span class="co"># Plot</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">pred_quantiles</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, group <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_ribbon.html" class="external-link">geom_ribbon</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>ymin <span class="op">=</span> <span class="va">X5.</span>, ymax <span class="op">=</span> <span class="va">X95.</span><span class="op">)</span>, fill <span class="op">=</span> <span class="st">"#DCBCBC"</span><span class="op">)</span> <span class="op">+</span> </span>
+<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_ribbon.html" class="external-link">geom_ribbon</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>ymin <span class="op">=</span> <span class="va">X5.</span>, ymax <span class="op">=</span> <span class="va">X95.</span><span class="op">)</span>, fill <span class="op">=</span> <span class="st">"#DCBCBC"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_ribbon.html" class="external-link">geom_ribbon</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>ymin <span class="op">=</span> <span class="va">X30.</span>, ymax <span class="op">=</span> <span class="va">X70.</span><span class="op">)</span>, fill <span class="op">=</span> <span class="st">"#B97C7C"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">truth</span><span class="op">)</span>,</span>
-<span>              colour <span class="op">=</span> <span class="st">'black'</span>, linewidth <span class="op">=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">+</span></span>
+<span>      colour <span class="op">=</span> <span class="st">"black"</span>, linewidth <span class="op">=</span> <span class="fl">1</span></span>
+<span>    <span class="op">)</span> <span class="op">+</span></span>
 <span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">truth</span><span class="op">)</span>,</span>
-<span>               shape <span class="op">=</span> <span class="fl">21</span>, colour <span class="op">=</span> <span class="st">'white'</span>, fill <span class="op">=</span> <span class="st">'black'</span>,</span>
-<span>               size <span class="op">=</span> <span class="fl">2.5</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_jitter.html" class="external-link">geom_jitter</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">observations</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">obs</span><span class="op">)</span>,</span>
-<span>                width <span class="op">=</span> <span class="fl">0.06</span>, </span>
-<span>                shape <span class="op">=</span> <span class="fl">21</span>, fill <span class="op">=</span> <span class="st">'darkred'</span>, colour <span class="op">=</span> <span class="st">'white'</span>, size <span class="op">=</span> <span class="fl">2.5</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>y <span class="op">=</span> <span class="st">'Latent abundance (N)'</span>,</span>
-<span>         x <span class="op">=</span> <span class="st">'Time'</span>,</span>
-<span>         title <span class="op">=</span> <span class="va">species</span><span class="op">)</span></span>
+<span>      shape <span class="op">=</span> <span class="fl">21</span>, colour <span class="op">=</span> <span class="st">"white"</span>, fill <span class="op">=</span> <span class="st">"black"</span>,</span>
+<span>      size <span class="op">=</span> <span class="fl">2.5</span></span>
+<span>    <span class="op">)</span> <span class="op">+</span></span>
+<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_jitter.html" class="external-link">geom_jitter</a></span><span class="op">(</span></span>
+<span>      data <span class="op">=</span> <span class="va">observations</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">obs</span><span class="op">)</span>,</span>
+<span>      width <span class="op">=</span> <span class="fl">0.06</span>,</span>
+<span>      shape <span class="op">=</span> <span class="fl">21</span>, fill <span class="op">=</span> <span class="st">"darkred"</span>, colour <span class="op">=</span> <span class="st">"white"</span>, size <span class="op">=</span> <span class="fl">2.5</span></span>
+<span>    <span class="op">)</span> <span class="op">+</span></span>
+<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span></span>
+<span>      y <span class="op">=</span> <span class="st">"Latent abundance (N)"</span>,</span>
+<span>      x <span class="op">=</span> <span class="st">"Time"</span>,</span>
+<span>      title <span class="op">=</span> <span class="va">species</span></span>
+<span>    <span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
 <p>Latent abundance plots vs the simulated truths for each species are
 shown below. Here, the red points show the imperfect observations, the
 black line shows the true latent abundance, and the ribbons show
 credible intervals of our estimates:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">plot_latentN</span><span class="op">(</span><span class="va">hc</span>, <span class="va">testdat</span>, species <span class="op">=</span> <span class="st">'sp_1'</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu">plot_latentN</span><span class="op">(</span><span class="va">hc</span>, <span class="va">testdat</span>, species <span class="op">=</span> <span class="st">"sp_1"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-14-1.png" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">plot_latentN</span><span class="op">(</span><span class="va">hc</span>, <span class="va">testdat</span>, species <span class="op">=</span> <span class="st">'sp_2'</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu">plot_latentN</span><span class="op">(</span><span class="va">hc</span>, <span class="va">testdat</span>, species <span class="op">=</span> <span class="st">"sp_2"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-14-2.png" width="60%" style="display: block; margin: auto;"></p>
 <p>We can see that estimates for both species have correctly captured
 the true temporal variation and magnitudes in abundance</p>
@@ -665,7 +701,7 @@ process and detection probability models.</p>
 one species</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Date link</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/load.html" class="external-link">load</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/connections.html" class="external-link">url</a></span><span class="op">(</span><span class="st">'https://github.com/doserjef/spAbundance/raw/main/data/dataNMixSim.rda'</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/load.html" class="external-link">load</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/connections.html" class="external-link">url</a></span><span class="op">(</span><span class="st">"https://github.com/doserjef/spAbundance/raw/main/data/dataNMixSim.rda"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">data.one.sp</span> <span class="op">&lt;-</span> <span class="va">dataNMixSim</span></span>
 <span></span>
 <span><span class="co"># Pull out observations for one species</span></span>
@@ -678,7 +714,7 @@ one species</p>
 <span><span class="co"># Detection covariates that can change across repeat sampling observations</span></span>
 <span><span class="co"># Note that `NA`s are not allowed for covariates in mvgam, so we randomly</span></span>
 <span><span class="co"># impute them here</span></span>
-<span><span class="va">det.cov</span> <span class="op">&lt;-</span> <span class="va">dataNMixSim</span><span class="op">$</span><span class="va">det.covs</span><span class="op">$</span><span class="va">det.cov.1</span><span class="op">[</span>,<span class="op">]</span></span>
+<span><span class="va">det.cov</span> <span class="op">&lt;-</span> <span class="va">dataNMixSim</span><span class="op">$</span><span class="va">det.covs</span><span class="op">$</span><span class="va">det.cov.1</span><span class="op">[</span>, <span class="op">]</span></span>
 <span><span class="va">det.cov</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">det.cov</span><span class="op">)</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">det.cov</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">det.cov2</span> <span class="op">&lt;-</span> <span class="va">dataNMixSim</span><span class="op">$</span><span class="va">det.covs</span><span class="op">$</span><span class="va">det.cov.2</span></span>
 <span><span class="va">det.cov2</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">det.cov2</span><span class="op">)</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">det.cov2</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
@@ -688,22 +724,30 @@ indicators of <code>time</code> and <code>series</code> for working in
 represent the maximum latent N to marginalize over for each
 observation</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">mod_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>,</span>
-<span>                    <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">NROW</a></span><span class="op">(</span><span class="va">data.one.sp</span><span class="op">$</span><span class="va">y</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">{</span></span>
-<span>                      <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="va">data.one.sp</span><span class="op">$</span><span class="va">y</span><span class="op">[</span><span class="va">x</span>,<span class="op">]</span>,</span>
-<span>                                 abund_cov <span class="op">=</span> <span class="va">abund.cov</span><span class="op">[</span><span class="va">x</span><span class="op">]</span>,</span>
-<span>                                 abund_fac <span class="op">=</span> <span class="va">abund.factor</span><span class="op">[</span><span class="va">x</span><span class="op">]</span>,</span>
-<span>                                 det_cov <span class="op">=</span> <span class="va">det.cov</span><span class="op">[</span><span class="va">x</span>,<span class="op">]</span>,</span>
-<span>                                 det_cov2 <span class="op">=</span> <span class="va">det.cov2</span><span class="op">[</span><span class="va">x</span>,<span class="op">]</span>,</span>
-<span>                                 replicate <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">NCOL</a></span><span class="op">(</span><span class="va">data.one.sp</span><span class="op">$</span><span class="va">y</span><span class="op">)</span>,</span>
-<span>                                 site <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">'site'</span>, <span class="va">x</span><span class="op">)</span><span class="op">)</span></span>
-<span>                    <span class="op">}</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>species <span class="op">=</span> <span class="st">'sp_1'</span>,</span>
-<span>                series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">as.factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">site</span>, <span class="st">'_'</span>, <span class="va">species</span>, <span class="st">'_'</span>, <span class="va">replicate</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>site <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">site</span>, levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">site</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>                species <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">species</span>, levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">species</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>                time <span class="op">=</span> <span class="fl">1</span>,</span>
-<span>                cap <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">data.one.sp</span><span class="op">$</span><span class="va">y</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">+</span> <span class="fl">20</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">mod_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span></span>
+<span>  <span class="va">rbind</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">NROW</a></span><span class="op">(</span><span class="va">data.one.sp</span><span class="op">$</span><span class="va">y</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>      y <span class="op">=</span> <span class="va">data.one.sp</span><span class="op">$</span><span class="va">y</span><span class="op">[</span><span class="va">x</span>, <span class="op">]</span>,</span>
+<span>      abund_cov <span class="op">=</span> <span class="va">abund.cov</span><span class="op">[</span><span class="va">x</span><span class="op">]</span>,</span>
+<span>      abund_fac <span class="op">=</span> <span class="va">abund.factor</span><span class="op">[</span><span class="va">x</span><span class="op">]</span>,</span>
+<span>      det_cov <span class="op">=</span> <span class="va">det.cov</span><span class="op">[</span><span class="va">x</span>, <span class="op">]</span>,</span>
+<span>      det_cov2 <span class="op">=</span> <span class="va">det.cov2</span><span class="op">[</span><span class="va">x</span>, <span class="op">]</span>,</span>
+<span>      replicate <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">NCOL</a></span><span class="op">(</span><span class="va">data.one.sp</span><span class="op">$</span><span class="va">y</span><span class="op">)</span>,</span>
+<span>      site <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"site"</span>, <span class="va">x</span><span class="op">)</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">}</span><span class="op">)</span></span>
+<span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
+<span>    species <span class="op">=</span> <span class="st">"sp_1"</span>,</span>
+<span>    series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">as.factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">site</span>, <span class="st">"_"</span>, <span class="va">species</span>, <span class="st">"_"</span>, <span class="va">replicate</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
+<span>    site <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">site</span>, levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">site</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    species <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">species</span>, levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">species</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    time <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>    cap <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">data.one.sp</span><span class="op">$</span><span class="va">y</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">+</span> <span class="fl">20</span></span>
+<span>  <span class="op">)</span></span></code></pre></div>
 <p>The data include observations for 225 sites with three replicates per
 site, though some observations are missing</p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
@@ -777,32 +821,35 @@ around 90 seconds to around 12 seconds for this example)</p>
 <span>  <span class="co"># effects of covariates on detection probability;</span></span>
 <span>  <span class="co"># here we use penalized splines for both continuous covariates</span></span>
 <span>  formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">det_cov</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">det_cov2</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>,</span>
-<span>  </span>
+<span></span>
 <span>  <span class="co"># effects of the covariates on latent abundance;</span></span>
 <span>  <span class="co"># here we use a penalized spline for the continuous covariate and</span></span>
 <span>  <span class="co"># hierarchical intercepts for the factor covariate</span></span>
 <span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">abund_cov</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">abund_fac</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span>,</span>
-<span>  </span>
+<span>    <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">abund_fac</span>, bs <span class="op">=</span> <span class="st">"re"</span><span class="op">)</span>,</span>
+<span></span>
 <span>  <span class="co"># link multiple observations to each site</span></span>
 <span>  trend_map <span class="op">=</span> <span class="va">trend_map</span>,</span>
-<span>  </span>
+<span></span>
 <span>  <span class="co"># nmix() family and supplied data</span></span>
 <span>  family <span class="op">=</span> <span class="fu"><a href="../reference/mvgam_families.html">nmix</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">mod_data</span>,</span>
-<span>  </span>
+<span></span>
 <span>  <span class="co"># standard normal priors on key regression parameters</span></span>
-<span>  priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'b'</span><span class="op">)</span>,</span>
-<span>             <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'Intercept'</span><span class="op">)</span>,</span>
-<span>             <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'Intercept_trend'</span><span class="op">)</span>,</span>
-<span>             <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'sigma_raw_trend'</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  </span>
+<span>  priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>    <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">"b"</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">"Intercept"</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">"Intercept_trend"</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">"sigma_raw_trend"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span></span>
 <span>  <span class="co"># use Stan's variational inference for quicker results</span></span>
-<span>  algorithm <span class="op">=</span> <span class="st">'meanfield'</span>,</span>
-<span>  </span>
+<span>  algorithm <span class="op">=</span> <span class="st">"meanfield"</span>,</span>
+<span></span>
 <span>  <span class="co"># no need to compute "series-level" residuals</span></span>
 <span>  residuals <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  samples <span class="op">=</span> <span class="fl">1000</span><span class="op">)</span></span></code></pre></div>
+<span>  samples <span class="op">=</span> <span class="fl">1000</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p>Inspect the model summary but don’t bother looking at estimates for
 all individual spline coefficients. Notice how we no longer receive
 information on convergence because we did not use MCMC sampling for this
@@ -873,7 +920,7 @@ model</p>
 interrogating the model through targeted predictions. First, we can
 inspect the estimated average detection probability</p>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/r/predictions.html" class="external-link">avg_predictions</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/r/predictions.html" class="external-link">avg_predictions</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"detection"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;  Estimate 2.5 % 97.5 %</span></span>
 <span><span class="co">#&gt;     0.591 0.522  0.655</span></span>
@@ -884,57 +931,70 @@ using the <code><a href="https://paulbuerkner.com/brms/reference/conditional_eff
 <code>type = 'link'</code>; this will return plots on the expectation
 scale</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">abund_plots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>,</span>
-<span>                                        type <span class="op">=</span> <span class="st">'link'</span>,</span>
-<span>                                        effects <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'abund_cov'</span>,</span>
-<span>                                                    <span class="st">'abund_fac'</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>                    plot <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">abund_plots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>,</span>
+<span>    type <span class="op">=</span> <span class="st">"link"</span>,</span>
+<span>    effects <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>      <span class="st">"abund_cov"</span>,</span>
+<span>      <span class="st">"abund_fac"</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  plot <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p>The effect of the continuous covariate on expected latent
 abundance</p>
 <div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">abund_plots</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Expected latent abundance'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">"Expected latent abundance"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-24-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>The effect of the factor covariate on expected latent abundance,
 estimated as a hierarchical random effect</p>
 <div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">abund_plots</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Expected latent abundance'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">"Expected latent abundance"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-25-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>Now we can investigate estimated effects of covariates on detection
 probability using <code>type = 'detection'</code></p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">det_plots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>,</span>
-<span>                                      type <span class="op">=</span> <span class="st">'detection'</span>,</span>
-<span>                                      effects <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'det_cov'</span>,</span>
-<span>                                                  <span class="st">'det_cov2'</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>                  plot <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">det_plots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>,</span>
+<span>    type <span class="op">=</span> <span class="st">"detection"</span>,</span>
+<span>    effects <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>      <span class="st">"det_cov"</span>,</span>
+<span>      <span class="st">"det_cov2"</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  plot <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p>The covariate smooths were estimated to be somewhat nonlinear on the
 logit scale according to the model summary (based on their approximate
 significances). But inspecting conditional effects of each covariate on
 the probability scale is more intuitive and useful</p>
 <div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">det_plots</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">"Pr(detection)"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-27-1.png" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">det_plots</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">"Pr(detection)"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-27-2.png" width="60%" style="display: block; margin: auto;"></p>
 <p>More targeted predictions are also easy with
 <code>marginaleffects</code> support. For example, we can ask: How does
 detection probability change as we change <em>both</em> detection
 covariates?</p>
 <div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">fivenum_round</span> <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/fivenum.html" class="external-link">fivenum</a></span><span class="op">(</span><span class="va">x</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">fivenum_round</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/fivenum.html" class="external-link">fivenum</a></span><span class="op">(</span><span class="va">x</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, </span>
-<span>                 newdata <span class="op">=</span> <span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/r/datagrid.html" class="external-link">datagrid</a></span><span class="op">(</span>det_cov <span class="op">=</span> <span class="va">unique</span>,</span>
-<span>                                    det_cov2 <span class="op">=</span> <span class="va">fivenum_round</span><span class="op">)</span>,</span>
-<span>                 by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'det_cov'</span>, <span class="st">'det_cov2'</span><span class="op">)</span>,</span>
-<span>                 type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span> <span class="op">+</span></span>
+<span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>,</span>
+<span>  newdata <span class="op">=</span> <span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/r/datagrid.html" class="external-link">datagrid</a></span><span class="op">(</span></span>
+<span>    det_cov <span class="op">=</span> <span class="va">unique</span>,</span>
+<span>    det_cov2 <span class="op">=</span> <span class="va">fivenum_round</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"det_cov"</span>, <span class="st">"det_cov2"</span><span class="op">)</span>,</span>
+<span>  type <span class="op">=</span> <span class="st">"detection"</span></span>
+<span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_classic</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">"Pr(detection)"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-28-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>The model has found support for some important covariate effects, but
 of course we’d want to interrogate how well the model predicts and think

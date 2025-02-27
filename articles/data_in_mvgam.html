@@ -160,8 +160,9 @@ format is that it is now very easy to specify effects that vary among
 time series:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span> <span class="va">time</span>,</span>
-<span>            data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span>
-<span>            family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span>  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Call:</span></span>
 <span><span class="co">#&gt; glm(formula = y ~ series + time, family = poisson(), data = simdat$data_train)</span></span>
@@ -186,8 +187,9 @@ time series:</p>
 <span><span class="co">#&gt; Number of Fisher Scoring iterations: 5</span></span></code></pre></div>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="fu">mgcv</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">series</span><span class="op">)</span>,</span>
-<span>            data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span>
-<span>            family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span>  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Family: poisson </span></span>
 <span><span class="co">#&gt; Link function: log </span></span>
@@ -231,10 +233,13 @@ distribution (ensuring that some of our values will be
 <code>&lt; 1</code>) and attempt a Beta regression in <code>mvgam</code>
 using the <code>betar</code> family:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">gauss_dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>outcome <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">10</span><span class="op">)</span>,</span>
-<span>                        series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="st">'series1'</span>,</span>
-<span>                                        levels <span class="op">=</span> <span class="st">'series1'</span><span class="op">)</span>,</span>
-<span>                        time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">10</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">gauss_dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  outcome <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">10</span><span class="op">)</span>,</span>
+<span>  series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="st">"series1"</span>,</span>
+<span>    levels <span class="op">=</span> <span class="st">"series1"</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">10</span></span>
+<span><span class="op">)</span></span>
 <span><span class="va">gauss_dat</span></span>
 <span><span class="co">#&gt;         outcome  series time</span></span>
 <span><span class="co">#&gt; 1  -0.314772157 series1    1</span></span>
@@ -252,8 +257,9 @@ leads to a model that actually fits (though it does give an unhelpful
 warning message):</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">mgcv</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></span><span class="op">(</span><span class="va">outcome</span> <span class="op">~</span> <span class="va">time</span>,</span>
-<span>    family <span class="op">=</span> <span class="fu"><a href="../reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>    data <span class="op">=</span> <span class="va">gauss_dat</span><span class="op">)</span></span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="../reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  data <span class="op">=</span> <span class="va">gauss_dat</span></span>
+<span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Family: Beta regression(0.084) </span></span>
 <span><span class="co">#&gt; Link function: logit </span></span>
@@ -267,8 +273,9 @@ warning message):</p>
 useful:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">outcome</span> <span class="op">~</span> <span class="va">time</span>,</span>
-<span>      family <span class="op">=</span> <span class="fu"><a href="../reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>      data <span class="op">=</span> <span class="va">gauss_dat</span><span class="op">)</span></span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="../reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  data <span class="op">=</span> <span class="va">gauss_dat</span></span>
+<span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error: Values &lt;= 0 not allowed for beta responses</span></span></code></pre></div>
 <p>Please see <code><a href="../reference/mvgam_families.html">?mvgam_families</a></code> for more information on the
 types of responses that the package can handle and their
@@ -294,9 +301,11 @@ in your data. You can generally do this with a simple <code>dplyr</code>
 call:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># A function to ensure all timepoints within a sequence are identical</span></span>
-<span><span class="va">all_times_avail</span> <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">time</span>, <span class="va">min_time</span>, <span class="va">max_time</span><span class="op">)</span><span class="op">{</span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="va">time</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>              <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq.int</a></span><span class="op">(</span>from <span class="op">=</span> <span class="va">min_time</span>, to <span class="op">=</span> <span class="va">max_time</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">all_times_avail</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">time</span>, <span class="va">min_time</span>, <span class="va">max_time</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="va">time</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq.int</a></span><span class="op">(</span>from <span class="op">=</span> <span class="va">min_time</span>, to <span class="op">=</span> <span class="va">max_time</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span></span>
 <span><span class="co"># Get min and max times from the data</span></span>
@@ -304,16 +313,20 @@ call:</p>
 <span><span class="va">max_time</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">time</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Check that all times are recorded for each series</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>series <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">series</span>,</span>
-<span>           time <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">time</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">group_by</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/summarise.html" class="external-link">summarise</a></span><span class="op">(</span>all_there <span class="op">=</span> <span class="fu">all_times_avail</span><span class="op">(</span><span class="va">time</span>,</span>
-<span>                                                 <span class="va">min_time</span>,</span>
-<span>                                                 <span class="va">max_time</span><span class="op">)</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">checked_times</span></span>
-<span><span class="kw">if</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/any.html" class="external-link">any</a></span><span class="op">(</span><span class="va">checked_times</span><span class="op">$</span><span class="va">all_there</span> <span class="op">==</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span><span class="op">{</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  series <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">series</span>,</span>
+<span>  time <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">time</span></span>
+<span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">group_by</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/summarise.html" class="external-link">summarise</a></span><span class="op">(</span>all_there <span class="op">=</span> <span class="fu">all_times_avail</span><span class="op">(</span></span>
+<span>    <span class="va">time</span>,</span>
+<span>    <span class="va">min_time</span>,</span>
+<span>    <span class="va">max_time</span></span>
+<span>  <span class="op">)</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">checked_times</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/any.html" class="external-link">any</a></span><span class="op">(</span><span class="va">checked_times</span><span class="op">$</span><span class="va">all_there</span> <span class="op">==</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="kw"><a href="https://rdrr.io/r/base/warning.html" class="external-link">warning</a></span><span class="op">(</span><span class="st">"One or more series in is missing observations for one or more timepoints"</span><span class="op">)</span></span>
 <span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">'All series have observations at all timepoints :)'</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"All series have observations at all timepoints :)"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span><span class="co">#&gt; All series have observations at all timepoints :)</span></span></code></pre></div>
 <p>Note that models which use dynamic components will assume that
@@ -356,9 +369,11 @@ a single call to <code><a href="../reference/get_mvgam_priors.html">get_mvgam_pr
 some data in which some of the timepoints in the <code>time</code>
 variable are not included in the data:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">bad_times</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">16</span>, by <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,</span>
-<span>                        series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="st">'series_1'</span><span class="op">)</span>,</span>
-<span>                        outcome <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">8</span><span class="op">)</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">bad_times</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">16</span>, by <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,</span>
+<span>  series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="st">"series_1"</span><span class="op">)</span>,</span>
+<span>  outcome <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">8</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
 <span><span class="va">bad_times</span></span>
 <span><span class="co">#&gt;   time   series     outcome</span></span>
 <span><span class="co">#&gt; 1    1 series_1  1.85866321</span></span>
@@ -373,8 +388,9 @@ variable are not included in the data:</p>
 intercept-only model, which is enough to trigger all the checks:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span><span class="va">outcome</span> <span class="op">~</span> <span class="fl">1</span>,</span>
-<span>                 data <span class="op">=</span> <span class="va">bad_times</span>,</span>
-<span>                 family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span>  data <span class="op">=</span> <span class="va">bad_times</span>,</span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error: One or more series in data is missing observations for one or more timepoints</span></span></code></pre></div>
 <p>This error is useful as it tells us where the problem is. There are
 many ways to fill in missing timepoints, so the correct way will have to
@@ -382,10 +398,15 @@ be left up to the user. But if you don’t have any covariates, it should
 be pretty easy using <code><a href="https://rdrr.io/r/base/expand.grid.html" class="external-link">expand.grid()</a></code>:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">bad_times</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">right_join</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/expand.grid.html" class="external-link">expand.grid</a></span><span class="op">(</span>time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">min</a></span><span class="op">(</span><span class="va">bad_times</span><span class="op">$</span><span class="va">time</span><span class="op">)</span>,</span>
-<span>                                           <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">bad_times</span><span class="op">$</span><span class="va">time</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>                                series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">bad_times</span><span class="op">$</span><span class="va">series</span><span class="op">)</span>,</span>
-<span>                                                levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">bad_times</span><span class="op">$</span><span class="va">series</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">right_join</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/expand.grid.html" class="external-link">expand.grid</a></span><span class="op">(</span></span>
+<span>    time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span></span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">min</a></span><span class="op">(</span><span class="va">bad_times</span><span class="op">$</span><span class="va">time</span><span class="op">)</span>,</span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">bad_times</span><span class="op">$</span><span class="va">time</span><span class="op">)</span></span>
+<span>    <span class="op">)</span>,</span>
+<span>    series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">bad_times</span><span class="op">$</span><span class="va">series</span><span class="op">)</span>,</span>
+<span>      levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">bad_times</span><span class="op">$</span><span class="va">series</span><span class="op">)</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">)</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/arrange.html" class="external-link">arrange</a></span><span class="op">(</span><span class="va">time</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">good_times</span></span>
 <span><span class="va">good_times</span></span>
 <span><span class="co">#&gt;    time   series     outcome</span></span>
@@ -408,8 +429,9 @@ be pretty easy using <code><a href="https://rdrr.io/r/base/expand.grid.html" cla
 data, should work:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span><span class="va">outcome</span> <span class="op">~</span> <span class="fl">1</span>,</span>
-<span>                 data <span class="op">=</span> <span class="va">good_times</span>,</span>
-<span>                 family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span>  data <span class="op">=</span> <span class="va">good_times</span>,</span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
 <span><span class="co">#&gt;                             param_name param_length           param_info</span></span>
 <span><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
 <span><span class="co">#&gt; 2 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
@@ -424,11 +446,16 @@ data, should work:</p>
 this time adding an additional factor level that is not included in the
 data:</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">bad_levels</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">8</span>,</span>
-<span>                        series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="st">'series_1'</span>,</span>
-<span>                                        levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'series_1'</span>,</span>
-<span>                                                   <span class="st">'series_2'</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>                        outcome <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">8</span><span class="op">)</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">bad_levels</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">8</span>,</span>
+<span>  series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="st">"series_1"</span>,</span>
+<span>    levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>      <span class="st">"series_1"</span>,</span>
+<span>      <span class="st">"series_2"</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  outcome <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">8</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">bad_levels</span><span class="op">$</span><span class="va">series</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "series_1" "series_2"</span></span></code></pre></div>
@@ -436,8 +463,9 @@ data:</p>
 error:</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span><span class="va">outcome</span> <span class="op">~</span> <span class="fl">1</span>,</span>
-<span>                 data <span class="op">=</span> <span class="va">bad_levels</span>,</span>
-<span>                 family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span>  data <span class="op">=</span> <span class="va">bad_levels</span>,</span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error: Mismatch between factor levels of "series" and unique values of "series"</span></span>
 <span><span class="co">#&gt; Use</span></span>
 <span><span class="co">#&gt;   `setdiff(levels(data$series), unique(data$series))` </span></span>
@@ -458,8 +486,9 @@ no observations for this series in the data:</p>
 <span><span class="co">#&gt; [1] "series_1"</span></span></code></pre></div>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span><span class="va">outcome</span> <span class="op">~</span> <span class="fl">1</span>,</span>
-<span>                 data <span class="op">=</span> <span class="va">good_levels</span>,</span>
-<span>                 family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span>  data <span class="op">=</span> <span class="va">good_levels</span>,</span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
 <span><span class="co">#&gt;                             param_name param_length           param_info</span></span>
 <span><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
 <span><span class="co">#&gt; 2 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
@@ -482,11 +511,14 @@ which is not helpful when debugging. Both the <code><a href="../reference/mvgam.
 for you, and hopefully will return useful errors if it finds in missing
 values:</p>
 <div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">miss_dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>outcome <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">10</span><span class="op">)</span>,</span>
-<span>                       cov <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="cn">NA</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">9</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>                       series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="st">'series1'</span>,</span>
-<span>                                       levels <span class="op">=</span> <span class="st">'series1'</span><span class="op">)</span>,</span>
-<span>                       time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">10</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">miss_dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  outcome <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">10</span><span class="op">)</span>,</span>
+<span>  cov <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="cn">NA</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">9</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="st">"series1"</span>,</span>
+<span>    levels <span class="op">=</span> <span class="st">"series1"</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">10</span></span>
+<span><span class="op">)</span></span>
 <span><span class="va">miss_dat</span></span>
 <span><span class="co">#&gt;        outcome          cov  series time</span></span>
 <span><span class="co">#&gt; 1  -1.43332110           NA series1    1</span></span>
@@ -501,8 +533,9 @@ values:</p>
 <span><span class="co">#&gt; 10  0.06089889 -0.308211421 series1   10</span></span></code></pre></div>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span><span class="va">outcome</span> <span class="op">~</span> <span class="va">cov</span>,</span>
-<span>                 data <span class="op">=</span> <span class="va">miss_dat</span>,</span>
-<span>                 family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span>  data <span class="op">=</span> <span class="va">miss_dat</span>,</span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
 <span><span class="co">#&gt;                             param_name param_length           param_info</span></span>
 <span><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
 <span><span class="co">#&gt; 2                                  cov            1     cov fixed effect</span></span>
@@ -522,17 +555,21 @@ functional predictors</a> or even distributed lag predictors. The checks
 run by <code>mvgam</code> should still work on these data. Here we
 change the <code>cov</code> predictor to be a <code>matrix</code>:</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">miss_dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>outcome <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">10</span><span class="op">)</span>,</span>
-<span>                 series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="st">'series1'</span>,</span>
-<span>                                 levels <span class="op">=</span> <span class="st">'series1'</span><span class="op">)</span>,</span>
-<span>                 time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">10</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">miss_dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>  outcome <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">10</span><span class="op">)</span>,</span>
+<span>  series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="st">"series1"</span>,</span>
+<span>    levels <span class="op">=</span> <span class="st">"series1"</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">10</span></span>
+<span><span class="op">)</span></span>
 <span><span class="va">miss_dat</span><span class="op">$</span><span class="va">cov</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">50</span><span class="op">)</span>, ncol <span class="op">=</span> <span class="fl">5</span>, nrow <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span>
-<span><span class="va">miss_dat</span><span class="op">$</span><span class="va">cov</span><span class="op">[</span><span class="fl">2</span>,<span class="fl">3</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="cn">NA</span></span></code></pre></div>
+<span><span class="va">miss_dat</span><span class="op">$</span><span class="va">cov</span><span class="op">[</span><span class="fl">2</span>, <span class="fl">3</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="cn">NA</span></span></code></pre></div>
 <p>A call to <code><a href="../reference/get_mvgam_priors.html">get_mvgam_priors()</a></code> returns the same error:</p>
 <div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span><span class="va">outcome</span> <span class="op">~</span> <span class="va">cov</span>,</span>
-<span>                 data <span class="op">=</span> <span class="va">miss_dat</span>,</span>
-<span>                 family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span>  data <span class="op">=</span> <span class="va">miss_dat</span>,</span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
 <span><span class="co">#&gt;                             param_name param_length           param_info</span></span>
 <span><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
 <span><span class="co">#&gt; 2                                 cov1            1    cov1 fixed effect</span></span>
@@ -571,24 +608,30 @@ distribution for a single time series. For example, to plot all of the
 time series in our data, and highlight a single series in each plot, we
 can use:</p>
 <div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, </span>
-<span>                  y <span class="op">=</span> <span class="st">'y'</span>, </span>
-<span>                  series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span></span>
+<span>  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span>
+<span>  y <span class="op">=</span> <span class="st">"y"</span>,</span>
+<span>  series <span class="op">=</span> <span class="st">"all"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p><img src="data_in_mvgam_files/figure-html/unnamed-chunk-24-1.png" alt="Plotting time series features for GAM models in mvgam" width="60%" style="display: block; margin: auto;"></p>
 <p>Or we can look more closely at the distribution for the first time
 series:</p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, </span>
-<span>                  y <span class="op">=</span> <span class="st">'y'</span>, </span>
-<span>                  series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span></span>
+<span>  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span>
+<span>  y <span class="op">=</span> <span class="st">"y"</span>,</span>
+<span>  series <span class="op">=</span> <span class="fl">1</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p><img src="data_in_mvgam_files/figure-html/unnamed-chunk-25-1.png" alt="Plotting time series features for GAM models in mvgam" width="60%" style="display: block; margin: auto;"></p>
 <p>If you have split your data into training and testing folds (i.e. for
 forecast evaluation), you can include the test data in your plots:</p>
 <div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span>
-<span>                  newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span>,</span>
-<span>                  y <span class="op">=</span> <span class="st">'y'</span>, </span>
-<span>                  series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span></span>
+<span>  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span>
+<span>  newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span>,</span>
+<span>  y <span class="op">=</span> <span class="st">"y"</span>,</span>
+<span>  series <span class="op">=</span> <span class="fl">1</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p><img src="data_in_mvgam_files/figure-html/unnamed-chunk-26-1.png" alt="Plotting time series features for GAM models in mvgam" width="60%" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level2">
@@ -649,10 +692,12 @@ data using the call <code><a href="../reference/all_neon_tick_data.html">?all_ne
 an index of seasonality, and we will only work with observations from a
 few sampling plots (labelled in the <code>plotID</code> column):</p>
 <div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">plotIDs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'SCBI_013'</span>,<span class="st">'SCBI_002'</span>,</span>
-<span>             <span class="st">'SERC_001'</span>,<span class="st">'SERC_005'</span>,</span>
-<span>             <span class="st">'SERC_006'</span>,<span class="st">'SERC_012'</span>,</span>
-<span>             <span class="st">'BLAN_012'</span>,<span class="st">'BLAN_005'</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">plotIDs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  <span class="st">"SCBI_013"</span>, <span class="st">"SCBI_002"</span>,</span>
+<span>  <span class="st">"SERC_001"</span>, <span class="st">"SERC_005"</span>,</span>
+<span>  <span class="st">"SERC_006"</span>, <span class="st">"SERC_012"</span>,</span>
+<span>  <span class="st">"BLAN_012"</span>, <span class="st">"BLAN_005"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p>Now we can select the target species we want (<em>I.
 scapularis</em>), filter to the correct plot IDs and convert the
 <code>epiWeek</code> variable from <code>character</code> to
@@ -672,27 +717,32 @@ data. But we can use <code><a href="https://rdrr.io/r/base/expand.grid.html" cla
 this:</p>
 <div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">model_dat</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="co"># Create all possible combos of plotID, Year and epiWeek; </span></span>
+<span>  <span class="co"># Create all possible combos of plotID, Year and epiWeek;</span></span>
 <span>  <span class="co"># missing outcomes will be filled in as NA</span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">full_join</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/expand.grid.html" class="external-link">expand.grid</a></span><span class="op">(</span>plotID <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">model_dat</span><span class="op">$</span><span class="va">plotID</span><span class="op">)</span>,</span>
-<span>                               Year <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">model_dat</span><span class="op">$</span><span class="va">Year</span><span class="op">)</span>,</span>
-<span>                               epiWeek <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">52</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  </span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">full_join</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/expand.grid.html" class="external-link">expand.grid</a></span><span class="op">(</span></span>
+<span>    plotID <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">model_dat</span><span class="op">$</span><span class="va">plotID</span><span class="op">)</span>,</span>
+<span>    Year <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">model_dat</span><span class="op">$</span><span class="va">Year</span><span class="op">)</span>,</span>
+<span>    epiWeek <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">52</span><span class="op">)</span></span>
+<span>  <span class="op">)</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>  <span class="co"># left_join back to original data so plotID and siteID will</span></span>
 <span>  <span class="co"># match up, in case you need the siteID for anything else later on</span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">left_join</a></span><span class="op">(</span><span class="va">all_neon_tick_data</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>                     <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">siteID</span>, <span class="va">plotID</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>                     <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/distinct.html" class="external-link">distinct</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">model_dat</span></span></code></pre></div>
+<span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">siteID</span>, <span class="va">plotID</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/distinct.html" class="external-link">distinct</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">model_dat</span></span></code></pre></div>
 <p>Create the <code>series</code> variable needed for <code>mvgam</code>
 modelling:</p>
 <div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">model_dat</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>series <span class="op">=</span> <span class="va">plotID</span>,</span>
-<span>                y <span class="op">=</span> <span class="va">target</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>siteID <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">siteID</span><span class="op">)</span>,</span>
-<span>                series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
+<span>    series <span class="op">=</span> <span class="va">plotID</span>,</span>
+<span>    y <span class="op">=</span> <span class="va">target</span></span>
+<span>  <span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
+<span>    siteID <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">siteID</span><span class="op">)</span>,</span>
+<span>    series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span></span>
+<span>  <span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">target</span>, <span class="op">-</span><span class="va">plotID</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/arrange.html" class="external-link">arrange</a></span><span class="op">(</span><span class="va">Year</span>, <span class="va">epiWeek</span>, <span class="va">series</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">model_dat</span> </span></code></pre></div>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/arrange.html" class="external-link">arrange</a></span><span class="op">(</span><span class="va">Year</span>, <span class="va">epiWeek</span>, <span class="va">series</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">model_dat</span></span></code></pre></div>
 <p>Now create the <code>time</code> variable, which needs to track
 <code>Year</code> and <code>epiWeek</code> for each unique series. The
 <code>n</code> function from <code>dplyr</code> is often useful if
@@ -713,8 +763,9 @@ generating a <code>time</code> index for grouped dataframes:</p>
 <code><a href="../reference/get_mvgam_priors.html">get_mvgam_priors()</a></code>:</p>
 <div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fl">1</span>,</span>
-<span>                 data <span class="op">=</span> <span class="va">model_dat</span>,</span>
-<span>                 family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span>  data <span class="op">=</span> <span class="va">model_dat</span>,</span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
 <span><span class="co">#&gt;    param_name param_length  param_info                                  prior</span></span>
 <span><span class="co">#&gt; 1 (Intercept)            1 (Intercept) (Intercept) ~ student_t(3, -2.3, 2.5);</span></span>
 <span><span class="co">#&gt;                example_change new_lowerbound new_upperbound</span></span>
@@ -728,12 +779,14 @@ for checking the package-generated <code>Stan</code> code for any
 inefficiencies that can be fixed to lead to sampling performance
 improvements:</p>
 <div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">testmod</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">epiWeek</span>, by <span class="op">=</span> <span class="va">series</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span> <span class="op">+</span></span>
-<span>                   <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span>,</span>
-<span>                 trend_model <span class="op">=</span> <span class="st">'AR1'</span>,</span>
-<span>                 data <span class="op">=</span> <span class="va">model_dat</span>,</span>
-<span>                 backend <span class="op">=</span> <span class="st">'cmdstanr'</span>,</span>
-<span>                 run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">testmod</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span></span>
+<span>  <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">epiWeek</span>, by <span class="op">=</span> <span class="va">series</span>, bs <span class="op">=</span> <span class="st">"cc"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">"re"</span><span class="op">)</span>,</span>
+<span>  trend_model <span class="op">=</span> <span class="st">"AR1"</span>,</span>
+<span>  data <span class="op">=</span> <span class="va">model_dat</span>,</span>
+<span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span>,</span>
+<span>  run_model <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p>This call runs without issue, and the resulting object now contains
 the model code and data objects that are needed to initiate
 sampling:</p>
