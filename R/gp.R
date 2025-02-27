@@ -303,13 +303,14 @@ make_gp_additions = function(
     clean_coefs <- sub("^(.*)[.].*", "\\1", names(coef(mgcv_model)))
 
     coef_indices <- which(
-      clean_coefs %in% clean_name &
+      clean_coefs %in%
+        clean_name &
         !grepl(
           paste0(gp_att_table[[covariate]]$name, ':'),
           names(coef(mgcv_model)),
           fixed = TRUE
         ) ==
-        TRUE
+          TRUE
     )
 
     gp_att_table[[covariate]]$first_coef <- min(coef_indices)
