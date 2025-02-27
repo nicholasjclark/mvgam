@@ -126,7 +126,7 @@ gen_fevd <- function(x, h = 6, ...) {
   mse <- matrix(NA, nrow = h, ncol = K)
   Omega <- array(0, dim = c(h, K, K))
   for (i in 1:h) {
-    mse[i, ] <- diag(msey[, , i])
+    mse[i, ] <- diag(msey[,, i])
     temp <- matrix(0, K, K)
     for (l in 1:K) {
       for (m in 1:K) {
@@ -142,7 +142,7 @@ gen_fevd <- function(x, h = 6, ...) {
   }
   result <- list()
   for (i in 1:K) {
-    result[[i]] <- matrix(Omega[, , i], nrow = h, ncol = K)
+    result[[i]] <- matrix(Omega[,, i], nrow = h, ncol = K)
     colnames(result[[i]]) <- ynames
   }
   names(result) <- ynames
@@ -155,14 +155,14 @@ gen_fevd <- function(x, h = 6, ...) {
 var_fecov <- function(x, h) {
   sigma_yh <- array(NA, dim = c(x$K, x$K, h))
   Phi <- var_phi(x, h = h)
-  sigma_yh[, , 1] <- Phi[, , 1] %*% t(Phi[, , 1])
+  sigma_yh[,, 1] <- Phi[,, 1] %*% t(Phi[,, 1])
   if (h > 1) {
     for (i in 2:h) {
       temp <- matrix(0, nrow = x$K, ncol = x$K)
       for (j in 2:i) {
-        temp <- temp + Phi[, , j] %*% t(Phi[, , j])
+        temp <- temp + Phi[,, j] %*% t(Phi[,, j])
       }
-      sigma_yh[, , i] <- temp + sigma_yh[, , 1]
+      sigma_yh[,, i] <- temp + sigma_yh[,, 1]
     }
   }
   return(sigma_yh)

@@ -71,11 +71,12 @@ irf <- function(object, ...) {
 #' @method irf mvgam
 #' @export
 irf.mvgam <- function(
-    object,
-    h = 1,
-    cumulative = FALSE,
-    orthogonal = FALSE,
-    ...) {
+  object,
+  h = 1,
+  cumulative = FALSE,
+  orthogonal = FALSE,
+  ...
+) {
   validate_pos_integer(h)
   trend_model <- attr(object$model_data, "trend_model")
   if (!trend_model %in% c("VAR", "VARcor", "VAR1", "VAR1cor")) {
@@ -161,8 +162,8 @@ gen_irf <- function(x, h = 6, cumulative = TRUE, orthogonal = FALSE) {
     indx_[jj, 1] <- 1
 
     for (kk in 1:h) {
-      IRF_o[kk, , jj] <- var_ma[, , kk] %*% P %*% indx_ # Peseran-Shin eqn 7 (OIRF)
-      IRF_g1[kk, , jj] <- var_ma[, , kk] %*% sigma_u %*% indx_
+      IRF_o[kk, , jj] <- var_ma[,, kk] %*% P %*% indx_ # Peseran-Shin eqn 7 (OIRF)
+      IRF_g1[kk, , jj] <- var_ma[,, kk] %*% sigma_u %*% indx_
       IRF_g[kk, , jj] <- sig_jj[jj]^(-0.5) * IRF_g1[kk, , jj] # Peseran-Shin eqn 10 (GIRF)
     }
   }
@@ -203,24 +204,24 @@ var_phi <- function(x, h = 10) {
   if (h >= p) {
     As <- array(0, dim = c(K, K, h + 1))
     for (i in (p + 1):(h + 1)) {
-      As[, , i] <- matrix(0, nrow = K, ncol = K)
+      As[,, i] <- matrix(0, nrow = K, ncol = K)
     }
   } else {
     As <- array(0, dim = c(K, K, p))
   }
-  As[, , 1] <- A
+  As[,, 1] <- A
   Phi <- array(0, dim = c(K, K, h + 1))
-  Phi[, , 1] <- diag(K)
-  Phi[, , 2] <- Phi[, , 1] %*% As[, , 1]
+  Phi[,, 1] <- diag(K)
+  Phi[,, 2] <- Phi[,, 1] %*% As[,, 1]
   if (h > 1) {
     for (i in 3:(h + 1)) {
-      tmp1 <- Phi[, , 1] %*% As[, , i - 1]
+      tmp1 <- Phi[,, 1] %*% As[,, i - 1]
       tmp2 <- matrix(0, nrow = K, ncol = K)
       idx <- (i - 2):1
       for (j in 1:(i - 2)) {
-        tmp2 <- tmp2 + Phi[, , j + 1] %*% As[, , idx[j]]
+        tmp2 <- tmp2 + Phi[,, j + 1] %*% As[,, idx[j]]
       }
-      Phi[, , i] <- tmp1 + tmp2
+      Phi[,, i] <- tmp1 + tmp2
     }
   }
   return(Phi)
@@ -236,7 +237,7 @@ var_psi <- function(x, h = 10) {
   P <- t(chol(sigma_u))
   dim3 <- dim(Phi)[3]
   for (i in 1:dim3) {
-    Psi[, , i] <- Phi[, , i] %*% P
+    Psi[,, i] <- Phi[,, i] %*% P
   }
   return(Psi)
 }
