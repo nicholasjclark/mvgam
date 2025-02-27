@@ -147,6 +147,24 @@ Economics Letters 58: 17–29.</p>
 <span class="r-plt img"><img src="irf.mvgam-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">irfs</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="irf.mvgam-4.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Calculate posterior median, upper and lower 90th quantiles</span></span></span>
+<span class="r-in"><span><span class="co"># of the impulse responses</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">irfs</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 192 × 5</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    shock                horizon  median  Qlower  Qupper</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                  <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> Process1 -&gt; Process1       1  0.680   0.454   0.887 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> Process1 -&gt; Process1       2 -<span style="color: #BB0000;">0.065</span><span style="color: #BB0000; text-decoration: underline;">4</span> -<span style="color: #BB0000;">0.329</span>   0.174 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> Process1 -&gt; Process1       3 -<span style="color: #BB0000;">0.383</span>  -<span style="color: #BB0000;">0.583</span>  -<span style="color: #BB0000;">0.166</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> Process1 -&gt; Process1       4 -<span style="color: #BB0000;">0.037</span><span style="color: #BB0000; text-decoration: underline;">6</span> -<span style="color: #BB0000;">0.286</span>   0.203 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> Process1 -&gt; Process1       5  0.248   0.083<span style="text-decoration: underline;">6</span>  0.425 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> Process1 -&gt; Process1       6  0.104  -<span style="color: #BB0000;">0.060</span><span style="color: #BB0000; text-decoration: underline;">4</span>  0.292 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> Process1 -&gt; Process1       7 -<span style="color: #BB0000;">0.092</span><span style="color: #BB0000; text-decoration: underline;">7</span> -<span style="color: #BB0000;">0.255</span>   0.034<span style="text-decoration: underline;">8</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> Process1 -&gt; Process1       8 -<span style="color: #BB0000;">0.068</span><span style="color: #BB0000; text-decoration: underline;">6</span> -<span style="color: #BB0000;">0.246</span>   0.064<span style="text-decoration: underline;">7</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> Process1 -&gt; Process1       9  0.053<span style="text-decoration: underline;">5</span> -<span style="color: #BB0000;">0.075</span><span style="color: #BB0000; text-decoration: underline;">6</span>  0.198 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> Process1 -&gt; Process1      10  0.062<span style="text-decoration: underline;">4</span> -<span style="color: #BB0000;">0.018</span><span style="color: #BB0000; text-decoration: underline;">5</span>  0.214 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 182 more rows</span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
