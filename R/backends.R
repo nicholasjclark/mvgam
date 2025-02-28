@@ -207,6 +207,8 @@
       exclude = c(
         'trend_raw',
         'b_raw',
+        'b_raw_trend',
+        'p',
         'eta',
         'phi_vec',
         'nu_vec',

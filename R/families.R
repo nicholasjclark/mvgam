@@ -1045,7 +1045,7 @@ family_par_names = function(family) {
   }
 
   if (family == 'nmix') {
-    out <- c('p')
+    out <- c('detprob')
   }
 
   return(out)

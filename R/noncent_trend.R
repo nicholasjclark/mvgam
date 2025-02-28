@@ -373,7 +373,8 @@ check_noncent = function(
   add_cor,
   trend_model,
   drift,
-  silent
+  silent,
+  nmix
 ) {
   if (!missing(trend_map)) {
     trendmap <- TRUE
@@ -392,7 +393,8 @@ check_noncent = function(
     noncentred <- FALSE
   }
 
-  if (!noncentred & use_lv & trendmap & trend_model == 'None') {
+  if (!noncentred & use_lv & trendmap &
+      trend_model == 'None' & !nmix) {
     if (silent <= 1L) {
       message('Your model may benefit from using "noncentred = TRUE"')
     }
@@ -402,6 +404,7 @@ check_noncent = function(
     !noncentred &
       !add_ma &
       !add_cor &
+      !nmix &
       trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'CAR1')
   ) {
     if (use_lv & trendmap) {

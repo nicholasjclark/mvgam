@@ -2000,7 +2000,8 @@ mvgam <- function(
       add_cor = add_cor,
       trend_model = trend_model,
       drift = drift,
-      silent = silent
+      silent = silent,
+      nmix = add_nmix
     )
     vectorised$model_file <- nc_check$model_file
     noncentred <- nc_check$noncentred

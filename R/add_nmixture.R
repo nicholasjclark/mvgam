@@ -398,6 +398,7 @@ add_nmix_genquant = function(model_file, trend_map, nmix_trendmap) {
       'generated quantities {\n',
       penalty_line,
       '\n',
+      'vector[total_obs] detprob = inv_logit(p);\n',
       if (rho_included) {
         'vector[n_sp] rho = log(lambda);\n'
       } else {
@@ -534,8 +535,8 @@ add_nmix_posterior = function(
   trend <- mcmc_chains(model_output, 'trend')
 
   # Construct latent_ypred samples (arranged by time, then series)
-  ps <- mcmc_chains(model_output, 'p')
-  detprob <- plogis(ps)
+  detprob <- mcmc_chains(model_output, 'detprob')
+  ps <- qlogis(detprob)
   Xp <- matrix(as.vector(ps))
   attr(Xp, 'model.offset') <- 0
 
@@ -689,16 +690,16 @@ add_nmix_posterior = function(
     model_output@sim$dims_oi$trend
 
   # Now construct the detprob samples
-  model_output <- add_samples(
-    model_output = model_output,
-    names = gsub('p', 'detprob', dimnames(ps)[[2]]),
-    samples = detprob,
-    nsamples = NROW(detprob) / nchains,
-    nchains = nchains,
-    parname = 'detprob'
-  )
-  model_output@sim$dims_oi$detprob <-
-    model_output@sim$dims_oi$p
+  # model_output <- add_samples(
+  #   model_output = model_output,
+  #   names = gsub('p', 'detprob', dimnames(ps)[[2]]),
+  #   samples = detprob,
+  #   nsamples = NROW(detprob) / nchains,
+  #   nchains = nchains,
+  #   parname = 'detprob'
+  # )
+  # model_output@sim$dims_oi$detprob <-
+  #   model_output@sim$dims_oi$p
 
   # Now construct ypred samples
   ypreds_vec <- rbinom(
