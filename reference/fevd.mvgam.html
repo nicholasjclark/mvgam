@@ -146,7 +146,20 @@ New Introduction to Multiple Time Series Analysis. Springer, New York.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># View a summary of the error variance decompositions</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fevds</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in summary.mvgam_fevd(fevds):</span> object 'x' not found</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 192 × 5</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    shock                  horizon fevd_median fevd_Qlower fevd_Qupper</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> Process_1 -&gt; Process_1       1       1           1           1    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> Process_1 -&gt; Process_1       2       0.766       0.250       0.990</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> Process_1 -&gt; Process_1       3       0.699       0.178       0.985</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> Process_1 -&gt; Process_1       4       0.659       0.163       0.983</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> Process_1 -&gt; Process_1       5       0.641       0.153       0.981</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> Process_1 -&gt; Process_1       6       0.630       0.150       0.980</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> Process_1 -&gt; Process_1       7       0.622       0.148       0.979</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> Process_1 -&gt; Process_1       8       0.618       0.147       0.978</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> Process_1 -&gt; Process_1       9       0.617       0.147       0.977</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> Process_1 -&gt; Process_1      10       0.616       0.145       0.977</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 182 more rows</span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
