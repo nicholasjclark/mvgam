@@ -488,6 +488,7 @@ sense of how the marginalization over latent N works</p>
 <span><span class="co">#&gt; }</span></span>
 <span><span class="co">#&gt; generated quantities {</span></span>
 <span><span class="co">#&gt;   vector[n_lv] penalty = rep_vector(1e12, n_lv);</span></span>
+<span><span class="co">#&gt;   vector[total_obs] detprob = inv_logit(p);</span></span>
 <span><span class="co">#&gt;   vector[n_sp_trend] rho_trend = log(lambda_trend);</span></span>
 <span><span class="co">#&gt; }</span></span></code></pre></div>
 <p>The posterior summary of this model shows that it has converged
@@ -552,7 +553,7 @@ nicely</p>
 <span><span class="co">#&gt; 0 of 4000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Fri Feb 28 01:13:07 2025.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Fri Feb 28 07:05:13 2025.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
