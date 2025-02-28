@@ -393,8 +393,7 @@ check_noncent = function(
     noncentred <- FALSE
   }
 
-  if (!noncentred & use_lv & trendmap &
-      trend_model == 'None' & !nmix) {
+  if (!noncentred & use_lv & trendmap & trend_model == 'None' & !nmix) {
     if (silent <= 1L) {
       message('Your model may benefit from using "noncentred = TRUE"')
     }
