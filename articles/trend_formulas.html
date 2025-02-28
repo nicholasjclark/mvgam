@@ -65,7 +65,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-02-27</h4>
+            <h4 data-toc-skip class="date">2025-02-28</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/master/vignettes/trend_formulas.Rmd" class="external-link"><code>vignettes/trend_formulas.Rmd</code></a></small>
       <div class="d-none name"><code>trend_formulas.Rmd</code></div>
@@ -578,7 +578,7 @@ to interpret:</p>
 <span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Thu Feb 27 08:26:47 2025.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Fri Feb 28 00:15:39 2025.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
@@ -744,18 +744,18 @@ timesteps:</p>
 <div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">irfs</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 300 × 5</span></span></span>
-<span><span class="co">#&gt;    shock                horizon median Qlower Qupper</span></span>
-<span><span class="co">#&gt;    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                  <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> Process1 -&gt; Process1       1 0.353  0.270   0.446</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> Process1 -&gt; Process1       2 0.298  0.236   0.371</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> Process1 -&gt; Process1       3 0.252  0.196   0.318</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> Process1 -&gt; Process1       4 0.214  0.159   0.280</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> Process1 -&gt; Process1       5 0.181  0.126   0.250</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> Process1 -&gt; Process1       6 0.153  0.097<span style="text-decoration: underline;">1</span>  0.227</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> Process1 -&gt; Process1       7 0.130  0.073<span style="text-decoration: underline;">4</span>  0.204</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> Process1 -&gt; Process1       8 0.111  0.054<span style="text-decoration: underline;">1</span>  0.184</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> Process1 -&gt; Process1       9 0.095<span style="text-decoration: underline;">1</span> 0.039<span style="text-decoration: underline;">6</span>  0.169</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> Process1 -&gt; Process1      10 0.080<span style="text-decoration: underline;">8</span> 0.028<span style="text-decoration: underline;">8</span>  0.155</span></span>
+<span><span class="co">#&gt;    shock                horizon irf_median irf_Qlower irf_Qupper</span></span>
+<span><span class="co">#&gt;    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                  <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> Process1 -&gt; Process1       1     0.353      0.270       0.446</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> Process1 -&gt; Process1       2     0.298      0.236       0.371</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> Process1 -&gt; Process1       3     0.252      0.196       0.318</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> Process1 -&gt; Process1       4     0.214      0.159       0.280</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> Process1 -&gt; Process1       5     0.181      0.126       0.250</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> Process1 -&gt; Process1       6     0.153      0.097<span style="text-decoration: underline;">1</span>      0.227</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> Process1 -&gt; Process1       7     0.130      0.073<span style="text-decoration: underline;">4</span>      0.204</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> Process1 -&gt; Process1       8     0.111      0.054<span style="text-decoration: underline;">1</span>      0.184</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> Process1 -&gt; Process1       9     0.095<span style="text-decoration: underline;">1</span>     0.039<span style="text-decoration: underline;">6</span>      0.169</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> Process1 -&gt; Process1      10     0.080<span style="text-decoration: underline;">8</span>     0.028<span style="text-decoration: underline;">8</span>      0.155</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># ℹ 290 more rows</span></span></span></code></pre></div>
 <p>But it is easier to understand these responses using plots. For
 example, we can plot the expected responses of the remaining series to a
@@ -771,7 +771,18 @@ and nonlinear responses over time (due to the complex lagged dependence
 structure captured by the
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
 matrix). This hopefully makes it clear why IRFs are an important tool in
-the analysis of multivariate autoregressive models.</p>
+the analysis of multivariate autoregressive models. You can also use
+these IRFs to calculate a relative contribution from each shock to the
+forecast error variance for a focal series. This method, known as a <a href="https://en.wikipedia.org/wiki/Variance_decomposition_of_forecast_errors" class="external-link">Forecast
+Error Variance Decomposition</a> (FEVD), is useful to get an idea about
+the amount of information that each series contributes to the evolution
+of all other series in a Vector Autoregression:</p>
+<div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fevds</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fevd.mvgam.html">fevd</a></span><span class="op">(</span><span class="va">varcor_mod</span>, h <span class="op">=</span> <span class="fl">12</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fevds</span><span class="op">)</span></span></code></pre></div>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-37-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p>The plot above shows the median contribution to forecast error
+variance for each series.</p>
 </div>
 <div class="section level3">
 <h3 id="comparing-forecast-scores">Comparing forecast scores<a class="anchor" aria-label="anchor" href="#comparing-forecast-scores"></a>
@@ -779,7 +790,7 @@ the analysis of multivariate autoregressive models.</p>
 <p>But which model is better? We can compute the variogram score for out
 of sample forecasts to get a sense of which model does a better job of
 capturing the dependence structure in the true evaluation set:</p>
-<div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># create forecast objects for each model</span></span>
 <span><span class="va">fcvar</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">var_mod</span><span class="op">)</span></span>
 <span><span class="va">fcvarcor</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">varcor_mod</span><span class="op">)</span></span>
@@ -798,11 +809,11 @@ capturing the dependence structure in the true evaluation set:</p>
 <span>  ylab <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/expression.html" class="external-link">expression</a></span><span class="op">(</span><span class="va">variogram</span><span class="op">[</span><span class="va">VAR1cor</span><span class="op">]</span> <span class="op">~</span> <span class="op">-</span><span class="op">~</span> <span class="va">variogram</span><span class="op">[</span><span class="va">VAR1</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html" class="external-link">abline</a></span><span class="op">(</span>h <span class="op">=</span> <span class="fl">0</span>, lty <span class="op">=</span> <span class="st">"dashed"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-37-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-38-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>And we can also compute the energy score for out of sample forecasts
 to get a sense of which model provides forecasts that are better
 calibrated:</p>
-<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># plot the difference in energy scores; a negative value means the VAR1cor model is better, while a positive value means the VAR1 model is better</span></span>
 <span><span class="va">diff_scores</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">fcvarcor</span>, score <span class="op">=</span> <span class="st">"energy"</span><span class="op">)</span><span class="op">$</span><span class="va">all_series</span><span class="op">$</span><span class="va">score</span> <span class="op">-</span></span>
 <span>  <span class="fu"><a href="../reference/score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">fcvar</span>, score <span class="op">=</span> <span class="st">"energy"</span><span class="op">)</span><span class="op">$</span><span class="va">all_series</span><span class="op">$</span><span class="va">score</span></span>
@@ -817,7 +828,7 @@ calibrated:</p>
 <span>  ylab <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/expression.html" class="external-link">expression</a></span><span class="op">(</span><span class="va">energy</span><span class="op">[</span><span class="va">VAR1cor</span><span class="op">]</span> <span class="op">~</span> <span class="op">-</span><span class="op">~</span> <span class="va">energy</span><span class="op">[</span><span class="va">VAR1</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html" class="external-link">abline</a></span><span class="op">(</span>h <span class="op">=</span> <span class="fl">0</span>, lty <span class="op">=</span> <span class="st">"dashed"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-38-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-39-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>The models tend to provide similar forecasts, though the correlated
 error model does slightly better overall. We would probably need to use
 a more extensive rolling forecast evaluation exercise if we felt like we
