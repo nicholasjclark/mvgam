@@ -195,19 +195,20 @@ residual_cor.jsdgam <- function(
       final_trace <- mean(all_trace_rescor)
     }
 
-    out <- structure(list(
-      cor = cormat,
-      cor_lower = cormat_lower,
-      cor_upper = cormat_upper,
-      sig_cor = sig_cormat,
-      cov = covmat,
-      prec = precmat,
-      prec_lower = precmat_lower,
-      prec_upper = precmat_upper,
-      sig_prec = sig_precmat,
-      trace = final_trace
-    ),
-    class = 'mvgam_residcor'
+    out <- structure(
+      list(
+        cor = cormat,
+        cor_lower = cormat_lower,
+        cor_upper = cormat_upper,
+        sig_cor = sig_cormat,
+        cov = covmat,
+        prec = precmat,
+        prec_lower = precmat_lower,
+        prec_upper = precmat_upper,
+        sig_prec = sig_precmat,
+        trace = final_trace
+      ),
+      class = 'mvgam_residcor'
     )
   }
   return(out)
@@ -230,16 +231,14 @@ residual_cor.jsdgam <- function(
 #'
 #' @export
 plot.mvgam_residcor = function(x, ...) {
-
   # Plot the significant correlations
-  ggplot2::ggplot(data = gather_matrix(x$sig_cor),
-                  mapping = ggplot2::aes(x = Var1,
-                                         y = Var2,
-                                         fill = correlation)) +
+  ggplot2::ggplot(
+    data = gather_matrix(x$sig_cor),
+    mapping = ggplot2::aes(x = Var1, y = Var2, fill = correlation)
+  ) +
     ggplot2::geom_tile(colour = 'grey50') +
     ggplot2::scale_fill_gradient2() +
     ggplot2::labs(x = '', y = '')
-
 }
 
 #' Melt a symmetric matrix into a long data.frame
