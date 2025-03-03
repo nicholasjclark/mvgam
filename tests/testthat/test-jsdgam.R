@@ -3366,10 +3366,12 @@ test_that("jsdgam post-processing works correctly", {
     n_lv = 2,
     family = nb(),
     run_model = TRUE,
+    residuals = FALSE,
     chains = 2,
     silent = 2
   ))
   expect_true(inherits(mod, 'jsdgam'))
+  expect_true(is.null(mod$resids))
 
   # Calculate residual correlations to ensure it works
   post_cors <- residual_cor(mod, summary = FALSE)

@@ -30,7 +30,7 @@ Generate evenly weighted ensemble forecast distributions from \code{mvgam_foreca
 It is widely recognised in the forecasting literature that combining forecasts
 from different models often results in improved forecast accuracy. The simplest way to create
 an ensemble is to use evenly weighted combinations of forecasts from the different models.
-This is straightforward to do in a Bayesian setting with \code{mvgam} as the posterior MCMC draws
+This is straightforward to do in a Bayesian setting with \pkg{mvgam} as the posterior MCMC draws
 contained in each \code{mvgam_forecast} object will already implicitly capture correlations among
 the temporal posterior predictions.
 }

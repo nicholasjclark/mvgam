@@ -385,16 +385,16 @@ test_that("plot_mvgam... functions work properly", {
   expect_message(plot(mvgam:::mvgam_example1, type = 're'))
   expect_error(plot(mvgam:::mvgam_example1, type = 'factors'))
   expect_no_error(plot(mvgam:::mvgam_example4, type = 'factors'))
-  expect_no_error(plot_mvgam_trend(mvgam:::mvgam_example1))
-  expect_no_error(plot_mvgam_trend(mvgam:::mvgam_example4))
-  expect_no_error(plot_mvgam_trend(mvgam:::mvgam_example4, derivatives = TRUE))
-  expect_no_error(plot_mvgam_trend(
+  expect_ggplot(plot_mvgam_trend(mvgam:::mvgam_example1))
+  expect_ggplot(plot_mvgam_trend(mvgam:::mvgam_example4))
+  expect_ggplot(plot_mvgam_trend(mvgam:::mvgam_example4, derivatives = TRUE))
+  expect_ggplot(plot_mvgam_trend(
     mvgam:::mvgam_example1,
     realisations = TRUE,
     n_realisations = 2
   ))
-  expect_no_error(plot_mvgam_trend(mvgam:::mvgam_example3, derivatives = TRUE))
-  expect_no_error(plot_mvgam_trend(
+  expect_ggplot(plot_mvgam_trend(mvgam:::mvgam_example3, derivatives = TRUE))
+  expect_ggplot(plot_mvgam_trend(
     mvgam:::mvgam_example2,
     realisations = TRUE,
     n_realisations = 2

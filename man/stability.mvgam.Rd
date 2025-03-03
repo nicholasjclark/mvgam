@@ -98,8 +98,9 @@ Major advantages of using \pkg{mvgam} to compute these metrics are that well-cal
 available and that VAR processes are forced to be stationary. These properties make it simple and
 insightful to calculate and inspect aspects of both long-term and short-term stability.
 But it is also possible to more directly inspect possible interactions among the
-time series in a latent VAR process. To do so, you can calculate and plot
-Generalized or Orthogonalized Impulse Response Functions using the \code{\link{irf}} function.
+time series in a latent VAR process. To do so, you can calculate
+Generalized or Orthogonalized Impulse Response Functions using the \code{\link{irf}} function,
+or you can calculate Forecast Error Variance Decompositions using the \code{\link{fevd}} function.
 }
 \examples{
 \donttest{

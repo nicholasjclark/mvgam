@@ -12,7 +12,7 @@
 \item{...}{Ignored}
 }
 \value{
-A ggplot object of Pareto-k and ELPD values over the
+A \code{ggplot} object presenting Pareto-k and ELPD values over the
 evaluation timepoints. For the Pareto-k plot, a dashed red line indicates the
 specified threshold chosen for triggering model refits. For the ELPD plot,
 a dashed red line indicates the bottom 10\% quantile of ELPD values. Points below

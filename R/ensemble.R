@@ -8,7 +8,7 @@
 #'@details It is widely recognised in the forecasting literature that combining forecasts
 #'from different models often results in improved forecast accuracy. The simplest way to create
 #'an ensemble is to use evenly weighted combinations of forecasts from the different models.
-#' This is straightforward to do in a Bayesian setting with `mvgam` as the posterior MCMC draws
+#' This is straightforward to do in a Bayesian setting with \pkg{mvgam} as the posterior MCMC draws
 #' contained in each \code{mvgam_forecast} object will already implicitly capture correlations among
 #' the temporal posterior predictions.
 #'@return An object of class \code{mvgam_forecast} containing the ensemble predictions. This
@@ -174,7 +174,6 @@ ensemble.mvgam_forecast <- function(object, ..., ndraws = 5000) {
   # Return
   return(ens_fc)
 }
-
 
 #'@noRd
 split_fc_dots = function(x, ..., model_names = NULL, other = TRUE) {

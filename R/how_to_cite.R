@@ -112,12 +112,18 @@ how_to_cite.mvgam <- function(object, ...) {
   ) {
     specials_text <- c(
       specials_text,
-      " To encourage stability and prevent forecast variance from increasing indefinitely, we enforced stationarity of the Vector Autoregressive process following methods described by Heaps (2023)."
+      " To encourage stability and prevent forecast variance from increasing indefinitely, we enforced stationarity of the Vector Autoregressive process following methods described by Heaps (2023) and Clark et al. (2025)."
     )
     citations <- append(
       citations,
       list(
         "Heaps, SE (2023). Enforcing stationarity through the prior in vector autoregressions. Journal of Computational and Graphical Statistics 32, 74-83."
+      )
+    )
+    citations <- append(
+      citations,
+      list(
+        "Clark NJ, Ernest SKM, Senyondo H, Simonis J, White EP, Yenni GM, Karunarathna KANK (2025). Beyond single-species models: leveraging multispecies forecasts to navigate the dynamics of ecological predictability. PeerJ 13:e18929."
       )
     )
   }

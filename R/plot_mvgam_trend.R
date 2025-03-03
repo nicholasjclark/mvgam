@@ -14,13 +14,10 @@
 #'empirical quantiles of the posterior distribution are shown
 #'@param n_realisations \code{integer} specifying the number of posterior realisations to plot, if
 #'\code{realisations = TRUE}. Ignored otherwise
-#'@param n_cores \code{integer} specifying number of cores for generating trend forecasts in parallel
-#'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
-#'\code{axis} from base \code{R}. Ignored if \code{derivatives = TRUE}
+#'@param n_cores Deprecated. Parallel processing is no longer supported
 #'@param xlab label for x axis.
 #'@param ylab label for y axis.
-#'@param ... further \code{\link[graphics]{par}} graphical parameters.
-#'@return A base \code{R} graphics plot
+#'@return A `ggplot` object
 #' @examples
 #' \donttest{
 #' simdat <- sim_mvgam(n_series = 3, trend_model = 'AR1')
@@ -54,23 +51,15 @@ plot_mvgam_trend = function(
   n_realisations = 15,
   n_cores = 1,
   derivatives = FALSE,
-  hide_xlabels = FALSE,
   xlab,
-  ylab,
-  ...
+  ylab
 ) {
   # Check arguments
   if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
 
-  if (sign(series) != 1) {
-    stop('argument "series" must be a positive integer', call. = FALSE)
-  } else {
-    if (series %% 1 != 0) {
-      stop('argument "series" must be a positive integer', call. = FALSE)
-    }
-  }
+  validate_pos_integer(series)
 
   if (series > NCOL(object$ytimes)) {
     stop(
@@ -98,7 +87,7 @@ plot_mvgam_trend = function(
   data_train <- object$obs_data
   ends <- seq(
     0,
-    dim(mcmc_chains(object$model_output, 'ypred'))[2],
+    dim(mcmc_chains(object$model_output, 'trend'))[2],
     length.out = NCOL(object$ytimes) + 1
   )
   starts <- ends + 1
@@ -192,14 +181,8 @@ plot_mvgam_trend = function(
 
   # Plot quantiles of the smooth function, along with observed values
   # if specified
-  probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+  probs <- c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
   cred <- sapply(1:NCOL(preds), function(n) quantile(preds[, n], probs = probs))
-  c_light <- c("#DCBCBC")
-  c_light_highlight <- c("#C79999")
-  c_mid <- c("#B97C7C")
-  c_mid_highlight <- c("#A25050")
-  c_dark <- c("#8F2727")
-  c_dark_highlight <- c("#7C0000")
 
   if (missing(xlab)) {
     xlab <- 'Time'
@@ -209,251 +192,188 @@ plot_mvgam_trend = function(
     ylab <- paste0('Estimated trend for ', levels(data_train$series)[series])
   }
 
-  if (derivatives) {
-    .pardefault <- par(no.readonly = T)
-    on.exit(par(.pardefault))
-    par(mfrow = c(2, 1))
+  # Create a base plot using posterior credible intervals and observations
+  # for the specified series
+  plot_dat <- data.frame(
+    time = 1:NCOL(cred),
+    med = cred[5, ],
+    lower1 = cred[1, ],
+    lower2 = cred[2, ],
+    lower3 = cred[3, ],
+    lower4 = cred[4, ],
+    upper1 = cred[9, ],
+    upper2 = cred[8, ],
+    upper3 = cred[7, ],
+    upper4 = cred[6, ]
+  )
 
-    plot(
-      1,
-      type = "n",
-      bty = 'L',
-      xlab = xlab,
-      ylab = ylab,
-      xlim = c(0, length(preds_last)),
-      ylim = range(cred),
-      ...
-    )
+  base_plot <- ggplot2::ggplot(
+    data = plot_dat,
+    mapping = ggplot2::aes(x = time, y = med)
+  ) +
+    ggplot2::theme_classic() +
+    ggplot2::labs(x = xlab, y = ylab)
 
-    if (realisations) {
-      for (i in 1:n_realisations) {
-        lines(x = pred_vals, y = preds[i, ], col = 'white', lwd = 2.5)
-        lines(
-          x = pred_vals,
-          y = preds[i, ],
+  # Add to the base plot accordingly
+  if (realisations) {
+    for (i in 1:n_realisations) {
+      base_plot <- base_plot +
+        ggplot2::geom_line(
+          data = data.frame(
+            y = preds[i, ],
+            time = 1:NCOL(cred)
+          ),
+          mapping = ggplot2::aes(x = time, y = y),
+          col = "white",
+          linewidth = 1
+        ) +
+        ggplot2::geom_line(
+          data = data.frame(
+            y = preds[i, ],
+            time = 1:NCOL(cred)
+          ),
+          mapping = ggplot2::aes(x = time, y = y),
           col = sample(
             c("#DCBCBC", "#C79999", "#B97C7C", "#A25050", "#7C0000"),
             1
           ),
-          lwd = 2.25
+          linewidth = 0.75
         )
-      }
-    } else {
-      polygon(
-        c(pred_vals, rev(pred_vals)),
-        c(cred[1, ], rev(cred[9, ])),
-        col = c_light,
-        border = NA
-      )
-      polygon(
-        c(pred_vals, rev(pred_vals)),
-        c(cred[2, ], rev(cred[8, ])),
-        col = c_light_highlight,
-        border = NA
-      )
-      polygon(
-        c(pred_vals, rev(pred_vals)),
-        c(cred[3, ], rev(cred[7, ])),
-        col = c_mid,
-        border = NA
-      )
-      polygon(
-        c(pred_vals, rev(pred_vals)),
-        c(cred[4, ], rev(cred[6, ])),
-        col = c_mid_highlight,
-        border = NA
-      )
-      lines(pred_vals, cred[5, ], col = c_dark, lwd = 2.5)
     }
-    box(bty = 'L', lwd = 2)
-
-    if (!missing(data_test)) {
-      if (class(data_train)[1] == 'list') {
-        abline(
-          v = length(data_train$y) / NCOL(object$ytimes),
-          col = '#FFFFFF60',
-          lwd = 2.85
-        )
-        abline(
-          v = length(data_train$y) / NCOL(object$ytimes),
-          col = 'black',
-          lwd = 2.5,
-          lty = 'dashed'
-        )
-      } else {
-        abline(
-          v = NROW(data_train) / NCOL(object$ytimes),
-          col = '#FFFFFF60',
-          lwd = 2.85
-        )
-        abline(
-          v = NROW(data_train) / NCOL(object$ytimes),
-          col = 'black',
-          lwd = 2.5,
-          lty = 'dashed'
-        )
-      }
-    }
-
-    # Compute 1st derivative from posterior draws
-    first_derivs <- cbind(rep(NA, NROW(preds)), t(apply(preds, 1, diff)))
-    cred <- sapply(
-      1:NCOL(first_derivs),
-      function(n) quantile(first_derivs[, n], probs = probs, na.rm = T)
-    )
-
-    plot(
-      1,
-      type = "n",
-      bty = "L",
-      xlab = xlab,
-      ylab = '1st derivative',
-      xlim = c(min(pred_vals), max(pred_vals)),
-      ylim = c(
-        min(cred, na.rm = T) - sd(first_derivs, na.rm = T),
-        max(cred, na.rm = T) + sd(first_derivs, na.rm = T)
-      ),
-      ...
-    )
-
-    if (realisations) {
-      for (i in 1:n_realisations) {
-        lines(x = pred_vals, y = first_derivs[i, ], col = 'white', lwd = 2.5)
-        lines(
-          x = pred_vals,
-          y = first_derivs[i, ],
-          col = sample(
-            c("#DCBCBC", "#C79999", "#B97C7C", "#A25050", "#7C0000"),
-            1
-          ),
-          lwd = 2.25
-        )
-      }
-    } else {
-      polygon(
-        c(pred_vals, rev(pred_vals)),
-        c(cred[1, ], rev(cred[9, ])),
-        col = c_light,
-        border = NA
-      )
-      polygon(
-        c(pred_vals, rev(pred_vals)),
-        c(cred[2, ], rev(cred[8, ])),
-        col = c_light_highlight,
-        border = NA
-      )
-      polygon(
-        c(pred_vals, rev(pred_vals)),
-        c(cred[3, ], rev(cred[7, ])),
-        col = c_mid,
-        border = NA
-      )
-      polygon(
-        c(pred_vals, rev(pred_vals)),
-        c(cred[4, ], rev(cred[6, ])),
-        col = c_mid_highlight,
-        border = NA
-      )
-      lines(pred_vals, cred[5, ], col = c_dark, lwd = 2.5)
-    }
-    box(bty = 'L', lwd = 2)
-
-    abline(h = 0, lty = 'dashed', lwd = 2)
-
-    invisible()
   } else {
-    if (hide_xlabels) {
-      plot(
-        1,
-        type = "n",
-        bty = 'L',
-        xlab = '',
-        xaxt = 'n',
-        ylab = ylab,
-        xlim = c(0, length(preds_last)),
-        ylim = range(cred)
+    base_plot <- base_plot +
+      ggplot2::geom_ribbon(
+        mapping = ggplot2::aes(ymin = lower1, ymax = upper1),
+        fill = "#DCBCBC"
+      ) +
+      ggplot2::geom_ribbon(
+        mapping = ggplot2::aes(ymin = lower2, ymax = upper2),
+        fill = "#C79999"
+      ) +
+      ggplot2::geom_ribbon(
+        mapping = ggplot2::aes(ymin = lower3, ymax = upper3),
+        fill = "#B97C7C"
+      ) +
+      ggplot2::geom_ribbon(
+        mapping = ggplot2::aes(ymin = lower4, ymax = upper4),
+        fill = "#A25050"
+      ) +
+      ggplot2::geom_line(
+        mapping = ggplot2::aes(x = time, y = med),
+        col = "#8F2727",
+        linewidth = 1
       )
-    } else {
-      plot(
-        1,
-        type = "n",
-        bty = 'L',
-        xlab = xlab,
-        ylab = ylab,
-        xlim = c(0, length(preds_last)),
-        ylim = range(cred),
-        ...
-      )
-    }
+  }
 
-    if (realisations) {
-      for (i in 1:n_realisations) {
-        lines(x = pred_vals, y = preds[i, ], col = 'white', lwd = 2.5)
-        lines(
-          x = pred_vals,
-          y = preds[i, ],
-          col = sample(
-            c("#DCBCBC", "#C79999", "#B97C7C", "#A25050", "#7C0000"),
-            1
-          ),
-          lwd = 2.25
-        )
-      }
+  if (!missing(data_test)) {
+    if (class(data_train)[1] == 'list') {
+      base_plot <- base_plot +
+        ggplot2::geom_vline(xintercept = length(data_train$y) / NCOL(object$ytimes),
+                            linetype = 'dashed')
     } else {
-      polygon(
-        c(pred_vals, rev(pred_vals)),
-        c(cred[1, ], rev(cred[9, ])),
-        col = c_light,
-        border = NA
-      )
-      polygon(
-        c(pred_vals, rev(pred_vals)),
-        c(cred[2, ], rev(cred[8, ])),
-        col = c_light_highlight,
-        border = NA
-      )
-      polygon(
-        c(pred_vals, rev(pred_vals)),
-        c(cred[3, ], rev(cred[7, ])),
-        col = c_mid,
-        border = NA
-      )
-      polygon(
-        c(pred_vals, rev(pred_vals)),
-        c(cred[4, ], rev(cred[6, ])),
-        col = c_mid_highlight,
-        border = NA
-      )
-      lines(pred_vals, cred[5, ], col = c_dark, lwd = 2.5)
-    }
-    box(bty = 'L', lwd = 2)
-
-    if (!missing(data_test)) {
-      if (class(data_train)[1] == 'list') {
-        abline(
-          v = length(data_train$y) / NCOL(object$ytimes),
-          col = '#FFFFFF60',
-          lwd = 2.85
-        )
-        abline(
-          v = length(data_train$y) / NCOL(object$ytimes),
-          col = 'black',
-          lwd = 2.5,
-          lty = 'dashed'
-        )
-      } else {
-        abline(
-          v = NROW(data_train) / NCOL(object$ytimes),
-          col = '#FFFFFF60',
-          lwd = 2.85
-        )
-        abline(
-          v = NROW(data_train) / NCOL(object$ytimes),
-          col = 'black',
-          lwd = 2.5,
-          lty = 'dashed'
-        )
-      }
+      base_plot <- base_plot +
+        ggplot2::geom_vline(xintercept = NROW(data_train) / NCOL(object$ytimes),
+                            linetype = 'dashed')
     }
   }
+
+  # Add the 1st derivative plot if necessary
+  if (derivatives) {
+    first_derivs <- cbind(rep(0, NROW(preds)), t(apply(preds, 1, diff)))
+    cred <- sapply(
+      1:NCOL(first_derivs),
+      function(n) quantile(first_derivs[, n], probs = probs, na.rm = TRUE)
+    )
+    plot_dat <- data.frame(
+      time = 1:NCOL(cred),
+      med = cred[5, ],
+      lower1 = cred[1, ],
+      lower2 = cred[2, ],
+      lower3 = cred[3, ],
+      lower4 = cred[4, ],
+      upper1 = cred[9, ],
+      upper2 = cred[8, ],
+      upper3 = cred[7, ],
+      upper4 = cred[6, ]
+    )
+
+    deriv_plot <- ggplot2::ggplot(
+      data = plot_dat,
+      mapping = ggplot2::aes(x = time, y = med)
+    ) +
+      ggplot2::theme_classic() +
+      ggplot2::labs(x = xlab,
+                    y = '1st derivative')
+
+    # Add to the base plot accordingly
+    if (realisations) {
+      for (i in 1:n_realisations) {
+        deriv_plot <- deriv_plot +
+          ggplot2::geom_line(
+            data = data.frame(
+              y = first_derivs[i, ],
+              time = 1:NCOL(cred)
+            ),
+            mapping = ggplot2::aes(x = time, y = y),
+            col = "white",
+            linewidth = 1
+          ) +
+          ggplot2::geom_line(
+            data = data.frame(
+              y = first_derivs[i, ],
+              time = 1:NCOL(cred)
+            ),
+            mapping = ggplot2::aes(x = time, y = y),
+            col = sample(
+              c("#DCBCBC", "#C79999", "#B97C7C", "#A25050", "#7C0000"),
+              1
+            ),
+            linewidth = 0.75
+          )
+      }
+    } else {
+      deriv_plot <- deriv_plot +
+        ggplot2::geom_ribbon(
+          mapping = ggplot2::aes(ymin = lower1, ymax = upper1),
+          fill = "#DCBCBC"
+        ) +
+        ggplot2::geom_ribbon(
+          mapping = ggplot2::aes(ymin = lower2, ymax = upper2),
+          fill = "#C79999"
+        ) +
+        ggplot2::geom_ribbon(
+          mapping = ggplot2::aes(ymin = lower3, ymax = upper3),
+          fill = "#B97C7C"
+        ) +
+        ggplot2::geom_ribbon(
+          mapping = ggplot2::aes(ymin = lower4, ymax = upper4),
+          fill = "#A25050"
+        ) +
+        ggplot2::geom_line(
+          mapping = ggplot2::aes(x = time, y = med),
+          col = "#8F2727",
+          linewidth = 1
+        )
+    }
+
+    if (!missing(data_test)) {
+      if (class(data_train)[1] == 'list') {
+        deriv_plot <- deriv_plot +
+          ggplot2::geom_vline(xintercept = length(data_train$y) / NCOL(object$ytimes),
+                              linetype = 'dashed')
+      } else {
+        deriv_plot <- deriv_plot +
+          ggplot2::geom_vline(xintercept = NROW(data_train) / NCOL(object$ytimes),
+                              linetype = 'dashed')
+      }
+    }
+
+    out <- patchwork::wrap_plots(base_plot,
+                                 deriv_plot,
+                                 ncol = 1)
+  } else {
+    out <- base_plot
+  }
+
+    return(out)
 }

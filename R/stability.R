@@ -82,8 +82,9 @@
 #' available and that VAR processes are forced to be stationary. These properties make it simple and
 #' insightful to calculate and inspect aspects of both long-term and short-term stability.
 #' But it is also possible to more directly inspect possible interactions among the
-#' time series in a latent VAR process. To do so, you can calculate and plot
-#' Generalized or Orthogonalized Impulse Response Functions using the \code{\link{irf}} function.
+#' time series in a latent VAR process. To do so, you can calculate
+#' Generalized or Orthogonalized Impulse Response Functions using the \code{\link{irf}} function,
+#' or you can calculate Forecast Error Variance Decompositions using the \code{\link{fevd}} function.
 #'@return A \code{data.frame} containing posterior draws for each stability metric.
 #'@references AR Ives, B Dennis, KL Cottingham & SR Carpenter (2003).
 #'Estimating community stability and ecological interactions from time-series data.

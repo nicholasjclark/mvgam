@@ -29,6 +29,7 @@ jsdgam(
   silent = 1,
   run_model = TRUE,
   return_model_data = FALSE,
+  residuals = TRUE,
   ...
 )
 }
@@ -181,6 +182,11 @@ This will be helpful if users wish to modify the model file to add
 other stochastic elements that are not currently available in \code{mvgam}.
 Default is \code{FALSE} to reduce
 the size of the returned object, unless \code{run_model == FALSE}}
+
+\item{residuals}{Logical indicating whether to compute series-level randomized quantile residuals and include
+them as part of the returned object. Defaults to \code{TRUE}, but you can set to \code{FALSE} to save
+computational time and reduce the size of the returned object (users can always add residuals to
+an object of class \code{mvgam} using \link{add_residuals})}
 
 \item{...}{Other arguments to pass to \link{mvgam}}
 }
@@ -398,6 +404,9 @@ plot(mod, type = 'smooths', trend_effects = TRUE)
 if(requireNamespace('gratia', quietly = TRUE)){
   gratia::draw(mod, trend_effects = TRUE)
 }
+
+# Plot species' randomized quantile residual distributions
+pp_check(mod, type = 'resid_ribbon_grouped', group = 'species')
 
 # Calculate residual spatial correlations
 post_cors <- residual_cor(mod)

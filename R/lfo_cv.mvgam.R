@@ -294,7 +294,7 @@ lfo_cv.mvgam = function(
 #' @importFrom graphics layout axis lines abline polygon points
 #' @param x An object of class `mvgam_lfo`
 #' @param ... Ignored
-#' @return A ggplot object of Pareto-k and ELPD values over the
+#' @return A `ggplot` object presenting Pareto-k and ELPD values over the
 #' evaluation timepoints. For the Pareto-k plot, a dashed red line indicates the
 #' specified threshold chosen for triggering model refits. For the ELPD plot,
 #' a dashed red line indicates the bottom 10% quantile of ELPD values. Points below
