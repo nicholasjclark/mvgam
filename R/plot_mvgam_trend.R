@@ -268,12 +268,16 @@ plot_mvgam_trend = function(
   if (!missing(data_test)) {
     if (class(data_train)[1] == 'list') {
       base_plot <- base_plot +
-        ggplot2::geom_vline(xintercept = length(data_train$y) / NCOL(object$ytimes),
-                            linetype = 'dashed')
+        ggplot2::geom_vline(
+          xintercept = length(data_train$y) / NCOL(object$ytimes),
+          linetype = 'dashed'
+        )
     } else {
       base_plot <- base_plot +
-        ggplot2::geom_vline(xintercept = NROW(data_train) / NCOL(object$ytimes),
-                            linetype = 'dashed')
+        ggplot2::geom_vline(
+          xintercept = NROW(data_train) / NCOL(object$ytimes),
+          linetype = 'dashed'
+        )
     }
   }
 
@@ -302,8 +306,7 @@ plot_mvgam_trend = function(
       mapping = ggplot2::aes(x = time, y = med)
     ) +
       ggplot2::theme_classic() +
-      ggplot2::labs(x = xlab,
-                    y = '1st derivative')
+      ggplot2::labs(x = xlab, y = '1st derivative')
 
     # Add to the base plot accordingly
     if (realisations) {
@@ -359,21 +362,23 @@ plot_mvgam_trend = function(
     if (!missing(data_test)) {
       if (class(data_train)[1] == 'list') {
         deriv_plot <- deriv_plot +
-          ggplot2::geom_vline(xintercept = length(data_train$y) / NCOL(object$ytimes),
-                              linetype = 'dashed')
+          ggplot2::geom_vline(
+            xintercept = length(data_train$y) / NCOL(object$ytimes),
+            linetype = 'dashed'
+          )
       } else {
         deriv_plot <- deriv_plot +
-          ggplot2::geom_vline(xintercept = NROW(data_train) / NCOL(object$ytimes),
-                              linetype = 'dashed')
+          ggplot2::geom_vline(
+            xintercept = NROW(data_train) / NCOL(object$ytimes),
+            linetype = 'dashed'
+          )
       }
     }
 
-    out <- patchwork::wrap_plots(base_plot,
-                                 deriv_plot,
-                                 ncol = 1)
+    out <- patchwork::wrap_plots(base_plot, deriv_plot, ncol = 1)
   } else {
     out <- base_plot
   }
 
-    return(out)
+  return(out)
 }
