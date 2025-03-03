@@ -165,7 +165,12 @@ plot.mvgam = function(
     if (missing(data_test)) {
       return(plot_mvgam_trend(object, series = series, ...))
     } else {
-      return(plot_mvgam_trend(object, series = series, data_test = data_test, ...))
+      return(plot_mvgam_trend(
+        object,
+        series = series,
+        data_test = data_test,
+        ...
+      ))
     }
   }
 
