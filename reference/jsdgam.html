@@ -88,6 +88,7 @@ observation model can also be highly flexible (including all smooth, GP and othe
 <span>  silent <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  run_model <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  return_model_data <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  residuals <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -289,6 +290,13 @@ This will be helpful if users wish to modify the model file to add
 other stochastic elements that are not currently available in <code>mvgam</code>.
 Default is <code>FALSE</code> to reduce
 the size of the returned object, unless <code>run_model == FALSE</code></p></dd>
+
+
+<dt id="arg-residuals">residuals<a class="anchor" aria-label="anchor" href="#arg-residuals"></a></dt>
+<dd><p>Logical indicating whether to compute series-level randomized quantile residuals and include
+them as part of the returned object. Defaults to <code>TRUE</code>, but you can set to <code>FALSE</code> to save
+computational time and reduce the size of the returned object (users can always add residuals to
+an object of class <code>mvgam</code> using <a href="add_residuals.mvgam.html">add_residuals</a>)</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -563,6 +571,11 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-plt img"><img src="jsdgam-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Plot species' randomized quantile residual distributions</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="pp_check.mvgam.html">pp_check</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'resid_ribbon_grouped'</span>, group <span class="op">=</span> <span class="st">'species'</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using 10 posterior draws for ppc type 'resid_ribbon_grouped' by default.</span>
+<span class="r-plt img"><img src="jsdgam-7.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Calculate residual spatial correlations</span></span></span>
 <span class="r-in"><span><span class="va">post_cors</span> <span class="op">&lt;-</span> <span class="fu"><a href="residual_cor.jsdgam.html">residual_cor</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="index-mvgam.html">names</a></span><span class="op">(</span><span class="va">post_cors</span><span class="op">)</span></span></span>
@@ -593,12 +606,12 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.5661061 -0.71698145 -0.4062964 -0.72367280  1.0000000</span>
 <span class="r-in"><span><span class="co"># A quick and dirty plot of the posterior median correlations</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/image.html" class="external-link">image</a></span><span class="op">(</span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="jsdgam-7.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="jsdgam-8.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Posterior predictive checks and ELPD-LOO can ascertain model fit</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="pp_check.mvgam.html">pp_check</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"pit_ecdf_grouped"</span>,</span></span>
 <span class="r-in"><span>         group <span class="op">=</span> <span class="st">"species"</span>, ndraws <span class="op">=</span> <span class="fl">100</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="jsdgam-8.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="jsdgam-9.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -639,7 +652,7 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span> <span class="va">species</span>, scales <span class="op">=</span> <span class="st">'free'</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_viridis.html" class="external-link">scale_color_viridis_c</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_classic</a></span><span class="op">(</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="jsdgam-9.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="jsdgam-10.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
