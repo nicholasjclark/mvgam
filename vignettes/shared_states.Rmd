@@ -142,7 +142,7 @@ However, forecasts for series' 1 and 2 will differ because they have different i
 ## Example: signal detection
 Now we will explore a more complicated example. Here we simulate a true hidden signal that we are trying to track. This signal depends nonlinearly on some covariate (called `productivity`, which represents a measure of how productive the landscape is). The signal also demonstrates a fairly large amount of temporal autocorrelation:
 ```{r}
-set.seed(0)
+set.seed(123)
 # simulate a nonlinear relationship using the mgcv function gamSim
 signal_dat <- mgcv::gamSim(n = 100, eg = 1, scale = 1)
 
@@ -168,16 +168,27 @@ plot(true_signal,
 
 Next we simulate three sensors that are trying to track the same hidden signal. All of these sensors have different observation errors that can depend nonlinearly on a second external covariate, called `temperature` in this example. Again this makes use of `gamSim`
 ```{r}
+# Function to simulate a monotonic response to a covariate
+sim_monotonic <- function(x, a = 2.2, b = 2) {
+  out <- exp(a * x) / (6 + exp(b * x)) * -1
+  return(2.5 * as.vector(scale(out)))
+}
+
+# Simulated temperature covariate
+temperature <- runif(100, -2, 2)
+
+# Simulate the three series
 sim_series <- function(n_series = 3, true_signal) {
-  temp_effects <- mgcv::gamSim(n = 100, eg = 7, scale = 0.1)
-  temperature <- temp_effects$y
+  temp_effects <- mgcv::gamSim(n = 100, eg = 7, scale = 0.05)
   alphas <- rnorm(n_series, sd = 2)
 
   do.call(rbind, lapply(seq_len(n_series), function(series) {
     data.frame(
       observed = rnorm(length(true_signal),
         mean = alphas[series] +
-          1.5 * as.vector(scale(temp_effects[, series + 1])) +
+          sim_monotonic(temperature, 
+                            runif(1, 2.2, 3),
+                            runif(1, 2.2, 3)) +
           true_signal,
         sd = runif(1, 1, 2)
       ),
@@ -263,7 +274,7 @@ mod <- mvgam(
   # Gaussian observations
   family = gaussian(),
   burnin = 600,
-  adapt_delta = 0.95,
+  control = list(adapt_delta = 0.95),
   data = model_dat,
   silent = 2
 )
@@ -321,7 +332,6 @@ conditional_effects(mod, type = "link")
 
 `conditional_effects` is simply a wrapper to the more flexible `plot_predictions` function from the `marginaleffects` package. We can get more useful plots of these effects using this function for further customisation:
 ```{r}
-require(marginaleffects)
 plot_predictions(mod,
   condition = c("temperature", "series", "series"),
   points = 0.5
@@ -334,11 +344,11 @@ We have successfully estimated effects, some of them nonlinear, that impact the 
 ### Recovering the hidden signal
 A final but very key question is whether we can successfully recover the true hidden signal. The `trend` slot in the returned model parameters has the estimates for this signal, which we can easily plot using the `mvgam` S3 method for `plot`. We can also overlay the true values for the hidden signal, which shows that our model has done a good job of recovering it:
 ```{r}
-plot(mod, type = "trend")
-
-# Overlay the true simulated signal
-points(true_signal, pch = 16, cex = 1, col = "white")
-points(true_signal, pch = 16, cex = 0.8)
+plot(mod, type = "trend") +
+  ggplot2::geom_point(data = data.frame(time = 1:100,
+                                        y = true_signal),
+                      mapping = ggplot2::aes(x = time,
+                                             y = y))
 ```
 
 ## Further reading
