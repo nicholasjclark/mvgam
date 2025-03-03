@@ -314,32 +314,32 @@
 #'}
 #'@export
 jsdgam = function(
-    formula,
-    factor_formula = ~ -1,
-    knots,
-    factor_knots,
-    data,
-    newdata,
-    family = poisson(),
-    unit = time,
-    species = series,
-    share_obs_params = FALSE,
-    priors,
-    n_lv = 2,
-    backend = getOption("brms.backend", "cmdstanr"),
-    algorithm = getOption("brms.algorithm", "sampling"),
-    control = list(max_treedepth = 10, adapt_delta = 0.8),
-    chains = 4,
-    burnin = 500,
-    samples = 500,
-    thin = 1,
-    parallel = TRUE,
-    threads = 1,
-    silent = 1,
-    run_model = TRUE,
-    return_model_data = FALSE,
-    residuals = TRUE,
-    ...
+  formula,
+  factor_formula = ~ -1,
+  knots,
+  factor_knots,
+  data,
+  newdata,
+  family = poisson(),
+  unit = time,
+  species = series,
+  share_obs_params = FALSE,
+  priors,
+  n_lv = 2,
+  backend = getOption("brms.backend", "cmdstanr"),
+  algorithm = getOption("brms.algorithm", "sampling"),
+  control = list(max_treedepth = 10, adapt_delta = 0.8),
+  chains = 4,
+  burnin = 500,
+  samples = 500,
+  thin = 1,
+  parallel = TRUE,
+  threads = 1,
+  silent = 1,
+  run_model = TRUE,
+  return_model_data = FALSE,
+  residuals = TRUE,
+  ...
 ) {
   #### Validate arguments and initialise the model skeleton ####
   validate_pos_integer(n_lv)
@@ -526,7 +526,7 @@ jsdgam = function(
   if (requireNamespace('cmdstanr', quietly = TRUE) & backend == 'cmdstanr') {
     if (
       requireNamespace('cmdstanr') &
-      cmdstanr::cmdstan_version() >= "2.29.0"
+        cmdstanr::cmdstan_version() >= "2.29.0"
     ) {
       model_file <- .autoformat(
         model_file,
@@ -628,7 +628,7 @@ jsdgam = function(
     out1 <- mod
     out1$model_output <- out_gam_mod
     class(out1) <- c('mvgam')
-    if(residuals) {
+    if (residuals) {
       mod_residuals <- dsresids_vec(out1)
     } else {
       mod_residuals <- NULL
