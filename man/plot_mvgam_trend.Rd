@@ -13,10 +13,8 @@ plot_mvgam_trend(
   n_realisations = 15,
   n_cores = 1,
   derivatives = FALSE,
-  hide_xlabels = FALSE,
   xlab,
-  ylab,
-  ...
+  ylab
 )
 }
 \arguments{
@@ -37,22 +35,17 @@ empirical quantiles of the posterior distribution are shown}
 \item{n_realisations}{\code{integer} specifying the number of posterior realisations to plot, if
 \code{realisations = TRUE}. Ignored otherwise}
 
-\item{n_cores}{\code{integer} specifying number of cores for generating trend forecasts in parallel}
+\item{n_cores}{Deprecated. Parallel processing is no longer supported}
 
 \item{derivatives}{\code{logical}. If \code{TRUE}, an additional plot will be returned to show the
 estimated 1st derivative for the estimated trend}
 
-\item{hide_xlabels}{\code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
-\code{axis} from base \code{R}. Ignored if \code{derivatives = TRUE}}
-
 \item{xlab}{label for x axis.}
 
 \item{ylab}{label for y axis.}
-
-\item{...}{further \code{\link[graphics]{par}} graphical parameters.}
 }
 \value{
-A base \code{R} graphics plot
+A \code{ggplot} object
 }
 \description{
 Plot latent trend predictions from \pkg{mvgam} models
