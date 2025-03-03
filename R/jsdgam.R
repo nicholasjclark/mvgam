@@ -190,7 +190,7 @@
 #'   dplyr::group_by(lat, lon) -> dat
 #'
 #' # View the count distributions for each species
-#' library(ggplot2)
+#' library(ggplot2); theme_set(theme_bw())
 #' ggplot(dat, aes(x = count)) +
 #'   geom_histogram() +
 #'   facet_wrap(~ species, scales = 'free')
@@ -198,8 +198,7 @@
 #' ggplot(dat, aes(x = lon, y = lat, col = log(count + 1))) +
 #'   geom_point(size = 2.25) +
 #'   facet_wrap(~ species, scales = 'free') +
-#'   scale_color_viridis_c() +
-#'   theme_classic()
+#'   scale_color_viridis_c()
 #'
 #' # Inspect default priors for a joint species model with three spatial factors
 #' priors <- get_mvgam_priors(formula = count ~
@@ -267,11 +266,16 @@
 #'
 #' # Or using gratia, if you have it installed
 #' if(requireNamespace('gratia', quietly = TRUE)){
-#'   gratia::draw(mod, trend_effects = TRUE)
+#'   gratia::draw(mod, trend_effects = TRUE, dist = 0)
 #' }
 #'
 #' # Plot species' randomized quantile residual distributions
-#' pp_check(mod, type = 'resid_ribbon_grouped', group = 'species')
+#' # as a function of latitude
+#' pp_check(mod,
+#'          type = 'resid_ribbon_grouped',
+#'          group = 'species',
+#'          x = 'lat',
+#'          ndraws = 200)
 #'
 #' # Calculate residual spatial correlations
 #' post_cors <- residual_cor(mod)
@@ -283,12 +287,15 @@
 #' post_cors$cor_upper[1:5, 1:5]
 #' post_cors$cor_lower[1:5, 1:5]
 
-#' # A quick and dirty plot of the posterior median correlations
-#' image(post_cors$cor)
+#' # Plot of the posterior median correlations for those estimated
+#' # to be non-zero
+#' plot(post_cors$cor)
 #'
 #' # Posterior predictive checks and ELPD-LOO can ascertain model fit
-#' pp_check(mod, type = "pit_ecdf_grouped",
-#'          group = "species", ndraws = 100)
+#' pp_check(mod,
+#'          type = "pit_ecdf_grouped",
+#'          group = "species",
+#'          ndraws = 200)
 #' loo(mod)
 #'
 #' # Forecast log(counts) for entire region (site value doesn't matter as long

@@ -1,7 +1,8 @@
-# mvgam 1.1.5 (not yet on CRAN)
+# mvgam (development version, not yet on CRAN)
 ## New functionalities
 * Converted several more plotting functions to return `ggplot` objects in place of base R plots
 * Added four new `type`s to the `pp_check()` function to allow more targeted investigations of randomized quantile residual distributions
+* Added a `plot.mvgam_residcor()` function for nicer plotting of estimated residual correlations from `jsdgam` objects 
 * Added `summary()` functions to calculate useful posterior summaries from objects of class `mvgam_irf` and `mvgam_fevd` (see `?irf` and `fevd` for examples)
 
 ## Bug fixes

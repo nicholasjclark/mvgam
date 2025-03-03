@@ -30,7 +30,7 @@ If \code{TRUE}, the median is used instead. Only used if \code{summary} is \code
 function. Only used if \code{summary} is \code{TRUE}.}
 }
 \value{
-If \code{summary = TRUE}, a \code{list} with the following components:
+If \code{summary = TRUE}, a \code{list} of class \code{mvgam_residcor} with the following components:
 \item{cor, cor_lower, cor_upper}{A set of \eqn{p \times p} correlation matrices,
 containing either the posterior median or mean estimate, plus lower and upper limits
 of the corresponding credible intervals supplied to \code{probs}}
@@ -60,7 +60,7 @@ Compute residual correlation estimates from Joint Species Distribution
 }
 \details{
 Hui (2016) provides an excellent description of the quantities that this function calculates, so this passage
-is heavily paraphrased from his associated \code{boral} package.
+is heavily paraphrased from his associated \pkg{boral} package.
 
 In Joint Species Distribution Models, the residual covariance matrix is calculated
 based on the matrix of latent factor loading matrix \eqn{\Theta}, where the residual covariance

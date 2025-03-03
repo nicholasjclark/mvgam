@@ -9,7 +9,7 @@
 #' @param robust If `FALSE` (the default) the mean is used as a measure of central tendency.
 #' If `TRUE`, the median is used instead. Only used if `summary` is `TRUE`
 #' @param ... ignored
-#' @return If `summary = TRUE`, a `list` with the following components:
+#' @return If `summary = TRUE`, a `list` of class `mvgam_residcor` with the following components:
 #'  \item{cor, cor_lower, cor_upper}{A set of \eqn{p \times p} correlation matrices,
 #'  containing either the posterior median or mean estimate, plus lower and upper limits
 #'  of the corresponding credible intervals supplied to `probs`}
@@ -35,7 +35,7 @@
 #'
 #' @details
 #' Hui (2016) provides an excellent description of the quantities that this function calculates, so this passage
-#' is heavily paraphrased from his associated `boral` package.
+#' is heavily paraphrased from his associated \pkg{boral} package.
 #'
 #' In Joint Species Distribution Models, the residual covariance matrix is calculated
 #' based on the matrix of latent factor loading matrix \eqn{\Theta}, where the residual covariance
@@ -195,7 +195,7 @@ residual_cor.jsdgam <- function(
       final_trace <- mean(all_trace_rescor)
     }
 
-    out <- list(
+    out <- structure(list(
       cor = cormat,
       cor_lower = cormat_lower,
       cor_upper = cormat_upper,
@@ -206,7 +206,52 @@ residual_cor.jsdgam <- function(
       prec_upper = precmat_upper,
       sig_prec = sig_precmat,
       trace = final_trace
+    ),
+    class = 'mvgam_residcor'
     )
   }
+  return(out)
+}
+
+#' Plot residual correlations based on latent factors from a fitted jsdgam
+#'
+#' Plot residual correlation estimates from Joint Species Distribution
+#' \code{jsdgam} models
+#' @param x \code{list} object of class \code{mvgam_residcor} resulting from a
+#' call to `residual_cor(..., summary = TRUE)`
+#' @param ... ignored
+#' @method plot mvgam_residcor
+#' @details This function plots the significant residual correlations from a
+#' \code{mvgam_residcor} object
+#' @return A `ggplot` object
+#' @seealso \code{\link{jsdgam}}, \code{\link{residual_cor}}
+#'
+#' @author Nicholas J Clark
+#'
+#' @export
+plot.mvgam_residcor = function(x, ...) {
+
+  # Plot the significant correlations
+  ggplot2::ggplot(data = gather_matrix(x$sig_cor),
+                  mapping = ggplot2::aes(x = Var1,
+                                         y = Var2,
+                                         fill = correlation)) +
+    ggplot2::geom_tile(colour = 'grey50') +
+    ggplot2::scale_fill_gradient2() +
+    ggplot2::labs(x = '', y = '')
+
+}
+
+#' Melt a symmetric matrix into a long data.frame
+#' @noRd
+gather_matrix <- function(mat) {
+  mat[upper.tri(mat)] <- NA
+  if (is.null(dimnames(mat))) {
+    grid <- expand.grid(seq.int(NROW(mat)), seq.int(NCOL(mat)))
+  } else {
+    grid <- expand.grid(dimnames(mat))
+  }
+  out <- as.data.frame(cbind(grid, value = as.vector(mat)))
+  colnames(out) <- c('Var1', 'Var2', 'correlation')
   return(out)
 }
