@@ -9,7 +9,7 @@ jsdgam models using latent factor loadings"><meta property="og:image" content="h
 
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5001</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -92,7 +92,7 @@ function. Only used if <code>summary</code> is <code>TRUE</code>.</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>If <code>summary = TRUE</code>, a <code>list</code> with the following components:</p>
+    <p>If <code>summary = TRUE</code>, a <code>list</code> of class <code>mvgam_residcor</code> with the following components:</p>
 <dl><dt>cor, cor_lower, cor_upper</dt>
 <dd><p>A set of \(p \times p\) correlation matrices,
 containing either the posterior median or mean estimate, plus lower and upper limits
@@ -139,7 +139,7 @@ residual precision matrix draws</p></dd>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Hui (2016) provides an excellent description of the quantities that this function calculates, so this passage
-is heavily paraphrased from his associated <code>boral</code> package.</p>
+is heavily paraphrased from his associated <span class="pkg">boral</span> package.</p>
 <p>In Joint Species Distribution Models, the residual covariance matrix is calculated
 based on the matrix of latent factor loading matrix \(\Theta\), where the residual covariance
 matrix \(\Sigma = \Theta\Theta'\). A strong residual covariance/correlation matrix
