@@ -35,7 +35,6 @@ jobs:
           dependencies: NA
           extra-packages: |
               local::.
-              pkgdown
               remotes
               knitr
               extraDistr
@@ -58,10 +57,11 @@ jobs:
           cmdstanr::check_cmdstan_toolchain(fix = TRUE)
           cmdstanr::install_cmdstan()
           remotes::install_github('paul-buerkner/brms')
+          remotes::install_github('r-lib/pkgdown')
         shell: Rscript {0}
 
       - name: Build site
-        run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)
+        run: pkgdown::build_site_github_pages(lazy = TRUE, new_process = FALSE, install = FALSE)
         shell: Rscript {0}
 
       - name: Deploy to GitHub pages 🚀
