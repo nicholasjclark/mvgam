@@ -5,54 +5,77 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="description" content="mvgam">
 <title>Overview of the mvgam package • mvgam</title>
+<!-- favicons --><link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
+<link rel="apple-touch-icon" type="image/png" sizes="180x180" href="../apple-touch-icon.png">
+<link rel="apple-touch-icon" type="image/png" sizes="120x120" href="../apple-touch-icon-120x120.png">
+<link rel="apple-touch-icon" type="image/png" sizes="76x76" href="../apple-touch-icon-76x76.png">
+<link rel="apple-touch-icon" type="image/png" sizes="60x60" href="../apple-touch-icon-60x60.png">
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
-<link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Overview of the mvgam package">
+<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><!-- Font Awesome icons --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css" integrity="sha256-mmgLkCYLUQbXn0B1SRqzHar6dCnv9oZFPEC1g1cwlkk=" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/v4-shims.min.css" integrity="sha256-wZjR52fzng1pJHwx4aV2AO3yyTOXrcDW7jBpJtTwVxw=" crossorigin="anonymous">
+<!-- bootstrap-toc --><script src="https://cdn.jsdelivr.net/gh/afeld/bootstrap-toc@v1.0.1/dist/bootstrap-toc.min.js" integrity="sha256-4veVQbu7//Lk5TSmc7YV48MxtMy98e26cf5MrgZYnwo=" crossorigin="anonymous"></script><!-- headroom.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/headroom.min.js" integrity="sha256-AsUX4SJE1+yuDu5+mAVzJbuYNPHj/WroHuZ8Ir/CkE0=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/jQuery.headroom.min.js" integrity="sha256-ZX/yNShbjqsohH1k95liqY9Gd8uOiE1S4vZc+9KQ1K4=" crossorigin="anonymous"></script><!-- clipboard.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.11/clipboard.min.js" integrity="sha512-7O5pXpc0oCRrxk8RUfDYFgn0nO1t+jLuIOQdOMRp4APB7uZ4vSjspzp5y6YDtDs4VzUSTbWzBFZ/LKJhnyFOKw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script><!-- search --><script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.js" integrity="sha512-zv6Ywkjyktsohkbp9bb45V6tEMoWhzFzXis+LrMehmJZZSys19Yxf1dopHx7WzIKxr5tK2dVcYmaCk2uqdjF4A==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/autocomplete.js/0.38.0/autocomplete.jquery.min.js" integrity="sha512-GU9ayf+66Xx2TmpxqJpliWbT5PiGYxpaG8rfnBEk1LL8l1KGkRShhngwdXK1UgqhAzWpZHSiYPc09/NwDQIGyg==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/mark.min.js" integrity="sha512-5CYOlHXGh6QpOFA/TeTylKLWfB3ftPsde7AnmhuitiTX4K5SqCLBeKro6sPS8ilsz1Q4NRx3v8Ko2IBiszzdww==" crossorigin="anonymous"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Overview of the mvgam package">
+<meta property="og:description" content="mvgam">
+<meta property="og:image" content="https://nicholasjclark.github.io/mvgam/logo.png">
+<!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
+<script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
+<script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+<![endif]-->
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
+    
 
-
-    <nav class="navbar navbar-expand-lg fixed-top bg-primary" data-bs-theme="dark" aria-label="Site navigation"><div class="container">
-
+    <nav class="navbar fixed-top navbar-dark navbar-expand-lg bg-primary" data-bs-theme="dark"><div class="container">
+    
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
     <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5001</small>
 
-
+    
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
-<li class="active nav-item dropdown">
-  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/data_in_mvgam.html">Formatting data for use in mvgam</a></li>
-    <li><a class="dropdown-item" href="../articles/forecast_evaluation.html">Forecasting and forecast evaluation in mvgam</a></li>
-    <li><a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a></li>
-    <li><a class="dropdown-item" href="../articles/nmixtures.html">N-mixtures in mvgam</a></li>
-    <li><a class="dropdown-item" href="../articles/shared_states.html">Shared latent states in mvgam</a></li>
-    <li><a class="dropdown-item" href="../articles/time_varying_effects.html">Time-varying effects in mvgam</a></li>
-    <li><a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in mvgam</a></li>
-  </ul>
+<li class="nav-item">
+  <a class="nav-link" href="../reference/index.html">Reference</a>
 </li>
-<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
+<li class="active nav-item dropdown">
+  <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-haspopup="true" id="dropdown-articles">Articles</a>
+  <div class="dropdown-menu" aria-labelledby="dropdown-articles">
+    <a class="dropdown-item" href="../articles/data_in_mvgam.html">Formatting data for use in mvgam</a>
+    <a class="dropdown-item" href="../articles/forecast_evaluation.html">Forecasting and forecast evaluation in mvgam</a>
+    <a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a>
+    <a class="dropdown-item" href="../articles/nmixtures.html">N-mixtures in mvgam</a>
+    <a class="dropdown-item" href="../articles/shared_states.html">Shared latent states in mvgam</a>
+    <a class="dropdown-item" href="../articles/time_varying_effects.html">Time-varying effects in mvgam</a>
+    <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in mvgam</a>
+  </div>
+</li>
+<li class="nav-item">
+  <a class="nav-link" href="../news/index.html">Changelog</a>
+</li>
       </ul>
-<ul class="navbar-nav">
-<li class="nav-item"><form class="form-inline" role="search">
- <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json">
-</form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/nicholasjclark/mvgam/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
+<form class="form-inline my-2 my-lg-0" role="search">
+        <input type="search" class="form-control me-sm-2" aria-label="Toggle navigation" name="search-input" data-search-index="../search.json" id="search-input" placeholder="Search for" autocomplete="off">
+</form>
+
+      <ul class="navbar-nav">
+<li class="nav-item">
+  <a class="external-link nav-link" href="https://github.com/nicholasjclark/mvgam/" aria-label="github">
+    <span class="fab fa fab fa-github fa-lg"></span>
+     
+  </a>
+</li>
       </ul>
 </div>
 
-
+    
   </div>
 </nav><div class="container template-article">
 
@@ -67,7 +90,7 @@ Clark</h4>
             
             <h4 data-toc-skip class="date">2025-03-04</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/master/vignettes/mvgam_overview.Rmd" class="external-link"><code>vignettes/mvgam_overview.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/mvgam_overview.Rmd" class="external-link"><code>vignettes/mvgam_overview.Rmd</code></a></small>
       <div class="d-none name"><code>mvgam_overview.Rmd</code></div>
     </div>
 
@@ -83,51 +106,28 @@ processes to capture latent dynamics in the observed time series. This
 works in a state-space format, with the temporal <em>trend</em> evolving
 independently of the observation process. An introduction to the package
 and some worked examples are also shown in this seminar: <a href="https://www.youtube.com/watch?v=0zZopLlomsQ" target="_blank" class="external-link">Ecological Forecasting with Dynamic Generalized Additive
-Models</a>. Briefly, assume
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mover><mi>𝐲</mi><mo accent="true">̃</mo></mover><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">\tilde{\boldsymbol{y}}_{i,t}</annotation></semantics></math>
-is the conditional expectation of response variable
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>𝐢</mi><annotation encoding="application/x-tex">\boldsymbol{i}</annotation></semantics></math>
-at time
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>𝐭</mi><annotation encoding="application/x-tex">\boldsymbol{t}</annotation></semantics></math>.
-Assuming
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>𝐲</mi><mi>𝐢</mi></msub><annotation encoding="application/x-tex">\boldsymbol{y_i}</annotation></semantics></math>
-is drawn from an exponential distribution with an invertible link
-function, the linear predictor for a multivariate Dynamic GAM can be
-written as:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>f</mi><mi>o</mi><mi>r</mi><mspace width="0.222em"></mspace><mi>i</mi><mspace width="0.222em"></mspace><mi>i</mi><mi>n</mi><mspace width="0.222em"></mspace><mn>1</mn><mo>:</mo><msub><mi>N</mi><mrow><mi>s</mi><mi>e</mi><mi>r</mi><mi>i</mi><mi>e</mi><mi>s</mi></mrow></msub><mspace width="0.222em"></mspace><mi>.</mi><mi>.</mi><mi>.</mi></mrow><annotation encoding="application/x-tex">for~i~in~1:N_{series}~...</annotation></semantics></math><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>f</mi><mi>o</mi><mi>r</mi><mspace width="0.222em"></mspace><mi>t</mi><mspace width="0.222em"></mspace><mi>i</mi><mi>n</mi><mspace width="0.222em"></mspace><mn>1</mn><mo>:</mo><msub><mi>N</mi><mrow><mi>t</mi><mi>i</mi><mi>m</mi><mi>e</mi><mi>p</mi><mi>o</mi><mi>i</mi><mi>n</mi><mi>t</mi><mi>s</mi></mrow></msub><mspace width="0.222em"></mspace><mi>.</mi><mi>.</mi><mi>.</mi></mrow><annotation encoding="application/x-tex">for~t~in~1:N_{timepoints}~...</annotation></semantics></math></p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>g</mi><mrow><mo>−</mo><mn>1</mn></mrow></msup><mrow><mo stretchy="true" form="prefix">(</mo><msub><mover><mi>𝐲</mi><mo accent="true">̃</mo></mover><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><msub><mi>α</mi><mi>i</mi></msub><mo>+</mo><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>J</mi></munderover><msub><mi>𝐬</mi><mrow><mi>i</mi><mo>,</mo><mi>j</mi><mo>,</mo><mi>t</mi></mrow></msub><msub><mi>𝐱</mi><mrow><mi>j</mi><mo>,</mo><mi>t</mi></mrow></msub><mo>+</mo><mi>𝐙</mi><msub><mi>𝐳</mi><mrow><mi>k</mi><mo>,</mo><mi>t</mi></mrow></msub><mspace width="0.167em"></mspace><mo>,</mo></mrow><annotation encoding="application/x-tex">g^{-1}(\tilde{\boldsymbol{y}}_{i,t})=\alpha_{i}+\sum\limits_{j=1}^J\boldsymbol{s}_{i,j,t}\boldsymbol{x}_{j,t}+\boldsymbol{Z}\boldsymbol{z}_{k,t}\,,</annotation></semantics></math>
-Here
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>α</mi><annotation encoding="application/x-tex">\alpha</annotation></semantics></math>
-are the unknown intercepts, the
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>𝐬</mi><annotation encoding="application/x-tex">\boldsymbol{s}</annotation></semantics></math>’s
-are unknown smooth functions of covariates
-(<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>𝐱</mi><annotation encoding="application/x-tex">\boldsymbol{x}</annotation></semantics></math>’s),
-which can potentially vary among the response series, and
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>𝐳</mi><annotation encoding="application/x-tex">\boldsymbol{z}</annotation></semantics></math>
-are dynamic latent processes. Each smooth function
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>𝐬</mi><mi>𝐣</mi></msub><annotation encoding="application/x-tex">\boldsymbol{s_j}</annotation></semantics></math>
-is composed of basis expansions whose coefficients, which must be
-estimated, control the functional relationship between
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>𝐱</mi><mi>j</mi></msub><annotation encoding="application/x-tex">\boldsymbol{x}_{j}</annotation></semantics></math>
-and
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>g</mi><mrow><mo>−</mo><mn>1</mn></mrow></msup><mrow><mo stretchy="true" form="prefix">(</mo><mover><mi>𝐲</mi><mo accent="true">̃</mo></mover><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">g^{-1}(\tilde{\boldsymbol{y}})</annotation></semantics></math>.
-The size of the basis expansion limits the smooth’s potential
-complexity. A larger set of basis functions allows greater flexibility.
-For more information on GAMs and how they can smooth through data, see
-<a href="https://ecogambler.netlify.app/blog/interpreting-gams/" target="_blank" class="external-link">this blogpost on how to interpret nonlinear effects from
+Models</a>. Briefly, assume <span class="math inline">\(\tilde{\boldsymbol{y}}_{i,t}\)</span> is the
+conditional expectation of response variable <span class="math inline">\(\boldsymbol{i}\)</span> at time <span class="math inline">\(\boldsymbol{t}\)</span>. Assuming <span class="math inline">\(\boldsymbol{y_i}\)</span> is drawn from an
+exponential distribution with an invertible link function, the linear
+predictor for a multivariate Dynamic GAM can be written as:</p>
+<p><span class="math display">\[for~i~in~1:N_{series}~...\]</span> <span class="math display">\[for~t~in~1:N_{timepoints}~...\]</span></p>
+<p><span class="math display">\[g^{-1}(\tilde{\boldsymbol{y}}_{i,t})=\alpha_{i}+\sum\limits_{j=1}^J\boldsymbol{s}_{i,j,t}\boldsymbol{x}_{j,t}+\boldsymbol{Z}\boldsymbol{z}_{k,t}\,,\]</span>
+Here <span class="math inline">\(\alpha\)</span> are the unknown
+intercepts, the <span class="math inline">\(\boldsymbol{s}\)</span>’s
+are unknown smooth functions of covariates (<span class="math inline">\(\boldsymbol{x}\)</span>’s), which can potentially
+vary among the response series, and <span class="math inline">\(\boldsymbol{z}\)</span> are dynamic latent
+processes. Each smooth function <span class="math inline">\(\boldsymbol{s_j}\)</span> is composed of basis
+expansions whose coefficients, which must be estimated, control the
+functional relationship between <span class="math inline">\(\boldsymbol{x}_{j}\)</span> and <span class="math inline">\(g^{-1}(\tilde{\boldsymbol{y}})\)</span>. The size
+of the basis expansion limits the smooth’s potential complexity. A
+larger set of basis functions allows greater flexibility. For more
+information on GAMs and how they can smooth through data, see <a href="https://ecogambler.netlify.app/blog/interpreting-gams/" target="_blank" class="external-link">this blogpost on how to interpret nonlinear effects from
 Generalized Additive Models</a>. Latent processes are captured with
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>𝐙</mi><msub><mi>𝐳</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub></mrow><annotation encoding="application/x-tex">\boldsymbol{Z}\boldsymbol{z}_{i,t}</annotation></semantics></math>,
-where
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>𝐙</mi><annotation encoding="application/x-tex">\boldsymbol{Z}</annotation></semantics></math>
-is an
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>i</mi><mspace width="0.222em"></mspace><mi>b</mi><mi>y</mi><mspace width="0.222em"></mspace><mi>k</mi></mrow><annotation encoding="application/x-tex">i~by~k</annotation></semantics></math>
-matrix of loading coefficients (which can be fixed or a combination of
-fixed and freely estimated parameters) and
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>𝐳</mi><mrow><mi>k</mi><mo>,</mo><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">\boldsymbol{z}_{k,t}</annotation></semantics></math>
-are a set of
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math>
-latent factors that can also include their own GAM linear predictors
-(see the <a href="https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html">State-Space
+<span class="math inline">\(\boldsymbol{Z}\boldsymbol{z}_{i,t}\)</span>,
+where <span class="math inline">\(\boldsymbol{Z}\)</span> is an <span class="math inline">\(i~by~k\)</span> matrix of loading coefficients
+(which can be fixed or a combination of fixed and freely estimated
+parameters) and <span class="math inline">\(\boldsymbol{z}_{k,t}\)</span> are a set of <span class="math inline">\(K\)</span> latent factors that can also include
+their own GAM linear predictors (see the <a href="https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html">State-Space
 models vignette</a>), the <a href="https://nicholasjclark.github.io/mvgam/articles/nmixtures.html">N-mixtures
 vignette</a> and the example in <a href="https://nicholasjclark.github.io/mvgam/reference/jsdgam.html"><code>jsdgam</code></a>
 to get an idea of how flexible these processes can be.</p>
@@ -159,106 +159,91 @@ which are summarized below:</p>
 <tr class="odd">
 <td align="center">Gaussian (identity link)</td>
 <td align="center"><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code></td>
-<td align="center">Real values in
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mo>−</mo><mi>∞</mi><mo>,</mo><mi>∞</mi><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(-\infty, \infty)</annotation></semantics></math>
+<td align="center">Real values in <span class="math inline">\((-\infty,
+\infty)\)</span>
 </td>
-<td align="center"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>σ</mi><annotation encoding="application/x-tex">\sigma</annotation></semantics></math></td>
+<td align="center"><span class="math inline">\(\sigma\)</span></td>
 </tr>
 <tr class="even">
 <td align="center">Student’s T (identity link)</td>
 <td align="center"><code>student-t()</code></td>
-<td align="center">Heavy-tailed real values in
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mo>−</mo><mi>∞</mi><mo>,</mo><mi>∞</mi><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(-\infty, \infty)</annotation></semantics></math>
+<td align="center">Heavy-tailed real values in <span class="math inline">\((-\infty, \infty)\)</span>
 </td>
 <td align="center">
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>σ</mi><annotation encoding="application/x-tex">\sigma</annotation></semantics></math>,
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>ν</mi><annotation encoding="application/x-tex">\nu</annotation></semantics></math>
+<span class="math inline">\(\sigma\)</span>, <span class="math inline">\(\nu\)</span>
 </td>
 </tr>
 <tr class="odd">
 <td align="center">LogNormal (identity link)</td>
 <td align="center"><code><a href="../reference/mvgam_families.html">lognormal()</a></code></td>
-<td align="center">Positive real values in
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">[</mo><mn>0</mn><mo>,</mo><mi>∞</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">[0, \infty)</annotation></semantics></math>
+<td align="center">Positive real values in <span class="math inline">\([0, \infty)\)</span>
 </td>
-<td align="center"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>σ</mi><annotation encoding="application/x-tex">\sigma</annotation></semantics></math></td>
+<td align="center"><span class="math inline">\(\sigma\)</span></td>
 </tr>
 <tr class="even">
 <td align="center">Gamma (log link)</td>
 <td align="center"><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code></td>
-<td align="center">Positive real values in
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">[</mo><mn>0</mn><mo>,</mo><mi>∞</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">[0, \infty)</annotation></semantics></math>
+<td align="center">Positive real values in <span class="math inline">\([0, \infty)\)</span>
 </td>
-<td align="center"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>α</mi><annotation encoding="application/x-tex">\alpha</annotation></semantics></math></td>
+<td align="center"><span class="math inline">\(\alpha\)</span></td>
 </tr>
 <tr class="odd">
 <td align="center">Beta (logit link)</td>
 <td align="center"><code><a href="../reference/mvgam_families.html">betar()</a></code></td>
-<td align="center">Real values (proportional) in
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="true" form="postfix">]</mo></mrow><annotation encoding="application/x-tex">[0,1]</annotation></semantics></math>
+<td align="center">Real values (proportional) in <span class="math inline">\([0,1]\)</span>
 </td>
-<td align="center"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>ϕ</mi><annotation encoding="application/x-tex">\phi</annotation></semantics></math></td>
+<td align="center"><span class="math inline">\(\phi\)</span></td>
 </tr>
 <tr class="even">
 <td align="center">Bernoulli (logit link)</td>
 <td align="center"><code><a href="../reference/mvgam_families.html">bernoulli()</a></code></td>
-<td align="center">Binary data in
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>0</mn><mo>,</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">{0,1}</annotation></semantics></math>
+<td align="center">Binary data in <span class="math inline">\({0,1}\)</span>
 </td>
 <td align="center">-</td>
 </tr>
 <tr class="odd">
 <td align="center">Poisson (log link)</td>
 <td align="center"><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code></td>
-<td align="center">Non-negative integers in
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mi>.</mi><mi>.</mi><mi>.</mi><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(0,1,2,...)</annotation></semantics></math>
+<td align="center">Non-negative integers in <span class="math inline">\((0,1,2,...)\)</span>
 </td>
 <td align="center">-</td>
 </tr>
 <tr class="even">
 <td align="center">Negative Binomial2 (log link)</td>
 <td align="center"><code><a href="../reference/mvgam_families.html">nb()</a></code></td>
-<td align="center">Non-negative integers in
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mi>.</mi><mi>.</mi><mi>.</mi><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(0,1,2,...)</annotation></semantics></math>
+<td align="center">Non-negative integers in <span class="math inline">\((0,1,2,...)\)</span>
 </td>
-<td align="center"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>ϕ</mi><annotation encoding="application/x-tex">\phi</annotation></semantics></math></td>
+<td align="center"><span class="math inline">\(\phi\)</span></td>
 </tr>
 <tr class="odd">
 <td align="center">Binomial (logit link)</td>
 <td align="center"><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code></td>
-<td align="center">Non-negative integers in
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mi>.</mi><mi>.</mi><mi>.</mi><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(0,1,2,...)</annotation></semantics></math>
+<td align="center">Non-negative integers in <span class="math inline">\((0,1,2,...)\)</span>
 </td>
 <td align="center">-</td>
 </tr>
 <tr class="even">
 <td align="center">Beta-Binomial (logit link)</td>
 <td align="center"><code><a href="../reference/mvgam_families.html">beta_binomial()</a></code></td>
-<td align="center">Non-negative integers in
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mi>.</mi><mi>.</mi><mi>.</mi><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(0,1,2,...)</annotation></semantics></math>
+<td align="center">Non-negative integers in <span class="math inline">\((0,1,2,...)\)</span>
 </td>
-<td align="center"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>ϕ</mi><annotation encoding="application/x-tex">\phi</annotation></semantics></math></td>
+<td align="center"><span class="math inline">\(\phi\)</span></td>
 </tr>
 <tr class="odd">
 <td align="center">Poisson Binomial N-mixture (log link)</td>
 <td align="center"><code><a href="../reference/mvgam_families.html">nmix()</a></code></td>
-<td align="center">Non-negative integers in
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mi>.</mi><mi>.</mi><mi>.</mi><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(0,1,2,...)</annotation></semantics></math>
+<td align="center">Non-negative integers in <span class="math inline">\((0,1,2,...)\)</span>
 </td>
 <td align="center">-</td>
 </tr>
 </tbody>
 </table>
 <p>For all supported observation families, any extra parameters that
-need to be estimated (i.e. the
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>σ</mi><annotation encoding="application/x-tex">\sigma</annotation></semantics></math>
-in a Gaussian model or the
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>ϕ</mi><annotation encoding="application/x-tex">\phi</annotation></semantics></math>
-in a Negative Binomial model) are by default estimated independently for
-each series. However, users can opt to force all series to share extra
-observation parameters using <code>share_obs_params = TRUE</code> in
-<code><a href="../reference/mvgam.html">mvgam()</a></code>. Note that default link functions cannot currently
-be changed.</p>
+need to be estimated (i.e. the <span class="math inline">\(\sigma\)</span> in a Gaussian model or the <span class="math inline">\(\phi\)</span> in a Negative Binomial model) are by
+default estimated independently for each series. However, users can opt
+to force all series to share extra observation parameters using
+<code>share_obs_params = TRUE</code> in <code><a href="../reference/mvgam.html">mvgam()</a></code>. Note that
+default link functions cannot currently be changed.</p>
 </div>
 <div class="section level2">
 <h2 id="supported-temporal-dynamic-processes">Supported temporal dynamic processes<a class="anchor" aria-label="anchor" href="#supported-temporal-dynamic-processes"></a>
@@ -273,20 +258,17 @@ process models are described in detail below.</p>
 <h3 id="correlated-multivariate-processes">Correlated multivariate processes<a class="anchor" aria-label="anchor" href="#correlated-multivariate-processes"></a>
 </h3>
 <p>If more than one observational unit (usually referred to as ‘series’)
-is included in <code>data</code>
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>N</mi><mrow><mi>s</mi><mi>e</mi><mi>r</mi><mi>i</mi><mi>e</mi><mi>s</mi></mrow></msub><mo>&gt;</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(N_{series} &gt; 1)</annotation></semantics></math>,
-use <code>trend_model = ZMVN()</code> to set up a model where the
-outcomes for different observational units may be correlated according
-to:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>z</mi><mi>t</mi></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">MVNormal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mi>Σ</mi><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
-z_{t} &amp; \sim \text{MVNormal}(0, \Sigma) \end{align*}</annotation></semantics></math></p>
-<p>The covariance matrix
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>Σ</mi><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>
+is included in <code>data</code> <span class="math inline">\((N_{series}
+&gt; 1)\)</span>, use <code>trend_model = ZMVN()</code> to set up a
+model where the outcomes for different observational units may be
+correlated according to:</p>
+<p><span class="math display">\[\begin{align*}
+z_{t} &amp; \sim \text{MVNormal}(0, \Sigma) \end{align*}\]</span></p>
+<p>The covariance matrix <span class="math inline">\(\Sigma\)</span>
 will capture potentially correlated process errors. It is parameterised
 using a Cholesky factorization, which requires priors on the
-series-level variances
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>σ</mi><annotation encoding="application/x-tex">\sigma</annotation></semantics></math>
-and on the strength of correlations using <code>Stan</code>’s
+series-level variances <span class="math inline">\(\sigma\)</span> and
+on the strength of correlations using <code>Stan</code>’s
 <code>lkj_corr_cholesky</code> distribution. Note that this
 <code>trend_model</code> does not assume that measurements occur over
 <em>time</em>, as users can specify what variable in the
@@ -302,64 +284,54 @@ for guidelines).</p>
 <code>trend_model = RW()</code> to set up a model where each series in
 <code>data</code> has independent latent temporal dynamics of the
 form:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>z</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Normal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>z</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>,</mo><msub><mi>σ</mi><mi>i</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
-z_{i,t} &amp; \sim \text{Normal}(z_{i,t-1}, \sigma_i) \end{align*}</annotation></semantics></math></p>
-<p>Process error parameters
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>σ</mi><annotation encoding="application/x-tex">\sigma</annotation></semantics></math>
+<p><span class="math display">\[\begin{align*}
+z_{i,t} &amp; \sim \text{Normal}(z_{i,t-1}, \sigma_i)
+\end{align*}\]</span></p>
+<p>Process error parameters <span class="math inline">\(\sigma\)</span>
 are modeled independently for each series. If a moving average process
 is required, use <code>trend_model = RW(ma = TRUE)</code> to set up the
 following:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>z</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>=</mo><msub><mi>z</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><msub><mi>θ</mi><mi>i</mi></msub><mo>*</mo><mi>e</mi><mi>r</mi><mi>r</mi><mi>o</mi><msub><mi>r</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><mi>e</mi><mi>r</mi><mi>r</mi><mi>o</mi><msub><mi>r</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><mi>e</mi><mi>r</mi><mi>r</mi><mi>o</mi><msub><mi>r</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Normal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><msub><mi>σ</mi><mi>i</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
+<p><span class="math display">\[\begin{align*}
 z_{i,t} &amp; = z_{i,t-1} + \theta_i * error_{i,t-1} + error_{i,t} \\
-error_{i,t} &amp; \sim \text{Normal}(0, \sigma_i) \end{align*}</annotation></semantics></math></p>
-<p>Moving average coefficients
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>θ</mi><annotation encoding="application/x-tex">\theta</annotation></semantics></math>
-are independently estimated for each series and will be forced to be
-stationary by default
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mi>a</mi><mi>b</mi><mi>s</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>θ</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>&lt;</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(abs(\theta)&lt;1)</annotation></semantics></math>.
-Only moving averages of order
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">q=1</annotation></semantics></math>
-are currently allowed.</p>
+error_{i,t} &amp; \sim \text{Normal}(0, \sigma_i)
+\end{align*}\]</span></p>
+<p>Moving average coefficients <span class="math inline">\(\theta\)</span> are independently estimated for
+each series and will be forced to be stationary by default <span class="math inline">\((abs(\theta)&lt;1)\)</span>. Only moving averages
+of order <span class="math inline">\(q=1\)</span> are currently
+allowed.</p>
 </div>
 <div class="section level3">
 <h3 id="multivariate-random-walks">Multivariate Random Walks<a class="anchor" aria-label="anchor" href="#multivariate-random-walks"></a>
 </h3>
-<p>If more than one series is included in <code>data</code>
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>N</mi><mrow><mi>s</mi><mi>e</mi><mi>r</mi><mi>i</mi><mi>e</mi><mi>s</mi></mrow></msub><mo>&gt;</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(N_{series} &gt; 1)</annotation></semantics></math>,
-a multivariate Random Walk can be set up using
+<p>If more than one series is included in <code>data</code> <span class="math inline">\((N_{series} &gt; 1)\)</span>, a multivariate
+Random Walk can be set up using
 <code>trend_model = RW(cor = TRUE)</code>, resulting in the
 following:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>z</mi><mi>t</mi></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">MVNormal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>z</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>,</mo><mi>Σ</mi><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
-z_{t} &amp; \sim \text{MVNormal}(z_{t-1}, \Sigma) \end{align*}</annotation></semantics></math></p>
-<p>Where the latent process estimate
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>z</mi><mi>t</mi></msub><annotation encoding="application/x-tex">z_t</annotation></semantics></math>
-now takes the form of a vector. The covariance matrix
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>Σ</mi><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>
-will capture contemporaneously correlated process errors. It is
-parameterised using a Cholesky factorization, which requires priors on
-the series-level variances
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>σ</mi><annotation encoding="application/x-tex">\sigma</annotation></semantics></math>
-and on the strength of correlations using <code>Stan</code>’s
+<p><span class="math display">\[\begin{align*}
+z_{t} &amp; \sim \text{MVNormal}(z_{t-1}, \Sigma)
+\end{align*}\]</span></p>
+<p>Where the latent process estimate <span class="math inline">\(z_t\)</span> now takes the form of a vector. The
+covariance matrix <span class="math inline">\(\Sigma\)</span> will
+capture contemporaneously correlated process errors. It is parameterised
+using a Cholesky factorization, which requires priors on the
+series-level variances <span class="math inline">\(\sigma\)</span> and
+on the strength of correlations using <code>Stan</code>’s
 <code>lkj_corr_cholesky</code> distribution.</p>
 <p>Moving average terms can also be included for multivariate random
-walks, in which case the moving average coefficients
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>θ</mi><annotation encoding="application/x-tex">\theta</annotation></semantics></math>
-will be parameterised as an
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>N</mi><mrow><mi>s</mi><mi>e</mi><mi>r</mi><mi>i</mi><mi>e</mi><mi>s</mi></mrow></msub><mo>*</mo><msub><mi>N</mi><mrow><mi>s</mi><mi>e</mi><mi>r</mi><mi>i</mi><mi>e</mi><mi>s</mi></mrow></msub></mrow><annotation encoding="application/x-tex">N_{series} * N_{series}</annotation></semantics></math>
-matrix</p>
+walks, in which case the moving average coefficients <span class="math inline">\(\theta\)</span> will be parameterised as an <span class="math inline">\(N_{series} * N_{series}\)</span> matrix</p>
 </div>
 <div class="section level3">
 <h3 id="autoregressive-processes">Autoregressive processes<a class="anchor" aria-label="anchor" href="#autoregressive-processes"></a>
 </h3>
-<p>Autoregressive models up to
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>p</mi><mo>=</mo><mn>3</mn></mrow><annotation encoding="application/x-tex">p=3</annotation></semantics></math>,
+<p>Autoregressive models up to <span class="math inline">\(p=3\)</span>,
 in which the autoregressive coefficients are estimated independently for
 each series, can be used by specifying <code>trend_model = 'AR1'</code>,
 <code>trend_model = 'AR2'</code>, <code>trend_model = 'AR3'</code>, or
 <code>trend_model = AR(p = 1, 2, or 3)</code>. For example, a univariate
 AR(1) model takes the form:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>z</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Normal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><mi>a</mi><mi>r</mi><msub><mn>1</mn><mi>i</mi></msub><mo>*</mo><msub><mi>z</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>,</mo><msub><mi>σ</mi><mi>i</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
-z_{i,t} &amp; \sim \text{Normal}(ar1_i * z_{i,t-1}, \sigma_i) \end{align*}</annotation></semantics></math></p>
+<p><span class="math display">\[\begin{align*}
+z_{i,t} &amp; \sim \text{Normal}(ar1_i * z_{i,t-1}, \sigma_i)
+\end{align*}\]</span></p>
 <p>All options are the same as for Random Walks, but additional options
 will be available for placing priors on the autoregressive coefficients.
 By default, these coefficients will not be forced into stationarity, but
@@ -370,36 +342,22 @@ details.</p>
 <div class="section level3">
 <h3 id="vector-autoregressive-processes">Vector Autoregressive processes<a class="anchor" aria-label="anchor" href="#vector-autoregressive-processes"></a>
 </h3>
-<p>A Vector Autoregression of order
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>p</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">p=1</annotation></semantics></math>
-can be specified if
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>N</mi><mrow><mi>s</mi><mi>e</mi><mi>r</mi><mi>i</mi><mi>e</mi><mi>s</mi></mrow></msub><mo>&gt;</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">N_{series} &gt; 1</annotation></semantics></math>
-using <code>trend_model = 'VAR1'</code> or
-<code>trend_model = VAR()</code>. A VAR(1) model takes the form:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>z</mi><mi>t</mi></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Normal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><mi>A</mi><mo>*</mo><msub><mi>z</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>,</mo><mi>Σ</mi><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
-z_{t} &amp; \sim \text{Normal}(A * z_{t-1}, \Sigma) \end{align*}</annotation></semantics></math></p>
-<p>Where
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
-is an
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>N</mi><mrow><mi>s</mi><mi>e</mi><mi>r</mi><mi>i</mi><mi>e</mi><mi>s</mi></mrow></msub><mo>*</mo><msub><mi>N</mi><mrow><mi>s</mi><mi>e</mi><mi>r</mi><mi>i</mi><mi>e</mi><mi>s</mi></mrow></msub></mrow><annotation encoding="application/x-tex">N_{series} * N_{series}</annotation></semantics></math>
-matrix of autoregressive coefficients in which the diagonals capture
-lagged self-dependence (i.e. the effect of a process at time
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>
-on its own estimate at time
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi><mo>+</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">t+1</annotation></semantics></math>),
-while off-diagonals capture lagged cross-dependence (i.e. the effect of
-a process at time
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>
-on the process for another series at time
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi><mo>+</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">t+1</annotation></semantics></math>).
-By default, the covariance matrix
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>Σ</mi><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>
-will assume no process error covariance by fixing the off-diagonals to
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mn>0</mn><annotation encoding="application/x-tex">0</annotation></semantics></math>.
-To allow for correlated errors, use <code>trend_model = 'VAR1cor'</code>
-or <code>trend_model = VAR(cor = TRUE)</code>. A moving average of order
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">q=1</annotation></semantics></math>
-can also be included using
+<p>A Vector Autoregression of order <span class="math inline">\(p=1\)</span> can be specified if <span class="math inline">\(N_{series} &gt; 1\)</span> using
+<code>trend_model = 'VAR1'</code> or <code>trend_model = VAR()</code>. A
+VAR(1) model takes the form:</p>
+<p><span class="math display">\[\begin{align*}
+z_{t} &amp; \sim \text{Normal}(A * z_{t-1}, \Sigma)
+\end{align*}\]</span></p>
+<p>Where <span class="math inline">\(A\)</span> is an <span class="math inline">\(N_{series} * N_{series}\)</span> matrix of
+autoregressive coefficients in which the diagonals capture lagged
+self-dependence (i.e. the effect of a process at time <span class="math inline">\(t\)</span> on its own estimate at time <span class="math inline">\(t+1\)</span>), while off-diagonals capture lagged
+cross-dependence (i.e. the effect of a process at time <span class="math inline">\(t\)</span> on the process for another series at
+time <span class="math inline">\(t+1\)</span>). By default, the
+covariance matrix <span class="math inline">\(\Sigma\)</span> will
+assume no process error covariance by fixing the off-diagonals to <span class="math inline">\(0\)</span>. To allow for correlated errors, use
+<code>trend_model = 'VAR1cor'</code> or
+<code>trend_model = VAR(cor = TRUE)</code>. A moving average of order
+<span class="math inline">\(q=1\)</span> can also be included using
 <code>trend_model = VAR(ma = TRUE, cor = TRUE)</code>.</p>
 <p>Note that for all VAR models, stationarity of the process is enforced
 with a structured prior distribution that is described in detail in <a href="https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648" class="external-link">Heaps
@@ -419,31 +377,25 @@ variable (<code>gr</code>; which must be a <code>factor</code> in the
 supplied <code>data</code>) exists, users can model hierarchical
 residual correlation structures. where the residual correlations for a
 specific level of <code>gr</code> are modelled hierarchically:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>Ω</mi><mrow><mi>g</mi><mi>r</mi><mi>o</mi><mi>u</mi><mi>p</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>=</mo><msub><mi>α</mi><mrow><mi>c</mi><mi>o</mi><mi>r</mi></mrow></msub><msub><mi>Ω</mi><mrow><mi>g</mi><mi>l</mi><mi>o</mi><mi>b</mi><mi>a</mi><mi>l</mi></mrow></msub><mo>+</mo><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo>−</mo><msub><mi>α</mi><mrow><mi>c</mi><mi>o</mi><mi>r</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><msub><mi>Ω</mi><mrow><mi>g</mi><mi>r</mi><mi>o</mi><mi>u</mi><mi>p</mi><mo>,</mo><mi>l</mi><mi>o</mi><mi>c</mi><mi>a</mi><mi>l</mi></mrow></msub></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
-\Omega_{group} &amp; = \alpha_{cor}\Omega_{global} + (1 - \alpha_{cor})\Omega_{group, local} \end{align*}</annotation></semantics></math></p>
-<p>where
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>Ω</mi><mrow><mi>g</mi><mi>l</mi><mi>o</mi><mi>b</mi><mi>a</mi><mi>l</mi></mrow></msub><annotation encoding="application/x-tex">\Omega_{global}</annotation></semantics></math>
-is a <em>global</em> correlation matrix,
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>Ω</mi><mrow><mi>g</mi><mi>r</mi><mi>o</mi><mi>u</mi><mi>p</mi><mo>,</mo><mi>l</mi><mi>o</mi><mi>c</mi><mi>a</mi><mi>l</mi></mrow></msub><annotation encoding="application/x-tex">\Omega_{group, local}</annotation></semantics></math>
-is a <em>local deviation</em> correlation matrix and
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>α</mi><mrow><mi>c</mi><mi>o</mi><mi>r</mi></mrow></msub><annotation encoding="application/x-tex">\alpha_{cor}</annotation></semantics></math>
-is a weighting parameter controlling how strongly the local correlation
-matrix
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>Ω</mi><mrow><mi>g</mi><mi>r</mi><mi>o</mi><mi>u</mi><mi>p</mi></mrow></msub><annotation encoding="application/x-tex">\Omega_{group}</annotation></semantics></math>
-(i.e. the derived correlation matrix that will be used for each level of
-the grouping factor <code>gr</code>) is shrunk towards the global
-correlation matrix
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>Ω</mi><mrow><mi>g</mi><mi>l</mi><mi>o</mi><mi>b</mi><mi>a</mi><mi>l</mi></mrow></msub><annotation encoding="application/x-tex">\Omega_{global}</annotation></semantics></math>
-(larger values of
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>α</mi><mrow><mi>c</mi><mi>o</mi><mi>r</mi></mrow></msub><annotation encoding="application/x-tex">\alpha_{cor}</annotation></semantics></math>
-indicate a greater degree of shrinkage, i.e. a greater degree of partial
-pooling). This option is valuable for many types of designs where the
-same observational units (i.e. <em>financial assets</em> or
-<em>species</em>, for example) are measured in different strata
-(i.e. <em>regions</em>, <em>countries</em> or <em>experimental
-units</em>, for example). Currently hierarchical correlations can be
-included for <code><a href="../reference/RW.html">AR()</a></code>, <code><a href="../reference/RW.html">VAR()</a></code> or
-<code><a href="../reference/ZMVN.html">ZMVN()</a></code> <code>trend_model</code> options.</p>
+<p><span class="math display">\[\begin{align*}
+\Omega_{group} &amp; = \alpha_{cor}\Omega_{global} + (1 -
+\alpha_{cor})\Omega_{group, local} \end{align*}\]</span></p>
+<p>where <span class="math inline">\(\Omega_{global}\)</span> is a
+<em>global</em> correlation matrix, <span class="math inline">\(\Omega_{group, local}\)</span> is a <em>local
+deviation</em> correlation matrix and <span class="math inline">\(\alpha_{cor}\)</span> is a weighting parameter
+controlling how strongly the local correlation matrix <span class="math inline">\(\Omega_{group}\)</span> (i.e. the derived
+correlation matrix that will be used for each level of the grouping
+factor <code>gr</code>) is shrunk towards the global correlation matrix
+<span class="math inline">\(\Omega_{global}\)</span> (larger values of
+<span class="math inline">\(\alpha_{cor}\)</span> indicate a greater
+degree of shrinkage, i.e. a greater degree of partial pooling). This
+option is valuable for many types of designs where the same
+observational units (i.e. <em>financial assets</em> or <em>species</em>,
+for example) are measured in different strata (i.e. <em>regions</em>,
+<em>countries</em> or <em>experimental units</em>, for example).
+Currently hierarchical correlations can be included for
+<code><a href="../reference/RW.html">AR()</a></code>, <code><a href="../reference/RW.html">VAR()</a></code> or <code><a href="../reference/ZMVN.html">ZMVN()</a></code>
+<code>trend_model</code> options.</p>
 </div>
 <div class="section level3">
 <h3 id="gaussian-processes">Gaussian Processes<a class="anchor" aria-label="anchor" href="#gaussian-processes"></a>
@@ -453,23 +405,20 @@ Process with squared exponential kernel. These are set up independently
 for each series (there is currently no multivariate GP option), using
 <code>trend_model = 'GP'</code>. The dynamics for each latent process
 are modelled as:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><mi>z</mi></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">MVNormal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><msub><mi>Σ</mi><mrow><mi>e</mi><mi>r</mi><mi>r</mi><mi>o</mi><mi>r</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>Σ</mi><mrow><mi>e</mi><mi>r</mi><mi>r</mi><mi>o</mi><mi>r</mi></mrow></msub><mrow><mo stretchy="true" form="prefix">[</mo><msub><mi>t</mi><mi>i</mi></msub><mo>,</mo><msub><mi>t</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">]</mo></mrow></mtd><mtd columnalign="left" style="text-align: left"><mo>=</mo><msup><mi>α</mi><mn>2</mn></msup><mo>*</mo><mi>e</mi><mi>x</mi><mi>p</mi><mrow><mo stretchy="true" form="prefix">(</mo><mo>−</mo><mn>0.5</mn><mo>*</mo><msup><mrow><mo stretchy="true" form="prefix">(</mo><mrow><mo stretchy="true" form="prefix">(</mo><mrow><mo stretchy="true" form="prefix">|</mo><msub><mi>t</mi><mi>i</mi></msub><mo>−</mo><msub><mi>t</mi><mi>j</mi></msub><mo stretchy="true" form="postfix">|</mo></mrow><mi>/</mi><mi>ρ</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo stretchy="true" form="postfix">)</mo></mrow><mn>2</mn></msup><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
+<p><span class="math display">\[\begin{align*}
 z &amp; \sim \text{MVNormal}(0, \Sigma_{error}) \\
-\Sigma_{error}[t_i, t_j] &amp; = \alpha^2 * exp(-0.5 * ((|t_i - t_j| / \rho))^2) \end{align*}</annotation></semantics></math></p>
+\Sigma_{error}[t_i, t_j] &amp; = \alpha^2 * exp(-0.5 * ((|t_i - t_j| /
+\rho))^2) \end{align*}\]</span></p>
 <p>The latent dynamic process evolves from a complex, high-dimensional
-Multivariate Normal distribution which depends on
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>ρ</mi><annotation encoding="application/x-tex">\rho</annotation></semantics></math>
-(often called the length scale parameter) to control how quickly the
-correlations between the model’s errors decay as a function of time. For
-these models, covariance decays exponentially fast with the squared
-distance (in time) between the observations. The functions also depend
-on a parameter
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>α</mi><annotation encoding="application/x-tex">\alpha</annotation></semantics></math>,
-which controls the marginal variability of the temporal function at all
-points; in other words it controls how much the GP term contributes to
-the linear predictor. <code>mvgam</code> capitalizes on some advances
-that allow GPs to be approximated using Hilbert space basis functions,
-which <a href="https://link.springer.com/article/10.1007/s11222-022-10167-2" target="_blank" class="external-link">considerably speed up computation at little cost to
+Multivariate Normal distribution which depends on <span class="math inline">\(\rho\)</span> (often called the length scale
+parameter) to control how quickly the correlations between the model’s
+errors decay as a function of time. For these models, covariance decays
+exponentially fast with the squared distance (in time) between the
+observations. The functions also depend on a parameter <span class="math inline">\(\alpha\)</span>, which controls the marginal
+variability of the temporal function at all points; in other words it
+controls how much the GP term contributes to the linear predictor.
+<code>mvgam</code> capitalizes on some advances that allow GPs to be
+approximated using Hilbert space basis functions, which <a href="https://link.springer.com/article/10.1007/s11222-022-10167-2" target="_blank" class="external-link">considerably speed up computation at little cost to
 accuracy or prediction performance</a>.</p>
 </div>
 <div class="section level3">
@@ -479,38 +428,31 @@ accuracy or prediction performance</a>.</p>
 modeling population growth in natural ecosystems, where there series
 exhibits nonlinear growth that saturates at some particular carrying
 capacity. The logistic trend model available in {<code>mvgam</code>}
-allows for a time-varying capacity
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>C</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>t</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">C(t)</annotation></semantics></math>
-as well as a non-constant growth rate. Changes in the base growth rate
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>
-are incorporated by explicitly defining changepoints throughout the
-training period where the growth rate is allowed to vary. The
-changepoint vector
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>a</mi><annotation encoding="application/x-tex">a</annotation></semantics></math>
-is represented as a vector of <code>1</code>s and <code>0</code>s, and
-the rate of growth at time
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>
-is represented as
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>k</mi><mo>+</mo><mi>a</mi><msup><mrow><mo stretchy="true" form="prefix">(</mo><mi>t</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>T</mi></msup><mi>δ</mi></mrow><annotation encoding="application/x-tex">k+a(t)^T\delta</annotation></semantics></math>.
-Potential changepoints are selected uniformly across the training
-period, and the number of changepoints, as well as the flexibility of
-the potential rate changes at these changepoints, can be controlled
-using <code>trend_model = PW()</code>. The full piecewise logistic
-growth model is then:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>z</mi><mi>t</mi></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>=</mo><mfrac><msub><mi>C</mi><mi>t</mi></msub><mrow><mn>1</mn><mo>+</mo><mo>exp</mo><mrow><mo stretchy="true" form="prefix">(</mo><mo>−</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>k</mi><mo>+</mo><mi>a</mi><msup><mrow><mo stretchy="true" form="prefix">(</mo><mi>t</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>T</mi></msup><mi>δ</mi><mo stretchy="true" form="postfix">)</mo></mrow><mrow><mo stretchy="true" form="prefix">(</mo><mi>t</mi><mo>−</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo>+</mo><mi>a</mi><msup><mrow><mo stretchy="true" form="prefix">(</mo><mi>t</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>T</mi></msup><mi>γ</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo stretchy="true" form="postfix">)</mo></mrow><mo stretchy="true" form="postfix">)</mo></mrow></mrow></mfrac></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
-z_t &amp; = \frac{C_t}{1 + \exp(-(k+a(t)^T\delta)(t-(m+a(t)^T\gamma)))}  \end{align*}</annotation></semantics></math></p>
+allows for a time-varying capacity <span class="math inline">\(C(t)\)</span> as well as a non-constant growth
+rate. Changes in the base growth rate <span class="math inline">\(k\)</span> are incorporated by explicitly defining
+changepoints throughout the training period where the growth rate is
+allowed to vary. The changepoint vector <span class="math inline">\(a\)</span> is represented as a vector of
+<code>1</code>s and <code>0</code>s, and the rate of growth at time
+<span class="math inline">\(t\)</span> is represented as <span class="math inline">\(k+a(t)^T\delta\)</span>. Potential changepoints
+are selected uniformly across the training period, and the number of
+changepoints, as well as the flexibility of the potential rate changes
+at these changepoints, can be controlled using
+<code>trend_model = PW()</code>. The full piecewise logistic growth
+model is then:</p>
+<p><span class="math display">\[\begin{align*}
+z_t &amp; = \frac{C_t}{1 +
+\exp(-(k+a(t)^T\delta)(t-(m+a(t)^T\gamma)))}  \end{align*}\]</span></p>
 <p>For time series that do not appear to exhibit saturating growth, a
 piece-wise constant rate of growth can often provide a useful trend
 model. The piecewise linear trend is defined as:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>z</mi><mi>t</mi></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>=</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>k</mi><mo>+</mo><mi>a</mi><msup><mrow><mo stretchy="true" form="prefix">(</mo><mi>t</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>T</mi></msup><mi>δ</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>t</mi><mo>+</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>m</mi><mo>+</mo><mi>a</mi><msup><mrow><mo stretchy="true" form="prefix">(</mo><mi>t</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>T</mi></msup><mi>γ</mi><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
-z_t &amp; = (k+a(t)^T\delta)t + (m+a(t)^T\gamma)  \end{align*}</annotation></semantics></math></p>
-<p>In both trend models,
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>m</mi><annotation encoding="application/x-tex">m</annotation></semantics></math>
-is an offset parameter that controls the trend intercept. Because of
-this parameter, it is not recommended that you include an intercept in
-your observation formula because this will not be identifiable. You can
-read about the full description of piecewise linear and logistic trends
-<a href="https://www.tandfonline.com/doi/abs/10.1080/00031305.2017.1380080" target="_blank" class="external-link">in this paper by Taylor and Letham</a>.</p>
+<p><span class="math display">\[\begin{align*}
+z_t &amp; = (k+a(t)^T\delta)t +
+(m+a(t)^T\gamma)  \end{align*}\]</span></p>
+<p>In both trend models, <span class="math inline">\(m\)</span> is an
+offset parameter that controls the trend intercept. Because of this
+parameter, it is not recommended that you include an intercept in your
+observation formula because this will not be identifiable. You can read
+about the full description of piecewise linear and logistic trends <a href="https://www.tandfonline.com/doi/abs/10.1080/00031305.2017.1380080" target="_blank" class="external-link">in this paper by Taylor and Letham</a>.</p>
 <p>Sean J. Taylor and Benjamin Letham. “<a href="https://www.tandfonline.com/doi/full/10.1080/00031305.2017.1380080" class="external-link">Forecasting
 at scale.</a>” <em>The American Statistician</em> 72.1 (2018):
 37-45.</p>
@@ -526,12 +468,12 @@ properties of these. The <code>trend_model = CAR()</code> can be useful
 to set up these models, which currently only support autoregressive
 processes of order <code>1</code>. The evolution of the latent dynamic
 process follows the form:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>z</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Normal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><mi>a</mi><mi>r</mi><msubsup><mn>1</mn><mi>i</mi><mrow><mi>d</mi><mi>i</mi><mi>s</mi><mi>t</mi><mi>a</mi><mi>n</mi><mi>c</mi><mi>e</mi></mrow></msubsup><mo>*</mo><msub><mi>z</mi><mrow><mi>i</mi><mo>,</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>,</mo><msub><mi>σ</mi><mi>i</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
-z_{i,t} &amp; \sim \text{Normal}(ar1_i^{distance} * z_{i,t-1}, \sigma_i) \end{align*}</annotation></semantics></math></p>
-<p>Where
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>d</mi><mi>i</mi><mi>s</mi><mi>t</mi><mi>a</mi><mi>n</mi><mi>c</mi><mi>e</mi></mrow><annotation encoding="application/x-tex">distance</annotation></semantics></math>
-is a vector of non-negative measurements of the time differences between
-successive observations. See the <strong>Examples</strong> section in
+<p><span class="math display">\[\begin{align*}
+z_{i,t} &amp; \sim \text{Normal}(ar1_i^{distance} * z_{i,t-1}, \sigma_i)
+\end{align*}\]</span></p>
+<p>Where <span class="math inline">\(distance\)</span> is a vector of
+non-negative measurements of the time differences between successive
+observations. See the <strong>Examples</strong> section in
 <code><a href="../reference/RW.html">?CAR</a></code> for an illustration of how to set these models up.</p>
 </div>
 </div>
@@ -788,27 +730,19 @@ tackled with HMC.</p>
 <span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">model_data</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>The model can be described mathematically for each timepoint
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>
-as follows:
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mrow><mi>𝐜</mi><mi>𝐨</mi><mi>𝐮</mi><mi>𝐧</mi><mi>𝐭</mi></mrow><mi>t</mi></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Poisson</mtext><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>λ</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><mi>l</mi><mi>o</mi><mi>g</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>λ</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd><mtd columnalign="left" style="text-align: left"><mo>=</mo><msub><mi>β</mi><mrow><mi>y</mi><mi>e</mi><mi>a</mi><mi>r</mi><mrow><mo stretchy="true" form="prefix">[</mo><mi>y</mi><mi>e</mi><mi>a</mi><msub><mi>r</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">]</mo></mrow></mrow></msub></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>β</mi><mrow><mi>y</mi><mi>e</mi><mi>a</mi><mi>r</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Normal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>μ</mi><mrow><mi>y</mi><mi>e</mi><mi>a</mi><mi>r</mi></mrow></msub><mo>,</mo><msub><mi>σ</mi><mrow><mi>y</mi><mi>e</mi><mi>a</mi><mi>r</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
+<p>The model can be described mathematically for each timepoint <span class="math inline">\(t\)</span> as follows: <span class="math display">\[\begin{align*}
 \boldsymbol{count}_t &amp; \sim \text{Poisson}(\lambda_t) \\
 log(\lambda_t) &amp; = \beta_{year[year_t]} \\
-\beta_{year} &amp; \sim \text{Normal}(\mu_{year}, \sigma_{year}) \end{align*}</annotation></semantics></math></p>
-<p>Where the
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>β</mi><mrow><mi>y</mi><mi>e</mi><mi>a</mi><mi>r</mi></mrow></msub><annotation encoding="application/x-tex">\beta_{year}</annotation></semantics></math>
-effects are drawn from a <em>population</em> distribution that is
-parameterized by a common mean
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>μ</mi><mrow><mi>y</mi><mi>e</mi><mi>a</mi><mi>r</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(\mu_{year})</annotation></semantics></math>
-and variance
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>σ</mi><mrow><mi>y</mi><mi>e</mi><mi>a</mi><mi>r</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(\sigma_{year})</annotation></semantics></math>.
-Priors on most of the model parameters can be interrogated and changed
-using similar functionality to the options available in
-<code>brms</code>. For example, the default priors on
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>μ</mi><mrow><mi>y</mi><mi>e</mi><mi>a</mi><mi>r</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(\mu_{year})</annotation></semantics></math>
-and
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>σ</mi><mrow><mi>y</mi><mi>e</mi><mi>a</mi><mi>r</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(\sigma_{year})</annotation></semantics></math>
-can be viewed using the following code:</p>
+\beta_{year} &amp; \sim \text{Normal}(\mu_{year}, \sigma_{year})
+\end{align*}\]</span></p>
+<p>Where the <span class="math inline">\(\beta_{year}\)</span> effects
+are drawn from a <em>population</em> distribution that is parameterized
+by a common mean <span class="math inline">\((\mu_{year})\)</span> and
+variance <span class="math inline">\((\sigma_{year})\)</span>. Priors on
+most of the model parameters can be interrogated and changed using
+similar functionality to the options available in <code>brms</code>. For
+example, the default priors on <span class="math inline">\((\mu_{year})\)</span> and <span class="math inline">\((\sigma_{year})\)</span> can be viewed using the
+following code:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span><span class="va">count</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">year_fac</span>, bs <span class="op">=</span> <span class="st">"re"</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span>
 <span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -893,7 +827,7 @@ posterior distributions for key parameters</p>
 <span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Tue Mar 04 03:08:47 2025.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Tue Mar 04 04:25:48 2025.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
@@ -905,9 +839,8 @@ spaces. This is a good sign. Posterior distributions for model
 parameters can be extracted in any way that an object of class
 <code>brmsfit</code> can (see <code><a href="../reference/mvgam_draws.html">?mvgam::mvgam_draws</a></code> for
 details). For example, we can extract the coefficients related to the
-GAM linear predictor (i.e. the
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>β</mi><annotation encoding="application/x-tex">\beta</annotation></semantics></math>’s)
-into a <code>data.frame</code> using:</p>
+GAM linear predictor (i.e. the <span class="math inline">\(\beta\)</span>’s) into a <code>data.frame</code>
+using:</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">beta_post</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">model1</span>, variable <span class="op">=</span> <span class="st">"betas"</span><span class="op">)</span></span>
 <span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://pillar.r-lib.org/reference/glimpse.html" class="external-link">glimpse</a></span><span class="op">(</span><span class="va">beta_post</span><span class="op">)</span></span>
@@ -1164,19 +1097,15 @@ Here, we will update the model from above by including a parametric
 <span>  data <span class="op">=</span> <span class="va">data_train</span>,</span>
 <span>  newdata <span class="op">=</span> <span class="va">data_test</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>The model can be described mathematically as follows:
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mrow><mi>𝐜</mi><mi>𝐨</mi><mi>𝐮</mi><mi>𝐧</mi><mi>𝐭</mi></mrow><mi>t</mi></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Poisson</mtext><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>λ</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><mi>l</mi><mi>o</mi><mi>g</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>λ</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd><mtd columnalign="left" style="text-align: left"><mo>=</mo><msub><mi>β</mi><mrow><mi>y</mi><mi>e</mi><mi>a</mi><mi>r</mi><mrow><mo stretchy="true" form="prefix">[</mo><mi>y</mi><mi>e</mi><mi>a</mi><msub><mi>r</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">]</mo></mrow></mrow></msub><mo>+</mo><msub><mi>β</mi><mrow><mi>n</mi><mi>d</mi><mi>v</mi><mi>i</mi></mrow></msub><mo>*</mo><msub><mrow><mi>𝐧</mi><mi>𝐝</mi><mi>𝐯</mi><mi>𝐢</mi></mrow><mi>t</mi></msub></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>β</mi><mrow><mi>y</mi><mi>e</mi><mi>a</mi><mi>r</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Normal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>μ</mi><mrow><mi>y</mi><mi>e</mi><mi>a</mi><mi>r</mi></mrow></msub><mo>,</mo><msub><mi>σ</mi><mrow><mi>y</mi><mi>e</mi><mi>a</mi><mi>r</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>β</mi><mrow><mi>n</mi><mi>d</mi><mi>v</mi><mi>i</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Normal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
+<p>The model can be described mathematically as follows: <span class="math display">\[\begin{align*}
 \boldsymbol{count}_t &amp; \sim \text{Poisson}(\lambda_t) \\
-log(\lambda_t) &amp; = \beta_{year[year_t]} + \beta_{ndvi} * \boldsymbol{ndvi}_t \\
+log(\lambda_t) &amp; = \beta_{year[year_t]} + \beta_{ndvi} *
+\boldsymbol{ndvi}_t \\
 \beta_{year} &amp; \sim \text{Normal}(\mu_{year}, \sigma_{year}) \\
-\beta_{ndvi} &amp; \sim \text{Normal}(0, 1) \end{align*}</annotation></semantics></math></p>
-<p>Where the
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>β</mi><mrow><mi>y</mi><mi>e</mi><mi>a</mi><mi>r</mi></mrow></msub><annotation encoding="application/x-tex">\beta_{year}</annotation></semantics></math>
-effects are the same as before but we now have another predictor
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>β</mi><mrow><mi>n</mi><mi>d</mi><mi>v</mi><mi>i</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(\beta_{ndvi})</annotation></semantics></math>
-that applies to the <code>ndvi</code> value at each timepoint
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>.
-Inspect the summary of this model</p>
+\beta_{ndvi} &amp; \sim \text{Normal}(0, 1) \end{align*}\]</span></p>
+<p>Where the <span class="math inline">\(\beta_{year}\)</span> effects
+are the same as before but we now have another predictor <span class="math inline">\((\beta_{ndvi})\)</span> that applies to the
+<code>ndvi</code> value at each timepoint <span class="math inline">\(t\)</span>. Inspect the summary of this model</p>
 <div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">model2</span><span class="op">)</span></span>
 <span><span class="co">#&gt; GAM formula:</span></span>
@@ -1242,7 +1171,7 @@ Inspect the summary of this model</p>
 <span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Tue Mar 04 03:09:14 2025.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Tue Mar 04 04:26:15 2025.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
@@ -1356,23 +1285,20 @@ visualize these basis functions to get a better sense of how splines
 work. We’ll create a set of 6 basis functions to represent possible
 variation in the effect of <code>time</code> on our outcome.In addition
 to constructing the basis functions, <code>mgcv</code> also creates a
-penalty matrix
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>S</mi><annotation encoding="application/x-tex">S</annotation></semantics></math>,
-which contains <strong>known</strong> coefficients that work to
-constrain the wiggliness of the resulting smooth function. When fitting
-a GAM to data, we must estimate the smoothing parameters
-(<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>λ</mi><annotation encoding="application/x-tex">\lambda</annotation></semantics></math>)
-that will penalize these matrices, resulting in constrained basis
-coefficients and smoother functions that are less likely to overfit the
-data. This is the key to fitting GAMs in a Bayesian framework, as we can
-jointly estimate the
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>λ</mi><annotation encoding="application/x-tex">\lambda</annotation></semantics></math>’s
-using informative priors to prevent overfitting and expand the
-complexity of models we can tackle. To see this in practice, we can now
-fit a model that replaces the yearly random effects with a smooth
-function of <code>time</code>. We will need a reasonably complex
-function (large <code>k</code>) to try and accommodate the temporal
-variation in our observations. Following some <a href="https://fromthebottomoftheheap.net/2020/06/03/extrapolating-with-gams/" target="_blank" class="external-link">useful advice by Gavin Simpson</a>, we will use a
+penalty matrix <span class="math inline">\(S\)</span>, which contains
+<strong>known</strong> coefficients that work to constrain the
+wiggliness of the resulting smooth function. When fitting a GAM to data,
+we must estimate the smoothing parameters (<span class="math inline">\(\lambda\)</span>) that will penalize these
+matrices, resulting in constrained basis coefficients and smoother
+functions that are less likely to overfit the data. This is the key to
+fitting GAMs in a Bayesian framework, as we can jointly estimate the
+<span class="math inline">\(\lambda\)</span>’s using informative priors
+to prevent overfitting and expand the complexity of models we can
+tackle. To see this in practice, we can now fit a model that replaces
+the yearly random effects with a smooth function of <code>time</code>.
+We will need a reasonably complex function (large <code>k</code>) to try
+and accommodate the temporal variation in our observations. Following
+some <a href="https://fromthebottomoftheheap.net/2020/06/03/extrapolating-with-gams/" target="_blank" class="external-link">useful advice by Gavin Simpson</a>, we will use a
 b-spline basis for the temporal smooth. Because we no longer have
 intercepts for each year, we also retain the primary intercept term in
 this model (there is no <code>-1</code> in the formula now):</p>
@@ -1384,34 +1310,24 @@ this model (there is no <code>-1</code> in the formula now):</p>
 <span>  data <span class="op">=</span> <span class="va">data_train</span>,</span>
 <span>  newdata <span class="op">=</span> <span class="va">data_test</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>The model can be described mathematically as follows:
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mrow><mi>𝐜</mi><mi>𝐨</mi><mi>𝐮</mi><mi>𝐧</mi><mi>𝐭</mi></mrow><mi>t</mi></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Poisson</mtext><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>λ</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><mi>l</mi><mi>o</mi><mi>g</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>λ</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd><mtd columnalign="left" style="text-align: left"><mo>=</mo><mi>f</mi><msub><mrow><mo stretchy="true" form="prefix">(</mo><mrow><mi>𝐭</mi><mi>𝐢</mi><mi>𝐦</mi><mi>𝐞</mi></mrow><mo stretchy="true" form="postfix">)</mo></mrow><mi>t</mi></msub><mo>+</mo><msub><mi>β</mi><mrow><mi>n</mi><mi>d</mi><mi>v</mi><mi>i</mi></mrow></msub><mo>*</mo><msub><mrow><mi>𝐧</mi><mi>𝐝</mi><mi>𝐯</mi><mi>𝐢</mi></mrow><mi>t</mi></msub></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><mi>f</mi><mrow><mo stretchy="true" form="prefix">(</mo><mrow><mi>𝐭</mi><mi>𝐢</mi><mi>𝐦</mi><mi>𝐞</mi></mrow><mo stretchy="true" form="postfix">)</mo></mrow></mtd><mtd columnalign="left" style="text-align: left"><mo>=</mo><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><mi>b</mi><mo>*</mo><msub><mi>β</mi><mrow><mi>s</mi><mi>m</mi><mi>o</mi><mi>o</mi><mi>t</mi><mi>h</mi></mrow></msub></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>β</mi><mrow><mi>s</mi><mi>m</mi><mi>o</mi><mi>o</mi><mi>t</mi><mi>h</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">MVNormal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><msup><mrow><mo stretchy="true" form="prefix">(</mo><mi>Ω</mi><mo>*</mo><mi>λ</mi><mo stretchy="true" form="postfix">)</mo></mrow><mrow><mo>−</mo><mn>1</mn></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>β</mi><mrow><mi>n</mi><mi>d</mi><mi>v</mi><mi>i</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Normal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
+<p>The model can be described mathematically as follows: <span class="math display">\[\begin{align*}
 \boldsymbol{count}_t &amp; \sim \text{Poisson}(\lambda_t) \\
-log(\lambda_t) &amp; = f(\boldsymbol{time})_t + \beta_{ndvi} * \boldsymbol{ndvi}_t  \\
+log(\lambda_t) &amp; = f(\boldsymbol{time})_t + \beta_{ndvi} *
+\boldsymbol{ndvi}_t  \\
 f(\boldsymbol{time}) &amp; = \sum_{k=1}^{K}b * \beta_{smooth} \\
 \beta_{smooth} &amp; \sim \text{MVNormal}(0, (\Omega * \lambda)^{-1}) \\
-\beta_{ndvi} &amp; \sim \text{Normal}(0, 1) \end{align*}</annotation></semantics></math></p>
-<p>Where the smooth function
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>f</mi><mrow><mi>t</mi><mi>i</mi><mi>m</mi><mi>e</mi></mrow></msub><annotation encoding="application/x-tex">f_{time}</annotation></semantics></math>
-is built by summing across a set of weighted basis functions. The basis
-functions
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mi>b</mi><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(b)</annotation></semantics></math>
-are constructed using a thin plate regression basis in
-<code>mgcv</code>. The weights
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>β</mi><mrow><mi>s</mi><mi>m</mi><mi>o</mi><mi>o</mi><mi>t</mi><mi>h</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(\beta_{smooth})</annotation></semantics></math>
-are drawn from a penalized multivariate normal distribution where the
-precision matrix
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><mi>Ω</mi></mrow><annotation encoding="application/x-tex">(\Omega</annotation></semantics></math>)
-is multiplied by a smoothing penalty
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mi>λ</mi><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(\lambda)</annotation></semantics></math>.
-If
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>λ</mi><annotation encoding="application/x-tex">\lambda</annotation></semantics></math>
-becomes large, this acts to <em>squeeze</em> the covariances among the
-weights
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>β</mi><mrow><mi>s</mi><mi>m</mi><mi>o</mi><mi>o</mi><mi>t</mi><mi>h</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(\beta_{smooth})</annotation></semantics></math>,
-leading to a less wiggly spline. Note that sometimes there are multiple
-smoothing penalties that contribute to the covariance matrix, but I am
-only showing one here for simplicity. View the summary as before</p>
+\beta_{ndvi} &amp; \sim \text{Normal}(0, 1) \end{align*}\]</span></p>
+<p>Where the smooth function <span class="math inline">\(f_{time}\)</span> is built by summing across a set
+of weighted basis functions. The basis functions <span class="math inline">\((b)\)</span> are constructed using a thin plate
+regression basis in <code>mgcv</code>. The weights <span class="math inline">\((\beta_{smooth})\)</span> are drawn from a
+penalized multivariate normal distribution where the precision matrix
+<span class="math inline">\((\Omega\)</span>) is multiplied by a
+smoothing penalty <span class="math inline">\((\lambda)\)</span>. If
+<span class="math inline">\(\lambda\)</span> becomes large, this acts to
+<em>squeeze</em> the covariances among the weights <span class="math inline">\((\beta_{smooth})\)</span>, leading to a less
+wiggly spline. Note that sometimes there are multiple smoothing
+penalties that contribute to the covariance matrix, but I am only
+showing one here for simplicity. View the summary as before</p>
 <div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">model3</span><span class="op">)</span></span>
 <span><span class="co">#&gt; GAM formula:</span></span>
@@ -1470,7 +1386,7 @@ only showing one here for simplicity. View the summary as before</p>
 <span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Tue Mar 04 03:09:38 2025.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Tue Mar 04 04:26:39 2025.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
@@ -1550,11 +1466,9 @@ how the spline is being penalized:</p>
 <span><span class="co">#&gt; }</span></span></code></pre></div>
 <p>The line below <code>// prior for s(time)...</code> shows how the
 spline basis coefficients are drawn from a zero-centred multivariate
-normal distribution. The precision matrix
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>S</mi><annotation encoding="application/x-tex">S</annotation></semantics></math>
-is penalized by two different smoothing parameters (the
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>λ</mi><annotation encoding="application/x-tex">\lambda</annotation></semantics></math>’s)
-to enforce smoothness and reduce overfitting</p>
+normal distribution. The precision matrix <span class="math inline">\(S\)</span> is penalized by two different smoothing
+parameters (the <span class="math inline">\(\lambda\)</span>’s) to
+enforce smoothness and reduce overfitting</p>
 </div>
 <div class="section level2">
 <h2 id="latent-dynamics-in-mvgam">Latent dynamics in <code>mvgam</code><a class="anchor" aria-label="anchor" href="#latent-dynamics-in-mvgam"></a>
@@ -1605,19 +1519,18 @@ components:</p>
 <span>  newdata <span class="op">=</span> <span class="va">data_test</span>,</span>
 <span>  trend_model <span class="op">=</span> <span class="st">"AR1"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>The model can be described mathematically as follows:
-<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mrow><mi>𝐜</mi><mi>𝐨</mi><mi>𝐮</mi><mi>𝐧</mi><mi>𝐭</mi></mrow><mi>t</mi></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Poisson</mtext><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>λ</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><mi>l</mi><mi>o</mi><mi>g</mi><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>λ</mi><mi>t</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd><mtd columnalign="left" style="text-align: left"><mo>=</mo><mi>f</mi><msub><mrow><mo stretchy="true" form="prefix">(</mo><mrow><mi>𝐧</mi><mi>𝐝</mi><mi>𝐯</mi><mi>𝐢</mi></mrow><mo stretchy="true" form="postfix">)</mo></mrow><mi>t</mi></msub><mo>+</mo><msub><mi>z</mi><mi>t</mi></msub></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>z</mi><mi>t</mi></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Normal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><mi>a</mi><mi>r</mi><mn>1</mn><mo>*</mo><msub><mi>z</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>,</mo><msub><mi>σ</mi><mrow><mi>e</mi><mi>r</mi><mi>r</mi><mi>o</mi><mi>r</mi></mrow></msub><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><mi>a</mi><mi>r</mi><mn>1</mn></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Normal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow><mrow><mo stretchy="true" form="prefix">[</mo><mo>−</mo><mn>1</mn><mo>,</mo><mn>1</mn><mo stretchy="true" form="postfix">]</mo></mrow></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>σ</mi><mrow><mi>e</mi><mi>r</mi><mi>r</mi><mi>o</mi><mi>r</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">Exponential</mtext><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><mi>f</mi><mrow><mo stretchy="true" form="prefix">(</mo><mrow><mi>𝐧</mi><mi>𝐝</mi><mi>𝐯</mi><mi>𝐢</mi></mrow><mo stretchy="true" form="postfix">)</mo></mrow></mtd><mtd columnalign="left" style="text-align: left"><mo>=</mo><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><mi>b</mi><mo>*</mo><msub><mi>β</mi><mrow><mi>s</mi><mi>m</mi><mi>o</mi><mi>o</mi><mi>t</mi><mi>h</mi></mrow></msub></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>β</mi><mrow><mi>s</mi><mi>m</mi><mi>o</mi><mi>o</mi><mi>t</mi><mi>h</mi></mrow></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>∼</mo><mtext mathvariant="normal">MVNormal</mtext><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><msup><mrow><mo stretchy="true" form="prefix">(</mo><mi>Ω</mi><mo>*</mo><mi>λ</mi><mo stretchy="true" form="postfix">)</mo></mrow><mrow><mo>−</mo><mn>1</mn></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{align*}
+<p>The model can be described mathematically as follows: <span class="math display">\[\begin{align*}
 \boldsymbol{count}_t &amp; \sim \text{Poisson}(\lambda_t) \\
 log(\lambda_t) &amp; = f(\boldsymbol{ndvi})_t + z_t \\
 z_t &amp; \sim \text{Normal}(ar1 * z_{t-1}, \sigma_{error}) \\
 ar1 &amp; \sim \text{Normal}(0, 1)[-1, 1] \\
 \sigma_{error} &amp; \sim \text{Exponential}(2) \\
 f(\boldsymbol{ndvi}) &amp; = \sum_{k=1}^{K}b * \beta_{smooth} \\
-\beta_{smooth} &amp; \sim \text{MVNormal}(0, (\Omega * \lambda)^{-1}) \end{align*}</annotation></semantics></math></p>
-<p>Here the term
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>z</mi><mi>t</mi></msub><annotation encoding="application/x-tex">z_t</annotation></semantics></math>
-captures autocorrelated latent residuals, which are modelled using an
-AR1 process. You can also notice that this model is estimating
+\beta_{smooth} &amp; \sim \text{MVNormal}(0, (\Omega * \lambda)^{-1})
+\end{align*}\]</span></p>
+<p>Here the term <span class="math inline">\(z_t\)</span> captures
+autocorrelated latent residuals, which are modelled using an AR1
+process. You can also notice that this model is estimating
 autocorrelated errors for the full time period, even though some of
 these time points have missing observations. This is useful for getting
 more realistic estimates of the residual autocorrelation parameters.
@@ -1675,7 +1588,7 @@ the latent AR1 process:</p>
 <span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Tue Mar 04 03:10:15 2025.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Tue Mar 04 04:27:15 2025.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
@@ -1726,7 +1639,7 @@ development of <code>mvgam</code>. Please see <a href="https://ecogambler.netlif
 opportunities on my website</a> and do reach out if you are interested
 (n.clark’at’uq.edu.au)</p>
 </div>
-  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+  </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
     </nav></aside>
 </div>
 
@@ -1737,15 +1650,15 @@ opportunities on my website</a> and do reach out if you are interested
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.1.9000.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.9.</p>
 </div>
 
     </footer>
 </div>
 
+  
 
-
-
+  
 
   </body>
 </html>

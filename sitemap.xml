@@ -1,97 +1,285 @@
-<urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
-<url><loc>https://nicholasjclark.github.io/mvgam/404.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/CODE_OF_CONDUCT.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/CONTRIBUTING.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/LICENSE-text.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/LICENSE.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/articles/data_in_mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/articles/index.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/articles/nmixtures.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/articles/shared_states.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/articles/time_varying_effects.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/authors.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/index.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/news/index.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/GP.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/RW.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/ZMVN.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/add_residuals.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/all_neon_tick_data.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/augment.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/code.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/conditional_effects.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/dynamic.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/ensemble.mvgam_forecast.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/evaluate_mvgams.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/fevd.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/fitted.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/forecast.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/formula.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/get_mvgam_priors.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/gratia_mvgam_enhancements.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/hindcast.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/how_to_cite.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/index-mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/index.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/irf.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/jsdgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/lfo_cv.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/logLik.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/loo.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/lv_correlations.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/mcmc_plot.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/model.frame.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/monotonic.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/mvgam-class.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/mvgam-package.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_diagnostics.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_draws.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_families.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_fevd-class.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_forecast-class.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_formulae.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_irf-class.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_marginaleffects.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_trends.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/pairs.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/piecewise_trends.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/pipe.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/plot.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/plot.mvgam_fevd.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/plot.mvgam_irf.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/plot.mvgam_lfo.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/plot.mvgam_residcor.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_factors.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_forecasts.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_pterms.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_randomeffects.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_resids.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_series.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_smooth.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_trend.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_uncertainty.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/portal_data.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/posterior_epred.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/posterior_linpred.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/posterior_predict.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/pp_check.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/ppc.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/predict.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/print.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/reexports.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/residual_cor.jsdgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/residuals.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/score.mvgam_forecast.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/series_to_mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/sim_mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/stability.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/summary.mvgam.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/summary.mvgam_fevd.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/summary.mvgam_irf.html</loc></url>
-<url><loc>https://nicholasjclark.github.io/mvgam/reference/update.mvgam.html</loc></url>
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/404.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/CODE_OF_CONDUCT.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/CONTRIBUTING.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/LICENSE-text.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/LICENSE.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/articles/data_in_mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/articles/index.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/articles/nmixtures.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/articles/shared_states.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/articles/time_varying_effects.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/authors.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/index.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/news/index.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/GP.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/RW.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/ZMVN.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/add_residuals.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/all_neon_tick_data.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/augment.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/code.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/conditional_effects.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/dynamic.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/ensemble.mvgam_forecast.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/evaluate_mvgams.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/fevd.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/fitted.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/forecast.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/formula.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/get_mvgam_priors.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/gratia_mvgam_enhancements.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/hindcast.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/how_to_cite.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/index-mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/index.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/irf.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/jsdgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/lfo_cv.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/logLik.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/loo.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/lv_correlations.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/mcmc_plot.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/model.frame.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/monotonic.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam-class.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam-package.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_diagnostics.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_draws.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_families.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_fevd-class.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_forecast-class.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_formulae.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_irf-class.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_marginaleffects.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_trends.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/pairs.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/piecewise_trends.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/pipe.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/plot.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/plot.mvgam_fevd.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/plot.mvgam_irf.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/plot.mvgam_lfo.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/plot.mvgam_residcor.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_factors.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_forecasts.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_pterms.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_randomeffects.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_resids.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_series.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_smooth.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_trend.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_uncertainty.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/portal_data.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/posterior_epred.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/posterior_linpred.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/posterior_predict.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/pp_check.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/ppc.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/predict.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/print.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/reexports.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/residual_cor.jsdgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/residuals.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/score.mvgam_forecast.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/series_to_mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/sim_mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/stability.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/summary.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/summary.mvgam_fevd.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/summary.mvgam_irf.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/update.mvgam.html</loc>
+  </url>
 </urlset>
-
