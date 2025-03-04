@@ -73,66 +73,70 @@ plot_mvgam_factors = function(object, plot = TRUE) {
         1:NCOL(preds),
         function(n) quantile(preds[, n], probs = probs)
       ))) %>%
-        dplyr::mutate(lv = paste0('Factor ', x),
-                      time = 1:NCOL(preds))
-      colnames(cred) <- c(paste0('lower', 1:4),
-                          'med',
-                          paste0('upper', 4:1),
-                          'lv',
-                          'time')
+        dplyr::mutate(lv = paste0('Factor ', x), time = 1:NCOL(preds))
+      colnames(cred) <- c(
+        paste0('lower', 1:4),
+        'med',
+        paste0('upper', 4:1),
+        'lv',
+        'time'
+      )
       cred
-    }))
+    })
+  )
 
-      # If plot = TRUE, plot the LVs
-      if (plot) {
-        p <- ggplot2::ggplot(
-          data = lv_estimates,
-          mapping = ggplot2::aes(x = time, y = med)
-        ) +
-          ggplot2::facet_wrap(~lv) +
-          ggplot2::geom_ribbon(
-            mapping = ggplot2::aes(ymin = lower1, ymax = upper1),
-            fill = "#DCBCBC"
-          ) +
-          ggplot2::geom_ribbon(
-            mapping = ggplot2::aes(ymin = lower2, ymax = upper2),
-            fill = "#C79999"
-          ) +
-          ggplot2::geom_ribbon(
-            mapping = ggplot2::aes(ymin = lower3, ymax = upper3),
-            fill = "#B97C7C"
-          ) +
-          ggplot2::geom_ribbon(
-            mapping = ggplot2::aes(ymin = lower4, ymax = upper4),
-            fill = "#A25050"
-          ) +
-          ggplot2::geom_line(
-            mapping = ggplot2::aes(x = time, y = med),
-            col = "#8F2727",
-            linewidth = 1
-          ) +
-          ggplot2::theme_bw() +
-          ggplot2::labs(x = 'Time', y = 'Posterior prediction')
-      }
+  # If plot = TRUE, plot the LVs
+  if (plot) {
+    p <- ggplot2::ggplot(
+      data = lv_estimates,
+      mapping = ggplot2::aes(x = time, y = med)
+    ) +
+      ggplot2::facet_wrap(~lv) +
+      ggplot2::geom_ribbon(
+        mapping = ggplot2::aes(ymin = lower1, ymax = upper1),
+        fill = "#DCBCBC"
+      ) +
+      ggplot2::geom_ribbon(
+        mapping = ggplot2::aes(ymin = lower2, ymax = upper2),
+        fill = "#C79999"
+      ) +
+      ggplot2::geom_ribbon(
+        mapping = ggplot2::aes(ymin = lower3, ymax = upper3),
+        fill = "#B97C7C"
+      ) +
+      ggplot2::geom_ribbon(
+        mapping = ggplot2::aes(ymin = lower4, ymax = upper4),
+        fill = "#A25050"
+      ) +
+      ggplot2::geom_line(
+        mapping = ggplot2::aes(x = time, y = med),
+        col = "#8F2727",
+        linewidth = 1
+      ) +
+      ggplot2::theme_bw() +
+      ggplot2::labs(x = 'Time', y = 'Posterior prediction')
+  }
 
-      # Calculate second derivatives of empirical medians and upper / lower intervals;
-      # factors with small second derivatives are moving in roughly a straight line and not
-      # likely contributing much (or at all) to the latent trend estimates
+  # Calculate second derivatives of empirical medians and upper / lower intervals;
+  # factors with small second derivatives are moving in roughly a straight line and not
+  # likely contributing much (or at all) to the latent trend estimates
   lv_contributions <- lv_estimates %>%
     dplyr::group_by(lv) %>%
-    dplyr::reframe(med_deriv = abs(diff(diff(med))),
-                   upper_deriv = abs(diff(diff(upper2))),
-                   lower_deriv = abs(diff(diff(lower2)))) %>%
+    dplyr::reframe(
+      med_deriv = abs(diff(diff(med))),
+      upper_deriv = abs(diff(diff(upper2))),
+      lower_deriv = abs(diff(diff(lower2)))
+    ) %>%
     dplyr::rowwise() %>%
-    dplyr::mutate(contribution = sum(med_deriv,
-                                     upper_deriv,
-                                     lower_deriv)) %>%
+    dplyr::mutate(contribution = sum(med_deriv, upper_deriv, lower_deriv)) %>%
     dplyr::group_by(lv) %>%
     dplyr::summarise(sum_contribution = sum(contribution)) %>%
     dplyr::ungroup() %>%
-    dplyr::mutate(total = sum(sum_contribution),
-                  Contribution = sum_contribution / total,
-                  Factor = lv) %>%
+    dplyr::mutate(
+      total = sum(sum_contribution),
+      Contribution = sum_contribution / total,
+      Factor = lv
+    ) %>%
     dplyr::select(Factor, Contribution)
 
   if (plot) {
