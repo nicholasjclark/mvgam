@@ -1,4 +1,5 @@
-# mvgam (development version, not yet on CRAN)
+# mvgam (development version)
+
 ## New functionalities
 * Converted several more plotting functions to return `ggplot` objects in place of base R plots
 * Added four new `type`s to the `pp_check()` function to allow more targeted investigations of randomized quantile residual distributions
