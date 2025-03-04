@@ -422,7 +422,7 @@ post_cors$cor_upper[1:5, 1:5]
 post_cors$cor_lower[1:5, 1:5]
 # Plot of the posterior median correlations for those estimated
 # to be non-zero
-plot(post_cors$cor)
+plot(post_cors)
 
 # Posterior predictive checks and ELPD-LOO can ascertain model fit
 pp_check(mod,

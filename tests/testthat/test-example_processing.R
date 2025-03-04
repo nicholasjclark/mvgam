@@ -441,6 +441,7 @@ test_that("dynamic factor investigations work", {
   expect_no_error(plot_mvgam_factors(mvgam:::mvgam_example4))
   facconts <- plot_mvgam_factors(mvgam:::mvgam_example4, plot = FALSE)
   expect_true(inherits(facconts, 'data.frame'))
+  expect_true(inherits(facconts, 'tbl_df'))
 })
 
 

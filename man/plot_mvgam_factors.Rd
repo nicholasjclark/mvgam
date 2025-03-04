@@ -12,8 +12,8 @@ plot_mvgam_factors(object, plot = TRUE)
 \item{plot}{\code{logical} specifying whether factors should be plotted}
 }
 \value{
-A \code{dataframe} of factor contributions and,
-optionally, a series of base \code{R} plots
+A \code{data.frame} of factor contributions and,
+optionally, a \code{ggplot} object
 }
 \description{
 This function takes a fitted \code{mvgam} object and returns plots and summary statistics for
@@ -37,7 +37,8 @@ mod <- mvgam(y ~ s(season, bs = 'cc',
             use_lv = TRUE,
             n_lv = 2,
             data = simdat$data_train,
-            chains = 2)
+            chains = 2,
+            silent = 2)
 plot_mvgam_factors(mod)
 }
 }

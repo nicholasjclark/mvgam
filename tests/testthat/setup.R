@@ -29,7 +29,6 @@ expect_range <- function(object, lower = -Inf, upper = Inf, ...) {
 SM <- suppressMessages
 SW <- suppressWarnings
 
-#ptm <- proc.time()
 set.seed(100)
 beta_data <- sim_mvgam(
   family = betar(),

@@ -142,14 +142,14 @@ plot.mvgam = function(
   }
 
   if (type == 'residuals') {
-    print(plot_mvgam_resids(object, series = series, ...))
+    return(plot_mvgam_resids(object, series = series, ...))
   }
 
   if (type == 'factors') {
     if (!object$use_lv) {
       stop('no latent variables were fitted in the model')
     } else {
-      plot_mvgam_factors(object)
+      return(plot_mvgam_factors(object))
     }
   }
 
