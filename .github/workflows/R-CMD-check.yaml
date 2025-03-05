@@ -48,6 +48,7 @@ jobs:
         with:
           dependencies: NA
           extra-packages: |
+              mvgam
               knitr
               extraDistr
               lubridate
