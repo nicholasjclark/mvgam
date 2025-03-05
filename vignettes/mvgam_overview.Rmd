@@ -202,6 +202,7 @@ Notice how we have four different time series in these simulated data, but we do
 portal_data %>%
   # Filter the data to only contain captures of the 'PP' 
   dplyr::filter(series == 'PP') %>%
+  droplevels() %>%
   dplyr::mutate(count = captures) %>%
   # Add a 'year' variable
   dplyr::mutate(year = sort(rep(1:8, 12))[time]) %>%
@@ -528,7 +529,7 @@ model4 <- mvgam(count ~ s(ndvi_ma12, k = 6),
   family = poisson(),
   data = data_train,
   newdata = data_test,
-  trend_model = "AR1",
+  trend_model = AR(),
   parallel = FALSE
 )
 ```
@@ -538,7 +539,7 @@ model4 <- mvgam(count ~ s(ndvi_ma12, k = 6),
   family = poisson(),
   data = data_train,
   newdata = data_test,
-  trend_model = "AR1"
+  trend_model = AR()
 )
 ```
 

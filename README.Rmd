@@ -28,6 +28,7 @@ knitr::opts_chunk$set(
 [![R-CMD-check](https://github.com/nicholasjclark/mvgam/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
 [![Coverage status](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://app.codecov.io/gh/nicholasjclark/mvgam)
 [![Documentation](https://img.shields.io/badge/documentation-mvgam-orange.svg?colorB=brightgreen)](https://nicholasjclark.github.io/mvgam/)
+[![Methods in Ecology & Evolution](https://img.shields.io/badge/Methods%20in%20Ecology%20&%20Evolution-14,%20771–784-blue.svg)](https://doi.org/10.1111/2041-210X.13974)
 [![CRAN Version](https://www.r-pkg.org/badges/version/mvgam)](https://cran.r-project.org/package=mvgam)
 [![CRAN Downloads](https://cranlogs.r-pkg.org/badges/grand-total/mvgam?color=brightgreen)](https://cran.r-project.org/package=mvgam)
 
@@ -322,7 +323,7 @@ When using any software please make sure to appropriately acknowledge the hard w
 
 When using `mvgam`, please cite the following:
 
-> Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. *Methods in Ecology and Evolution*. DOI: https://doi.org/10.1111/2041-210X.13974
+> Clark, N.J. and Wells, K. (2023). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. *Methods in Ecology and Evolution*. DOI: https://doi.org/10.1111/2041-210X.13974
 
 As `mvgam` acts as an interface to `Stan`, please additionally cite:
 

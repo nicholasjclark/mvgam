@@ -11,6 +11,8 @@
 [![Coverage
 status](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://app.codecov.io/gh/nicholasjclark/mvgam)
 [![Documentation](https://img.shields.io/badge/documentation-mvgam-orange.svg?colorB=brightgreen)](https://nicholasjclark.github.io/mvgam/)
+[![Methods in Ecology &
+Evolution](https://img.shields.io/badge/documentation-mvgam-orange.svg?colorB=blue)](https://doi.org/10.1111/2041-210X.13974)
 [![CRAN
 Version](https://www.r-pkg.org/badges/version/mvgam)](https://cran.r-project.org/package=mvgam)
 [![CRAN
@@ -37,34 +39,6 @@ fit a wide range of models, including:
 - <a href="https://nicholasjclark.github.io/mvgam/reference/jsdgam.html"
   target="_blank">Joint Species Distribution Models</a>
 
-## Resources
-
-A series of <a href="https://nicholasjclark.github.io/mvgam/"
-target="_blank">vignettes cover data formatting, forecasting and several
-extended case studies of DGAMs</a>. A number of other examples,
-including some step-by-step introductory webinars, have also been
-compiled:
-
-- <a
-  href="https://www.youtube.com/playlist?list=PLzFHNoUxkCvsFIg6zqogylUfPpaxau_a3"
-  target="_blank">Time series in R and Stan using the <code>mvgam</code>
-  package</a>
-- <a href="https://www.youtube.com/watch?v=0zZopLlomsQ"
-  target="_blank">Ecological Forecasting with Dynamic Generalized Additive
-  Models</a>
-- <a href="https://ecogambler.netlify.app/blog/distributed-lags-mgcv/"
-  target="_blank">Distributed lags (and hierarchical distributed lags)
-  using <code>mgcv</code> and <code>mvgam</code></a>
-- <a href="https://ecogambler.netlify.app/blog/vector-autoregressions/"
-  target="_blank">State-Space Vector Autoregressions in
-  <code>mvgam</code></a>
-- <a href="https://www.youtube.com/watch?v=RwllLjgPUmM"
-  target="_blank">Ecological Forecasting with Dynamic GAMs; a tutorial and
-  detailed case study</a>
-- <a href="https://ecogambler.netlify.app/blog/time-varying-seasonality/"
-  target="_blank">Incorporating time-varying seasonality in forecast
-  models</a>
-
 ## Installation
 
 Install the stable version from `CRAN` using:
@@ -76,37 +50,6 @@ for `Stan` with `rstan`
 <a href="https://mc-stan.org/users/interfaces/rstan"
 target="_blank">here</a>, or for `Stan` with `cmdstandr`
 <a href="https://mc-stan.org/cmdstanr/" target="_blank">here</a>.
-
-## Citing `mvgam` and related software
-
-When using any software please make sure to appropriately acknowledge
-the hard work that developers and maintainers put into making these
-packages available. Citations are currently the best way to formally
-acknowledge this work, so we highly encourage you to cite any packages
-that you rely on for your research.
-
-When using `mvgam`, please cite the following:
-
-> Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models
-> (DGAMs) for forecasting discrete ecological time series. *Methods in
-> Ecology and Evolution*. DOI: <https://doi.org/10.1111/2041-210X.13974>
-
-As `mvgam` acts as an interface to `Stan`, please additionally cite:
-
-> Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B.,
-> Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017).
-> Stan: A probabilistic programming language. *Journal of Statistical
-> Software*. 76(1). DOI: <https://doi.org/10.18637/jss.v076.i01>
-
-`mvgam` relies on several other `R` packages and, of course, on `R`
-itself. To find out how to cite `R` and its packages, use `citation()`.
-There are some features of `mvgam` which specifically rely on certain
-packages. The most important of these is the generation of data
-necessary to estimate smoothing splines and Gaussian Processes, which
-rely on the `mgcv`, `brms` and `splines2` packages. The `rstan` and
-`cmdstanr` packages together with `Rcpp` makes `Stan` conveniently
-accessible in `R`. If you use some of these features, please also
-consider citing the related packages.
 
 ## Cheatsheet
 
@@ -228,7 +171,7 @@ summary(mod, include_betas = FALSE)
 #> 
 #> Status:
 #> Fitted using Stan 
-#> 4 chains, each with iter = 1250; warmup = 750; thin = 1 
+#> 4 chains, each with iter = 1500; warmup = 1000; thin = 1 
 #> Total post-warmup draws = 2000
 #> 
 #> 
@@ -238,75 +181,76 @@ summary(mod, include_betas = FALSE)
 #> 
 #> Process model VAR parameter estimates:
 #>          2.5%     50% 97.5% Rhat n_eff
-#> A[1,1]  0.710  0.9000 1.100 1.00   738
-#> A[1,2] -0.290 -0.0140 0.240 1.00   845
-#> A[1,3] -0.098  0.0092 0.120 1.00  1036
-#> A[1,4] -0.100 -0.0091 0.066 1.00  1189
-#> A[2,1] -0.310  0.0450 0.440 1.01   414
-#> A[2,2]  0.390  0.8300 1.100 1.00   449
-#> A[2,3] -0.220 -0.0200 0.140 1.00   802
-#> A[2,4] -0.190 -0.0120 0.130 1.01   349
-#> A[3,1] -1.000 -0.0840 1.200 1.02   173
-#> A[3,2] -1.500 -0.1200 1.200 1.03   116
-#> A[3,3]  0.063  0.7200 1.200 1.02   151
-#> A[3,4] -0.120  0.2100 0.850 1.02   184
-#> A[4,1] -1.800 -0.1700 1.500 1.02   138
-#> A[4,2] -2.800 -0.3100 2.500 1.03    92
-#> A[4,3] -1.200 -0.2700 0.580 1.02   148
-#> A[4,4]  0.530  0.9500 1.500 1.02   168
+#> A[1,1]  0.670  0.9000 1.100 1.02   251
+#> A[1,2] -0.260 -0.0130 0.240 1.02   239
+#> A[1,3] -0.093  0.0084 0.100 1.01   451
+#> A[1,4] -0.100 -0.0080 0.062 1.01   626
+#> A[2,1] -0.300  0.0390 0.580 1.03   189
+#> A[2,2]  0.330  0.8300 1.100 1.02   251
+#> A[2,3] -0.250 -0.0200 0.120 1.00   463
+#> A[2,4] -0.170 -0.0077 0.160 1.01   258
+#> A[3,1] -1.000 -0.0900 1.800 1.06    87
+#> A[3,2] -2.000 -0.0970 1.200 1.07    70
+#> A[3,3]  0.140  0.7200 1.100 1.02   199
+#> A[3,4] -0.110  0.2000 0.850 1.03   165
+#> A[4,1] -2.400 -0.1700 2.800 1.05    93
+#> A[4,2] -3.800 -0.2600 2.700 1.06    78
+#> A[4,3] -1.200 -0.2700 0.620 1.03   189
+#> A[4,4]  0.540  0.9600 1.600 1.05   150
 #> 
 #> Process error parameter estimates:
 #>                2.5%      50% 97.5% Rhat n_eff
-#> Sigma[1,1]  0.00790  0.02300 0.063 1.01   240
-#> Sigma[1,2] -0.00860  0.01000 0.045 1.01   372
-#> Sigma[1,3] -0.06100 -0.01200 0.033 1.01   700
-#> Sigma[1,4] -0.06400 -0.00930 0.041 1.00  1009
-#> Sigma[2,1] -0.00860  0.01000 0.045 1.01   372
-#> Sigma[2,2]  0.00740  0.04500 0.190 1.06    77
-#> Sigma[2,3] -0.13000 -0.03300 0.036 1.01   660
-#> Sigma[2,4] -0.09400 -0.00032 0.091 1.00  1049
-#> Sigma[3,1] -0.06100 -0.01200 0.033 1.01   700
-#> Sigma[3,2] -0.13000 -0.03300 0.036 1.01   660
-#> Sigma[3,3]  0.07200  0.27000 0.710 1.02   170
-#> Sigma[3,4]  0.00091  0.14000 0.430 1.01   297
-#> Sigma[4,1] -0.06400 -0.00930 0.041 1.00  1009
-#> Sigma[4,2] -0.09400 -0.00032 0.091 1.00  1049
-#> Sigma[4,3]  0.00091  0.14000 0.430 1.01   297
-#> Sigma[4,4]  0.11000  0.35000 0.890 1.02   162
+#> Sigma[1,1]  0.00700  2.5e-02 0.064 1.01   212
+#> Sigma[1,2] -0.00950  1.1e-02 0.053 1.01   293
+#> Sigma[1,3] -0.06800 -1.3e-02 0.033 1.00   611
+#> Sigma[1,4] -0.06900 -1.1e-02 0.041 1.00   936
+#> Sigma[2,1] -0.00950  1.1e-02 0.053 1.01   293
+#> Sigma[2,2]  0.00710  5.0e-02 0.260 1.06    77
+#> Sigma[2,3] -0.15000 -3.3e-02 0.039 1.00   579
+#> Sigma[2,4] -0.09000  2.3e-05 0.110 1.00   666
+#> Sigma[3,1] -0.06800 -1.3e-02 0.033 1.00   611
+#> Sigma[3,2] -0.15000 -3.3e-02 0.039 1.00   579
+#> Sigma[3,3]  0.08400  2.6e-01 0.740 1.03   156
+#> Sigma[3,4] -0.00018  1.4e-01 0.420 1.02   326
+#> Sigma[4,1] -0.06900 -1.1e-02 0.041 1.00   936
+#> Sigma[4,2] -0.09000  2.3e-05 0.110 1.00   666
+#> Sigma[4,3] -0.00018  1.4e-01 0.420 1.02   326
+#> Sigma[4,4]  0.13000  3.7e-01 0.930 1.04   220
 #> 
 #> GAM process model coefficient (beta) estimates:
-#>                    2.5%   50% 97.5% Rhat n_eff
-#> trendtrend1_trend  2.50  2.90  3.30    1  1415
-#> trendtrend2_trend -0.14  0.48  0.95    1  1016
-#> trendtrend3_trend -1.20 -0.12  0.79    1  1464
-#> trendtrend4_trend -0.31  0.72  1.60    1  1245
+#>                    2.5%    50% 97.5% Rhat n_eff
+#> trendtrend1_trend  2.60  2.900  3.30    1   924
+#> trendtrend2_trend -0.24  0.460  0.96    1   500
+#> trendtrend3_trend -1.20 -0.078  0.94    1   661
+#> trendtrend4_trend -0.30  0.730  1.70    1   923
 #> 
 #> GAM process model group-level estimates:
 #>                                  2.5%  50% 97.5% Rhat n_eff
-#> mean(s(trend):ndvi_ma12)_trend -0.480 0.36   1.2 1.01   908
-#> sd(s(trend):ndvi_ma12)_trend    0.023 0.43   2.3 1.00   806
+#> mean(s(trend):ndvi_ma12)_trend -0.510 0.39   1.3    1   863
+#> sd(s(trend):ndvi_ma12)_trend    0.017 0.41   2.1    1   712
 #> 
 #> Approximate significance of GAM process smooths:
 #>                          edf Ref.df Chi.sq p-value
-#> s(mintemp):seriestrend1 2.56      9   1.62    0.57
-#> s(mintemp):seriestrend2 2.32      9   0.11    0.98
-#> s(mintemp):seriestrend3 2.18      9   3.25    0.22
-#> s(mintemp):seriestrend4 5.18      9   1.03    0.97
-#> s(series):ndvi_ma12     3.14      4   1.30    0.79
+#> s(mintemp):seriestrend1 1.68      9   1.64    0.40
+#> s(mintemp):seriestrend2 1.30      9   0.09    0.89
+#> s(mintemp):seriestrend3 2.35      9   3.83    0.19
+#> s(mintemp):seriestrend4 1.98      9   0.81    0.65
+#> s(series):ndvi_ma12     2.23      4   1.18    0.62
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
-#> Rhats above 1.05 found for 3 parameters
+#> Rhats above 1.05 found for 8 parameters
 #>  *Diagnose further to investigate why the chains have not mixed
-#> 14 of 2000 iterations ended with a divergence (0.7%)
+#> 28 of 2000 iterations ended with a divergence (1.4%)
 #>  *Try running with larger adapt_delta to remove the divergences
 #> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
-#> Chain 2: E-FMI = 0.1729
-#> Chain 3: E-FMI = 0.181
-#> Chain 4: E-FMI = 0.0965
+#> Chain 1: E-FMI = 0.1831
+#> Chain 2: E-FMI = 0.1373
+#> Chain 3: E-FMI = 0.099
+#> Chain 4: E-FMI = 0.0902
 #>  *E-FMI below 0.2 indicates you may need to reparameterize your model
 #> 
-#> Samples were drawn using NUTS(diag_e) at Wed Mar 05 11:15:27 AM 2025.
+#> Samples were drawn using NUTS(diag_e) at Wed Mar 05 12:30:25 PM 2025.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -339,7 +283,6 @@ partial effects of smooths
 ``` r
 require(gratia)
 #> Loading required package: gratia
-#> Warning: package 'gratia' was built under R version 4.4.2
 #> 
 #> Attaching package: 'gratia'
 #> The following object is masked from 'package:mvgam':
@@ -384,13 +327,13 @@ plot(fcs, series = 1) +
   plot(fcs, series = 3) +
   plot(fcs, series = 4)
 #> Out of sample DRPS:
-#> 8.52036
+#> 8.3086915
 #> Out of sample DRPS:
-#> 5.347132
+#> 5.2079045
 #> Out of sample DRPS:
-#> 8.3858715
+#> 8.8530545
 #> Out of sample DRPS:
-#> 3.9390075
+#> 3.97454875
 ```
 
 <img src="man/figures/README-unnamed-chunk-14-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
@@ -398,17 +341,17 @@ plot(fcs, series = 1) +
 For Vector Autoregressions fit in `mvgam`, we can inspect <a
 href="https://ecogambler.netlify.app/blog/vector-autoregressions/#impulse-response-functions"
 target="_blank">impulse response functions and forecast error variance
-decompositions</a>. The `irf()` function runs a simulation whereby a
-positive “shock” is generated for a target process at time `t = 0`. All
-else remaining stable, it then monitors how each of the remaining
-processes in the latent VAR would be expected to respond over the
-forecast horizon `h`. The function computes impulse responses for all
-processes in the object and returns them in an array that can be plotted
-using the S3 `plot()` function. Here we will use the generalized IRF,
-which makes no assumptions about the order in which the series appear in
-the VAR process, and inspect how each process is expected to respond to
-a sudden, positive pulse from the other processes over a horizon of 12
-timepoints.
+decompositions</a>. The `irf()` function runs an Impulse Response
+Function (IRF) simulation whereby a positive “shock” is generated for a
+target process at time `t = 0`. All else remaining stable, it then
+monitors how each of the remaining processes in the latent VAR would be
+expected to respond over the forecast horizon `h`. The function computes
+impulse responses for all processes in the object and returns them in an
+array that can be plotted using the S3 `plot()` function. Here we will
+use the generalized IRF, which makes no assumptions about the order in
+which the series appear in the VAR process, and inspect how each process
+is expected to respond to a sudden, positive pulse from the other
+processes over a horizon of 12 timepoints.
 
 ``` r
 irfs <- irf(mod, h = 12, orthogonal = FALSE)
@@ -484,9 +427,9 @@ description
     #>   Autoregressive process following methods described by Heaps (2023) and
     #>   Clark et al. (2025). The mvgam-constructed model and observed data were
     #>   passed to the probabilistic programming environment Stan (version
-    #>   2.34.1; Carpenter et al. 2017, Stan Development Team 2025), specifically
+    #>   2.36.0; Carpenter et al. 2017, Stan Development Team 2025), specifically
     #>   through the cmdstanr interface (Gabry & Cesnovar, 2021). We ran 4
-    #>   Hamiltonian Monte Carlo chains for 750 warmup iterations and 500
+    #>   Hamiltonian Monte Carlo chains for 1000 warmup iterations and 500
     #>   sampling iterations for joint posterior estimation. Rank normalized
     #>   split Rhat (Vehtari et al. 2021) and effective sample sizes were used to
     #>   monitor convergence.
@@ -627,41 +570,40 @@ summary(mod, include_betas = FALSE)
 #> 
 #> Observation precision parameter estimates:
 #>        2.5%  50% 97.5% Rhat n_eff
-#> phi[1]  7.9 12.0  17.0    1  1743
-#> phi[2]  5.6  8.5  13.0    1  1583
-#> phi[3]  4.1  6.1   8.7    1  1846
+#> phi[1]  8.1 12.0  18.0    1  1644
+#> phi[2]  5.7  8.6  13.0    1  1124
+#> phi[3]  4.1  6.0   8.6    1  1830
 #> 
 #> GAM coefficient (beta) estimates:
-#>              2.5%  50% 97.5% Rhat n_eff
-#> (Intercept) 0.034 0.45  0.69 1.01   435
+#>             2.5%  50% 97.5% Rhat n_eff
+#> (Intercept) 0.13 0.46  0.69    1   685
 #> 
 #> Approximate significance of GAM smooths:
 #>                           edf Ref.df Chi.sq p-value  
-#> s(season)                4.06      5   7.49   0.063 .
-#> s(season):seriesseries_1 1.44      4   6.66   0.198  
-#> s(season):seriesseries_2 2.67      4   1.91   0.434  
-#> s(season):seriesseries_3 1.55      4   3.60   0.378  
+#> s(season)                3.95      5   7.96    0.06 .
+#> s(season):seriesseries_1 2.00      4   4.84    0.13  
+#> s(season):seriesseries_2 3.08      4   1.68    0.36  
+#> s(season):seriesseries_3 1.21      4   4.07    0.41  
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend marginal deviation (alpha) and length scale (rho) estimates:
 #>              2.5%   50% 97.5% Rhat n_eff
-#> alpha_gp[1] 0.086  0.40  0.86 1.00   757
-#> alpha_gp[2] 0.540  0.91  1.40 1.00  1238
-#> alpha_gp[3] 0.100  0.41  0.91 1.00   762
-#> rho_gp[1]   1.100  4.00 12.00 1.00   740
-#> rho_gp[2]   3.000 12.00 31.00 1.02   270
-#> rho_gp[3]   1.300  5.00 22.00 1.00   979
+#> alpha_gp[1] 0.097  0.39  0.86 1.01   547
+#> alpha_gp[2] 0.550  0.92  1.40 1.00  1721
+#> alpha_gp[3] 0.074  0.40  0.96 1.00   848
+#> rho_gp[1]   1.100  3.80 12.00 1.00   652
+#> rho_gp[2]   3.200 12.00 31.00 1.01   375
+#> rho_gp[3]   1.300  5.00 26.00 1.01   734
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
-#> 5 of 2000 iterations ended with a divergence (0.25%)
-#>  *Try running with larger adapt_delta to remove the divergences
+#> 0 of 2000 iterations ended with a divergence (0%)
 #> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Wed Mar 05 11:16:55 AM 2025.
+#> Samples were drawn using NUTS(diag_e) at Wed Mar 05 12:31:48 PM 2025.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -682,8 +624,6 @@ wrap_plots(
 )
 ```
 
-    #> Warning: package 'patchwork' was built under R version 4.4.2
-
 <img src="man/figures/README-beta_fc-1.png" width="60%" style="display: block; margin: auto;" />
 
 There are many more extended uses of `mvgam`, including the ability to
@@ -698,6 +638,37 @@ suit their own bespoke research / analysis goals. The
 <a href="https://discourse.mc-stan.org/" target="_blank">Stan
 Discourse</a> is a helpful place to troubleshoot.
 
+## Citing `mvgam` and related software
+
+When using any software please make sure to appropriately acknowledge
+the hard work that developers and maintainers put into making these
+packages available. Citations are currently the best way to formally
+acknowledge this work, so we highly encourage you to cite any packages
+that you rely on for your research.
+
+When using `mvgam`, please cite the following:
+
+> Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models
+> (DGAMs) for forecasting discrete ecological time series. *Methods in
+> Ecology and Evolution*. DOI: <https://doi.org/10.1111/2041-210X.13974>
+
+As `mvgam` acts as an interface to `Stan`, please additionally cite:
+
+> Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B.,
+> Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017).
+> Stan: A probabilistic programming language. *Journal of Statistical
+> Software*. 76(1). DOI: <https://doi.org/10.18637/jss.v076.i01>
+
+`mvgam` relies on several other `R` packages and, of course, on `R`
+itself. To find out how to cite `R` and its packages, use `citation()`.
+There are some features of `mvgam` which specifically rely on certain
+packages. The most important of these is the generation of data
+necessary to estimate smoothing splines and Gaussian Processes, which
+rely on the `mgcv`, `brms` and `splines2` packages. The `rstan` and
+`cmdstanr` packages together with `Rcpp` makes `Stan` conveniently
+accessible in `R`. If you use some of these features, please also
+consider citing the related packages.
+
 ## Getting help
 
 If you encounter a clear bug, please file an issue with a minimal
@@ -709,6 +680,34 @@ or post other discussion topics related to the package, and do check out
 the [`mvgam`
 changelog](https://nicholasjclark.github.io/mvgam/news/index.html) for
 any updates about recent upgrades that the package has incorporated.
+
+## Other resources
+
+A series of <a href="https://nicholasjclark.github.io/mvgam/"
+target="_blank">vignettes cover data formatting, forecasting and several
+extended case studies of DGAMs</a>. A number of other examples,
+including some step-by-step introductory webinars, have also been
+compiled:
+
+- <a
+  href="https://www.youtube.com/playlist?list=PLzFHNoUxkCvsFIg6zqogylUfPpaxau_a3"
+  target="_blank">Time series in R and Stan using the <code>mvgam</code>
+  package</a>
+- <a href="https://www.youtube.com/watch?v=0zZopLlomsQ"
+  target="_blank">Ecological Forecasting with Dynamic Generalized Additive
+  Models</a>
+- <a href="https://ecogambler.netlify.app/blog/distributed-lags-mgcv/"
+  target="_blank">Distributed lags (and hierarchical distributed lags)
+  using <code>mgcv</code> and <code>mvgam</code></a>
+- <a href="https://ecogambler.netlify.app/blog/vector-autoregressions/"
+  target="_blank">State-Space Vector Autoregressions in
+  <code>mvgam</code></a>
+- <a href="https://www.youtube.com/watch?v=RwllLjgPUmM"
+  target="_blank">Ecological Forecasting with Dynamic GAMs; a tutorial and
+  detailed case study</a>
+- <a href="https://ecogambler.netlify.app/blog/time-varying-seasonality/"
+  target="_blank">Incorporating time-varying seasonality in forecast
+  models</a>
 
 ## Interested in contributing?
 
