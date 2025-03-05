@@ -200,21 +200,13 @@ head(data$data_train, 12)
 Notice how we have four different time series in these simulated data, but we do not spread the outcome values into different columns. Rather, there is only a single column for the outcome variable, labelled `y` in these simulated data. We also must supply a variable labelled `time` to ensure the modelling software knows how to arrange the time series when building models. This setup still allows us to formulate multivariate time series models, as you can see in the [State-Space vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html). Below are the steps needed to shape our `portal_data` object into the correct form. First, we create a `time` variable, select the column representing counts of our target species (`PP`), and select appropriate variables that we can use as predictors
 ```{r Wrangle data for modelling}
 portal_data %>%
-  # mvgam requires a 'time' variable be present in the data to index
-  # the temporal observations. This is especially important when tracking
-  # multiple time series. In the Portal data, the 'moon' variable indexes the
-  # lunar monthly timestep of the trapping sessions
-  dplyr::mutate(time = moon - (min(moon)) + 1) %>%
-  # We can also provide a more informative name for the outcome variable, which
-  # is counts of the 'PP' species (Chaetodipus penicillatus) across all control
-  # plots
-  dplyr::mutate(count = PP) %>%
-  # The other requirement for mvgam is a 'series' variable, which needs to be a
-  # factor variable to index which time series each row in the data belongs to.
-  # Again, this is more useful when you have multiple time series in the data
-  dplyr::mutate(series = as.factor("PP")) %>%
+  # Filter the data to only contain captures of the 'PP' 
+  dplyr::filter(series == 'PP') %>%
+  dplyr::mutate(count = captures) %>%
+  # Add a 'year' variable
+  dplyr::mutate(year = sort(rep(1:8, 12))[time]) %>%
   # Select the variables of interest to keep in the model_data
-  dplyr::select(series, year, time, count, mintemp, ndvi) -> model_data
+  dplyr::select(series, year, time, count, mintemp, ndvi_ma12) -> model_data
 ```
 
 The data now contain six variables:  
@@ -223,7 +215,7 @@ The data now contain six variables:
   `time`, the indicator of which time step each observation belongs to  
   `count`, the response variable representing the number of captures of the species `PP` in each sampling observation  
   `mintemp`, the monthly average minimum temperature at each time step  
-  `ndvi`, the monthly average Normalized Difference Vegetation Index at each time step  
+  `ndvi_ma12`, a 12-month moving average of the monthly Normalized Difference Vegetation Index at each time step  
 
 Now check the data structure again
 ```{r}
@@ -354,9 +346,9 @@ plot(model1, type = "residuals")
 These temporal random effects do not have a sense of "time". Because of this, each yearly random intercept is not restricted in some way to be similar to the previous yearly intercept. This drawback becomes evident when we predict for a new year. To do this, we can repeat the exercise above but this time will split the data into training and testing sets before re-running the model. We can then supply the test set as `newdata`. For splitting, we will make use of the `filter` function from `dplyr`
 ```{r}
 model_data %>%
-  dplyr::filter(time <= 160) -> data_train
+  dplyr::filter(time <= 70) -> data_train
 model_data %>%
-  dplyr::filter(time > 160) -> data_test
+  dplyr::filter(time > 70) -> data_test
 ```
 
 ```{r include=FALSE, message=FALSE, warning=FALSE}
@@ -388,11 +380,11 @@ str(fc)
 ```
 
 ## Adding predictors as "fixed" effects
-Any users familiar with GLMs will know that we nearly always wish to include predictor variables that may explain some of the variation in our observations. Predictors are easily incorporated into GLMs / GAMs. Here, we will update the model from above by including a parametric (fixed) effect of `ndvi` as a linear predictor:
+Any users familiar with GLMs will know that we nearly always wish to include predictor variables that may explain some of the variation in our observations. Predictors are easily incorporated into GLMs / GAMs. Here, we will update the model from above by including a parametric (fixed) effect of `ndvi_ma12` as a linear predictor:
 ```{r model2, include=FALSE, message=FALSE, warning=FALSE}
 model2 <- mvgam(
   count ~ s(year_fac, bs = "re") +
-    ndvi - 1,
+    ndvi_ma12 - 1,
   family = poisson(),
   data = data_train,
   newdata = data_test,
@@ -403,7 +395,7 @@ model2 <- mvgam(
 ```{r eval=FALSE}
 model2 <- mvgam(
   count ~ s(year_fac, bs = "re") +
-    ndvi - 1,
+    ndvi_ma12 - 1,
   family = poisson(),
   data = data_train,
   newdata = data_test
@@ -417,7 +409,7 @@ log(\lambda_t) & = \beta_{year[year_t]} + \beta_{ndvi} * \boldsymbol{ndvi}_t \\
 \beta_{year} & \sim \text{Normal}(\mu_{year}, \sigma_{year}) \\
 \beta_{ndvi} & \sim \text{Normal}(0, 1) \end{align*}
 
-Where the $\beta_{year}$ effects are the same as before but we now have another predictor $(\beta_{ndvi})$ that applies to the `ndvi` value at each timepoint $t$. Inspect the summary of this model
+Where the $\beta_{year}$ effects are the same as before but we now have another predictor $(\beta_{ndvi})$ that applies to the `ndvi_ma12` value at each timepoint $t$. Inspect the summary of this model
 
 ```{r, class.output="scroll-300"}
 summary(model2)
@@ -434,11 +426,11 @@ beta_post <- as.data.frame(model2, variable = "betas")
 dplyr::glimpse(beta_post)
 ```
 
-The posterior distribution for the effect of `ndvi` is stored in the `ndvi` column. A quick histogram confirms our inference that `log(counts)` respond positively to increases in `ndvi`:
+The posterior distribution for the effect of `ndvi` is stored in the `ndvi_ma12` column. A quick histogram confirms our inference that `log(counts)` respond positively to increases in `ndvi`:
 ```{r Histogram of NDVI effects}
-hist(beta_post$ndvi,
+hist(beta_post$ndvi_ma12,
   xlim = c(
-    -1 * max(abs(beta_post$ndvi)),
+    -1 * max(abs(beta_post$ndvi_ma12)),
     max(abs(beta_post$ndvi))
   ),
   col = "darkred",
@@ -464,7 +456,7 @@ Smooth functions, using penalized splines, are a major feature of `mvgam`. Nonli
 ```{r model3, include=FALSE, message=FALSE, warning=FALSE}
 model3 <- mvgam(
   count ~ s(time, bs = "bs", k = 15) +
-    ndvi,
+    ndvi_ma12,
   family = poisson(),
   data = data_train,
   newdata = data_test,
@@ -475,7 +467,7 @@ model3 <- mvgam(
 ```{r eval=FALSE}
 model3 <- mvgam(
   count ~ s(time, bs = "bs", k = 15) +
-    ndvi,
+    ndvi_ma12,
   family = poisson(),
   data = data_train,
   newdata = data_test
@@ -524,15 +516,15 @@ plot_mvgam_smooth(model3,
   # testing period
   newdata = data.frame(
     time = 1:max(data_test$time),
-    ndvi = 0
+    ndvi_ma12 = 0
   )
 )
 abline(v = max(data_train$time), lty = "dashed", lwd = 2)
 ```
 
-This model is not doing well. Clearly we need to somehow account for the strong temporal autocorrelation when modelling these data without using a smooth function of `time`. Now onto another prominent feature of `mvgam`: the ability to include (possibly latent) autocorrelated residuals in regression models. To do so, we use the `trend_model` argument (see `?mvgam_trends` for details of different dynamic trend models that are supported). This model will use a separate sub-model for latent residuals that evolve as an AR1 process (i.e. the error in the current time point is a function of the error in the previous time point, plus some stochastic noise). We also include a smooth function of `ndvi` in this model, rather than the parametric term that was used above, to showcase that `mvgam` can include combinations of smooths and dynamic components:
+This model is not doing well. Clearly we need to somehow account for the strong temporal autocorrelation when modelling these data without using a smooth function of `time`. Now onto another prominent feature of `mvgam`: the ability to include (possibly latent) autocorrelated residuals in regression models. To do so, we use the `trend_model` argument (see `?mvgam_trends` for details of different dynamic trend models that are supported). This model will use a separate sub-model for latent residuals that evolve as an AR1 process (i.e. the error in the current time point is a function of the error in the previous time point, plus some stochastic noise). We also include a smooth function of `ndvi_ma12` in this model, rather than the parametric term that was used above, to showcase that `mvgam` can include combinations of smooths and dynamic components:
 ```{r model4, include=FALSE}
-model4 <- mvgam(count ~ s(ndvi, k = 6),
+model4 <- mvgam(count ~ s(ndvi_ma12, k = 6),
   family = poisson(),
   data = data_train,
   newdata = data_test,
@@ -542,7 +534,7 @@ model4 <- mvgam(count ~ s(ndvi, k = 6),
 ```
 
 ```{r eval=FALSE}
-model4 <- mvgam(count ~ s(ndvi, k = 6),
+model4 <- mvgam(count ~ s(ndvi_ma12, k = 6),
   family = poisson(),
   data = data_train,
   newdata = data_test,
