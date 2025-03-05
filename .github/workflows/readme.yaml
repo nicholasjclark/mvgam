@@ -2,7 +2,7 @@
 # Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
 on:
   push:
-    branches: main
+    branches: master
 
 name: render-rmarkdown
 
@@ -23,8 +23,6 @@ jobs:
         with:
           use-public-rspm: true
 
-      # - uses: r-lib/actions/setup-renv@v1
-
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: |
@@ -34,12 +32,20 @@ jobs:
             mvgam
             patchwork
             remotes
+            splines2
+            extraDistr
+            stan-dev/cmdstanr
 
-      - name: install mvgam
+      - name: Install mvgam
         run: Rscript -e 'remotes::install_github("nicholasjclark/mvgam", upgrade_dependencies = FALSE)'
 
-      # Render README.md using rmarkdown
-      - name: render README
+      - name: Build Cmdstan
+        run: |
+          cmdstanr::check_cmdstan_toolchain(fix = TRUE)
+          cmdstanr::install_cmdstan()
+        shell: Rscript {0}
+
+      - name: Render README
         run: Rscript -e 'rmarkdown::render("README.Rmd", output_format = "md_document")'
 
       - name: Commit results
