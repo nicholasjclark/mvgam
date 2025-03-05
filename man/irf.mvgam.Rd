@@ -7,7 +7,7 @@
 \usage{
 irf(object, ...)
 
-\method{irf}{mvgam}(object, h = 1, cumulative = FALSE, orthogonal = FALSE, ...)
+\method{irf}{mvgam}(object, h = 10, cumulative = FALSE, orthogonal = FALSE, ...)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}

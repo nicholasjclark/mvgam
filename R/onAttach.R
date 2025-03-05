@@ -1,11 +1,8 @@
 .onAttach = function(libname, pkgname) {
   options("marginaleffects_model_classes" = "mvgam")
+  version <- utils::packageVersion("mvgam")
   packageStartupMessage(
-    paste0(
-      'Welcome to mvgam. Please cite as:\n',
-      'Clark, NJ, and Wells, K. 2022. Dynamic Generalized Additive Models (DGAMs)\n',
-      'for forecasting discrete ecological time series. Methods in Ecology and\n',
-      'Evolution, 2022, https://doi.org/10.1111/2041-210X.13974'
-    )
-  )
+    insight::format_message(
+      paste0("Loading 'mvgam' (version ", version, "). Useful instructions can be found by typing help('mvgam'). A more detailed introduction to the package is available through vignette('mvgam_overview')."
+  )))
 }

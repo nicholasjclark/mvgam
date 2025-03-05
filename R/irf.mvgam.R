@@ -72,7 +72,7 @@ irf <- function(object, ...) {
 #' @export
 irf.mvgam <- function(
   object,
-  h = 1,
+  h = 10,
   cumulative = FALSE,
   orthogonal = FALSE,
   ...

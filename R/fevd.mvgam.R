@@ -70,7 +70,7 @@ fevd <- function(object, ...) {
 #' @rdname fevd.mvgam
 #' @method fevd mvgam
 #' @export
-fevd.mvgam <- function(object, h = 1, ...) {
+fevd.mvgam <- function(object, h = 10, ...) {
   validate_pos_integer(h)
   trend_model <- attr(object$model_data, "trend_model")
   if (!trend_model %in% c("VAR", "VARcor", "VAR1", "VAR1cor")) {

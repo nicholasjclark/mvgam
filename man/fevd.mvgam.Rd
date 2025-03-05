@@ -7,7 +7,7 @@
 \usage{
 fevd(object, ...)
 
-\method{fevd}{mvgam}(object, h = 1, ...)
+\method{fevd}{mvgam}(object, h = 10, ...)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
