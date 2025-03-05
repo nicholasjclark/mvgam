@@ -6,13 +6,13 @@ bibentry(
   author = c(person(given = "Nicholas J", family = "Clark"),
              person(given = "Konstans", family = "Wells")),
   journal = "Methods in Ecology and Evolution",
-  year = "2022",
+  year = "2023",
   volume = "14",
   number = "",
   pages = "771-784",
   doi = "10.18637/jss.v100.i05",
   textVersion = paste(
-    "Clark & Wells (2022).",
+    "Clark & Wells (2023).",
     "Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series.",
     "Methods in Ecology and Evolution, 14, 771-784.",
     "doi.org/10.1111/2041-210X.13974"
