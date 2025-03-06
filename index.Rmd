@@ -18,7 +18,8 @@ Install the stable version from CRAN using: `install.packages('mvgam')`, or inst
 
 ## Introductory seminar
 ```{r echo=FALSE}
-vembedr::embed_url("https://www.youtube.com/watch?v=0zZopLlomsQ")
+vembedr::embed_url("https://www.youtube.com/watch?v=0zZopLlomsQ") %>%
+  vembedr::use_bs_responsive()
 ```
 
 ## Cheatsheet
