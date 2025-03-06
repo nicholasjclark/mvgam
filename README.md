@@ -220,13 +220,13 @@ proper scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.283336
+    #> 8.060974
     #> Out of sample DRPS:
-    #> 5.4041745
+    #> 5.351874
     #> Out of sample DRPS:
-    #> 8.68831775
+    #> 8.6231525
     #> Out of sample DRPS:
-    #> 3.91200375
+    #> 3.88274975
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
@@ -476,7 +476,7 @@ estimates for the `Beta` precision parameters *ϕ*.
     #> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
     #> E-FMI indicated no pathological behavior
     #> 
-    #> Samples were drawn using NUTS(diag_e) at Wed Mar 05 04:33:33 2025.
+    #> Samples were drawn using NUTS(diag_e) at Thu Mar 06 06:35:19 2025.
     #> For each parameter, n_eff is a crude measure of effective sample size,
     #> and Rhat is the potential scale reduction factor on split MCMC chains
     #> (at convergence, Rhat = 1)
@@ -498,8 +498,9 @@ Plot the hindcast and forecast distributions for each series
 
 There are many more extended uses of `mvgam`, including the ability to
 fit hierarchical State-Space GAMs that include dynamic and spatially
-varying coefficient models, dynamic factors and Vector Autoregressive
-processes. See the <a href="https://nicholasjclark.github.io/mvgam/"
+varying coefficient models, dynamic factors, Joint Species Distribution
+Models and much more. See the
+<a href="https://nicholasjclark.github.io/mvgam/"
 target="_blank">package documentation</a> for more details. The package
 can also be used to generate all necessary data structures, initial
 value functions and modelling code necessary to fit DGAMs using `Stan`.
@@ -513,8 +514,9 @@ Discourse</a> is a helpful place to troubleshoot.
 When using any software please make sure to appropriately acknowledge
 the hard work that developers and maintainers put into making these
 packages available. Citations are currently the best way to formally
-acknowledge this work, so we highly encourage you to cite any packages
-that you rely on for your research.
+acknowledge this work (but feel free to ⭐ this repo as well), so we
+highly encourage you to cite any packages that you rely on for your
+research.
 
 When using `mvgam`, please cite the following:
 
