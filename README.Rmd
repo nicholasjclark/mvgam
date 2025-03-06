@@ -322,10 +322,10 @@ wrap_plots(
 )
 ```
 
-There are many more extended uses of `mvgam`, including the ability to fit hierarchical State-Space GAMs that include dynamic and spatially varying coefficient models, dynamic factors and Vector Autoregressive processes. See the [package documentation](https://nicholasjclark.github.io/mvgam/){target="_blank"} for more details. The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using `Stan`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals. The [Stan Discourse](https://discourse.mc-stan.org/){target="_blank"} is a helpful place to troubleshoot.
+There are many more extended uses of `mvgam`, including the ability to fit hierarchical State-Space GAMs that include dynamic and spatially varying coefficient models, dynamic factors, Joint Species Distribution Models and much more. See the [package documentation](https://nicholasjclark.github.io/mvgam/){target="_blank"} for more details. The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using `Stan`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals. The [Stan Discourse](https://discourse.mc-stan.org/){target="_blank"} is a helpful place to troubleshoot.
 
 ## Citing `mvgam` and related software
-When using any software please make sure to appropriately acknowledge the hard work that developers and maintainers put into making these packages available. Citations are currently the best way to formally acknowledge this work, so we highly encourage you to cite any packages that you rely on for your research.
+When using any software please make sure to appropriately acknowledge the hard work that developers and maintainers put into making these packages available. Citations are currently the best way to formally acknowledge this work (but feel free to ⭐ this repo as well), so we highly encourage you to cite any packages that you rely on for your research.
 
 When using `mvgam`, please cite the following:
 
