@@ -97,10 +97,12 @@
 <h2 id="introductory-seminar">Introductory seminar<a class="anchor" aria-label="anchor" href="#introductory-seminar"></a>
 </h2>
 <center>
-<iframe width="560" height="315" src="https://www.youtube.com/embed/0zZopLlomsQ?si=fWBVTPRDMi9TXcIy" data-external="1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen>
+<div style="display: flex; justify-content: center;">
+<iframe style="aspect-ratio: 16 / 9; width: 100% !important;" src="https://www.youtube.com/embed/0zZopLlomsQ?si=fWBVTPRDMi9TXcIy" data-external="1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen>
 </iframe>
-</center>
 
+</div>
+</center>
 </div>
 <div class="section level2">
 <h2 id="cheatsheet">Cheatsheet<a class="anchor" aria-label="anchor" href="#cheatsheet"></a>
@@ -137,32 +139,36 @@
 <code><a href="reference/mvgam_families.html">nmix()</a></code> for count data with imperfect detection (unknown number of trials)</li>
 </ul>
 <p>See <code>??mvgam_families</code> for more information. Below is a simple example for simulating and modelling proportional data with <code>Beta</code> observations over a set of seasonal series with independent Gaussian Process dynamic trends:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode R"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">100</span>)</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">sim_mvgam</span>(<span class="at">family =</span> <span class="fu">betar</span>(),</span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>                  <span class="at">T =</span> <span class="dv">80</span>,</span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>                  <span class="at">trend_model =</span> <span class="fu">GP</span>(),</span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>                  <span class="at">prop_trend =</span> <span class="fl">0.5</span>, </span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>                  <span class="at">seasonality =</span> <span class="st">'shared'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">100</span><span class="op">)</span></span>
+<span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>                  T <span class="op">=</span> <span class="fl">80</span>,</span>
+<span>                  trend_model <span class="op">=</span> <span class="fu"><a href="reference/GP.html">GP</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>                  prop_trend <span class="op">=</span> <span class="fl">0.5</span>, </span>
+<span>                  seasonality <span class="op">=</span> <span class="st">'shared'</span><span class="op">)</span></span></code></pre></div>
 <p>Plot the series to see how they evolve over time</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode R"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">plot_mvgam_series</span>(<span class="at">data =</span> data<span class="sc">$</span>data_train, <span class="at">series =</span> <span class="st">'all'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_train</span>, series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></code></pre></div>
 <figure><img src="reference/figures/README-beta_sim-1.png" alt="Visualizing multivariate proportional time series using the mvgam R package #rstats"><figcaption aria-hidden="true">
 Visualizing multivariate proportional time series using the mvgam R package #rstats
 </figcaption></figure><p>Fit a State-Space GAM to these series that uses a hierarchical cyclic seasonal smooth term to capture variation in seasonality among series. The model also includes series-specific latent Gaussian Processes with squared exponential covariance functions to capture temporal dynamics</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode R"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>mod <span class="ot">&lt;-</span> <span class="fu">mvgam</span>(y <span class="sc">~</span> <span class="fu">s</span>(season, <span class="at">bs =</span> <span class="st">'cc'</span>, <span class="at">k =</span> <span class="dv">7</span>) <span class="sc">+</span></span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>               <span class="fu">s</span>(season, <span class="at">by =</span> series, <span class="at">m =</span> <span class="dv">1</span>, <span class="at">k =</span> <span class="dv">5</span>),</span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>             <span class="at">trend_model =</span> <span class="fu">GP</span>(),</span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>             <span class="at">data =</span> data<span class="sc">$</span>data_train,</span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>             <span class="at">newdata =</span> data<span class="sc">$</span>data_test,</span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>             <span class="at">family =</span> <span class="fu">betar</span>())</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">7</span><span class="op">)</span> <span class="op">+</span></span>
+<span>               <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, by <span class="op">=</span> <span class="va">series</span>, m <span class="op">=</span> <span class="fl">1</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span>
+<span>             trend_model <span class="op">=</span> <span class="fu"><a href="reference/GP.html">GP</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>             data <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_train</span>,</span>
+<span>             newdata <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_test</span>,</span>
+<span>             family <span class="op">=</span> <span class="fu"><a href="reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>Plot the estimated posterior hindcast and forecast distributions for each series</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode R"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">library</span>(patchwork)</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>fc <span class="ot">&lt;-</span> <span class="fu">forecast</span>(mod)</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="fu">wrap_plots</span>(</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="fu">plot</span>(fc, <span class="at">series =</span> <span class="dv">1</span>), </span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="fu">plot</span>(fc, <span class="at">series =</span> <span class="dv">2</span>), </span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="fu">plot</span>(fc, <span class="at">series =</span> <span class="dv">3</span>), </span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>  <span class="at">ncol =</span> <span class="dv">2</span></span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://patchwork.data-imaginist.com" class="external-link">patchwork</a></span><span class="op">)</span></span>
+<span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://patchwork.data-imaginist.com/reference/wrap_plots.html" class="external-link">wrap_plots</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>, </span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>, </span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>, </span>
+<span>  ncol <span class="op">=</span> <span class="fl">2</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <figure><img src="reference/figures/README-beta_fc-1.png" alt="Forecasting multivariate time series with Dynamic Generalized Additive Models"><figcaption aria-hidden="true">
 Forecasting multivariate time series with Dynamic Generalized Additive Models
 </figcaption></figure><p>Various <code>S3</code> functions can be used to inspect parameter estimates, plot smooth functions and residuals, and evaluate models through posterior predictive checks or forecast comparisons. Please see <a href="https://nicholasjclark.github.io/mvgam/reference/index.html">the package documentation</a> for more detailed examples.</p>
