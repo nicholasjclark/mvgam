@@ -48,7 +48,6 @@ jobs:
         with:
           dependencies: NA
           extra-packages: |
-              mvgam
               knitr
               extraDistr
               lubridate
@@ -71,6 +70,7 @@ jobs:
 
       - name: Build Cmdstan
         run: |
+          install.packages('mvgam', repos = "http://cran.rstudio.com")
           cmdstanr::check_cmdstan_toolchain(fix = TRUE)
           cmdstanr::install_cmdstan()
         shell: Rscript {0}
