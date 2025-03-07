@@ -36,7 +36,6 @@ jobs:
           extra-packages: |
               local::.
               remotes
-              vembedr
               knitr
               extraDistr
               lubridate
@@ -60,10 +59,7 @@ jobs:
           remotes::install_github('paul-buerkner/brms')
           remotes::install_version("pkgdown", version = "2.0.9", repos = "http://cran.us.r-project.org")
         shell: Rscript {0}
-        
-      - name: Render Home
-        run: Rscript -e 'rmarkdown::render("index.Rmd", output_format = "md_document")'
-     
+
       - name: Build site
         run: pkgdown::build_site_github_pages(lazy = TRUE, new_process = FALSE, install = FALSE)
         shell: Rscript {0}

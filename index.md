@@ -56,7 +56,7 @@ information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-
 
 <div style="display: flex; justify-content: center;">
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/0zZopLlomsQ?si=fWBVTPRDMi9TXcIy" data-external="1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen>
+<iframe style="aspect-ratio: 16 / 9; width: 100% !important;" src="https://www.youtube.com/embed/0zZopLlomsQ?si=fWBVTPRDMi9TXcIy" data-external="1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen>
 </iframe>
 </center>
 
