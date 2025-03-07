@@ -54,6 +54,7 @@ jobs:
 
       - name: Build Cmdstan and install development brms version
         run: |
+          install.packages('mvgam', repos = "http://cran.rstudio.com")
           cmdstanr::check_cmdstan_toolchain(fix = TRUE)
           cmdstanr::install_cmdstan()
           remotes::install_github('paul-buerkner/brms')
