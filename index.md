@@ -52,11 +52,17 @@ information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-
 
 ## Introductory seminar
 
-<div class="vembedr embed-responsive embed-responsive-16by9">
-<div>
-<iframe src="https://www.youtube.com/embed/0zZopLlomsQ" width="533" height="300" frameborder="0" allowfullscreen="" data-external="1" class="embed-responsive-item"></iframe>
+<center>
+
+<div style="display: flex; justify-content: center;">
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/0zZopLlomsQ?si=fWBVTPRDMi9TXcIy" data-external="1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen>
+</iframe>
+</center>
+
 </div>
-</div>
+
+</center>
 
 ## Cheatsheet
 
