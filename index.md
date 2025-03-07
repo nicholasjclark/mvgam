@@ -52,9 +52,9 @@ information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-
 
 ## Introductory seminar
 
-<div class="vembedr">
+<div class="vembedr embed-responsive embed-responsive-16by9">
 <div>
-<iframe src="https://www.youtube.com/embed/0zZopLlomsQ" width="533" height="300" frameborder="0" allowfullscreen="" data-external="1"></iframe>
+<iframe src="https://www.youtube.com/embed/0zZopLlomsQ" width="533" height="300" frameborder="0" allowfullscreen="" data-external="1" class="embed-responsive-item"></iframe>
 </div>
 </div>
 
