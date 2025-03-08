@@ -494,7 +494,9 @@ plot(diff_scores,
 abline(h = 0, lty = "dashed")
 ```
 
-The models tend to provide similar forecasts, though the correlated error model does slightly better overall. We would probably need to use a more extensive rolling forecast evaluation exercise if we felt like we needed to only choose one for production. `mvgam` offers some utilities for doing this (i.e. see `?lfo_cv` for guidance). Alternatively, we could use forecasts from *both* models by creating an evenly-weighted ensemble forecast distribution. This capability is available using the `ensemble()` function in `mvgam` (see `?ensemble` for guidance).
+The models tend to provide similar forecasts, though the correlated error model does slightly better overall. We would probably need to use a more extensive rolling forecast evaluation exercise if we felt like we needed to only choose one for production. `mvgam` offers some utilities for doing this (i.e. see `?lfo_cv` for guidance). Alternatively, we could use forecasts from *both* models by creating an evenly-weighted ensemble forecast distribution. This capability is available using the `ensemble()` function in `mvgam` (see `?ensemble` for guidance). 
+
+More advanced hierarchical panel VAR models can also be handled by using the `gr` and `subgr` arguments in `VAR()`. These models are useful if you have a data for the same set of series (`subgr`) that are measured in different regions (`gr`), such as species measured in different sampling regions or financial series measured in different countries.
 
 ## Further reading
 The following papers and resources offer a lot of useful material about multivariate State-Space models and how they can be applied in practice:
