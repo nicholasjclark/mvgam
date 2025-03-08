@@ -498,7 +498,7 @@ Plot the hindcast and forecast distributions for each series
 
 There are many more extended uses of `mvgam`, including the ability to
 fit hierarchical State-Space GAMs that include dynamic and spatially
-varying coefficient models, dynamic factors, Joint Species Distribution
+varying coefficient models, dynamic factor and shared signal models, panel vector autoregressions, Joint Species Distribution
 Models and much more. See the
 <a href="https://nicholasjclark.github.io/mvgam/"
 target="_blank">package documentation</a> for more details. The package
