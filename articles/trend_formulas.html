@@ -600,7 +600,7 @@ to interpret:</p>
 <span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Sat Mar 08 21:57:29 2025.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Sat Mar 08 23:36:21 2025.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
@@ -850,6 +850,13 @@ Alternatively, we could use forecasts from <em>both</em> models by
 creating an evenly-weighted ensemble forecast distribution. This
 capability is available using the <code><a href="../reference/ensemble.mvgam_forecast.html">ensemble()</a></code> function in
 <code>mvgam</code> (see <code><a href="../reference/ensemble.mvgam_forecast.html">?ensemble</a></code> for guidance).</p>
+<p>More advanced hierarchical panel VAR models can also be handled by
+using the <code>gr</code> and <code>subgr</code> arguments in
+<code><a href="../reference/RW.html">VAR()</a></code>. These models are useful if you have a data for the
+same set of series (<code>subgr</code>) that are measured in different
+regions (<code>gr</code>), such as species measured in different
+sampling regions or financial series measured in different
+countries.</p>
 </div>
 </div>
 <div class="section level2">
