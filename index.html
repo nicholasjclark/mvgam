@@ -82,12 +82,21 @@
 <div class="row">
   <main id="main" class="col-md-9"><p><br><br></p>
 <p><img src="reference/figures/mvgam_logo.png" width="120" alt="mvgam R package logo"><a href="https://mc-stan.org/" class="external-link"><img src="https://raw.githubusercontent.com/stan-dev/logos/master/logo_tm.png" align="right" width="120" alt="Stan Logo"></a></p>
-<div class="section level2">
-<h2 id="mvgam">mvgam<a class="anchor" aria-label="anchor" href="#mvgam"></a>
-</h2>
-<p><strong>M</strong>ulti<strong>V</strong>ariate (Dynamic) <strong>G</strong>eneralized <strong>A</strong>ddivite <strong>M</strong>odels</p>
-<p>The goal of <code>mvgam</code> is to fit Bayesian (Dynamic) Generalized Additive Models. This package constructs State-Space models that can include highly flexible nonlinear predictor effects for both process and observation components by leveraging functionalities from the impressive <a href="https://paulbuerkner.com/brms/" target="_blank" class="external-link"><code>brms</code></a> and <a href="https://cran.r-project.org/web/packages/mgcv/index.html" target="_blank" class="external-link"><code>mgcv</code></a> packages. This allows <code>mvgam</code> to fit a wide range of models, including hierarchical ecological models such as N-mixture or Joint Species Distribution models, as well as univariate and multivariate time series models with imperfect detection. The original motivation for the package is described in <a href="https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974" target="_blank" class="external-link">Clark &amp; Wells 2022</a> (published in <em>Methods in Ecology and Evolution</em>), with additional inspiration on the use of Bayesian probabilistic modelling coming from <a href="https://betanalpha.github.io/writing/" target="_blank" class="external-link">Michael Betancourt</a>, <a href="https://www.bu.edu/earth/profiles/michael-dietze/" target="_blank" class="external-link">Michael Dietze</a> and <a href="https://www.durham.ac.uk/staff/sarah-e-heaps/" target="_blank" class="external-link">Sarah Heaps</a>, among many others.</p>
+<div class="section level1">
+<div class="page-header">
+<img src="logo.png" class="logo" alt=""><h1 id="mvgam">mvgam<a class="anchor" aria-label="anchor" href="#mvgam"></a>
+</h1>
 </div>
+<blockquote>
+<p><strong>M</strong>ulti<strong>V</strong>ariate (Dynamic) <strong>G</strong>eneralized <strong>A</strong>ddivite <strong>M</strong>odels</p>
+</blockquote>
+<p>The goal of <code>mvgam</code> is to fit Bayesian Dynamic Generalized Additive Models (DGAMs) that can include highly flexible nonlinear predictor effects for both process and observation components. The package does this by relying on functionalities from the impressive <a href="https://paulbuerkner.com/brms/" target="_blank" class="external-link"><code>brms</code></a> and <a href="https://cran.r-project.org/package=mgcv" target="_blank" class="external-link"><code>mgcv</code></a> packages. This allows <code>mvgam</code> to fit a wide range of models, including:</p>
+<ul>
+<li><a href="https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html" target="_blank">Multivariate State-Space Time Series models</a></li>
+<li><a href="https://nicholasjclark.github.io/mvgam/articles/nmixtures.html" target="_blank">Hierarchical N-mixture models</a></li>
+<li><a href="https://www.youtube.com/watch?v=2POK_FVwCHk" target="_blank" class="external-link">Hierarchical Generalized Additive Models</a></li>
+<li><a href="https://nicholasjclark.github.io/mvgam/reference/jsdgam.html" target="_blank">Joint Species Distribution Models</a></li>
+</ul>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
@@ -138,7 +147,7 @@
 <li>
 <code><a href="reference/mvgam_families.html">nmix()</a></code> for count data with imperfect detection (unknown number of trials)</li>
 </ul>
-<p>See <code>??mvgam_families</code> for more information. Below is a simple example for simulating and modelling proportional data with <code>Beta</code> observations over a set of seasonal series with independent Gaussian Process dynamic trends:</p>
+<p>See <code><a href="reference/mvgam_families.html">?mvgam_families</a></code> for more information. Below is a simple example for simulating and modelling proportional data with <code>Beta</code> observations over a set of seasonal series with independent Gaussian Process dynamic trends:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">100</span><span class="op">)</span></span>
 <span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -179,6 +188,20 @@ Forecasting multivariate time series with Dynamic Generalized Additive Models
 <p>You can set <code>build_vignettes = TRUE</code> when installing but be aware this will slow down the installation drastically. Instead, you can always access the vignette htmls online at <a href="https://nicholasjclark.github.io/mvgam/articles/" class="uri">https://nicholasjclark.github.io/mvgam/articles/</a></p>
 </div>
 <div class="section level2">
+<h2 id="citing-mvgam-and-related-software">Citing <code>mvgam</code> and related software<a class="anchor" aria-label="anchor" href="#citing-mvgam-and-related-software"></a>
+</h2>
+<p>When using any software please make sure to appropriately acknowledge the hard work that developers and maintainers put into making these packages available. Citations are currently the best way to formally acknowledge this work (but feel free to ⭐ <a href="https://github.com/nicholasjclark/mvgam" class="external-link">the repo</a> as well), so we highly encourage you to cite any packages that you rely on for your research.</p>
+<p>When using <code>mvgam</code>, please cite the following:</p>
+<blockquote>
+<p>Clark, N.J. and Wells, K. (2023). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. <em>Methods in Ecology and Evolution</em>. DOI: <a href="https://doi.org/10.1111/2041-210X.13974" class="external-link uri">https://doi.org/10.1111/2041-210X.13974</a></p>
+</blockquote>
+<p>As <code>mvgam</code> acts as an interface to <code>Stan</code>, please additionally cite:</p>
+<blockquote>
+<p>Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B., Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017). Stan: A probabilistic programming language. <em>Journal of Statistical Software</em>. 76(1). DOI: <a href="https://doi.org/10.18637/jss.v076.i01" class="external-link uri">https://doi.org/10.18637/jss.v076.i01</a></p>
+</blockquote>
+<p><code>mvgam</code> relies on several other <code>R</code> packages and, of course, on <code>R</code> itself. To find out how to cite <code>R</code> and its packages, use <code><a href="https://rdrr.io/r/utils/citation.html" class="external-link">citation()</a></code>. There are some features of <code>mvgam</code> which specifically rely on certain packages. The most important of these is the generation of data necessary to estimate smoothing splines and Gaussian Processes, which rely on the <code>mgcv</code>, <code>brms</code> and <code>splines2</code> packages. The <code>rstan</code> and <code>cmdstanr</code> packages together with <code>Rcpp</code> makes <code>Stan</code> conveniently accessible in <code>R</code>. If you use some of these features, please also consider citing the related packages.</p>
+</div>
+<div class="section level2">
 <h2 id="other-resources">Other resources<a class="anchor" aria-label="anchor" href="#other-resources"></a>
 </h2>
 <p>A number of case studies and step-by-step webinars have been compiled to highlight how GAMs and DGAMs can be useful for analysing multivariate data:</p>
@@ -191,12 +214,17 @@ Forecasting multivariate time series with Dynamic Generalized Additive Models
 <li><a href="https://ecogambler.netlify.app/blog/distributed-lags-mgcv/" target="_blank" class="external-link">Distributed lags (and hierarchical distributed lags) using mgcv and mvgam</a></li>
 <li><a href="https://ecogambler.netlify.app/blog/time-varying-seasonality/" target="_blank" class="external-link">Incorporating time-varying seasonality in forecast models</a></li>
 </ul>
-<p>Please also feel free to use the <a href="https://github.com/nicholasjclark/mvgam/discussions" class="external-link"><code>mvgam</code> Discussion Board</a> to hunt for or post other discussion topics related to the package, and do check out the <a href="https://nicholasjclark.github.io/mvgam/news/index.html"><code>mvgam</code> changelog</a> for any updates about recent upgrades that the package has incorporated.</p>
+</div>
+<div class="section level2">
+<h2 id="getting-help">Getting help<a class="anchor" aria-label="anchor" href="#getting-help"></a>
+</h2>
+<p>If you encounter a clear bug, please file an issue with a minimal reproducible example on <a href="https://github.com/nicholasjclark/mvgam/issues" class="external-link">GitHub</a>. Please also feel free to use the <a href="https://github.com/nicholasjclark/mvgam/discussions" class="external-link"><code>mvgam</code> Discussion Board</a> to hunt for or post other discussion topics related to the package, and do check out the <a href="https://nicholasjclark.github.io/mvgam/news/index.html"><code>mvgam</code> changelog</a> for any updates about recent upgrades that the package has incorporated.</p>
 </div>
 <div class="section level2">
 <h2 id="interested-in-contributing">Interested in contributing?<a class="anchor" aria-label="anchor" href="#interested-in-contributing"></a>
 </h2>
 <p>I’m actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of <code>mvgam</code>. Please reach out if you are interested (n.clark’at’uq.edu.au). Other contributions are also very welcome, but please see <a href="https://github.com/nicholasjclark/mvgam/blob/master/.github/CONTRIBUTING.md" class="external-link">The Contributor Instructions</a> for general guidelines. Note that by participating in this project you agree to abide by the terms of its <a href="https://dplyr.tidyverse.org/CODE_OF_CONDUCT" class="external-link">Contributor Code of Conduct</a>.</p>
+</div>
 </div>
 
   </main><aside class="col-md-3"><div class="links">
