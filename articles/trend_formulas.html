@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-03-08</h4>
+            <h4 data-toc-skip class="date">2025-03-09</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/trend_formulas.Rmd" class="external-link"><code>vignettes/trend_formulas.Rmd</code></a></small>
       <div class="d-none name"><code>trend_formulas.Rmd</code></div>
@@ -600,7 +600,7 @@ to interpret:</p>
 <span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Sat Mar 08 23:36:21 2025.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Sun Mar 09 03:57:32 2025.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
@@ -850,6 +850,76 @@ Alternatively, we could use forecasts from <em>both</em> models by
 creating an evenly-weighted ensemble forecast distribution. This
 capability is available using the <code><a href="../reference/ensemble.mvgam_forecast.html">ensemble()</a></code> function in
 <code>mvgam</code> (see <code><a href="../reference/ensemble.mvgam_forecast.html">?ensemble</a></code> for guidance).</p>
+<p>Using <code><a href="../reference/how_to_cite.mvgam.html">how_to_cite()</a></code> for models with VAR dynamics will
+give you information on how they are restricted to remain
+stationary:</p>
+<div class="sourceCode" id="cb39"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">description</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/how_to_cite.mvgam.html">how_to_cite</a></span><span class="op">(</span><span class="va">varcor_mod</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb40"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">description</span></span></code></pre></div>
+<pre><code><span><span class="co">#&gt; Methods text skeleton</span></span>
+<span><span class="co">#&gt; We used the R package mvgam (version 1.1.5001; Clark &amp; Wells, 2023) to</span></span>
+<span><span class="co">#&gt;   construct, fit and interrogate the model. mvgam fits Bayesian</span></span>
+<span><span class="co">#&gt;   State-Space models that can include flexible predictor effects in both</span></span>
+<span><span class="co">#&gt;   the process and observation components by incorporating functionalities</span></span>
+<span><span class="co">#&gt;   from the brms (Burkner 2017), mgcv (Wood 2017) and splines2 (Wang &amp; Yan,</span></span>
+<span><span class="co">#&gt;   2023) packages. To encourage stability and prevent forecast variance</span></span>
+<span><span class="co">#&gt;   from increasing indefinitely, we enforced stationarity of the Vector</span></span>
+<span><span class="co">#&gt;   Autoregressive process following methods described by Heaps (2023) and</span></span>
+<span><span class="co">#&gt;   Clark et al. (2025). The mvgam-constructed model and observed data were</span></span>
+<span><span class="co">#&gt;   passed to the probabilistic programming environment Stan (version</span></span>
+<span><span class="co">#&gt;   2.36.0; Carpenter et al. 2017, Stan Development Team 2025), specifically</span></span>
+<span><span class="co">#&gt;   through the cmdstanr interface (Gabry &amp; Cesnovar, 2021). We ran 4</span></span>
+<span><span class="co">#&gt;   Hamiltonian Monte Carlo chains for 1000 warmup iterations and 500</span></span>
+<span><span class="co">#&gt;   sampling iterations for joint posterior estimation. Rank normalized</span></span>
+<span><span class="co">#&gt;   split Rhat (Vehtari et al. 2021) and effective sample sizes were used to</span></span>
+<span><span class="co">#&gt;   monitor convergence.</span></span></code></pre>
+<pre><code><span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Primary references</span></span>
+<span><span class="co">#&gt; Clark, NJ and Wells K (2023). Dynamic Generalized Additive Models</span></span>
+<span><span class="co">#&gt;   (DGAMs) for forecasting discrete ecological time series. Methods in</span></span>
+<span><span class="co">#&gt;   Ecology and Evolution, 14, 771-784. doi.org/10.1111/2041-210X.13974</span></span>
+<span><span class="co">#&gt; Burkner, PC (2017). brms: An R Package for Bayesian Multilevel Models</span></span>
+<span><span class="co">#&gt;   Using Stan. Journal of Statistical Software, 80(1), 1-28.</span></span>
+<span><span class="co">#&gt;   doi:10.18637/jss.v080.i01</span></span>
+<span><span class="co">#&gt; Wood, SN (2017). Generalized Additive Models: An Introduction with R</span></span>
+<span><span class="co">#&gt;   (2nd edition). Chapman and Hall/CRC.</span></span>
+<span><span class="co">#&gt; Wang W and Yan J (2021). Shape-Restricted Regression Splines with R</span></span>
+<span><span class="co">#&gt;   Package splines2. Journal of Data Science, 19(3), 498-517.</span></span>
+<span><span class="co">#&gt;   doi:10.6339/21-JDS1020 https://doi.org/10.6339/21-JDS1020.</span></span>
+<span><span class="co">#&gt; Heaps, SE (2023). Enforcing stationarity through the prior in vector</span></span>
+<span><span class="co">#&gt;   autoregressions. Journal of Computational and Graphical Statistics 32,</span></span>
+<span><span class="co">#&gt;   74-83.</span></span>
+<span><span class="co">#&gt; Clark NJ, Ernest SKM, Senyondo H, Simonis J, White EP, Yenni GM,</span></span>
+<span><span class="co">#&gt;   Karunarathna KANK (2025). Beyond single-species models: leveraging</span></span>
+<span><span class="co">#&gt;   multispecies forecasts to navigate the dynamics of ecological</span></span>
+<span><span class="co">#&gt;   predictability. PeerJ 13:e18929.</span></span>
+<span><span class="co">#&gt; Carpenter, B, Gelman, A, Hoffman, MD, Lee, D, Goodrich, B, Betancourt,</span></span>
+<span><span class="co">#&gt;   M, Brubaker, M, Guo, J, Li, P and Riddell, A (2017). Stan: A</span></span>
+<span><span class="co">#&gt;   probabilistic programming language. Journal of Statistical Software 76.</span></span>
+<span><span class="co">#&gt; Gabry J, Cesnovar R, Johnson A, and Bronder S (2025). cmdstanr: R</span></span>
+<span><span class="co">#&gt;   Interface to 'CmdStan'. https://mc-stan.org/cmdstanr/,</span></span>
+<span><span class="co">#&gt;   https://discourse.mc-stan.org.</span></span>
+<span><span class="co">#&gt; Vehtari A, Gelman A, Simpson D, Carpenter B, and Burkner P (2021).</span></span>
+<span><span class="co">#&gt;   Rank-normalization, folding, and localization: An improved Rhat for</span></span>
+<span><span class="co">#&gt;   assessing convergence of MCMC (with discussion). Bayesian Analysis 16(2)</span></span>
+<span><span class="co">#&gt;   667-718. https://doi.org/10.1214/20-BA1221.</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Other useful references</span></span>
+<span><span class="co">#&gt; Arel-Bundock, V, Greifer, N, and Heiss, A (2024). How to interpret</span></span>
+<span><span class="co">#&gt;   statistical models using marginaleffects for R and Python. Journal of</span></span>
+<span><span class="co">#&gt;   Statistical Software, 111(9), 1-32.</span></span>
+<span><span class="co">#&gt;   https://doi.org/10.18637/jss.v111.i09</span></span>
+<span><span class="co">#&gt; Gabry J, Simpson D, Vehtari A, Betancourt M, and Gelman A (2019).</span></span>
+<span><span class="co">#&gt;   Visualization in Bayesian workflow. Journal of the Royal Statatistical</span></span>
+<span><span class="co">#&gt;   Society A, 182, 389-402. doi:10.1111/rssa.12378.</span></span>
+<span><span class="co">#&gt; Vehtari A, Gelman A, and Gabry J (2017). Practical Bayesian model</span></span>
+<span><span class="co">#&gt;   evaluation using leave-one-out cross-validation and WAIC. Statistics and</span></span>
+<span><span class="co">#&gt;   Computing, 27, 1413-1432. doi:10.1007/s11222-016-9696-4.</span></span>
+<span><span class="co">#&gt; Burkner, PC, Gabry, J, and Vehtari, A. (2020). Approximate</span></span>
+<span><span class="co">#&gt;   leave-future-out cross-validation for Bayesian time series models.</span></span>
+<span><span class="co">#&gt;   Journal of Statistical Computation and Simulation, 90(14), 2499-2523.</span></span>
+<span><span class="co">#&gt;   https://doi.org/10.1080/00949655.2020.1783262</span></span></code></pre>
 <p>More advanced hierarchical panel VAR models can also be handled by
 using the <code>gr</code> and <code>subgr</code> arguments in
 <code><a href="../reference/RW.html">VAR()</a></code>. These models are useful if you have a data for the
