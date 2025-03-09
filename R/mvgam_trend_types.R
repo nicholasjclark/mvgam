@@ -24,7 +24,9 @@
 #'  controlling how strongly the local correlation matrix \eqn{\Omega_{group}}
 #'  is shrunk towards the global
 #'  correlation matrix \eqn{\Omega_{global}} (larger values of \eqn{\alpha_{cor}} indicate
-#'  a greater degree of shrinkage, i.e. a greater degree of partial pooling).
+#'  a greater degree of shrinkage, i.e. a greater degree of partial pooling). When used
+#'  within a `VAR()` model, this essentially sets up a hierarchical panel vector autoregression
+#'  where both the autoregressive and correlation matrices are learned hierarchically.
 #'  If `gr` is supplied then `subgr` *must* also be supplied
 #' @param subgr A subgrouping `factor` variable specifying which element in `data` represents the
 #' different time series. Defaults to `series`, but note that
@@ -84,14 +86,18 @@
 #'       dplyr::mutate(series = as.factor(series))
 #'
 #'# mvgam with CAR(1) trends and series-level seasonal smooths; the
-#'# State-Space representation (using trend_formula) will be more efficient
-#'mod <- mvgam(formula = y ~ 1,
+#'# State-Space representation (using trend_formula) will be more efficient;
+#'# using informative priors on the sigmas often helps with convergence
+#'mod <- mvgam(formula = y ~ -1,
 #'             trend_formula = ~ s(season, bs = 'cc',
 #'                                 k = 5, by = trend),
 #'             trend_model = CAR(),
+#'             priors = c(prior(exponential(3),
+#'                            class = sigma),
+#'                        prior(exponential(4),
+#'                            class = sigma_obs)),
 #'             data = dat,
 #'             family = gaussian(),
-#'             samples = 300,
 #'             chains = 2,
 #'             silent = 2)
 #'
@@ -102,6 +108,7 @@
 #'plot(mod, type = 'trend', series = 2)
 #'plot(mod, type = 'residuals', series = 1)
 #'plot(mod, type = 'residuals', series = 2)
+#'mcmc_plot(mod, variable = 'ar1', regex = TRUE)
 #'
 #'# Now an example illustrating hierarchical dynamics
 #'set.seed(123)

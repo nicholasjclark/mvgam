@@ -3,32 +3,29 @@
 
 <img src="man/figures/mvgam_logo.png" width = 120 alt="mvgam R package logo"/>[<img src="https://raw.githubusercontent.com/stan-dev/logos/master/logo_tm.png" align="right" width=120 alt="Stan Logo"/>](https://mc-stan.org/)
 
-## mvgam
+# mvgam
 
-**M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
+> **M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
 
-The goal of `mvgam` is to fit Bayesian (Dynamic) Generalized Additive
-Models. This package constructs State-Space models that can include
-highly flexible nonlinear predictor effects for both process and
-observation components by leveraging functionalities from the impressive
+The goal of `mvgam` is to fit Bayesian Dynamic Generalized Additive
+Models (DGAMs) that can include highly flexible nonlinear predictor
+effects for both process and observation components. The package does
+this by relying on functionalities from the impressive
 <a href="https://paulbuerkner.com/brms/"
 target="_blank"><code>brms</code></a> and
-<a href="https://cran.r-project.org/web/packages/mgcv/index.html"
+<a href="https://cran.r-project.org/package=mgcv"
 target="_blank"><code>mgcv</code></a> packages. This allows `mvgam` to
-fit a wide range of models, including hierarchical ecological models
-such as N-mixture or Joint Species Distribution models, as well as
-univariate and multivariate time series models with imperfect detection.
-The original motivation for the package is described in <a
-href="https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974"
-target="_blank">Clark &amp; Wells 2022</a> (published in *Methods in
-Ecology and Evolution*), with additional inspiration on the use of
-Bayesian probabilistic modelling coming from
-<a href="https://betanalpha.github.io/writing/" target="_blank">Michael
-Betancourt</a>,
-<a href="https://www.bu.edu/earth/profiles/michael-dietze/"
-target="_blank">Michael Dietze</a> and
-<a href="https://www.durham.ac.uk/staff/sarah-e-heaps/"
-target="_blank">Sarah Heaps</a>, among many others.
+fit a wide range of models, including:
+
+- <a
+  href="https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html"
+  target="_blank">Multivariate State-Space Time Series models</a>
+- <a href="https://nicholasjclark.github.io/mvgam/articles/nmixtures.html"
+  target="_blank">Hierarchical N-mixture models</a>
+- <a href="https://www.youtube.com/watch?v=2POK_FVwCHk"
+  target="_blank">Hierarchical Generalized Additive Models</a>
+- <a href="https://nicholasjclark.github.io/mvgam/reference/jsdgam.html"
+  target="_blank">Joint Species Distribution Models</a>
 
 ## Installation
 
@@ -62,8 +59,6 @@ information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-
 
 </div>
 
-</center>
-
 ## Cheatsheet
 
 [![`mvgam` usage
@@ -92,7 +87,7 @@ package can handle data for the following families:
 - `nmix()` for count data with imperfect detection (unknown number of
   trials)
 
-See `??mvgam_families` for more information. Below is a simple example
+See `?mvgam_families` for more information. Below is a simple example
 for simulating and modelling proportional data with `Beta` observations
 over a set of seasonal series with independent Gaussian Process dynamic
 trends:
@@ -167,6 +162,38 @@ will slow down the installation drastically. Instead, you can always
 access the vignette htmls online at
 <https://nicholasjclark.github.io/mvgam/articles/>
 
+## Citing `mvgam` and related software
+
+When using any software please make sure to appropriately acknowledge
+the hard work that developers and maintainers put into making these
+packages available. Citations are currently the best way to formally
+acknowledge this work (but feel free to ⭐ [the
+repo](https://github.com/nicholasjclark/mvgam) as well), so we highly
+encourage you to cite any packages that you rely on for your research.
+
+When using `mvgam`, please cite the following:
+
+> Clark, N.J. and Wells, K. (2023). Dynamic Generalized Additive Models
+> (DGAMs) for forecasting discrete ecological time series. *Methods in
+> Ecology and Evolution*. DOI: <https://doi.org/10.1111/2041-210X.13974>
+
+As `mvgam` acts as an interface to `Stan`, please additionally cite:
+
+> Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B.,
+> Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017).
+> Stan: A probabilistic programming language. *Journal of Statistical
+> Software*. 76(1). DOI: <https://doi.org/10.18637/jss.v076.i01>
+
+`mvgam` relies on several other `R` packages and, of course, on `R`
+itself. To find out how to cite `R` and its packages, use `citation()`.
+There are some features of `mvgam` which specifically rely on certain
+packages. The most important of these is the generation of data
+necessary to estimate smoothing splines and Gaussian Processes, which
+rely on the `mgcv`, `brms` and `splines2` packages. The `rstan` and
+`cmdstanr` packages together with `Rcpp` makes `Stan` conveniently
+accessible in `R`. If you use some of these features, please also
+consider citing the related packages.
+
 ## Other resources
 
 A number of case studies and step-by-step webinars have been compiled to
@@ -195,7 +222,12 @@ data:
   target="_blank">Incorporating time-varying seasonality in forecast
   models</a>
 
-Please also feel free to use the [`mvgam` Discussion
+## Getting help
+
+If you encounter a clear bug, please file an issue with a minimal
+reproducible example on
+[GitHub](https://github.com/nicholasjclark/mvgam/issues). Please also
+feel free to use the [`mvgam` Discussion
 Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for
 or post other discussion topics related to the package, and do check out
 the [`mvgam`
