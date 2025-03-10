@@ -17,10 +17,10 @@ Version](https://www.r-pkg.org/badges/version/mvgam)](https://cran.r-project.org
 [![CRAN
 Downloads](https://cranlogs.r-pkg.org/badges/grand-total/mvgam?color=brightgreen)](https://cran.r-project.org/package=mvgam)
 
-The goal of `mvgam` is to fit Bayesian Dynamic Generalized Additive
-Models (DGAMs) that can include highly flexible nonlinear predictor
-effects for both process and observation components. The package does
-this by relying on functionalities from the impressive
+The goal of the `mvgam` 📦 is to fit Bayesian Dynamic Generalized
+Additive Models (DGAMs) that can include highly flexible nonlinear
+predictor effects for both process and observation components. The
+package does this by relying on functionalities from the impressive
 <a href="https://paulbuerkner.com/brms/"
 target="_blank"><code>brms</code></a> and
 <a href="https://cran.r-project.org/package=mgcv"
@@ -64,21 +64,27 @@ Project</a>, which represent captures of four desert rodent species over
 time (see `?portal_data` for more details)
 
     data(portal_data)
-    plot_mvgam_series(data = portal_data, 
-                      y = 'captures',
-                      series = 'all')
+    plot_mvgam_series(
+      data = portal_data, 
+      y = 'captures',
+      series = 'all'
+    )
 
 <img src="man/figures/README-unnamed-chunk-4-1.png" alt="Visualizing the multivariate time series in mvgam" width="60%" style="display: block; margin: auto;" />
 
-    plot_mvgam_series(data = portal_data, 
-                      y = 'captures',
-                      series = 1)
+    plot_mvgam_series(
+      data = portal_data, 
+      y = 'captures',
+      series = 1
+    )
 
 <img src="man/figures/README-unnamed-chunk-4-2.png" alt="Visualizing the multivariate time series in mvgam" width="60%" style="display: block; margin: auto;" />
 
-    plot_mvgam_series(data = portal_data, 
-                      y = 'captures',
-                      series = 4)
+    plot_mvgam_series(
+      data = portal_data, 
+      y = 'captures',
+      series = 4
+    )
 
 <img src="man/figures/README-unnamed-chunk-4-3.png" alt="Visualizing the multivariate time series in mvgam" width="60%" style="display: block; margin: auto;" />
 
@@ -166,12 +172,14 @@ Using `print()` will return a quick summary of the object:
 Split Rhat and effective sample size diagnostics show good convergence
 of the model estimates
 
-    mcmc_plot(mod, type = 'rhat_hist')
+    mcmc_plot(mod, 
+              type = 'rhat_hist')
     #> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 
 <img src="man/figures/README-unnamed-chunk-9-1.png" alt="Rhats of parameters estimated with Stan in mvgam" width="60%" style="display: block; margin: auto;" />
 
-    mcmc_plot(mod, type = 'neff_hist')
+    mcmc_plot(mod, 
+              type = 'neff_hist')
     #> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 
 <img src="man/figures/README-unnamed-chunk-10-1.png" alt="Effective sample sizes of parameters estimated with Stan in mvgam" width="60%" style="display: block; margin: auto;" />
@@ -179,7 +187,8 @@ of the model estimates
 Use `conditional_effects()` for a quick visualisation of the main terms
 in model formulae
 
-    conditional_effects(mod, type = 'link')
+    conditional_effects(mod, 
+                        type = 'link')
 
 <img src="man/figures/README-unnamed-chunk-11-1.png" alt="Plotting GAM effects in mvgam and R" width="60%" style="display: block; margin: auto;" /><img src="man/figures/README-unnamed-chunk-11-2.png" alt="Plotting GAM effects in mvgam and R" width="60%" style="display: block; margin: auto;" /><img src="man/figures/README-unnamed-chunk-11-3.png" alt="Plotting GAM effects in mvgam and R" width="60%" style="display: block; margin: auto;" />
 
@@ -187,26 +196,31 @@ If you have the `gratia` package installed, it can also be used to plot
 partial effects of smooths
 
     require(gratia)
-    draw(mod, trend_effects = TRUE)
+    draw(mod, 
+         trend_effects = TRUE)
 
 <img src="man/figures/README-unnamed-chunk-12-1.png" alt="Plotting GAM smooth functions in mvgam using gratia" width="60%" style="display: block; margin: auto;" />
 
 Or design more targeted plots using `plot_predictions()` from the
 `marginaleffects` package
 
-    plot_predictions(mod,
-                     condition = c('ndvi_ma12',
-                                   'series',
-                                   'series'),
-                     type = 'link')
+    plot_predictions(
+      mod,
+      condition = c('ndvi_ma12',
+                    'series',
+                    'series'),
+      type = 'link'
+    )
 
 <img src="man/figures/README-unnamed-chunk-13-1.png" alt="Using marginaleffects and mvgam to plot GAM smooth functions in R" width="60%" style="display: block; margin: auto;" />
 
-    plot_predictions(mod,
-                     condition = c('mintemp',
-                                   'series',
-                                   'series'),
-                     type = 'link')
+    plot_predictions(
+      mod,
+      condition = c('mintemp',
+                    'series',
+                    'series'),
+      type = 'link'
+    )
 
 <img src="man/figures/README-unnamed-chunk-14-1.png" alt="Using marginaleffects and mvgam to plot GAM smooth functions in R" width="60%" style="display: block; margin: auto;" />
 
@@ -214,19 +228,20 @@ We can also view the model’s posterior predictions for the entire series
 (testing and training). These forecasts can be scored using a range of
 proper scoring rules. See `?score.mvgam_forecast` for more details
 
-    fcs <- forecast(mod, newdata = data_test)
+    fcs <- forecast(mod, 
+                    newdata = data_test)
     plot(fcs, series = 1) +
       plot(fcs, series = 2) +
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.644098
+    #> 8.38808175
     #> Out of sample DRPS:
-    #> 5.2988905
+    #> 5.1808785
     #> Out of sample DRPS:
-    #> 8.87216225
+    #> 8.56007625
     #> Out of sample DRPS:
-    #> 3.65725475
+    #> 3.6260535
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
@@ -245,12 +260,16 @@ which the series appear in the VAR process, and inspect how each process
 is expected to respond to a sudden, positive pulse from the other
 processes over a horizon of 12 timepoints.
 
-    irfs <- irf(mod, h = 12, orthogonal = FALSE)
-    plot(irfs, series = 1)
+    irfs <- irf(mod, 
+                h = 12, 
+                orthogonal = FALSE)
+    plot(irfs, 
+         series = 1)
 
 <img src="man/figures/README-unnamed-chunk-16-1.png" alt="Impulse response functions computed using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
-    plot(irfs, series = 3)
+    plot(irfs, 
+         series = 3)
 
 <img src="man/figures/README-unnamed-chunk-16-2.png" alt="Impulse response functions computed using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
@@ -264,7 +283,8 @@ effects of the other series in the VAR process. FEVDs are useful because
 some shocks may not be expected to cause variations in the short-term
 but may cause longer-term fluctuations
 
-    fevds <- fevd(mod, h = 12)
+    fevds <- fevd(mod, 
+                  h = 12)
     plot(fevds)
 
 <img src="man/figures/README-unnamed-chunk-17-1.png" alt="Forecast error variance decompositions computed using mvgam in R" width="60%" style="display: block; margin: auto;" />
@@ -280,11 +300,13 @@ Plotting randomized quantile residuals over `time` for each series can
 give useful information about what might be missing from the model. We
 can use the highly versatile `pp_check()` function to plot these:
 
-    pp_check(mod, 
-             type = 'resid_ribbon_grouped',
-             group = 'series',
-             x = 'time',
-             ndraws = 200)
+    pp_check(
+      mod, 
+      type = 'resid_ribbon_grouped',
+      group = 'series',
+      x = 'time',
+      ndraws = 200
+    )
 
 <img src="man/figures/README-unnamed-chunk-18-1.png" width="60%" style="display: block; margin: auto;" />
 
@@ -297,7 +319,7 @@ details in scientific communications
     description
 
     #> Methods text skeleton
-    #> We used the R package mvgam (version 1.1.5002; Clark & Wells, 2023) to
+    #> We used the R package mvgam (version 1.1.5003; Clark & Wells, 2023) to
     #>   construct, fit and interrogate the model. mvgam fits Bayesian
     #>   State-Space models that can include flexible predictor effects in both
     #>   the process and observation components by incorporating functionalities
@@ -334,9 +356,9 @@ details in scientific communications
     #>   Karunarathna KANK (2025). Beyond single-species models: leveraging
     #>   multispecies forecasts to navigate the dynamics of ecological
     #>   predictability. PeerJ 13:e18929.
-    #> Carpenter, B, Gelman, A, Hoffman, MD, Lee, D, Goodrich, B, Betancourt,
-    #>   M, Brubaker, M, Guo, J, Li, P and Riddell, A (2017). Stan: A
-    #>   probabilistic programming language. Journal of Statistical Software 76.
+    #> Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt M,
+    #>   Brubaker M, Guo J, Li P and Riddell A (2017). Stan: A probabilistic
+    #>   programming language. Journal of Statistical Software 76.
     #> Gabry J, Cesnovar R, Johnson A, and Bronder S (2025). cmdstanr: R
     #>   Interface to 'CmdStan'. https://mc-stan.org/cmdstanr/,
     #>   https://discourse.mc-stan.org.
@@ -346,7 +368,7 @@ details in scientific communications
     #>   667-718. https://doi.org/10.1214/20-BA1221.
     #> 
     #> Other useful references
-    #> Arel-Bundock, V, Greifer, N, and Heiss, A (2024). How to interpret
+    #> Arel-Bundock V, Greifer N, and Heiss A (2024). How to interpret
     #>   statistical models using marginaleffects for R and Python. Journal of
     #>   Statistical Software, 111(9), 1-32.
     #>   https://doi.org/10.18637/jss.v111.i09
@@ -356,9 +378,9 @@ details in scientific communications
     #> Vehtari A, Gelman A, and Gabry J (2017). Practical Bayesian model
     #>   evaluation using leave-one-out cross-validation and WAIC. Statistics and
     #>   Computing, 27, 1413-1432. doi:10.1007/s11222-016-9696-4.
-    #> Burkner, PC, Gabry, J, and Vehtari, A. (2020). Approximate
-    #>   leave-future-out cross-validation for Bayesian time series models.
-    #>   Journal of Statistical Computation and Simulation, 90(14), 2499-2523.
+    #> Burkner PC, Gabry J, and Vehtari A. (2020). Approximate leave-future-out
+    #>   cross-validation for Bayesian time series models. Journal of Statistical
+    #>   Computation and Simulation, 90(14), 2499-2523.
     #>   https://doi.org/10.1080/00949655.2020.1783262
 
 The post-processing methods we have shown above are just the tip of the
@@ -400,7 +422,10 @@ trends:
       prop_trend = 0.5,
       seasonality = "shared"
     )
-    plot_mvgam_series(data = data$data_train, series = "all")
+    plot_mvgam_series(
+      data = data$data_train, 
+      series = "all"
+    )
 
 <img src="man/figures/README-beta_sim-1.png" width="60%" style="display: block; margin: auto;" />
 
@@ -416,7 +441,8 @@ trends:
 Inspect the summary to see that the posterior now also contains
 estimates for the `Beta` precision parameters *ϕ*.
 
-    summary(mod, include_betas = FALSE)
+    summary(mod, 
+            include_betas = FALSE)
     #> GAM formula:
     #> y ~ s(season, bs = "cc", k = 7) + s(season, by = series, m = 1, 
     #>     k = 5)
@@ -476,7 +502,7 @@ estimates for the `Beta` precision parameters *ϕ*.
     #> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
     #> E-FMI indicated no pathological behavior
     #> 
-    #> Samples were drawn using NUTS(diag_e) at Mon Mar 10 02:41:06 2025.
+    #> Samples were drawn using NUTS(diag_e) at Mon Mar 10 09:18:25 2025.
     #> For each parameter, n_eff is a crude measure of effective sample size,
     #> and Rhat is the potential scale reduction factor on split MCMC chains
     #> (at convergence, Rhat = 1)
@@ -550,7 +576,7 @@ feel free to use the [`mvgam` Discussion
 Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for
 or post other discussion topics related to the package, and do check out
 the [`mvgam`
-changelog](https://nicholasjclark.github.io/mvgam/news/index.html) for
+Changelog](https://nicholasjclark.github.io/mvgam/news/index.html) for
 any updates about recent upgrades that the package has incorporated.
 
 ## Other resources
