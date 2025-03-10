@@ -159,7 +159,8 @@ how_to_cite.mvgam <- function(object, ...) {
   # Check for piecewise trends
   if (
     trend_model %in%
-    c('PWlogistic', 'PWlinear')) {
+      c('PWlogistic', 'PWlinear')
+  ) {
     specials_text <- c(
       specials_text,
       " Piecewise dynamic trends were parameterized and estimated following methods described by Taylor and Letham (2018)."
