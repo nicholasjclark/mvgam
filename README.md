@@ -220,13 +220,13 @@ proper scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.09659325
+    #> 8.644098
     #> Out of sample DRPS:
-    #> 5.4602125
+    #> 5.2988905
     #> Out of sample DRPS:
-    #> 8.67309025
+    #> 8.87216225
     #> Out of sample DRPS:
-    #> 4.04606075
+    #> 3.65725475
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
@@ -476,7 +476,7 @@ estimates for the `Beta` precision parameters *ϕ*.
     #> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
     #> E-FMI indicated no pathological behavior
     #> 
-    #> Samples were drawn using NUTS(diag_e) at Sun Mar 09 21:26:44 2025.
+    #> Samples were drawn using NUTS(diag_e) at Mon Mar 10 02:41:06 2025.
     #> For each parameter, n_eff is a crude measure of effective sample size,
     #> and Rhat is the potential scale reduction factor on split MCMC chains
     #> (at convergence, Rhat = 1)
