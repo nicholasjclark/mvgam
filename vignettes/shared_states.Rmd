@@ -57,7 +57,8 @@ trend_map
 
 We can see that the factor levels in `trend_map` match those in the data:
 ```{r}
-all.equal(levels(trend_map$series), levels(simdat$data_train$series))
+all.equal(levels(trend_map$series), 
+          levels(simdat$data_train$series))
 ```
 
 ### Checking `trend_map` with `run_model = FALSE`
@@ -91,7 +92,7 @@ fake_mod <- mvgam(
 
 Inspecting the `Stan` code shows how this model is a dynamic factor model in which the loadings are constructed to reflect the supplied `trend_map`:
 ```{r}
-code(fake_mod)
+stancode(fake_mod)
 ```
 
 Notice the line that states "lv_coefs = Z;". This uses the supplied $Z$ matrix to construct the loading coefficients. The supplied matrix now looks exactly like what you'd use if you were to create a similar model in the `MARSS` package:
@@ -102,7 +103,8 @@ fake_mod$model_data$Z
 ### Fitting and inspecting the model
 Though this model doesn't perfectly match the data-generating process (which allowed each series to have different underlying dynamics), we can still fit it to show what the resulting inferences look like:
 ```{r full_mod, include = FALSE, results='hide'}
-full_mod <- mvgam(y ~ series - 1,
+full_mod <- mvgam(
+  y ~ series - 1,
   trend_formula = ~ s(season, bs = "cc", k = 6),
   trend_model = AR(),
   noncentred = TRUE,
@@ -114,7 +116,8 @@ full_mod <- mvgam(y ~ series - 1,
 ```
 
 ```{r eval=FALSE}
-full_mod <- mvgam(y ~ series - 1,
+full_mod <- mvgam(
+  y ~ series - 1,
   trend_formula = ~ s(season, bs = "cc", k = 6),
   trend_model = AR(),
   noncentred = TRUE,
@@ -158,7 +161,8 @@ true_signal <- as.vector(scale(signal_dat$y) +
 
 Plot the signal to inspect it's evolution over time
 ```{r}
-plot(true_signal,
+plot(
+  true_signal,
   type = "l",
   bty = "l", lwd = 2,
   ylab = "True signal",
@@ -214,21 +218,24 @@ plot_mvgam_series(
 
 And now plot the observed relationships between the three sensors and the `temperature` covariate
 ```{r}
-plot(observed ~ temperature,
+plot(
+  observed ~ temperature,
   data = model_dat %>%
     dplyr::filter(series == "sensor_1"),
   pch = 16, bty = "l",
   ylab = "Sensor 1",
   xlab = "Temperature"
 )
-plot(observed ~ temperature,
+plot(
+  observed ~ temperature,
   data = model_dat %>%
     dplyr::filter(series == "sensor_2"),
   pch = 16, bty = "l",
   ylab = "Sensor 2",
   xlab = "Temperature"
 )
-plot(observed ~ temperature,
+plot(
+  observed ~ temperature,
   data = model_dat %>%
     dplyr::filter(series == "sensor_3"),
   pch = 16, bty = "l",
@@ -332,7 +339,8 @@ conditional_effects(mod, type = "link")
 
 `conditional_effects` is simply a wrapper to the more flexible `plot_predictions` function from the `marginaleffects` package. We can get more useful plots of these effects using this function for further customisation:
 ```{r}
-plot_predictions(mod,
+plot_predictions(
+  mod,
   condition = c("temperature", "series", "series"),
   points = 0.5
 ) +
@@ -344,7 +352,8 @@ We have successfully estimated effects, some of them nonlinear, that impact the 
 ### Recovering the hidden signal
 A final but very key question is whether we can successfully recover the true hidden signal. The `trend` slot in the returned model parameters has the estimates for this signal, which we can easily plot using the `mvgam` S3 method for `plot`. We can also overlay the true values for the hidden signal, which shows that our model has done a good job of recovering it:
 ```{r}
-plot(mod, type = "trend") +
+plot(mod, 
+     type = "trend") +
   ggplot2::geom_point(data = data.frame(time = 1:100,
                                         y = true_signal),
                       mapping = ggplot2::aes(x = time,

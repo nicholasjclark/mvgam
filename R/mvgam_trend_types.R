@@ -45,9 +45,9 @@
 #'\donttest{
 #'# A short example to illustrate CAR(1) models
 #'# Function to simulate CAR1 data with seasonality
-#'sim_corcar1 = function(n = 120,
+#'sim_corcar1 = function(n = 125,
 #'                       phi = 0.5,
-#'                       sigma = 1,
+#'                       sigma = 2,
 #'                       sigma_obs = 0.75){
 #'# Sample irregularly spaced time intervals
 #'time_dis <- c(0, runif(n - 1, -0.1, 1))
@@ -94,7 +94,7 @@
 #'             trend_model = CAR(),
 #'             priors = c(prior(exponential(3),
 #'                            class = sigma),
-#'                        prior(exponential(4),
+#'                        prior(beta(4, 4),
 #'                            class = sigma_obs)),
 #'             data = dat,
 #'             family = gaussian(),
@@ -108,7 +108,10 @@
 #'plot(mod, type = 'trend', series = 2)
 #'plot(mod, type = 'residuals', series = 1)
 #'plot(mod, type = 'residuals', series = 2)
-#'mcmc_plot(mod, variable = 'ar1', regex = TRUE)
+#'mcmc_plot(mod,
+#'          variable = 'ar1',
+#'          regex = TRUE,
+#'          type = 'hist')
 #'
 #'# Now an example illustrating hierarchical dynamics
 #'set.seed(123)

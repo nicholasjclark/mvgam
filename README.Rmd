@@ -10,7 +10,7 @@ knitr::opts_chunk$set(
   comment = "#>",
   fig.path = "man/figures/README-",
   dev = "png",
-  dpi = 160,
+  dpi = 180,
   fig.asp = 0.8,
   fig.width = 6,
   out.width = "60%",
@@ -60,15 +60,21 @@ library(mvgam)
 
 ```{r, fig.alt = "Visualizing the multivariate time series in mvgam", warning=FALSE}
 data(portal_data)
-plot_mvgam_series(data = portal_data, 
-                  y = 'captures',
-                  series = 'all')
-plot_mvgam_series(data = portal_data, 
-                  y = 'captures',
-                  series = 1)
-plot_mvgam_series(data = portal_data, 
-                  y = 'captures',
-                  series = 4)
+plot_mvgam_series(
+  data = portal_data, 
+  y = 'captures',
+  series = 'all'
+)
+plot_mvgam_series(
+  data = portal_data, 
+  y = 'captures',
+  series = 1
+)
+plot_mvgam_series(
+  data = portal_data, 
+  y = 'captures',
+  series = 4
+)
 ```
 
 These plots show that the time series are count-responses, with missing data, seasonality and temporal autocorrelation all present. These features make time series analysis and forecasting very difficult if using conventional software and models. But `mvgam` shines in these tasks. 
@@ -147,44 +153,53 @@ mod
 
 Split Rhat and effective sample size diagnostics show good convergence of the model estimates
 ```{r, fig.alt = "Rhats of parameters estimated with Stan in mvgam", warning=FALSE}
-mcmc_plot(mod, type = 'rhat_hist')
+mcmc_plot(mod, 
+          type = 'rhat_hist')
 ```
 
 ```{r, fig.alt = "Effective sample sizes of parameters estimated with Stan in mvgam", warning=FALSE}
-mcmc_plot(mod, type = 'neff_hist')
+mcmc_plot(mod, 
+          type = 'neff_hist')
 ```
 
 Use `conditional_effects()` for a quick visualisation of the main terms in model formulae
 ```{r, fig.alt = "Plotting GAM effects in mvgam and R"}
-conditional_effects(mod, type = 'link')
+conditional_effects(mod, 
+                    type = 'link')
 ```
 
 If you have the `gratia` package installed, it can also be used to plot partial effects of smooths
 ```{r, fig.alt = "Plotting GAM smooth functions in mvgam using gratia", message=FALSE}
 require(gratia)
-draw(mod, trend_effects = TRUE)
+draw(mod, 
+     trend_effects = TRUE)
 ```
 
 Or design more targeted plots using `plot_predictions()` from the `marginaleffects` package
 ```{r, fig.alt = "Using marginaleffects and mvgam to plot GAM smooth functions in R"}
-plot_predictions(mod,
-                 condition = c('ndvi_ma12',
-                               'series',
-                               'series'),
-                 type = 'link')
+plot_predictions(
+  mod,
+  condition = c('ndvi_ma12',
+                'series',
+                'series'),
+  type = 'link'
+)
 ```
 
 ```{r, fig.alt = "Using marginaleffects and mvgam to plot GAM smooth functions in R"}
-plot_predictions(mod,
-                 condition = c('mintemp',
-                               'series',
-                               'series'),
-                 type = 'link')
+plot_predictions(
+  mod,
+  condition = c('mintemp',
+                'series',
+                'series'),
+  type = 'link'
+)
 ```
 
 We can also view the model's posterior predictions for the entire series (testing and training). These forecasts can be scored using a range of proper scoring rules. See `?score.mvgam_forecast` for more details
 ```{r, fig.alt = "Plotting forecast distributions using mvgam in R", warning=FALSE}
-fcs <- forecast(mod, newdata = data_test)
+fcs <- forecast(mod, 
+                newdata = data_test)
 plot(fcs, series = 1) +
   plot(fcs, series = 2) +
   plot(fcs, series = 3) +
@@ -193,14 +208,19 @@ plot(fcs, series = 1) +
 
 For Vector Autoregressions fit in `mvgam`, we can inspect [impulse response functions and forecast error variance decompositions](https://ecogambler.netlify.app/blog/vector-autoregressions/#impulse-response-functions){target="_blank"}. The `irf()` function runs an Impulse Response Function (IRF) simulation whereby a positive “shock” is generated for a target process at time `t = 0`. All else remaining stable, it then monitors how each of the remaining processes in the latent VAR would be expected to respond over the forecast horizon `h`. The function computes impulse responses for all processes in the object and returns them in an array that can be plotted using the S3 `plot()` function. Here we will use the generalized IRF, which makes no assumptions about the order in which the series appear in the VAR process, and inspect how each process is expected to respond to a sudden, positive pulse from the other processes over a horizon of 12 timepoints.
 ```{r, fig.alt = "Impulse response functions computed using mvgam in R"}
-irfs <- irf(mod, h = 12, orthogonal = FALSE)
-plot(irfs, series = 1)
-plot(irfs, series = 3)
+irfs <- irf(mod, 
+            h = 12, 
+            orthogonal = FALSE)
+plot(irfs, 
+     series = 1)
+plot(irfs, 
+     series = 3)
 ```
 
 Using the same logic as above, we can inspect forecast error variance decompositions (FEVDs) for each process using the `fevd()` function. This type of analysis asks how orthogonal shocks to all process in the system contribute to the variance of forecast uncertainty for a focal process over increasing horizons. In other words, the proportion of the forecast variance of each latent time series can be attributed to the effects of the other series in the VAR process. FEVDs are useful because some shocks may not be expected to cause variations in the short-term but may cause longer-term fluctuations
 ```{r, fig.alt = "Forecast error variance decompositions computed using mvgam in R"}
-fevds <- fevd(mod, h = 12)
+fevds <- fevd(mod, 
+              h = 12)
 plot(fevds)
 ```
 
@@ -208,11 +228,13 @@ This plot shows that the variance of forecast uncertainty for each process is in
   
 Plotting randomized quantile residuals over `time` for each series can give useful information about what might be missing from the model. We can use the highly versatile `pp_check()` function to plot these:
 ```{r, warning=FALSE}
-pp_check(mod, 
-         type = 'resid_ribbon_grouped',
-         group = 'series',
-         x = 'time',
-         ndraws = 200)
+pp_check(
+  mod, 
+  type = 'resid_ribbon_grouped',
+  group = 'series',
+  x = 'time',
+  ndraws = 200
+)
 ```
 
 When describing the model, it can be helpful to use the `how_to_cite()` function to generate a scaffold for describing the model and sampling details in scientific communications
@@ -269,7 +291,10 @@ data <- sim_mvgam(
   prop_trend = 0.5,
   seasonality = "shared"
 )
-plot_mvgam_series(data = data$data_train, series = "all")
+plot_mvgam_series(
+  data = data$data_train, 
+  series = "all"
+)
 ```
 
 ```{r, include=FALSE}
@@ -296,7 +321,8 @@ mod <- mvgam(
 
 Inspect the summary to see that the posterior now also contains estimates for the `Beta` precision parameters $\phi$.
 ```{r}
-summary(mod, include_betas = FALSE)
+summary(mod, 
+        include_betas = FALSE)
 ```
 
 Plot the hindcast and forecast distributions for each series

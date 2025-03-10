@@ -38,8 +38,8 @@ theme_set(theme_bw(base_size = 12, base_family = "serif"))
 
 This vignette gives an example of how to take raw data and format it for use in `mvgam`. This is not an exhaustive example, as data can be recorded and stored in a variety of ways, which requires different approaches to wrangle the data into the necessary format for `mvgam`. For full details on the basic `mvgam` functionality, please see [the introductory vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html) and [the growing set of walk through video tutorials on `mvgam` applications](https://www.youtube.com/playlist?list=PLzFHNoUxkCvsFIg6zqogylUfPpaxau_a3&si=lyg7qUrMLbD-tHCB).
 
-## Required *long* data format
-Manipulating the data into a 'long' format is necessary for modelling in `mvgam`. By 'long' format, we mean that each `series x time` observation needs to have its own entry in the `dataframe` or `list` object that we wish to pass as data for to the two primary modelling functions, `mvgam()` and `jsdgam()`. A simple example can be viewed by simulating data using the `sim_mvgam()` function. See `?sim_mvgam` for more details
+## Required *tidy* data format
+Manipulating the data into a 'long' format (i.e. *tidy* format) is necessary for modelling in `mvgam`. By 'long' format, we mean that each `series x time` observation needs to have its own entry in the `dataframe` or `list` object that we wish to pass as data for to the two primary modelling functions, `mvgam()` and `jsdgam()`. A simple example can be viewed by simulating data using the `sim_mvgam()` function. See `?sim_mvgam` for more details
 ```{r}
 simdat <- sim_mvgam(n_series = 4, T = 24, prop_missing = 0.2)
 head(simdat$data_train, 16)
@@ -212,7 +212,8 @@ get_mvgam_priors(outcome ~ 1,
 
 Following the message's advice tells us there is a level for `series_2` in the `series` variable, but there are no observations for this series in the data:
 ```{r}
-setdiff(levels(bad_levels$series), unique(bad_levels$series))
+setdiff(levels(bad_levels$series), 
+        unique(bad_levels$series))
 ```
 
 Re-assigning the levels fixes the issue:
@@ -223,7 +224,8 @@ levels(good_levels$series)
 ```
 
 ```{r error = TRUE}
-get_mvgam_priors(outcome ~ 1,
+get_mvgam_priors(
+  outcome ~ 1,
   data = good_levels,
   family = gaussian()
 )
@@ -244,7 +246,8 @@ miss_dat
 ```
 
 ```{r error = TRUE}
-get_mvgam_priors(outcome ~ cov,
+get_mvgam_priors(
+  outcome ~ cov,
   data = miss_dat,
   family = gaussian()
 )
@@ -265,7 +268,8 @@ miss_dat$cov[2, 3] <- NA
 
 A call to `get_mvgam_priors()` returns the same error:
 ```{r error=TRUE}
-get_mvgam_priors(outcome ~ cov,
+get_mvgam_priors(
+  outcome ~ cov,
   data = miss_dat,
   family = gaussian()
 )
@@ -378,7 +382,8 @@ levels(model_dat$series)
 
 This looks good, as does a more rigorous check using `get_mvgam_priors()`:
 ```{r error=TRUE}
-get_mvgam_priors(y ~ 1,
+get_mvgam_priors(
+  y ~ 1,
   data = model_dat,
   family = poisson()
 )
@@ -389,7 +394,7 @@ We can also set up a model in `mvgam()` but use `run_model = FALSE` to further e
 testmod <- mvgam(
   y ~ s(epiWeek, by = series, bs = "cc") +
     s(series, bs = "re"),
-  trend_model = "AR1",
+  trend_model = AR(),
   data = model_dat,
   backend = "cmdstanr",
   run_model = FALSE
