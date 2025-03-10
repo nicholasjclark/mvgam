@@ -657,8 +657,8 @@ test_that("how_to_cite() works correctly", {
     grepl('To encourage stability', description$methods_text)
   )
 
-description <- how_to_cite(mvgam:::mvgam_example4)
-expect_true(
-  grepl('Gaussian Process functional', description$methods_text)
-)
+  description <- how_to_cite(mvgam:::mvgam_example4)
+  expect_true(
+    grepl('Gaussian Process functional', description$methods_text)
+  )
 })
