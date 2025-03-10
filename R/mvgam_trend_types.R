@@ -41,6 +41,7 @@
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #' arguments to be interpreted by the parsing functions in \pkg{mvgam}
 #' @rdname RW
+#' @author Nicholas J Clark
 #'@examples
 #'\donttest{
 #'# A short example to illustrate CAR(1) models
@@ -319,13 +320,17 @@ VAR = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA) {
 #' @param ... unused
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #' arguments to be interpreted by the parsing functions in \pkg{mvgam}
-#' @details A GP trend is estimated for each series using
-#' [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408).
+#' @details A GP trend is estimated for each series using Hilbert space
+#' approximate Gaussian Processes.
 #' In `mvgam`, latent squared exponential GP trends are approximated using by
 #' default \code{20} basis functions and using a multiplicative factor of `c = 5/4`,
 #' which saves computational costs compared to fitting full GPs while adequately estimating
 #' GP \code{alpha} and \code{rho} parameters.
 #' @rdname GP
+#' @author Nicholas J Clark
+#' @references Riutort-Mayol G, Burkner PC, Andersen MR, Solin A and Vehtari A (2023).
+#' Practical Hilbert space approximate Bayesian Gaussian processes for probabilistic
+#' programming. Statistics and Computing 33, 1. https://doi.org/10.1007/s11222-022-10167-2
 #' @seealso \code{\link[brms]{gp}}
 #' @export
 GP = function(...) {
@@ -364,6 +369,7 @@ GP = function(...) {
 #' maximum saturation point for the trend (see details and examples in \code{\link{mvgam}} for
 #' more information).
 #' Default is 'linear'.
+#' @author Nicholas J Clark
 #' @references Taylor, Sean J., and Benjamin Letham. "Forecasting at scale." The American Statistician 72.1 (2018): 37-45.
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #' arguments to be interpreted by the parsing functions in \code{mvgam}
@@ -442,11 +448,13 @@ GP = function(...) {
 #'              trend_model = PW(growth = 'logistic'),
 #'              family = poisson(),
 #'              data = mod_data,
-#'              chains = 2)
+#'              chains = 2,
+#'              silent = 2)
 #' summary(mod)
 #'
 #' # Plot the posterior hindcast
-#' plot(mod, type = 'forecast')
+#' hc <- hindcast(mod)
+#' plot(hc)
 #'
 #' # View the changepoints with ggplot2 utilities
 #' library(ggplot2)
@@ -455,6 +463,9 @@ GP = function(...) {
 #' scale_y_discrete(labels = mod$trend_model$changepoints) +
 #' labs(y = 'Potential changepoint',
 #'      x = 'Rate change')
+#'
+#' # Generate a methods description scaffold
+#' how_to_cite(mod)
 #' }
 #' @export
 PW = function(

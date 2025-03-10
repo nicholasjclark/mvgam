@@ -60,6 +60,7 @@
 #'   `predict.gam(object, type = "terms", se.fit = TRUE)`, where mean contributions
 #'   from each effect are returned in `matrix` form while standard errors (representing
 #'   the interval: `(max(probs) - min(probs)) / 2`) are returned in a separate `matrix`
+#' @author Nicholas J Clark
 #'@examples
 #'\donttest{
 #'# Simulate 4 time series with hierarchical seasonality

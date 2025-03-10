@@ -1,7 +1,7 @@
 Package: mvgam
 Title: Multivariate (Dynamic) Generalized Additive Models
-Version: 1.1.5002
-Date: 2025-03-03
+Version: 1.1.5003
+Date: 2025-03-10
 Authors@R: c(person("Nicholas J", "Clark", , "nicholas.j.clark1214@gmail.com", 
                     role = c("aut", "cre"), comment = c(ORCID = "0000-0001-7131-3301")),
              person("Sarah", "Heaps", role = c("ctb"),
@@ -10,7 +10,7 @@ Authors@R: c(person("Nicholas J", "Clark", , "nicholas.j.clark1214@gmail.com",
                     comment = c("broom enhancements", ORCID = "0009-0006-8977-9285")),
              person("Matthijs", "Hollanders", role = c("ctb"),
                     comment = c("ggplot visualizations", ORCID = "0000-0003-0796-1018")))
-Description: Fit Bayesian Dynamic Generalized Additive Models to multivariate observations. Users can build nonlinear State-Space models that can incorporate semiparametric effects in observation and process components, using a wide range of observation families. Estimation is performed using Markov Chain Monte Carlo with Hamiltonian Monte Carlo in the software 'Stan'. References: Clark & Wells (2022) <doi:10.1111/2041-210X.13974>.
+Description: Fit Bayesian Dynamic Generalized Additive Models to multivariate observations. Users can build nonlinear State-Space models that can incorporate semiparametric effects in observation and process components, using a wide range of observation families. Estimation is performed using Markov Chain Monte Carlo with Hamiltonian Monte Carlo in the software 'Stan'. References: Clark & Wells (2023) <doi:10.1111/2041-210X.13974>.
 URL: https://github.com/nicholasjclark/mvgam, https://nicholasjclark.github.io/mvgam/
 BugReports: https://github.com/nicholasjclark/mvgam/issues
 License: MIT + file LICENSE

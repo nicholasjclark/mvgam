@@ -91,7 +91,7 @@
 #'predictor can contain any of `mvgam`'s allowed predictor effects, providing enormous flexibility for
 #'modelling species' communities.
 #'@seealso [mvgam()], [residual_cor()]
-#'@references Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
+#'@references Nicholas J Clark & Konstans Wells (2023). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
 #'Methods in Ecology and Evolution. 14:3, 771-784.
 #' \cr
 #' \cr

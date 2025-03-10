@@ -115,11 +115,13 @@ mod <- mvgam(y ~ 0,
              trend_model = PW(growth = 'logistic'),
              family = poisson(),
              data = mod_data,
-             chains = 2)
+             chains = 2,
+             silent = 2)
 summary(mod)
 
 # Plot the posterior hindcast
-plot(mod, type = 'forecast')
+hc <- hindcast(mod)
+plot(hc)
 
 # View the changepoints with ggplot2 utilities
 library(ggplot2)
@@ -128,8 +130,14 @@ mcmc_plot(mod, variable = 'delta_trend',
 scale_y_discrete(labels = mod$trend_model$changepoints) +
 labs(y = 'Potential changepoint',
      x = 'Rate change')
+
+# Generate a methods description scaffold
+how_to_cite(mod)
 }
 }
 \references{
 Taylor, Sean J., and Benjamin Letham. "Forecasting at scale." The American Statistician 72.1 (2018): 37-45.
+}
+\author{
+Nicholas J Clark
 }

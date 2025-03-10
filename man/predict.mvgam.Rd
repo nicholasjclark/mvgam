@@ -131,3 +131,6 @@ preds <- predict(mod1,
 head(preds)
 }
 }
+\author{
+Nicholas J Clark
+}

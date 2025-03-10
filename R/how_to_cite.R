@@ -53,12 +53,22 @@ how_to_cite <- function(object, ...) {
 #'@export
 #'@export
 print.how_to_cite = function(x, ...) {
-  cat('Methods text skeleton\n')
-  cat(x$methods_text, sep = '\n')
-  cat('\nPrimary references\n')
-  print(unlist(x$citations))
-  cat('\nOther useful references\n')
-  print(unlist(x$other_citations))
+  cat("Methods text skeleton\n")
+  cat(insight::format_message(x$methods_text))
+  cat('\n')
+
+  cat("\nPrimary references\n")
+  for (i in seq_along(x$citations)) {
+    cat(insight::format_message(x$citations[[i]]))
+    cat('\n')
+  }
+
+  cat("\nOther useful references\n")
+  for (i in seq_along(x$other_citations)) {
+    cat(insight::format_message(x$other_citations[[i]]))
+    cat('\n')
+  }
+
   invisible(x)
 }
 
@@ -140,7 +150,23 @@ how_to_cite.mvgam <- function(object, ...) {
     citations <- append(
       citations,
       list(
-        "Riutort-Mayol, G, Burkner, PC, Andersen, MR, Solin, A and Vehtari, A (2023). Practical Hilbert space approximate Bayesian Gaussian processes for probabilistic programming. Statistics and Computing 33, 1. https://doi.org/10.1007/s11222-022-10167-2"
+        "Riutort-Mayol G, Burkner PC, Andersen MR, Solin A and Vehtari A (2023). Practical Hilbert space approximate Bayesian Gaussian processes for probabilistic programming. Statistics and Computing 33, 1. https://doi.org/10.1007/s11222-022-10167-2"
+      )
+    )
+  }
+
+  # Check for piecewise trends
+  if (
+    trend_model %in%
+    c('PWlogistic', 'PWlinear')) {
+    specials_text <- c(
+      specials_text,
+      " Piecewise dynamic trends were parameterized and estimated following methods described by Taylor and Letham (2018)."
+    )
+    citations <- append(
+      citations,
+      list(
+        "Taylor S and Letham B (2018). Forecasting at scale. The American Statistician 72(1) 37-45. https://doi.org/10.1080/00031305.2017.1380080"
       )
     )
   }
@@ -149,7 +175,7 @@ how_to_cite.mvgam <- function(object, ...) {
   citations <- append(
     citations,
     list(
-      "Carpenter, B, Gelman, A, Hoffman, MD, Lee, D, Goodrich, B, Betancourt, M, Brubaker, M, Guo, J, Li, P and Riddell, A (2017). Stan: A probabilistic programming language. Journal of Statistical Software 76."
+      "Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt M, Brubaker M, Guo J, Li P and Riddell A (2017). Stan: A probabilistic programming language. Journal of Statistical Software 76."
     )
   )
 
@@ -232,7 +258,7 @@ how_to_cite.mvgam <- function(object, ...) {
     citations <- append(
       citations,
       list(
-        "Kucukelbir, A, Tran, D, Ranganath, R, Gelman, A, and Blei, DM (2017). Automatic Differentiation Variational Inference. Journal of Machine Learning Research 18 1-45."
+        "Kucukelbir A, Tran D, Ranganath R, Gelman A, and Blei DM (2017). Automatic Differentiation Variational Inference. Journal of Machine Learning Research 18 1-45."
       )
     )
   }
@@ -259,7 +285,7 @@ how_to_cite.mvgam <- function(object, ...) {
     citations <- append(
       citations,
       list(
-        "Zhang, L, Carpenter, B, Gelman, A, and Vehtari, A (2022). Pathfinder: parallel Quasi-Newton variational inference. Journal of Machine Learning Research 23(306), 1-49. http://jmlr.org/papers/v23/21-0889.html."
+        "Zhang L, Carpenter B, Gelman A, and Vehtari A (2022). Pathfinder: parallel Quasi-Newton variational inference. Journal of Machine Learning Research 23(306), 1-49. http://jmlr.org/papers/v23/21-0889.html."
       )
     )
   }
@@ -270,7 +296,7 @@ how_to_cite.mvgam <- function(object, ...) {
   other_citations <- vector(mode = 'list')
   other_citations[[
     1
-  ]] <- "Arel-Bundock, V, Greifer, N, and Heiss, A (2024). How to interpret statistical models using marginaleffects for R and Python. Journal of Statistical Software, 111(9), 1-32. https://doi.org/10.18637/jss.v111.i09"
+  ]] <- "Arel-Bundock V, Greifer N, and Heiss A (2024). How to interpret statistical models using marginaleffects for R and Python. Journal of Statistical Software, 111(9), 1-32. https://doi.org/10.18637/jss.v111.i09"
   other_citations[[
     2
   ]] <- "Gabry J, Simpson D, Vehtari A, Betancourt M, and Gelman A (2019). Visualization in Bayesian workflow. Journal of the Royal Statatistical Society A, 182, 389-402. doi:10.1111/rssa.12378."
@@ -279,7 +305,7 @@ how_to_cite.mvgam <- function(object, ...) {
   ]] <- "Vehtari A, Gelman A, and Gabry J (2017). Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Statistics and Computing, 27, 1413-1432. doi:10.1007/s11222-016-9696-4."
   other_citations[[
     4
-  ]] <- "Burkner, PC, Gabry, J, and Vehtari, A. (2020). Approximate leave-future-out cross-validation for Bayesian time series models. Journal of Statistical Computation and Simulation, 90(14), 2499-2523. https://doi.org/10.1080/00949655.2020.1783262"
+  ]] <- "Burkner PC, Gabry J, and Vehtari A. (2020). Approximate leave-future-out cross-validation for Bayesian time series models. Journal of Statistical Computation and Simulation, 90(14), 2499-2523. https://doi.org/10.1080/00949655.2020.1783262"
 
   out <- structure(
     list(

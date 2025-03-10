@@ -423,22 +423,26 @@ variety of trend models. Users are strongly encouraged to opt for \code{Stan} ov
 good starting place if you are just learning to use the package. It gives an overview of the package's key functions and objects,
 as well as providing a reasonable workflow that new users can follow. In general it is recommended to
 \itemize{
-\item 1. Check that your time series data are in a suitable long format for \code{mvgam} modeling (see the \href{https://nicholasjclark.github.io/mvgam/articles/data_in_mvgam.html}{data formatting vignette} for guidance)
+\item 1. Check that your time series data are in a suitable tidy format for \code{mvgam} modeling (see the \href{https://nicholasjclark.github.io/mvgam/articles/data_in_mvgam.html}{data formatting vignette} for guidance)
 \item 2. Inspect features of the data using \code{\link{plot_mvgam_series}}. Now is also a good time to familiarise yourself
 with the package's example workflows that are detailed in the vignettes. In particular,
-the \href{https://nicholasjclark.github.io/mvgam/articles/shared_states.html}{getting started vignette},
+the \href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{getting started vignette},
 the \href{https://nicholasjclark.github.io/mvgam/articles/shared_states.html}{shared latent states vignette},
 the \href{https://nicholasjclark.github.io/mvgam/articles/time_varying_effects.html}{time-varying effects vignette} and
 the \href{https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html}{State-Space models vignette} all provide
-detailed information about how to structure, fit and interrogate Dynamic Generalized Additive Models in \code{mvgam}. Some
+useful information about how to structure, fit and interrogate Dynamic Generalized Additive Models in \code{mvgam}. Some
 more specialized how-to articles include
+\href{https://nicholasjclark.github.io/mvgam/articles/nmixtures.html}{"Fitting N-mixture models in \code{mgam}},
+\href{https://nicholasjclark.github.io/mvgam/reference/jsdgam.html}{"Joint Species Distribution Models in \code{mgam}},
 \href{https://ecogambler.netlify.app/blog/time-varying-seasonality/}{"Incorporating time-varying seasonality in forecast models"}
 and \href{https://ecogambler.netlify.app/blog/autocorrelated-gams/}{"Temporal autocorrelation in GAMs and the \code{mvgam} package"}
 \item 3. Carefully think about how to structure linear predictor effects (i.e. smooth terms using \code{\link[mgcv]{s}},
 \code{\link[mgcv]{te}} or \code{\link[mgcv]{ti}}, GPs using \code{\link[brms]{gp}}, dynamic time-varying effects using \code{\link{dynamic}}, and parametric terms), latent temporal trend components (see \code{\link{mvgam_trends}}) and the appropriate
 observation family (see \code{\link{mvgam_families}}). Use \code{\link{get_mvgam_priors}} to see default prior distributions
 for stochastic parameters
-\item 4. Change default priors using appropriate prior knowledge (see \code{\link[brms]{prior}})
+\item 4. Change default priors using appropriate prior knowledge (see \code{\link[brms]{prior}}). When using State-Space models
+with a \code{trend_formula}, pay particular attention to priors for any variance parameters such as process errors and observation
+errors
 \item 5. Fit the model using either Hamiltonian Monte Carlo or an approximation algorithm (i.e. change the \code{backend} argument)
 and use \code{\link{summary.mvgam}}, \code{\link{conditional_effects.mvgam}}, \code{\link{mcmc_plot.mvgam}}, \code{\link{pp_check.mvgam}} and
 \code{\link{plot.mvgam}} to inspect / interrogate the model
@@ -447,6 +451,8 @@ use \code{\link{forecast.mvgam}} and \code{\link{score.mvgam_forecast}} to compa
 \item 7. When satisfied with the model structure, use \code{\link{predict.mvgam}},
 \code{\link[marginaleffects]{plot_predictions}} and/or \code{\link[marginaleffects]{plot_slopes}} for
 more targeted inferences (see \href{https://ecogambler.netlify.app/blog/interpreting-gams/}{"How to interpret and report nonlinear effects from Generalized Additive Models"} for some guidance on interpreting GAMs)
+\item 8. Use \code{\link{how_to_cite}} to obtain a scaffold methods section (with full references) to begin describing this
+model in scientific publications
 }
 }
 \examples{
@@ -757,7 +763,7 @@ conditional_effects(mod, type = "link")
 }
 }
 \references{
-Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
+Nicholas J Clark & Konstans Wells (2023). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
 Methods in Ecology and Evolution. 14:3, 771-784.
 \cr
 \cr

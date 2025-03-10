@@ -187,3 +187,6 @@ conditional_effects(mod, type = 'link')
 mcmc_plot(mod, variable = 'alpha_cor', type = 'hist')
 }
 }
+\author{
+Nicholas J Clark
+}

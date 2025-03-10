@@ -94,17 +94,22 @@ trends:
 
 ``` r
 set.seed(100)
-data <- sim_mvgam(family = betar(),
-                  T = 80,
-                  trend_model = GP(),
-                  prop_trend = 0.5, 
-                  seasonality = 'shared')
+data <- sim_mvgam(
+  family = betar(),
+  T = 80,
+  trend_model = GP(),
+  prop_trend = 0.5, 
+  seasonality = 'shared'
+)
 ```
 
 Plot the series to see how they evolve over time
 
 ``` r
-plot_mvgam_series(data = data$data_train, series = 'all')
+plot_mvgam_series(
+  data = data$data_train, 
+  series = 'all'
+)
 ```
 
 <figure>
@@ -120,12 +125,14 @@ The model also includes series-specific latent Gaussian Processes with
 squared exponential covariance functions to capture temporal dynamics
 
 ``` r
-mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
-               s(season, by = series, m = 1, k = 5),
-             trend_model = GP(),
-             data = data$data_train,
-             newdata = data$data_test,
-             family = betar())
+mod <- mvgam(
+  y ~ s(season, bs = 'cc', k = 7) +
+    s(season, by = series, m = 1, k = 5),
+  trend_model = GP(),
+  data = data$data_train,
+  newdata = data$data_test,
+  family = betar()
+)
 ```
 
 Plot the estimated posterior hindcast and forecast distributions for

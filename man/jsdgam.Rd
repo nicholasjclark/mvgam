@@ -454,7 +454,7 @@ ggplot(newdata, aes(x = lon, y = lat, col = log_count)) +
 }
 }
 \references{
-Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
+Nicholas J Clark & Konstans Wells (2023). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
 Methods in Ecology and Evolution. 14:3, 771-784.
 \cr
 \cr
