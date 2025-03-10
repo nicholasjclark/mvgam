@@ -806,7 +806,7 @@ posterior distributions for key parameters</p>
 <span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Mon Mar 10 09:55:11 2025.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Mon Mar 10 22:59:13 2025.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
@@ -1131,7 +1131,7 @@ are the same as before but we now have another predictor <span class="math inlin
 <span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Mon Mar 10 09:55:32 2025.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Mon Mar 10 22:59:35 2025.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
@@ -1326,7 +1326,7 @@ showing one here for simplicity. View the summary as before</p>
 <span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Mon Mar 10 09:55:54 2025.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Mon Mar 10 22:59:57 2025.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
@@ -1529,7 +1529,7 @@ the latent AR1 process:</p>
 <span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Mon Mar 10 09:56:24 2025.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Mon Mar 10 23:00:28 2025.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
@@ -1570,6 +1570,34 @@ lower value is preferred for this metric)</p>
 <p>A strongly negative value here suggests the score for the dynamic
 model (model 4) is much smaller than the score for the model with a
 smooth function of time (model 3)</p>
+</div>
+<div class="section level2">
+<h2 id="further-reading">Further reading<a class="anchor" aria-label="anchor" href="#further-reading"></a>
+</h2>
+<p>The following papers and resources offer useful material about
+Dynamic GAMs and how they can be applied in practice:</p>
+<p>Clark, Nicholas J. and Wells, K. <a href="https://doi.org/10.1111/2041-210X.13974" class="external-link">Dynamic Generalized
+Additive Models (DGAMs) for forecasting discrete ecological time
+series</a>. <em>Methods in Ecology and Evolution</em>. (2023): 14,
+771-784.</p>
+<p>Clark, Nicholas J., et al. <a href="https://peerj.com/articles/18929/" class="external-link">Beyond single-species models:
+leveraging multispecies forecasts to navigate the dynamics of ecological
+predictability</a>. <em>PeerJ</em>. (2025): 13:e18929</p>
+<p>de Sousa, Heitor C., et al. <a href="https://doi.org/10.1111/1365-2656.14188" class="external-link">Severe fire regimes
+decrease resilience of ectothermic populations</a>. <em>Journal of
+Animal Ecology</em> (2024): 93(11), 1656-1669.</p>
+<p>Hannaford, Naomi E., et al. <a href="https://doi.org/10.1016/j.csda.2022.107659" class="external-link">A sparse Bayesian
+hierarchical vector autoregressive model for microbial dynamics in a
+wastewater treatment plant.</a> <em>Computational Statistics &amp; Data
+Analysis</em> (2023): 179, 107659.</p>
+<p>Karunarathna, K.A.N.K., et al. <a href="https://doi.org/10.1016/j.ecolmodel.2024.110648" class="external-link">Modelling
+nonlinear responses of a desert rodent species to environmental change
+with hierarchical dynamic generalized additive models</a>.
+<em>Ecological Modelling</em> (2024): 490, 110648.</p>
+<p>Zhu, L., et al. <a href="https://doi.org/10.1111/1365-2435.14711" class="external-link">Responses of a widespread
+pest insect to extreme high temperatures are stage-dependent and
+divergent among seasonal cohorts</a>. <em>Functional Ecology</em>
+(2025): 39, 165–180. <a href="https://doi.org/10.1111/1365-2435.14711" class="external-link uri">https://doi.org/10.1111/1365-2435.14711</a></p>
 </div>
 <div class="section level2">
 <h2 id="interested-in-contributing">Interested in contributing?<a class="anchor" aria-label="anchor" href="#interested-in-contributing"></a>

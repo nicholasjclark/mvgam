@@ -119,7 +119,11 @@ example can be viewed by simulating data using the
 <code><a href="../reference/sim_mvgam.html">sim_mvgam()</a></code> function. See <code><a href="../reference/sim_mvgam.html">?sim_mvgam</a></code> for more
 details</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">4</span>, T <span class="op">=</span> <span class="fl">24</span>, prop_missing <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span></span>
+<span>  n_series <span class="op">=</span> <span class="fl">4</span>, </span>
+<span>  T <span class="op">=</span> <span class="fl">24</span>, </span>
+<span>  prop_missing <span class="op">=</span> <span class="fl">0.2</span></span>
+<span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, <span class="fl">16</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    y season year   series time</span></span>
 <span><span class="co">#&gt; 1  0      1    1 series_1    1</span></span>
@@ -157,7 +161,8 @@ workhorse functions in the package (including <code><a href="../reference/mvgam.
 <code><a href="../reference/get_mvgam_priors.html">get_mvgam_priors()</a></code>) will give an error if this is not the
 case, but it may be worth checking anyway:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/all.html" class="external-link">all</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">series</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/all.html" class="external-link">all</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">series</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> </span>
+<span>      <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
 <p>Note that you can technically supply data that does not have a
 <code>series</code> indicator, and the package will generally assume
@@ -184,7 +189,8 @@ other regression modelling packages out there. The advantage of this
 format is that it is now very easy to specify effects that vary among
 time series:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span> <span class="va">time</span>,</span>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm</a></span><span class="op">(</span></span>
+<span>  <span class="va">y</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span> <span class="va">time</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span>
 <span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span><span class="op">)</span></span>
@@ -211,7 +217,8 @@ time series:</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Number of Fisher Scoring iterations: 5</span></span></code></pre></div>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="fu">mgcv</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">series</span><span class="op">)</span>,</span>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="fu">mgcv</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></span><span class="op">(</span></span>
+<span>  <span class="va">y</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">series</span><span class="op">)</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span>
 <span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span><span class="op">)</span></span>
@@ -858,7 +865,7 @@ sampling:</p>
 <span><span class="co">#&gt;   .. ..$ : chr [1:73] "X.Intercept." "V2" "V3" "V4" ...</span></span>
 <span><span class="co">#&gt;  - attr(*, "trend_model")= chr "AR1"</span></span></code></pre></div>
 <div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/code.html">code</a></span><span class="op">(</span><span class="va">testmod</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/stancode.html" class="external-link">stancode</a></span><span class="op">(</span><span class="va">testmod</span><span class="op">)</span></span>
 <span><span class="co">#&gt; // Stan model code generated by package mvgam</span></span>
 <span><span class="co">#&gt; data {</span></span>
 <span><span class="co">#&gt;   int&lt;lower=0&gt; total_obs; // total number of observations</span></span>
@@ -994,6 +1001,34 @@ sampling:</p>
 <span><span class="co">#&gt;     ypred[1 : n, s] = poisson_log_rng(mus[1 : n, s]);</span></span>
 <span><span class="co">#&gt;   }</span></span>
 <span><span class="co">#&gt; }</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="further-reading">Further reading<a class="anchor" aria-label="anchor" href="#further-reading"></a>
+</h2>
+<p>The following papers and resources offer useful material about
+Dynamic GAMs and how they can be applied in practice:</p>
+<p>Clark, Nicholas J. and Wells, K. <a href="https://doi.org/10.1111/2041-210X.13974" class="external-link">Dynamic Generalized
+Additive Models (DGAMs) for forecasting discrete ecological time
+series</a>. <em>Methods in Ecology and Evolution</em>. (2023): 14,
+771-784.</p>
+<p>Clark, Nicholas J., et al. <a href="https://peerj.com/articles/18929/" class="external-link">Beyond single-species models:
+leveraging multispecies forecasts to navigate the dynamics of ecological
+predictability</a>. <em>PeerJ</em>. (2025): 13:e18929</p>
+<p>de Sousa, Heitor C., et al. <a href="https://doi.org/10.1111/1365-2656.14188" class="external-link">Severe fire regimes
+decrease resilience of ectothermic populations</a>. <em>Journal of
+Animal Ecology</em> (2024): 93(11), 1656-1669.</p>
+<p>Hannaford, Naomi E., et al. <a href="https://doi.org/10.1016/j.csda.2022.107659" class="external-link">A sparse Bayesian
+hierarchical vector autoregressive model for microbial dynamics in a
+wastewater treatment plant.</a> <em>Computational Statistics &amp; Data
+Analysis</em> (2023): 179, 107659.</p>
+<p>Karunarathna, K.A.N.K., et al. <a href="https://doi.org/10.1016/j.ecolmodel.2024.110648" class="external-link">Modelling
+nonlinear responses of a desert rodent species to environmental change
+with hierarchical dynamic generalized additive models</a>.
+<em>Ecological Modelling</em> (2024): 490, 110648.</p>
+<p>Zhu, L., et al. <a href="https://doi.org/10.1111/1365-2435.14711" class="external-link">Responses of a widespread
+pest insect to extreme high temperatures are stage-dependent and
+divergent among seasonal cohorts</a>. <em>Functional Ecology</em>
+(2025): 39, 165–180. <a href="https://doi.org/10.1111/1365-2435.14711" class="external-link uri">https://doi.org/10.1111/1365-2435.14711</a></p>
 </div>
 <div class="section level2">
 <h2 id="interested-in-contributing">Interested in contributing?<a class="anchor" aria-label="anchor" href="#interested-in-contributing"></a>
