@@ -48,7 +48,6 @@ jobs:
         with:
           dependencies: NA
           extra-packages: |
-              mvgam
               BH
               RcppEigen
               knitr
@@ -70,6 +69,11 @@ jobs:
               usethis
               rcmdcheck
 
+      - name: Ensure install works
+        run: |
+          install.packages('mvgam', repos = "http://cran.rstudio.com")
+        shell: Rscript {0}
+        
       - uses: r-lib/actions/check-r-package@v2
         with:
           build_args: 'c("--no-manual", "--no-build-vignettes")'
