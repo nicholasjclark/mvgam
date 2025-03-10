@@ -528,17 +528,19 @@ More advanced hierarchical panel VAR models can also be handled by using the `gr
 ## Further reading
 The following papers and resources offer a lot of useful material about multivariate State-Space models and how they can be applied in practice:
   
-Auger‐Méthé, Marie, et al. ["A guide to state–space modeling of ecological time series.](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/ecm.1470)" *Ecological Monographs* 91.4 (2021): e01470.
+Auger‐Méthé, Marie, et al. [A guide to state–space modeling of ecological time series](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/ecm.1470). *Ecological Monographs* 91.4 (2021): e01470.
   
 Clark, Nicholas J., et al. [Beyond single-species models: leveraging multispecies forecasts to navigate the dynamics of ecological predictability](https://peerj.com/articles/18929/). *PeerJ*. (2025): 13:e18929
   
-Heaps, Sarah E. "[Enforcing stationarity through the prior in vector autoregressions.](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648)" *Journal of Computational and Graphical Statistics* 32.1 (2023): 74-83.
+Heaps, Sarah E. [Enforcing stationarity through the prior in vector autoregressions](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648). *Journal of Computational and Graphical Statistics* 32.1 (2023): 74-83.
   
-Hannaford, Naomi E., et al. "[A sparse Bayesian hierarchical vector autoregressive model for microbial dynamics in a wastewater treatment plant.](https://doi.org/10.1016/j.csda.2022.107659)" *Computational Statistics & Data Analysis* 179 (2023): 107659.
+Hannaford, Naomi E., et al. [A sparse Bayesian hierarchical vector autoregressive model for microbial dynamics in a wastewater treatment plant](https://doi.org/10.1016/j.csda.2022.107659). *Computational Statistics & Data Analysis* 179 (2023): 107659.
   
-Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. "[MARSS: multivariate autoregressive state-space models for analyzing time-series data.](https://journal.r-project.org/archive/2012/RJ-2012-002/index.html)" *R Journal*. 4.1 (2012): 11.
+Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. [MARSS: multivariate autoregressive state-space models for analyzing time-series data](https://journal.r-project.org/archive/2012/RJ-2012-002/index.html). *R Journal*. 4.1 (2012): 11.
   
-Ward, Eric J., et al. "[Inferring spatial structure from time‐series data: using multivariate state‐space models to detect metapopulation structure of California sea lions in the Gulf of California, Mexico.](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.1365-2664.2009.01745.x)" *Journal of Applied Ecology* 47.1 (2010): 47-56.
+Karunarathna, K.A.N.K., et al. [Modelling nonlinear responses of a desert rodent species to environmental change with hierarchical dynamic generalized additive models](https://doi.org/10.1016/j.ecolmodel.2024.110648). *Ecological Modelling* (2024): 490, 110648.  
+  
+Ward, Eric J., et al. [Inferring spatial structure from time‐series data: using multivariate state‐space models to detect metapopulation structure of California sea lions in the Gulf of California, Mexico](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.1365-2664.2009.01745.x). *Journal of Applied Ecology* 47.1 (2010): 47-56.
 
 ## Interested in contributing?
 I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please see [this small list of opportunities on my website](https://ecogambler.netlify.app/opportunities/) and do reach out if you are interested (n.clark'at'uq.edu.au)

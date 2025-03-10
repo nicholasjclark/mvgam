@@ -586,5 +586,20 @@ sum(score_mod4$PP$score, na.rm = TRUE) - sum(score_mod3$PP$score, na.rm = TRUE)
 
 A strongly negative value here suggests the score for the dynamic model (model 4) is much smaller than the score for the model with a smooth function of time (model 3)
 
+## Further reading
+The following papers and resources offer useful material about Dynamic GAMs and how they can be applied in practice:
+  
+Clark, Nicholas J. and Wells, K. [Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series](https://doi.org/10.1111/2041-210X.13974). *Methods in Ecology and Evolution*. (2023): 14, 771-784.  
+  
+Clark, Nicholas J., et al. [Beyond single-species models: leveraging multispecies forecasts to navigate the dynamics of ecological predictability](https://peerj.com/articles/18929/). *PeerJ*. (2025): 13:e18929
+  
+de Sousa, Heitor C., et al. [Severe fire regimes decrease resilience of ectothermic populations](https://doi.org/10.1111/1365-2656.14188). *Journal of Animal Ecology* (2024): 93(11), 1656-1669.  
+  
+Hannaford, Naomi E., et al. [A sparse Bayesian hierarchical vector autoregressive model for microbial dynamics in a wastewater treatment plant.](https://doi.org/10.1016/j.csda.2022.107659) *Computational Statistics & Data Analysis* (2023): 179, 107659.
+  
+Karunarathna, K.A.N.K., et al. [Modelling nonlinear responses of a desert rodent species to environmental change with hierarchical dynamic generalized additive models](https://doi.org/10.1016/j.ecolmodel.2024.110648). *Ecological Modelling* (2024): 490, 110648.
+  
+Zhu, L., et al. [Responses of a widespread pest insect to extreme high temperatures are stage-dependent and divergent among seasonal cohorts](https://doi.org/10.1111/1365-2435.14711). *Functional Ecology* (2025): 39, 165–180. https://doi.org/10.1111/1365-2435.14711
+  
 ## Interested in contributing?
 I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please see [this small list of opportunities on my website](https://ecogambler.netlify.app/opportunities/) and do reach out if you are interested (n.clark'at'uq.edu.au)
