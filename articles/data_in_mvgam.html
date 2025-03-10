@@ -107,16 +107,17 @@ introductory vignette</a> and <a href="https://www.youtube.com/playlist?list=PLz
 growing set of walk through video tutorials on <code>mvgam</code>
 applications</a>.</p>
 <div class="section level2">
-<h2 id="required-long-data-format">Required <em>long</em> data format<a class="anchor" aria-label="anchor" href="#required-long-data-format"></a>
+<h2 id="required-tidy-data-format">Required <em>tidy</em> data format<a class="anchor" aria-label="anchor" href="#required-tidy-data-format"></a>
 </h2>
-<p>Manipulating the data into a ‘long’ format is necessary for modelling
-in <code>mvgam</code>. By ‘long’ format, we mean that each
-<code>series x time</code> observation needs to have its own entry in
-the <code>dataframe</code> or <code>list</code> object that we wish to
-pass as data for to the two primary modelling functions,
-<code><a href="../reference/mvgam.html">mvgam()</a></code> and <code><a href="../reference/jsdgam.html">jsdgam()</a></code>. A simple example can be
-viewed by simulating data using the <code><a href="../reference/sim_mvgam.html">sim_mvgam()</a></code> function.
-See <code><a href="../reference/sim_mvgam.html">?sim_mvgam</a></code> for more details</p>
+<p>Manipulating the data into a ‘long’ format (i.e. <em>tidy</em>
+format) is necessary for modelling in <code>mvgam</code>. By ‘long’
+format, we mean that each <code>series x time</code> observation needs
+to have its own entry in the <code>dataframe</code> or <code>list</code>
+object that we wish to pass as data for to the two primary modelling
+functions, <code><a href="../reference/mvgam.html">mvgam()</a></code> and <code><a href="../reference/jsdgam.html">jsdgam()</a></code>. A simple
+example can be viewed by simulating data using the
+<code><a href="../reference/sim_mvgam.html">sim_mvgam()</a></code> function. See <code><a href="../reference/sim_mvgam.html">?sim_mvgam</a></code> for more
+details</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">4</span>, T <span class="op">=</span> <span class="fl">24</span>, prop_missing <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, <span class="fl">16</span><span class="op">)</span></span>
@@ -500,7 +501,8 @@ error:</p>
 <code>series_2</code> in the <code>series</code> variable, but there are
 no observations for this series in the data:</p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/sets.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">bad_levels</span><span class="op">$</span><span class="va">series</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">bad_levels</span><span class="op">$</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/sets.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">bad_levels</span><span class="op">$</span><span class="va">series</span><span class="op">)</span>, </span>
+<span>        <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">bad_levels</span><span class="op">$</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "series_2"</span></span></code></pre></div>
 <p>Re-assigning the levels fixes the issue:</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
@@ -509,7 +511,8 @@ no observations for this series in the data:</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">good_levels</span><span class="op">$</span><span class="va">series</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "series_1"</span></span></code></pre></div>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span><span class="va">outcome</span> <span class="op">~</span> <span class="fl">1</span>,</span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span></span>
+<span>  <span class="va">outcome</span> <span class="op">~</span> <span class="fl">1</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">good_levels</span>,</span>
 <span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
@@ -556,7 +559,8 @@ values:</p>
 <span><span class="co">#&gt; 9   0.23995957  0.766983379 series1    9</span></span>
 <span><span class="co">#&gt; 10  0.06089889 -0.308211421 series1   10</span></span></code></pre></div>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span><span class="va">outcome</span> <span class="op">~</span> <span class="va">cov</span>,</span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span></span>
+<span>  <span class="va">outcome</span> <span class="op">~</span> <span class="va">cov</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">miss_dat</span>,</span>
 <span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
@@ -590,7 +594,8 @@ change the <code>cov</code> predictor to be a <code>matrix</code>:</p>
 <span><span class="va">miss_dat</span><span class="op">$</span><span class="va">cov</span><span class="op">[</span><span class="fl">2</span>, <span class="fl">3</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="cn">NA</span></span></code></pre></div>
 <p>A call to <code><a href="../reference/get_mvgam_priors.html">get_mvgam_priors()</a></code> returns the same error:</p>
 <div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span><span class="va">outcome</span> <span class="op">~</span> <span class="va">cov</span>,</span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span></span>
+<span>  <span class="va">outcome</span> <span class="op">~</span> <span class="va">cov</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">miss_dat</span>,</span>
 <span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
@@ -786,7 +791,8 @@ generating a <code>time</code> index for grouped dataframes:</p>
 <p>This looks good, as does a more rigorous check using
 <code><a href="../reference/get_mvgam_priors.html">get_mvgam_priors()</a></code>:</p>
 <div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fl">1</span>,</span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span></span>
+<span>  <span class="va">y</span> <span class="op">~</span> <span class="fl">1</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">model_dat</span>,</span>
 <span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
@@ -806,7 +812,7 @@ improvements:</p>
 <code class="sourceCode R"><span><span class="va">testmod</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span></span>
 <span>  <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">epiWeek</span>, by <span class="op">=</span> <span class="va">series</span>, bs <span class="op">=</span> <span class="st">"cc"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">"re"</span><span class="op">)</span>,</span>
-<span>  trend_model <span class="op">=</span> <span class="st">"AR1"</span>,</span>
+<span>  trend_model <span class="op">=</span> <span class="fu"><a href="../reference/RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">model_dat</span>,</span>
 <span>  backend <span class="op">=</span> <span class="st">"cmdstanr"</span>,</span>
 <span>  run_model <span class="op">=</span> <span class="cn">FALSE</span></span>
