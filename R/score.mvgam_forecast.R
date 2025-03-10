@@ -33,6 +33,7 @@
 #'slot is a binary indicator of whether or not the true value was within the forecast's corresponding
 #'posterior empirical quantiles. Intervals are not calculated when using `elpd` because forecasts
 #'will only contain the linear predictors
+#' @author Nicholas J Clark
 #'@examples
 #'\donttest{
 #'# Simulate observations for three count-valued time series
@@ -42,7 +43,8 @@
 #'             trend_model = RW(),
 #'             data = data$data_train,
 #'             newdata = data$data_test,
-#'             chains = 2)
+#'             chains = 2,
+#'             silent = 2)
 #'
 #'# Extract forecasts into a 'mvgam_forecast' object
 #'fc <- forecast(mod)
@@ -59,7 +61,8 @@
 #'             data = data$data_train,
 #'             newdata = data$data_test,
 #'             family = bernoulli(),
-#'             chains = 2)
+#'             chains = 2,
+#'             silent = 2)
 #'
 #'# Extract forecasts on the expectation (probability) scale
 #'fc <- forecast(mod, type = 'expected')

@@ -650,3 +650,15 @@ test_that("loo() works correctly", {
   ))
   expect_true(inherits(p, 'compare.loo'))
 })
+
+test_that("how_to_cite() works correctly", {
+  description <- how_to_cite(mvgam:::mvgam_example3)
+  expect_true(
+    grepl('To encourage stability', description$methods_text)
+  )
+
+description <- how_to_cite(mvgam:::mvgam_example4)
+expect_true(
+  grepl('Gaussian Process functional', description$methods_text)
+)
+})

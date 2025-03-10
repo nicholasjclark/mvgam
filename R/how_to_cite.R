@@ -141,7 +141,8 @@ how_to_cite.mvgam <- function(object, ...) {
   # Check for approximate GPs
   if (
     !is.null(attr(object$mgcv_model, 'gp_att_table')) |
-      !is.null(attr(object$trend_mgcv_model, 'gp_att_table'))
+    !is.null(attr(object$trend_mgcv_model, 'gp_att_table')) |
+    trend_model == 'GP'
   ) {
     specials_text <- c(
       specials_text,

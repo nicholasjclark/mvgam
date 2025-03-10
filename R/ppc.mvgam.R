@@ -967,6 +967,7 @@ ppc.mvgam <- function(
 #' documentation of the \pkg{\link[bayesplot:bayesplot-package]{bayesplot}}
 #' package.
 #' @seealso \code{\link{ppc}}, \code{\link{predict.mvgam}}
+#' @author Nicholas J Clark
 #' @examples
 #' \donttest{
 #' simdat <- sim_mvgam(seasonality = "hierarchical")

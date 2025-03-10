@@ -219,6 +219,8 @@ test_that("piecewise models fit and forecast without error", {
     chains = 2,
     silent = 2
   )
+  expect_no_error(capture_output(how_to_cite(mod)))
+
   # Compute and plot forecasts
   fc <- forecast(mod, newdata = dat_test, type = 'trend')
   expect_no_error(capture_output(plot(fc)))
