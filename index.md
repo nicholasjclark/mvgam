@@ -1,16 +1,12 @@
 
-<br> <br>
-
-<img src="man/figures/mvgam_logo.png" width = 120 alt="mvgam R package logo"/>[<img src="https://raw.githubusercontent.com/stan-dev/logos/master/logo_tm.png" align="right" width=120 alt="Stan Logo"/>](https://mc-stan.org/)
-
 # mvgam
 
 > **M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
 
-The goal of `mvgam` is to fit Bayesian Dynamic Generalized Additive
-Models (DGAMs) that can include highly flexible nonlinear predictor
-effects for both process and observation components. The package does
-this by relying on functionalities from the impressive
+The goal of the `mvgam` 📦 is to fit Bayesian Dynamic Generalized
+Additive Models (DGAMs) that can include highly flexible nonlinear
+predictor effects for both process and observation components. The
+package does this by relying on functionalities from the impressive
 <a href="https://paulbuerkner.com/brms/"
 target="_blank"><code>brms</code></a> and
 <a href="https://cran.r-project.org/package=mgcv"

@@ -5,6 +5,7 @@
 * Added four new `type`s to the `pp_check()` function to allow more targeted investigations of randomized quantile residual distributions
 * Added a `plot.mvgam_residcor()` function for nicer plotting of estimated residual correlations from `jsdgam` objects 
 * Added `summary()` functions to calculate useful posterior summaries from objects of class `mvgam_irf` and `mvgam_fevd` (see `?irf` and `?fevd` for examples)
+* Improved efficiency of `nmix()` models with some slight restructuring of the model objects (#102)
 
 ## Bug fixes
 * Bug fix to ensure piecewise trends are extrapolated the correct number of timepoints when forecasting using the `forecast()` function
