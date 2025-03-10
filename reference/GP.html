@@ -16,7 +16,7 @@ trend models."><meta property="og:image" content="https://nicholasjclark.github.
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5002</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5003</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -92,16 +92,26 @@ arguments to be interpreted by the parsing functions in <span class="pkg">mvgam<
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>A GP trend is estimated for each series using
-<a href="https://arxiv.org/abs/2004.11408" class="external-link">Hilbert space approximate Gaussian Processes</a>.
+    <p>A GP trend is estimated for each series using Hilbert space
+approximate Gaussian Processes.
 In <code>mvgam</code>, latent squared exponential GP trends are approximated using by
 default <code>20</code> basis functions and using a multiplicative factor of <code>c = 5/4</code>,
 which saves computational costs compared to fitting full GPs while adequately estimating
 GP <code>alpha</code> and <code>rho</code> parameters.</p>
     </div>
     <div class="section level2">
+    <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
+    <p>Riutort-Mayol G, Burkner PC, Andersen MR, Solin A and Vehtari A (2023).
+Practical Hilbert space approximate Bayesian Gaussian processes for probabilistic
+programming. Statistics and Computing 33, 1. https://doi.org/10.1007/s11222-022-10167-2</p>
+    </div>
+    <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
     <div class="dont-index"><p><code><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp</a></code></p></div>
+    </div>
+    <div class="section level2">
+    <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
+    <p>Nicholas J Clark</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

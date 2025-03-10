@@ -16,7 +16,7 @@ trend models."><meta property="og:image" content="https://nicholasjclark.github.
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5002</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5003</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -145,6 +145,10 @@ no missing values are allowed in <code>cap</code>.</p>
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
     <p>Taylor, Sean J., and Benjamin Letham. "Forecasting at scale." The American Statistician 72.1 (2018): 37-45.</p>
     </div>
+    <div class="section level2">
+    <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
+    <p>Nicholas J Clark</p>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
@@ -200,47 +204,12 @@ no missing values are allowed in <code>cap</code>.</p>
 <span class="r-in"><span>             trend_model <span class="op">=</span> <span class="fu">PW</span><span class="op">(</span>growth <span class="op">=</span> <span class="st">'logistic'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">mod_data</span>,</span></span>
-<span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 8.9 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 9.1 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 9.0 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 9.2 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>             silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ 1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x56022987e010&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55da81427db8&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -284,7 +253,7 @@ no missing values are allowed in <code>cap</code>.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  *Run with max_treedepth set to a larger value to avoid saturation</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Mon Mar 10 04:21:39 2025.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Mon Mar 10 06:39:51 2025.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
@@ -292,7 +261,9 @@ no missing values are allowed in <code>cap</code>.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Use how_to_cite(mod) to get started describing this model</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot the posterior hindcast</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu"><a href="hindcast.mvgam.html">hindcast</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
 <span class="r-plt img"><img src="piecewise_trends-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># View the changepoints with ggplot2 utilities</span></span></span>
@@ -305,6 +276,65 @@ no missing values are allowed in <code>cap</code>.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Scale for <span style="color: #00BB00;">y</span> is already present.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Adding another scale for <span style="color: #00BB00;">y</span>, which will replace the existing scale.</span>
 <span class="r-plt img"><img src="piecewise_trends-5.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Generate a methods description scaffold</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="how_to_cite.mvgam.html">how_to_cite</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Methods text skeleton</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> We used the R package mvgam (version 1.1.5003; Clark &amp; Wells, 2023) to</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   construct, fit and interrogate the model. mvgam fits Bayesian</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   State-Space models that can include flexible predictor effects in both</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   the process and observation components by incorporating functionalities</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   from the brms (Burkner 2017), mgcv (Wood 2017) and splines2 (Wang &amp; Yan,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   2023) packages. Piecewise dynamic trends were parameterized and</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   estimated following methods described by Taylor and Letham (2018). The</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   mvgam-constructed model and observed data were passed to the</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   probabilistic programming environment Stan (version 2.36.0; Carpenter et</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   al. 2017, Stan Development Team 2025), specifically through the cmdstanr</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   interface (Gabry &amp; Cesnovar, 2021). We ran 2 Hamiltonian Monte Carlo</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   chains for 500 warmup iterations and 500 sampling iterations for joint</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   posterior estimation. Rank normalized split Rhat (Vehtari et al. 2021)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   and effective sample sizes were used to monitor convergence.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Primary references</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Clark, NJ and Wells K (2023). Dynamic Generalized Additive Models</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   (DGAMs) for forecasting discrete ecological time series. Methods in</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Ecology and Evolution, 14, 771-784. doi.org/10.1111/2041-210X.13974</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Burkner, PC (2017). brms: An R Package for Bayesian Multilevel Models</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Using Stan. Journal of Statistical Software, 80(1), 1-28.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   doi:10.18637/jss.v080.i01</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Wood, SN (2017). Generalized Additive Models: An Introduction with R</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   (2nd edition). Chapman and Hall/CRC.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Wang W and Yan J (2021). Shape-Restricted Regression Splines with R</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Package splines2. Journal of Data Science, 19(3), 498-517.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   doi:10.6339/21-JDS1020 https://doi.org/10.6339/21-JDS1020.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Taylor S and Letham B (2018). Forecasting at scale. The American</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Statistician 72(1) 37-45. https://doi.org/10.1080/00031305.2017.1380080</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt M,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Brubaker M, Guo J, Li P and Riddell A (2017). Stan: A probabilistic</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   programming language. Journal of Statistical Software 76.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Gabry J, Cesnovar R, Johnson A, and Bronder S (2025). cmdstanr: R</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Interface to 'CmdStan'. https://mc-stan.org/cmdstanr/,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   https://discourse.mc-stan.org.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Vehtari A, Gelman A, Simpson D, Carpenter B, and Burkner P (2021).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Rank-normalization, folding, and localization: An improved Rhat for</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   assessing convergence of MCMC (with discussion). Bayesian Analysis 16(2)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   667-718. https://doi.org/10.1214/20-BA1221.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Other useful references</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Arel-Bundock V, Greifer N, and Heiss A (2024). How to interpret</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   statistical models using marginaleffects for R and Python. Journal of</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Statistical Software, 111(9), 1-32.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   https://doi.org/10.18637/jss.v111.i09</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Gabry J, Simpson D, Vehtari A, Betancourt M, and Gelman A (2019).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Visualization in Bayesian workflow. Journal of the Royal Statatistical</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Society A, 182, 389-402. doi:10.1111/rssa.12378.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Vehtari A, Gelman A, and Gabry J (2017). Practical Bayesian model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   evaluation using leave-one-out cross-validation and WAIC. Statistics and</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Computing, 27, 1413-1432. doi:10.1007/s11222-016-9696-4.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Burkner PC, Gabry J, and Vehtari A. (2020). Approximate leave-future-out</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   cross-validation for Bayesian time series models. Journal of Statistical</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Computation and Simulation, 90(14), 2499-2523.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   https://doi.org/10.1080/00949655.2020.1783262</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
