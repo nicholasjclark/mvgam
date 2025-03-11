@@ -70,7 +70,7 @@ time (see `?portal_data` for more details)
       series = 'all'
     )
 
-<img src="man/figures/README-unnamed-chunk-4-1.png" alt="Visualizing the multivariate time series in mvgam" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-4-1.png" alt="Visualizing the multivariate time series in mvgam" width="100%" />
 
     plot_mvgam_series(
       data = portal_data, 
@@ -78,7 +78,7 @@ time (see `?portal_data` for more details)
       series = 1
     )
 
-<img src="man/figures/README-unnamed-chunk-4-2.png" alt="Visualizing the multivariate time series in mvgam" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-4-2.png" alt="Visualizing the multivariate time series in mvgam" width="100%" />
 
     plot_mvgam_series(
       data = portal_data, 
@@ -86,7 +86,7 @@ time (see `?portal_data` for more details)
       series = 4
     )
 
-<img src="man/figures/README-unnamed-chunk-4-3.png" alt="Visualizing the multivariate time series in mvgam" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-4-3.png" alt="Visualizing the multivariate time series in mvgam" width="100%" />
 
 These plots show that the time series are count-responses, with missing
 data, seasonality and temporal autocorrelation all present. These
@@ -176,13 +176,13 @@ of the model estimates
               type = 'rhat_hist')
     #> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 
-<img src="man/figures/README-unnamed-chunk-9-1.png" alt="Rhats of parameters estimated with Stan in mvgam" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-9-1.png" alt="Rhats of parameters estimated with Stan in mvgam" width="100%" />
 
     mcmc_plot(mod, 
               type = 'neff_hist')
     #> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 
-<img src="man/figures/README-unnamed-chunk-10-1.png" alt="Effective sample sizes of parameters estimated with Stan in mvgam" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-10-1.png" alt="Effective sample sizes of parameters estimated with Stan in mvgam" width="100%" />
 
 Use `conditional_effects()` for a quick visualisation of the main terms
 in model formulae
@@ -190,7 +190,7 @@ in model formulae
     conditional_effects(mod, 
                         type = 'link')
 
-<img src="man/figures/README-unnamed-chunk-11-1.png" alt="Plotting GAM effects in mvgam and R" width="60%" style="display: block; margin: auto;" /><img src="man/figures/README-unnamed-chunk-11-2.png" alt="Plotting GAM effects in mvgam and R" width="60%" style="display: block; margin: auto;" /><img src="man/figures/README-unnamed-chunk-11-3.png" alt="Plotting GAM effects in mvgam and R" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-11-1.png" alt="Plotting GAM effects in mvgam and R" width="100%" /><img src="man/figures/README-unnamed-chunk-11-2.png" alt="Plotting GAM effects in mvgam and R" width="100%" /><img src="man/figures/README-unnamed-chunk-11-3.png" alt="Plotting GAM effects in mvgam and R" width="100%" />
 
 If you have the `gratia` package installed, it can also be used to plot
 partial effects of smooths
@@ -199,7 +199,7 @@ partial effects of smooths
     draw(mod, 
          trend_effects = TRUE)
 
-<img src="man/figures/README-unnamed-chunk-12-1.png" alt="Plotting GAM smooth functions in mvgam using gratia" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-12-1.png" alt="Plotting GAM smooth functions in mvgam using gratia" width="100%" />
 
 Or design more targeted plots using `plot_predictions()` from the
 `marginaleffects` package
@@ -212,7 +212,7 @@ Or design more targeted plots using `plot_predictions()` from the
       type = 'link'
     )
 
-<img src="man/figures/README-unnamed-chunk-13-1.png" alt="Using marginaleffects and mvgam to plot GAM smooth functions in R" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-13-1.png" alt="Using marginaleffects and mvgam to plot GAM smooth functions in R" width="100%" />
 
     plot_predictions(
       mod,
@@ -222,7 +222,7 @@ Or design more targeted plots using `plot_predictions()` from the
       type = 'link'
     )
 
-<img src="man/figures/README-unnamed-chunk-14-1.png" alt="Using marginaleffects and mvgam to plot GAM smooth functions in R" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-14-1.png" alt="Using marginaleffects and mvgam to plot GAM smooth functions in R" width="100%" />
 
 We can also view the model’s posterior predictions for the entire series
 (testing and training). These forecasts can be scored using a range of
@@ -235,15 +235,15 @@ proper scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.61254925
+    #> 8.7590555
     #> Out of sample DRPS:
-    #> 5.375349
+    #> 5.24526575
     #> Out of sample DRPS:
-    #> 8.80328275
+    #> 8.916533
     #> Out of sample DRPS:
-    #> 3.866582
+    #> 3.607879
 
-<img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
 For Vector Autoregressions fit in `mvgam`, we can inspect <a
 href="https://ecogambler.netlify.app/blog/vector-autoregressions/#impulse-response-functions"
@@ -266,12 +266,12 @@ processes over a horizon of 12 timepoints.
     plot(irfs, 
          series = 1)
 
-<img src="man/figures/README-unnamed-chunk-16-1.png" alt="Impulse response functions computed using mvgam in R" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-16-1.png" alt="Impulse response functions computed using mvgam in R" width="100%" />
 
     plot(irfs, 
          series = 3)
 
-<img src="man/figures/README-unnamed-chunk-16-2.png" alt="Impulse response functions computed using mvgam in R" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-16-2.png" alt="Impulse response functions computed using mvgam in R" width="100%" />
 
 Using the same logic as above, we can inspect forecast error variance
 decompositions (FEVDs) for each process using the `fevd()` function.
@@ -287,7 +287,7 @@ but may cause longer-term fluctuations
                   h = 12)
     plot(fevds)
 
-<img src="man/figures/README-unnamed-chunk-17-1.png" alt="Forecast error variance decompositions computed using mvgam in R" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-17-1.png" alt="Forecast error variance decompositions computed using mvgam in R" width="100%" />
 
 This plot shows that the variance of forecast uncertainty for each
 process is initially dominated by contributions from that same process
@@ -308,7 +308,7 @@ can use the highly versatile `pp_check()` function to plot these:
       ndraws = 200
     )
 
-<img src="man/figures/README-unnamed-chunk-18-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-18-1.png" width="100%" />
 
 When describing the model, it can be helpful to use the `how_to_cite()`
 function to generate a scaffold for describing the model and sampling
@@ -427,7 +427,7 @@ trends:
       series = "all"
     )
 
-<img src="man/figures/README-beta_sim-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-beta_sim-1.png" width="100%" />
 
     mod <- mvgam(
       y ~ s(season, bs = "cc", k = 7) +
@@ -502,7 +502,7 @@ estimates for the `Beta` precision parameters *ϕ*.
     #> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
     #> E-FMI indicated no pathological behavior
     #> 
-    #> Samples were drawn using NUTS(diag_e) at Mon Mar 10 22:25:43 2025.
+    #> Samples were drawn using NUTS(diag_e) at Tue Mar 11 04:46:34 2025.
     #> For each parameter, n_eff is a crude measure of effective sample size,
     #> and Rhat is the potential scale reduction factor on split MCMC chains
     #> (at convergence, Rhat = 1)
@@ -520,7 +520,7 @@ Plot the hindcast and forecast distributions for each series
       ncol = 2
     )
 
-<img src="man/figures/README-beta_fc-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-beta_fc-1.png" width="100%" />
 
 There are many more extended uses of `mvgam`, including the ability to
 fit hierarchical State-Space GAMs that include dynamic and spatially
