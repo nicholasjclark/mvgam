@@ -29,9 +29,9 @@ fit a wide range of models, including:
 
 -   <a
     href="https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html"
-    target="_blank">Multivariate State-Space Time Series Models</a>
+    target="_blank">Multivariate State-Space Time Series models</a>
 -   <a href="https://nicholasjclark.github.io/mvgam/articles/nmixtures.html"
-    target="_blank">Hierarchical N-Mixture Models</a>
+    target="_blank">Hierarchical N-mixture models</a>
 -   <a href="https://www.youtube.com/watch?v=2POK_FVwCHk"
     target="_blank">Hierarchical Generalized Additive Models</a>
 -   <a href="https://nicholasjclark.github.io/mvgam/reference/jsdgam.html"
@@ -235,13 +235,13 @@ proper scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.41165675
+    #> 8.5224455
     #> Out of sample DRPS:
-    #> 5.23682525
+    #> 5.4023015
     #> Out of sample DRPS:
-    #> 8.5813205
+    #> 8.85614725
     #> Out of sample DRPS:
-    #> 3.457641
+    #> 3.333083
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
