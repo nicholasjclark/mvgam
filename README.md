@@ -29,9 +29,9 @@ fit a wide range of models, including:
 
 -   <a
     href="https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html"
-    target="_blank">Multivariate State-Space Time Series models</a>
+    target="_blank">Multivariate State-Space Time Series Models</a>
 -   <a href="https://nicholasjclark.github.io/mvgam/articles/nmixtures.html"
-    target="_blank">Hierarchical N-mixture models</a>
+    target="_blank">Hierarchical N-Mixture Models</a>
 -   <a href="https://www.youtube.com/watch?v=2POK_FVwCHk"
     target="_blank">Hierarchical Generalized Additive Models</a>
 -   <a href="https://nicholasjclark.github.io/mvgam/reference/jsdgam.html"
