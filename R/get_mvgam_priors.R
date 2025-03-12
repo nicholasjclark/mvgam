@@ -10,15 +10,15 @@
 #'[jsdgam]
 #'@details Users can supply a model formula, prior to fitting the model, so that default priors can be inspected and
 #'altered. To make alterations, change the contents of the `prior` column and supplying this
-#'\code{data.frame} to the `mvgam` function using the argument `priors`. If using `Stan` as the backend,
+#'\code{data.frame} to the \code{\link{mvgam}} or \code{\link{jsdgam}} functions using the argument `priors`. If using `Stan` as the backend,
 #'users can also modify the parameter bounds by modifying the `new_lowerbound` and/or `new_upperbound` columns.
 #'This will be necessary if using restrictive distributions on some parameters, such as a Beta distribution
 #'for the trend sd parameters for example (Beta only has support on  \code{(0,1)}), so the upperbound cannot
-#'be above `1`. Another option is to make use of the prior modification functions in `brms`
+#'be above `1`. Another option is to make use of the prior modification functions in \pkg{brms}
 #'(i.e. \code{\link[brms]{prior}}) to change prior distributions and bounds (just use the name of the parameter that
 #'you'd like to change as the `class` argument; see examples below)
 #' @note Only the `prior`, `new_lowerbound` and/or `new_upperbound` columns of the output
-#' should be altered when defining the user-defined priors for the `mvgam` model. Use only if you are
+#' should be altered when defining the user-defined priors for the model. Use only if you are
 #' familiar with the underlying probabilistic programming language. There are no sanity checks done to
 #' ensure that the code is legal (i.e. to check that lower bounds are smaller than upper bounds, for
 #' example)
@@ -26,7 +26,7 @@
 #'@seealso \code{\link{mvgam}}, \code{\link{mvgam_formulae}}, \code{\link[brms]{prior}}
 #'@return either a \code{data.frame} containing the prior definitions (if any suitable
 #'priors can be altered by the user) or \code{NULL}, indicating that no priors in the model
-#'can be modified through the `mvgam` interface
+#'can be modified
 #'
 #'@examples
 #'\donttest{
@@ -1771,9 +1771,7 @@ update_default_scales = function(
   response,
   family,
   df = 3,
-  center = TRUE,
-  location = 0,
-  scale = 2.5
+  center = TRUE
 ) {
   if (all(is.na(response))) {
     out <- paste0(
@@ -1790,21 +1788,25 @@ update_default_scales = function(
     }
 
     y_link <- suppressWarnings(linkfun(y, link = link))
-    scale_y <- round(mad(y_link), 1)
-    if (is.finite(scale_y)) {
-      scale <- max(scale, scale_y)
+    scale_y <- round(mad(y_link,
+                         na.rm = TRUE), 1)
+
+    if(scale_y <= 5) {
+      out <- 'inv_gamma(1.418, 0.452)'
     }
-    if (!center) {
-      location_y <- round(median(y_link), 1)
-      if (is.finite(location_y)) {
-        location <- location_y
-      }
+
+    if(scale_y > 5 &
+       scale_y <= 20) {
+      out <- 'inv_gamma(0.9187, 0.3516)'
     }
-    out <- paste0(
-      "student_t(",
-      paste0(as.character(c(df, location, scale)), collapse = ", "),
-      ")"
-    )
+
+    if(scale_y > 20) {
+      out <- paste0(
+        "student_t(",
+        paste0(as.character(c(df, 0, scale_y)), collapse = ", "),
+        ")"
+      )
+    }
   }
 
   return(out)

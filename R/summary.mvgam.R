@@ -1012,17 +1012,20 @@ summary.mvgam = function(
     )
 
     sampler <- attr(object$model_output@sim$samples[[1]], "args")$sampler_t
+    if(sampler == "NUTS(diag_e)") sampler <- 'sampling(hmc)'
     cat(
-      "\nSamples were drawn using ",
-      sampler,
-      " at ",
-      object$model_output@date,
-      ".\n",
-      "For each parameter, n_eff is a crude measure of effective sample size,\n",
-      "and Rhat is the potential scale reduction factor on split MCMC chains\n",
-      "(at convergence, Rhat = 1)\n",
-      sep = ''
+      insight::format_message(
+        paste0("\nSamples were drawn using ",
+               sampler,
+               ". For each parameter, n_eff is",
+               " a crude measure of effective",
+               " sample size, and Rhat is the",
+               " potential scale reduction factor",
+               " on split MCMC chains (at",
+               " convergence, Rhat = 1)")
+      )
     )
+    cat('\n')
   }
 
   if (object$algorithm != 'sampling') {
@@ -1040,19 +1043,14 @@ summary.mvgam = function(
       cat(
         '\nRhats above 1.05 found for',
         length(which(rhats > 1.05)),
-        'parameters\n*Diagnose further to investigate why the chains have not mixed\n'
+        'parameters\n* Use pairs() to investigate\n'
       )
     } else {
       cat('\nRhat looks reasonable for all parameters\n')
     }
   }
 
-  mod_name <- as.character(match.call()$object)
-  cat(paste0(
-    '\nUse how_to_cite(',
-    mod_name,
-    ') to get started describing this model'
-  ))
+  cat('\nUse how_to_cite() to get started describing this model')
 }
 
 #' @rdname summary.mvgam

@@ -294,17 +294,17 @@
 #' can be found in \code{\link{mvgam_trends}}.
 #' \cr
 #' \cr
-#' *Priors*: Default priors for intercepts and any scale parameters are generated
-#' using the same practice as \pkg{brms}. Prior distributions for most important
-#' model parameters can be altered by the user to inspect model
-#' sensitivities to given priors (see \code{\link{get_mvgam_priors}} for details).
+#' *Priors*: Default priors for intercepts and any variance parameters are chosen
+#' to be vaguely informative, but these should always be checked by the user.
+#' Prior distributions for most important model parameters can be altered
+#' (see \code{\link{get_mvgam_priors}} for details).
 #' Note that latent trends are estimated on the link scale so choose priors
 #' accordingly. However more control over the model specification can be accomplished
-#' by first using `mvgam` as a baseline, then editing the returned model accordingly.
-#' The model file can be edited and run outside of `mvgam` by setting
-#' \code{run_model = FALSE} and this is encouraged for complex modelling tasks.
-#' Note, no priors are formally checked to ensure they are in the right syntax so it is
-#' up to the user to ensure these are correct
+#' by setting \code{run_model = FALSE} and then editing the model code (
+#' found in the `model_file` slot in the returned object) before running the
+#' model using either \pkg{rstan} or \pkg{cmdstanr}. This is encouraged for
+#' complex modelling tasks. Note, no priors are formally checked to ensure
+#' they are in the right syntax so it is up to the user to ensure these are correct
 #' \cr
 #' \cr
 #' *Random effects*: For any smooth terms using the random effect basis (\code{\link[mgcv]{smooth.construct.re.smooth.spec}}),
@@ -363,12 +363,18 @@
 #'   for stochastic parameters
 #'   \item 4. Change default priors using appropriate prior knowledge (see \code{\link[brms]{prior}}). When using State-Space models
 #'   with a `trend_formula`, pay particular attention to priors for any variance parameters such as process errors and observation
-#'   errors
-#'   \item 5. Fit the model using either Hamiltonian Monte Carlo or an approximation algorithm (i.e. change the `backend` argument)
-#'   and use \code{\link{summary.mvgam}}, \code{\link{conditional_effects.mvgam}}, \code{\link{mcmc_plot.mvgam}}, \code{\link{pp_check.mvgam}} and
+#'   errors. Default priors on these parameters are chosen to be vaguely informative and to avoid
+#'   zero (using Inverse Gamma priors), but more informative priors will often help with
+#'   model efficiency and convergence
+#'   \item 5. Fit the model using either Hamiltonian Monte Carlo or an approximation algorithm (i.e.
+#'   change the `backend` argument) and use \code{\link{summary.mvgam}}, \code{\link{conditional_effects.mvgam}},
+#'   \code{\link{mcmc_plot.mvgam}}, \code{\link{pp_check.mvgam}}, \code{\link{pairs.mvgam}} and
 #'   \code{\link{plot.mvgam}} to inspect / interrogate the model
-#'   \item 6. Update the model as needed and use \code{\link{loo_compare.mvgam}} for in-sample model comparisons, or alternatively
-#'   use \code{\link{forecast.mvgam}} and \code{\link{score.mvgam_forecast}} to compare models based on out-of-sample forecasts (see the [forecast evaluation vignette](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html) for guidance)
+#'   \item 6. Update the model as needed and use \code{\link{loo_compare.mvgam}} for in-sample model comparisons,
+#'   or alternatively use \code{\link{forecast.mvgam}}, \code{\link{lfo_cv.mvgam}} and
+#'   \code{\link{score.mvgam_forecast}} to compare models based on out-of-sample forecasts
+#'   (see the [forecast evaluation vignette](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+#'   for guidance)
 #'   \item 7. When satisfied with the model structure, use \code{\link{predict.mvgam}},
 #'   \code{\link[marginaleffects]{plot_predictions}} and/or \code{\link[marginaleffects]{plot_slopes}} for
 #'   more targeted inferences (see ["How to interpret and report nonlinear effects from Generalized Additive Models"](https://ecogambler.netlify.app/blog/interpreting-gams/) for some guidance on interpreting GAMs)

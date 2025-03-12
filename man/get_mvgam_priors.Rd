@@ -195,7 +195,7 @@ See examples for details}
 \value{
 either a \code{data.frame} containing the prior definitions (if any suitable
 priors can be altered by the user) or \code{NULL}, indicating that no priors in the model
-can be modified through the \code{mvgam} interface
+can be modified
 }
 \description{
 This function lists the parameters that can have their prior distributions
@@ -204,17 +204,17 @@ changed for a given model, as well listing their default distributions
 \details{
 Users can supply a model formula, prior to fitting the model, so that default priors can be inspected and
 altered. To make alterations, change the contents of the \code{prior} column and supplying this
-\code{data.frame} to the \code{mvgam} function using the argument \code{priors}. If using \code{Stan} as the backend,
+\code{data.frame} to the \code{\link{mvgam}} or \code{\link{jsdgam}} functions using the argument \code{priors}. If using \code{Stan} as the backend,
 users can also modify the parameter bounds by modifying the \code{new_lowerbound} and/or \code{new_upperbound} columns.
 This will be necessary if using restrictive distributions on some parameters, such as a Beta distribution
 for the trend sd parameters for example (Beta only has support on  \code{(0,1)}), so the upperbound cannot
-be above \code{1}. Another option is to make use of the prior modification functions in \code{brms}
+be above \code{1}. Another option is to make use of the prior modification functions in \pkg{brms}
 (i.e. \code{\link[brms]{prior}}) to change prior distributions and bounds (just use the name of the parameter that
 you'd like to change as the \code{class} argument; see examples below)
 }
 \note{
 Only the \code{prior}, \code{new_lowerbound} and/or \code{new_upperbound} columns of the output
-should be altered when defining the user-defined priors for the \code{mvgam} model. Use only if you are
+should be altered when defining the user-defined priors for the model. Use only if you are
 familiar with the underlying probabilistic programming language. There are no sanity checks done to
 ensure that the code is legal (i.e. to check that lower bounds are smaller than upper bounds, for
 example)

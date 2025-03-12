@@ -1,6 +1,8 @@
 # mvgam (development version)
 
 ## New functionalities
+* Changed default priors for scale parameters (i.e. process errors "sigma" and observation errors "sigma_obs") to inverse gammas to provide more sensible prior regularisation away from zero
+* Improved messaging in `summary()` for better guidance on how to investigate poor HMC sampler behaviours
 * Converted several more plotting functions to return `ggplot` objects in place of base R plots for broader customisation
 * Added four new `type`s to the `pp_check()` function to allow more targeted investigations of randomized quantile residual distributions
 * Added a `plot.mvgam_residcor()` function for nicer plotting of estimated residual correlations from `jsdgam` objects 

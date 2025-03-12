@@ -281,7 +281,7 @@ The post-processing methods we have shown above are just the tip of the iceberg.
 * `nmix()` for count data with imperfect detection (unknown number of trials)
   
 See `??mvgam_families` for more information. Below is a simple example for simulating and modelling proportional data with `Beta` observations over a set of seasonal series with independent Gaussian Process dynamic trends:
-```{r beta_sim, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=6.5, dpi=160}
+```{r beta_sim, message=FALSE, warning=FALSE}
 set.seed(100)
 data <- sim_mvgam(
   family = betar(),

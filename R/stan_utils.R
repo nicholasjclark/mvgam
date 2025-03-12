@@ -4266,18 +4266,26 @@ check_div <- function(fit, quiet = FALSE, sampler_params) {
   n = sum(divergent)
   N = length(divergent)
 
-  if (!quiet)
-    cat(sprintf(
-      '%s of %s iterations ended with a divergence (%s%%)\n',
-      n,
-      N,
-      round(100 * n / N, 4)
-    ))
-  if (n > 0) {
+
+  if (round(100 * n / N, 4) > 2) {
     if (!quiet)
-      cat(' *Try running with larger adapt_delta to remove the divergences\n')
+      insight::print_color(sprintf(
+        '\u2716 %s of %s iterations ended with a divergence (%s%%)\n',
+        n,
+        N,
+        round(100 * n / N, 4)
+      ),
+      "bred")
+    insight::print_color(
+      '    Try a larger adapt_delta to remove divergences\n',
+      "bred"
+      )
     if (quiet) return(FALSE)
   } else {
+    if(!quiet){
+      insight::print_color('\u2714', "green")
+      cat(' No issues with divergences\n')
+    }
     if (quiet) return(TRUE)
   }
 }
@@ -4300,56 +4308,27 @@ check_treedepth <- function(
   n = length(treedepths[sapply(treedepths, function(x) x >= max_depth)])
   N = length(treedepths)
 
-  if (!quiet)
-    cat(sprintf(
-      '%s of %s iterations saturated the maximum tree depth of %s (%s%%)\n',
-      n,
-      N,
-      max_depth,
-      round(100 * n / N, 4)
-    ))
-
-  if (n > 0) {
+  if (round(100 * n / N, 4) > 2) {
     if (!quiet)
-      cat(
-        ' *Run with max_treedepth set to a larger value to avoid saturation\n'
+      insight::print_color(sprintf(
+        '\u2716 %s of %s iterations saturated the maximum tree depth of %s (%s%%)\n',
+        n,
+        N,
+        max_depth,
+        round(100 * n / N, 4)
+      ),
+      "bred")
+    insight::print_color(
+        '    Try a larger max_treedepth to avoid saturation\n',
+        "bred"
       )
     if (quiet) return(FALSE)
   } else {
-    if (quiet) return(TRUE)
-  }
-}
-
-#' Check the energy fraction of missing information (E-FMI)
-#' @importFrom stats var
-#' @param fit A stanfit object
-#' @param quiet Logical (verbose or not?)
-#' @details Utility function written by Michael Betancourt (https://betanalpha.github.io/)
-#' @noRd
-check_energy <- function(fit, quiet = FALSE, sampler_params) {
-  if (missing(sampler_params)) {
-    sampler_params <- rstan::get_sampler_params(fit, inc_warmup = FALSE)
-  }
-  no_warning <- TRUE
-  for (n in 1:length(sampler_params)) {
-    energies = sampler_params[n][[1]][, 'energy__']
-    numer = sum(diff(energies)**2) / length(energies)
-    denom = var(energies)
-    if (numer / denom < 0.2) {
-      if (!quiet)
-        cat(sprintf('Chain %s: E-FMI = %s\n', n, round(numer / denom, 4)))
-      no_warning <- FALSE
+    if (!quiet){
+      insight::print_color('\u2714', "green")
+      cat(' No issues with maximum tree depth\n')
     }
-  }
-  if (no_warning) {
-    if (!quiet) cat('E-FMI indicated no pathological behavior\n')
     if (quiet) return(TRUE)
-  } else {
-    if (!quiet)
-      cat(
-        ' *E-FMI below 0.2 indicates you may need to reparameterize your model\n'
-      )
-    if (quiet) return(FALSE)
   }
 }
 
@@ -4417,14 +4396,18 @@ check_n_eff <- function(
   no_warning <- TRUE
   if (min(ratios, na.rm = TRUE) < 0.001) no_warning <- FALSE
   if (no_warning) {
-    if (!quiet) cat('n_eff / iter looks reasonable for all parameters\n')
+    if (!quiet){
+      insight::print_color('\u2714', "green")
+      cat(' No issues with effective samples per iteration\n')
+    }
     if (quiet) return(TRUE)
   } else {
     if (!quiet) {
-      cat(
-        'n_eff / iter below 0.001 found for',
+      insight::print_color(
+        paste0('\u2716 n_eff / iter below 0.001 found for ',
         length(which(ratios < 0.001)),
-        'parameters\n *Effective sample size is likely overestimated for these parameters\n'
+        ' parameters\n    Effective sample size is inaccurate for these parameters\n'),
+        "bred"
       )
     }
     if (quiet) return(FALSE)
@@ -4492,14 +4475,18 @@ check_rhat <- function(
   rhats <- fit_summary[, 'Rhat']
   if (max(rhats, na.rm = TRUE) > 1.05) no_warning <- FALSE
   if (no_warning) {
-    if (!quiet) cat('Rhat looks reasonable for all parameters\n')
+    if (!quiet){
+      insight::print_color('\u2714', "green")
+      cat(' Rhat looks good for all parameters\n')
+    }
     if (quiet) return(TRUE)
   } else {
     if (!quiet) {
-      cat(
-        'Rhats above 1.05 found for',
-        length(which(rhats > 1.05)),
-        'parameters\n *Diagnose further to investigate why the chains have not mixed\n'
+      insight::print_color(
+        paste0('\u2716 Rhats above 1.05 found for some',
+        ' parameters\n',
+        '    Use pairs() and mcmc_plot() to investigate\n'),
+        "bred"
       )
     }
     if (quiet) return(FALSE)
@@ -4526,7 +4513,6 @@ check_all_diagnostics <- function(
     max_depth = max_treedepth,
     sampler_params = sampler_params
   )
-  check_energy(fit, sampler_params = sampler_params)
 }
 
 #' @noRd
