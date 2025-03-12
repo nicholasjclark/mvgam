@@ -4266,23 +4266,24 @@ check_div <- function(fit, quiet = FALSE, sampler_params) {
   n = sum(divergent)
   N = length(divergent)
 
-
   if (round(100 * n / N, 4) > 2) {
     if (!quiet)
-      insight::print_color(sprintf(
-        '\u2716 %s of %s iterations ended with a divergence (%s%%)\n',
-        n,
-        N,
-        round(100 * n / N, 4)
-      ),
-      "bred")
+      insight::print_color(
+        sprintf(
+          '\u2716 %s of %s iterations ended with a divergence (%s%%)\n',
+          n,
+          N,
+          round(100 * n / N, 4)
+        ),
+        "bred"
+      )
     insight::print_color(
       '    Try a larger adapt_delta to remove divergences\n',
       "bred"
-      )
+    )
     if (quiet) return(FALSE)
   } else {
-    if(!quiet){
+    if (!quiet) {
       insight::print_color('\u2714', "green")
       cat(' No issues with divergences\n')
     }
@@ -4310,21 +4311,23 @@ check_treedepth <- function(
 
   if (round(100 * n / N, 4) > 2) {
     if (!quiet)
-      insight::print_color(sprintf(
-        '\u2716 %s of %s iterations saturated the maximum tree depth of %s (%s%%)\n',
-        n,
-        N,
-        max_depth,
-        round(100 * n / N, 4)
-      ),
-      "bred")
-    insight::print_color(
-        '    Try a larger max_treedepth to avoid saturation\n',
+      insight::print_color(
+        sprintf(
+          '\u2716 %s of %s iterations saturated the maximum tree depth of %s (%s%%)\n',
+          n,
+          N,
+          max_depth,
+          round(100 * n / N, 4)
+        ),
         "bred"
       )
+    insight::print_color(
+      '    Try a larger max_treedepth to avoid saturation\n',
+      "bred"
+    )
     if (quiet) return(FALSE)
   } else {
-    if (!quiet){
+    if (!quiet) {
       insight::print_color('\u2714', "green")
       cat(' No issues with maximum tree depth\n')
     }
@@ -4396,7 +4399,7 @@ check_n_eff <- function(
   no_warning <- TRUE
   if (min(ratios, na.rm = TRUE) < 0.001) no_warning <- FALSE
   if (no_warning) {
-    if (!quiet){
+    if (!quiet) {
       insight::print_color('\u2714', "green")
       cat(' No issues with effective samples per iteration\n')
     }
@@ -4404,9 +4407,11 @@ check_n_eff <- function(
   } else {
     if (!quiet) {
       insight::print_color(
-        paste0('\u2716 n_eff / iter below 0.001 found for ',
-        length(which(ratios < 0.001)),
-        ' parameters\n    Effective sample size is inaccurate for these parameters\n'),
+        paste0(
+          '\u2716 n_eff / iter below 0.001 found for ',
+          length(which(ratios < 0.001)),
+          ' parameters\n    Effective sample size is inaccurate for these parameters\n'
+        ),
         "bred"
       )
     }
@@ -4475,7 +4480,7 @@ check_rhat <- function(
   rhats <- fit_summary[, 'Rhat']
   if (max(rhats, na.rm = TRUE) > 1.05) no_warning <- FALSE
   if (no_warning) {
-    if (!quiet){
+    if (!quiet) {
       insight::print_color('\u2714', "green")
       cat(' Rhat looks good for all parameters\n')
     }
@@ -4483,9 +4488,11 @@ check_rhat <- function(
   } else {
     if (!quiet) {
       insight::print_color(
-        paste0('\u2716 Rhats above 1.05 found for some',
-        ' parameters\n',
-        '    Use pairs() and mcmc_plot() to investigate\n'),
+        paste0(
+          '\u2716 Rhats above 1.05 found for some',
+          ' parameters\n',
+          '    Use pairs() and mcmc_plot() to investigate\n'
+        ),
         "bred"
       )
     }

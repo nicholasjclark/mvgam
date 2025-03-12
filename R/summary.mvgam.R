@@ -1012,17 +1012,19 @@ summary.mvgam = function(
     )
 
     sampler <- attr(object$model_output@sim$samples[[1]], "args")$sampler_t
-    if(sampler == "NUTS(diag_e)") sampler <- 'sampling(hmc)'
+    if (sampler == "NUTS(diag_e)") sampler <- 'sampling(hmc)'
     cat(
       insight::format_message(
-        paste0("\nSamples were drawn using ",
-               sampler,
-               ". For each parameter, n_eff is",
-               " a crude measure of effective",
-               " sample size, and Rhat is the",
-               " potential scale reduction factor",
-               " on split MCMC chains (at",
-               " convergence, Rhat = 1)")
+        paste0(
+          "\nSamples were drawn using ",
+          sampler,
+          ". For each parameter, n_eff is",
+          " a crude measure of effective",
+          " sample size, and Rhat is the",
+          " potential scale reduction factor",
+          " on split MCMC chains (at",
+          " convergence, Rhat = 1)"
+        )
       )
     )
     cat('\n')

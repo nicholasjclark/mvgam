@@ -1788,19 +1788,20 @@ update_default_scales = function(
     }
 
     y_link <- suppressWarnings(linkfun(y, link = link))
-    scale_y <- round(mad(y_link,
-                         na.rm = TRUE), 1)
+    scale_y <- round(mad(y_link, na.rm = TRUE), 1)
 
-    if(scale_y <= 5) {
+    if (scale_y <= 5) {
       out <- 'inv_gamma(1.418, 0.452)'
     }
 
-    if(scale_y > 5 &
-       scale_y <= 20) {
+    if (
+      scale_y > 5 &
+        scale_y <= 20
+    ) {
       out <- 'inv_gamma(0.9187, 0.3516)'
     }
 
-    if(scale_y > 20) {
+    if (scale_y > 20) {
       out <- paste0(
         "student_t(",
         paste0(as.character(c(df, 0, scale_y)), collapse = ", "),
