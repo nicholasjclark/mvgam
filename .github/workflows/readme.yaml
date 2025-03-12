@@ -29,7 +29,6 @@ jobs:
             rmarkdown
             knitr
             gratia
-            mvgam
             patchwork
             remotes
             splines2
