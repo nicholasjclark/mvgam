@@ -34,7 +34,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5004</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-03-11</h4>
+            <h4 data-toc-skip class="date">2025-03-12</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/trend_formulas.Rmd" class="external-link"><code>vignettes/trend_formulas.Rmd</code></a></small>
       <div class="d-none name"><code>trend_formulas.Rmd</code></div>
@@ -416,7 +416,7 @@ used in <code>mvgam</code>:</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">priors</span><span class="op">[</span>, <span class="fl">4</span><span class="op">]</span></span>
 <span><span class="co">#&gt;  [1] "(Intercept) ~ student_t(3, -0.1, 2.5);"</span></span>
-<span><span class="co">#&gt;  [2] "sigma ~ student_t(3, 0, 2.5);"         </span></span>
+<span><span class="co">#&gt;  [2] "sigma ~ inv_gamma(1.418, 0.452);"      </span></span>
 <span><span class="co">#&gt;  [3] "es[1] = 0;"                            </span></span>
 <span><span class="co">#&gt;  [4] "es[2] = 0;"                            </span></span>
 <span><span class="co">#&gt;  [5] "fs[1] = sqrt(0.455);"                  </span></span>
@@ -425,7 +425,7 @@ used in <code>mvgam</code>:</p>
 <span><span class="co">#&gt;  [8] "gs[2] = 1.365;"                        </span></span>
 <span><span class="co">#&gt;  [9] "hs[1] = 0.071175;"                     </span></span>
 <span><span class="co">#&gt; [10] "hs[2] = 0.071175;"                     </span></span>
-<span><span class="co">#&gt; [11] "sigma_obs ~ student_t(3, 0, 2.5);"     </span></span>
+<span><span class="co">#&gt; [11] "sigma_obs ~ inv_gamma(1.418, 0.452);"  </span></span>
 <span><span class="co">#&gt; [12] "lambda_trend ~ normal(5, 30);"</span></span></code></pre></div>
 <p>Setting priors is easy in <code>mvgam</code> as you can use
 <code>brms</code> routines. Here we use more informative Normal priors
@@ -593,19 +593,17 @@ to interpret:</p>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
-<span><span class="co">#&gt; n_eff / iter looks reasonable for all parameters</span></span>
-<span><span class="co">#&gt; Rhats above 1.05 found for 8 parameters</span></span>
-<span><span class="co">#&gt;  *Diagnose further to investigate why the chains have not mixed</span></span>
-<span><span class="co">#&gt; 0 of 2000 iterations ended with a divergence (0%)</span></span>
-<span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
-<span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
+<span><span class="co">#&gt; ✔ No issues with effective samples per iteration</span></span>
+<span><span class="co">#&gt; ✖ Rhats above 1.05 found for some parameters</span></span>
+<span><span class="co">#&gt;     Use pairs() and mcmc_plot() to investigate</span></span>
+<span><span class="co">#&gt; ✔ No issues with divergences</span></span>
+<span><span class="co">#&gt; ✔ No issues with maximum tree depth</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Tue Mar 11 07:50:38 2025.</span></span>
-<span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
-<span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
-<span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
+<span><span class="co">#&gt; Samples were drawn using sampling(hmc). For each parameter, n_eff is a</span></span>
+<span><span class="co">#&gt;   crude measure of effective sample size, and Rhat is the potential scale</span></span>
+<span><span class="co">#&gt;   reduction factor on split MCMC chains (at convergence, Rhat = 1)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Use how_to_cite(var_mod) to get started describing this model</span></span></code></pre></div>
+<span><span class="co">#&gt; Use how_to_cite() to get started describing this model</span></span></code></pre></div>
 <p>The convergence of this model isn’t fabulous (more on this in a
 moment). But we can again plot the smooth functions, which this time
 operate on the process model. We can see the same plot using
@@ -858,7 +856,7 @@ stationary:</p>
 <div class="sourceCode" id="cb40"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">description</span></span></code></pre></div>
 <pre><code><span><span class="co">#&gt; Methods text skeleton</span></span>
-<span><span class="co">#&gt; We used the R package mvgam (version 1.1.5003; Clark &amp; Wells, 2023) to</span></span>
+<span><span class="co">#&gt; We used the R package mvgam (version 1.1.5004; Clark &amp; Wells, 2023) to</span></span>
 <span><span class="co">#&gt;   construct, fit and interrogate the model. mvgam fits Bayesian</span></span>
 <span><span class="co">#&gt;   State-Space models that can include flexible predictor effects in both</span></span>
 <span><span class="co">#&gt;   the process and observation components by incorporating functionalities</span></span>

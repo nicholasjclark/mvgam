@@ -20,7 +20,7 @@ mvgam can handle)"><meta property="og:image" content="https://nicholasjclark.git
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5004</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -513,7 +513,7 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                                          prior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1                        (Intercept) ~ student_t(3, 2.1, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2                                       mu_raw ~ std_normal();</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3                            sigma_raw ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3                         sigma_raw ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 4 alpha_gp_trend(lon, lat):trendtrend1 ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 5 alpha_gp_trend(lon, lat):trendtrend2 ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6 alpha_gp_trend(lon, lat):trendtrend3 ~ student_t(3, 0, 2.5);</span>

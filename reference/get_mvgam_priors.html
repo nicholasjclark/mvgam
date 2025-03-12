@@ -12,7 +12,7 @@ changed for a given model, as well listing their default distributions"><meta pr
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5004</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -282,24 +282,24 @@ See examples for details</p></dd>
 
 <p>either a <code>data.frame</code> containing the prior definitions (if any suitable
 priors can be altered by the user) or <code>NULL</code>, indicating that no priors in the model
-can be modified through the <code>mvgam</code> interface</p>
+can be modified</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Users can supply a model formula, prior to fitting the model, so that default priors can be inspected and
 altered. To make alterations, change the contents of the <code>prior</code> column and supplying this
-<code>data.frame</code> to the <code>mvgam</code> function using the argument <code>priors</code>. If using <code>Stan</code> as the backend,
+<code>data.frame</code> to the <code><a href="mvgam.html">mvgam</a></code> or <code><a href="jsdgam.html">jsdgam</a></code> functions using the argument <code>priors</code>. If using <code>Stan</code> as the backend,
 users can also modify the parameter bounds by modifying the <code>new_lowerbound</code> and/or <code>new_upperbound</code> columns.
 This will be necessary if using restrictive distributions on some parameters, such as a Beta distribution
 for the trend sd parameters for example (Beta only has support on  <code>(0,1)</code>), so the upperbound cannot
-be above <code>1</code>. Another option is to make use of the prior modification functions in <code>brms</code>
+be above <code>1</code>. Another option is to make use of the prior modification functions in <span class="pkg">brms</span>
 (i.e. <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></code>) to change prior distributions and bounds (just use the name of the parameter that
 you'd like to change as the <code>class</code> argument; see examples below)</p>
     </div>
     <div class="section level2">
     <h2 id="note">Note<a class="anchor" aria-label="anchor" href="#note"></a></h2>
     <p>Only the <code>prior</code>, <code>new_lowerbound</code> and/or <code>new_upperbound</code> columns of the output
-should be altered when defining the user-defined priors for the <code>mvgam</code> model. Use only if you are
+should be altered when defining the user-defined priors for the model. Use only if you are
 familiar with the underlying probabilistic programming language. There are no sanity checks done to
 ensure that the code is legal (i.e. to check that lower bounds are smaller than upper bounds, for
 example)</p>
@@ -398,7 +398,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> model {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population variances</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_raw ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_raw ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population means</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   mu_raw ~ std_normal();</span>
@@ -420,7 +420,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for latent trend variance parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // trend estimates</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[1, 1 : n_series] ~ normal(0, sigma);</span>
@@ -482,22 +482,22 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 5 vector&lt;lower=-1,upper=1&gt;[n_series] ar2;            3</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6        vector&lt;lower=0&gt;[n_series] sigma;            3</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7      vector&lt;lower=0&gt;[n_series] phi_inv;            3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                    param_info                             prior</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 s(season) smooth parameters           lambda ~ normal(5, 30);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2          s(series) pop mean            mu_raw ~ std_normal();</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3            s(series) pop sd sigma_raw ~ student_t(3, 0, 2.5);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4       trend AR1 coefficient               ar1 ~ std_normal();</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5       trend AR2 coefficient               ar2 ~ std_normal();</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ student_t(3, 0, 2.5);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion   phi_inv ~ student_t(3, 0, 0.1);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                    param_info                                prior</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 s(season) smooth parameters              lambda ~ normal(5, 30);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2          s(series) pop mean               mu_raw ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3            s(series) pop sd sigma_raw ~ inv_gamma(1.418, 0.452);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4       trend AR1 coefficient                  ar1 ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5       trend AR2 coefficient                  ar2 ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ inv_gamma(1.418, 0.452);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion      phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.81);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2    mu_raw ~ normal(-0.2, 0.3);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.53);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4     ar1 ~ normal(-0.39, 0.41);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5      ar2 ~ normal(0.95, 0.73);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.82);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7 phi_inv ~ normal(-0.62, 0.79);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.46);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2    mu_raw ~ normal(0.5, 0.21);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.93);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(0.98, 0.41);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5     ar2 ~ normal(-0.75, 0.87);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.44);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.59, 0.87);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>
@@ -583,7 +583,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> model {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population variances</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_raw ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_raw ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population means</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   mu_raw ~ normal(0.2, 0.5);</span>
@@ -605,7 +605,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for latent trend variance parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // trend estimates</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[1, 1 : n_series] ~ normal(0, sigma);</span>
@@ -742,7 +742,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> model {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population variances</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_raw ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_raw ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population means</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   mu_raw ~ normal(0.2, 0.5);</span>
@@ -764,7 +764,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for latent trend variance parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // trend estimates</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[1, 1 : n_series] ~ normal(0, sigma);</span>
@@ -889,7 +889,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> model {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population variances</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_raw ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_raw ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population means</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   mu_raw ~ normal(0.2, 0.5);</span>
@@ -911,7 +911,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for latent trend variance parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // trend estimates</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[1, 1 : n_series] ~ normal(0, sigma);</span>
@@ -1037,7 +1037,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(5, 30);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for latent trend variance parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ student_t(3, 0, 2.7);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // trend estimates</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[1, 1 : n_series] ~ normal(0, sigma);</span>
@@ -1146,7 +1146,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(5, 30);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for latent trend variance parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ student_t(3, 0, 2.7);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // trend estimates</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[1, 1 : n_series] ~ normal(0, sigma);</span>
@@ -1264,7 +1264,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(5, 30);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for observation error parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_obs ~ student_t(3, 0, 3.7);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_obs ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     // likelihood functions</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     vector[n_nonmissing] flat_sigma_obs;</span>

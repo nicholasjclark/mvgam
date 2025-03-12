@@ -34,7 +34,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5004</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-03-11</h4>
+            <h4 data-toc-skip class="date">2025-03-12</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/forecast_evaluation.Rmd" class="external-link"><code>vignettes/forecast_evaluation.Rmd</code></a></small>
       <div class="d-none name"><code>forecast_evaluation.Rmd</code></div>
@@ -227,20 +227,18 @@ possible:</p>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
-<span><span class="co">#&gt; n_eff / iter looks reasonable for all parameters</span></span>
-<span><span class="co">#&gt; Rhats above 1.05 found for 29 parameters</span></span>
-<span><span class="co">#&gt;  *Diagnose further to investigate why the chains have not mixed</span></span>
-<span><span class="co">#&gt; 0 of 2000 iterations ended with a divergence (0%)</span></span>
-<span><span class="co">#&gt; 43 of 2000 iterations saturated the maximum tree depth of 10 (2.15%)</span></span>
-<span><span class="co">#&gt;  *Run with max_treedepth set to a larger value to avoid saturation</span></span>
-<span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
+<span><span class="co">#&gt; ✔ No issues with effective samples per iteration</span></span>
+<span><span class="co">#&gt; ✖ Rhats above 1.05 found for some parameters</span></span>
+<span><span class="co">#&gt;     Use pairs() and mcmc_plot() to investigate</span></span>
+<span><span class="co">#&gt; ✔ No issues with divergences</span></span>
+<span><span class="co">#&gt; ✖ 43 of 2000 iterations saturated the maximum tree depth of 10 (2.15%)</span></span>
+<span><span class="co">#&gt;     Try a larger max_treedepth to avoid saturation</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Tue Mar 11 07:33:39 2025.</span></span>
-<span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
-<span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
-<span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
+<span><span class="co">#&gt; Samples were drawn using sampling(hmc). For each parameter, n_eff is a</span></span>
+<span><span class="co">#&gt;   crude measure of effective sample size, and Rhat is the potential scale</span></span>
+<span><span class="co">#&gt;   reduction factor on split MCMC chains (at convergence, Rhat = 1)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Use how_to_cite(mod1) to get started describing this model</span></span></code></pre></div>
+<span><span class="co">#&gt; Use how_to_cite() to get started describing this model</span></span></code></pre></div>
 <p>And we can plot the conditional effects of the splines (on the link
 scale) to see that they are estimated to be highly nonlinear</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
@@ -301,40 +299,37 @@ autoregressive and process error parameters for each time series:</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
 <span><span class="co">#&gt;             2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; (Intercept)  1.7   2   2.4    1   925</span></span>
+<span><span class="co">#&gt; (Intercept)  1.7   2   2.4    1   706</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Process model AR parameter estimates:</span></span>
 <span><span class="co">#&gt;        2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; ar1[1] 0.73 0.89  0.99 1.01   575</span></span>
-<span><span class="co">#&gt; ar1[2] 0.65 0.82  0.95 1.00   662</span></span>
-<span><span class="co">#&gt; ar1[3] 0.87 0.96  1.00 1.01   534</span></span>
+<span><span class="co">#&gt; ar1[1] 0.74 0.89  0.99 1.00   688</span></span>
+<span><span class="co">#&gt; ar1[2] 0.66 0.82  0.95 1.01   639</span></span>
+<span><span class="co">#&gt; ar1[3] 0.87 0.96  1.00 1.00   625</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Process error parameter estimates:</span></span>
 <span><span class="co">#&gt;          2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; sigma[1] 0.24 0.33  0.45 1.01   511</span></span>
-<span><span class="co">#&gt; sigma[2] 0.32 0.43  0.60 1.00   501</span></span>
-<span><span class="co">#&gt; sigma[3] 0.19 0.26  0.37 1.00   424</span></span>
+<span><span class="co">#&gt; sigma[1] 0.24 0.33  0.44 1.00   574</span></span>
+<span><span class="co">#&gt; sigma[2] 0.31 0.43  0.59 1.01   495</span></span>
+<span><span class="co">#&gt; sigma[3] 0.19 0.26  0.36 1.02   314</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
 <span><span class="co">#&gt;            edf Ref.df Chi.sq p-value    </span></span>
-<span><span class="co">#&gt; s(season) 2.74      6   17.9 5.3e-06 ***</span></span>
+<span><span class="co">#&gt; s(season) 2.29      6   20.6 3.3e-06 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
-<span><span class="co">#&gt; n_eff / iter looks reasonable for all parameters</span></span>
-<span><span class="co">#&gt; Rhat looks reasonable for all parameters</span></span>
-<span><span class="co">#&gt; 11 of 2000 iterations ended with a divergence (0.55%)</span></span>
-<span><span class="co">#&gt;  *Try running with larger adapt_delta to remove the divergences</span></span>
-<span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
-<span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
+<span><span class="co">#&gt; ✔ No issues with effective samples per iteration</span></span>
+<span><span class="co">#&gt; ✔ Rhat looks good for all parameters</span></span>
+<span><span class="co">#&gt; ✔ No issues with divergences</span></span>
+<span><span class="co">#&gt; ✔ No issues with maximum tree depth</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Tue Mar 11 07:34:38 2025.</span></span>
-<span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
-<span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
-<span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
+<span><span class="co">#&gt; Samples were drawn using sampling(hmc). For each parameter, n_eff is a</span></span>
+<span><span class="co">#&gt;   crude measure of effective sample size, and Rhat is the potential scale</span></span>
+<span><span class="co">#&gt;   reduction factor on split MCMC chains (at convergence, Rhat = 1)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Use how_to_cite(mod2) to get started describing this model</span></span></code></pre></div>
+<span><span class="co">#&gt; Use how_to_cite() to get started describing this model</span></span></code></pre></div>
 <p>We can plot the posteriors for these parameters, and for any other
 parameter for that matter, using <code>bayesplot</code> routines. First
 the autoregressive parameters:</p>
@@ -642,7 +637,7 @@ goals, but both are very easy to compute:</p>
 <span><span class="co">#&gt;   ..$ interval_width: num [1:25] 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 ...</span></span>
 <span><span class="co">#&gt;   ..$ eval_horizon  : int [1:25] 1 2 3 4 5 6 7 8 9 10 ...</span></span>
 <span><span class="co">#&gt;  $ all_series:'data.frame':  25 obs. of  3 variables:</span></span>
-<span><span class="co">#&gt;   ..$ score       : num [1:25] 4.68 NA 4.97 5.5 NA ...</span></span>
+<span><span class="co">#&gt;   ..$ score       : num [1:25] 4.75 NA 4.99 5.33 NA ...</span></span>
 <span><span class="co">#&gt;   ..$ eval_horizon: int [1:25] 1 2 3 4 5 6 7 8 9 10 ...</span></span>
 <span><span class="co">#&gt;   ..$ score_type  : chr [1:25] "energy" "energy" "energy" "energy" ...</span></span></code></pre></div>
 <p>The returned object still provides information on interval coverage
@@ -651,31 +646,31 @@ now (which is provided in the <code>all_series</code> slot):</p>
 <div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">energy_mod2</span><span class="op">$</span><span class="va">all_series</span></span>
 <span><span class="co">#&gt;        score eval_horizon score_type</span></span>
-<span><span class="co">#&gt; 1   4.676734            1     energy</span></span>
+<span><span class="co">#&gt; 1   4.754920            1     energy</span></span>
 <span><span class="co">#&gt; 2         NA            2     energy</span></span>
-<span><span class="co">#&gt; 3   4.971224            3     energy</span></span>
-<span><span class="co">#&gt; 4   5.495762            4     energy</span></span>
+<span><span class="co">#&gt; 3   4.989503            3     energy</span></span>
+<span><span class="co">#&gt; 4   5.326173            4     energy</span></span>
 <span><span class="co">#&gt; 5         NA            5     energy</span></span>
 <span><span class="co">#&gt; 6         NA            6     energy</span></span>
 <span><span class="co">#&gt; 7         NA            7     energy</span></span>
-<span><span class="co">#&gt; 8   4.021035            8     energy</span></span>
-<span><span class="co">#&gt; 9   4.193438            9     energy</span></span>
+<span><span class="co">#&gt; 8   3.900958            8     energy</span></span>
+<span><span class="co">#&gt; 9   4.043380            9     energy</span></span>
 <span><span class="co">#&gt; 10        NA           10     energy</span></span>
-<span><span class="co">#&gt; 11 13.062641           11     energy</span></span>
-<span><span class="co">#&gt; 12 22.344846           12     energy</span></span>
+<span><span class="co">#&gt; 11 12.842520           11     energy</span></span>
+<span><span class="co">#&gt; 12 22.035085           12     energy</span></span>
 <span><span class="co">#&gt; 13        NA           13     energy</span></span>
-<span><span class="co">#&gt; 14 20.732809           14     energy</span></span>
-<span><span class="co">#&gt; 15 24.023995           15     energy</span></span>
-<span><span class="co">#&gt; 16 25.017249           16     energy</span></span>
-<span><span class="co">#&gt; 17 27.913722           17     energy</span></span>
-<span><span class="co">#&gt; 18  6.225731           18     energy</span></span>
-<span><span class="co">#&gt; 19 10.575444           19     energy</span></span>
-<span><span class="co">#&gt; 20  4.096245           20     energy</span></span>
-<span><span class="co">#&gt; 21  3.045512           21     energy</span></span>
-<span><span class="co">#&gt; 22  3.573394           22     energy</span></span>
+<span><span class="co">#&gt; 14 20.567052           14     energy</span></span>
+<span><span class="co">#&gt; 15 23.911131           15     energy</span></span>
+<span><span class="co">#&gt; 16 24.922317           16     energy</span></span>
+<span><span class="co">#&gt; 17 28.014677           17     energy</span></span>
+<span><span class="co">#&gt; 18  6.071522           18     energy</span></span>
+<span><span class="co">#&gt; 19 10.428866           19     energy</span></span>
+<span><span class="co">#&gt; 20  4.043061           20     energy</span></span>
+<span><span class="co">#&gt; 21  3.084471           21     energy</span></span>
+<span><span class="co">#&gt; 22  3.457620           22     energy</span></span>
 <span><span class="co">#&gt; 23        NA           23     energy</span></span>
-<span><span class="co">#&gt; 24  9.180310           24     energy</span></span>
-<span><span class="co">#&gt; 25  8.122963           25     energy</span></span></code></pre></div>
+<span><span class="co">#&gt; 24  9.183656           24     energy</span></span>
+<span><span class="co">#&gt; 25  7.921793           25     energy</span></span></code></pre></div>
 <p>You can use your score(s) of choice to compare different models. For
 example, we can compute and plot the difference in CRPS scores for each
 series in data. Here, a negative value means the AR(1) model

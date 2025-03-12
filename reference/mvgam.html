@@ -28,7 +28,7 @@ leave-one-out / leave-future-out cross-validation."><meta property="og:image" co
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5004</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -503,17 +503,17 @@ are non-identifiable (as in piecewise trends, see examples below)
 can be found in <code><a href="mvgam_families.html">mvgam_families</a></code>.
 <br><br><em>Trend models</em>: Details of latent error process models supported by <span class="pkg">mvgam</span>
 can be found in <code><a href="mvgam_trends.html">mvgam_trends</a></code>.
-<br><br><em>Priors</em>: Default priors for intercepts and any scale parameters are generated
-using the same practice as <span class="pkg">brms</span>. Prior distributions for most important
-model parameters can be altered by the user to inspect model
-sensitivities to given priors (see <code><a href="get_mvgam_priors.html">get_mvgam_priors</a></code> for details).
+<br><br><em>Priors</em>: Default priors for intercepts and any variance parameters are chosen
+to be vaguely informative, but these should always be checked by the user.
+Prior distributions for most important model parameters can be altered
+(see <code><a href="get_mvgam_priors.html">get_mvgam_priors</a></code> for details).
 Note that latent trends are estimated on the link scale so choose priors
 accordingly. However more control over the model specification can be accomplished
-by first using <code>mvgam</code> as a baseline, then editing the returned model accordingly.
-The model file can be edited and run outside of <code>mvgam</code> by setting
-<code>run_model = FALSE</code> and this is encouraged for complex modelling tasks.
-Note, no priors are formally checked to ensure they are in the right syntax so it is
-up to the user to ensure these are correct
+by setting <code>run_model = FALSE</code> and then editing the model code (
+found in the <code>model_file</code> slot in the returned object) before running the
+model using either <span class="pkg">rstan</span> or <span class="pkg">cmdstanr</span>. This is encouraged for
+complex modelling tasks. Note, no priors are formally checked to ensure
+they are in the right syntax so it is up to the user to ensure these are correct
 <br><br><em>Random effects</em>: For any smooth terms using the random effect basis (<code><a href="https://rdrr.io/pkg/mgcv/man/smooth.construct.re.smooth.spec.html" class="external-link">smooth.construct.re.smooth.spec</a></code>),
 a non-centred parameterisation is automatically employed to avoid degeneracies that are common in hierarchical models.
 Note however that centred versions may perform better for series that are particularly informative, so as with any
@@ -560,12 +560,18 @@ observation family (see <code><a href="mvgam_families.html">mvgam_families</a></
 for stochastic parameters</p></li>
 <li><p>4. Change default priors using appropriate prior knowledge (see <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></code>). When using State-Space models
 with a <code>trend_formula</code>, pay particular attention to priors for any variance parameters such as process errors and observation
-errors</p></li>
-<li><p>5. Fit the model using either Hamiltonian Monte Carlo or an approximation algorithm (i.e. change the <code>backend</code> argument)
-and use <code><a href="summary.mvgam.html">summary.mvgam</a></code>, <code><a href="conditional_effects.mvgam.html">conditional_effects.mvgam</a></code>, <code><a href="mcmc_plot.mvgam.html">mcmc_plot.mvgam</a></code>, <code><a href="pp_check.mvgam.html">pp_check.mvgam</a></code> and
+errors. Default priors on these parameters are chosen to be vaguely informative and to avoid
+zero (using Inverse Gamma priors), but more informative priors will often help with
+model efficiency and convergence</p></li>
+<li><p>5. Fit the model using either Hamiltonian Monte Carlo or an approximation algorithm (i.e.
+change the <code>backend</code> argument) and use <code><a href="summary.mvgam.html">summary.mvgam</a></code>, <code><a href="conditional_effects.mvgam.html">conditional_effects.mvgam</a></code>,
+<code><a href="mcmc_plot.mvgam.html">mcmc_plot.mvgam</a></code>, <code><a href="pp_check.mvgam.html">pp_check.mvgam</a></code>, <code><a href="pairs.mvgam.html">pairs.mvgam</a></code> and
 <code><a href="plot.mvgam.html">plot.mvgam</a></code> to inspect / interrogate the model</p></li>
-<li><p>6. Update the model as needed and use <code><a href="loo.mvgam.html">loo_compare.mvgam</a></code> for in-sample model comparisons, or alternatively
-use <code><a href="forecast.mvgam.html">forecast.mvgam</a></code> and <code><a href="score.mvgam_forecast.html">score.mvgam_forecast</a></code> to compare models based on out-of-sample forecasts (see the <a href="https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html">forecast evaluation vignette</a> for guidance)</p></li>
+<li><p>6. Update the model as needed and use <code><a href="loo.mvgam.html">loo_compare.mvgam</a></code> for in-sample model comparisons,
+or alternatively use <code><a href="forecast.mvgam.html">forecast.mvgam</a></code>, <code><a href="lfo_cv.mvgam.html">lfo_cv.mvgam</a></code> and
+<code><a href="score.mvgam_forecast.html">score.mvgam_forecast</a></code> to compare models based on out-of-sample forecasts
+(see the <a href="https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html">forecast evaluation vignette</a>
+for guidance)</p></li>
 <li><p>7. When satisfied with the model structure, use <code><a href="predict.mvgam.html">predict.mvgam</a></code>,
 <code><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></code> and/or <code><a href="https://marginaleffects.com/man/r/plot_slopes.html" class="external-link">plot_slopes</a></code> for
 more targeted inferences (see <a href="https://ecogambler.netlify.app/blog/interpreting-gams/" class="external-link">"How to interpret and report nonlinear effects from Generalized Additive Models"</a> for some guidance on interpreting GAMs)</p></li>
@@ -689,7 +695,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(5, 30);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for latent trend variance parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   to_vector(trend_raw) ~ std_normal();</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     // likelihood functions</span>
@@ -767,7 +773,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55ea2ac491b8&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x5616290cf928&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -793,40 +799,38 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>               2.5%   50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)  1.900  2.00  2.10    1   401</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1  0.066  0.31  0.54    1   497</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2  0.580  0.83  1.10    1   443</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3 -0.060  0.18  0.40    1   423</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4 -0.690 -0.44 -0.18    1   445</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)  1.900  2.00  2.10 1.00   582</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1  0.079  0.31  0.52 1.00   457</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2  0.590  0.82  1.10 1.01   293</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3 -0.051  0.17  0.41 1.00   407</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4 -0.650 -0.42 -0.22 1.01   594</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM smooths:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>            edf Ref.df Chi.sq p-value    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 3.76      4     37  &lt;2e-16 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 3.31      4   42.3 8.3e-07 ***</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Latent trend parameter AR estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           2.5%   50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]    0.29  0.73 0.980 1.01   199</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[2]   -0.94 -0.41 0.039 1.00   141</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[3]    0.18  0.69 0.990 1.01   175</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.42  0.56 0.770 1.01   335</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[2]  0.35  0.50 0.680 1.00   263</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[3]  0.38  0.52 0.690 1.00   395</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           2.5%   50%   97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]    0.28  0.74  0.9800 1.00   231</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[2]   -0.95 -0.48 -0.0039 1.01   143</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[3]    0.19  0.72  0.9800 1.00   174</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.41  0.55  0.7600 1.01   364</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[2]  0.32  0.47  0.6600 1.01   274</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[3]  0.36  0.49  0.6800 1.00   339</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Rhat looks reasonable for all parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations ended with a divergence (0%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 10 (0%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ No issues with effective samples per iteration</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ Rhat looks good for all parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ No issues with divergences</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ No issues with maximum tree depth</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Tue Mar 11 07:22:14 2025.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using sampling(hmc). For each parameter, n_eff is a</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   crude measure of effective sample size, and Rhat is the potential scale</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   reduction factor on split MCMC chains (at convergence, Rhat = 1)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Use how_to_cite(mod1) to get started describing this model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Use how_to_cite() to get started describing this model</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot the estimated historical trend and forecast for one series</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">"trend"</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
@@ -839,7 +843,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-plt img"><img src="mvgam-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="va">resids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/residuals.html" class="external-link">residuals</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">resids</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  num [1:180, 1:4] -0.1514 NaN -0.0868 0.2815 -0.8162 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  num [1:180, 1:4] -0.158 NaN -0.154 0.277 -0.848 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ : chr [1:4] "Estimate" "Est.Error" "Q2.5" "Q97.5"</span>
@@ -849,16 +853,16 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 180 × 14</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>        y season  year series    time .observed .fitted .fit.variability</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>            <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>     4      1     1 series_1     1         4    4.67             1.60</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>    <span style="color: #BB0000;">NA</span>      1     1 series_2     1        <span style="color: #BB0000;">NA</span>    6.79             3.78</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>     4      1     1 series_3     1         4    4.50             1.59</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>     5      2     1 series_1     2         5    4.72             1.65</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>     2      2     1 series_2     2         2    3.78             1.44</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>    <span style="color: #BB0000;">NA</span>      2     1 series_3     2        <span style="color: #BB0000;">NA</span>    5.20             2.92</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>     7      3     1 series_1     3         7    8.49             2.40</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>    12      3     1 series_2     3        12   11.5              2.90</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>     4      3     1 series_3     3         4    5.31             1.87</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>    39      4     1 series_1     4        39   35.8              5.82</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>     4      1     1 series_1     1         4    4.68             1.57</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>    <span style="color: #BB0000;">NA</span>      1     1 series_2     1        <span style="color: #BB0000;">NA</span>    7.06             4.03</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>     4      1     1 series_3     1         4    4.63             1.52</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>     5      2     1 series_1     2         5    4.73             1.62</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>     2      2     1 series_2     2         2    3.84             1.38</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>    <span style="color: #BB0000;">NA</span>      2     1 series_3     2        <span style="color: #BB0000;">NA</span>    5.22             3.01</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>     7      3     1 series_1     3         7    8.50             2.51</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>    12      3     1 series_2     3        12   11.5              2.67</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>     4      3     1 series_3     3         4    5.46             1.94</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>    39      4     1 series_1     4        39   36.1              5.62</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 170 more rows</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 6 more variables: .fit.cred.low &lt;dbl&gt;, .fit.cred.high &lt;dbl&gt;, .resid &lt;dbl&gt;,</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;">#   .resid.variability &lt;dbl&gt;, .resid.cred.low &lt;dbl&gt;, .resid.cred.high &lt;dbl&gt;</span></span>
@@ -868,7 +872,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 16</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x55ea2ac491b8&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x5616290cf928&gt; </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family_pars       : NULL</span>
@@ -897,26 +901,26 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:20] 6 8 5 5 19 14 1 1 7 0 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_times        : int [1:20] 61 62 63 64 65 66 67 68 69 70 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ hindcasts         :List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: num [1:1000, 1:60] 2 6 3 5 3 6 8 5 5 3 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: num [1:1000, 1:60] 8 3 1 5 7 1 8 3 5 2 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:60] "ypred[1,1]" "ypred[2,1]" "ypred[3,1]" "ypred[4,1]" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: num [1:1000, 1:60] 11 6 2 8 5 9 4 11 11 10 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: num [1:1000, 1:60] 9 4 6 12 8 4 4 6 4 8 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:60] "ypred[1,2]" "ypred[2,2]" "ypred[3,2]" "ypred[4,2]" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: num [1:1000, 1:60] 8 7 3 4 6 2 9 4 8 3 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: num [1:1000, 1:60] 2 3 7 5 5 3 6 1 12 0 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:60] "ypred[1,3]" "ypred[2,3]" "ypred[3,3]" "ypred[4,3]" ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ forecasts         :List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:1000, 1:20] 2 5 2 2 3 5 2 12 5 4 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:1000, 1:20] 1 0 18 4 1 14 2 12 7 4 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:1000, 1:20] 12 7 7 13 9 12 6 7 21 2 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:1000, 1:20] 2 3 1 0 3 2 0 12 2 10 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:1000, 1:20] 2 13 3 13 8 1 11 4 7 6 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:1000, 1:20] 15 1 12 3 6 7 7 5 33 10 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "class")= chr "mvgam_forecast"</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> 57.083331</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 57.427275</span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Removed 8 rows containing missing values or values outside the scale range</span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> (`geom_point()`).</span>
 <span class="r-plt img"><img src="mvgam-6.png" alt="" width="700" height="433"></span>
@@ -955,19 +959,19 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="va">beta_draws_df</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">mod1</span>, variable <span class="op">=</span> <span class="st">"betas"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">beta_draws_df</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   (Intercept) s(season).1 s(season).2 s(season).3 s(season).4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1     1.96629    0.296470    0.874324   0.1196780   -0.529862</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2     1.98013    0.237857    1.045300   0.2190120   -0.531390</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3     1.96823    0.261277    0.917819   0.1533780   -0.496630</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4     1.98294    0.281111    0.978535   0.2808860   -0.623235</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5     1.94172    0.254845    1.014710   0.3435790   -0.493195</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     2.01020    0.202327    0.840690   0.0856527   -0.632896</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1     2.02377    0.339960    0.807651   0.2134910   -0.384225</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2     1.90911    0.426211    0.999631   0.1254090   -0.570203</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3     1.99496    0.464323    0.766504   0.3942860   -0.506176</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4     1.93253    0.429288    0.705769   0.1273360   -0.307990</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5     1.97859    0.154809    0.964565   0.0666232   -0.493254</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     1.95921    0.385504    0.686465   0.1625780   -0.223091</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">beta_draws_df</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 'data.frame':	1000 obs. of  5 variables:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ (Intercept): num  1.97 1.98 1.97 1.98 1.94 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).1: num  0.296 0.238 0.261 0.281 0.255 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).2: num  0.874 1.045 0.918 0.979 1.015 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).3: num  0.12 0.219 0.153 0.281 0.344 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).4: num  -0.53 -0.531 -0.497 -0.623 -0.493 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ (Intercept): num  2.02 1.91 1.99 1.93 1.98 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).1: num  0.34 0.426 0.464 0.429 0.155 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).2: num  0.808 1 0.767 0.706 0.965 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).3: num  0.2135 0.1254 0.3943 0.1273 0.0666 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).4: num  -0.384 -0.57 -0.506 -0.308 -0.493 ...</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Investigate model fit</span></span></span>
 <span class="r-in"><span><span class="va">mc.cores.def</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">"mc.cores"</span><span class="op">)</span></span></span>
@@ -978,18 +982,18 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 164 log-likelihood matrix.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate   SE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo   -458.3  8.9</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo        88.4  5.0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> looic       916.7 17.8</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo   -460.5  9.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo        89.8  5.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> looic       921.1 18.8</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> MCSE of elpd_loo is NA.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.4, 1.8]).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.4, 1.6]).</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Pareto k diagnostic values:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                           Count Pct.    Min. ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.67]   (good)     80    48.8%   70      </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.67, 1]   (bad)      74    45.1%   &lt;NA&gt;    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     (1, Inf)   (very bad) 10     6.1%   &lt;NA&gt;    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.67]   (good)     78    47.6%   60      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.67, 1]   (bad)      73    44.5%   &lt;NA&gt;    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     (1, Inf)   (very bad) 13     7.9%   &lt;NA&gt;    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> See help('pareto-k-diagnostic') for details.</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>mc.cores <span class="op">=</span> <span class="va">mc.cores.def</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
@@ -1090,7 +1094,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(5, 30);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for factor SD parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // dynamic factor estimates</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   LV[1, 1 : n_lv] ~ normal(0, sigma);</span>
@@ -1178,7 +1182,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> out ~ gp(time, by = temp, c = 5/4, k = 40, scale = FALSE)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55ea2ac491b8&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x5616290cf928&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> gaussian</span>
@@ -1203,77 +1207,74 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Observation error parameter estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>              2.5%  50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_obs[1] 0.45 0.49  0.54    1   721</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_obs[1] 0.44 0.49  0.54    1   895</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                    2.5%       50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)       4.000   4.0e+00 4.100    1  1810</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.1   1.100   3.3e+00 6.400    1   848</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.2  -2.700   1.4e+00 5.600    1   660</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.3  -5.100  -1.4e+00 3.900    1   945</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.4  -5.200  -1.3e+00 2.600    1   767</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.5  -2.500   4.8e-01 4.300    1   877</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.6  -2.300   2.5e-01 3.300    1   912</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.7  -3.400  -3.4e-01 2.100    1  1035</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.8  -1.700   3.2e-01 2.900    1  1034</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.9  -1.500   2.9e-01 2.500    1   812</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.10 -2.600  -3.6e-01 1.200    1   678</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.11 -2.000  -4.5e-02 1.200    1   928</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.12 -0.850   1.3e-01 2.000    1   658</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.13 -1.300   1.3e-06 1.300    1  1044</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.14 -1.500  -2.0e-02 0.690    1   762</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.15 -0.970   2.6e-11 1.300    1  1083</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.16 -0.750   1.6e-07 1.200    1  1022</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.17 -0.680   1.8e-09 0.990    1  1059</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.18 -0.750   2.1e-23 0.740    1   719</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.19 -1.100  -1.8e-05 0.400    1  1012</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.20 -0.630   8.5e-29 0.620    1   917</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.21 -0.200   6.3e-07 1.000    1   699</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.22 -0.560  -1.5e-14 0.320    1   693</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.23 -0.630  -1.0e-13 0.340    1  1264</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.24 -0.200   1.0e-11 0.590    1   816</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.25 -0.310  -2.5e-66 0.360    1  1108</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.26 -0.540  -5.9e-19 0.160    1   598</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.27 -0.150   1.9e-27 0.360    1   629</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.28 -0.110   3.1e-36 0.320    1   548</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.29 -0.260  -9.2e-36 0.160    1   895</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.30 -0.170  -1.6e-29 0.220    1  1065</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.31 -0.160   0.0e+00 0.140    1   655</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.32 -0.180  -2.8e-38 0.100    1   624</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.33 -0.140   7.4e-79 0.120    1   657</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.34 -0.130   1.5e-88 0.090    1   882</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.35 -0.045  3.0e-120 0.097    1  1114</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.36 -0.100  -1.9e-93 0.038    1   948</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.37 -0.094  -2.7e-68 0.028    1   722</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.38 -0.042   0.0e+00 0.088    1  1441</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.39 -0.028   5.3e-76 0.095    1  1184</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.40 -0.037   0.0e+00 0.032    1   822</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)       4.000   4.0e+00 4.100 1.00  1037</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.1   0.920   3.3e+00 6.200 1.00   803</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.2  -3.600   1.4e+00 5.400 1.00   464</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.3  -5.500  -1.5e+00 3.600 1.00   451</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.4  -5.900  -1.2e+00 2.300 1.00   537</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.5  -3.000   4.9e-01 3.700 1.01   262</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.6  -2.400   2.4e-01 3.600 1.00   866</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.7  -3.600  -4.0e-01 1.900 1.01   421</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.8  -1.700   2.7e-01 2.700 1.00   937</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.9  -1.300   3.7e-01 2.400 1.00   841</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.10 -2.400  -3.8e-01 1.000 1.00   720</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.11 -2.000  -3.7e-02 1.400 1.00   943</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.12 -0.740   1.7e-01 2.100 1.00  1059</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.13 -1.400  -9.4e-13 1.300 1.00  1147</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.14 -1.600  -6.4e-03 0.780 1.00   970</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.15 -0.980  -3.1e-18 1.100 1.00  1218</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.16 -0.640   3.0e-06 1.100 1.00  1390</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.17 -0.660   7.0e-11 0.960 1.00  1029</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.18 -0.670  -3.2e-26 0.710 1.00  1423</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.19 -0.830  -1.9e-05 0.310 1.00   890</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.20 -0.630   3.3e-26 0.500 1.00  1502</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.21 -0.330   7.3e-09 0.860 1.01   526</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.22 -0.640  -2.8e-19 0.310 1.00   909</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.23 -0.580  -4.8e-13 0.290 1.00  1044</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.24 -0.180   2.0e-10 0.550 1.00   794</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.25 -0.300  -4.9e-32 0.290 1.00  1154</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.26 -0.390  -9.6e-15 0.140 1.00   903</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.27 -0.190   1.6e-55 0.340 1.00  1268</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.28 -0.100   2.1e-33 0.380 1.00   976</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.29 -0.250  -3.6e-40 0.150 1.00   934</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.30 -0.200  -4.0e-28 0.170 1.00  1329</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.31 -0.140   1.4e-75 0.160 1.00   854</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.32 -0.130 -2.2e-100 0.130 1.00   855</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.33 -0.130  -4.7e-30 0.120 1.01   963</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.34 -0.066   5.4e-86 0.093 1.00   977</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.35 -0.074   1.1e-42 0.120 1.00  1098</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.36 -0.076  -8.6e-55 0.063 1.00  1034</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.37 -0.085  -1.6e-64 0.045 1.00   854</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.38 -0.032  4.5e-107 0.039 1.01   862</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.39 -0.027  2.0e-140 0.056 1.00   803</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> gp(time):temp.40 -0.051   5.2e-55 0.032 1.00   962</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM gp term marginal deviation (alpha) and length scale (rho) estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                      2.5%   50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> alpha_gp(time):temp  0.18  0.33  0.83 1.01   358</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> rho_gp(time):temp   11.00 31.00 98.00 1.01   149</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> alpha_gp(time):temp  0.17  0.32  0.89    1   235</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> rho_gp(time):temp   11.00 30.00 90.00    1   197</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Rhat looks reasonable for all parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8 of 1000 iterations ended with a divergence (0.8%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  *Try running with larger adapt_delta to remove the divergences</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 10 (0%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ No issues with effective samples per iteration</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ Rhat looks good for all parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ No issues with divergences</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ No issues with maximum tree depth</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Tue Mar 11 07:23:08 2025.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using sampling(hmc). For each parameter, n_eff is a</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   crude measure of effective sample size, and Rhat is the potential scale</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   reduction factor on split MCMC chains (at convergence, Rhat = 1)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Use how_to_cite(mod) to get started describing this model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Use how_to_cite() to get started describing this model</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"smooths"</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="mvgam-18.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod</span>, newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample CRPS:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> 6.46799053704002</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 6.48777085114583</span>
 <span class="r-plt img"><img src="mvgam-19.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Propagating the smooth term shows how the coefficient is expected to evolve</span></span></span>
@@ -1351,7 +1352,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> model {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population variances</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_raw ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_raw ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population means</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   mu_raw ~ std_normal();</span>
@@ -1406,11 +1407,11 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span>, ncol <span class="op">=</span> <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span>, series <span class="op">=</span> <span class="fl">1</span>, ylim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">75</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> 26.765584</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 26.650371</span>
 <span class="r-plt img"><img src="mvgam-21.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span>, series <span class="op">=</span> <span class="fl">2</span>, ylim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">75</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> 101.909078</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 101.645578</span>
 <span class="r-plt img"><img src="mvgam-22.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
@@ -1420,7 +1421,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> 41.427398</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 41.425863</span>
 <span class="r-plt img"><img src="mvgam-23.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Relative Risks can be computed by fixing the offset to the same value</span></span></span>
@@ -1499,7 +1500,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> cbind(y, ntrials) ~ series + s(x, by = series)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55ea2ac491b8&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x5616290cf928&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> binomial</span>
@@ -1524,47 +1525,45 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                        2.5%     50%  97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)          -0.700 -0.5700 -0.440 1.00   764</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> seriesseries2         0.490  0.6600  0.860 1.00   734</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.1 -0.420 -0.0510  0.120 1.01   256</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.2 -0.340 -0.0150  0.240 1.00   319</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.3 -0.130 -0.0110  0.083 1.00   545</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.4 -0.220 -0.0140  0.130 1.00   305</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.5 -0.049  0.0120  0.120 1.00   232</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.6 -0.110  0.0150  0.190 1.00   266</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.7 -0.040 -0.0021  0.025 1.00   446</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.8 -0.830 -0.0670  0.460 1.00   276</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.9  0.220  0.7100  0.940 1.01   261</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.1 -0.170  0.0210  0.300 1.01   428</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.2 -0.300  0.0110  0.270 1.00   283</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.3 -0.067  0.0130  0.120 1.00   346</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.4 -0.120  0.0200  0.190 1.00   318</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.5 -0.110 -0.0120  0.051 1.01   424</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.6 -0.160 -0.0190  0.130 1.00   312</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.7 -0.031  0.0021  0.035 1.00   904</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.8 -0.430  0.1100  0.770 1.00   321</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.9 -1.000 -0.7500 -0.420 1.01   320</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)          -0.710 -0.5800 -0.440 1.00   610</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> seriesseries2         0.430  0.6000  0.790 1.00   601</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.1 -0.680 -0.0780  0.110 1.03    55</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.2 -0.520 -0.0130  0.450 1.01   245</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.3 -0.260 -0.0180  0.037 1.02    80</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.4 -0.260 -0.0094  0.230 1.01   256</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.5 -0.040  0.0067  0.120 1.01   134</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.6 -0.290 -0.0160  0.180 1.01   158</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.7 -0.160 -0.0085  0.099 1.01   219</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.8 -0.770  0.0510  0.990 1.01   238</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.9 -0.033  0.6700  0.940 1.03    52</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.1 -0.100  0.0470  0.640 1.01    61</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.2 -0.160  0.0460  1.300 1.02    54</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.3 -0.042  0.0110  0.250 1.02    49</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.4 -0.100  0.0230  0.520 1.02    74</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.5 -0.180 -0.0076  0.030 1.02    64</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.6 -0.089  0.0250  0.570 1.02    61</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.7 -0.046  0.0150  0.310 1.02    61</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.8 -2.200 -0.1000  0.320 1.02    61</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.9 -0.920 -0.6900 -0.110 1.01    70</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM smooths:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                     edf Ref.df Chi.sq p-value    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1 1.26      9   29.7 0.00024 ***</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2 1.12      9   33.0 0.00279 ** </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1 4.20      9   59.3 0.00038 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2 2.62      9   27.4 &lt; 2e-16 ***</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Rhat looks reasonable for all parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations ended with a divergence (0%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 10 (0%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ No issues with effective samples per iteration</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ Rhat looks good for all parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ No issues with divergences</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ No issues with maximum tree depth</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Tue Mar 11 07:23:57 2025.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using sampling(hmc). For each parameter, n_eff is a</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   crude measure of effective sample size, and Rhat is the potential scale</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   reduction factor on split MCMC chains (at convergence, Rhat = 1)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Use how_to_cite(mod) to get started describing this model</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Use how_to_cite() to get started describing this model</span>
 <span class="r-in"><span><span class="fu"><a href="pp_check.mvgam.html">pp_check</a></span><span class="op">(</span><span class="va">mod</span>,</span></span>
 <span class="r-in"><span>  type <span class="op">=</span> <span class="st">"bars_grouped"</span>,</span></span>
 <span class="r-in"><span>  group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span></span></span>

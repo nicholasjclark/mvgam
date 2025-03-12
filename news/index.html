@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5004</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -60,7 +60,9 @@
 <h2 class="pkg-version" data-toc-text="development version" id="mvgam-development-version">mvgam (development version)<a class="anchor" aria-label="anchor" href="#mvgam-development-version"></a></h2>
 <div class="section level3">
 <h3 id="new-functionalities-development-version">New functionalities<a class="anchor" aria-label="anchor" href="#new-functionalities-development-version"></a></h3>
-<ul><li>Converted several more plotting functions to return <code>ggplot</code> objects in place of base R plots for broader customisation</li>
+<ul><li>Changed default priors for scale parameters (i.e. process errors “sigma” and observation errors “sigma_obs”) to inverse gammas to provide more sensible prior regularisation away from zero</li>
+<li>Improved messaging in <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> for better guidance on how to investigate poor HMC sampler behaviours</li>
+<li>Converted several more plotting functions to return <code>ggplot</code> objects in place of base R plots for broader customisation</li>
 <li>Added four new <code>type</code>s to the <code><a href="../reference/pp_check.mvgam.html">pp_check()</a></code> function to allow more targeted investigations of randomized quantile residual distributions</li>
 <li>Added a <code><a href="../reference/plot.mvgam_residcor.html">plot.mvgam_residcor()</a></code> function for nicer plotting of estimated residual correlations from <code>jsdgam</code> objects</li>
 <li>Added <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> functions to calculate useful posterior summaries from objects of class <code>mvgam_irf</code> and <code>mvgam_fevd</code> (see <code><a href="../reference/irf.mvgam.html">?irf</a></code> and <code><a href="../reference/fevd.mvgam.html">?fevd</a></code> for examples)</li>

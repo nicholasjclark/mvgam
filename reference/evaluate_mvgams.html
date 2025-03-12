@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5004</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -248,9 +248,9 @@ provides a series of summary plots to facilitate model selection. It is essentia
 <span class="r-in"><span><span class="va">score_ar2</span> <span class="op">&lt;-</span> <span class="fu"><a href="score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">fc_ar2</span>, score <span class="op">=</span> <span class="st">'drps'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">score_rw</span> <span class="op">&lt;-</span> <span class="fu"><a href="score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">fc_rw</span>, score <span class="op">=</span> <span class="st">'drps'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">score_ar2</span><span class="op">$</span><span class="va">series_1</span><span class="op">$</span><span class="va">score</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 22.60649</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 39.48068</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">score_rw</span><span class="op">$</span><span class="va">series_1</span><span class="op">$</span><span class="va">score</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 150.4021</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 39.65344</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Use rolling evaluation for approximate comparisons of 3-step ahead</span></span></span>
 <span class="r-in"><span><span class="co"># forecasts across the training period</span></span></span>
@@ -261,8 +261,8 @@ provides a series of summary plots to facilitate model selection. It is essentia
 <span class="r-in"><span>              n_evaluations <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> RPS summaries per model (lower is better)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             Min.  1st Qu.   Median     Mean  3rd Qu.     Max.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Model 1 0.969002 1.533884 2.098765 2.420098 3.145646 4.192528</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Model 2 1.872385 2.191963 2.511542 2.681447 3.085978 3.660415</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Model 1 0.816925 1.411382 2.005840 2.367583 3.142912 4.279985</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Model 2 1.842947 2.168967 2.494988 2.523765 2.864174 3.233360</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 90% interval coverages per model (closer to 0.9 is better)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Model 1 0.9333333 </span>
@@ -294,13 +294,13 @@ provides a series of summary plots to facilitate model selection. It is essentia
 <span class="r-in"><span><span class="co"># better forecasts</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="op">(</span><span class="va">lfo_ar2</span><span class="op">$</span><span class="va">elpds</span> <span class="op">-</span> <span class="va">lfo_rw</span><span class="op">$</span><span class="va">elpds</span><span class="op">)</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span><span class="op">)</span> <span class="op">/</span></span></span>
 <span class="r-in"><span>      <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">lfo_ar2</span><span class="op">$</span><span class="va">elpds</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.8461538</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.7692308</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># A higher total ELPD is preferred</span></span></span>
 <span class="r-in"><span><span class="va">lfo_ar2</span><span class="op">$</span><span class="va">sum_ELPD</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] -57.64126</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] -58.77854</span>
 <span class="r-in"><span><span class="va">lfo_rw</span><span class="op">$</span><span class="va">sum_ELPD</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] -74.73546</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] -75.98128</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

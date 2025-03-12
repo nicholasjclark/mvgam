@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5004</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -154,188 +154,188 @@ the temporal posterior predictions.</p>
 <span class="r-in"><span><span class="co"># Plot forecasts</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc1</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> 43.02091</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 42.585823</span>
 <span class="r-plt img"><img src="ensemble.mvgam_forecast-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc2</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> 48.960093</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 47.85449</span>
 <span class="r-plt img"><img src="ensemble.mvgam_forecast-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">ensemble_fc</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> 44.4178854</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 43.86142888</span>
 <span class="r-plt img"><img src="ensemble.mvgam_forecast-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Score forecasts</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">fc1</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $series_1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       score in_interval interval_width eval_horizon score_type</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  3.519694           1            0.9            1       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1.065430           1            0.9            2       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  2.046281           1            0.9            3       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  1.413042           1            0.9            4       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  0.930472           1            0.9            5       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  1.416889           1            0.9            6       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  2.013766           1            0.9            7       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  1.641915           1            0.9            8       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  1.155585           1            0.9            9       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 1.228389           1            0.9           10       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11 1.408479           1            0.9           11       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12 1.692215           1            0.9           12       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 13 1.061687           1            0.9           13       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 14 1.045703           1            0.9           14       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 15 0.883987           1            0.9           15       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 16 1.006851           1            0.9           16       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 17 1.052675           1            0.9           17       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 18 4.424570           1            0.9           18       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 19 1.245641           1            0.9           19       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 20 2.255526           1            0.9           20       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 21 1.523731           1            0.9           21       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 22 1.627687           1            0.9           22       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 23 4.674054           1            0.9           23       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 24 1.358524           1            0.9           24       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 25 1.328117           1            0.9           25       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  3.523114           1            0.9            1       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  0.932258           1            0.9            2       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  2.073581           1            0.9            3       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  1.414644           1            0.9            4       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  0.996667           1            0.9            5       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  1.419490           1            0.9            6       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  2.097700           1            0.9            7       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  1.610148           1            0.9            8       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  1.232733           1            0.9            9       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 1.225088           1            0.9           10       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11 1.347235           1            0.9           11       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12 1.604694           1            0.9           12       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 13 0.990786           1            0.9           13       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 14 0.966188           1            0.9           14       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 15 0.843817           1            0.9           15       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 16 1.019958           1            0.9           16       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 17 0.899248           1            0.9           17       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 18 4.163395           1            0.9           18       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 19 1.249429           1            0.9           19       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 20 2.031900           1            0.9           20       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 21 1.496291           1            0.9           21       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 22 1.579091           1            0.9           22       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 23 5.095182           0            0.9           23       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 24 1.374279           1            0.9           24       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 25 1.398907           1            0.9           25       crps</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $all_series</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       score eval_horizon score_type</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  3.519694            1   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1.065430            2   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  2.046281            3   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  1.413042            4   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  0.930472            5   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  1.416889            6   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  2.013766            7   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  1.641915            8   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  1.155585            9   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 1.228389           10   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11 1.408479           11   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12 1.692215           12   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 13 1.061687           13   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 14 1.045703           14   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 15 0.883987           15   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 16 1.006851           16   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 17 1.052675           17   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 18 4.424570           18   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 19 1.245641           19   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 20 2.255526           20   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 21 1.523731           21   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 22 1.627687           22   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 23 4.674054           23   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 24 1.358524           24   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 25 1.328117           25   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  3.523114            1   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  0.932258            2   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  2.073581            3   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  1.414644            4   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  0.996667            5   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  1.419490            6   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  2.097700            7   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  1.610148            8   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  1.232733            9   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 1.225088           10   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11 1.347235           11   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12 1.604694           12   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 13 0.990786           13   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 14 0.966188           14   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 15 0.843817           15   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 16 1.019958           16   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 17 0.899248           17   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 18 4.163395           18   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 19 1.249429           19   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 20 2.031900           20   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 21 1.496291           21   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 22 1.579091           22   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 23 5.095182           23   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 24 1.374279           24   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 25 1.398907           25   sum_crps</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="fu"><a href="score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">fc2</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $series_1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       score in_interval interval_width eval_horizon score_type</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  4.107042           1            0.9            1       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1.497690           1            0.9            2       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3.242727           0            0.9            3       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  0.887296           1            0.9            4       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  2.538681           1            0.9            5       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  2.644940           1            0.9            6       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  1.914831           1            0.9            7       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  0.958046           1            0.9            8       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  1.764683           1            0.9            9       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 1.284474           1            0.9           10       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11 1.762642           1            0.9           11       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12 1.679764           1            0.9           12       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 13 1.029331           1            0.9           13       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 14 1.124692           1            0.9           14       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 15 1.124117           1            0.9           15       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 16 1.194408           1            0.9           16       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 17 1.220449           1            0.9           17       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 18 2.770525           1            0.9           18       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 19 1.171404           1            0.9           19       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 20 3.784434           1            0.9           20       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 21 2.684297           1            0.9           21       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 22 1.634375           1            0.9           22       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 23 4.185527           1            0.9           23       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 24 1.377147           1            0.9           24       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 25 1.376571           1            0.9           25       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  4.027405           1            0.9            1       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1.601258           1            0.9            2       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3.404619           0            0.9            3       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  0.890614           1            0.9            4       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  2.538261           1            0.9            5       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  2.620900           1            0.9            6       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  1.892433           1            0.9            7       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  0.918860           1            0.9            8       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  1.634557           1            0.9            9       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 1.184265           1            0.9           10       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11 1.456347           1            0.9           11       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12 1.715809           1            0.9           12       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 13 1.019106           1            0.9           13       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 14 0.957008           1            0.9           14       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 15 1.113928           1            0.9           15       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 16 1.133647           1            0.9           16       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 17 1.101088           1            0.9           17       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 18 2.844725           1            0.9           18       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 19 1.189586           1            0.9           19       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 20 3.681478           1            0.9           20       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 21 2.473191           1            0.9           21       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 22 1.617496           1            0.9           22       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 23 4.132401           1            0.9           23       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 24 1.385082           1            0.9           24       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 25 1.320426           1            0.9           25       crps</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $all_series</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       score eval_horizon score_type</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  4.107042            1   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1.497690            2   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3.242727            3   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  0.887296            4   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  2.538681            5   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  2.644940            6   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  1.914831            7   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  0.958046            8   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  1.764683            9   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 1.284474           10   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11 1.762642           11   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12 1.679764           12   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 13 1.029331           13   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 14 1.124692           14   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 15 1.124117           15   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 16 1.194408           16   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 17 1.220449           17   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 18 2.770525           18   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 19 1.171404           19   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 20 3.784434           20   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 21 2.684297           21   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 22 1.634375           22   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 23 4.185527           23   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 24 1.377147           24   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 25 1.376571           25   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  4.027405            1   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1.601258            2   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3.404619            3   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  0.890614            4   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  2.538261            5   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  2.620900            6   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  1.892433            7   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  0.918860            8   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  1.634557            9   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 1.184265           10   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11 1.456347           11   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12 1.715809           12   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 13 1.019106           13   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 14 0.957008           14   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 15 1.113928           15   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 16 1.133647           16   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 17 1.101088           17   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 18 2.844725           18   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 19 1.189586           19   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 20 3.681478           20   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 21 2.473191           21   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 22 1.617496           22   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 23 4.132401           23   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 24 1.385082           24   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 25 1.320426           25   sum_crps</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="fu"><a href="score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">ensemble_fc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $series_1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>        score in_interval interval_width eval_horizon score_type</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  3.7955833           1            0.9            1       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1.2905165           1            0.9            2       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  2.5552722           1            0.9            3       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  0.9911988           1            0.9            4       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  1.6143423           1            0.9            5       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  1.9904654           1            0.9            6       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  1.9141916           1            0.9            7       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  1.1961590           1            0.9            8       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  1.3656752           1            0.9            9       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 1.1456970           1            0.9           10       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11 1.5757315           1            0.9           11       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12 1.6626805           1            0.9           12       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 13 1.0550899           1            0.9           13       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 14 1.0944728           1            0.9           14       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 15 0.9176216           1            0.9           15       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 16 0.9550766           1            0.9           16       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 17 0.9648343           1            0.9           17       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 18 3.4611669           1            0.9           18       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 19 1.1867785           1            0.9           19       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 20 2.9053145           1            0.9           20       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 21 1.9779106           1            0.9           21       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 22 1.5642031           1            0.9           22       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 23 4.4477604           1            0.9           23       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 24 1.3894922           1            0.9           24       crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 25 1.4006509           1            0.9           25       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  3.7299148           1            0.9            1       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1.2316120           1            0.9            2       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  2.7003969           1            0.9            3       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  1.0364422           1            0.9            4       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  1.6282435           1            0.9            5       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  1.9640138           1            0.9            6       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  1.9986178           1            0.9            7       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  1.1822043           1            0.9            8       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  1.3414211           1            0.9            9       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 1.1086363           1            0.9           10       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11 1.3902652           1            0.9           11       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12 1.6876465           1            0.9           12       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 13 0.9988800           1            0.9           13       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 14 0.9523391           1            0.9           14       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 15 0.9620027           1            0.9           15       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 16 0.9439318           1            0.9           16       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 17 0.9259058           1            0.9           17       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 18 3.3335444           1            0.9           18       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 19 1.2523325           1            0.9           19       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 20 2.6802113           1            0.9           20       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 21 1.8845088           1            0.9           21       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 22 1.4960584           1            0.9           22       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 23 4.7087855           1            0.9           23       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 24 1.3857925           1            0.9           24       crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 25 1.3377218           1            0.9           25       crps</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $all_series</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>        score eval_horizon score_type</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  3.7955833            1   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1.2905165            2   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  2.5552722            3   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  0.9911988            4   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  1.6143423            5   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  1.9904654            6   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  1.9141916            7   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  1.1961590            8   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  1.3656752            9   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 1.1456970           10   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11 1.5757315           11   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12 1.6626805           12   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 13 1.0550899           13   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 14 1.0944728           14   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 15 0.9176216           15   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 16 0.9550766           16   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 17 0.9648343           17   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 18 3.4611669           18   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 19 1.1867785           19   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 20 2.9053145           20   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 21 1.9779106           21   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 22 1.5642031           22   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 23 4.4477604           23   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 24 1.3894922           24   sum_crps</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 25 1.4006509           25   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  3.7299148            1   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1.2316120            2   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  2.7003969            3   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  1.0364422            4   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  1.6282435            5   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  1.9640138            6   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  1.9986178            7   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  1.1822043            8   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  1.3414211            9   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 1.1086363           10   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11 1.3902652           11   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12 1.6876465           12   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 13 0.9988800           13   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 14 0.9523391           14   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 15 0.9620027           15   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 16 0.9439318           16   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 17 0.9259058           17   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 18 3.3335444           18   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 19 1.2523325           19   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 20 2.6802113           20   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 21 1.8845088           21   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 22 1.4960584           22   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 23 4.7087855           23   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 24 1.3857925           24   sum_crps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 25 1.3377218           25   sum_crps</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>

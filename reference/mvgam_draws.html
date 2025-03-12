@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5004</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -211,51 +211,51 @@ will be selected. Defaults to <code>FALSE</code>.</p></dd>
 <span class="r-in"><span><span class="va">beta_draws_df</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">mod1</span>, variable <span class="op">=</span> <span class="st">'betas'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">beta_draws_df</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   (Intercept) s(season).1 s(season).2 s(season).3 s(season).4 s(season).5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1   -0.665563 -0.04910330   -0.729776   -1.095580    -1.53355   -0.406250</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2   -0.681358 -0.03876870   -0.723734   -1.127600    -1.53530   -0.403584</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3   -0.647536  0.01268390   -0.653057   -1.060560    -1.47870   -0.504684</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4   -0.677591 -0.00532764   -0.115463   -1.195240    -1.53471   -0.138667</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5   -0.812200  0.05334260   -0.337354   -0.625487    -1.19688   -0.564655</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6   -0.795634  0.07156260   -0.251256   -0.546085    -1.20969   -0.641432</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    0.576263   -0.442657   -1.277570   -0.941167   -0.454183   0.3173160</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2    0.421946   -0.403229   -1.306820   -1.459220   -0.652293  -0.0942556</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3    0.427732   -0.511082   -1.396910   -1.436200   -0.741150  -0.0537835</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4    0.481900   -0.514655   -0.953897   -1.250180   -0.583693   0.0103624</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5    0.557969   -0.605313   -1.500150   -1.241990   -0.713826  -0.0339844</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6    0.452181   -0.650946   -1.280080   -1.230980   -0.833795  -0.1681980</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   s(season).6 s(season).7 s(season).8</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    0.374048  -0.0887139    0.637541</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2    0.385566  -0.0699071    0.651340</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3    0.401995  -0.2740700    0.652934</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4    0.332383  -0.1416180    0.597028</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5    0.825908  -0.8796400    0.332227</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6    0.792609  -0.9158250    0.406708</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    0.824204    0.721980    0.454141</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2    0.429512    0.772680    0.717363</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3    0.513967    0.830639    0.640509</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4    0.657579    1.103670    0.824368</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5    0.751659    1.023500    1.008320</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6    0.818845    1.260120    0.465691</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">beta_draws_df</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 'data.frame':	1000 obs. of  9 variables:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ (Intercept): num  -0.666 -0.681 -0.648 -0.678 -0.812 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).1: num  -0.0491 -0.03877 0.01268 -0.00533 0.05334 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).2: num  -0.73 -0.724 -0.653 -0.115 -0.337 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).3: num  -1.096 -1.128 -1.061 -1.195 -0.625 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).4: num  -1.53 -1.54 -1.48 -1.53 -1.2 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).5: num  -0.406 -0.404 -0.505 -0.139 -0.565 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).6: num  0.374 0.386 0.402 0.332 0.826 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).7: num  -0.0887 -0.0699 -0.2741 -0.1416 -0.8796 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).8: num  0.638 0.651 0.653 0.597 0.332 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ (Intercept): num  0.576 0.422 0.428 0.482 0.558 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).1: num  -0.443 -0.403 -0.511 -0.515 -0.605 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).2: num  -1.278 -1.307 -1.397 -0.954 -1.5 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).3: num  -0.941 -1.459 -1.436 -1.25 -1.242 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).4: num  -0.454 -0.652 -0.741 -0.584 -0.714 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).5: num  0.3173 -0.0943 -0.0538 0.0104 -0.034 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).6: num  0.824 0.43 0.514 0.658 0.752 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).7: num  0.722 0.773 0.831 1.104 1.024 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).8: num  0.454 0.717 0.641 0.824 1.008 ...</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="va">beta_draws_mat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">mod1</span>, variable <span class="op">=</span> <span class="st">'betas'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">beta_draws_mat</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     variable</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> draw (Intercept) s(season).1 s(season).2 s(season).3 s(season).4 s(season).5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    1   -0.665563 -0.04910330   -0.729776   -1.095580    -1.53355   -0.406250</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    2   -0.681358 -0.03876870   -0.723734   -1.127600    -1.53530   -0.403584</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    3   -0.647536  0.01268390   -0.653057   -1.060560    -1.47870   -0.504684</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    4   -0.677591 -0.00532764   -0.115463   -1.195240    -1.53471   -0.138667</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    5   -0.812200  0.05334260   -0.337354   -0.625487    -1.19688   -0.564655</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    6   -0.795634  0.07156260   -0.251256   -0.546085    -1.20969   -0.641432</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    1    0.576263   -0.442657   -1.277570   -0.941167   -0.454183   0.3173160</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    2    0.421946   -0.403229   -1.306820   -1.459220   -0.652293  -0.0942556</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    3    0.427732   -0.511082   -1.396910   -1.436200   -0.741150  -0.0537835</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    4    0.481900   -0.514655   -0.953897   -1.250180   -0.583693   0.0103624</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    5    0.557969   -0.605313   -1.500150   -1.241990   -0.713826  -0.0339844</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    6    0.452181   -0.650946   -1.280080   -1.230980   -0.833795  -0.1681980</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     variable</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> draw s(season).6 s(season).7 s(season).8</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    1    0.374048  -0.0887139    0.637541</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    2    0.385566  -0.0699071    0.651340</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    3    0.401995  -0.2740700    0.652934</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    4    0.332383  -0.1416180    0.597028</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    5    0.825908  -0.8796400    0.332227</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    6    0.792609  -0.9158250    0.406708</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    1    0.824204    0.721980    0.454141</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    2    0.429512    0.772680    0.717363</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    3    0.513967    0.830639    0.640509</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    4    0.657579    1.103670    0.824368</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    5    0.751659    1.023500    1.008320</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    6    0.818845    1.260120    0.465691</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">beta_draws_mat</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  num [1:1000, 1:9] -0.666 -0.681 -0.648 -0.678 -0.812 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  num [1:1000, 1:9] 0.576 0.422 0.428 0.482 0.558 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ draw    : chr [1:1000] "1" "2" "3" "4" ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ variable: chr [1:9] "(Intercept)" "s(season).1" "s(season).2" "s(season).3" ...</span>
@@ -265,12 +265,12 @@ will be selected. Defaults to <code>FALSE</code>.</p></dd>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">shape_pars</span><span class="op">)</span><span class="co"># }</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     variable</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> draw shape[1] shape[2] shape[3]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    1  25.8484 1.107290 1.044340</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    2  20.3778 1.115680 1.061880</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    3  16.1088 0.934937 1.236390</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    4  15.9863 1.182650 0.922991</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    5  18.7865 1.227450 1.653890</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    6  15.2880 1.254560 1.726000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    1 0.949103 0.676745  1.14757</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    2 1.062070 0.789662  1.16521</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    3 1.001270 0.777792  1.04710</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    4 0.731076 1.121930  1.23934</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    5 0.949215 1.020530  0.96095</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    6 0.885994 0.930078  1.27962</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

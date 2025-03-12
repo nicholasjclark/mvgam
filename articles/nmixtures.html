@@ -34,7 +34,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5004</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-03-11</h4>
+            <h4 data-toc-skip class="date">2025-03-12</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/nmixtures.Rmd" class="external-link"><code>vignettes/nmixtures.Rmd</code></a></small>
       <div class="d-none name"><code>nmixtures.Rmd</code></div>
@@ -561,18 +561,16 @@ nicely</p>
 <span><span class="co">#&gt; s(time):seriestrend2 1.14      3    1.1    0.86</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
-<span><span class="co">#&gt; n_eff / iter looks reasonable for all parameters</span></span>
-<span><span class="co">#&gt; Rhat looks reasonable for all parameters</span></span>
-<span><span class="co">#&gt; 0 of 4000 iterations ended with a divergence (0%)</span></span>
-<span><span class="co">#&gt; 0 of 4000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
-<span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
+<span><span class="co">#&gt; ✔ No issues with effective samples per iteration</span></span>
+<span><span class="co">#&gt; ✔ Rhat looks good for all parameters</span></span>
+<span><span class="co">#&gt; ✔ No issues with divergences</span></span>
+<span><span class="co">#&gt; ✔ No issues with maximum tree depth</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Tue Mar 11 07:37:45 2025.</span></span>
-<span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
-<span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
-<span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
+<span><span class="co">#&gt; Samples were drawn using sampling(hmc). For each parameter, n_eff is a</span></span>
+<span><span class="co">#&gt;   crude measure of effective sample size, and Rhat is the potential scale</span></span>
+<span><span class="co">#&gt;   reduction factor on split MCMC chains (at convergence, Rhat = 1)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Use how_to_cite(mod) to get started describing this model</span></span></code></pre></div>
+<span><span class="co">#&gt; Use how_to_cite() to get started describing this model</span></span></code></pre></div>
 <p><code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> functionality works just as it does for all
 <code>mvgam</code> models to aid in model comparison / selection (though
 note that Pareto K values often give warnings for mixture models so
@@ -930,7 +928,7 @@ model</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Posterior approximation used: no diagnostics to compute</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Use how_to_cite(mod) to get started describing this model</span></span></code></pre></div>
+<span><span class="co">#&gt; Use how_to_cite() to get started describing this model</span></span></code></pre></div>
 <p>Again we can make use of <code>marginaleffects</code> support for
 interrogating the model through targeted predictions. First, we can
 inspect the estimated average detection probability</p>

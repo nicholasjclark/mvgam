@@ -12,7 +12,7 @@ of the algorithms applied by Stan at the back-end of mvgam."><meta property="og:
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5004</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -156,20 +156,20 @@ all parameters are included.</p></dd>
 <span class="r-in"><span><span class="va">np</span> <span class="op">&lt;-</span> <span class="fu">nuts_params</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">np</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Chain Iteration     Parameter    Value</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1     1         1 accept_stat__ 0.896415</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2     1         2 accept_stat__ 0.862973</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3     1         3 accept_stat__ 0.950381</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4     1         4 accept_stat__ 0.992235</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5     1         5 accept_stat__ 0.824117</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     1         6 accept_stat__ 0.933587</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1     1         1 accept_stat__ 0.833376</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2     1         2 accept_stat__ 0.841230</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3     1         3 accept_stat__ 0.786984</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4     1         4 accept_stat__ 0.896456</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5     1         5 accept_stat__ 0.818355</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     1         6 accept_stat__ 0.982187</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># extract the number of divergence transitions</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">np</span>, <span class="va">Parameter</span> <span class="op">==</span> <span class="st">"divergent__"</span><span class="op">)</span><span class="op">$</span><span class="va">Value</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu">neff_ratio</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  mus[1,1]  mus[2,1]  mus[3,1]  mus[4,1]  mus[5,1]  mus[6,1] </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0.8522845 0.8278097 0.7219989 0.9045687 0.5547461 0.5999579 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0.7952996 0.7198956 0.5259765 0.9224632 0.7063161 0.7280866 </span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

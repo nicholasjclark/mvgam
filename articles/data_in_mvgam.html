@@ -34,7 +34,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5004</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-03-11</h4>
+            <h4 data-toc-skip class="date">2025-03-12</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/data_in_mvgam.Rmd" class="external-link"><code>vignettes/data_in_mvgam.Rmd</code></a></small>
       <div class="d-none name"><code>data_in_mvgam.Rmd</code></div>
@@ -469,7 +469,7 @@ data, should work:</p>
 <span><span class="co">#&gt; 2 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
 <span><span class="co">#&gt;                                   prior                  example_change</span></span>
 <span><span class="co">#&gt; 1 (Intercept) ~ student_t(3, 0.5, 2.5);     (Intercept) ~ normal(0, 1);</span></span>
-<span><span class="co">#&gt; 2     sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(0.77, 0.45);</span></span>
+<span><span class="co">#&gt; 2  sigma_obs ~ inv_gamma(1.418, 0.452); sigma_obs ~ normal(0.77, 0.45);</span></span>
 <span><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
 <span><span class="co">#&gt; 1             NA             NA</span></span>
 <span><span class="co">#&gt; 2             NA             NA</span></span></code></pre></div>
@@ -526,9 +526,9 @@ no observations for this series in the data:</p>
 <span><span class="co">#&gt;                             param_name param_length           param_info</span></span>
 <span><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
 <span><span class="co">#&gt; 2 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
-<span><span class="co">#&gt;                                 prior                  example_change</span></span>
-<span><span class="co">#&gt; 1 (Intercept) ~ student_t(3, 0, 2.5);     (Intercept) ~ normal(0, 1);</span></span>
-<span><span class="co">#&gt; 2   sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(0.12, 0.87);</span></span>
+<span><span class="co">#&gt;                                  prior                  example_change</span></span>
+<span><span class="co">#&gt; 1  (Intercept) ~ student_t(3, 0, 2.5);     (Intercept) ~ normal(0, 1);</span></span>
+<span><span class="co">#&gt; 2 sigma_obs ~ inv_gamma(1.418, 0.452); sigma_obs ~ normal(0.12, 0.87);</span></span>
 <span><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
 <span><span class="co">#&gt; 1             NA             NA</span></span>
 <span><span class="co">#&gt; 2             NA             NA</span></span></code></pre></div>
@@ -578,7 +578,7 @@ values:</p>
 <span><span class="co">#&gt;                                    prior                  example_change</span></span>
 <span><span class="co">#&gt; 1 (Intercept) ~ student_t(3, -0.2, 2.5);     (Intercept) ~ normal(0, 1);</span></span>
 <span><span class="co">#&gt; 2              cov ~ student_t(3, 0, 2);             cov ~ normal(0, 1);</span></span>
-<span><span class="co">#&gt; 3      sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(-0.3, 0.11);</span></span>
+<span><span class="co">#&gt; 3   sigma_obs ~ inv_gamma(1.418, 0.452); sigma_obs ~ normal(-0.3, 0.11);</span></span>
 <span><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
 <span><span class="co">#&gt; 1             NA             NA</span></span>
 <span><span class="co">#&gt; 2             NA             NA</span></span>
@@ -621,7 +621,7 @@ change the <code>cov</code> predictor to be a <code>matrix</code>:</p>
 <span><span class="co">#&gt; 4            cov3 ~ student_t(3, 0, 2);             cov3 ~ normal(0, 1);</span></span>
 <span><span class="co">#&gt; 5            cov4 ~ student_t(3, 0, 2);             cov4 ~ normal(0, 1);</span></span>
 <span><span class="co">#&gt; 6            cov5 ~ student_t(3, 0, 2);             cov5 ~ normal(0, 1);</span></span>
-<span><span class="co">#&gt; 7     sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(-0.61, 0.83);</span></span>
+<span><span class="co">#&gt; 7  sigma_obs ~ inv_gamma(1.418, 0.452); sigma_obs ~ normal(-0.61, 0.83);</span></span>
 <span><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
 <span><span class="co">#&gt; 1             NA             NA</span></span>
 <span><span class="co">#&gt; 2             NA             NA</span></span>
@@ -919,7 +919,7 @@ sampling:</p>
 <span><span class="co">#&gt; }</span></span>
 <span><span class="co">#&gt; model {</span></span>
 <span><span class="co">#&gt;   // prior for random effect population variances</span></span>
-<span><span class="co">#&gt;   sigma_raw ~ student_t(3, 0, 2.5);</span></span>
+<span><span class="co">#&gt;   sigma_raw ~ inv_gamma(1.418, 0.452);</span></span>
 <span><span class="co">#&gt;   </span></span>
 <span><span class="co">#&gt;   // prior for random effect population means</span></span>
 <span><span class="co">#&gt;   mu_raw ~ std_normal();</span></span>
@@ -968,7 +968,7 @@ sampling:</p>
 <span><span class="co">#&gt;   lambda ~ normal(5, 30);</span></span>
 <span><span class="co">#&gt;   </span></span>
 <span><span class="co">#&gt;   // priors for latent trend variance parameters</span></span>
-<span><span class="co">#&gt;   sigma ~ student_t(3, 0, 2.5);</span></span>
+<span><span class="co">#&gt;   sigma ~ inv_gamma(1.418, 0.452);</span></span>
 <span><span class="co">#&gt;   </span></span>
 <span><span class="co">#&gt;   // trend estimates</span></span>
 <span><span class="co">#&gt;   trend[1, 1 : n_series] ~ normal(0, sigma);</span></span>
