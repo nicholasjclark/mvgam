@@ -235,13 +235,13 @@ proper scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.49630275
+    #> 8.35221875
     #> Out of sample DRPS:
-    #> 5.25913825
+    #> 5.22224825
     #> Out of sample DRPS:
-    #> 8.84681625
+    #> 8.683958
     #> Out of sample DRPS:
-    #> 4.129553
+    #> 3.49446725
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
@@ -319,7 +319,7 @@ details in scientific communications
     description
 
     #> Methods text skeleton
-    #> We used the R package mvgam (version 1.1.5003; Clark & Wells, 2023) to
+    #> We used the R package mvgam (version 1.1.5004; Clark & Wells, 2023) to
     #>   construct, fit and interrogate the model. mvgam fits Bayesian
     #>   State-Space models that can include flexible predictor effects in both
     #>   the process and observation components by incorporating functionalities
@@ -496,18 +496,16 @@ estimates for the `Beta` precision parameters *ϕ*.
     #> rho_gp[3]   1.200  4.90 23.00 1.01   515
     #> 
     #> Stan MCMC diagnostics:
-    #> n_eff / iter looks reasonable for all parameters
-    #> Rhat looks reasonable for all parameters
-    #> 0 of 2000 iterations ended with a divergence (0%)
-    #> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
-    #> E-FMI indicated no pathological behavior
+    #> ✔ No issues with effective samples per iteration
+    #> ✔ Rhat looks good for all parameters
+    #> ✔ No issues with divergences
+    #> ✔ No issues with maximum tree depth
     #> 
-    #> Samples were drawn using NUTS(diag_e) at Tue Mar 11 06:00:48 2025.
-    #> For each parameter, n_eff is a crude measure of effective sample size,
-    #> and Rhat is the potential scale reduction factor on split MCMC chains
-    #> (at convergence, Rhat = 1)
+    #> Samples were drawn using sampling(hmc). For each parameter, n_eff is a
+    #>   crude measure of effective sample size, and Rhat is the potential scale
+    #>   reduction factor on split MCMC chains (at convergence, Rhat = 1)
     #> 
-    #> Use how_to_cite(mod) to get started describing this model
+    #> Use how_to_cite() to get started describing this model
 
 Plot the hindcast and forecast distributions for each series
 
