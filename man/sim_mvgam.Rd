@@ -2,7 +2,7 @@
 % Please edit documentation in R/sim_mvgam.R
 \name{sim_mvgam}
 \alias{sim_mvgam}
-\title{Simulate a set of time series for mvgam modelling}
+\title{Simulate a set of time series for modelling in \pkg{mvgam}}
 \usage{
 sim_mvgam(
   T = 100,

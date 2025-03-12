@@ -7,7 +7,7 @@
 \description{
 \if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
 
-Fit Bayesian Dynamic Generalized Additive Models to multivariate observations. Users can build nonlinear State-Space models that can incorporate semiparametric effects in observation and process components, using a wide range of observation families. Estimation is performed using Markov Chain Monte Carlo with Hamiltonian Monte Carlo in the software 'Stan'. References: Clark & Wells (2022) \doi{10.1111/2041-210X.13974}.
+Fit Bayesian Dynamic Generalized Additive Models to multivariate observations. Users can build nonlinear State-Space models that can incorporate semiparametric effects in observation and process components, using a wide range of observation families. Estimation is performed using Markov Chain Monte Carlo with Hamiltonian Monte Carlo in the software 'Stan'. References: Clark & Wells (2023) \doi{10.1111/2041-210X.13974}.
 }
 \seealso{
 Useful links:

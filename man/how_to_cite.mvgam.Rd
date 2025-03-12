@@ -3,7 +3,7 @@
 \name{how_to_cite.mvgam}
 \alias{how_to_cite.mvgam}
 \alias{how_to_cite}
-\title{Generate a methods description for mvgam models}
+\title{Generate a methods description for \pkg{mvgam} models}
 \usage{
 how_to_cite(object, ...)
 
@@ -31,7 +31,7 @@ text returned by this function to be a completely adequate methods section, it i
 meant to get you started.
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate 4 time series with hierarchical seasonality
 # and a VAR(1) dynamic process
 set.seed(0)
@@ -44,7 +44,8 @@ mod1 <- mvgam(y ~ s(season, bs = 'cc', k = 6),
               data = simdat$data_train,
               family = gaussian(),
               trend_model = VAR(cor = TRUE),
-              chains = 2)
+              chains = 2,
+              silent = 2)
 how_to_cite(mod1)
 
 # For a GP example, simulate data using the mgcv package
@@ -54,15 +55,9 @@ dat <- mgcv::gamSim(1, n = 30, scale = 2)
 mod2 <- mvgam(y ~ gp(x2, k = 12),
               data = dat,
               family = gaussian(),
-              chains = 2)
+              chains = 2,
+              silent = 2)
 how_to_cite(mod2)
-
-# Repeat using meanfield variational inference
-mod3 <- mvgam(y ~ gp(x2, k = 12),
-              data = dat,
-              family = gaussian(),
-              algorithm = 'meanfield')
-how_to_cite(mod3)
 }
 }
 \seealso{

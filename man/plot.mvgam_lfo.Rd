@@ -2,7 +2,7 @@
 % Please edit documentation in R/lfo_cv.mvgam.R
 \name{plot.mvgam_lfo}
 \alias{plot.mvgam_lfo}
-\title{Plot Pareto-k and ELPD values from a leave-future-out object}
+\title{Plot Pareto-k and ELPD values from a \code{mvgam_lfo} object}
 \usage{
 \method{plot}{mvgam_lfo}(x, ...)
 }
@@ -12,7 +12,7 @@
 \item{...}{Ignored}
 }
 \value{
-A ggplot object of Pareto-k and ELPD values over the
+A \code{ggplot} object presenting Pareto-k and ELPD values over the
 evaluation timepoints. For the Pareto-k plot, a dashed red line indicates the
 specified threshold chosen for triggering model refits. For the ELPD plot,
 a dashed red line indicates the bottom 10\% quantile of ELPD values. Points below

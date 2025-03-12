@@ -1,4 +1,4 @@
-#' Details of formula specifications in `mvgam`
+#' Details of formula specifications in \pkg{mvgam} models
 #' @details \code{\link{mvgam}} will accept an observation model formula and an optional
 #' process model formula (via the argument `trend_formula`). Neither of these formulae can
 #' be specified as lists, contrary to the accepted behaviour in some `mgcv` or `brms` models.
@@ -12,7 +12,8 @@
 #' are non-identifiable.
 #' \cr
 #' \cr
-#' The formulae supplied to \code{\link{mvgam}} are exactly like those supplied to
+#' The formulae supplied to \code{\link{mvgam}} and \code{\link{jsdgam}}
+#' are exactly like those supplied to
 #' \code{\link{glm}} except that smooth terms,
 #' \code{\link[mgcv]{s}},
 #' \code{\link[mgcv]{te}},

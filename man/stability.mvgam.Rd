@@ -22,7 +22,7 @@ A \code{data.frame} containing posterior draws for each stability metric.
 \description{
 Compute reactivity, return rates and contributions of interactions to
 stationary forecast variance from
-\code{mvgam} models with Vector Autoregressive dynamics
+\pkg{mvgam} models with Vector Autoregressive dynamics
 }
 \details{
 These measures of stability can be used to assess how important inter-series
@@ -98,8 +98,9 @@ Major advantages of using \pkg{mvgam} to compute these metrics are that well-cal
 available and that VAR processes are forced to be stationary. These properties make it simple and
 insightful to calculate and inspect aspects of both long-term and short-term stability.
 But it is also possible to more directly inspect possible interactions among the
-time series in a latent VAR process. To do so, you can calculate and plot
-Generalized or Orthogonalized Impulse Response Functions using the \code{\link{irf}} function.
+time series in a latent VAR process. To do so, you can calculate
+Generalized or Orthogonalized Impulse Response Functions using the \code{\link{irf}} function,
+or you can calculate Forecast Error Variance Decompositions using the \code{\link{fevd}} function.
 }
 \examples{
 \donttest{
@@ -116,6 +117,7 @@ mod <- mvgam(y ~ -1,
              trend_model = VAR(cor = TRUE),
              family = gaussian(),
              data = simdat$data_train,
+             chains = 2,
              silent = 2)
 
 # Calulate stability metrics for this system

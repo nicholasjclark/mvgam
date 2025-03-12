@@ -20,7 +20,7 @@
 \method{neff_ratio}{mvgam}(object, pars = NULL, ...)
 }
 \arguments{
-\item{object, x}{A \code{mvgam} object.}
+\item{object, x}{A \code{mvgam} or \code{jsdgam} object.}
 
 \item{pars}{An optional character vector of parameter names.
 For \code{nuts_params} these will be NUTS sampler parameter

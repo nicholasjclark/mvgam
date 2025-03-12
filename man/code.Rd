@@ -5,7 +5,7 @@
 \alias{stancode.mvgam_prefit}
 \alias{stancode.mvgam}
 \alias{standata.mvgam_prefit}
-\title{Stan code and data objects for mvgam models}
+\title{Stan code and data objects for \pkg{mvgam} models}
 \usage{
 code(object)
 
@@ -30,6 +30,7 @@ to fit the model in Stan.
 Generate Stan code and data objects for \pkg{mvgam} models
 }
 \examples{
+\donttest{
 simdat <- sim_mvgam()
 mod <- mvgam(y ~ s(season) +
                s(time, by = series),
@@ -43,5 +44,6 @@ stancode(mod)
 # View Stan model data
 sdata <- standata(mod)
 str(sdata)
+}
 
 }

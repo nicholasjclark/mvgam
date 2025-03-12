@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_mvgam_series.R
 \name{plot_mvgam_series}
 \alias{plot_mvgam_series}
-\title{Plot observed time series used for mvgam modelling}
+\title{Plot observed time series used for \pkg{mvgam} modelling}
 \usage{
 plot_mvgam_series(
   object,

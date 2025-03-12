@@ -5,7 +5,7 @@
 \alias{eval_mvgam}
 \alias{roll_eval_mvgam}
 \alias{compare_mvgams}
-\title{Evaluate forecasts from fitted mvgam objects}
+\title{Evaluate forecasts from fitted \pkg{mvgam} objects}
 \usage{
 eval_mvgam(
   object,
@@ -100,7 +100,7 @@ temporal dependencies in the data. These trends are time series models and so wi
 stable forecasts
 }
 \description{
-Evaluate forecasts from fitted mvgam objects
+Evaluate forecasts from fitted \pkg{mvgam} objects
 }
 \details{
 \code{eval_mvgam} may be useful when both repeated fitting of a model using \code{\link{update.mvgam}}
@@ -125,13 +125,13 @@ provides a series of summary plots to facilitate model selection. It is essentia
 \code{roll_eval_mvgam}
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate from a Poisson-AR2 model with a seasonal smooth
-set.seed(100)
+set.seed(1)
 dat <- sim_mvgam(T = 75,
                 n_series = 1,
                 prop_trend = 0.75,
-                trend_model = 'AR2',
+                trend_model = AR(p = 2),
                 family = poisson())
 
 
@@ -141,15 +141,17 @@ mod_ar2 <- mvgam(y ~ s(season, bs = 'cc'),
                 family = poisson(),
                 data = dat$data_train,
                 newdata = dat$data_test,
-                chains = 2)
+                chains = 2,
+                silent = 2)
 
 # Fit a less appropriate model
-mod_rw <- mvgam(y ~ s(season, bs = 'cc'),
+mod_rw <- mvgam(y ~ 1,
                trend_model = RW(),
                family = poisson(),
                data = dat$data_train,
                newdata = dat$data_test,
-               chains = 2)
+               chains = 2,
+               silent = 2)
 
 # Compare Discrete Ranked Probability Scores for the testing period
 fc_ar2 <- forecast(mod_ar2)
@@ -173,10 +175,12 @@ compare_mvgams(mod_ar2,
 # for estimating model parameters
 lfo_ar2 <- lfo_cv(mod_ar2,
                  min_t = 40,
-                 fc_horizon = 3)
+                 fc_horizon = 3,
+                 silent = 2)
 lfo_rw <- lfo_cv(mod_rw,
                 min_t = 40,
-                fc_horizon = 3)
+                fc_horizon = 3,
+                silent = 2)
 
 # Plot Pareto-K values and ELPD estimates
 plot(lfo_ar2)

@@ -2,7 +2,7 @@
 % Please edit documentation in R/posterior_epred.mvgam.R
 \name{fitted.mvgam}
 \alias{fitted.mvgam}
-\title{Expected Values of the Posterior Predictive Distribution}
+\title{Expected values of the posterior predictive distribution for \pkg{mvgam} objects}
 \usage{
 \method{fitted}{mvgam}(
   object,
@@ -74,15 +74,14 @@ in the model. This is in contrast to the set of predict functions (i.e.
 any dynamic trend component has reached stationarity when returning hypothetical predictions
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate some data and fit a model
-simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 mod <- mvgam(y ~ s(season, bs = 'cc'),
-            trend_model = 'AR1',
+            trend_model = AR(),
             data = simdat$data_train,
             chains = 2,
-            burnin = 300,
-            samples = 300)
+            silent = 2)
 
 # Extract fitted values (posterior expectations)
 expectations <- fitted(mod)

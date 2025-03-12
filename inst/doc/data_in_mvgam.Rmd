@@ -35,10 +35,10 @@ library(ggplot2)
 theme_set(theme_bw(base_size = 12, base_family = 'serif'))
 ```
 
-This vignette gives an example of how to take raw data and format it for use in `mvgam`. This is not an exhaustive example, as data can be recorded and stored in a variety of ways, which requires different approaches to wrangle the data into the necessary format for `mvgam`. For full details on the basic `mvgam` functionality, please see [the introductory vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html).
+This vignette gives an example of how to take raw data and format it for use in `mvgam`. This is not an exhaustive example, as data can be recorded and stored in a variety of ways, which requires different approaches to wrangle the data into the necessary format for `mvgam`. For full details on the basic `mvgam` functionality, please see [the introductory vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html) and [the growing set of walk through video tutorials on `mvgam` applications](https://www.youtube.com/playlist?list=PLzFHNoUxkCvsFIg6zqogylUfPpaxau_a3&si=lyg7qUrMLbD-tHCB).
 
 ## Required *long* data format
-Manipulating the data into a 'long' format is necessary for modelling in `mvgam`. By 'long' format, we mean that each `series x time` observation needs to have its own entry in the `dataframe` or `list` object that we wish to use as data for modelling. A simple example can be viewed by simulating data using the `sim_mvgam` function. See `?sim_mvgam` for more details
+Manipulating the data into a 'long' format is necessary for modelling in `mvgam`. By 'long' format, we mean that each `series x time` observation needs to have its own entry in the `dataframe` or `list` object that we wish to pass as data for to the two primary modelling functions, `mvgam()` and `jsdgam()`. A simple example can be viewed by simulating data using the `sim_mvgam()` function. See `?sim_mvgam` for more details
 ```{r}
 simdat <- sim_mvgam(n_series = 4, T = 24, prop_missing = 0.2)
 head(simdat$data_train, 16)
@@ -56,7 +56,7 @@ It is important that the number of levels matches the number of unique series in
 all(levels(simdat$data_train$series) %in% unique(simdat$data_train$series))
 ```
 
-Note that you can technically supply data that does not have a `series` indicator, and the package will assume that you are only using a single time series. But again, it is better to have this included so there is no confusion.
+Note that you can technically supply data that does not have a `series` indicator, and the package will generally assume that you are only using a single time series. There are exceptions to this, for example if you have grouped data and would like to estimate hierarchical dependencies (see an example of hierarchical process error correlations in the `?AR` documentation) or if you would like to set up a Joint Species Distribution Model (JSDM) using a Zero-Mean Multivariate Gaussian distribution for the latent residuals (see examples in the `?ZMVN` documentation).
 
 ### A single outcome variable
 You may also have notices that we do not spread the `numeric / integer`-classed outcome variable into different columns. Rather, there is only a single column for the outcome variable, labelled `y` in these simulated data (though the outcome does not have to be labelled `y`). This is another important requirement in `mvgam`, but it shouldn't be too unfamiliar to `R` users who frequently use modelling packages such as `lme4`, `mgcv`, `brms` or the many other regression modelling packages out there. The advantage of this format is that it is now very easy to specify effects that vary among time series:
@@ -81,14 +81,14 @@ gauss_dat <- data.frame(outcome = rnorm(10),
 gauss_dat
 ```
 
-A call to `gam` using the `mgcv` package leads to a model that actually fits (though it does give an unhelpful warning message):
+A call to `gam()` using the `mgcv` package leads to a model that actually fits (though it does give an unhelpful warning message):
 ```{r}
 mgcv::gam(outcome ~ time,
     family = betar(),
     data = gauss_dat)
 ```
 
-But the same call to `mvgam` gives us something more useful:
+But the same call to `mvgam()` gives us something more useful:
 ```{r error=TRUE}
 mvgam(outcome ~ time,
       family = betar(),
@@ -98,7 +98,7 @@ mvgam(outcome ~ time,
 Please see `?mvgam_families` for more information on the types of responses that the package can handle and their restrictions
 
 ### A `time` variable
-The other requirement for most models that can be fit in `mvgam` is a `numeric / integer`-classed variable labelled `time`. This ensures the modelling software knows how to arrange the time series when building models. This setup still allows us to formulate multivariate time series models. If you plan to use any of the autoregressive dynamic trend functions available in `mvgam` (see `?mvgam_trends` for details of available dynamic processes), you will need to ensure your time series are entered with a fixed sampling interval (i.e. the time between timesteps 1 and 2 should be the same as the time between timesteps 2 and 3, etc...). But note that you can have missing observations for some (or all) series. `mvgam` will check this for you, but again it is useful to ensure you have no missing timepoint x series combinations in your data. You can generally do this with a simple `dplyr` call:
+The other requirement for most models that can be fit in `mvgam` is a `numeric / integer`-classed variable labelled `time`. This ensures the modelling software knows how to arrange the time series when building models. This setup still allows us to formulate multivariate time series models. If you plan to use any of the autoregressive dynamic trend functions available in `mvgam` (see `?mvgam_trends` for details of available dynamic processes), you will need to ensure your time series are entered with a fixed sampling interval (i.e. the time between timesteps 1 and 2 should be the same as the time between timesteps 2 and 3, etc...). But note that you can have missing observations for some (or all) series. `mvgam()` will check this for you, but again it is useful to ensure you have no missing timepoint x series combinations in your data. You can generally do this with a simple `dplyr` call:
 ```{r}
 # A function to ensure all timepoints within a sequence are identical
 all_times_avail = function(time, min_time, max_time){
@@ -127,10 +127,10 @@ if(any(checked_times$all_there == FALSE)){
 Note that models which use dynamic components will assume that smaller values of `time` are *older* (i.e. `time = 1` came *before* `time = 2`, etc...)
 
 ### Irregular sampling intervals?
-Most `mvgam` trend models expect `time` to be measured in discrete, evenly-spaced intervals (i.e. one measurement per week, or one per year, for example; though missing values are allowed). But please note that irregularly sampled time intervals are allowed, in which case the `CAR()` trend model (continuous time autoregressive) is appropriate. You can see an example of this kind of model in the **Examples** section in `?CAR`. You can also use `trend_model = 'None'` (the default in `mvgam()`) and instead use a Gaussian Process to model temporal variation for irregularly-sampled time series. See the `?brms::gp` for details
+Most `mvgam` dynamic trend models expect `time` to be measured in discrete, evenly-spaced intervals (i.e. one measurement per week, or one per year, for example; though missing values are allowed). But please note that irregularly sampled time intervals are allowed, in which case the `CAR()` trend model (continuous time autoregressive) is appropriate. You can see an example of this kind of model in the **Examples** section in `?CAR`. You can also use `trend_model = 'None'` (the default in `mvgam()`) and instead use a Gaussian Process to model temporal variation for irregularly-sampled time series. See the `?brms::gp` for details. But to reiterate the point from above, if you do not have time series data (or don't want to estimate latent temporal dynamics) but you would like to estimate correlated latent residuals among multivariate outcomes, you can set up models that use `trend_model = ZMVN(...)` without the need for a `time` variable (see `?ZMVN` for details).
 
-## Checking data with `get_mvgam_priors`
-The `get_mvgam_priors` function is designed to return information about the parameters in a model whose prior distributions can be modified by the user. But in doing so, it will perform a series of checks to ensure the data are formatted properly. It can therefore be very useful to new users for ensuring there isn't anything strange going on in the data setup. For example, we can replicate the steps taken above (to check factor levels and timepoint x series combinations) with a single call to `get_mvgam_priors`. Here we first simulate some data in which some of the timepoints in the `time` variable are not included in the data:
+## Checking data with `get_mvgam_priors()`
+The `get_mvgam_priors()` function is designed to return information about the parameters in a model whose prior distributions can be modified by the user. But in doing so, it will perform a series of checks to ensure the data are formatted properly. It can therefore be very useful to new users for ensuring there isn't anything strange going on in the data setup. For example, we can replicate the steps taken above (to check factor levels and timepoint x series combinations) with a single call to `get_mvgam_priors()`. Here we first simulate some data in which some of the timepoints in the `time` variable are not included in the data:
 ```{r}
 bad_times <- data.frame(time = seq(1, 16, by = 2),
                         series = factor('series_1'),
@@ -138,14 +138,14 @@ bad_times <- data.frame(time = seq(1, 16, by = 2),
 bad_times
 ```
 
-Next we call `get_mvgam_priors` by simply specifying an intercept-only model, which is enough to trigger all the checks:
+Next we call `get_mvgam_priors()` by simply specifying an intercept-only model, which is enough to trigger all the checks:
 ```{r error = TRUE}
 get_mvgam_priors(outcome ~ 1,
                  data = bad_times,
                  family = gaussian())
 ```
 
-This error is useful as it tells us where the problem is. There are many ways to fill in missing timepoints, so the correct way will have to be left up to the user. But if you don't have any covariates, it should be pretty easy using `expand.grid`:
+This error is useful as it tells us where the problem is. There are many ways to fill in missing timepoints, so the correct way will have to be left up to the user. But if you don't have any covariates, it should be pretty easy using `expand.grid()`:
 ```{r}
 bad_times %>%
   dplyr::right_join(expand.grid(time = seq(min(bad_times$time),
@@ -156,7 +156,7 @@ bad_times %>%
 good_times
 ```
 
-Now the call to `get_mvgam_priors`, using our filled in data, should work:
+Now the call to `get_mvgam_priors()`, using our filled in data, should work:
 ```{r error = TRUE}
 get_mvgam_priors(outcome ~ 1,
                  data = good_times,
@@ -174,7 +174,7 @@ bad_levels <- data.frame(time = 1:8,
 levels(bad_levels$series)
 ```
 
-Another call to `get_mvgam_priors` brings up a useful error:
+Another call to `get_mvgam_priors()` brings up a useful error:
 ```{r error = TRUE}
 get_mvgam_priors(outcome ~ 1,
                  data = bad_levels,
@@ -200,7 +200,7 @@ get_mvgam_priors(outcome ~ 1,
 ```
 
 ### Covariates with no `NA`s
-Covariates can be used in models just as you would when using `mgcv` (see `?formula.gam` for details of the formula syntax). But although the outcome variable can have `NA`s, covariates cannot. Most regression software will silently drop any raws in the model matrix that have `NA`s, which is not helpful when debugging. Both the `mvgam` and `get_mvgam_priors` functions will run some simple checks for you, and hopefully will return useful errors if it finds in missing values:
+Covariates can be used in models just as you would when using `mgcv` (see `?formula.gam` for details of the formula syntax). But although the outcome variable can have `NA`s, covariates cannot. Most regression software will silently drop any raws in the model matrix that have `NA`s, which is not helpful when debugging. Both the `mvgam()` and `get_mvgam_priors()` functions will run some simple checks for you, and hopefully will return useful errors if it finds in missing values:
 ```{r}
 miss_dat <- data.frame(outcome = rnorm(10),
                        cov = c(NA, rnorm(9)),
@@ -226,15 +226,15 @@ miss_dat$cov <- matrix(rnorm(50), ncol = 5, nrow = 10)
 miss_dat$cov[2,3] <- NA
 ```
 
-A call to `mvgam` returns the same error:
+A call to `get_mvgam_priors()` returns the same error:
 ```{r error=TRUE}
 get_mvgam_priors(outcome ~ cov,
                  data = miss_dat,
                  family = gaussian())
 ```
 
-## Plotting with `plot_mvgam_series`
-Plotting the data is a useful way to ensure everything looks ok, once you've gone throug the above checks on factor levels and timepoint x series combinations. The `plot_mvgam_series` function will take supplied data and plot either a series of line plots (if you choose `series = 'all'`) or a set of plots to describe the distribution for a single time series. For example, to plot all of the time series in our data, and highlight a single series in each plot, we can use:
+## Plotting with `plot_mvgam_series()`
+Plotting the data is a useful way to ensure everything looks ok, once you've gone throug the above checks on factor levels and timepoint x series combinations. The `plot_mvgam_series()` function will take supplied data and plot either a series of line plots (if you choose `series = 'all'`) or a set of plots to describe the distribution for a single time series. For example, to plot all of the time series in our data, and highlight a single series in each plot, we can use:
 ```{r, fig.alt = "Plotting time series features for GAM models in mvgam"}
 plot_mvgam_series(data = simdat$data_train, 
                   y = 'y', 
@@ -283,7 +283,7 @@ model_dat <- all_neon_tick_data %>%
   dplyr::mutate(epiWeek = as.numeric(epiWeek))
 ```
 
-Now is the tricky part: we need to fill in missing observations with `NA`s. The tick data are sparse in that field observers do not go out and sample in each possible `epiWeek`. So there are many particular weeks in which observations are not included in the data. But we can use `expand.grid` again to take care of this:
+Now is the tricky part: we need to fill in missing observations with `NA`s. The tick data are sparse in that field observers do not go out and sample in each possible `epiWeek`. So there are many particular weeks in which observations are not included in the data. But we can use `expand.grid()` again to take care of this:
 ```{r}
 model_dat %>%
   # Create all possible combos of plotID, Year and epiWeek; 
@@ -325,14 +325,14 @@ Check factor levels for the `series`:
 levels(model_dat$series)
 ```
 
-This looks good, as does a more rigorous check using `get_mvgam_priors`:
+This looks good, as does a more rigorous check using `get_mvgam_priors()`:
 ```{r error=TRUE}
 get_mvgam_priors(y ~ 1,
                  data = model_dat,
                  family = poisson())
 ```
 
-We can also set up a model in `mvgam` but use `run_model = FALSE` to further ensure all of the necessary steps for creating the modelling code and objects will run. It is recommended that you use the `cmdstanr` backend if possible, as the auto-formatting options available in this package are very useful for checking the package-generated `Stan` code for any inefficiencies that can be fixed to lead to sampling performance improvements:
+We can also set up a model in `mvgam()` but use `run_model = FALSE` to further ensure all of the necessary steps for creating the modelling code and objects will run. It is recommended that you use the `cmdstanr` backend if possible, as the auto-formatting options available in this package are very useful for checking the package-generated `Stan` code for any inefficiencies that can be fixed to lead to sampling performance improvements:
 ```{r}
 testmod <- mvgam(y ~ s(epiWeek, by = series, bs = 'cc') +
                    s(series, bs = 're'),
@@ -352,4 +352,4 @@ code(testmod)
 ```
 
 ## Interested in contributing?
-I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au)
+I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please see [this small list of opportunities on my website](https://ecogambler.netlify.app/opportunities/) and do reach out if you are interested (n.clark'at'uq.edu.au)

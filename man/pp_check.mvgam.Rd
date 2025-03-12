@@ -3,7 +3,7 @@
 \name{pp_check.mvgam}
 \alias{pp_check.mvgam}
 \alias{pp_check}
-\title{Posterior Predictive Checks for \code{mvgam} Objects}
+\title{Posterior Predictive Checks for \code{mvgam} models}
 \usage{
 \method{pp_check}{mvgam}(
   object,
@@ -46,7 +46,8 @@ and ignored otherwise.}
 
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the
 variables included in the linear predictor of \code{formula}. If not supplied,
-predictions are generated for the original observations used for the model fit.}
+predictions are generated for the original observations used for the model fit.
+Ignored if using one of the residual plots (i.e. 'resid_hist')}
 
 \item{...}{Further arguments passed to \code{\link{predict.mvgam}}
 as well as to the PPC function specified in \code{type}.}
@@ -69,14 +70,16 @@ documentation of the \pkg{\link[bayesplot:bayesplot-package]{bayesplot}}
 package.
 }
 \examples{
-\dontrun{
-simdat <- sim_mvgam(seasonality = 'hierarchical')
-mod <- mvgam(y ~ series +
-              s(season, bs = 'cc', k = 6) +
-              s(season, series, bs = 'fs', k = 4),
-            data = simdat$data_train,
-            burnin = 300,
-            samples = 300)
+\donttest{
+simdat <- sim_mvgam(seasonality = "hierarchical")
+mod <- mvgam(
+  y ~ series +
+    s(season, bs = "cc", k = 6) +
+    s(season, series, bs = "fs", k = 4),
+  data = simdat$data_train,
+  chains = 2,
+  silent = 2
+)
 
 # Use pp_check(mod, type = "xyz") for a list of available plot types
 
@@ -87,26 +90,54 @@ pp_check(mod)
 pp_check(mod, type = "rootogram")
 
 # Grouping plots by series is useful
-pp_check(mod, type = "bars_grouped",
-        group = "series", ndraws = 50)
-pp_check(mod, type = "ecdf_overlay_grouped",
-        group = "series", ndraws = 50)
-pp_check(mod, type = "stat_freqpoly_grouped",
-        group = "series", ndraws = 50)
+pp_check(mod,
+  type = "bars_grouped",
+  group = "series", ndraws = 50
+)
+pp_check(mod,
+  type = "ecdf_overlay_grouped",
+  group = "series", ndraws = 50
+)
+pp_check(mod,
+  type = "stat_freqpoly_grouped",
+  group = "series", ndraws = 50
+)
+
+# Several types can be used to plot distributions of randomized
+# quantile residuals
+pp_check(
+  object = mod,
+  x = "season",
+  type = "resid_ribbon"
+)
+pp_check(
+  object = mod,
+  x = "season",
+  group = "series",
+  type = "resid_ribbon_grouped"
+)
+pp_check(mod,
+  ndraws = 5,
+  type = "resid_hist_grouped",
+  group = "series"
+)
 
 # Custom functions accepted
-prop_zero <- function(x) mean(x == 0)
-pp_check(mod, type = "stat", stat = "prop_zero")
-pp_check(mod, type = "stat_grouped",
-        stat = "prop_zero",
-        group = "series")
+pp_check(mod, type = "stat", stat = function(x) mean(x == 0))
+pp_check(mod,
+  type = "stat_grouped",
+  stat = function(x) mean(x == 0),
+  group = "series"
+)
 
 # Some functions accept covariates to set the x-axes
-pp_check(mod, x = "season",
-        type = "ribbon_grouped",
-        prob = 0.5,
-        prob_outer = 0.8,
-        group = "series")
+pp_check(mod,
+  x = "season",
+  type = "ribbon_grouped",
+  prob = 0.5,
+  prob_outer = 0.8,
+  group = "series"
+)
 
 # Many plots can be made without the observed data
 pp_check(mod, prefix = "ppd")

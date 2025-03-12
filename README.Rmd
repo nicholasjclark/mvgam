@@ -10,11 +10,10 @@ knitr::opts_chunk$set(
   comment = "#>",
   fig.path = "man/figures/README-",
   dev = "png",
-  dpi = 160,
-  fig.asp = 0.8,
-  fig.width = 6,
-  out.width = "60%",
-  fig.align = "center"
+  dpi = 150,
+  fig.height = 6,
+  fig.width = 9,
+  out.width = "100%"
 )
 ```
 
@@ -28,199 +27,218 @@ knitr::opts_chunk$set(
 [![R-CMD-check](https://github.com/nicholasjclark/mvgam/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
 [![Coverage status](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://app.codecov.io/gh/nicholasjclark/mvgam)
 [![Documentation](https://img.shields.io/badge/documentation-mvgam-orange.svg?colorB=brightgreen)](https://nicholasjclark.github.io/mvgam/)
+[![Methods in Ecology & Evolution](https://img.shields.io/badge/Methods%20in%20Ecology%20&%20Evolution-14,%20771–784-blue.svg)](https://doi.org/10.1111/2041-210X.13974)
 [![CRAN Version](https://www.r-pkg.org/badges/version/mvgam)](https://cran.r-project.org/package=mvgam)
 [![CRAN Downloads](https://cranlogs.r-pkg.org/badges/grand-total/mvgam?color=brightgreen)](https://cran.r-project.org/package=mvgam)
 
-The goal of `mvgam` is to fit Bayesian (Dynamic) Generalized Additive Models. This package constructs State-Space models that can include highly flexible nonlinear predictor effects for both process and observation components by leveraging functionalities from the impressive [`brms`](https://paulbuerkner.com/brms/){target="_blank"} and [`mgcv`](https://cran.r-project.org/web/packages/mgcv/index.html){target="_blank"} packages. This allows `mvgam` to fit a wide range of models, including hierarchical ecological models such as N-mixture or Joint Species Distribution models, as well as univariate and multivariate time series models with imperfect detection. The original motivation for the package is described in [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974){target="_blank"} (published in *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling coming from [Michael Betancourt](https://betanalpha.github.io/writing/){target="_blank"}, [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/){target="_blank"} and [Sarah Heaps](https://www.durham.ac.uk/staff/sarah-e-heaps/){target="_blank"}, among many others. 
+The goal of the `mvgam` 📦 is to fit Bayesian Dynamic Generalized Additive Models (DGAMs) that can include highly flexible nonlinear predictor effects for both process and observation components. The package does this by relying on functionalities from the impressive [`brms`](https://paulbuerkner.com/brms/){target="_blank"} and [`mgcv`](https://cran.r-project.org/package=mgcv){target="_blank"} packages. This allows `mvgam` to fit a wide range of models, including:
 
-## Resources
-A series of [vignettes cover data formatting, forecasting and several extended case studies of DGAMs](https://nicholasjclark.github.io/mvgam/){target="_blank"}. A number of other examples, including some step-by-step introductory webinars, have also been compiled:
-  
-* [Time series in R and Stan using the `mvgam` package](https://www.youtube.com/playlist?list=PLzFHNoUxkCvsFIg6zqogylUfPpaxau_a3){target="_blank"}
-* [Ecological Forecasting with Dynamic Generalized Additive Models](https://www.youtube.com/watch?v=0zZopLlomsQ){target="_blank"}
-* [Distributed lags (and hierarchical distributed lags) using `mgcv` and `mvgam`](https://ecogambler.netlify.app/blog/distributed-lags-mgcv/){target="_blank"}
-* [State-Space Vector Autoregressions in `mvgam`](https://ecogambler.netlify.app/blog/vector-autoregressions/){target="_blank"}
-* [Ecological Forecasting with Dynamic GAMs; a tutorial and detailed case study](https://www.youtube.com/watch?v=RwllLjgPUmM){target="_blank"}
-* [How to interpret and report nonlinear effects from Generalized Additive Models](https://ecogambler.netlify.app/blog/interpreting-gams/){target="_blank"}
-* [Phylogenetic smoothing using `mgcv`](https://ecogambler.netlify.app/blog/phylogenetic-smooths-mgcv/){target="_blank"}
-* [Incorporating time-varying seasonality in forecast models](https://ecogambler.netlify.app/blog/time-varying-seasonality/){target="_blank"}
-
-Please also feel free to use the [`mvgam` Discussion Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for or post other discussion topics related to the package, and do check out the [`mvgam` changelog](https://nicholasjclark.github.io/mvgam/news/index.html) for any updates about recent upgrades that the package has incorporated.
+* [Multivariate State-Space Time Series models](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html){target="_blank"}
+* [Hierarchical N-mixture models](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html){target="_blank"}
+* [Hierarchical Generalized Additive Models](https://www.youtube.com/watch?v=2POK_FVwCHk){target="_blank"}
+* [Joint Species Distribution Models](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html){target="_blank"}
 
 ## Installation
 Install the stable version from `CRAN` using: `install.packages('mvgam')`, or install the development version from `GitHub` using:
-`devtools::install_github("nicholasjclark/mvgam")`. Note that to condition models on observed data, `Stan` must be installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}.
-
-We highly recommend you use `Cmdstan` through the `cmdstanr` interface. This is because `Cmdstan` is easier to install, is more up to date with new features, and uses less memory than `rstan`. See [this documentation from the `Cmdstan` team for more information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan){target="_blank"}. 
-
-## Citing `mvgam` and related software
-When using any software please make sure to appropriately acknowledge the hard work that developers and maintainers put into making these packages available. Citations are currently the best way to formally acknowledge this work, so we highly encourage you to cite any packages that you rely on for your research.
-
-When using `mvgam`, please cite the following:
-
-> Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. *Methods in Ecology and Evolution*. DOI: https://doi.org/10.1111/2041-210X.13974
-
-As `mvgam` acts as an interface to `Stan`, please additionally cite:
-
-> Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B., Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017). Stan: A probabilistic programming language. *Journal of Statistical Software*. 76(1). DOI: https://doi.org/10.18637/jss.v076.i01
-
-`mvgam` relies on several other `R` packages and, of course, on `R` itself. To
-find out how to cite `R` and its packages, use the `citation()` function. There are
-some features of `mvgam` which specifically rely on certain packages. The most important of these is the generation of data necessary to estimate smoothing splines, which rely on `mgcv` and `splines2`. The `rstan` and `cmdstanr` packages together with `Rcpp` makes `Stan` conveniently accessible in `R`. If you use some of these features, please also consider citing the related packages.
+`devtools::install_github("nicholasjclark/mvgam")`. To condition models on observed data, `Stan` must be installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}.
 
 ## Cheatsheet
 [![`mvgam` usage cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
 
-## Introducing `mvgam` for fitting Dynamic Generalized Additive Models
-We can explore the package’s primary functions using a dataset that is available with all `R` installations. Load the `lynx` data and plot the series as well as its autocorrelation function
+## A simple example
+We can explore the package’s primary functions using one of it's built-in datasets. Use `plot_mvgam_series()` to inspect features for the four time series from [the Portal Project](https://portal.weecology.org/){target="_blank"}, which represent captures of four desert rodent species over time (see `?portal_data` for more details)
 ```{r include = FALSE}
 library(mvgam)
-library(ggplot2); theme_set(theme_bw())
+library(ggplot2)
+theme_set(theme_bw())
 ```
 
 ```{r echo = FALSE}
 library(mvgam)
 ```
 
-```{r, fig.alt = "Visualizing the lynx time series in R"}
-data(lynx)
-lynx_full <- data.frame(year = 1821:1934, 
-                        population = as.numeric(lynx))
-plot(lynx_full$population, type = 'l', ylab = 'Lynx trappings',
-     xlab = 'Time', bty = 'l', lwd = 2)
-box(bty = 'l', lwd  = 2)
-acf(lynx_full$population, main = '', bty = 'l', lwd = 2,
-    ci.col = 'darkred')
-box(bty = 'l', lwd  = 2)
+```{r, fig.alt = "Visualizing the multivariate time series in mvgam", warning=FALSE}
+data(portal_data)
+plot_mvgam_series(
+  data = portal_data, 
+  y = 'captures',
+  series = 'all'
+)
+plot_mvgam_series(
+  data = portal_data, 
+  y = 'captures',
+  series = 1
+)
+plot_mvgam_series(
+  data = portal_data, 
+  y = 'captures',
+  series = 4
+)
 ```
 
-Along with serial autocorrelation, there is a clear ~19-year cyclic pattern. Create a `season` term that can be used to model this effect and give a better representation of the data generating process than we would likely get with a linear model
-```{r, fig.alt = "Visualizing and decomposing the lynx time series in R"}
-plot(stl(ts(lynx_full$population, frequency = 19), s.window = 'periodic'),
-     lwd = 2, col.range = 'darkred')
-lynx_full$season <- (lynx_full$year%%19) + 1
-```
+These plots show that the time series are count-responses, with missing data, seasonality and temporal autocorrelation all present. These features make time series analysis and forecasting very difficult if using conventional software and models. But `mvgam` shines in these tasks. 
 
-For most `mvgam` models, we need an indicator of the series name as a `factor`. A `time` column is also needed for most models to index time (but note that these variables are not necessarily needed for other models supported by `mvgam`, such as [Joint Species Distribution Models](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html))
+For most forecasting exercises, we'll want to split the data into training and testing folds
 ```{r}
-lynx_full$time <- 1:NROW(lynx_full)
-lynx_full$series <- factor('series1')
+data_train <- portal_data %>%
+  dplyr::filter(time <= 60)
+data_test <- portal_data %>%
+  dplyr::filter(time > 60 &
+                  time <= 65)
 ```
 
-Split the data into training (first 50 years) and testing (next 10 years of data) to evaluate forecasts
-```{r}
-lynx_train = lynx_full[1:50, ]
-lynx_test = lynx_full[51:60, ]
-```
-
-Inspect the series in a bit more detail using `mvgam`'s plotting utility
-```{r, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=6.5, dpi=160, fig.alt = "Plotting time series features with the mvgam R package"}
-plot_mvgam_series(data = lynx_train, y = 'population')
-```
-
-Formulate an `mvgam` model; this model fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the temporal process (in this case an `AR1` process). We assume the outcome follows a Poisson distribution and will condition the model in `Stan` using MCMC sampling with the `Cmdstan` interface:
+Formulate an `mvgam` model; this model fits a State-Space GAM in which each species has its own intercept, linear association with `ndvi_ma12` and potentially nonlinear association with `mintemp`. These effects are estimated jointly with a full time series model for the temporal dynamics (in this case an Vector Autoregressive process). We assume the outcome follows a Poisson distribution and will condition the model in `Stan` using MCMC sampling with the `Cmdstan` interface:
 ```{r, include=FALSE}
-lynx_mvgam <- mvgam(data = lynx_train,
-               newdata = lynx_test,
-               formula = population ~ s(season, bs = 'cc', k = 12),
-               knots = list(season = c(0.5, 19.5)),
-               family = poisson(),
-               trend_model = AR(p = 1),
-               noncentred = TRUE)
+mod <- mvgam(
+  # Observation model is empty as we don't have any
+  # covariates that impact observation error
+  formula = captures ~ 0,
+  
+  # Process model contains varying intercepts, 
+  # varying slopes of ndvi_ma12 and varying smooths 
+  # of mintemp for each series. 
+  # Temporal dynamics are modelled with a Vector 
+  # Autoregression (VAR(1))
+  trend_formula = ~ 
+    trend +
+    s(trend, bs = 're', by = ndvi_ma12) +
+    s(mintemp, bs = 'bs', by = trend) - 1,
+  trend_model = VAR(cor = TRUE),
+  
+  # Obvservations are conditionally Poisson
+  family = poisson(),
+  priors = c(prior(normal(0, 2),
+                 class = b),
+             prior(exponential(2.5),
+                   class = sigma)),
+  
+  # Condition on the training data
+  data = data_train,
+  control = list(adapt_delta = 0.99),
+  burnin = 1500
+)
 ```
 
 ```{r, eval=FALSE}
-lynx_mvgam <- mvgam(population ~ s(season, bs = 'cc', k = 12),
-                    knots = list(season = c(0.5, 19.5)),
-                    data = lynx_train,
-                    newdata = lynx_test,
-                    family = poisson(),
-                    trend_model = AR(p = 1),
-                    backend = 'cmdstanr')
+mod <- mvgam(
+  # Observation model is empty as we don't have any
+  # covariates that impact observation error
+  formula = captures ~ 0,
+  
+  # Process model contains varying intercepts, 
+  # varying slopes of ndvi_ma12 and varying smooths 
+  # of mintemp for each series. 
+  # Temporal dynamics are modelled with a Vector 
+  # Autoregression (VAR(1))
+  trend_formula = ~ 
+    trend +
+    s(trend, bs = 're', by = ndvi_ma12) +
+    s(mintemp, bs = 'bs', by = trend) - 1,
+  trend_model = VAR(cor = TRUE),
+  
+  # Obvservations are conditionally Poisson
+  family = poisson(),
+
+  # Condition on the training data
+  data = data_train,
+  backend = 'cmdstanr'
+)
 ```
 
-Have a look at this model's summary to see what is being estimated. Note that no pathological behaviours have been detected and we achieve good effective sample sizes / mixing for all parameters
+Using `print()` will return a quick summary of the object:
 ```{r}
-summary(lynx_mvgam)
+mod
 ```
 
-As with any MCMC software, we can inspect traceplots. Here for the GAM smoothing parameters, using `mvgam`'s reliance on the excellent `bayesplot` library:
-```{r, fig.alt = "Smoothing parameter posterior distributions estimated with Stan in mvgam"}
-mcmc_plot(lynx_mvgam, variable = 'rho', regex = TRUE, type = 'trace')
+Split Rhat and effective sample size diagnostics show good convergence of the model estimates
+```{r, fig.alt = "Rhats of parameters estimated with Stan in mvgam", warning=FALSE}
+mcmc_plot(mod, 
+          type = 'rhat_hist')
 ```
 
-and for the latent trend parameters
-```{r, fig.alt = "Dynamic temporal autocorrelation parameters estimated with Stan in mvgam"}
-mcmc_plot(lynx_mvgam, variable = 'trend_params', regex = TRUE, type = 'trace')
+```{r, fig.alt = "Effective sample sizes of parameters estimated with Stan in mvgam", warning=FALSE}
+mcmc_plot(mod, 
+          type = 'neff_hist')
 ```
 
-Use posterior predictive checks, which capitalize on the extensive functionality of the `bayesplot` package, to see if the model can simulate data that looks realistic and unbiased. First, examine histograms for posterior retrodictions (`yhat`) and compare to the histogram of the observations (`y`)
-```{r, fig.alt = "Posterior predictive checks for discrete time series in R"}
-pp_check(lynx_mvgam, type = "hist", ndraws = 5)
+Use `conditional_effects()` for a quick visualisation of the main terms in model formulae
+```{r, fig.alt = "Plotting GAM effects in mvgam and R"}
+conditional_effects(mod, 
+                    type = 'link')
 ```
 
-Next examine simulated empirical Cumulative Distribution Functions (CDF) for posterior predictions
-```{r, fig.alt = "Posterior predictive checks for discrete time series in R"}
-pp_check(lynx_mvgam, type = "ecdf_overlay", ndraws = 25)
-```
-
-Rootograms are [popular graphical tools for checking a discrete model's ability to capture dispersion properties of the response variable](http://arxiv.org/pdf/1605.01311){target="_blank"}. Posterior predictive hanging rootograms can be displayed using the `ppc()` function. In the plot below, we bin the unique observed values into `25` bins to prevent overplotting and help with interpretation. This plot compares the frequencies of observed vs predicted values for each bin. For example, if the gray bars (representing observed frequencies) tend to stretch below zero, this suggests the model's simulations predict the values in that particular bin less frequently than they are observed in the data. A well-fitting model that can generate realistic simulated data will provide a rootogram in which the lower boundaries of the grey bars are generally near zero. For this plot we use the `S3` function `ppc.mvgam()`, which is not as versatile as `pp_check()` but allows us to bin rootograms to avoid overplotting
-```{r, fig.alt = "Posterior predictive rootograms for discrete time series in R"}
-ppc(lynx_mvgam, type = "rootogram", n_bins = 25)
-```
-
-All plots indicate the model is well calibrated against the training data. Inspect the estimated cyclic smooth, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior quantiles of partial residuals (shown in red), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. A strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
-```{r, fig.width=5, fig.height=4, fig.align='center', dpi=150, fig.alt = "Plotting GAM smooth functions in mvgam and R"}
-plot(lynx_mvgam, type = 'smooths', residuals = TRUE)
-```
-
-First derivatives of smooths can be plotted to inspect how the slope of the function changes. To plot these we use the more flexible `plot_mvgam_smooth()` function
-```{r, fig.alt = "Plotting GAM smooth functions in mvgam and R"}
-plot_mvgam_smooth(lynx_mvgam, series = 1, 
-                  smooth = 'season', 
-                  derivatives = TRUE)
-```
-
-If you have the `gratia` package installed, it can also be used to plot partial effects of smooths on the link scale
-```{r, fig.alt = "Plotting GAM smooth functions in mvgam using gratia"}
+If you have the `gratia` package installed, it can also be used to plot partial effects of smooths
+```{r, fig.alt = "Plotting GAM smooth functions in mvgam using gratia", message=FALSE}
 require(gratia)
-draw(lynx_mvgam)
+draw(mod, 
+     trend_effects = TRUE)
 ```
 
-As for many types of regression models, it is often more useful to plot model effects on the outcome scale. `mvgam` has support for the wonderful `marginaleffects` package, allowing a wide variety of posterior contrasts, averages, conditional and marginal predictions to be calculated and plotted. Below is the conditional effect of season plotted on the outcome scale, for example:
+Or design more targeted plots using `plot_predictions()` from the `marginaleffects` package
 ```{r, fig.alt = "Using marginaleffects and mvgam to plot GAM smooth functions in R"}
-require(ggplot2); require(marginaleffects)
-plot_predictions(lynx_mvgam, condition = 'season', points = 0.5) +
-  theme_classic()
+plot_predictions(
+  mod,
+  condition = c('ndvi_ma12',
+                'series',
+                'series'),
+  type = 'link'
+)
 ```
 
-We can also view the `mvgam`'s posterior predictions for the entire series (testing and training)
-```{r, fig.alt = "Plotting forecast distributions using mvgam in R"}
-plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
+```{r, fig.alt = "Using marginaleffects and mvgam to plot GAM smooth functions in R"}
+plot_predictions(
+  mod,
+  condition = c('mintemp',
+                'series',
+                'series'),
+  type = 'link'
+)
 ```
 
-And the estimated latent trend component, again using the more flexible `plot_mvgam_...()` option to show first derivatives of the estimated trend
-```{r, fig.alt = "Plotting dynamic trend components using mvgam in R"}
-plot_mvgam_trend(lynx_mvgam, newdata = lynx_test, derivatives = TRUE)
+We can also view the model's posterior predictions for the entire series (testing and training). These forecasts can be scored using a range of proper scoring rules. See `?score.mvgam_forecast` for more details
+```{r, fig.alt = "Plotting forecast distributions using mvgam in R", warning=FALSE}
+fcs <- forecast(mod, 
+                newdata = data_test)
+plot(fcs, series = 1) +
+  plot(fcs, series = 2) +
+  plot(fcs, series = 3) +
+  plot(fcs, series = 4)
 ```
 
-A key aspect of ecological forecasting is to understand [how different components of a model contribute to forecast uncertainty](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/eap.1589){target="_blank"}. We can estimate relative contributions to forecast uncertainty for the GAM component and the latent trend component using `mvgam`
-```{r, fig.alt = "Decomposing uncertainty contributions to forecasts in mvgam in R"}
-plot_mvgam_uncertainty(lynx_mvgam, newdata = lynx_test, legend_position = 'none')
-text(1, 0.2, cex = 1.5, label = "GAM component", 
-     pos = 4, col = "white", family = 'serif')
-text(1, 0.8, cex = 1.5, label = "Trend component", 
-     pos = 4, col = "#7C0000", family = 'serif')
+For Vector Autoregressions fit in `mvgam`, we can inspect [impulse response functions and forecast error variance decompositions](https://ecogambler.netlify.app/blog/vector-autoregressions/#impulse-response-functions){target="_blank"}. The `irf()` function runs an Impulse Response Function (IRF) simulation whereby a positive “shock” is generated for a target process at time `t = 0`. All else remaining stable, it then monitors how each of the remaining processes in the latent VAR would be expected to respond over the forecast horizon `h`. The function computes impulse responses for all processes in the object and returns them in an array that can be plotted using the S3 `plot()` function. Here we will use the generalized IRF, which makes no assumptions about the order in which the series appear in the VAR process, and inspect how each process is expected to respond to a sudden, positive pulse from the other processes over a horizon of 12 timepoints.
+```{r, fig.alt = "Impulse response functions computed using mvgam in R"}
+irfs <- irf(mod, 
+            h = 12, 
+            orthogonal = FALSE)
+plot(irfs, 
+     series = 1)
+plot(irfs, 
+     series = 3)
 ```
 
-Both components contribute to forecast uncertainty. Diagnostics of the model can also be performed using `mvgam`. Have a look at the model's residuals, which are posterior medians of Dunn-Smyth randomised quantile residuals so should follow approximate normality. We are primarily looking for a lack of autocorrelation, which would suggest our AR1 model is appropriate for the latent trend
-```{r, fig.width=6.5, fig.height=6.5, dpi=160, fig.alt = "Plotting Dunn-Smyth residuals for time series analysis in mvgam and R"}
-plot(lynx_mvgam, type = 'residuals')
+Using the same logic as above, we can inspect forecast error variance decompositions (FEVDs) for each process using the `fevd()` function. This type of analysis asks how orthogonal shocks to all process in the system contribute to the variance of forecast uncertainty for a focal process over increasing horizons. In other words, the proportion of the forecast variance of each latent time series can be attributed to the effects of the other series in the VAR process. FEVDs are useful because some shocks may not be expected to cause variations in the short-term but may cause longer-term fluctuations
+```{r, fig.alt = "Forecast error variance decompositions computed using mvgam in R"}
+fevds <- fevd(mod, 
+              h = 12)
+plot(fevds)
 ```
 
-We can use the `how_to_cite()` function to generate a scaffold for describing the model and sampling details in scientific communications
+This plot shows that the variance of forecast uncertainty for each process is initially dominated by contributions from that same process (i.e. self-dependent effects) but that effects from other processes become more important over increasing forecast horizons. Given what we saw from the IRF plots above, these long-term contributions from interactions among the processes makes sense.
+  
+Plotting randomized quantile residuals over `time` for each series can give useful information about what might be missing from the model. We can use the highly versatile `pp_check()` function to plot these:
+```{r, warning=FALSE}
+pp_check(
+  mod, 
+  type = 'resid_ribbon_grouped',
+  group = 'series',
+  x = 'time',
+  ndraws = 200
+)
+```
+
+When describing the model, it can be helpful to use the `how_to_cite()` function to generate a scaffold for describing the model and sampling details in scientific communications
 ```{r}
-description <- how_to_cite(lynx_mvgam)
+description <- how_to_cite(mod)
 ```
 
 ```{r, eval = FALSE}
@@ -228,28 +246,24 @@ description
 ```
 
 ```{r, echo=FALSE}
-str_break = function(x, width = 90L) {
-  n = nchar(x)
-  if (n <= width) return(x)
-  n1 = seq(1L, n, by = width)
-  n2 = seq(width, n, by = width)
-  if (n %% width != 0) n2 = c(n2, n)
-  substring(x, n1, n2)
-}
-cat('Methods text skeleton\n')
-cat(str_break(description$methods_text), sep = '\n')
+cat("Methods text skeleton\n")
+cat(insight::format_message(description$methods_text))
 ```
 
 ```{r echo=FALSE}
-cat('\nPrimary references\n')
-for(i in seq_along(description$citations)){
-  message(description$citations[[i]])
+cat("\nPrimary references\n")
+for (i in seq_along(description$citations)) {
+  cat(insight::format_message(description$citations[[i]]))
+  cat('\n')
 }
-cat('\nOther useful references\n')
-for(i in seq_along(description$other_citations)){
-  message(description$other_citations[[i]])
+cat("\nOther useful references\n")
+for (i in seq_along(description$other_citations)) {
+  cat(insight::format_message(description$other_citations[[i]]))
+  cat('\n')
 }
 ```
+
+The post-processing methods we have shown above are just the tip of the iceberg. For a full list of methods to apply on fitted model objects, type `methods(class = "mvgam")`. 
 
 ## Extended observation families
 `mvgam` was originally designed to analyse and forecast non-negative integer-valued data. These data are traditionally challenging to analyse with existing time-series analysis packages. But further development of `mvgam` has resulted in support for a growing number of observation families. Currently, the package can handle data for the following:  
@@ -267,62 +281,102 @@ for(i in seq_along(description$other_citations)){
 * `nmix()` for count data with imperfect detection (unknown number of trials)
   
 See `??mvgam_families` for more information. Below is a simple example for simulating and modelling proportional data with `Beta` observations over a set of seasonal series with independent Gaussian Process dynamic trends:
-```{r beta_sim, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=6.5, dpi=160}
+```{r beta_sim, message=FALSE, warning=FALSE}
 set.seed(100)
-data <- sim_mvgam(family = betar(),
-                  T = 80,
-                  trend_model = GP(),
-                  prop_trend = 0.5, 
-                  seasonality = 'shared')
-plot_mvgam_series(data = data$data_train, series = 'all')
+data <- sim_mvgam(
+  family = betar(),
+  T = 80,
+  trend_model = GP(),
+  prop_trend = 0.5,
+  seasonality = "shared"
+)
+plot_mvgam_series(
+  data = data$data_train, 
+  series = "all"
+)
 ```
 
 ```{r, include=FALSE}
-mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
-               s(season, by = series, m = 1, k = 5),
-             trend_model = GP(),
-             data = data$data_train,
-             newdata = data$data_test,
-             family = betar())
+mod <- mvgam(
+  y ~ s(season, bs = "cc", k = 7) +
+    s(season, by = series, m = 1, k = 5),
+  trend_model = GP(),
+  data = data$data_train,
+  newdata = data$data_test,
+  family = betar()
+)
 ```
 
 ```{r, eval=FALSE}
-mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
-               s(season, by = series, m = 1, k = 5),
-             trend_model = GP(),
-             data = data$data_train,
-             newdata = data$data_test,
-             family = betar())
+mod <- mvgam(
+  y ~ s(season, bs = "cc", k = 7) +
+    s(season, by = series, m = 1, k = 5),
+  trend_model = GP(),
+  data = data$data_train,
+  newdata = data$data_test,
+  family = betar()
+)
 ```
 
-Inspect the summary to see that the posterior now also contains estimates for the `Beta` precision parameters $\phi$. We can suppress a summary of the $\beta$ coefficients, which is useful when there are many spline coefficients to report:
+Inspect the summary to see that the posterior now also contains estimates for the `Beta` precision parameters $\phi$.
 ```{r}
-summary(mod, include_betas = FALSE)
+summary(mod, 
+        include_betas = FALSE)
 ```
 
 Plot the hindcast and forecast distributions for each series
 ```{r eval=FALSE}
-layout(matrix(1:4, nrow = 2, byrow = TRUE))
-for(i in 1:3){
-  plot(mod, type = 'forecast', series = i)
-}
+library(patchwork)
+fc <- forecast(mod)
+wrap_plots(
+  plot(fc, series = 1),
+  plot(fc, series = 2),
+  plot(fc, series = 3),
+  ncol = 2
+)
 ```
 
 ```{r beta_fc, echo=FALSE, message=FALSE}
-layout(matrix(1:4, nrow = 2, byrow = TRUE))
-par(mar=c(3, 3, 2, 2),
-    oma = c(2, 2, 0, 0),
-    mgp = c(2, 0.5, 0))
-for(i in 1:3){
-  plot(mod, type = 'forecast', series = i)
-}
+library(patchwork)
+fc <- forecast(mod)
+wrap_plots(
+  plot(fc, series = 1),
+  plot(fc, series = 2),
+  plot(fc, series = 3),
+  ncol = 2
+)
 ```
 
-There are many more extended uses of `mvgam`, including the ability to fit hierarchical State-Space GAMs that include dynamic and spatially varying coefficient models, dynamic factors and Vector Autoregressive processes. See the [package documentation](https://nicholasjclark.github.io/mvgam/){target="_blank"} for more details. The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using `Stan`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals. The [Stan Discourse](https://discourse.mc-stan.org/){target="_blank"} is a helpful place to troubleshoot.
+There are many more extended uses of `mvgam`, including the ability to fit hierarchical State-Space GAMs that include dynamic and spatially varying coefficient models, dynamic factors, Joint Species Distribution Models and much more. See the [package documentation](https://nicholasjclark.github.io/mvgam/){target="_blank"} for more details. The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using `Stan`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals. The [Stan Discourse](https://discourse.mc-stan.org/){target="_blank"} is a helpful place to troubleshoot.
+
+## Citing `mvgam` and related software
+When using any software please make sure to appropriately acknowledge the hard work that developers and maintainers put into making these packages available. Citations are currently the best way to formally acknowledge this work (but feel free to ⭐ this repo as well), so we highly encourage you to cite any packages that you rely on for your research.
+
+When using `mvgam`, please cite the following:
+
+> Clark, N.J. and Wells, K. (2023). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. *Methods in Ecology and Evolution*. DOI: https://doi.org/10.1111/2041-210X.13974
+
+As `mvgam` acts as an interface to `Stan`, please additionally cite:
+
+> Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B., Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017). Stan: A probabilistic programming language. *Journal of Statistical Software*. 76(1). DOI: https://doi.org/10.18637/jss.v076.i01
+
+`mvgam` relies on several other `R` packages and, of course, on `R` itself. To find out how to cite `R` and its packages, use `citation()`. There are some features of `mvgam` which specifically rely on certain packages. The most important of these is the generation of data necessary to estimate smoothing splines and Gaussian Processes, which rely on the `mgcv`, `brms` and `splines2` packages. The `rstan` and `cmdstanr` packages together with `Rcpp` makes `Stan` conveniently accessible in `R`. If you use some of these features, please also consider citing the related packages.
+
+## Getting help
+If you encounter a clear bug, please file an issue with a minimal reproducible example on [GitHub](https://github.com/nicholasjclark/mvgam/issues). Please also feel free to use the [`mvgam` Discussion Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for or post other discussion topics related to the package, and do check out the [`mvgam` Changelog](https://nicholasjclark.github.io/mvgam/news/index.html) for any updates about recent upgrades that the package has incorporated.
+
+## Other resources
+A series of [vignettes cover data formatting, forecasting and several extended case studies of DGAMs](https://nicholasjclark.github.io/mvgam/){target="_blank"}. A number of other examples, including some step-by-step introductory webinars, have also been compiled:
+  
+* [Time series in R and Stan using the `mvgam` package](https://www.youtube.com/playlist?list=PLzFHNoUxkCvsFIg6zqogylUfPpaxau_a3){target="_blank"}
+* [Ecological Forecasting with Dynamic Generalized Additive Models](https://www.youtube.com/watch?v=0zZopLlomsQ){target="_blank"}
+* [Distributed lags (and hierarchical distributed lags) using `mgcv` and `mvgam`](https://ecogambler.netlify.app/blog/distributed-lags-mgcv/){target="_blank"}
+* [State-Space Vector Autoregressions in `mvgam`](https://ecogambler.netlify.app/blog/vector-autoregressions/){target="_blank"}
+* [Ecological Forecasting with Dynamic GAMs; a tutorial and detailed case study](https://www.youtube.com/watch?v=RwllLjgPUmM){target="_blank"}
+* [Incorporating time-varying seasonality in forecast models](https://ecogambler.netlify.app/blog/time-varying-seasonality/){target="_blank"}
+
+## Interested in contributing?
+I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au). Other contributions are also very welcome, but please see [The Contributor Instructions](https://github.com/nicholasjclark/mvgam/blob/master/.github/CONTRIBUTING.md) for general guidelines. Note that by participating in this project you agree to abide by the terms of its [Contributor Code of Conduct](https://dplyr.tidyverse.org/CODE_OF_CONDUCT).
 
 ## License
 This project is licensed under an `MIT` open source license
-
-## Interested in contributing?
-I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au). Other contributions are also very welcome, but please see [The Contributor Instructions](https://github.com/nicholasjclark/mvgam/blob/master/.github/CONTRIBUTING.md) for general guidelines. Note that
-by participating in this project you agree to abide by the terms of its [Contributor Code of Conduct](https://dplyr.tidyverse.org/CODE_OF_CONDUCT).

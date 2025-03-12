@@ -8,17 +8,32 @@
 #' @param drift Logical (was a drift term estimated or not)
 #' @return A string of parameters to monitor
 #' @noRd
-get_monitor_pars = function(family, smooths_included = TRUE,
-                            use_lv, trend_model, drift){
+get_monitor_pars = function(
+  family,
+  smooths_included = TRUE,
+  use_lv,
+  trend_model,
+  drift
+) {
+  family <- match.arg(
+    arg = family,
+    choices = c(
+      "negative binomial",
+      "poisson",
+      "tweedie",
+      "beta",
+      "gaussian",
+      "lognormal",
+      "student",
+      "Gamma",
+      "nmix",
+      "binomial",
+      "bernoulli",
+      "beta_binomial"
+    )
+  )
 
-  family <- match.arg(arg = family, choices = c("negative binomial", "poisson",
-                                                "tweedie", "beta",
-                                                "gaussian", "lognormal",
-                                                "student", "Gamma",
-                                                "nmix", "binomial", "bernoulli",
-                                                "beta_binomial"))
-
-  if(smooths_included){
+  if (smooths_included) {
     param <- c('rho', 'b', 'ypred', 'mus', 'lp__', 'lambda')
   } else {
     param <- c('b', 'ypred', 'mus', 'lp__')
@@ -28,8 +43,10 @@ get_monitor_pars = function(family, smooths_included = TRUE,
   param <- c(param, family_par_names(family))
 
   # Trend-specific parameters
-  param <- c(param, trend_par_names(trend_model = trend_model,
-                                    use_lv = use_lv, drift = drift))
+  param <- c(
+    param,
+    trend_par_names(trend_model = trend_model, use_lv = use_lv, drift = drift)
+  )
 
   return(param)
 }

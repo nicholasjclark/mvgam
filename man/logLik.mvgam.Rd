@@ -2,12 +2,12 @@
 % Please edit documentation in R/logLik.mvgam.R
 \name{logLik.mvgam}
 \alias{logLik.mvgam}
-\title{Compute pointwise Log-Likelihoods from fitted \code{mvgam} objects}
+\title{Compute pointwise Log-Likelihoods from fitted \pkg{mvgam} objects}
 \usage{
 \method{logLik}{mvgam}(object, linpreds, newdata, family_pars, include_forecast = TRUE, ...)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}}
+\item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}}
 
 \item{linpreds}{Optional \code{matrix} of linear predictor draws to use for calculating
 pointwise log-likelihoods}
@@ -34,18 +34,17 @@ original model via the \code{newdata} argument in \code{\link{mvgam}},
 testing observations)
 }
 \description{
-Compute pointwise Log-Likelihoods from fitted \code{mvgam} objects
+Compute pointwise Log-Likelihoods from fitted \pkg{mvgam} objects
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate some data and fit a model
 simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
              trend_model = AR(),
              data = simdat$data_train,
-             burnin = 300,
-             samples = 300,
-             chains = 2)
+             chains = 2,
+             silent = 2)
 
 # Extract logLikelihood values
 lls <- logLik(mod)

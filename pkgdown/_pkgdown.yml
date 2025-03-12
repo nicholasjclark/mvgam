@@ -6,5 +6,9 @@ authors:
 
 template:
   bootstrap: 5
-  bootswatch: sandstone
+  bootswatch: pulse
 
+navbar:
+  structure:
+    left: [intro, articles, reference, news]
+    right: [search, github]

@@ -1,4 +1,18 @@
-# mvgam 1.1.4 (development version; not yet on CRAN)
+# mvgam (development version)
+
+## New functionalities
+* Changed default priors for scale parameters (i.e. process errors "sigma" and observation errors "sigma_obs") to inverse gammas to provide more sensible prior regularisation away from zero
+* Improved messaging in `summary()` for better guidance on how to investigate poor HMC sampler behaviours
+* Converted several more plotting functions to return `ggplot` objects in place of base R plots for broader customisation
+* Added four new `type`s to the `pp_check()` function to allow more targeted investigations of randomized quantile residual distributions
+* Added a `plot.mvgam_residcor()` function for nicer plotting of estimated residual correlations from `jsdgam` objects 
+* Added `summary()` functions to calculate useful posterior summaries from objects of class `mvgam_irf` and `mvgam_fevd` (see `?irf` and `?fevd` for examples)
+* Improved efficiency of `nmix()` models with some slight restructuring of the model objects (#102)
+
+## Bug fixes
+* Bug fix to ensure piecewise trends are extrapolated the correct number of timepoints when forecasting using the `forecast()` function
+
+# mvgam 1.1.4
 ## New functionalities
 * Added the `how_to_cite.mvgam()` function to generate a scaffold methods description of fitted models, which can hopefully make it easier for users to fully describe their programming environment 
 * Improved various plotting functions by returning `ggplot` objects in place of base plots (thanks to @mhollanders #38)
@@ -15,6 +29,7 @@
 * Arguments `use_stan`, `jags_path`, `data_train`, `data_test`, `adapt_delta`, `max_treedepth` and `drift` have been removed from primary functions to streamline documentation and reflect the package's mission to deprecate 'JAGS' as a suitable backend. Both `adapt_delta` and `max_treedepth` should now be supplied in a named `list()` to the new argument `control`
 
 ## Bug fixes
+* Bug fix to ensure `marginaleffects::comparisons` functions appropriately recognise internal `rowid` variables
 * Updates to ensure `ensemble` provides appropriate weighting of forecast draws (#98)
 * Not necessarily a "bug fix", but this update removes several dependencies to lighten installation and improve efficiency of the workflow (#93)
 * Fixed a minor bug in the way `trend_map` recognises levels of the `series` factor

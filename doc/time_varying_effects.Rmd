@@ -103,7 +103,7 @@ Inspect the model summary, which shows how the `dynamic()` wrapper was used to c
 summary(mod, include_betas = FALSE)
 ```
 
-Because this model used a spline with a `gp` basis, it's smooths can be visualised just like any other `gam`. We can plot the estimates for the in-sample and out-of-sample periods to see how the Gaussian Process function produces sensible smooth forecasts. Here we supply the full dataset to the `newdata` argument in `plot_mvgam_smooth` to inspect posterior forecasts of the time-varying smooth function. Overlay the true simulated function to see that the model has adequately estimated it's dynamics in both the training and testing data partitions
+Because this model used a spline with a `gp` basis, it's smooths can be visualised just like any other `gam`. We can plot the estimates for the in-sample and out-of-sample periods to see how the Gaussian Process function produces sensible smooth forecasts. Here we supply the full dataset to the `newdata` argument in `plot_mvgam_smooth()` to inspect posterior forecasts of the time-varying smooth function. Overlay the true simulated function to see that the model has adequately estimated it's dynamics in both the training and testing data partitions
 ```{r}
 plot_mvgam_smooth(mod, smooth = 1, newdata = data)
 abline(v = 190, lty = 'dashed', lwd = 2)
@@ -111,7 +111,7 @@ lines(beta_temp, lwd = 2.5, col = 'white')
 lines(beta_temp, lwd = 2)
 ```
 
-We can also use `plot_predictions` from the `marginaleffects` package to visualise the time-varying coefficient for what the effect would be estimated to be at different values of $temperature$:
+We can also use `plot_predictions()` from the `marginaleffects` package to visualise the time-varying coefficient for what the effect would be estimated to be at different values of $temperature$:
 ```{r}
 require(marginaleffects)
 range_round = function(x){
@@ -130,7 +130,7 @@ fc <- forecast(mod, newdata = data_test)
 plot(fc)
 ```
 
-The syntax is very similar if we wish to estimate the parameters of the underlying Gaussian Process, this time using a Hilbert space approximation. We simply omit the `rho` argument in `dynamic` to make this happen. This will set up a call similar to `gp(time, by = 'temp', c = 5/4, k = 40)`.
+The syntax is very similar if we wish to estimate the parameters of the underlying Gaussian Process, this time using a Hilbert space approximation. We simply omit the `rho` argument in `dynamic()` to make this happen. This will set up a call similar to `gp(time, by = 'temp', c = 5/4, k = 40)`.
 ```{r include=FALSE}
 mod <- mvgam(out ~ dynamic(temp, k = 40),
              family = gaussian(),
@@ -198,6 +198,7 @@ plot_mvgam_series(data = model_data, y = 'survival')
 mod0 <- mvgam(formula = survival ~ 1,
              trend_model = AR(),
              noncentred = TRUE,
+             priors = prior(normal(-3.5, 0.5), class = Intercept),
              family = betar(),
              data = model_data,
              silent = 2)
@@ -205,11 +206,12 @@ mod0 <- mvgam(formula = survival ~ 1,
 
 ```{r eval = FALSE}
 mod0 <- mvgam(formula = survival ~ 1,
-             trend_model = AR(),
-             noncentred = TRUE,
-             family = betar(),
-             data = model_data,
-             silent = 2)
+              trend_model = AR(),
+              noncentred = TRUE,
+              priors = prior(normal(-3.5, 0.5), class = Intercept),
+              family = betar(),
+              data = model_data,
+              silent = 2)
 ```
 
 The summary of this model shows good behaviour of the Hamiltonian Monte Carlo sampler and provides useful summaries on the Beta observation model parameters:
@@ -226,20 +228,22 @@ plot(mod0, type = 'trend')
 Now we can increase the complexity of our model by constructing and fitting a State-Space model with a time-varying effect of the coastal upwelling index in addition to the autoregressive dynamics. We again use a Beta observation model to capture the restrictions of our proportional observations, but this time will include a `dynamic()` effect of `CUI.apr` in the latent process model. We do not specify the $\rho$ parameter, instead opting to estimate it using a Hilbert space approximate GP:
 ```{r include=FALSE}
 mod1 <- mvgam(formula = survival ~ 1,
-              trend_formula = ~ dynamic(CUI.apr, k = 25, scale = FALSE),
+              trend_formula = ~ dynamic(CUI.apr, k = 25, scale = FALSE) - 1,
               trend_model = AR(),
               noncentred = TRUE,
+              priors = prior(normal(-3.5, 0.5), class = Intercept),
               family = betar(),
               data = model_data,
-              adapt_delta = 0.99,
+              control = list(adapt_delta = 0.99),
               silent = 2)
 ```
 
 ```{r eval=FALSE}
 mod1 <- mvgam(formula = survival ~ 1,
-              trend_formula = ~ dynamic(CUI.apr, k = 25, scale = FALSE),
+              trend_formula = ~ dynamic(CUI.apr, k = 25, scale = FALSE) - 1,
               trend_model = AR(),
               noncentred = TRUE,
+              priors = prior(normal(-3.5, 0.5), class = Intercept),
               family = betar(),
               data = model_data,
               silent = 2)
@@ -329,4 +333,4 @@ Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. "[MARSS: multivariate auto
 Scheuerell, Mark D., and John G. Williams. [Forecasting climate induced changes in the survival of Snake River Spring/Summer Chinook Salmon (*Oncorhynchus Tshawytscha*)](https://onlinelibrary.wiley.com/doi/10.1111/j.1365-2419.2005.00346.x) *Fisheries Oceanography*  14 (2005): 448–57.
 
 ## Interested in contributing?
-I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au)
+I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please see [this small list of opportunities on my website](https://ecogambler.netlify.app/opportunities/) and do reach out if you are interested (n.clark'at'uq.edu.au)

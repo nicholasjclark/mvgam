@@ -2,12 +2,12 @@
 % Please edit documentation in R/plot_mvgam_pterms.R
 \name{plot_mvgam_pterms}
 \alias{plot_mvgam_pterms}
-\title{Plot mvgam parametric term partial effects}
+\title{Plot parametric term partial effects for \pkg{mvgam} models}
 \usage{
 plot_mvgam_pterms(object, trend_effects = FALSE)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{\code{list} object of class \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{trend_effects}{logical. If \code{TRUE} and a \code{trend_formula} was used in model
 fitting, terms from the trend (i.e. process) model will be plotted}

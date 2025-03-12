@@ -2,7 +2,7 @@
 % Please edit documentation in R/dynamic.R
 \name{dynamic}
 \alias{dynamic}
-\title{Defining dynamic coefficients in mvgam formulae}
+\title{Defining dynamic coefficients in \pkg{mvgam} formulae}
 \usage{
 dynamic(variable, k, rho = 5, stationary = TRUE, scale = TRUE)
 }
@@ -35,7 +35,7 @@ length-scale parameters in that they resemble those of scaled predictors
 a \code{list} object for internal usage in 'mvgam'
 }
 \description{
-Set up time-varying (dynamic) coefficients for use in mvgam models. Currently, only
+Set up time-varying (dynamic) coefficients for use in \pkg{mvgam} models. Currently, only
 low-rank Gaussian Process smooths are available for estimating the dynamics of the
 time-varying coefficient.
 }

@@ -3,14 +3,14 @@
 \name{add_residuals.mvgam}
 \alias{add_residuals.mvgam}
 \alias{add_residuals}
-\title{Calculate randomized quantile residuals for mvgam objects}
+\title{Calculate randomized quantile residuals for \pkg{mvgam} objects}
 \usage{
 add_residuals(object, ...)
 
 \method{add_residuals}{mvgam}(object, ...)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{\code{list} object of class \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{...}{unused}
 }
@@ -18,7 +18,7 @@ add_residuals(object, ...)
 A list object of class \code{mvgam} with residuals included in the \code{'resids'} slot
 }
 \description{
-Calculate randomized quantile residuals for mvgam objects
+Calculate randomized quantile residuals for \pkg{mvgam} objects
 }
 \details{
 For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics

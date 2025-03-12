@@ -35,7 +35,9 @@ and \eqn{\alpha_{cor}} is a weighting parameter
 controlling how strongly the local correlation matrix \eqn{\Omega_{group}}
 is shrunk towards the global
 correlation matrix \eqn{\Omega_{global}} (larger values of \eqn{\alpha_{cor}} indicate
-a greater degree of shrinkage, i.e. a greater degree of partial pooling).
+a greater degree of shrinkage, i.e. a greater degree of partial pooling). When used
+within a \code{VAR()} model, this essentially sets up a hierarchical panel vector autoregression
+where both the autoregressive and correlation matrices are learned hierarchically.
 If \code{gr} is supplied then \code{subgr} \emph{must} also be supplied}
 
 \item{subgr}{A subgrouping \code{factor} variable specifying which element in \code{data} represents the
@@ -64,12 +66,12 @@ they exist purely to help set up a model with particular autoregressive
 trend models.
 }
 \examples{
-\dontrun{
+\donttest{
 # A short example to illustrate CAR(1) models
 # Function to simulate CAR1 data with seasonality
-sim_corcar1 = function(n = 120,
+sim_corcar1 = function(n = 125,
                       phi = 0.5,
-                      sigma = 1,
+                      sigma = 2,
                       sigma_obs = 0.75){
 # Sample irregularly spaced time intervals
 time_dis <- c(0, runif(n - 1, -0.1, 1))
@@ -108,15 +110,20 @@ dat <- rbind(dplyr::bind_cols(sim_corcar1(phi = 0.65,
       dplyr::mutate(series = as.factor(series))
 
 # mvgam with CAR(1) trends and series-level seasonal smooths; the
-# State-Space representation (using trend_formula) will be more efficient
-mod <- mvgam(formula = y ~ 1,
+# State-Space representation (using trend_formula) will be more efficient;
+# using informative priors on the sigmas often helps with convergence
+mod <- mvgam(formula = y ~ -1,
             trend_formula = ~ s(season, bs = 'cc',
                                 k = 5, by = trend),
             trend_model = CAR(),
+            priors = c(prior(exponential(3),
+                           class = sigma),
+                       prior(beta(4, 4),
+                           class = sigma_obs)),
             data = dat,
             family = gaussian(),
-            samples = 300,
-            chains = 2)
+            chains = 2,
+            silent = 2)
 
 # View usual summaries and plots
 summary(mod)
@@ -125,6 +132,10 @@ plot(mod, type = 'trend', series = 1)
 plot(mod, type = 'trend', series = 2)
 plot(mod, type = 'residuals', series = 1)
 plot(mod, type = 'residuals', series = 2)
+mcmc_plot(mod,
+         variable = 'ar1',
+         regex = TRUE,
+         type = 'hist')
 
 # Now an example illustrating hierarchical dynamics
 set.seed(123)
@@ -164,16 +175,18 @@ get_mvgam_priors(formula = y ~ species,
 # Fit the model
 mod <- mvgam(formula = y ~ species,
             trend_model = AR(gr = region, subgr = species),
-            data = all_dat)
+            data = all_dat,
+            chains = 2,
+            silent = 2)
 
 # Check standard outputs
 summary(mod)
 conditional_effects(mod, type = 'link')
 
-# Inspect posterior estimates for process error and the
-# correlation weighting parameter
-mcmc_plot(mod, variable = 'Sigma', regex = TRUE,
-         type = 'hist')
+# Inspect posterior estimates for the correlation weighting parameter
 mcmc_plot(mod, variable = 'alpha_cor', type = 'hist')
 }
+}
+\author{
+Nicholas J Clark
 }

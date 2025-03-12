@@ -7,7 +7,7 @@
 \usage{
 fevd(object, ...)
 
-\method{fevd}{mvgam}(object, h = 1, ...)
+\method{fevd}{mvgam}(object, h = 10, ...)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
@@ -48,25 +48,32 @@ forecast error variance for \eqn{k} can be explained by an exogenous shock to \e
 \examples{
 \donttest{
 # Simulate some time series that follow a latent VAR(1) process
-simdat <- sim_mvgam(family = gaussian(),
-                    n_series = 4,
-                    trend_model = VAR(cor = TRUE),
-                    prop_trend = 1)
-plot_mvgam_series(data = simdat$data_train, series = 'all')
+simdat <- sim_mvgam(
+  family = gaussian(),
+  n_series = 4,
+  trend_model = VAR(cor = TRUE),
+  prop_trend = 1
+)
+plot_mvgam_series(data = simdat$data_train, series = "all")
 
 # Fit a model that uses a latent VAR(1)
 mod <- mvgam(y ~ -1,
-             trend_formula = ~ 1,
-             trend_model = VAR(cor = TRUE),
-             family = gaussian(),
-             data = simdat$data_train,
-             silent = 2)
+  trend_formula = ~1,
+  trend_model = VAR(cor = TRUE),
+  family = gaussian(),
+  data = simdat$data_train,
+  chains = 2,
+  silent = 2
+)
 
 # Calulate forecast error variance decompositions for each series
 fevds <- fevd(mod, h = 12)
 
 # Plot median contributions to forecast error variance
 plot(fevds)
+
+# View a summary of the error variance decompositions
+summary(fevds)
 }
 }
 \references{

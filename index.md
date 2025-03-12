@@ -1,34 +1,27 @@
 
-<br> <br>
+# mvgam
 
-<img src="man/figures/mvgam_logo.png" width = 120 alt="mvgam R package logo"/>[<img src="https://raw.githubusercontent.com/stan-dev/logos/master/logo_tm.png" align="right" width=120 alt="Stan Logo"/>](https://mc-stan.org/)
+> **M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
 
-## mvgam
-
-**M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
-
-The goal of `mvgam` is to fit Bayesian (Dynamic) Generalized Additive
-Models. This package constructs State-Space models that can include
-highly flexible nonlinear predictor effects for both process and
-observation components by leveraging functionalities from the impressive
+The goal of the `mvgam` 📦 is to fit Bayesian Dynamic Generalized
+Additive Models (DGAMs) that can include highly flexible nonlinear
+predictor effects for both process and observation components. The
+package does this by relying on functionalities from the impressive
 <a href="https://paulbuerkner.com/brms/"
 target="_blank"><code>brms</code></a> and
-<a href="https://cran.r-project.org/web/packages/mgcv/index.html"
+<a href="https://cran.r-project.org/package=mgcv"
 target="_blank"><code>mgcv</code></a> packages. This allows `mvgam` to
-fit a wide range of models, including hierarchical ecological models
-such as N-mixture or Joint Species Distribution models, as well as
-univariate and multivariate time series models with imperfect detection.
-The original motivation for the package is described in <a
-href="https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974"
-target="_blank">Clark &amp; Wells 2022</a> (published in *Methods in
-Ecology and Evolution*), with additional inspiration on the use of
-Bayesian probabilistic modelling coming from
-<a href="https://betanalpha.github.io/writing/" target="_blank">Michael
-Betancourt</a>,
-<a href="https://www.bu.edu/earth/profiles/michael-dietze/"
-target="_blank">Michael Dietze</a> and
-<a href="https://www.durham.ac.uk/staff/sarah-e-heaps/"
-target="_blank">Sarah Heaps</a>, among many others.
+fit a wide range of models, including:
+
+- <a
+  href="https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html"
+  target="_blank">Multivariate State-Space Time Series models</a>
+- <a href="https://nicholasjclark.github.io/mvgam/articles/nmixtures.html"
+  target="_blank">Hierarchical N-mixture models</a>
+- <a href="https://www.youtube.com/watch?v=2POK_FVwCHk"
+  target="_blank">Hierarchical Generalized Additive Models</a>
+- <a href="https://nicholasjclark.github.io/mvgam/reference/jsdgam.html"
+  target="_blank">Joint Species Distribution Models</a>
 
 ## Installation
 
@@ -52,10 +45,14 @@ information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-
 
 ## Introductory seminar
 
-<div class="vembedr">
-<div>
-<iframe src="https://www.youtube.com/embed/0zZopLlomsQ" width="533" height="300" frameborder="0" allowfullscreen="" data-external="1"></iframe>
-</div>
+<center>
+
+<div style="display: flex; justify-content: center;">
+
+<iframe style="aspect-ratio: 16 / 9; width: 100% !important;" src="https://www.youtube.com/embed/0zZopLlomsQ?si=fWBVTPRDMi9TXcIy" data-external="1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen>
+</iframe>
+</center>
+
 </div>
 
 ## Cheatsheet
@@ -86,24 +83,29 @@ package can handle data for the following families:
 - `nmix()` for count data with imperfect detection (unknown number of
   trials)
 
-See `??mvgam_families` for more information. Below is a simple example
+See `?mvgam_families` for more information. Below is a simple example
 for simulating and modelling proportional data with `Beta` observations
 over a set of seasonal series with independent Gaussian Process dynamic
 trends:
 
 ``` r
 set.seed(100)
-data <- sim_mvgam(family = betar(),
-                  T = 80,
-                  trend_model = GP(),
-                  prop_trend = 0.5, 
-                  seasonality = 'shared')
+data <- sim_mvgam(
+  family = betar(),
+  T = 80,
+  trend_model = GP(),
+  prop_trend = 0.5, 
+  seasonality = 'shared'
+)
 ```
 
 Plot the series to see how they evolve over time
 
 ``` r
-plot_mvgam_series(data = data$data_train, series = 'all')
+plot_mvgam_series(
+  data = data$data_train, 
+  series = 'all'
+)
 ```
 
 <figure>
@@ -119,22 +121,28 @@ The model also includes series-specific latent Gaussian Processes with
 squared exponential covariance functions to capture temporal dynamics
 
 ``` r
-mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
-               s(season, by = series, m = 1, k = 5),
-             trend_model = GP(),
-             data = data$data_train,
-             newdata = data$data_test,
-             family = betar())
+mod <- mvgam(
+  y ~ s(season, bs = 'cc', k = 7) +
+    s(season, by = series, m = 1, k = 5),
+  trend_model = GP(),
+  data = data$data_train,
+  newdata = data$data_test,
+  family = betar()
+)
 ```
 
 Plot the estimated posterior hindcast and forecast distributions for
 each series
 
 ``` r
-layout(matrix(1:4, nrow = 2, byrow = TRUE))
-for(i in 1:3){
-  plot(mod, type = 'forecast', series = i)
-}
+library(patchwork)
+fc <- forecast(mod)
+wrap_plots(
+  plot(fc, series = 1), 
+  plot(fc, series = 2), 
+  plot(fc, series = 3), 
+  ncol = 2
+)
 ```
 
 <figure>
@@ -156,6 +164,38 @@ You can set `build_vignettes = TRUE` when installing but be aware this
 will slow down the installation drastically. Instead, you can always
 access the vignette htmls online at
 <https://nicholasjclark.github.io/mvgam/articles/>
+
+## Citing `mvgam` and related software
+
+When using any software please make sure to appropriately acknowledge
+the hard work that developers and maintainers put into making these
+packages available. Citations are currently the best way to formally
+acknowledge this work (but feel free to ⭐ [the
+repo](https://github.com/nicholasjclark/mvgam) as well), so we highly
+encourage you to cite any packages that you rely on for your research.
+
+When using `mvgam`, please cite the following:
+
+> Clark, N.J. and Wells, K. (2023). Dynamic Generalized Additive Models
+> (DGAMs) for forecasting discrete ecological time series. *Methods in
+> Ecology and Evolution*. DOI: <https://doi.org/10.1111/2041-210X.13974>
+
+As `mvgam` acts as an interface to `Stan`, please additionally cite:
+
+> Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B.,
+> Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017).
+> Stan: A probabilistic programming language. *Journal of Statistical
+> Software*. 76(1). DOI: <https://doi.org/10.18637/jss.v076.i01>
+
+`mvgam` relies on several other `R` packages and, of course, on `R`
+itself. To find out how to cite `R` and its packages, use `citation()`.
+There are some features of `mvgam` which specifically rely on certain
+packages. The most important of these is the generation of data
+necessary to estimate smoothing splines and Gaussian Processes, which
+rely on the `mgcv`, `brms` and `splines2` packages. The `rstan` and
+`cmdstanr` packages together with `Rcpp` makes `Stan` conveniently
+accessible in `R`. If you use some of these features, please also
+consider citing the related packages.
 
 ## Other resources
 
@@ -185,7 +225,12 @@ data:
   target="_blank">Incorporating time-varying seasonality in forecast
   models</a>
 
-Please also feel free to use the [`mvgam` Discussion
+## Getting help
+
+If you encounter a clear bug, please file an issue with a minimal
+reproducible example on
+[GitHub](https://github.com/nicholasjclark/mvgam/issues). Please also
+feel free to use the [`mvgam` Discussion
 Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for
 or post other discussion topics related to the package, and do check out
 the [`mvgam`

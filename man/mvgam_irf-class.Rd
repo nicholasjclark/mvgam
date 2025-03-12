@@ -8,8 +8,8 @@ A \code{mvgam_irf} object returned by function \code{\link{irf}}.
 Run \code{methods(class = "mvgam_irf")} to see an overview of available methods.
 }
 \details{
-A \code{mvgam_irf} object contains a list of posterior IRFs, each stored as
-its own list
+A \code{mvgam_irf} object contains a \code{list} of posterior impulse response
+functions, each stored as its own \code{list}
 }
 \seealso{
 \link{mvgam}, \link{VAR}

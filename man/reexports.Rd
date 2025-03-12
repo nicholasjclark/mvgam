@@ -20,6 +20,7 @@
 \alias{loo}
 \alias{loo_compare}
 \alias{predictions}
+\alias{avg_predictions}
 \alias{plot_predictions}
 \alias{slopes}
 \alias{plot_slopes}
@@ -57,7 +58,7 @@ below to see their documentation.
 
   \item{loo}{\code{\link[loo]{loo}}, \code{\link[loo]{loo_compare}}}
 
-  \item{marginaleffects}{\code{\link[marginaleffects]{comparisons}}, \code{\link[marginaleffects]{datagrid}}, \code{\link[marginaleffects]{get_predict}}, \code{\link[marginaleffects]{hypotheses}}, \code{\link[marginaleffects]{plot_comparisons}}, \code{\link[marginaleffects]{plot_predictions}}, \code{\link[marginaleffects]{plot_slopes}}, \code{\link[marginaleffects]{predictions}}, \code{\link[marginaleffects]{slopes}}}
+  \item{marginaleffects}{\code{\link[marginaleffects:predictions]{avg_predictions}}, \code{\link[marginaleffects]{comparisons}}, \code{\link[marginaleffects]{datagrid}}, \code{\link[marginaleffects]{get_predict}}, \code{\link[marginaleffects]{hypotheses}}, \code{\link[marginaleffects]{plot_comparisons}}, \code{\link[marginaleffects]{plot_predictions}}, \code{\link[marginaleffects]{plot_slopes}}, \code{\link[marginaleffects]{predictions}}, \code{\link[marginaleffects]{slopes}}}
 
   \item{mgcv}{\code{\link[mgcv]{s}}, \code{\link[mgcv]{t2}}, \code{\link[mgcv]{te}}, \code{\link[mgcv:te]{ti}}}
 

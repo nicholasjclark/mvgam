@@ -3,7 +3,7 @@
 \name{score.mvgam_forecast}
 \alias{score.mvgam_forecast}
 \alias{score}
-\title{Compute probabilistic forecast scores for mvgam objects}
+\title{Compute probabilistic forecast scores for \pkg{mvgam} models}
 \usage{
 \method{score}{mvgam_forecast}(
   object,
@@ -58,7 +58,7 @@ posterior empirical quantiles. Intervals are not calculated when using \code{elp
 will only contain the linear predictors
 }
 \description{
-Compute probabilistic forecast scores for mvgam objects
+Compute probabilistic forecast scores for \pkg{mvgam} models
 }
 \examples{
 \donttest{
@@ -69,7 +69,8 @@ mod <- mvgam(y ~ 1,
             trend_model = RW(),
             data = data$data_train,
             newdata = data$data_test,
-            chains = 2)
+            chains = 2,
+            silent = 2)
 
 # Extract forecasts into a 'mvgam_forecast' object
 fc <- forecast(mod)
@@ -86,7 +87,8 @@ mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
             data = data$data_train,
             newdata = data$data_test,
             family = bernoulli(),
-            chains = 2)
+            chains = 2,
+            silent = 2)
 
 # Extract forecasts on the expectation (probability) scale
 fc <- forecast(mod, type = 'expected')
@@ -99,4 +101,7 @@ str(fc_scores)
 }
 \seealso{
 \code{\link{forecast.mvgam}}, \code{\link{ensemble}}
+}
+\author{
+Nicholas J Clark
 }

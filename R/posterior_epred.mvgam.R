@@ -1,4 +1,4 @@
-#' Draws from the Expected Value of the Posterior Predictive Distribution
+#' Draws from the expected value of the posterior predictive distribution for \pkg{mvgam} objects
 #'
 #' Compute posterior draws of the expected value of the posterior predictive
 #' distribution (i.e. the conditional expectation).
@@ -39,37 +39,43 @@
 #' @examples
 #' \donttest{
 #' # Simulate some data and fit a model
-#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+#' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),
 #'             trend_model = AR(),
 #'             noncentred = TRUE,
-#'             data = simdat$data_train)
+#'             data = simdat$data_train,
+#'             chains = 2,
+#'             silent = 2)
 #'
 #'# Compute posterior expectations
 #'expectations <- posterior_epred(mod)
 #'str(expectations)
 #'}
 #' @export
-posterior_epred.mvgam = function(object,
-                                 newdata,
-                                 data_test,
-                                 ndraws = NULL,
-                                 process_error = TRUE, ...){
-
-  if(missing(newdata) & missing(data_test)){
+posterior_epred.mvgam = function(
+  object,
+  newdata,
+  data_test,
+  ndraws = NULL,
+  process_error = TRUE,
+  ...
+) {
+  if (missing(newdata) & missing(data_test)) {
     out <- .mvgam_fitted(object, type = 'expected')
   } else {
-    out <- predict(object,
-                   newdata = newdata,
-                   data_test = data_test,
-                   process_error = process_error,
-                   type = 'expected',
-                   summary = FALSE)
+    out <- predict(
+      object,
+      newdata = newdata,
+      data_test = data_test,
+      process_error = process_error,
+      type = 'expected',
+      summary = FALSE
+    )
   }
 
-  if(!is.null(ndraws)){
+  if (!is.null(ndraws)) {
     validate_pos_integer(ndraws)
-    if(ndraws > NROW(out)){
+    if (ndraws > NROW(out)) {
     } else {
       idx <- sample(1:NROW(out), ndraws, replace = FALSE)
       out <- out[idx, ]
@@ -78,7 +84,7 @@ posterior_epred.mvgam = function(object,
   return(out)
 }
 
-#' Posterior Draws of the Linear Predictor
+#' Posterior draws of the linear predictor for \pkg{mvgam} objects
 #'
 #' Compute posterior draws of the linear predictor, that is draws before
 #' applying any link functions or other transformations. Can be performed for
@@ -110,42 +116,46 @@ posterior_epred.mvgam = function(object,
 #' @examples
 #' \donttest{
 #' # Simulate some data and fit a model
-#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+#' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),
 #'              trend_model = AR(),
 #'              noncentred = TRUE,
 #'              data = simdat$data_train,
-#'              chains = 2)
+#'              chains = 2,
+#'              silent = 2)
 #'
 #'# Extract linear predictor values
 #'linpreds <- posterior_linpred(mod)
 #'str(linpreds)
 #'}
 #' @export
-posterior_linpred.mvgam = function(object,
-                                   transform = FALSE,
-                                   newdata,
-                                   ndraws = NULL,
-                                   data_test,
-                                   process_error = TRUE,
-                                   ...){
-
-  if(transform){
+posterior_linpred.mvgam = function(
+  object,
+  transform = FALSE,
+  newdata,
+  ndraws = NULL,
+  data_test,
+  process_error = TRUE,
+  ...
+) {
+  if (transform) {
     type <- 'expected'
   } else {
     type <- 'link'
   }
 
-  out <- predict(object,
-                 newdata = newdata,
-                 data_test = data_test,
-                 process_error = process_error,
-                 type = type,
-                 summary = FALSE)
+  out <- predict(
+    object,
+    newdata = newdata,
+    data_test = data_test,
+    process_error = process_error,
+    type = type,
+    summary = FALSE
+  )
 
-  if(!is.null(ndraws)){
+  if (!is.null(ndraws)) {
     validate_pos_integer(ndraws)
-    if(ndraws > NROW(out)){
+    if (ndraws > NROW(out)) {
     } else {
       idx <- sample(1:NROW(out), ndraws, replace = FALSE)
       out <- out[idx, ]
@@ -154,7 +164,7 @@ posterior_linpred.mvgam = function(object,
   return(out)
 }
 
-#' Draws from the Posterior Predictive Distribution
+#' Draws from the posterior predictive distribution for \pkg{mvgam} objects
 #'
 #' Compute posterior draws of the posterior predictive distribution. Can be
 #' performed for the data used to fit the model (posterior predictive checks) or
@@ -189,34 +199,40 @@ posterior_linpred.mvgam = function(object,
 #' and \code{n_obs} is the number of observations in \code{newdata}
 #' @seealso \code{\link{hindcast.mvgam}} \code{\link{posterior_linpred.mvgam}} \code{\link{posterior_epred.mvgam}}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Simulate some data and fit a model
-#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+#' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),
-#'             trend_model = 'AR1',
-#'             data = simdat$data_train)
+#'             trend_model = AR(),
+#'             data = simdat$data_train,
+#'             chains = 2,
+#'             silent = 2)
 #'
 #'# Compute posterior predictions
 #'predictions <- posterior_predict(mod)
 #'str(predictions)
 #'}
 #' @export
-posterior_predict.mvgam = function(object,
-                                   newdata,
-                                   data_test,
-                                   ndraws = NULL,
-                                   process_error = TRUE, ...){
+posterior_predict.mvgam = function(
+  object,
+  newdata,
+  data_test,
+  ndraws = NULL,
+  process_error = TRUE,
+  ...
+) {
+  out <- predict(
+    object,
+    newdata = newdata,
+    data_test = data_test,
+    process_error = process_error,
+    type = 'response',
+    summary = FALSE
+  )
 
-  out <- predict(object,
-                 newdata = newdata,
-                 data_test = data_test,
-                 process_error = process_error,
-                 type = 'response',
-                 summary = FALSE)
-
-  if(!is.null(ndraws)){
+  if (!is.null(ndraws)) {
     validate_pos_integer(ndraws)
-    if(ndraws > NROW(out)){
+    if (ndraws > NROW(out)) {
     } else {
       idx <- sample(1:NROW(out), ndraws, replace = FALSE)
       out <- out[idx, ]
@@ -238,7 +254,7 @@ rstantools::posterior_epred
 rstantools::posterior_linpred
 
 
-#' Expected Values of the Posterior Predictive Distribution
+#' Expected values of the posterior predictive distribution for \pkg{mvgam} objects
 #'
 #' This method extracts posterior estimates of the fitted values
 #' (i.e. the actual predictions, included estimates for any trend states,
@@ -269,44 +285,51 @@ rstantools::posterior_linpred
 #'   quantile estimates as specified via argument \code{probs}.
 #' @seealso \code{\link{hindcast.mvgam}}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Simulate some data and fit a model
-#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+#' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),
-#'             trend_model = 'AR1',
+#'             trend_model = AR(),
 #'             data = simdat$data_train,
 #'             chains = 2,
-#'             burnin = 300,
-#'             samples = 300)
+#'             silent = 2)
 #'
 #'# Extract fitted values (posterior expectations)
 #'expectations <- fitted(mod)
 #'str(expectations)
 #'}
 #' @export
-fitted.mvgam <- function(object, process_error = TRUE,
-                        scale = c("response", "linear"),
-                        summary = TRUE, robust = FALSE,
-                        probs = c(0.025, 0.975), ...) {
-
+fitted.mvgam <- function(
+  object,
+  process_error = TRUE,
+  scale = c("response", "linear"),
+  summary = TRUE,
+  robust = FALSE,
+  probs = c(0.025, 0.975),
+  ...
+) {
+  if (length(probs) != 2L) {
+    stop("argument 'probs' must be a vector of length 2", call. = FALSE)
+  }
   scale <- match.arg(scale)
-  type <- switch(scale, "response" = "expected",
-                  "linear" = "link")
+  type <- switch(scale, "response" = "expected", "linear" = "link")
   preds <- .mvgam_fitted(object = object, type = type)
 
   # Preserve original data ordering
-  data.frame(time = object$obs_data$index..time..index,
-             order = object$obs_data$index..orig..order,
-             series = object$obs_data$series) %>%
+  data.frame(
+    time = object$obs_data$index..time..index,
+    order = object$obs_data$index..orig..order,
+    series = object$obs_data$series
+  ) %>%
     dplyr::arrange(time, series) %>%
     dplyr::pull(order) -> orig_order
-  preds <- preds[ , order(orig_order)]
+  preds <- preds[, order(orig_order)]
 
-  if(summary){
+  if (summary) {
     Qupper <- apply(preds, 2, quantile, probs = max(probs), na.rm = TRUE)
     Qlower <- apply(preds, 2, quantile, probs = min(probs), na.rm = TRUE)
 
-    if(robust){
+    if (robust) {
       estimates <- apply(preds, 2, median, na.rm = TRUE)
       errors <- apply(abs(preds - estimates), 2, median, na.rm = TRUE)
     } else {
@@ -315,8 +338,12 @@ fitted.mvgam <- function(object, process_error = TRUE,
     }
 
     out <- cbind(estimates, errors, Qlower, Qupper)
-    colnames(out) <- c('Estimate', 'Est.Error', paste0('Q', 100*min(probs)),
-                       paste0('Q', 100*max(probs)))
+    colnames(out) <- c(
+      'Estimate',
+      'Est.Error',
+      paste0('Q', 100 * min(probs)),
+      paste0('Q', 100 * max(probs))
+    )
   } else {
     out <- preds
   }
@@ -325,76 +352,79 @@ fitted.mvgam <- function(object, process_error = TRUE,
 }
 
 #' @noRd
-.mvgam_fitted = function(object, type = 'expected'){
+.mvgam_fitted = function(object, type = 'expected') {
+  # Extract the linear predictor draws
+  mus <- mcmc_chains(object$model_output, 'mus')
 
-    # Extract the linear predictor draws
-    mus <- mcmc_chains(object$model_output, 'mus')
-
-    # Need to know which series each observation belongs to so we can
-    # pull out appropriate family-level parameters (overdispersions, shapes, etc...)
-    if(is.null(object$test_data)){
-      all_dat <- data.frame(series = object$obs_data$series,
-                            time = object$obs_data$time,
-                            y = object$obs_data$y) %>%
-        dplyr::arrange(series, time)
-    } else {
-      all_dat <- data.frame(series = c(object$obs_data$series,
-                                       object$test_data$series),
-                            time = c(object$obs_data$time,
-                                     object$test_data$time),
-                            y = c(object$obs_data$y,
-                                  object$test_data$y)) %>%
-        dplyr::arrange(series, time)
-    }
-
-    obs <- all_dat$y
-    series_obs <- as.numeric(all_dat$series)
-
-    # Family-specific parameters
-    family <- object$family
-    family_pars <- extract_family_pars(object = object)
-    n_series <- NCOL(object$ytimes)
-
-    # Family parameters spread into a vector
-    family_extracts <- lapply(seq_along(family_pars), function(j){
-      if(is.matrix(family_pars[[j]])){
-        as.vector(family_pars[[j]][, series_obs])
-      } else {
-        family_pars[[j]][]
-      }
-    })
-    names(family_extracts) <- names(family_pars)
-
-    # Add trial information if this is a Binomial model
-    if(object$family %in% c('binomial', 'beta_binomial')){
-      trials <- as.vector(matrix(rep(as.vector(attr(object$mgcv_model, 'trials')),
-                                     NROW(mus)),
-                                 nrow = NROW(mus),
-                                 byrow = TRUE))
-      family_extracts$trials <- trials
-    }
-
-    # Expectations as a vector
-    Xp <- as.matrix(as.vector(mus))
-    attr(Xp, 'model.offset') <- 0
-
-    if(family == 'nmix'){
-      latent_lambdas <- exp(as.vector(mcmc_chains(object$model_output, 'trend')))
-      n_draws <- dim(mcmc_chains(object$model_output, 'ypred'))[1]
-      cap <- as.vector(t(replicate(n_draws, object$obs_data$cap)))
-    } else {
-      latent_lambdas <- NULL
-      cap <- NULL
-    }
-    pred_vec <- mvgam_predict(family = family,
-                              family_pars = family_extracts,
-                              latent_lambdas = latent_lambdas,
-                              cap = cap,
-                              type = type,
-                              Xp = Xp,
-                              betas = 1)
-
-    # Convert back to matrix and return
-    pred_mat <- matrix(pred_vec, nrow = NROW(mus))
-    return(pred_mat)
+  # Need to know which series each observation belongs to so we can
+  # pull out appropriate family-level parameters (overdispersions, shapes, etc...)
+  if (is.null(object$test_data)) {
+    all_dat <- data.frame(
+      series = object$obs_data$series,
+      time = object$obs_data$time,
+      y = object$obs_data$y
+    ) %>%
+      dplyr::arrange(series, time)
+  } else {
+    all_dat <- data.frame(
+      series = c(object$obs_data$series, object$test_data$series),
+      time = c(object$obs_data$time, object$test_data$time),
+      y = c(object$obs_data$y, object$test_data$y)
+    ) %>%
+      dplyr::arrange(series, time)
   }
+
+  obs <- all_dat$y
+  series_obs <- as.numeric(all_dat$series)
+
+  # Family-specific parameters
+  family <- object$family
+  family_pars <- extract_family_pars(object = object)
+  n_series <- NCOL(object$ytimes)
+
+  # Family parameters spread into a vector
+  family_extracts <- lapply(seq_along(family_pars), function(j) {
+    if (is.matrix(family_pars[[j]])) {
+      as.vector(family_pars[[j]][, series_obs])
+    } else {
+      family_pars[[j]][]
+    }
+  })
+  names(family_extracts) <- names(family_pars)
+
+  # Add trial information if this is a Binomial model
+  if (object$family %in% c('binomial', 'beta_binomial')) {
+    trials <- as.vector(matrix(
+      rep(as.vector(attr(object$mgcv_model, 'trials')), NROW(mus)),
+      nrow = NROW(mus),
+      byrow = TRUE
+    ))
+    family_extracts$trials <- trials
+  }
+
+  # Expectations as a vector
+  Xp <- as.matrix(as.vector(mus))
+  attr(Xp, 'model.offset') <- 0
+
+  if (family == 'nmix') {
+    latent_lambdas <- exp(as.vector(mcmc_chains(object$model_output, 'trend')))
+    n_draws <- dim(mcmc_chains(object$model_output, 'ypred'))[1]
+    cap <- as.vector(t(replicate(n_draws, object$obs_data$cap)))
+  } else {
+    latent_lambdas <- NULL
+    cap <- NULL
+  }
+  pred_vec <- mvgam_predict(
+    family = family,
+    family_pars = family_extracts,
+    latent_lambdas = latent_lambdas,
+    cap = cap,
+    type = type,
+    Xp = Xp,
+    betas = 1
+  )
+
+  # Convert back to matrix and return
+  pred_mat <- matrix(pred_vec, nrow = NROW(mus))
+  return(pred_mat)
+}

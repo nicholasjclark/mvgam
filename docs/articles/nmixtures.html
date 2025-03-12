@@ -82,7 +82,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-01-17</h4>
+            <h4 data-toc-skip class="date">2025-02-06</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/nmixtures.Rmd" class="external-link"><code>vignettes/nmixtures.Rmd</code></a></small>
       <div class="d-none name"><code>nmixtures.Rmd</code></div>
@@ -534,7 +534,7 @@ nicely</p>
 <span><span class="co">#&gt; 0 of 4000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Fri Jan 17 4:09:01 PM 2025.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Thu Feb 06 12:07:59 PM 2025.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
@@ -583,10 +583,10 @@ parameters:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">'species'</span>,</span>
 <span>                 type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">ylim</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">theme_classic</span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">theme</span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">'none'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/lims.html" class="external-link">ylim</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_classic</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">'none'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-12-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>A common goal in N-mixture modelling is to estimate the true latent
 abundance. The model has automatically generated predictions for the
@@ -629,18 +629,18 @@ can extract these and produce decent plots using a small function</p>
 <span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">time</span>, <span class="va">obs</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">observations</span></span>
 <span>  </span>
 <span>  <span class="co"># Plot</span></span>
-<span>  <span class="fu">ggplot</span><span class="op">(</span><span class="va">pred_quantiles</span>, <span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, group <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu">geom_ribbon</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>ymin <span class="op">=</span> <span class="va">X5.</span>, ymax <span class="op">=</span> <span class="va">X95.</span><span class="op">)</span>, fill <span class="op">=</span> <span class="st">"#DCBCBC"</span><span class="op">)</span> <span class="op">+</span> </span>
-<span>    <span class="fu">geom_ribbon</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>ymin <span class="op">=</span> <span class="va">X30.</span>, ymax <span class="op">=</span> <span class="va">X70.</span><span class="op">)</span>, fill <span class="op">=</span> <span class="st">"#B97C7C"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu">geom_line</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">truth</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">pred_quantiles</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, group <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_ribbon.html" class="external-link">geom_ribbon</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>ymin <span class="op">=</span> <span class="va">X5.</span>, ymax <span class="op">=</span> <span class="va">X95.</span><span class="op">)</span>, fill <span class="op">=</span> <span class="st">"#DCBCBC"</span><span class="op">)</span> <span class="op">+</span> </span>
+<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_ribbon.html" class="external-link">geom_ribbon</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>ymin <span class="op">=</span> <span class="va">X30.</span>, ymax <span class="op">=</span> <span class="va">X70.</span><span class="op">)</span>, fill <span class="op">=</span> <span class="st">"#B97C7C"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">truth</span><span class="op">)</span>,</span>
 <span>              colour <span class="op">=</span> <span class="st">'black'</span>, linewidth <span class="op">=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu">geom_point</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">truth</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">truth</span><span class="op">)</span>,</span>
 <span>               shape <span class="op">=</span> <span class="fl">21</span>, colour <span class="op">=</span> <span class="st">'white'</span>, fill <span class="op">=</span> <span class="st">'black'</span>,</span>
 <span>               size <span class="op">=</span> <span class="fl">2.5</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu">geom_jitter</span><span class="op">(</span>data <span class="op">=</span> <span class="va">observations</span>, <span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">obs</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_jitter.html" class="external-link">geom_jitter</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">observations</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">obs</span><span class="op">)</span>,</span>
 <span>                width <span class="op">=</span> <span class="fl">0.06</span>, </span>
 <span>                shape <span class="op">=</span> <span class="fl">21</span>, fill <span class="op">=</span> <span class="st">'darkred'</span>, colour <span class="op">=</span> <span class="st">'white'</span>, size <span class="op">=</span> <span class="fl">2.5</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu">labs</span><span class="op">(</span>y <span class="op">=</span> <span class="st">'Latent abundance (N)'</span>,</span>
+<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>y <span class="op">=</span> <span class="st">'Latent abundance (N)'</span>,</span>
 <span>         x <span class="op">=</span> <span class="st">'Time'</span>,</span>
 <span>         title <span class="op">=</span> <span class="va">species</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
@@ -719,7 +719,7 @@ site, though some observations are missing</p>
 <span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://pillar.r-lib.org/reference/glimpse.html" class="external-link">glimpse</a></span><span class="op">(</span><span class="va">mod_data</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Rows: 675</span></span>
 <span><span class="co">#&gt; Columns: 11</span></span>
-<span><span class="co">#&gt; $ y         <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 1, NA, NA, NA, 2, 2, NA, 1, NA, NA, 0, 1, 0, 0, 0, 0, NA, NA…</span></span>
+<span><span class="co">#&gt; $ y         <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 1, <span style="color: #BB0000;">NA</span>, <span style="color: #BB0000;">NA</span>, <span style="color: #BB0000;">NA</span>, 2, 2, <span style="color: #BB0000;">NA</span>, 1, <span style="color: #BB0000;">NA</span>, <span style="color: #BB0000;">NA</span>, 0, 1, 0, 0, 0, 0, <span style="color: #BB0000;">NA</span>, <span style="color: #BB0000;">NA</span>…</span></span>
 <span><span class="co">#&gt; $ abund_cov <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -0.3734384, -0.3734384, -0.3734384, 0.7064305, 0.7064305, 0.…</span></span>
 <span><span class="co">#&gt; $ abund_fac <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> 3, 3, 3, 4, 4, 4, 9, 9, 9, 2, 2, 2, 3, 3, 3, 2, 2, 2, 1, 1, …</span></span>
 <span><span class="co">#&gt; $ det_cov   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -1.2827999, 1.1770575, -1.3636225, -0.2922343, 0.1954809, 0.…</span></span>
@@ -883,8 +883,8 @@ inspect the estimated average detection probability</p>
 <span><span class="co">#&gt;  Estimate 2.5 % 97.5 %</span></span>
 <span><span class="co">#&gt;     0.568 0.504   0.63</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Columns: estimate, conf.low, conf.high </span></span>
-<span><span class="co">#&gt; Type:  detection</span></span></code></pre></div>
+<span><span class="co">#&gt; Type:  detection </span></span>
+<span><span class="co">#&gt; Columns: estimate, conf.low, conf.high</span></span></code></pre></div>
 <p>Next investigate estimated effects of covariates on latent abundance
 using the <code><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects()</a></code> function and specifying
 <code>type = 'link'</code>; this will return plots on the expectation
@@ -899,13 +899,13 @@ scale</p>
 abundance</p>
 <div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">abund_plots</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
-<span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Expected latent abundance'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Expected latent abundance'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-24-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>The effect of the factor covariate on expected latent abundance,
 estimated as a hierarchical random effect</p>
 <div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">abund_plots</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
-<span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Expected latent abundance'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Expected latent abundance'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-25-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>Now we can investigate estimated effects of covariates on detection
 probability using <code>type = 'detection'</code></p>
@@ -921,11 +921,11 @@ significances). But inspecting conditional effects of each covariate on
 the probability scale is more intuitive and useful</p>
 <div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">det_plots</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
-<span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-27-1.png" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">det_plots</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
-<span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-27-2.png" width="60%" style="display: block; margin: auto;"></p>
 <p>More targeted predictions are also easy with
 <code>marginaleffects</code> support. For example, we can ask: How does
@@ -939,8 +939,8 @@ covariates?</p>
 <span>                                    det_cov2 <span class="op">=</span> <span class="va">fivenum_round</span><span class="op">)</span>,</span>
 <span>                 by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'det_cov'</span>, <span class="st">'det_cov2'</span><span class="op">)</span>,</span>
 <span>                 type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">theme_classic</span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_classic</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-28-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>The model has found support for some important covariate effects, but
 of course we’d want to interrogate how well the model predicts and think
@@ -970,8 +970,9 @@ counts.</a>” <em>Biometrics</em> 60.1 (2004): 108-115.</p>
 </h2>
 <p>I’m actively seeking PhD students and other researchers to work in
 the areas of ecological forecasting, multivariate model evaluation and
-development of <code>mvgam</code>. Please reach out if you are
-interested (n.clark’at’uq.edu.au)</p>
+development of <code>mvgam</code>. Please see <a href="https://ecogambler.netlify.app/opportunities/" class="external-link">this small list of
+opportunities on my website</a> and do reach out if you are interested
+(n.clark’at’uq.edu.au)</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
     </nav></aside>

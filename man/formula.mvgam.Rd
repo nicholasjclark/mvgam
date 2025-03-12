@@ -3,14 +3,14 @@
 \name{formula.mvgam}
 \alias{formula.mvgam}
 \alias{formula.mvgam_prefit}
-\title{Extract formulae from mvgam objects}
+\title{Extract formulae from \pkg{mvgam} objects}
 \usage{
 \method{formula}{mvgam}(x, trend_effects = FALSE, ...)
 
 \method{formula}{mvgam_prefit}(x, trend_effects = FALSE, ...)
 }
 \arguments{
-\item{x}{\code{mvgam} or \code{mvgam_prefit} object}
+\item{x}{\code{mvgam}, \code{jsdgam} or \code{mvgam_prefit} object}
 
 \item{trend_effects}{\code{logical}, return the formula from the
 observation model (if \code{FALSE}) or from the underlying process
@@ -22,7 +22,7 @@ model (if\code{TRUE})}
 A \code{formula} object
 }
 \description{
-Extract formulae from mvgam objects
+Extract formulae from \pkg{mvgam} objects
 }
 \author{
 Nicholas J Clark

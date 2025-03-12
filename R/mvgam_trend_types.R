@@ -24,7 +24,9 @@
 #'  controlling how strongly the local correlation matrix \eqn{\Omega_{group}}
 #'  is shrunk towards the global
 #'  correlation matrix \eqn{\Omega_{global}} (larger values of \eqn{\alpha_{cor}} indicate
-#'  a greater degree of shrinkage, i.e. a greater degree of partial pooling).
+#'  a greater degree of shrinkage, i.e. a greater degree of partial pooling). When used
+#'  within a `VAR()` model, this essentially sets up a hierarchical panel vector autoregression
+#'  where both the autoregressive and correlation matrices are learned hierarchically.
 #'  If `gr` is supplied then `subgr` *must* also be supplied
 #' @param subgr A subgrouping `factor` variable specifying which element in `data` represents the
 #' different time series. Defaults to `series`, but note that
@@ -39,13 +41,14 @@
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #' arguments to be interpreted by the parsing functions in \pkg{mvgam}
 #' @rdname RW
+#' @author Nicholas J Clark
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'# A short example to illustrate CAR(1) models
 #'# Function to simulate CAR1 data with seasonality
-#'sim_corcar1 = function(n = 120,
+#'sim_corcar1 = function(n = 125,
 #'                       phi = 0.5,
-#'                       sigma = 1,
+#'                       sigma = 2,
 #'                       sigma_obs = 0.75){
 #'# Sample irregularly spaced time intervals
 #'time_dis <- c(0, runif(n - 1, -0.1, 1))
@@ -84,15 +87,20 @@
 #'       dplyr::mutate(series = as.factor(series))
 #'
 #'# mvgam with CAR(1) trends and series-level seasonal smooths; the
-#'# State-Space representation (using trend_formula) will be more efficient
-#'mod <- mvgam(formula = y ~ 1,
+#'# State-Space representation (using trend_formula) will be more efficient;
+#'# using informative priors on the sigmas often helps with convergence
+#'mod <- mvgam(formula = y ~ -1,
 #'             trend_formula = ~ s(season, bs = 'cc',
 #'                                 k = 5, by = trend),
 #'             trend_model = CAR(),
+#'             priors = c(prior(exponential(3),
+#'                            class = sigma),
+#'                        prior(beta(4, 4),
+#'                            class = sigma_obs)),
 #'             data = dat,
 #'             family = gaussian(),
-#'             samples = 300,
-#'             chains = 2)
+#'             chains = 2,
+#'             silent = 2)
 #'
 #'# View usual summaries and plots
 #'summary(mod)
@@ -101,6 +109,10 @@
 #'plot(mod, type = 'trend', series = 2)
 #'plot(mod, type = 'residuals', series = 1)
 #'plot(mod, type = 'residuals', series = 2)
+#'mcmc_plot(mod,
+#'          variable = 'ar1',
+#'          regex = TRUE,
+#'          type = 'hist')
 #'
 #'# Now an example illustrating hierarchical dynamics
 #'set.seed(123)
@@ -140,143 +152,166 @@
 #'# Fit the model
 #'mod <- mvgam(formula = y ~ species,
 #'             trend_model = AR(gr = region, subgr = species),
-#'             data = all_dat)
+#'             data = all_dat,
+#'             chains = 2,
+#'             silent = 2)
 #'
 #'# Check standard outputs
 #'summary(mod)
 #'conditional_effects(mod, type = 'link')
 #'
-#'# Inspect posterior estimates for process error and the
-#'# correlation weighting parameter
-#'mcmc_plot(mod, variable = 'Sigma', regex = TRUE,
-#'          type = 'hist')
+#'# Inspect posterior estimates for the correlation weighting parameter
 #'mcmc_plot(mod, variable = 'alpha_cor', type = 'hist')
 #'}
 #' @export
-RW = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA){
-
+RW = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA) {
   # Validate the supplied groupings and correlation argument
   gr <- deparse0(substitute(gr))
   subgr <- deparse0(substitute(subgr))
 
-  if(gr == 'NA'){
+  if (gr == 'NA') {
     subgr <- 'series'
   }
 
-  if(gr != 'NA'){
-    if(subgr == 'NA'){
-      stop('argument "subgr" must be supplied if "gr" is also supplied',
-           call. = FALSE)
-    } else if(subgr == 'series'){
-      stop('argument "subgr" cannot be set to "series" if "gr" is also supplied',
-           call. = FALSE)
-      } else {
-        cor <- TRUE
-      }
-    }
-
-  out <- structure(list(trend_model = 'RW',
-                        ma = ma,
-                        cor = cor,
-                        unit = 'time',
-                        gr = gr,
-                        subgr = subgr,
-                        label = match.call()),
-                   class = 'mvgam_trend')
-}
-
-#' @rdname RW
-#' @export
-AR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA){
-  validate_pos_integer(p)
-  if(p > 3){
-    stop("Argument 'p' must be <= 3",
-         call. = FALSE)
-  }
-
-  # Validate the supplied groupings and correlation argument
-  gr <- deparse0(substitute(gr))
-  subgr <- deparse0(substitute(subgr))
-
-  if(gr == 'NA'){
-    subgr <- 'series'
-  }
-
-  if(gr != 'NA'){
-    if(subgr == 'NA'){
-      stop('argument "subgr" must be supplied if "gr" is also supplied',
-           call. = FALSE)
-    } else if(subgr == 'series'){
-      stop('argument "subgr" cannot be set to "series" if "gr" is also supplied',
-           call. = FALSE)
+  if (gr != 'NA') {
+    if (subgr == 'NA') {
+      stop(
+        'argument "subgr" must be supplied if "gr" is also supplied',
+        call. = FALSE
+      )
+    } else if (subgr == 'series') {
+      stop(
+        'argument "subgr" cannot be set to "series" if "gr" is also supplied',
+        call. = FALSE
+      )
     } else {
       cor <- TRUE
     }
   }
 
-  out <- structure(list(trend_model = paste0('AR', p),
-                        ma = ma,
-                        cor = cor,
-                        unit = 'time',
-                        gr = gr,
-                        subgr = subgr,
-                        label = match.call()),
-                   class = 'mvgam_trend')
+  out <- structure(
+    list(
+      trend_model = 'RW',
+      ma = ma,
+      cor = cor,
+      unit = 'time',
+      gr = gr,
+      subgr = subgr,
+      label = match.call()
+    ),
+    class = 'mvgam_trend'
+  )
 }
 
 #' @rdname RW
 #' @export
-CAR = function(p = 1){
+AR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA) {
   validate_pos_integer(p)
-  if(p > 1){
-    stop("Argument 'p' must be = 1",
-         call. = FALSE)
+  if (p > 3) {
+    stop("Argument 'p' must be <= 3", call. = FALSE)
   }
-  out <- structure(list(trend_model = paste0('CAR', p),
-                        ma = FALSE,
-                        cor = FALSE,
-                        unit = 'time',
-                        gr = 'NA',
-                        subgr = 'series',
-                        label = match.call()),
-                   class = 'mvgam_trend')
-}
-
-#' @rdname RW
-#' @export
-VAR = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA){
 
   # Validate the supplied groupings and correlation argument
   gr <- deparse0(substitute(gr))
   subgr <- deparse0(substitute(subgr))
 
-  if(gr == 'NA'){
+  if (gr == 'NA') {
     subgr <- 'series'
   }
 
-  if(gr != 'NA'){
-    if(subgr == 'NA'){
-      stop('argument "subgr" must be supplied if "gr" is also supplied',
-           call. = FALSE)
-    } else if(subgr == 'series'){
-      stop('argument "subgr" cannot be set to "series" if "gr" is also supplied',
-           call. = FALSE)
+  if (gr != 'NA') {
+    if (subgr == 'NA') {
+      stop(
+        'argument "subgr" must be supplied if "gr" is also supplied',
+        call. = FALSE
+      )
+    } else if (subgr == 'series') {
+      stop(
+        'argument "subgr" cannot be set to "series" if "gr" is also supplied',
+        call. = FALSE
+      )
     } else {
       cor <- TRUE
     }
   }
 
-  out <- structure(list(trend_model = 'VAR',
-                        ma = ma,
-                        cor = cor,
-                        unit = 'time',
-                        gr = gr,
-                        subgr = subgr,
-                        label = match.call()),
-                   class = 'mvgam_trend')
+  out <- structure(
+    list(
+      trend_model = paste0('AR', p),
+      ma = ma,
+      cor = cor,
+      unit = 'time',
+      gr = gr,
+      subgr = subgr,
+      label = match.call()
+    ),
+    class = 'mvgam_trend'
+  )
 }
 
-#' Specify dynamic Gaussian processes
+#' @rdname RW
+#' @export
+CAR = function(p = 1) {
+  validate_pos_integer(p)
+  if (p > 1) {
+    stop("Argument 'p' must be = 1", call. = FALSE)
+  }
+  out <- structure(
+    list(
+      trend_model = paste0('CAR', p),
+      ma = FALSE,
+      cor = FALSE,
+      unit = 'time',
+      gr = 'NA',
+      subgr = 'series',
+      label = match.call()
+    ),
+    class = 'mvgam_trend'
+  )
+}
+
+#' @rdname RW
+#' @export
+VAR = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA) {
+  # Validate the supplied groupings and correlation argument
+  gr <- deparse0(substitute(gr))
+  subgr <- deparse0(substitute(subgr))
+
+  if (gr == 'NA') {
+    subgr <- 'series'
+  }
+
+  if (gr != 'NA') {
+    if (subgr == 'NA') {
+      stop(
+        'argument "subgr" must be supplied if "gr" is also supplied',
+        call. = FALSE
+      )
+    } else if (subgr == 'series') {
+      stop(
+        'argument "subgr" cannot be set to "series" if "gr" is also supplied',
+        call. = FALSE
+      )
+    } else {
+      cor <- TRUE
+    }
+  }
+
+  out <- structure(
+    list(
+      trend_model = 'VAR',
+      ma = ma,
+      cor = cor,
+      unit = 'time',
+      gr = gr,
+      subgr = subgr,
+      label = match.call()
+    ),
+    class = 'mvgam_trend'
+  )
+}
+
+#' Specify dynamic Gaussian process trends in \pkg{mvgam} models
 #'
 #' Set up low-rank approximate Gaussian Process trend models using Hilbert
 #' basis expansions in \pkg{mvgam}. This function does not evaluate its arguments –
@@ -285,27 +320,35 @@ VAR = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA){
 #' @param ... unused
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #' arguments to be interpreted by the parsing functions in \pkg{mvgam}
-#' @details A GP trend is estimated for each series using
-#' [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408).
+#' @details A GP trend is estimated for each series using Hilbert space
+#' approximate Gaussian Processes.
 #' In `mvgam`, latent squared exponential GP trends are approximated using by
 #' default \code{20} basis functions and using a multiplicative factor of `c = 5/4`,
 #' which saves computational costs compared to fitting full GPs while adequately estimating
 #' GP \code{alpha} and \code{rho} parameters.
 #' @rdname GP
+#' @author Nicholas J Clark
+#' @references Riutort-Mayol G, Burkner PC, Andersen MR, Solin A and Vehtari A (2023).
+#' Practical Hilbert space approximate Bayesian Gaussian processes for probabilistic
+#' programming. Statistics and Computing 33, 1. https://doi.org/10.1007/s11222-022-10167-2
 #' @seealso \code{\link[brms]{gp}}
 #' @export
-GP = function(...){
-  out <- structure(list(trend_model = 'GP',
-                        ma = FALSE,
-                        cor = FALSE,
-                        unit = 'time',
-                        gr = 'NA',
-                        subgr = 'series',
-                        label = match.call()),
-                   class = 'mvgam_trend')
+GP = function(...) {
+  out <- structure(
+    list(
+      trend_model = 'GP',
+      ma = FALSE,
+      cor = FALSE,
+      unit = 'time',
+      gr = 'NA',
+      subgr = 'series',
+      label = match.call()
+    ),
+    class = 'mvgam_trend'
+  )
 }
 
-#' Specify piecewise linear or logistic trends
+#' Specify piecewise linear or logistic trends in \pkg{mvgam} models
 #'
 #' Set up piecewise linear or logistic trend models
 #' in \code{mvgam}. These functions do not evaluate their arguments –
@@ -326,6 +369,7 @@ GP = function(...){
 #' maximum saturation point for the trend (see details and examples in \code{\link{mvgam}} for
 #' more information).
 #' Default is 'linear'.
+#' @author Nicholas J Clark
 #' @references Taylor, Sean J., and Benjamin Letham. "Forecasting at scale." The American Statistician 72.1 (2018): 37-45.
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #' arguments to be interpreted by the parsing functions in \code{mvgam}
@@ -404,11 +448,13 @@ GP = function(...){
 #'              trend_model = PW(growth = 'logistic'),
 #'              family = poisson(),
 #'              data = mod_data,
-#'              chains = 2)
+#'              chains = 2,
+#'              silent = 2)
 #' summary(mod)
 #'
 #' # Plot the posterior hindcast
-#' plot(mod, type = 'forecast')
+#' hc <- hindcast(mod)
+#' plot(hc)
 #'
 #' # View the changepoints with ggplot2 utilities
 #' library(ggplot2)
@@ -417,33 +463,41 @@ GP = function(...){
 #' scale_y_discrete(labels = mod$trend_model$changepoints) +
 #' labs(y = 'Potential changepoint',
 #'      x = 'Rate change')
+#'
+#' # Generate a methods description scaffold
+#' how_to_cite(mod)
 #' }
 #' @export
-PW = function(n_changepoints = 10,
-              changepoint_range = 0.8,
-              changepoint_scale = 0.05,
-              growth = 'linear'){
-
+PW = function(
+  n_changepoints = 10,
+  changepoint_range = 0.8,
+  changepoint_scale = 0.05,
+  growth = 'linear'
+) {
   growth <- match.arg(growth, choices = c('linear', 'logistic'))
   validate_proportional(changepoint_range)
   validate_pos_integer(n_changepoints)
   validate_pos_real(changepoint_scale)
 
   trend_model <- 'PWlinear'
-  if(growth == 'logistic'){
+  if (growth == 'logistic') {
     trend_model = 'PWlogistic'
   }
-  out <- structure(list(trend_model = trend_model,
-                        n_changepoints = n_changepoints,
-                        changepoint_range = changepoint_range,
-                        changepoint_scale = changepoint_scale,
-                        ma = FALSE,
-                        cor = FALSE,
-                        unit = 'time',
-                        gr = 'NA',
-                        subgr = 'series',
-                        label = match.call()),
-                   class = 'mvgam_trend')
+  out <- structure(
+    list(
+      trend_model = trend_model,
+      n_changepoints = n_changepoints,
+      changepoint_range = changepoint_range,
+      changepoint_scale = changepoint_scale,
+      ma = FALSE,
+      cor = FALSE,
+      unit = 'time',
+      gr = 'NA',
+      subgr = 'series',
+      label = match.call()
+    ),
+    class = 'mvgam_trend'
+  )
 }
 
 #' Specify correlated residual processes in \pkg{mvgam}
@@ -484,7 +538,7 @@ PW = function(n_changepoints = 10,
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #' arguments to be interpreted by the parsing functions in \pkg{mvgam}
 #' @examples
-#'\dontrun{
+#'\donttest{
 #'# Simulate counts of four species over ten sampling locations
 #'site_dat <- data.frame(site = rep(1:10, 4),
 #'                       species = as.factor(sort(rep(letters[1:4], 10))),
@@ -546,28 +600,29 @@ PW = function(n_changepoints = 10,
 #'}
 #'
 #' @export
-ZMVN = function(unit = time, gr = NA, subgr = series){
-
+ZMVN = function(unit = time, gr = NA, subgr = series) {
   # Validate the supplied groupings and correlation argument
   unit <- deparse0(substitute(unit))
   gr <- deparse0(substitute(gr))
   subgr <- deparse0(substitute(subgr))
-  if(subgr == 'NA'){
-    stop('argument "subgr" cannot be NA',
-         call. = FALSE)
+  if (subgr == 'NA') {
+    stop('argument "subgr" cannot be NA', call. = FALSE)
   }
 
-  if(unit == 'NA'){
-    stop('argument "unit" cannot be NA',
-         call. = FALSE)
+  if (unit == 'NA') {
+    stop('argument "unit" cannot be NA', call. = FALSE)
   }
 
-  out <- structure(list(trend_model = 'ZMVN',
-                        ma = FALSE,
-                        cor = TRUE,
-                        unit = unit,
-                        gr = gr,
-                        subgr = subgr,
-                        label = match.call()),
-                   class = 'mvgam_trend')
+  out <- structure(
+    list(
+      trend_model = 'ZMVN',
+      ma = FALSE,
+      cor = TRUE,
+      unit = unit,
+      gr = gr,
+      subgr = subgr,
+      label = match.call()
+    ),
+    class = 'mvgam_trend'
+  )
 }

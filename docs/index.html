@@ -5,82 +5,76 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<meta name="description" content="Fit Bayesian Dynamic Generalized Additive Models to multivariate observations. Users can build nonlinear State-Space models that can incorporate semiparametric effects in observation and process components, using a wide range of observation families. Estimation is performed using Markov Chain Monte Carlo with Hamiltonian Monte Carlo in the software Stan. References: Clark &amp; Wells (2022) &lt;doi:10.1111/2041-210X.13974&gt;.">
 <title>Multivariate (Dynamic) Generalized Additive Models • mvgam</title>
 <script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><!-- Font Awesome icons --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css" integrity="sha256-mmgLkCYLUQbXn0B1SRqzHar6dCnv9oZFPEC1g1cwlkk=" crossorigin="anonymous">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/v4-shims.min.css" integrity="sha256-wZjR52fzng1pJHwx4aV2AO3yyTOXrcDW7jBpJtTwVxw=" crossorigin="anonymous">
-<!-- bootstrap-toc --><script src="https://cdn.jsdelivr.net/gh/afeld/bootstrap-toc@v1.0.1/dist/bootstrap-toc.min.js" integrity="sha256-4veVQbu7//Lk5TSmc7YV48MxtMy98e26cf5MrgZYnwo=" crossorigin="anonymous"></script><!-- headroom.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/headroom.min.js" integrity="sha256-AsUX4SJE1+yuDu5+mAVzJbuYNPHj/WroHuZ8Ir/CkE0=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/jQuery.headroom.min.js" integrity="sha256-ZX/yNShbjqsohH1k95liqY9Gd8uOiE1S4vZc+9KQ1K4=" crossorigin="anonymous"></script><!-- clipboard.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min.js" integrity="sha256-inc5kl9MA1hkeYUt+EC3BhlIgyp/2jDIyBLS6k3UxPI=" crossorigin="anonymous"></script><!-- search --><script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.js" integrity="sha512-zv6Ywkjyktsohkbp9bb45V6tEMoWhzFzXis+LrMehmJZZSys19Yxf1dopHx7WzIKxr5tK2dVcYmaCk2uqdjF4A==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/autocomplete.js/0.38.0/autocomplete.jquery.min.js" integrity="sha512-GU9ayf+66Xx2TmpxqJpliWbT5PiGYxpaG8rfnBEk1LL8l1KGkRShhngwdXK1UgqhAzWpZHSiYPc09/NwDQIGyg==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/mark.min.js" integrity="sha512-5CYOlHXGh6QpOFA/TeTylKLWfB3ftPsde7AnmhuitiTX4K5SqCLBeKro6sPS8ilsz1Q4NRx3v8Ko2IBiszzdww==" crossorigin="anonymous"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Multivariate (Dynamic) Generalized Additive Models">
+<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><link href="extra.css" rel="stylesheet">
+<meta property="og:title" content="Multivariate (Dynamic) Generalized Additive Models">
+<meta name="description" content="Fit Bayesian Dynamic Generalized Additive Models to multivariate observations. Users can build nonlinear State-Space models that can incorporate semiparametric effects in observation and process components, using a wide range of observation families. Estimation is performed using Markov Chain Monte Carlo with Hamiltonian Monte Carlo in the software Stan. References: Clark &amp; Wells (2022) &lt;doi:10.1111/2041-210X.13974&gt;.">
 <meta property="og:description" content="Fit Bayesian Dynamic Generalized Additive Models to multivariate observations. Users can build nonlinear State-Space models that can incorporate semiparametric effects in observation and process components, using a wide range of observation families. Estimation is performed using Markov Chain Monte Carlo with Hamiltonian Monte Carlo in the software Stan. References: Clark &amp; Wells (2022) &lt;doi:10.1111/2041-210X.13974&gt;.">
 <meta property="og:image" content="https://nicholasjclark.github.io/mvgam/logo.png">
-<!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
-<script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
-<script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
-<![endif]-->
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
-    
 
-    <nav class="navbar fixed-top navbar-dark navbar-expand-lg bg-primary"><div class="container">
-    
+
+    <nav class="navbar navbar-expand-lg fixed-top bg-primary" data-bs-theme="dark" aria-label="Site navigation"><div class="container">
+
     <a class="navbar-brand me-2" href="index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.5002</small>
 
-    
+
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="nav-item">
-  <a class="nav-link" href="reference/index.html">Reference</a>
-</li>
 <li class="nav-item dropdown">
-  <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-haspopup="true" id="dropdown-articles">Articles</a>
-  <div class="dropdown-menu" aria-labelledby="dropdown-articles">
-    <a class="dropdown-item" href="articles/data_in_mvgam.html">Formatting data for use in mvgam</a>
-    <a class="dropdown-item" href="articles/forecast_evaluation.html">Forecasting and forecast evaluation in mvgam</a>
-    <a class="dropdown-item" href="articles/mvgam_overview.html">Overview of the mvgam package</a>
-    <a class="dropdown-item" href="articles/nmixtures.html">N-mixtures in mvgam</a>
-    <a class="dropdown-item" href="articles/shared_states.html">Shared latent states in mvgam</a>
-    <a class="dropdown-item" href="articles/time_varying_effects.html">Time-varying effects in mvgam</a>
-    <a class="dropdown-item" href="articles/trend_formulas.html">State-Space models in mvgam</a>
-  </div>
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
+<li><a class="dropdown-item" href="articles/data_in_mvgam.html">Formatting data for use in mvgam</a></li>
+    <li><a class="dropdown-item" href="articles/forecast_evaluation.html">Forecasting and forecast evaluation in mvgam</a></li>
+    <li><a class="dropdown-item" href="articles/mvgam_overview.html">Overview of the mvgam package</a></li>
+    <li><a class="dropdown-item" href="articles/nmixtures.html">N-mixtures in mvgam</a></li>
+    <li><a class="dropdown-item" href="articles/shared_states.html">Shared latent states in mvgam</a></li>
+    <li><a class="dropdown-item" href="articles/time_varying_effects.html">Time-varying effects in mvgam</a></li>
+    <li><a class="dropdown-item" href="articles/trend_formulas.html">State-Space models in mvgam</a></li>
+  </ul>
 </li>
-<li class="nav-item">
-  <a class="nav-link" href="news/index.html">Changelog</a>
-</li>
+<li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
       </ul>
-<form class="form-inline my-2 my-lg-0" role="search">
-        <input type="search" class="form-control me-sm-2" aria-label="Toggle navigation" name="search-input" data-search-index="search.json" id="search-input" placeholder="Search for" autocomplete="off">
-</form>
-
-      <ul class="navbar-nav">
-<li class="nav-item">
-  <a class="external-link nav-link" href="https://github.com/nicholasjclark/mvgam/" aria-label="github">
-    <span class="fab fa fab fa-github fa-lg"></span>
-     
-  </a>
-</li>
+<ul class="navbar-nav">
+<li class="nav-item"><form class="form-inline" role="search">
+ <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="search.json">
+</form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/nicholasjclark/mvgam/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul>
 </div>
 
-    
+
   </div>
 </nav><div class="container template-home">
 <div class="row">
   <main id="main" class="col-md-9"><p><br><br></p>
 <p><img src="reference/figures/mvgam_logo.png" width="120" alt="mvgam R package logo"><a href="https://mc-stan.org/" class="external-link"><img src="https://raw.githubusercontent.com/stan-dev/logos/master/logo_tm.png" align="right" width="120" alt="Stan Logo"></a></p>
-<div class="section level2">
-<h2 id="mvgam">mvgam<a class="anchor" aria-label="anchor" href="#mvgam"></a>
-</h2>
-<p><strong>M</strong>ulti<strong>V</strong>ariate (Dynamic) <strong>G</strong>eneralized <strong>A</strong>ddivite <strong>M</strong>odels</p>
-<p>The goal of <code>mvgam</code> is to fit Bayesian (Dynamic) Generalized Additive Models. This package constructs State-Space models that can include highly flexible nonlinear predictor effects for both process and observation components by leveraging functionalities from the impressive <a href="https://paulbuerkner.com/brms/" target="_blank" class="external-link"><code>brms</code></a> and <a href="https://cran.r-project.org/web/packages/mgcv/index.html" target="_blank" class="external-link"><code>mgcv</code></a> packages. This allows <code>mvgam</code> to fit a wide range of models, including hierarchical ecological models such as N-mixture or Joint Species Distribution models, as well as univariate and multivariate time series models with imperfect detection. The original motivation for the package is described in <a href="https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974" target="_blank" class="external-link">Clark &amp; Wells 2022</a> (published in <em>Methods in Ecology and Evolution</em>), with additional inspiration on the use of Bayesian probabilistic modelling coming from <a href="https://betanalpha.github.io/writing/" target="_blank" class="external-link">Michael Betancourt</a>, <a href="https://www.bu.edu/earth/profiles/michael-dietze/" target="_blank" class="external-link">Michael Dietze</a> and <a href="https://www.durham.ac.uk/staff/sarah-e-heaps/" target="_blank" class="external-link">Sarah Heaps</a>, among many others.</p>
+<div class="section level1">
+<div class="page-header">
+<img src="logo.png" class="logo" alt=""><h1 id="mvgam">mvgam<a class="anchor" aria-label="anchor" href="#mvgam"></a>
+</h1>
 </div>
+<blockquote>
+<p><strong>M</strong>ulti<strong>V</strong>ariate (Dynamic) <strong>G</strong>eneralized <strong>A</strong>ddivite <strong>M</strong>odels</p>
+</blockquote>
+<p>The goal of <code>mvgam</code> is to fit Bayesian Dynamic Generalized Additive Models (DGAMs) that can include highly flexible nonlinear predictor effects for both process and observation components. The package does this by relying on functionalities from the impressive <a href="https://paulbuerkner.com/brms/" target="_blank" class="external-link"><code>brms</code></a> and <a href="https://cran.r-project.org/package=mgcv" target="_blank" class="external-link"><code>mgcv</code></a> packages. This allows <code>mvgam</code> to fit a wide range of models, including:</p>
+<ul>
+<li><a href="https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html" target="_blank">Multivariate State-Space Time Series models</a></li>
+<li><a href="https://nicholasjclark.github.io/mvgam/articles/nmixtures.html" target="_blank">Hierarchical N-mixture models</a></li>
+<li><a href="https://www.youtube.com/watch?v=2POK_FVwCHk" target="_blank" class="external-link">Hierarchical Generalized Additive Models</a></li>
+<li><a href="https://nicholasjclark.github.io/mvgam/reference/jsdgam.html" target="_blank">Joint Species Distribution Models</a></li>
+</ul>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
@@ -89,12 +83,13 @@
 <div class="section level2">
 <h2 id="introductory-seminar">Introductory seminar<a class="anchor" aria-label="anchor" href="#introductory-seminar"></a>
 </h2>
-<div class="vembedr">
-<div>
-<iframe src="https://www.youtube.com/embed/0zZopLlomsQ" width="533" height="300" frameborder="0" allowfullscreen data-external="1">
+<center>
+<div style="display: flex; justify-content: center;">
+<iframe style="aspect-ratio: 16 / 9; width: 100% !important;" src="https://www.youtube.com/embed/0zZopLlomsQ?si=fWBVTPRDMi9TXcIy" data-external="1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen>
 </iframe>
+
 </div>
-</div>
+</center>
 </div>
 <div class="section level2">
 <h2 id="cheatsheet">Cheatsheet<a class="anchor" aria-label="anchor" href="#cheatsheet"></a>
@@ -130,33 +125,44 @@
 <li>
 <code><a href="reference/mvgam_families.html">nmix()</a></code> for count data with imperfect detection (unknown number of trials)</li>
 </ul>
-<p>See <code>??mvgam_families</code> for more information. Below is a simple example for simulating and modelling proportional data with <code>Beta</code> observations over a set of seasonal series with independent Gaussian Process dynamic trends:</p>
+<p>See <code><a href="reference/mvgam_families.html">?mvgam_families</a></code> for more information. Below is a simple example for simulating and modelling proportional data with <code>Beta</code> observations over a set of seasonal series with independent Gaussian Process dynamic trends:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">100</span><span class="op">)</span></span>
-<span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>                  T <span class="op">=</span> <span class="fl">80</span>,</span>
-<span>                  trend_model <span class="op">=</span> <span class="fu"><a href="reference/GP.html">GP</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>                  prop_trend <span class="op">=</span> <span class="fl">0.5</span>, </span>
-<span>                  seasonality <span class="op">=</span> <span class="st">'shared'</span><span class="op">)</span></span></code></pre></div>
+<span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span></span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  T <span class="op">=</span> <span class="fl">80</span>,</span>
+<span>  trend_model <span class="op">=</span> <span class="fu"><a href="reference/GP.html">GP</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  prop_trend <span class="op">=</span> <span class="fl">0.5</span>, </span>
+<span>  seasonality <span class="op">=</span> <span class="st">'shared'</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p>Plot the series to see how they evolve over time</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_train</span>, series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span></span>
+<span>  data <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_train</span>, </span>
+<span>  series <span class="op">=</span> <span class="st">'all'</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <figure><img src="reference/figures/README-beta_sim-1.png" alt="Visualizing multivariate proportional time series using the mvgam R package #rstats"><figcaption aria-hidden="true">
 Visualizing multivariate proportional time series using the mvgam R package #rstats
 </figcaption></figure><p>Fit a State-Space GAM to these series that uses a hierarchical cyclic seasonal smooth term to capture variation in seasonality among series. The model also includes series-specific latent Gaussian Processes with squared exponential covariance functions to capture temporal dynamics</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">7</span><span class="op">)</span> <span class="op">+</span></span>
-<span>               <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, by <span class="op">=</span> <span class="va">series</span>, m <span class="op">=</span> <span class="fl">1</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span>
-<span>             trend_model <span class="op">=</span> <span class="fu"><a href="reference/GP.html">GP</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>             data <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_train</span>,</span>
-<span>             newdata <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_test</span>,</span>
-<span>             family <span class="op">=</span> <span class="fu"><a href="reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/mvgam.html">mvgam</a></span><span class="op">(</span></span>
+<span>  <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">7</span><span class="op">)</span> <span class="op">+</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, by <span class="op">=</span> <span class="va">series</span>, m <span class="op">=</span> <span class="fl">1</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span>
+<span>  trend_model <span class="op">=</span> <span class="fu"><a href="reference/GP.html">GP</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  data <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_train</span>,</span>
+<span>  newdata <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_test</span>,</span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p>Plot the estimated posterior hindcast and forecast distributions for each series</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">4</span>, nrow <span class="op">=</span> <span class="fl">2</span>, byrow <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="kw">for</span><span class="op">(</span><span class="va">i</span> <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span><span class="fl">3</span><span class="op">)</span><span class="op">{</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="va">i</span><span class="op">)</span></span>
-<span><span class="op">}</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://patchwork.data-imaginist.com" class="external-link">patchwork</a></span><span class="op">)</span></span>
+<span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://patchwork.data-imaginist.com/reference/wrap_plots.html" class="external-link">wrap_plots</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>, </span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>, </span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>, </span>
+<span>  ncol <span class="op">=</span> <span class="fl">2</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <figure><img src="reference/figures/README-beta_fc-1.png" alt="Forecasting multivariate time series with Dynamic Generalized Additive Models"><figcaption aria-hidden="true">
 Forecasting multivariate time series with Dynamic Generalized Additive Models
 </figcaption></figure><p>Various <code>S3</code> functions can be used to inspect parameter estimates, plot smooth functions and residuals, and evaluate models through posterior predictive checks or forecast comparisons. Please see <a href="https://nicholasjclark.github.io/mvgam/reference/index.html">the package documentation</a> for more detailed examples.</p>
@@ -165,6 +171,20 @@ Forecasting multivariate time series with Dynamic Generalized Additive Models
 <h2 id="vignettes">Vignettes<a class="anchor" aria-label="anchor" href="#vignettes"></a>
 </h2>
 <p>You can set <code>build_vignettes = TRUE</code> when installing but be aware this will slow down the installation drastically. Instead, you can always access the vignette htmls online at <a href="https://nicholasjclark.github.io/mvgam/articles/" class="uri">https://nicholasjclark.github.io/mvgam/articles/</a></p>
+</div>
+<div class="section level2">
+<h2 id="citing-mvgam-and-related-software">Citing <code>mvgam</code> and related software<a class="anchor" aria-label="anchor" href="#citing-mvgam-and-related-software"></a>
+</h2>
+<p>When using any software please make sure to appropriately acknowledge the hard work that developers and maintainers put into making these packages available. Citations are currently the best way to formally acknowledge this work (but feel free to ⭐ <a href="https://github.com/nicholasjclark/mvgam" class="external-link">the repo</a> as well), so we highly encourage you to cite any packages that you rely on for your research.</p>
+<p>When using <code>mvgam</code>, please cite the following:</p>
+<blockquote>
+<p>Clark, N.J. and Wells, K. (2023). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. <em>Methods in Ecology and Evolution</em>. DOI: <a href="https://doi.org/10.1111/2041-210X.13974" class="external-link uri">https://doi.org/10.1111/2041-210X.13974</a></p>
+</blockquote>
+<p>As <code>mvgam</code> acts as an interface to <code>Stan</code>, please additionally cite:</p>
+<blockquote>
+<p>Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B., Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017). Stan: A probabilistic programming language. <em>Journal of Statistical Software</em>. 76(1). DOI: <a href="https://doi.org/10.18637/jss.v076.i01" class="external-link uri">https://doi.org/10.18637/jss.v076.i01</a></p>
+</blockquote>
+<p><code>mvgam</code> relies on several other <code>R</code> packages and, of course, on <code>R</code> itself. To find out how to cite <code>R</code> and its packages, use <code><a href="https://rdrr.io/r/utils/citation.html" class="external-link">citation()</a></code>. There are some features of <code>mvgam</code> which specifically rely on certain packages. The most important of these is the generation of data necessary to estimate smoothing splines and Gaussian Processes, which rely on the <code>mgcv</code>, <code>brms</code> and <code>splines2</code> packages. The <code>rstan</code> and <code>cmdstanr</code> packages together with <code>Rcpp</code> makes <code>Stan</code> conveniently accessible in <code>R</code>. If you use some of these features, please also consider citing the related packages.</p>
 </div>
 <div class="section level2">
 <h2 id="other-resources">Other resources<a class="anchor" aria-label="anchor" href="#other-resources"></a>
@@ -179,12 +199,17 @@ Forecasting multivariate time series with Dynamic Generalized Additive Models
 <li><a href="https://ecogambler.netlify.app/blog/distributed-lags-mgcv/" target="_blank" class="external-link">Distributed lags (and hierarchical distributed lags) using mgcv and mvgam</a></li>
 <li><a href="https://ecogambler.netlify.app/blog/time-varying-seasonality/" target="_blank" class="external-link">Incorporating time-varying seasonality in forecast models</a></li>
 </ul>
-<p>Please also feel free to use the <a href="https://github.com/nicholasjclark/mvgam/discussions" class="external-link"><code>mvgam</code> Discussion Board</a> to hunt for or post other discussion topics related to the package, and do check out the <a href="https://nicholasjclark.github.io/mvgam/news/index.html"><code>mvgam</code> changelog</a> for any updates about recent upgrades that the package has incorporated.</p>
+</div>
+<div class="section level2">
+<h2 id="getting-help">Getting help<a class="anchor" aria-label="anchor" href="#getting-help"></a>
+</h2>
+<p>If you encounter a clear bug, please file an issue with a minimal reproducible example on <a href="https://github.com/nicholasjclark/mvgam/issues" class="external-link">GitHub</a>. Please also feel free to use the <a href="https://github.com/nicholasjclark/mvgam/discussions" class="external-link"><code>mvgam</code> Discussion Board</a> to hunt for or post other discussion topics related to the package, and do check out the <a href="https://nicholasjclark.github.io/mvgam/news/index.html"><code>mvgam</code> changelog</a> for any updates about recent upgrades that the package has incorporated.</p>
 </div>
 <div class="section level2">
 <h2 id="interested-in-contributing">Interested in contributing?<a class="anchor" aria-label="anchor" href="#interested-in-contributing"></a>
 </h2>
 <p>I’m actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of <code>mvgam</code>. Please reach out if you are interested (n.clark’at’uq.edu.au). Other contributions are also very welcome, but please see <a href="https://github.com/nicholasjclark/mvgam/blob/master/.github/CONTRIBUTING.md" class="external-link">The Contributor Instructions</a> for general guidelines. Note that by participating in this project you agree to abide by the terms of its <a href="https://dplyr.tidyverse.org/CODE_OF_CONDUCT" class="external-link">Contributor Code of Conduct</a>.</p>
+</div>
 </div>
 
   </main><aside class="col-md-3"><div class="links">
@@ -235,21 +260,19 @@ Forecasting multivariate time series with Dynamic Generalized Additive Models
 
 
     <footer><div class="pkgdown-footer-left">
-  <p></p>
-<p>Developed by <a href="https://researchers.uq.edu.au/researcher/15140" class="external-link">Nicholas J Clark</a>.</p>
+  <p>Developed by <a href="https://researchers.uq.edu.au/researcher/15140" class="external-link">Nicholas J Clark</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p></p>
-<p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.7.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.1.</p>
 </div>
 
     </footer>
 </div>
 
-  
 
-  
+
+
 
   </body>
 </html>

@@ -9,7 +9,7 @@
 #' @param robust If `FALSE` (the default) the mean is used as a measure of central tendency.
 #' If `TRUE`, the median is used instead. Only used if `summary` is `TRUE`
 #' @param ... ignored
-#' @return If `summary = TRUE`, a `list` with the following components:
+#' @return If `summary = TRUE`, a `list` of class `mvgam_residcor` with the following components:
 #'  \item{cor, cor_lower, cor_upper}{A set of \eqn{p \times p} correlation matrices,
 #'  containing either the posterior median or mean estimate, plus lower and upper limits
 #'  of the corresponding credible intervals supplied to `probs`}
@@ -35,7 +35,7 @@
 #'
 #' @details
 #' Hui (2016) provides an excellent description of the quantities that this function calculates, so this passage
-#' is heavily paraphrased from his associated `boral` package.
+#' is heavily paraphrased from his associated \pkg{boral} package.
 #'
 #' In Joint Species Distribution Models, the residual covariance matrix is calculated
 #' based on the matrix of latent factor loading matrix \eqn{\Theta}, where the residual covariance
@@ -76,19 +76,20 @@
 #' 7, 549-555.
 #' @seealso [jsdgam()]
 #' @export
-residual_cor <- function(object, ...){
+residual_cor <- function(object, ...) {
   UseMethod("residual_cor", object)
 }
 
 #' @rdname residual_cor.jsdgam
 #' @method residual_cor jsdgam
 #' @export
-residual_cor.jsdgam <- function(object,
-                                summary = TRUE,
-                                robust = FALSE,
-                                probs = c(0.025, 0.975),
-                                ...) {
-
+residual_cor.jsdgam <- function(
+  object,
+  summary = TRUE,
+  robust = FALSE,
+  probs = c(0.025, 0.975),
+  ...
+) {
   insight::check_if_installed("corpcor")
 
   # Take draws of factor loadings
@@ -98,11 +99,14 @@ residual_cor.jsdgam <- function(object,
   loadings <- as.matrix(object$model_output, 'lv_coefs')
 
   # Initiate array to store all posterior correlation and covariance matrices
-  all_cormat <- all_covmat <- all_precmat <- array(0, dim = c(nrow(loadings), p, p))
+  all_cormat <- all_covmat <- all_precmat <- array(
+    0,
+    dim = c(nrow(loadings), p, p)
+  )
   all_trace_rescor <- numeric(NROW(loadings))
 
   # Calculate posterior covariance, correlation, precision and trace estimates
-  for(i in 1:NROW(loadings)){
+  for (i in 1:NROW(loadings)) {
     lv_coefs <- matrix(loadings[i, ], nrow = p, ncol = n_lv)
 
     lambdalambdaT <- tcrossprod(lv_coefs)
@@ -112,26 +116,33 @@ residual_cor.jsdgam <- function(object,
     all_precmat[i, , ] <- corpcor::cor2pcor(lambdalambdaT)
   }
 
-  if(!summary){
-    out <- list(all_cormat = all_cormat,
-                all_covmat = all_covmat,
-                all_precmat = all_precmat,
-                all_trace = all_trace_rescor)
+  if (!summary) {
+    out <- list(
+      all_cormat = all_cormat,
+      all_covmat = all_covmat,
+      all_precmat = all_precmat,
+      all_trace = all_trace_rescor
+    )
   } else {
-
     #### If summary, calculate summary statistics ####
     # Initiate summary correlation and covariance matrices
     sig_cormat <- cormat <- cormat_lower <- cormat_upper <-
       sig_precmat <- precmat <- precmat_lower <- precmat_upper <-
-      covmat <- matrix(0, nrow = p, ncol = p)
+        covmat <- matrix(0, nrow = p, ncol = p)
 
     rownames(cormat) <- rownames(cormat_lower) <- rownames(cormat_upper) <-
       rownames(sig_cormat) <- rownames(precmat) <- rownames(precmat_lower) <-
-      rownames(precmat_upper) <- rownames(sig_precmat) <- rownames(covmat) <-
-      colnames(cormat) <- colnames(cormat_lower) <- colnames(cormat_upper) <-
-      colnames(sig_cormat) <- colnames(precmat) <- colnames(precmat_lower) <-
-      colnames(precmat_upper) <- colnames(sig_precmat) <- colnames(covmat) <-
-      sp_names
+        rownames(precmat_upper) <- rownames(sig_precmat) <- rownames(covmat) <-
+          colnames(cormat) <- colnames(cormat_lower) <- colnames(
+            cormat_upper
+          ) <-
+            colnames(sig_cormat) <- colnames(precmat) <- colnames(
+              precmat_lower
+            ) <-
+              colnames(precmat_upper) <- colnames(sig_precmat) <- colnames(
+                covmat
+              ) <-
+                sp_names
 
     # Calculate posterior summaries
     for (j in 1:p) {
@@ -147,15 +158,31 @@ residual_cor.jsdgam <- function(object,
         }
 
         sig_cormat[j, j2] <- cormat[j, j2]
-        cormat_lower[j, j2] <- quantile(all_cormat[, j, j2], probs = min(probs), na.rm = TRUE)
-        cormat_upper[j, j2] <- quantile(all_cormat[, j, j2], probs = max(probs), na.rm = TRUE)
+        cormat_lower[j, j2] <- quantile(
+          all_cormat[, j, j2],
+          probs = min(probs),
+          na.rm = TRUE
+        )
+        cormat_upper[j, j2] <- quantile(
+          all_cormat[, j, j2],
+          probs = max(probs),
+          na.rm = TRUE
+        )
         if (0 > cormat_lower[j, j2] & 0 < cormat_upper[j, j2]) {
           sig_cormat[j, j2] <- 0
         }
 
         sig_precmat[j, j2] <- precmat[j, j2]
-        precmat_lower[j, j2] <- quantile(all_precmat[, j, j2], probs = min(probs), na.rm = TRUE)
-        precmat_upper[j, j2] <- quantile(all_precmat[, j, j2], probs = max(probs), na.rm = TRUE)
+        precmat_lower[j, j2] <- quantile(
+          all_precmat[, j, j2],
+          probs = min(probs),
+          na.rm = TRUE
+        )
+        precmat_upper[j, j2] <- quantile(
+          all_precmat[, j, j2],
+          probs = max(probs),
+          na.rm = TRUE
+        )
         if (0 > precmat_lower[j, j2] & 0 < precmat_upper[j, j2]) {
           sig_precmat[j, j2] <- 0
         }
@@ -168,16 +195,62 @@ residual_cor.jsdgam <- function(object,
       final_trace <- mean(all_trace_rescor)
     }
 
-    out <- list(cor = cormat,
-                cor_lower = cormat_lower,
-                cor_upper = cormat_upper,
-                sig_cor = sig_cormat,
-                cov = covmat,
-                prec = precmat,
-                prec_lower = precmat_lower,
-                prec_upper = precmat_upper,
-                sig_prec = sig_precmat,
-                trace = final_trace)
+    out <- structure(
+      list(
+        cor = cormat,
+        cor_lower = cormat_lower,
+        cor_upper = cormat_upper,
+        sig_cor = sig_cormat,
+        cov = covmat,
+        prec = precmat,
+        prec_lower = precmat_lower,
+        prec_upper = precmat_upper,
+        sig_prec = sig_precmat,
+        trace = final_trace
+      ),
+      class = 'mvgam_residcor'
+    )
   }
+  return(out)
+}
+
+#' Plot residual correlations based on latent factors from a fitted jsdgam
+#'
+#' Plot residual correlation estimates from Joint Species Distribution
+#' \code{jsdgam} models
+#' @param x \code{list} object of class \code{mvgam_residcor} resulting from a
+#' call to `residual_cor(..., summary = TRUE)`
+#' @param ... ignored
+#' @method plot mvgam_residcor
+#' @details This function plots the significant residual correlations from a
+#' \code{mvgam_residcor} object
+#' @return A `ggplot` object
+#' @seealso \code{\link{jsdgam}}, \code{\link{residual_cor}}
+#'
+#' @author Nicholas J Clark
+#'
+#' @export
+plot.mvgam_residcor = function(x, ...) {
+  # Plot the significant correlations
+  ggplot2::ggplot(
+    data = gather_matrix(x$sig_cor),
+    mapping = ggplot2::aes(x = Var1, y = Var2, fill = correlation)
+  ) +
+    ggplot2::geom_tile(colour = 'grey50') +
+    ggplot2::scale_fill_gradient2() +
+    ggplot2::labs(x = '', y = '')
+}
+
+#' Melt a symmetric matrix into a long data.frame
+#' @noRd
+gather_matrix <- function(mat) {
+  mat[upper.tri(mat)] <- NA
+  if (is.null(dimnames(mat))) {
+    grid <- expand.grid(seq.int(NROW(mat)), seq.int(NCOL(mat)))
+  } else {
+    grid <- expand.grid(dimnames(mat))
+  }
+  out <- as.data.frame(cbind(grid, value = as.vector(mat)))
+  colnames(out) <- c('Var1', 'Var2', 'correlation')
   return(out)
 }

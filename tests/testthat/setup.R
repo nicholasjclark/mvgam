@@ -29,17 +29,19 @@ expect_range <- function(object, lower = -Inf, upper = Inf, ...) {
 SM <- suppressMessages
 SW <- suppressWarnings
 
-#ptm <- proc.time()
 set.seed(100)
-beta_data <- sim_mvgam(family = betar(),
-                       trend_model = 'GP',
-                       trend_rel = 0.5,
-                       T = 60)
-gaus_data <- sim_mvgam(family = gaussian(),
-                       T = 60,
-                       trend_model = 'AR1',
-                       seasonality = 'shared',
-                       mu = c(-1, 0, 1),
-                       trend_rel = 0.5,
-                       prop_missing = 0.2)
-
+beta_data <- sim_mvgam(
+  family = betar(),
+  trend_model = 'GP',
+  trend_rel = 0.5,
+  T = 60
+)
+gaus_data <- sim_mvgam(
+  family = gaussian(),
+  T = 60,
+  trend_model = 'AR1',
+  seasonality = 'shared',
+  mu = c(-1, 0, 1),
+  trend_rel = 0.5,
+  prop_missing = 0.2
+)

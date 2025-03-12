@@ -368,7 +368,7 @@ trend_map %>%
   head(12)
 ```
 
-Now we are ready to fit a model using `mvgam()`. Here we will use penalized splines for each of the continuous covariate effects to detect possible nonlinear associations. We also showcase how `mvgam` can make use of the different approximation algorithms available in `Stan` by using the meanfield variational Bayes approximator (this reduces computation time to around 12 seconds for this example)
+Now we are ready to fit a model using `mvgam()`. Here we will use penalized splines for each of the continuous covariate effects to detect possible nonlinear associations. We also showcase how `mvgam` can make use of the different approximation algorithms available in `Stan` by using the meanfield variational Bayes approximator (this reduces computation time from around 90 seconds to around 12 seconds for this example)
 ```{r include = FALSE, results='hide'}
 mod <- mvgam(
   # effects of covariates on detection probability;
@@ -508,4 +508,4 @@ Kéry, Marc, and Royle Andrew J. "[Applied hierarchical modeling in ecology: Ana
 Royle, Andrew J. "[N‐mixture models for estimating population size from spatially replicated counts.](https://onlinelibrary.wiley.com/doi/full/10.1111/j.0006-341X.2004.00142.x)" *Biometrics* 60.1 (2004): 108-115.
 
 ## Interested in contributing?
-I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au)
+I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please see [this small list of opportunities on my website](https://ecogambler.netlify.app/opportunities/) and do reach out if you are interested (n.clark'at'uq.edu.au)

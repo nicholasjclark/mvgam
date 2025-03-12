@@ -2,10 +2,7 @@
 % Please edit documentation in R/mvgam_fevd-class.R
 \name{plot.mvgam_fevd}
 \alias{plot.mvgam_fevd}
-\title{Plot forecast error variance decompositions from an mvgam_fevd object
-This function takes an \code{mvgam_fevd} object and produces
-a plot of the posterior median contributions to forecast variance for each series
-in the fitted Vector Autoregression}
+\title{Plot forecast error variance decompositions from an \code{mvgam_fevd} object}
 \usage{
 \method{plot}{mvgam_fevd}(x, ...)
 }
@@ -19,7 +16,6 @@ A \code{\link[ggplot2]{ggplot}} object,
 which can be further customized using the \pkg{ggplot2} package
 }
 \description{
-Plot forecast error variance decompositions from an mvgam_fevd object
 This function takes an \code{mvgam_fevd} object and produces
 a plot of the posterior median contributions to forecast variance for each series
 in the fitted Vector Autoregression

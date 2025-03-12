@@ -10,7 +10,7 @@
 \alias{eval_smooth.mod.smooth}
 \alias{eval_smoothDotmoiDotsmooth}
 \alias{eval_smooth.moi.smooth}
-\title{Enhance mvgam post-processing using gratia functionality}
+\title{Enhance post-processing of \pkg{mvgam} models using \pkg{gratia} functionality}
 \usage{
 drawDotmvgam(
   object,
@@ -261,7 +261,7 @@ ggplot objects is returned, 1 per term plotted.}
 }
 \description{
 These evaluation and plotting functions exist to allow some popular \code{gratia}
-methods to work with \code{mvgam} models
+methods to work with \code{mvgam} or \code{jsdgam} models
 }
 \details{
 These methods allow \code{mvgam} models to be \emph{Enhanced} if users have the \code{gratia}
@@ -269,17 +269,21 @@ package installed, making available the popular \code{draw()} function to plot p
 of \code{mvgam} smooth functions using \code{\link[ggplot2:ggplot]{ggplot2::ggplot()}} utilities
 }
 \examples{
-\dontrun{
+\donttest{
 # Fit a simple GAM and draw partial effects of smooths using gratia
 set.seed(0)
-library(ggplot2); theme_set(theme_bw())
-library(gratia)
 dat <- mgcv::gamSim(1, n = 200, scale = 2)
 mod <- mvgam(y ~ s(x1, bs = 'moi') +
-              te(x0, x2), data = dat,
-             family = gaussian())
+              te(x0, x2),
+             data = dat,
+             family = gaussian(),
+             chains = 2,
+             silent = 2)
 
-draw(mod)
+if(require("gratia")){
+ gratia::draw(mod)
+}
+
 }
 }
 \author{

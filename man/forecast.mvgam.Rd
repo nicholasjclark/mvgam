@@ -10,7 +10,7 @@ forecast(object, ...)
 \method{forecast}{mvgam}(object, newdata, data_test, n_cores = 1, type = "response", ...)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{...}{Ignored}
 
@@ -58,11 +58,11 @@ Posterior predictions are drawn from the fitted \code{mvgam} and used to simulat
 \donttest{
 simdat <- sim_mvgam(n_series = 3, trend_model = AR())
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-            trend_model = AR(),
-            noncentred = TRUE,
-            data = simdat$data_train,
-            chains = 2,
-            silent = 2)
+             trend_model = AR(),
+             noncentred = TRUE,
+             data = simdat$data_train,
+             chains = 2,
+             silent = 2)
 
 # Hindcasts on response scale
 hc <- hindcast(mod)
@@ -72,20 +72,25 @@ plot(hc, series = 2)
 plot(hc, series = 3)
 
 # Forecasts on response scale
-fc <- forecast(mod, newdata = simdat$data_test)
+fc <- forecast(mod,
+               newdata = simdat$data_test)
 str(fc)
 plot(fc, series = 1)
 plot(fc, series = 2)
 plot(fc, series = 3)
 
 # Forecasts as expectations
-fc <- forecast(mod, newdata = simdat$data_test, type = 'expected')
+fc <- forecast(mod,
+               newdata = simdat$data_test,
+               type = 'expected')
 plot(fc, series = 1)
 plot(fc, series = 2)
 plot(fc, series = 3)
 
 # Dynamic trend extrapolations
-fc <- forecast(mod, newdata = simdat$data_test, type = 'trend')
+fc <- forecast(mod,
+               newdata = simdat$data_test,
+               type = 'trend')
 plot(fc, series = 1)
 plot(fc, series = 2)
 plot(fc, series = 3)

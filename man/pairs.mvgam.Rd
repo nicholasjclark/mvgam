@@ -7,7 +7,7 @@
 \method{pairs}{mvgam}(x, variable = NULL, regex = FALSE, use_alias = TRUE, ...)
 }
 \arguments{
-\item{x}{An object of class \code{mvgam}}
+\item{x}{An object of class \code{mvgam} or \code{jsdgam}}
 
 \item{variable}{Names of the variables (parameters) to plot, as given by a
 character vector or a regular expression (if \code{regex = TRUE}). By

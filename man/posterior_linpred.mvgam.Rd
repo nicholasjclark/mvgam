@@ -2,7 +2,7 @@
 % Please edit documentation in R/posterior_epred.mvgam.R
 \name{posterior_linpred.mvgam}
 \alias{posterior_linpred.mvgam}
-\title{Posterior Draws of the Linear Predictor}
+\title{Posterior draws of the linear predictor for \pkg{mvgam} objects}
 \usage{
 \method{posterior_linpred}{mvgam}(
   object,
@@ -15,7 +15,7 @@
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{transform}{Logical; if \code{FALSE}
 (the default), draws of the linear predictor are returned.
@@ -68,12 +68,13 @@ that respect the temporal dynamics of estimated latent trends.
 \examples{
 \donttest{
 # Simulate some data and fit a model
-simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 mod <- mvgam(y ~ s(season, bs = 'cc'),
              trend_model = AR(),
              noncentred = TRUE,
              data = simdat$data_train,
-             chains = 2)
+             chains = 2,
+             silent = 2)
 
 # Extract linear predictor values
 linpreds <- posterior_linpred(mod)

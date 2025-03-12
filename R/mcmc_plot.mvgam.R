@@ -1,7 +1,7 @@
-#' MCMC plots as implemented in \pkg{bayesplot}
+#' MCMC plots of \pkg{mvgam} parameters, as implemented in \pkg{bayesplot}
 #'
 #' Convenient way to call MCMC plotting functions
-#' implemented in the \pkg{bayesplot} package
+#' implemented in the \pkg{bayesplot} package for \pkg{mvgam} models
 #' @importFrom bayesplot color_scheme_set color_scheme_get
 #' @inheritParams brms::mcmc_plot
 #' @inheritParams as.data.frame.mvgam
@@ -21,38 +21,41 @@
 #' @seealso \code{\link{mvgam_draws}} for an overview of some of the shortcut strings
 #' that can be used for argument `variable`
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 #' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
 #'              trend_model = AR(),
 #'              noncentred = TRUE,
 #'              data = simdat$data_train,
-#'              chains = 2)
+#'              chains = 2,
+#'              silent = 2)
 #' mcmc_plot(mod)
 #' mcmc_plot(mod, type = 'neff_hist')
 #' mcmc_plot(mod, variable = 'betas', type = 'areas')
 #' mcmc_plot(mod, variable = 'trend_params', type = 'combo')
 #' }
 #' @export
-mcmc_plot.mvgam = function(object,
-                           type = 'intervals',
-                           variable = NULL,
-                           regex = FALSE,
-                           use_alias = TRUE,
-                           ...){
-
+mcmc_plot.mvgam = function(
+  object,
+  type = 'intervals',
+  variable = NULL,
+  regex = FALSE,
+  use_alias = TRUE,
+  ...
+) {
   # Set red colour scheme
-  col_scheme <- attr(color_scheme_get(),
-                     'scheme_name')
+  col_scheme <- attr(color_scheme_get(), 'scheme_name')
   color_scheme_set('red')
 
   # Check type validity
   valid_types <- as.character(bayesplot::available_mcmc(""))
   valid_types <- sub("^mcmc_", "", valid_types)
-  if(!type %in% valid_types) {
-    stop("Invalid plot type. Valid plot types are: \n",
-                 paste0("'", valid_types, "'", collapse = ", "),
-         call. = FALSE)
+  if (!type %in% valid_types) {
+    stop(
+      "Invalid plot type. Valid plot types are: \n",
+      paste0("'", valid_types, "'", collapse = ", "),
+      call. = FALSE
+    )
   }
 
   # Set default params to plot
@@ -60,12 +63,14 @@ mcmc_plot.mvgam = function(object,
   # of them in spline models
   if (is.null(variable)) {
     all_pars <- variables(object)
-    variable <- c(all_pars$observation_pars[,1],
-                  all_pars$observation_smoothpars[,1],
-                  all_pars$observation_re_params[,1],
-                  all_pars$trend_pars[,1],
-                  all_pars$trend_smoothpars[,1],
-                  all_pars$trend_re_params[,1])
+    variable <- c(
+      all_pars$observation_pars[, 1],
+      all_pars$observation_smoothpars[, 1],
+      all_pars$observation_re_params[, 1],
+      all_pars$trend_pars[, 1],
+      all_pars$trend_smoothpars[, 1],
+      all_pars$trend_re_params[, 1]
+    )
     regex <- FALSE
   }
 
@@ -73,41 +78,49 @@ mcmc_plot.mvgam = function(object,
   mcmc_fun <- get(paste0("mcmc_", type), asNamespace("bayesplot"))
   mcmc_arg_names <- names(formals(mcmc_fun))
   mcmc_args <- list(...)
-  if("x" %in% mcmc_arg_names){
+  if ("x" %in% mcmc_arg_names) {
     if (grepl("^nuts_", type)) {
       # x refers to a molten data.frame of NUTS parameters
       mcmc_args$x <- brms::nuts_params(object$model_output)
     } else {
-    # x refers to a data.frame of draws
-    draws <- as.array(object, variable = variable, regex = regex,
-                      use_alias = use_alias)
-    sel_variables <- dimnames(draws)$variable
-    if(type %in% c("scatter", "hex") && length(sel_variables) != 2L){
-      stop("Exactly 2 parameters must be selected for this type.",
-                   "\nParameters selected: ",
-                   paste0("'", sel_variables, "'", collapse = ", "),
-           call. = FALSE)
-    }
+      # x refers to a data.frame of draws
+      draws <- as.array(
+        object,
+        variable = variable,
+        regex = regex,
+        use_alias = use_alias
+      )
+      sel_variables <- dimnames(draws)$variable
+      if (type %in% c("scatter", "hex") && length(sel_variables) != 2L) {
+        stop(
+          "Exactly 2 parameters must be selected for this type.",
+          "\nParameters selected: ",
+          paste0("'", sel_variables, "'", collapse = ", "),
+          call. = FALSE
+        )
+      }
 
-    if(type == 'pairs' && length(sel_variables) == 1L){
-      stop("2 or more parameters must be selected for this type.",
-           "\nParameters selected: ",
-           paste0("'", sel_variables, "'", collapse = ", "),
-           call. = FALSE)
-    }
+      if (type == 'pairs' && length(sel_variables) == 1L) {
+        stop(
+          "2 or more parameters must be selected for this type.",
+          "\nParameters selected: ",
+          paste0("'", sel_variables, "'", collapse = ", "),
+          call. = FALSE
+        )
+      }
 
-    mcmc_args$x <- draws
+      mcmc_args$x <- draws
     }
   }
 
-  if("np" %in% mcmc_arg_names){
+  if ("np" %in% mcmc_arg_names) {
     mcmc_args$np <- brms::nuts_params(object$model_output)
   }
   interval_type <- type %in% c("intervals", "areas")
-  if("rhat" %in% mcmc_arg_names && !interval_type){
+  if ("rhat" %in% mcmc_arg_names && !interval_type) {
     mcmc_args$rhat <- rhat(object)
   }
-  if("ratio" %in% mcmc_arg_names){
+  if ("ratio" %in% mcmc_arg_names) {
     mcmc_args$ratio <- neff_ratio(object)
   }
 

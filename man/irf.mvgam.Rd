@@ -7,7 +7,7 @@
 \usage{
 irf(object, ...)
 
-\method{irf}{mvgam}(object, h = 1, cumulative = FALSE, orthogonal = FALSE, ...)
+\method{irf}{mvgam}(object, h = 10, cumulative = FALSE, orthogonal = FALSE, ...)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
@@ -45,19 +45,23 @@ VAR processes, you can use the related \code{\link{stability}} function.
 \examples{
 \donttest{
 # Simulate some time series that follow a latent VAR(1) process
-simdat <- sim_mvgam(family = gaussian(),
-                    n_series = 4,
-                    trend_model = VAR(cor = TRUE),
-                    prop_trend = 1)
-plot_mvgam_series(data = simdat$data_train, series = 'all')
+simdat <- sim_mvgam(
+  family = gaussian(),
+  n_series = 4,
+  trend_model = VAR(cor = TRUE),
+  prop_trend = 1
+)
+plot_mvgam_series(data = simdat$data_train, series = "all")
 
 # Fit a model that uses a latent VAR(1)
 mod <- mvgam(y ~ -1,
-             trend_formula = ~ 1,
-             trend_model = VAR(cor = TRUE),
-             family = gaussian(),
-             data = simdat$data_train,
-             silent = 2)
+  trend_formula = ~1,
+  trend_model = VAR(cor = TRUE),
+  family = gaussian(),
+  data = simdat$data_train,
+  chains = 2,
+  silent = 2
+)
 
 # Calulate Generalized IRFs for each series
 irfs <- irf(mod, h = 12, cumulative = FALSE)
@@ -66,6 +70,10 @@ irfs <- irf(mod, h = 12, cumulative = FALSE)
 plot(irfs, series = 1)
 plot(irfs, series = 2)
 plot(irfs, series = 3)
+
+# Calculate posterior median, upper and lower 90th quantiles
+# of the impulse responses
+summary(irfs)
 }
 }
 \references{

@@ -3,7 +3,7 @@
 \name{loo.mvgam}
 \alias{loo.mvgam}
 \alias{loo_compare.mvgam}
-\title{LOO information criteria for \code{mvgam} models}
+\title{LOO information criteria for \pkg{mvgam} models}
 \usage{
 \method{loo}{mvgam}(x, incl_dynamics = TRUE, ...)
 

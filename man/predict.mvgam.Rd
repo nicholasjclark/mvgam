@@ -2,14 +2,14 @@
 % Please edit documentation in R/predict.mvgam.R
 \name{predict.mvgam}
 \alias{predict.mvgam}
-\title{Predict from the GAM component of an mvgam model}
+\title{Predict from a fitted \pkg{mvgam} model}
 \usage{
 \method{predict}{mvgam}(
   object,
   newdata,
   data_test,
   type = "link",
-  process_error = TRUE,
+  process_error = FALSE,
   summary = TRUE,
   robust = FALSE,
   probs = c(0.025, 0.975),
@@ -17,7 +17,7 @@
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same variables
 that were included in the original \code{data} used to fit the model. If not supplied,
@@ -85,7 +85,7 @@ from each effect are returned in \code{matrix} form while standard errors (repre
 the interval: \code{(max(probs) - min(probs)) / 2}) are returned in a separate \code{matrix}
 }
 \description{
-Predict from the GAM component of an mvgam model
+Predict from a fitted \pkg{mvgam} model
 }
 \details{
 Note that for all types of predictions for models that did not include
@@ -116,14 +116,21 @@ mod1 <- mvgam(y ~ s(season, bs = 'cc', k = 6),
              family = gaussian(),
              trend_model = AR(),
              noncentred = TRUE,
-             chains = 2)
+             chains = 2,
+             silent = 2)
 
 # Generate predictions against observed data
-preds <- predict(mod1, summary = TRUE)
+preds <- predict(mod1,
+                summary = TRUE)
 head(preds)
 
 # Generate predictions against test data
-preds <- predict(mod1, newdata = simdat$data_test, summary = TRUE)
+preds <- predict(mod1,
+                newdata = simdat$data_test,
+                summary = TRUE)
 head(preds)
 }
+}
+\author{
+Nicholas J Clark
 }

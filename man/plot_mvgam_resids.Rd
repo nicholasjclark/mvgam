@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_mvgam_resids.R
 \name{plot_mvgam_resids}
 \alias{plot_mvgam_resids}
-\title{Residual diagnostics for a fitted mvgam object}
+\title{Residual diagnostics for a fitted \pkg{mvgam} object}
 \usage{
 plot_mvgam_resids(object, series = 1, n_draws = 100L, n_points = 1000L)
 }
@@ -31,7 +31,7 @@ Note, all plots only report statistics from a sample of up to 100 posterior
 draws (to save computational time), so uncertainty in these relationships may not be adequately represented.
 }
 \examples{
-\dontrun{
+\donttest{
 simdat <- sim_mvgam(n_series = 3, trend_model = AR())
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
             trend_model = AR(),

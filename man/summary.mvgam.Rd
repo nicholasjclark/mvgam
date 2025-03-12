@@ -4,7 +4,7 @@
 \alias{summary.mvgam}
 \alias{summary.mvgam_prefit}
 \alias{coef.mvgam}
-\title{Summary for a fitted mvgam object}
+\title{Summary for a fitted \pkg{mvgam} models}
 \usage{
 \method{summary}{mvgam}(object, include_betas = TRUE, smooth_test = TRUE, digits = 2, ...)
 
@@ -39,7 +39,8 @@ For \code{coef.mvgam}, either a \code{matrix} of posterior coefficient distribut
 (if \code{summarise == FALSE} or \code{data.frame} of coefficient summaries)
 }
 \description{
-These functions take a fitted \code{mvgam} object and return various useful summaries
+These functions take a fitted \code{mvgam} or \code{jsdgam} object and
+return various useful summaries
 }
 \details{
 \code{summary.mvgam} and \code{summary.mvgam_prefit} return brief summaries of the model's call, along with posterior intervals for
