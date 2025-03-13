@@ -89,7 +89,8 @@
 #'              dynamic(predictor, rho = 8, stationary = TRUE),
 #'             family = gaussian(),
 #'             data = data_train,
-#'             chains = 2)
+#'             chains = 2,
+#'             silent = 2)
 #'
 #'# Inspect the summary
 #'summary(mod)

@@ -44,7 +44,7 @@
 #'               run_model = FALSE)
 #'
 #'# Inspect the model file with default mvgam priors
-#'code(mod_default)
+#'stancode(mod_default)
 #'
 #'# Look at which priors can be updated in mvgam
 #'test_priors <- get_mvgam_priors(y ~ s(series, bs = 're') +
@@ -70,7 +70,7 @@
 #'             trend_model = AR(p = 2),
 #'             priors = test_priors,
 #'             run_model = FALSE)
-#'code(mod)
+#'stancode(mod)
 #'
 #'# No warnings, the model is ready for fitting now in the usual way with the addition
 #'# of the 'priors' argument
@@ -84,24 +84,24 @@
 #'brmsprior
 #'
 #'mod <- mvgam(y ~ s(series, bs = 're') +
-#'             s(season, bs = 'cc') - 1,
-#'           family = nb(),
-#'           data = dat$data_train,
-#'           trend_model = AR(p = 2),
-#'           priors = brmsprior,
-#'           run_model = FALSE)
-#'code(mod)
+#'              s(season, bs = 'cc') - 1,
+#'            family = nb(),
+#'            data = dat$data_train,
+#'            trend_model = AR(p = 2),
+#'            priors = brmsprior,
+#'            run_model = FALSE)
+#'stancode(mod)
 #'
 #'# Look at what is returned when an incorrect spelling is used
 #'test_priors$prior[5] <- 'ar2_bananas ~ normal(0, 0.25);'
 #'mod <- mvgam(y ~ s(series, bs = 're') +
-#'             s(season, bs = 'cc') - 1,
+#'              s(season, bs = 'cc') - 1,
 #'             family = nb(),
 #'             data = dat$data_train,
 #'             trend_model = AR(p = 2),
 #'             priors = test_priors,
 #'             run_model = FALSE)
-#'code(mod)
+#'stancode(mod)
 #'
 #'# Example of changing parametric (fixed effect) priors
 #'simdat <- sim_mvgam()
@@ -124,7 +124,7 @@
 #'              family = poisson(),
 #'              priors = priors,
 #'              run_model = FALSE)
-#'code(mod2)
+#'stancode(mod2)
 #'
 #'# Likewise using 'brms' utilities (note that you can use
 #'# Intercept rather than `(Intercept)`) to change priors on the intercept
@@ -138,7 +138,7 @@
 #'              family = poisson(),
 #'              priors = brmsprior,
 #'              run_model = FALSE)
-#'code(mod2)
+#'stancode(mod2)
 #'
 #'# The "class = 'b'" shortcut can be used to put the same prior on all
 #'# 'fixed' effect coefficients (apart from any intercepts)
@@ -150,7 +150,7 @@
 #'             data = dat,
 #'             family = gaussian(),
 #'             run_model = FALSE)
-#'code(mod)
+#'stancode(mod)
 #'}
 #'@export
 get_mvgam_priors = function(
