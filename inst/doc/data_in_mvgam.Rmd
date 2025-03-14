@@ -24,23 +24,28 @@ knitr::opts_chunk$set(
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-  echo = TRUE,   
+  echo = TRUE,
   dpi = 100,
   fig.asp = 0.8,
   fig.width = 6,
   out.width = "60%",
-  fig.align = "center")
+  fig.align = "center"
+)
 library(mvgam)
 library(ggplot2)
-theme_set(theme_bw(base_size = 12, base_family = 'serif'))
+theme_set(theme_bw(base_size = 12, base_family = "serif"))
 ```
 
 This vignette gives an example of how to take raw data and format it for use in `mvgam`. This is not an exhaustive example, as data can be recorded and stored in a variety of ways, which requires different approaches to wrangle the data into the necessary format for `mvgam`. For full details on the basic `mvgam` functionality, please see [the introductory vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html) and [the growing set of walk through video tutorials on `mvgam` applications](https://www.youtube.com/playlist?list=PLzFHNoUxkCvsFIg6zqogylUfPpaxau_a3&si=lyg7qUrMLbD-tHCB).
 
-## Required *long* data format
-Manipulating the data into a 'long' format is necessary for modelling in `mvgam`. By 'long' format, we mean that each `series x time` observation needs to have its own entry in the `dataframe` or `list` object that we wish to pass as data for to the two primary modelling functions, `mvgam()` and `jsdgam()`. A simple example can be viewed by simulating data using the `sim_mvgam()` function. See `?sim_mvgam` for more details
+## Required *tidy* data format
+Manipulating the data into a 'long' format (i.e. *tidy* format) is necessary for modelling in `mvgam`. By 'long' format, we mean that each `series x time` observation needs to have its own entry in the `dataframe` or `list` object that we wish to pass as data for to the two primary modelling functions, `mvgam()` and `jsdgam()`. A simple example can be viewed by simulating data using the `sim_mvgam()` function. See `?sim_mvgam` for more details
 ```{r}
-simdat <- sim_mvgam(n_series = 4, T = 24, prop_missing = 0.2)
+simdat <- sim_mvgam(
+  n_series = 4, 
+  T = 24, 
+  prop_missing = 0.2
+)
 head(simdat$data_train, 16)
 ```
 
@@ -53,7 +58,8 @@ levels(simdat$data_train$series)
 
 It is important that the number of levels matches the number of unique series in the data to ensure indexing across series works properly in the underlying modelling functions. Several of the main workhorse functions in the package (including `mvgam()` and `get_mvgam_priors()`) will give an error if this is not the case, but it may be worth checking anyway:
 ```{r}
-all(levels(simdat$data_train$series) %in% unique(simdat$data_train$series))
+all(levels(simdat$data_train$series) %in% 
+      unique(simdat$data_train$series))
 ```
 
 Note that you can technically supply data that does not have a `series` indicator, and the package will generally assume that you are only using a single time series. There are exceptions to this, for example if you have grouped data and would like to estimate hierarchical dependencies (see an example of hierarchical process error correlations in the `?AR` documentation) or if you would like to set up a Joint Species Distribution Model (JSDM) using a Zero-Mean Multivariate Gaussian distribution for the latent residuals (see examples in the `?ZMVN` documentation).
@@ -61,38 +67,47 @@ Note that you can technically supply data that does not have a `series` indicato
 ### A single outcome variable
 You may also have notices that we do not spread the `numeric / integer`-classed outcome variable into different columns. Rather, there is only a single column for the outcome variable, labelled `y` in these simulated data (though the outcome does not have to be labelled `y`). This is another important requirement in `mvgam`, but it shouldn't be too unfamiliar to `R` users who frequently use modelling packages such as `lme4`, `mgcv`, `brms` or the many other regression modelling packages out there. The advantage of this format is that it is now very easy to specify effects that vary among time series:
 ```{r}
-summary(glm(y ~ series + time,
-            data = simdat$data_train,
-            family = poisson()))
+summary(glm(
+  y ~ series + time,
+  data = simdat$data_train,
+  family = poisson()
+))
 ```
 
 ```{r}
-summary(mgcv::gam(y ~ series + s(time, by = series),
-            data = simdat$data_train,
-            family = poisson()))
+summary(mgcv::gam(
+  y ~ series + s(time, by = series),
+  data = simdat$data_train,
+  family = poisson()
+))
 ```
 
 Depending on the observation families you plan to use when building models, there may be some restrictions that need to be satisfied within the outcome variable. For example, a Beta regression can only handle proportional data, so values `>= 1` or `<= 0` are not allowed. Likewise, a Poisson regression can only handle non-negative integers. Most regression functions in `R` will assume the user knows all of this and so will not issue any warnings or errors if you choose the wrong distribution, but often this ends up leading to some unhelpful error from an optimizer that is difficult to interpret and diagnose. `mvgam` will attempt to provide some errors if you do something that is simply not allowed. For example, we can simulate data from a zero-centred Gaussian distribution (ensuring that some of our values will be `< 1`) and attempt a Beta regression in `mvgam` using the `betar` family:
 ```{r}
-gauss_dat <- data.frame(outcome = rnorm(10),
-                        series = factor('series1',
-                                        levels = 'series1'),
-                        time = 1:10)
+gauss_dat <- data.frame(
+  outcome = rnorm(10),
+  series = factor("series1",
+    levels = "series1"
+  ),
+  time = 1:10
+)
 gauss_dat
 ```
 
 A call to `gam()` using the `mgcv` package leads to a model that actually fits (though it does give an unhelpful warning message):
 ```{r}
 mgcv::gam(outcome ~ time,
-    family = betar(),
-    data = gauss_dat)
+  family = betar(),
+  data = gauss_dat
+)
 ```
 
 But the same call to `mvgam()` gives us something more useful:
 ```{r error=TRUE}
 mvgam(outcome ~ time,
-      family = betar(),
-      data = gauss_dat)
+  family = betar(),
+  data = gauss_dat
+)
 ```
 
 Please see `?mvgam_families` for more information on the types of responses that the package can handle and their restrictions
@@ -101,9 +116,11 @@ Please see `?mvgam_families` for more information on the types of responses that
 The other requirement for most models that can be fit in `mvgam` is a `numeric / integer`-classed variable labelled `time`. This ensures the modelling software knows how to arrange the time series when building models. This setup still allows us to formulate multivariate time series models. If you plan to use any of the autoregressive dynamic trend functions available in `mvgam` (see `?mvgam_trends` for details of available dynamic processes), you will need to ensure your time series are entered with a fixed sampling interval (i.e. the time between timesteps 1 and 2 should be the same as the time between timesteps 2 and 3, etc...). But note that you can have missing observations for some (or all) series. `mvgam()` will check this for you, but again it is useful to ensure you have no missing timepoint x series combinations in your data. You can generally do this with a simple `dplyr` call:
 ```{r}
 # A function to ensure all timepoints within a sequence are identical
-all_times_avail = function(time, min_time, max_time){
-    identical(as.numeric(sort(time)),
-              as.numeric(seq.int(from = min_time, to = max_time)))
+all_times_avail <- function(time, min_time, max_time) {
+  identical(
+    as.numeric(sort(time)),
+    as.numeric(seq.int(from = min_time, to = max_time))
+  )
 }
 
 # Get min and max times from the data
@@ -111,16 +128,20 @@ min_time <- min(simdat$data_train$time)
 max_time <- max(simdat$data_train$time)
 
 # Check that all times are recorded for each series
-data.frame(series = simdat$data_train$series,
-           time = simdat$data_train$time) %>%
-    dplyr::group_by(series) %>%
-    dplyr::summarise(all_there = all_times_avail(time,
-                                                 min_time,
-                                                 max_time)) -> checked_times
-if(any(checked_times$all_there == FALSE)){
+data.frame(
+  series = simdat$data_train$series,
+  time = simdat$data_train$time
+) %>%
+  dplyr::group_by(series) %>%
+  dplyr::summarise(all_there = all_times_avail(
+    time,
+    min_time,
+    max_time
+  )) -> checked_times
+if (any(checked_times$all_there == FALSE)) {
   warning("One or more series in is missing observations for one or more timepoints")
 } else {
-  cat('All series have observations at all timepoints :)')
+  cat("All series have observations at all timepoints :)")
 }
 ```
 
@@ -132,26 +153,34 @@ Most `mvgam` dynamic trend models expect `time` to be measured in discrete, even
 ## Checking data with `get_mvgam_priors()`
 The `get_mvgam_priors()` function is designed to return information about the parameters in a model whose prior distributions can be modified by the user. But in doing so, it will perform a series of checks to ensure the data are formatted properly. It can therefore be very useful to new users for ensuring there isn't anything strange going on in the data setup. For example, we can replicate the steps taken above (to check factor levels and timepoint x series combinations) with a single call to `get_mvgam_priors()`. Here we first simulate some data in which some of the timepoints in the `time` variable are not included in the data:
 ```{r}
-bad_times <- data.frame(time = seq(1, 16, by = 2),
-                        series = factor('series_1'),
-                        outcome = rnorm(8))
+bad_times <- data.frame(
+  time = seq(1, 16, by = 2),
+  series = factor("series_1"),
+  outcome = rnorm(8)
+)
 bad_times
 ```
 
 Next we call `get_mvgam_priors()` by simply specifying an intercept-only model, which is enough to trigger all the checks:
 ```{r error = TRUE}
 get_mvgam_priors(outcome ~ 1,
-                 data = bad_times,
-                 family = gaussian())
+  data = bad_times,
+  family = gaussian()
+)
 ```
 
 This error is useful as it tells us where the problem is. There are many ways to fill in missing timepoints, so the correct way will have to be left up to the user. But if you don't have any covariates, it should be pretty easy using `expand.grid()`:
 ```{r}
 bad_times %>%
-  dplyr::right_join(expand.grid(time = seq(min(bad_times$time),
-                                           max(bad_times$time)),
-                                series = factor(unique(bad_times$series),
-                                                levels = levels(bad_times$series)))) %>%
+  dplyr::right_join(expand.grid(
+    time = seq(
+      min(bad_times$time),
+      max(bad_times$time)
+    ),
+    series = factor(unique(bad_times$series),
+      levels = levels(bad_times$series)
+    )
+  )) %>%
   dplyr::arrange(time) -> good_times
 good_times
 ```
@@ -159,17 +188,23 @@ good_times
 Now the call to `get_mvgam_priors()`, using our filled in data, should work:
 ```{r error = TRUE}
 get_mvgam_priors(outcome ~ 1,
-                 data = good_times,
-                 family = gaussian())
+  data = good_times,
+  family = gaussian()
+)
 ```
 
 This function should also pick up on misaligned factor levels for the `series` variable. We can check this by again simulating, this time adding an additional factor level that is not included in the data:
 ```{r}
-bad_levels <- data.frame(time = 1:8,
-                        series = factor('series_1',
-                                        levels = c('series_1',
-                                                   'series_2')),
-                        outcome = rnorm(8))
+bad_levels <- data.frame(
+  time = 1:8,
+  series = factor("series_1",
+    levels = c(
+      "series_1",
+      "series_2"
+    )
+  ),
+  outcome = rnorm(8)
+)
 
 levels(bad_levels$series)
 ```
@@ -177,13 +212,15 @@ levels(bad_levels$series)
 Another call to `get_mvgam_priors()` brings up a useful error:
 ```{r error = TRUE}
 get_mvgam_priors(outcome ~ 1,
-                 data = bad_levels,
-                 family = gaussian())
+  data = bad_levels,
+  family = gaussian()
+)
 ```
 
 Following the message's advice tells us there is a level for `series_2` in the `series` variable, but there are no observations for this series in the data:
 ```{r}
-setdiff(levels(bad_levels$series), unique(bad_levels$series))
+setdiff(levels(bad_levels$series), 
+        unique(bad_levels$series))
 ```
 
 Re-assigning the levels fixes the issue:
@@ -194,66 +231,84 @@ levels(good_levels$series)
 ```
 
 ```{r error = TRUE}
-get_mvgam_priors(outcome ~ 1,
-                 data = good_levels,
-                 family = gaussian())
+get_mvgam_priors(
+  outcome ~ 1,
+  data = good_levels,
+  family = gaussian()
+)
 ```
 
 ### Covariates with no `NA`s
 Covariates can be used in models just as you would when using `mgcv` (see `?formula.gam` for details of the formula syntax). But although the outcome variable can have `NA`s, covariates cannot. Most regression software will silently drop any raws in the model matrix that have `NA`s, which is not helpful when debugging. Both the `mvgam()` and `get_mvgam_priors()` functions will run some simple checks for you, and hopefully will return useful errors if it finds in missing values:
 ```{r}
-miss_dat <- data.frame(outcome = rnorm(10),
-                       cov = c(NA, rnorm(9)),
-                       series = factor('series1',
-                                       levels = 'series1'),
-                       time = 1:10)
+miss_dat <- data.frame(
+  outcome = rnorm(10),
+  cov = c(NA, rnorm(9)),
+  series = factor("series1",
+    levels = "series1"
+  ),
+  time = 1:10
+)
 miss_dat
 ```
 
 ```{r error = TRUE}
-get_mvgam_priors(outcome ~ cov,
-                 data = miss_dat,
-                 family = gaussian())
+get_mvgam_priors(
+  outcome ~ cov,
+  data = miss_dat,
+  family = gaussian()
+)
 ```
 
 Just like with the `mgcv` package, `mvgam` can also accept data as a `list` object. This is useful if you want to set up [linear functional predictors](https://rdrr.io/cran/mgcv/man/linear.functional.terms.html) or even distributed lag predictors. The checks run by `mvgam` should still work on these data. Here we change the `cov` predictor to be a `matrix`:
 ```{r}
-miss_dat <- list(outcome = rnorm(10),
-                 series = factor('series1',
-                                 levels = 'series1'),
-                 time = 1:10)
+miss_dat <- list(
+  outcome = rnorm(10),
+  series = factor("series1",
+    levels = "series1"
+  ),
+  time = 1:10
+)
 miss_dat$cov <- matrix(rnorm(50), ncol = 5, nrow = 10)
-miss_dat$cov[2,3] <- NA
+miss_dat$cov[2, 3] <- NA
 ```
 
 A call to `get_mvgam_priors()` returns the same error:
 ```{r error=TRUE}
-get_mvgam_priors(outcome ~ cov,
-                 data = miss_dat,
-                 family = gaussian())
+get_mvgam_priors(
+  outcome ~ cov,
+  data = miss_dat,
+  family = gaussian()
+)
 ```
 
 ## Plotting with `plot_mvgam_series()`
 Plotting the data is a useful way to ensure everything looks ok, once you've gone throug the above checks on factor levels and timepoint x series combinations. The `plot_mvgam_series()` function will take supplied data and plot either a series of line plots (if you choose `series = 'all'`) or a set of plots to describe the distribution for a single time series. For example, to plot all of the time series in our data, and highlight a single series in each plot, we can use:
 ```{r, fig.alt = "Plotting time series features for GAM models in mvgam"}
-plot_mvgam_series(data = simdat$data_train, 
-                  y = 'y', 
-                  series = 'all')
+plot_mvgam_series(
+  data = simdat$data_train,
+  y = "y",
+  series = "all"
+)
 ```
 
 Or we can look more closely at the distribution for the first time series:
 ```{r, fig.alt = "Plotting time series features for GAM models in mvgam"}
-plot_mvgam_series(data = simdat$data_train, 
-                  y = 'y', 
-                  series = 1)
+plot_mvgam_series(
+  data = simdat$data_train,
+  y = "y",
+  series = 1
+)
 ```
 
 If you have split your data into training and testing folds (i.e. for forecast evaluation), you can include the test data in your plots:
 ```{r, fig.alt = "Plotting time series features for GAM models in mvgam"}
-plot_mvgam_series(data = simdat$data_train,
-                  newdata = simdat$data_test,
-                  y = 'y', 
-                  series = 1)
+plot_mvgam_series(
+  data = simdat$data_train,
+  newdata = simdat$data_test,
+  y = "y",
+  series = 1
+)
 ```
 
 ## Example with NEON tick data
@@ -267,10 +322,12 @@ str(dplyr::ungroup(all_neon_tick_data))
 
 For this exercise, we will use the `epiWeek` variable as an index of seasonality, and we will only work with observations from a few sampling plots (labelled in the `plotID` column):
 ```{r}
-plotIDs <- c('SCBI_013','SCBI_002',
-             'SERC_001','SERC_005',
-             'SERC_006','SERC_012',
-             'BLAN_012','BLAN_005')
+plotIDs <- c(
+  "SCBI_013", "SCBI_002",
+  "SERC_001", "SERC_005",
+  "SERC_006", "SERC_012",
+  "BLAN_012", "BLAN_005"
+)
 ```
 
 Now we can select the target species we want (*I. scapularis*), filter to the correct plot IDs and convert the `epiWeek` variable from `character` to `numeric`:
@@ -286,28 +343,33 @@ model_dat <- all_neon_tick_data %>%
 Now is the tricky part: we need to fill in missing observations with `NA`s. The tick data are sparse in that field observers do not go out and sample in each possible `epiWeek`. So there are many particular weeks in which observations are not included in the data. But we can use `expand.grid()` again to take care of this:
 ```{r}
 model_dat %>%
-  # Create all possible combos of plotID, Year and epiWeek; 
+  # Create all possible combos of plotID, Year and epiWeek;
   # missing outcomes will be filled in as NA
-  dplyr::full_join(expand.grid(plotID = unique(model_dat$plotID),
-                               Year = unique(model_dat$Year),
-                               epiWeek = seq(1, 52))) %>%
-  
+  dplyr::full_join(expand.grid(
+    plotID = unique(model_dat$plotID),
+    Year = unique(model_dat$Year),
+    epiWeek = seq(1, 52)
+  )) %>%
   # left_join back to original data so plotID and siteID will
   # match up, in case you need the siteID for anything else later on
   dplyr::left_join(all_neon_tick_data %>%
-                     dplyr::select(siteID, plotID) %>%
-                     dplyr::distinct()) -> model_dat
+    dplyr::select(siteID, plotID) %>%
+    dplyr::distinct()) -> model_dat
 ```
 
 Create the `series` variable needed for `mvgam` modelling:
 ```{r}
 model_dat %>%
-  dplyr::mutate(series = plotID,
-                y = target) %>%
-  dplyr::mutate(siteID = factor(siteID),
-                series = factor(series)) %>%
+  dplyr::mutate(
+    series = plotID,
+    y = target
+  ) %>%
+  dplyr::mutate(
+    siteID = factor(siteID),
+    series = factor(series)
+  ) %>%
   dplyr::select(-target, -plotID) %>%
-  dplyr::arrange(Year, epiWeek, series) -> model_dat 
+  dplyr::arrange(Year, epiWeek, series) -> model_dat
 ```
 
 Now create the `time` variable, which needs to track `Year` and `epiWeek` for each unique series. The `n` function from `dplyr` is often useful if generating a `time` index for grouped dataframes:
@@ -327,19 +389,23 @@ levels(model_dat$series)
 
 This looks good, as does a more rigorous check using `get_mvgam_priors()`:
 ```{r error=TRUE}
-get_mvgam_priors(y ~ 1,
-                 data = model_dat,
-                 family = poisson())
+get_mvgam_priors(
+  y ~ 1,
+  data = model_dat,
+  family = poisson()
+)
 ```
 
 We can also set up a model in `mvgam()` but use `run_model = FALSE` to further ensure all of the necessary steps for creating the modelling code and objects will run. It is recommended that you use the `cmdstanr` backend if possible, as the auto-formatting options available in this package are very useful for checking the package-generated `Stan` code for any inefficiencies that can be fixed to lead to sampling performance improvements:
 ```{r}
-testmod <- mvgam(y ~ s(epiWeek, by = series, bs = 'cc') +
-                   s(series, bs = 're'),
-                 trend_model = 'AR1',
-                 data = model_dat,
-                 backend = 'cmdstanr',
-                 run_model = FALSE)
+testmod <- mvgam(
+  y ~ s(epiWeek, by = series, bs = "cc") +
+    s(series, bs = "re"),
+  trend_model = AR(),
+  data = model_dat,
+  backend = "cmdstanr",
+  run_model = FALSE
+)
 ```
 
 This call runs without issue, and the resulting object now contains the model code and data objects that are needed to initiate sampling:
@@ -348,8 +414,23 @@ str(testmod$model_data)
 ```
 
 ```{r}
-code(testmod)
+stancode(testmod)
 ```
+
+## Further reading
+The following papers and resources offer useful material about Dynamic GAMs and how they can be applied in practice:
+  
+Clark, Nicholas J. and Wells, K. [Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series](https://doi.org/10.1111/2041-210X.13974). *Methods in Ecology and Evolution*. (2023): 14, 771-784.  
+  
+Clark, Nicholas J., et al. [Beyond single-species models: leveraging multispecies forecasts to navigate the dynamics of ecological predictability](https://peerj.com/articles/18929/). *PeerJ*. (2025): 13:e18929
+  
+de Sousa, Heitor C., et al. [Severe fire regimes decrease resilience of ectothermic populations](https://doi.org/10.1111/1365-2656.14188). *Journal of Animal Ecology* (2024): 93(11), 1656-1669.  
+  
+Hannaford, Naomi E., et al. [A sparse Bayesian hierarchical vector autoregressive model for microbial dynamics in a wastewater treatment plant.](https://doi.org/10.1016/j.csda.2022.107659) *Computational Statistics & Data Analysis* (2023): 179, 107659.
+  
+Karunarathna, K.A.N.K., et al. [Modelling nonlinear responses of a desert rodent species to environmental change with hierarchical dynamic generalized additive models](https://doi.org/10.1016/j.ecolmodel.2024.110648). *Ecological Modelling* (2024): 490, 110648.
+  
+Zhu, L., et al. [Responses of a widespread pest insect to extreme high temperatures are stage-dependent and divergent among seasonal cohorts](https://doi.org/10.1111/1365-2435.14711). *Functional Ecology* (2025): 39, 165–180. https://doi.org/10.1111/1365-2435.14711
 
 ## Interested in contributing?
 I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please see [this small list of opportunities on my website](https://ecogambler.netlify.app/opportunities/) and do reach out if you are interested (n.clark'at'uq.edu.au)

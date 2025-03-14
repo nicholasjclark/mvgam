@@ -22,4 +22,5 @@
 ^tests/testthat/Rplots\.pdf$
 ^tests/local$
 ^memcheck\.R$
+^build_vignettes_CRAN\.R$
 ^src\.gcda$

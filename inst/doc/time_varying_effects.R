@@ -1,5 +1,5 @@
 params <-
-  list(EVAL = TRUE)
+list(EVAL = TRUE)
 
 ## ----echo = FALSE----------------------------------------------------------------------------
 knitr::opts_chunk$set(
@@ -22,26 +22,26 @@ knitr::opts_chunk$set(
 )
 library(mvgam)
 library(ggplot2)
-theme_set(theme_bw(base_size = 12, base_family = 'serif'))
+theme_set(theme_bw(base_size = 12, base_family = "serif"))
 
 
 ## --------------------------------------------------------------------------------------------
 set.seed(1111)
 N <- 200
-beta_temp <- mvgam:::sim_gp(rnorm(1), alpha_gp = 0.75, rho_gp = 10, h = N) + 0.5
+beta_temp <- mvgam:::sim_gp(rnorm(1),
+  alpha_gp = 0.75,
+  rho_gp = 10,
+  h = N
+) + 0.5
 
 
 ## ----fig.alt = "Simulating time-varying effects in mvgam and R"------------------------------
-plot(
-  beta_temp,
-  type = 'l',
-  lwd = 3,
-  bty = 'l',
-  xlab = 'Time',
-  ylab = 'Coefficient',
-  col = 'darkred'
+plot(beta_temp,
+  type = "l", lwd = 3,
+  bty = "l", xlab = "Time", ylab = "Coefficient",
+  col = "darkred"
 )
-box(bty = 'l', lwd = 2)
+box(bty = "l", lwd = 2)
 
 
 ## --------------------------------------------------------------------------------------------
@@ -49,18 +49,17 @@ temp <- rnorm(N, sd = 1)
 
 
 ## ----fig.alt = "Simulating time-varying effects in mvgam and R"------------------------------
-out <- rnorm(N, mean = 4 + beta_temp * temp, sd = 0.25)
-time <- seq_along(temp)
-plot(
-  out,
-  type = 'l',
-  lwd = 3,
-  bty = 'l',
-  xlab = 'Time',
-  ylab = 'Outcome',
-  col = 'darkred'
+out <- rnorm(N,
+  mean = 4 + beta_temp * temp,
+  sd = 0.25
 )
-box(bty = 'l', lwd = 2)
+time <- seq_along(temp)
+plot(out,
+  type = "l", lwd = 3,
+  bty = "l", xlab = "Time", ylab = "Outcome",
+  col = "darkred"
+)
+box(bty = "l", lwd = 2)
 
 
 ## --------------------------------------------------------------------------------------------
@@ -70,8 +69,7 @@ data_test <- data[191:200, ]
 
 
 ## ----include=FALSE---------------------------------------------------------------------------
-mod <- mvgam(
-  out ~ dynamic(temp, rho = 8, stationary = TRUE, k = 40),
+mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE, k = 40),
   family = gaussian(),
   data = data_train,
   silent = 2
@@ -80,9 +78,11 @@ mod <- mvgam(
 
 ## ----eval=FALSE------------------------------------------------------------------------------
 # mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE, k = 40),
-#              family = gaussian(),
-#              data = data_train,
-#              silent = 2)
+#   family = gaussian(),
+#   data = data_train,
+#   silent = 2
+# )
+
 
 ## --------------------------------------------------------------------------------------------
 summary(mod, include_betas = FALSE)
@@ -90,21 +90,23 @@ summary(mod, include_betas = FALSE)
 
 ## --------------------------------------------------------------------------------------------
 plot_mvgam_smooth(mod, smooth = 1, newdata = data)
-abline(v = 190, lty = 'dashed', lwd = 2)
-lines(beta_temp, lwd = 2.5, col = 'white')
+abline(v = 190, lty = "dashed", lwd = 2)
+lines(beta_temp, lwd = 2.5, col = "white")
 lines(beta_temp, lwd = 2)
 
 
 ## --------------------------------------------------------------------------------------------
 require(marginaleffects)
-range_round = function(x) {
+range_round <- function(x) {
   round(range(x, na.rm = TRUE), 2)
 }
-plot_predictions(
-  mod,
-  newdata = datagrid(time = unique, temp = range_round),
-  by = c('time', 'temp', 'temp'),
-  type = 'link'
+plot_predictions(mod,
+  newdata = datagrid(
+    time = unique,
+    temp = range_round
+  ),
+  by = c("time", "temp", "temp"),
+  type = "link"
 )
 
 
@@ -114,8 +116,7 @@ plot(fc)
 
 
 ## ----include=FALSE---------------------------------------------------------------------------
-mod <- mvgam(
-  out ~ dynamic(temp, k = 40),
+mod <- mvgam(out ~ dynamic(temp, k = 40),
   family = gaussian(),
   data = data_train,
   silent = 2
@@ -124,9 +125,11 @@ mod <- mvgam(
 
 ## ----eval=FALSE------------------------------------------------------------------------------
 # mod <- mvgam(out ~ dynamic(temp, k = 40),
-#              family = gaussian(),
-#              data = data_train,
-#              silent = 2)
+#   family = gaussian(),
+#   data = data_train,
+#   silent = 2
+# )
+
 
 ## --------------------------------------------------------------------------------------------
 summary(mod, include_betas = FALSE)
@@ -134,13 +137,13 @@ summary(mod, include_betas = FALSE)
 
 ## --------------------------------------------------------------------------------------------
 plot_mvgam_smooth(mod, smooth = 1, newdata = data)
-abline(v = 190, lty = 'dashed', lwd = 2)
-lines(beta_temp, lwd = 2.5, col = 'white')
+abline(v = 190, lty = "dashed", lwd = 2)
+lines(beta_temp, lwd = 2.5, col = "white")
 lines(beta_temp, lwd = 2)
 
 
 ## --------------------------------------------------------------------------------------------
-load(url('https://github.com/atsa-es/MARSS/raw/master/data/SalmonSurvCUI.rda'))
+load(url("https://github.com/atsa-es/MARSS/raw/master/data/SalmonSurvCUI.rda"))
 dplyr::glimpse(SalmonSurvCUI)
 
 
@@ -148,13 +151,10 @@ dplyr::glimpse(SalmonSurvCUI)
 SalmonSurvCUI %>%
   # create a time variable
   dplyr::mutate(time = dplyr::row_number()) %>%
-
   # create a series variable
-  dplyr::mutate(series = as.factor('salmon')) %>%
-
+  dplyr::mutate(series = as.factor("salmon")) %>%
   # z-score the covariate CUI.apr
   dplyr::mutate(CUI.apr = as.vector(scale(CUI.apr))) %>%
-
   # convert logit-transformed survival back to proportional
   dplyr::mutate(survival = plogis(logit.s)) -> model_data
 
@@ -164,7 +164,7 @@ dplyr::glimpse(model_data)
 
 
 ## --------------------------------------------------------------------------------------------
-plot_mvgam_series(data = model_data, y = 'survival')
+plot_mvgam_series(data = model_data, y = "survival")
 
 
 ## ----include = FALSE-------------------------------------------------------------------------
@@ -180,20 +180,23 @@ mod0 <- mvgam(
 
 
 ## ----eval = FALSE----------------------------------------------------------------------------
-# mod0 <- mvgam(formula = survival ~ 1,
-#               trend_model = AR(),
-#               noncentred = TRUE,
-#               priors = prior(normal(-3.5, 0.5), class = Intercept),
-#               family = betar(),
-#               data = model_data,
-#               silent = 2)
+# mod0 <- mvgam(
+#   formula = survival ~ 1,
+#   trend_model = AR(),
+#   noncentred = TRUE,
+#   priors = prior(normal(-3.5, 0.5), class = Intercept),
+#   family = betar(),
+#   data = model_data,
+#   silent = 2
+# )
+
 
 ## --------------------------------------------------------------------------------------------
 summary(mod0)
 
 
 ## --------------------------------------------------------------------------------------------
-plot(mod0, type = 'trend')
+plot(mod0, type = "trend")
 
 
 ## ----include=FALSE---------------------------------------------------------------------------
@@ -211,33 +214,36 @@ mod1 <- mvgam(
 
 
 ## ----eval=FALSE------------------------------------------------------------------------------
-# mod1 <- mvgam(formula = survival ~ 1,
-#               trend_formula = ~ dynamic(CUI.apr, k = 25, scale = FALSE) - 1,
-#               trend_model = AR(),
-#               noncentred = TRUE,
-#               priors = prior(normal(-3.5, 0.5), class = Intercept),
-#               family = betar(),
-#               data = model_data,
-#               silent = 2)
+# mod1 <- mvgam(
+#   formula = survival ~ 1,
+#   trend_formula = ~ dynamic(CUI.apr, k = 25, scale = FALSE) - 1,
+#   trend_model = AR(),
+#   noncentred = TRUE,
+#   priors = prior(normal(-3.5, 0.5), class = Intercept),
+#   family = betar(),
+#   data = model_data,
+#   silent = 2
+# )
+
 
 ## --------------------------------------------------------------------------------------------
 summary(mod1, include_betas = FALSE)
 
 
 ## --------------------------------------------------------------------------------------------
-plot(mod1, type = 'trend')
+plot(mod1, type = "trend")
 
 
 ## --------------------------------------------------------------------------------------------
-plot(mod1, type = 'forecast')
+plot(mod1, type = "forecast")
 
 
 ## --------------------------------------------------------------------------------------------
 # Extract estimates of the process error 'sigma' for each model
-mod0_sigma <- as.data.frame(mod0, variable = 'sigma', regex = TRUE) %>%
-  dplyr::mutate(model = 'Mod0')
-mod1_sigma <- as.data.frame(mod1, variable = 'sigma', regex = TRUE) %>%
-  dplyr::mutate(model = 'Mod1')
+mod0_sigma <- as.data.frame(mod0, variable = "sigma", regex = TRUE) %>%
+  dplyr::mutate(model = "Mod0")
+mod1_sigma <- as.data.frame(mod1, variable = "sigma", regex = TRUE) %>%
+  dplyr::mutate(model = "Mod1")
 sigmas <- rbind(mod0_sigma, mod1_sigma)
 
 # Plot using ggplot2
@@ -248,7 +254,7 @@ ggplot(sigmas, aes(y = `sigma[1]`, fill = model)) +
 
 
 ## --------------------------------------------------------------------------------------------
-plot(mod1, type = 'smooths', trend_effects = TRUE)
+plot(mod1, type = "smooths", trend_effects = TRUE)
 
 
 ## --------------------------------------------------------------------------------------------
@@ -264,6 +270,7 @@ lfo_mod1 <- lfo_cv(mod1, min_t = 30)
 # lfo_mod0 <- lfo_cv(mod0, min_t = 30)
 # lfo_mod1 <- lfo_cv(mod1, min_t = 30)
 
+
 ## --------------------------------------------------------------------------------------------
 sum(lfo_mod0$elpds)
 sum(lfo_mod1$elpds)
@@ -273,10 +280,11 @@ sum(lfo_mod1$elpds)
 plot(
   x = 1:length(lfo_mod0$elpds) + 30,
   y = lfo_mod0$elpds - lfo_mod1$elpds,
-  ylab = 'ELPDmod0 - ELPDmod1',
-  xlab = 'Evaluation time point',
+  ylab = "ELPDmod0 - ELPDmod1",
+  xlab = "Evaluation time point",
   pch = 16,
-  col = 'darkred',
-  bty = 'l'
+  col = "darkred",
+  bty = "l"
 )
-abline(h = 0, lty = 'dashed')
+abline(h = 0, lty = "dashed")
+

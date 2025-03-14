@@ -29,24 +29,37 @@ knitr::opts_chunk$set(
   fig.asp = 0.8,
   fig.width = 6,
   out.width = "60%",
-  fig.align = "center")
+  fig.align = "center"
+)
 library(mvgam)
 library(ggplot2)
 library(dplyr)
 # A custom ggplot2 theme
-theme_set(theme_classic(base_size = 12, base_family = 'serif') +
-            theme(axis.line.x.bottom = element_line(colour = "black",
-                                                    size = 1),
-                  axis.line.y.left = element_line(colour = "black",
-                                                  size = 1)))
-options(ggplot2.discrete.colour = c("#A25050",
-                                    "#00008b",
-                                    'darkred',
-                                    "#010048"),
-        ggplot2.discrete.fill = c("#A25050",
-                                  "#00008b",
-                                  'darkred',
-                                  "#010048"))
+theme_set(theme_classic(base_size = 12, base_family = "serif") +
+  theme(
+    axis.line.x.bottom = element_line(
+      colour = "black",
+      size = 1
+    ),
+    axis.line.y.left = element_line(
+      colour = "black",
+      size = 1
+    )
+  ))
+options(
+  ggplot2.discrete.colour = c(
+    "#A25050",
+    "#00008b",
+    "darkred",
+    "#010048"
+  ),
+  ggplot2.discrete.fill = c(
+    "#A25050",
+    "#00008b",
+    "darkred",
+    "#010048"
+  )
+)
 ```
 
 The purpose of this vignette is to show how the `mvgam` package can be used to fit and interrogate N-mixture models for population abundance counts made with imperfect detection.
@@ -74,69 +87,91 @@ First we will use a simple simulation in which multiple replicate observations a
 ```{r}
 set.seed(999)
 # Simulate observations for species 1, which shows a declining trend and 0.7 detection probability
-data.frame(site = 1,
-           # five replicates per year; six years
-           replicate = rep(1:5, 6),
-           time = sort(rep(1:6, 5)),
-           species = 'sp_1',
-           # true abundance declines nonlinearly
-           truth = c(rep(28, 5),
-                     rep(26, 5),
-                     rep(23, 5),
-                     rep(16, 5),
-                     rep(14, 5),
-                     rep(14, 5)),
-           # observations are taken with detection prob = 0.7
-           obs = c(rbinom(5, 28, 0.7),
-                   rbinom(5, 26, 0.7),
-                   rbinom(5, 23, 0.7),
-                   rbinom(5, 15, 0.7),
-                   rbinom(5, 14, 0.7),
-                   rbinom(5, 14, 0.7))) %>%
+data.frame(
+  site = 1,
+  # five replicates per year; six years
+  replicate = rep(1:5, 6),
+  time = sort(rep(1:6, 5)),
+  species = "sp_1",
+  # true abundance declines nonlinearly
+  truth = c(
+    rep(28, 5),
+    rep(26, 5),
+    rep(23, 5),
+    rep(16, 5),
+    rep(14, 5),
+    rep(14, 5)
+  ),
+  # observations are taken with detection prob = 0.7
+  obs = c(
+    rbinom(5, 28, 0.7),
+    rbinom(5, 26, 0.7),
+    rbinom(5, 23, 0.7),
+    rbinom(5, 15, 0.7),
+    rbinom(5, 14, 0.7),
+    rbinom(5, 14, 0.7)
+  )
+) %>%
   # add 'series' information, which is an identifier of site, replicate and species
-  dplyr::mutate(series = paste0('site_', site,
-                                '_', species,
-                                '_rep_', replicate),
-                time = as.numeric(time),
-                # add a 'cap' variable that defines the maximum latent N to 
-                # marginalize over when estimating latent abundance; in other words
-                # how large do we realistically think the true abundance could be?
-                cap = 100) %>%
-  dplyr::select(- replicate) -> testdat
+  dplyr::mutate(
+    series = paste0(
+      "site_", site,
+      "_", species,
+      "_rep_", replicate
+    ),
+    time = as.numeric(time),
+    # add a 'cap' variable that defines the maximum latent N to
+    # marginalize over when estimating latent abundance; in other words
+    # how large do we realistically think the true abundance could be?
+    cap = 100
+  ) %>%
+  dplyr::select(-replicate) -> testdat
 
-# Now add another species that has a different temporal trend and a smaller 
+# Now add another species that has a different temporal trend and a smaller
 # detection probability (0.45 for this species)
-testdat = testdat %>%
-  dplyr::bind_rows(data.frame(site = 1,
-                              replicate = rep(1:5, 6),
-                              time = sort(rep(1:6, 5)),
-                              species = 'sp_2',
-                              truth = c(rep(4, 5),
-                                        rep(7, 5),
-                                        rep(15, 5),
-                                        rep(16, 5),
-                                        rep(19, 5),
-                                        rep(18, 5)),
-                              obs = c(rbinom(5, 4, 0.45),
-                                      rbinom(5, 7, 0.45),
-                                      rbinom(5, 15, 0.45),
-                                      rbinom(5, 16, 0.45),
-                                      rbinom(5, 19, 0.45),
-                                      rbinom(5, 18, 0.45))) %>%
-                     dplyr::mutate(series = paste0('site_', site,
-                                                   '_', species,
-                                                   '_rep_', replicate),
-                                   time = as.numeric(time),
-                                   cap = 50) %>%
-                     dplyr::select(-replicate))
+testdat <- testdat %>%
+  dplyr::bind_rows(data.frame(
+    site = 1,
+    replicate = rep(1:5, 6),
+    time = sort(rep(1:6, 5)),
+    species = "sp_2",
+    truth = c(
+      rep(4, 5),
+      rep(7, 5),
+      rep(15, 5),
+      rep(16, 5),
+      rep(19, 5),
+      rep(18, 5)
+    ),
+    obs = c(
+      rbinom(5, 4, 0.45),
+      rbinom(5, 7, 0.45),
+      rbinom(5, 15, 0.45),
+      rbinom(5, 16, 0.45),
+      rbinom(5, 19, 0.45),
+      rbinom(5, 18, 0.45)
+    )
+  ) %>%
+    dplyr::mutate(
+      series = paste0(
+        "site_", site,
+        "_", species,
+        "_rep_", replicate
+      ),
+      time = as.numeric(time),
+      cap = 50
+    ) %>%
+    dplyr::select(-replicate))
 ```
 
 This data format isn't too difficult to set up, but it does differ from the traditional multidimensional array setup that is commonly used for fitting N-mixture models in other software packages. Next we ensure that species and series IDs are included as factor variables, in case we'd like to allow certain effects to vary by species
 ```{r}
 testdat$species <- factor(testdat$species,
-                          levels = unique(testdat$species))
+  levels = unique(testdat$species)
+)
 testdat$series <- factor(testdat$series,
-                         levels = unique(testdat$series))
+  levels = unique(testdat$series)
+)
 ```
 
 Preview the dataset to get an idea of how it is structured:
@@ -168,22 +203,25 @@ mod <- mvgam(
   # the observation formula sets up linear predictors for
   # detection probability on the logit scale
   formula = obs ~ species - 1,
-  
-  # the trend_formula sets up the linear predictors for 
+
+  # the trend_formula sets up the linear predictors for
   # the latent abundance processes on the log scale
   trend_formula = ~ s(time, by = trend, k = 4) + species,
-  
+
   # the trend_map takes care of the mapping
   trend_map = trend_map,
-  
+
   # nmix() family and data
   family = nmix(),
   data = testdat,
-  
+
   # priors can be set in the usual way
-  priors = c(prior(std_normal(), class = b),
-             prior(normal(1, 1.5), class = Intercept_trend)),
-  samples = 1000)
+  priors = c(
+    prior(std_normal(), class = b),
+    prior(normal(1, 1.5), class = Intercept_trend)
+  ),
+  samples = 1000
+)
 ```
 
 ```{r eval = FALSE}
@@ -191,22 +229,25 @@ mod <- mvgam(
   # the observation formula sets up linear predictors for
   # detection probability on the logit scale
   formula = obs ~ species - 1,
-  
-  # the trend_formula sets up the linear predictors for 
+
+  # the trend_formula sets up the linear predictors for
   # the latent abundance processes on the log scale
   trend_formula = ~ s(time, by = trend, k = 4) + species,
-  
+
   # the trend_map takes care of the mapping
   trend_map = trend_map,
-  
+
   # nmix() family and data
   family = nmix(),
   data = testdat,
-  
+
   # priors can be set in the usual way
-  priors = c(prior(std_normal(), class = b),
-             prior(normal(1, 1.5), class = Intercept_trend)),
-  samples = 1000)
+  priors = c(
+    prior(std_normal(), class = b),
+    prior(normal(1, 1.5), class = Intercept_trend)
+  ),
+  samples = 1000
+)
 ```
 
 View the automatically-generated `Stan` code to get a sense of how the marginalization over latent N works
@@ -226,29 +267,31 @@ loo(mod)
 
 Plot the estimated smooths of time from each species' latent abundance process (on the log scale)
 ```{r}
-plot(mod, type = 'smooths', trend_effects = TRUE)
+plot(mod, type = "smooths", trend_effects = TRUE)
 ```
 
 `marginaleffects` support allows for more useful prediction-based interrogations on different scales (though note that at the time of writing this Vignette, you must have the development version of `marginaleffects` installed for `nmix()` models to be supported; use `remotes::install_github('vincentarelbundock/marginaleffects')` to install). Objects that use family `nmix()` have a few additional prediction scales that can be used (i.e. `link`, `response`, `detection` or `latent_N`). For example, here are the estimated detection probabilities per species, which show that the model has done a nice job of estimating these parameters:
 ```{r}
-marginaleffects::plot_predictions(mod, condition = 'species',
-                 type = 'detection') +
-  ylab('Pr(detection)') +
+marginaleffects::plot_predictions(mod,
+  condition = "species",
+  type = "detection"
+) +
+  ylab("Pr(detection)") +
   ylim(c(0, 1)) +
   theme_classic() +
-  theme(legend.position = 'none')
+  theme(legend.position = "none")
 ```
 
 A common goal in N-mixture modelling is to estimate the true latent abundance. The model has automatically generated predictions for the unknown latent abundance that are conditional on the observations. We can extract these and produce decent plots using a small function
 ```{r}
-hc <- hindcast(mod, type = 'latent_N')
+hc <- hindcast(mod, type = "latent_N")
 
 # Function to plot latent abundance estimates vs truth
-plot_latentN = function(hindcasts, data, species = 'sp_1'){
+plot_latentN <- function(hindcasts, data, species = "sp_1") {
   all_series <- unique(data %>%
-                         dplyr::filter(species == !!species) %>%
-                         dplyr::pull(series))
-  
+    dplyr::filter(species == !!species) %>%
+    dplyr::pull(series))
+
   # Grab the first replicate that represents this series
   # so we can get the true simulated values
   series <- as.numeric(all_series[1])
@@ -256,48 +299,57 @@ plot_latentN = function(hindcasts, data, species = 'sp_1'){
     dplyr::arrange(time, series) %>%
     dplyr::filter(series == !!levels(data$series)[series]) %>%
     dplyr::pull(truth)
-  
+
   # In case some replicates have missing observations,
   # pull out predictions for ALL replicates and average over them
-  hcs <- do.call(rbind, lapply(all_series, function(x){
+  hcs <- do.call(rbind, lapply(all_series, function(x) {
     ind <- which(names(hindcasts$hindcasts) %in% as.character(x))
     hindcasts$hindcasts[[ind]]
   }))
-  
+
   # Calculate posterior empirical quantiles of predictions
-  pred_quantiles <- data.frame(t(apply(hcs, 2, function(x) 
-    quantile(x, probs = c(0.05, 0.2, 0.3, 0.4, 
-                          0.5, 0.6, 0.7, 0.8, 0.95)))))
+  pred_quantiles <- data.frame(t(apply(hcs, 2, function(x) {
+    quantile(x, probs = c(
+      0.05, 0.2, 0.3, 0.4,
+      0.5, 0.6, 0.7, 0.8, 0.95
+    ))
+  })))
   pred_quantiles$time <- 1:NROW(pred_quantiles)
   pred_quantiles$truth <- truths
-  
+
   # Grab observations
   data %>%
     dplyr::filter(series %in% all_series) %>%
     dplyr::select(time, obs) -> observations
-  
+
   # Plot
   ggplot(pred_quantiles, aes(x = time, group = 1)) +
-    geom_ribbon(aes(ymin = X5., ymax = X95.), fill = "#DCBCBC") + 
+    geom_ribbon(aes(ymin = X5., ymax = X95.), fill = "#DCBCBC") +
     geom_ribbon(aes(ymin = X30., ymax = X70.), fill = "#B97C7C") +
     geom_line(aes(x = time, y = truth),
-              colour = 'black', linewidth = 1) +
+      colour = "black", linewidth = 1
+    ) +
     geom_point(aes(x = time, y = truth),
-               shape = 21, colour = 'white', fill = 'black',
-               size = 2.5) +
-    geom_jitter(data = observations, aes(x = time, y = obs),
-                width = 0.06, 
-                shape = 21, fill = 'darkred', colour = 'white', size = 2.5) +
-    labs(y = 'Latent abundance (N)',
-         x = 'Time',
-         title = species)
+      shape = 21, colour = "white", fill = "black",
+      size = 2.5
+    ) +
+    geom_jitter(
+      data = observations, aes(x = time, y = obs),
+      width = 0.06,
+      shape = 21, fill = "darkred", colour = "white", size = 2.5
+    ) +
+    labs(
+      y = "Latent abundance (N)",
+      x = "Time",
+      title = species
+    )
 }
 ```
 
 Latent abundance plots vs the simulated truths for each species are shown below. Here, the red points show the imperfect observations, the black line shows the true latent abundance, and the ribbons show credible intervals of our estimates:
 ```{r}
-plot_latentN(hc, testdat, species = 'sp_1')
-plot_latentN(hc, testdat, species = 'sp_2')
+plot_latentN(hc, testdat, species = "sp_1")
+plot_latentN(hc, testdat, species = "sp_2")
 ```
 
 We can see that estimates for both species have correctly captured the true temporal variation and magnitudes in abundance
@@ -309,7 +361,7 @@ Now for another example with a larger dataset. We will use data from [Jeff Doser
 Download the data and grab observations / covariate measurements for one species
 ```{r}
 # Date link
-load(url('https://github.com/doserjef/spAbundance/raw/main/data/dataNMixSim.rda'))
+load(url("https://github.com/doserjef/spAbundance/raw/main/data/dataNMixSim.rda"))
 data.one.sp <- dataNMixSim
 
 # Pull out observations for one species
@@ -322,7 +374,7 @@ abund.factor <- as.factor(dataNMixSim$abund.covs[, 2])
 # Detection covariates that can change across repeat sampling observations
 # Note that `NA`s are not allowed for covariates in mvgam, so we randomly
 # impute them here
-det.cov <- dataNMixSim$det.covs$det.cov.1[,]
+det.cov <- dataNMixSim$det.covs$det.cov.1[, ]
 det.cov[is.na(det.cov)] <- rnorm(length(which(is.na(det.cov))))
 det.cov2 <- dataNMixSim$det.covs$det.cov.2
 det.cov2[is.na(det.cov2)] <- rnorm(length(which(is.na(det.cov2))))
@@ -330,22 +382,30 @@ det.cov2[is.na(det.cov2)] <- rnorm(length(which(is.na(det.cov2))))
 
 Next we wrangle into the appropriate 'long' data format, adding indicators of `time` and `series` for working in `mvgam`. We also add the `cap` variable to represent the maximum latent N to marginalize over for each observation
 ```{r}
-mod_data <- do.call(rbind,
-                    lapply(1:NROW(data.one.sp$y), function(x){
-                      data.frame(y = data.one.sp$y[x,],
-                                 abund_cov = abund.cov[x],
-                                 abund_fac = abund.factor[x],
-                                 det_cov = det.cov[x,],
-                                 det_cov2 = det.cov2[x,],
-                                 replicate = 1:NCOL(data.one.sp$y),
-                                 site = paste0('site', x))
-                    })) %>%
-  dplyr::mutate(species = 'sp_1',
-                series = as.factor(paste0(site, '_', species, '_', replicate))) %>%
-  dplyr::mutate(site = factor(site, levels = unique(site)),
-                species = factor(species, levels = unique(species)),
-                time = 1,
-                cap = max(data.one.sp$y, na.rm = TRUE) + 20)
+mod_data <- do.call(
+  rbind,
+  lapply(1:NROW(data.one.sp$y), function(x) {
+    data.frame(
+      y = data.one.sp$y[x, ],
+      abund_cov = abund.cov[x],
+      abund_fac = abund.factor[x],
+      det_cov = det.cov[x, ],
+      det_cov2 = det.cov2[x, ],
+      replicate = 1:NCOL(data.one.sp$y),
+      site = paste0("site", x)
+    )
+  })
+) %>%
+  dplyr::mutate(
+    species = "sp_1",
+    series = as.factor(paste0(site, "_", species, "_", replicate))
+  ) %>%
+  dplyr::mutate(
+    site = factor(site, levels = unique(site)),
+    species = factor(species, levels = unique(species)),
+    time = 1,
+    cap = max(data.one.sp$y, na.rm = TRUE) + 20
+  )
 ```
 
 The data include observations for 225 sites with three replicates per site, though some observations are missing
@@ -374,32 +434,35 @@ mod <- mvgam(
   # effects of covariates on detection probability;
   # here we use penalized splines for both continuous covariates
   formula = y ~ s(det_cov, k = 3) + s(det_cov2, k = 3),
-  
+
   # effects of the covariates on latent abundance;
   # here we use a penalized spline for the continuous covariate and
   # hierarchical intercepts for the factor covariate
   trend_formula = ~ s(abund_cov, k = 3) +
-    s(abund_fac, bs = 're'),
-  
+    s(abund_fac, bs = "re"),
+
   # link multiple observations to each site
   trend_map = trend_map,
-  
+
   # nmix() family and supplied data
   family = nmix(),
   data = mod_data,
-  
+
   # standard normal priors on key regression parameters
-  priors = c(prior(std_normal(), class = 'b'),
-             prior(std_normal(), class = 'Intercept'),
-             prior(std_normal(), class = 'Intercept_trend'),
-             prior(std_normal(), class = 'sigma_raw_trend')),
-  
+  priors = c(
+    prior(std_normal(), class = "b"),
+    prior(std_normal(), class = "Intercept"),
+    prior(std_normal(), class = "Intercept_trend"),
+    prior(std_normal(), class = "sigma_raw_trend")
+  ),
+
   # use Stan's variational inference for quicker results
-  algorithm = 'meanfield',
-  
+  algorithm = "meanfield",
+
   # no need to compute "series-level" residuals
   residuals = FALSE,
-  samples = 1000)
+  samples = 1000
+)
 ```
 
 ```{r eval=FALSE}
@@ -407,32 +470,35 @@ mod <- mvgam(
   # effects of covariates on detection probability;
   # here we use penalized splines for both continuous covariates
   formula = y ~ s(det_cov, k = 4) + s(det_cov2, k = 4),
-  
+
   # effects of the covariates on latent abundance;
   # here we use a penalized spline for the continuous covariate and
   # hierarchical intercepts for the factor covariate
   trend_formula = ~ s(abund_cov, k = 4) +
-    s(abund_fac, bs = 're'),
-  
+    s(abund_fac, bs = "re"),
+
   # link multiple observations to each site
   trend_map = trend_map,
-  
+
   # nmix() family and supplied data
   family = nmix(),
   data = mod_data,
-  
+
   # standard normal priors on key regression parameters
-  priors = c(prior(std_normal(), class = 'b'),
-             prior(std_normal(), class = 'Intercept'),
-             prior(std_normal(), class = 'Intercept_trend'),
-             prior(std_normal(), class = 'sigma_raw_trend')),
-  
+  priors = c(
+    prior(std_normal(), class = "b"),
+    prior(std_normal(), class = "Intercept"),
+    prior(std_normal(), class = "Intercept_trend"),
+    prior(std_normal(), class = "sigma_raw_trend")
+  ),
+
   # use Stan's variational inference for quicker results
-  algorithm = 'meanfield',
-  
+  algorithm = "meanfield",
+
   # no need to compute "series-level" residuals
   residuals = FALSE,
-  samples = 1000)
+  samples = 1000
+)
 ```
 
 Inspect the model summary but don't bother looking at estimates for all individual spline coefficients. Notice how we no longer receive information on convergence because we did not use MCMC sampling for this model
@@ -442,58 +508,71 @@ summary(mod, include_betas = FALSE)
 
 Again we can make use of `marginaleffects` support for interrogating the model through targeted predictions. First, we can inspect the estimated average detection probability
 ```{r}
-marginaleffects::avg_predictions(mod, type = 'detection')
+marginaleffects::avg_predictions(mod, type = "detection")
 ```
 
 Next investigate estimated effects of covariates on latent abundance using the `conditional_effects()` function and specifying `type = 'link'`; this will return plots on the expectation scale
 ```{r}
-abund_plots <- plot(conditional_effects(mod,
-                                        type = 'link',
-                                        effects = c('abund_cov',
-                                                    'abund_fac')),
-                    plot = FALSE)
+abund_plots <- plot(
+  conditional_effects(mod,
+    type = "link",
+    effects = c(
+      "abund_cov",
+      "abund_fac"
+    )
+  ),
+  plot = FALSE
+)
 ```
 
 The effect of the continuous covariate on expected latent abundance
 ```{r}
 abund_plots[[1]] +
-  ylab('Expected latent abundance')
+  ylab("Expected latent abundance")
 ```
 
 The effect of the factor covariate on expected latent abundance, estimated as a hierarchical random effect
 ```{r}
 abund_plots[[2]] +
-  ylab('Expected latent abundance')
+  ylab("Expected latent abundance")
 ```
 
 Now we can investigate estimated effects of covariates on detection probability using `type = 'detection'`
 ```{r}
-det_plots <- plot(conditional_effects(mod,
-                                      type = 'detection',
-                                      effects = c('det_cov',
-                                                  'det_cov2')),
-                  plot = FALSE)
+det_plots <- plot(
+  conditional_effects(mod,
+    type = "detection",
+    effects = c(
+      "det_cov",
+      "det_cov2"
+    )
+  ),
+  plot = FALSE
+)
 ```
 
 The covariate smooths were estimated to be somewhat nonlinear on the logit scale according to the model summary (based on their approximate significances). But inspecting conditional effects of each covariate on the probability scale is more intuitive and useful
 ```{r}
 det_plots[[1]] +
-  ylab('Pr(detection)')
+  ylab("Pr(detection)")
 det_plots[[2]] +
-  ylab('Pr(detection)')
+  ylab("Pr(detection)")
 ```
 
 More targeted predictions are also easy with `marginaleffects` support. For example, we can ask: How does detection probability change as we change *both* detection covariates?
 ```{r}
-fivenum_round = function(x)round(fivenum(x, na.rm = TRUE), 2)
+fivenum_round <- function(x) round(fivenum(x, na.rm = TRUE), 2)
 
-marginaleffects::plot_predictions(mod, 
-                 newdata = marginaleffects::datagrid(det_cov = unique,
-                                    det_cov2 = fivenum_round),
-                 by = c('det_cov', 'det_cov2'),
-                 type = 'detection') +
+marginaleffects::plot_predictions(mod,
+  newdata = marginaleffects::datagrid(
+    det_cov = unique,
+    det_cov2 = fivenum_round
+  ),
+  by = c("det_cov", "det_cov2"),
+  type = "detection"
+) +
   theme_classic() +
-  ylab('Pr(detection)')
+  ylab("Pr(detection)")
 ```
 
 The model has found support for some important covariate effects, but of course we'd want to interrogate how well the model predicts and think about possible spatial effects to capture unmodelled variation in latent abundance (which can easily be incorporated into both linear predictors using spatial smooths).
