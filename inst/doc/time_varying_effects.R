@@ -1,5 +1,5 @@
 params <-
-list(EVAL = TRUE)
+  list(EVAL = TRUE)
 
 ## ----echo = FALSE----------------------------------------------------------------------------
 knitr::opts_chunk$set(
@@ -28,17 +28,17 @@ theme_set(theme_bw(base_size = 12, base_family = "serif"))
 ## --------------------------------------------------------------------------------------------
 set.seed(1111)
 N <- 200
-beta_temp <- mvgam:::sim_gp(rnorm(1),
-  alpha_gp = 0.75,
-  rho_gp = 10,
-  h = N
-) + 0.5
+beta_temp <- mvgam:::sim_gp(rnorm(1), alpha_gp = 0.75, rho_gp = 10, h = N) + 0.5
 
 
 ## ----fig.alt = "Simulating time-varying effects in mvgam and R"------------------------------
-plot(beta_temp,
-  type = "l", lwd = 3,
-  bty = "l", xlab = "Time", ylab = "Coefficient",
+plot(
+  beta_temp,
+  type = "l",
+  lwd = 3,
+  bty = "l",
+  xlab = "Time",
+  ylab = "Coefficient",
   col = "darkred"
 )
 box(bty = "l", lwd = 2)
@@ -49,14 +49,15 @@ temp <- rnorm(N, sd = 1)
 
 
 ## ----fig.alt = "Simulating time-varying effects in mvgam and R"------------------------------
-out <- rnorm(N,
-  mean = 4 + beta_temp * temp,
-  sd = 0.25
-)
+out <- rnorm(N, mean = 4 + beta_temp * temp, sd = 0.25)
 time <- seq_along(temp)
-plot(out,
-  type = "l", lwd = 3,
-  bty = "l", xlab = "Time", ylab = "Outcome",
+plot(
+  out,
+  type = "l",
+  lwd = 3,
+  bty = "l",
+  xlab = "Time",
+  ylab = "Outcome",
   col = "darkred"
 )
 box(bty = "l", lwd = 2)
@@ -69,7 +70,8 @@ data_test <- data[191:200, ]
 
 
 ## ----include=FALSE---------------------------------------------------------------------------
-mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE, k = 40),
+mod <- mvgam(
+  out ~ dynamic(temp, rho = 8, stationary = TRUE, k = 40),
   family = gaussian(),
   data = data_train,
   silent = 2
@@ -82,7 +84,6 @@ mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE, k = 40),
 #   data = data_train,
 #   silent = 2
 # )
-
 
 ## --------------------------------------------------------------------------------------------
 summary(mod, include_betas = FALSE)
@@ -100,7 +101,8 @@ require(marginaleffects)
 range_round <- function(x) {
   round(range(x, na.rm = TRUE), 2)
 }
-plot_predictions(mod,
+plot_predictions(
+  mod,
   newdata = datagrid(
     time = unique,
     temp = range_round
@@ -116,7 +118,8 @@ plot(fc)
 
 
 ## ----include=FALSE---------------------------------------------------------------------------
-mod <- mvgam(out ~ dynamic(temp, k = 40),
+mod <- mvgam(
+  out ~ dynamic(temp, k = 40),
   family = gaussian(),
   data = data_train,
   silent = 2
@@ -129,7 +132,6 @@ mod <- mvgam(out ~ dynamic(temp, k = 40),
 #   data = data_train,
 #   silent = 2
 # )
-
 
 ## --------------------------------------------------------------------------------------------
 summary(mod, include_betas = FALSE)
@@ -190,7 +192,6 @@ mod0 <- mvgam(
 #   silent = 2
 # )
 
-
 ## --------------------------------------------------------------------------------------------
 summary(mod0)
 
@@ -224,7 +225,6 @@ mod1 <- mvgam(
 #   data = model_data,
 #   silent = 2
 # )
-
 
 ## --------------------------------------------------------------------------------------------
 summary(mod1, include_betas = FALSE)
@@ -270,7 +270,6 @@ lfo_mod1 <- lfo_cv(mod1, min_t = 30)
 # lfo_mod0 <- lfo_cv(mod0, min_t = 30)
 # lfo_mod1 <- lfo_cv(mod1, min_t = 30)
 
-
 ## --------------------------------------------------------------------------------------------
 sum(lfo_mod0$elpds)
 sum(lfo_mod1$elpds)
@@ -287,4 +286,3 @@ plot(
   bty = "l"
 )
 abline(h = 0, lty = "dashed")
-
