@@ -1,5 +1,5 @@
 params <-
-  list(EVAL = TRUE)
+list(EVAL = TRUE)
 
 ## ----echo = FALSE----------------------------------------------------------------------------
 knitr::opts_chunk$set(
@@ -27,8 +27,8 @@ theme_set(theme_bw(base_size = 12, base_family = "serif"))
 
 ## --------------------------------------------------------------------------------------------
 simdat <- sim_mvgam(
-  n_series = 4,
-  T = 24,
+  n_series = 4, 
+  T = 24, 
   prop_missing = 0.2
 )
 head(simdat$data_train, 16)
@@ -40,10 +40,8 @@ levels(simdat$data_train$series)
 
 
 ## --------------------------------------------------------------------------------------------
-all(
-  levels(simdat$data_train$series) %in%
-    unique(simdat$data_train$series)
-)
+all(levels(simdat$data_train$series) %in% 
+      unique(simdat$data_train$series))
 
 
 ## --------------------------------------------------------------------------------------------
@@ -65,19 +63,27 @@ summary(mgcv::gam(
 ## --------------------------------------------------------------------------------------------
 gauss_dat <- data.frame(
   outcome = rnorm(10),
-  series = factor("series1", levels = "series1"),
+  series = factor("series1",
+    levels = "series1"
+  ),
   time = 1:10
 )
 gauss_dat
 
 
 ## --------------------------------------------------------------------------------------------
-mgcv::gam(outcome ~ time, family = betar(), data = gauss_dat)
+mgcv::gam(outcome ~ time,
+  family = betar(),
+  data = gauss_dat
+)
 
 
 ## ----error=TRUE------------------------------------------------------------------------------
 try({
-  mvgam(outcome ~ time, family = betar(), data = gauss_dat)
+mvgam(outcome ~ time,
+  family = betar(),
+  data = gauss_dat
+)
 })
 
 
@@ -100,17 +106,13 @@ data.frame(
   time = simdat$data_train$time
 ) %>%
   dplyr::group_by(series) %>%
-  dplyr::summarise(
-    all_there = all_times_avail(
-      time,
-      min_time,
-      max_time
-    )
-  ) -> checked_times
+  dplyr::summarise(all_there = all_times_avail(
+    time,
+    min_time,
+    max_time
+  )) -> checked_times
 if (any(checked_times$all_there == FALSE)) {
-  warning(
-    "One or more series in is missing observations for one or more timepoints"
-  )
+  warning("One or more series in is missing observations for one or more timepoints")
 } else {
   cat("All series have observations at all timepoints :)")
 }
@@ -127,7 +129,10 @@ bad_times
 
 ## ----error = TRUE----------------------------------------------------------------------------
 try({
-  get_mvgam_priors(outcome ~ 1, data = bad_times, family = gaussian())
+get_mvgam_priors(outcome ~ 1,
+  data = bad_times,
+  family = gaussian()
+)
 })
 
 
@@ -138,7 +143,9 @@ bad_times %>%
       min(bad_times$time),
       max(bad_times$time)
     ),
-    series = factor(unique(bad_times$series), levels = levels(bad_times$series))
+    series = factor(unique(bad_times$series),
+      levels = levels(bad_times$series)
+    )
   )) %>%
   dplyr::arrange(time) -> good_times
 good_times
@@ -146,15 +153,17 @@ good_times
 
 ## ----error = TRUE----------------------------------------------------------------------------
 try({
-  get_mvgam_priors(outcome ~ 1, data = good_times, family = gaussian())
+get_mvgam_priors(outcome ~ 1,
+  data = good_times,
+  family = gaussian()
+)
 })
 
 
 ## --------------------------------------------------------------------------------------------
 bad_levels <- data.frame(
   time = 1:8,
-  series = factor(
-    "series_1",
+  series = factor("series_1",
     levels = c(
       "series_1",
       "series_2"
@@ -168,12 +177,16 @@ levels(bad_levels$series)
 
 ## ----error = TRUE----------------------------------------------------------------------------
 try({
-  get_mvgam_priors(outcome ~ 1, data = bad_levels, family = gaussian())
+get_mvgam_priors(outcome ~ 1,
+  data = bad_levels,
+  family = gaussian()
+)
 })
 
 
 ## --------------------------------------------------------------------------------------------
-setdiff(levels(bad_levels$series), unique(bad_levels$series))
+setdiff(levels(bad_levels$series), 
+        unique(bad_levels$series))
 
 
 ## --------------------------------------------------------------------------------------------
@@ -184,11 +197,11 @@ levels(good_levels$series)
 
 ## ----error = TRUE----------------------------------------------------------------------------
 try({
-  get_mvgam_priors(
-    outcome ~ 1,
-    data = good_levels,
-    family = gaussian()
-  )
+get_mvgam_priors(
+  outcome ~ 1,
+  data = good_levels,
+  family = gaussian()
+)
 })
 
 
@@ -196,7 +209,9 @@ try({
 miss_dat <- data.frame(
   outcome = rnorm(10),
   cov = c(NA, rnorm(9)),
-  series = factor("series1", levels = "series1"),
+  series = factor("series1",
+    levels = "series1"
+  ),
   time = 1:10
 )
 miss_dat
@@ -204,18 +219,20 @@ miss_dat
 
 ## ----error = TRUE----------------------------------------------------------------------------
 try({
-  get_mvgam_priors(
-    outcome ~ cov,
-    data = miss_dat,
-    family = gaussian()
-  )
+get_mvgam_priors(
+  outcome ~ cov,
+  data = miss_dat,
+  family = gaussian()
+)
 })
 
 
 ## --------------------------------------------------------------------------------------------
 miss_dat <- list(
   outcome = rnorm(10),
-  series = factor("series1", levels = "series1"),
+  series = factor("series1",
+    levels = "series1"
+  ),
   time = 1:10
 )
 miss_dat$cov <- matrix(rnorm(50), ncol = 5, nrow = 10)
@@ -224,11 +241,11 @@ miss_dat$cov[2, 3] <- NA
 
 ## ----error=TRUE------------------------------------------------------------------------------
 try({
-  get_mvgam_priors(
-    outcome ~ cov,
-    data = miss_dat,
-    family = gaussian()
-  )
+get_mvgam_priors(
+  outcome ~ cov,
+  data = miss_dat,
+  family = gaussian()
+)
 })
 
 
@@ -264,14 +281,10 @@ str(dplyr::ungroup(all_neon_tick_data))
 
 ## --------------------------------------------------------------------------------------------
 plotIDs <- c(
-  "SCBI_013",
-  "SCBI_002",
-  "SERC_001",
-  "SERC_005",
-  "SERC_006",
-  "SERC_012",
-  "BLAN_012",
-  "BLAN_005"
+  "SCBI_013", "SCBI_002",
+  "SERC_001", "SERC_005",
+  "SERC_006", "SERC_012",
+  "BLAN_012", "BLAN_005"
 )
 
 
@@ -295,11 +308,9 @@ model_dat %>%
   )) %>%
   # left_join back to original data so plotID and siteID will
   # match up, in case you need the siteID for anything else later on
-  dplyr::left_join(
-    all_neon_tick_data %>%
-      dplyr::select(siteID, plotID) %>%
-      dplyr::distinct()
-  ) -> model_dat
+  dplyr::left_join(all_neon_tick_data %>%
+    dplyr::select(siteID, plotID) %>%
+    dplyr::distinct()) -> model_dat
 
 
 ## --------------------------------------------------------------------------------------------
@@ -331,19 +342,18 @@ levels(model_dat$series)
 
 ## ----error=TRUE------------------------------------------------------------------------------
 try({
-  get_mvgam_priors(
-    y ~ 1,
-    data = model_dat,
-    family = poisson()
-  )
+get_mvgam_priors(
+  y ~ 1,
+  data = model_dat,
+  family = poisson()
+)
 })
 
 
 ## --------------------------------------------------------------------------------------------
 testmod <- mvgam(
-  y ~
-    s(epiWeek, by = series, bs = "cc") +
-      s(series, bs = "re"),
+  y ~ s(epiWeek, by = series, bs = "cc") +
+    s(series, bs = "re"),
   trend_model = AR(),
   data = model_dat,
   backend = "cmdstanr",
@@ -357,3 +367,4 @@ str(testmod$model_data)
 
 ## --------------------------------------------------------------------------------------------
 stancode(testmod)
+

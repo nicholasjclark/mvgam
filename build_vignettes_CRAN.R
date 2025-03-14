@@ -19,9 +19,18 @@ purl_vignettes <- function(x) {
 
 # Build vignette htmls
 build_vignettes = function(x) {
+
+
   # Build the vignette html file
   devtools::build_rmd(
     paste0('vignettes/', x)
+  )
+
+  # Copy the .Rmd to doc
+  file.copy(
+    from = paste0('vignettes/', x),
+    to = paste0('doc/', x),
+    overwrite = TRUE
   )
 
   # Copy the .Rmd to inst/doc
@@ -37,6 +46,16 @@ build_vignettes = function(x) {
     to = paste0('inst/doc/', sub('.Rmd', '.html', x)),
     overwrite = TRUE
   )
+
+  # Copy the .html to doc
+  file.copy(
+    from = sub('.Rmd', '.html', paste0('vignettes/', x)),
+    to = paste0('doc/', sub('.Rmd', '.html', x)),
+    overwrite = TRUE
+  )
+
+  # Remove the .html
+  file.remove(sub('.Rmd', '.html', paste0('vignettes/', x)))
 }
 
 # Apply these functions to all vignette .Rmds

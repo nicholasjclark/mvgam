@@ -12,7 +12,7 @@
 
 <meta name="author" content="Nicholas J Clark" />
 
-<meta name="date" content="2025-02-18" />
+<meta name="date" content="2025-03-14" />
 
 <title>Formatting data for use in mvgam</title>
 
@@ -51,7 +51,7 @@ overflow: visible;
 </style>
 <style type="text/css" data-origin="pandoc">
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -340,12 +340,12 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <h1 class="title toc-ignore">Formatting data for use in mvgam</h1>
 <h4 class="author">Nicholas J Clark</h4>
-<h4 class="date">2025-02-18</h4>
+<h4 class="date">2025-03-14</h4>
 
 
 <div id="TOC">
 <ul>
-<li><a href="#required-long-data-format" id="toc-required-long-data-format">Required <em>long</em> data
+<li><a href="#required-tidy-data-format" id="toc-required-tidy-data-format">Required <em>tidy</em> data
 format</a>
 <ul>
 <li><a href="#series-as-a-factor-variable" id="toc-series-as-a-factor-variable"><code>series</code> as a
@@ -366,6 +366,8 @@ intervals?</a></li>
 <code>plot_mvgam_series()</code></a></li>
 <li><a href="#example-with-neon-tick-data" id="toc-example-with-neon-tick-data">Example with NEON tick
 data</a></li>
+<li><a href="#further-reading" id="toc-further-reading">Further
+reading</a></li>
 <li><a href="#interested-in-contributing" id="toc-interested-in-contributing">Interested in contributing?</a></li>
 </ul>
 </div>
@@ -379,35 +381,40 @@ functionality, please see <a href="https://nicholasjclark.github.io/mvgam/articl
 introductory vignette</a> and <a href="https://www.youtube.com/playlist?list=PLzFHNoUxkCvsFIg6zqogylUfPpaxau_a3&amp;si=lyg7qUrMLbD-tHCB">the
 growing set of walk through video tutorials on <code>mvgam</code>
 applications</a>.</p>
-<div id="required-long-data-format" class="section level2">
-<h2>Required <em>long</em> data format</h2>
-<p>Manipulating the data into a ‘long’ format is necessary for modelling
-in <code>mvgam</code>. By ‘long’ format, we mean that each
-<code>series x time</code> observation needs to have its own entry in
-the <code>dataframe</code> or <code>list</code> object that we wish to
-pass as data for to the two primary modelling functions,
-<code>mvgam()</code> and <code>jsdgam()</code>. A simple example can be
-viewed by simulating data using the <code>sim_mvgam()</code> function.
-See <code>?sim_mvgam</code> for more details</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>simdat <span class="ot">&lt;-</span> <span class="fu">sim_mvgam</span>(<span class="at">n_series =</span> <span class="dv">4</span>, <span class="at">T =</span> <span class="dv">24</span>, <span class="at">prop_missing =</span> <span class="fl">0.2</span>)</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">head</span>(simdat<span class="sc">$</span>data_train, <span class="dv">16</span>)</span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="co">#&gt;    y season year   series time</span></span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="co">#&gt; 1  2      1    1 series_1    1</span></span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co">#&gt; 2  0      1    1 series_2    1</span></span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="co">#&gt; 3  2      1    1 series_3    1</span></span>
-<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="co">#&gt; 4  1      1    1 series_4    1</span></span>
-<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="co">#&gt; 5  2      2    1 series_1    2</span></span>
-<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a><span class="co">#&gt; 6  1      2    1 series_2    2</span></span>
-<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="co">#&gt; 7  1      2    1 series_3    2</span></span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="co">#&gt; 8  3      2    1 series_4    2</span></span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a><span class="co">#&gt; 9  2      3    1 series_1    3</span></span>
-<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a><span class="co">#&gt; 10 1      3    1 series_2    3</span></span>
-<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a><span class="co">#&gt; 11 4      3    1 series_3    3</span></span>
-<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a><span class="co">#&gt; 12 9      3    1 series_4    3</span></span>
-<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a><span class="co">#&gt; 13 3      4    1 series_1    4</span></span>
-<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a><span class="co">#&gt; 14 0      4    1 series_2    4</span></span>
-<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a><span class="co">#&gt; 15 1      4    1 series_3    4</span></span>
-<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a><span class="co">#&gt; 16 0      4    1 series_4    4</span></span></code></pre></div>
+<div id="required-tidy-data-format" class="section level2">
+<h2>Required <em>tidy</em> data format</h2>
+<p>Manipulating the data into a ‘long’ format (i.e. <em>tidy</em>
+format) is necessary for modelling in <code>mvgam</code>. By ‘long’
+format, we mean that each <code>series x time</code> observation needs
+to have its own entry in the <code>dataframe</code> or <code>list</code>
+object that we wish to pass as data for to the two primary modelling
+functions, <code>mvgam()</code> and <code>jsdgam()</code>. A simple
+example can be viewed by simulating data using the
+<code>sim_mvgam()</code> function. See <code>?sim_mvgam</code> for more
+details</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>simdat <span class="ot">&lt;-</span> <span class="fu">sim_mvgam</span>(</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>  <span class="at">n_series =</span> <span class="dv">4</span>, </span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>  <span class="at">T =</span> <span class="dv">24</span>, </span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>  <span class="at">prop_missing =</span> <span class="fl">0.2</span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>)</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="fu">head</span>(simdat<span class="sc">$</span>data_train, <span class="dv">16</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="co">#&gt;     y season year   series time</span></span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="co">#&gt; 1   1      1    1 series_1    1</span></span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a><span class="co">#&gt; 2   0      1    1 series_2    1</span></span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="co">#&gt; 3  NA      1    1 series_3    1</span></span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="co">#&gt; 4   0      1    1 series_4    1</span></span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a><span class="co">#&gt; 5   0      2    1 series_1    2</span></span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a><span class="co">#&gt; 6   0      2    1 series_2    2</span></span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a><span class="co">#&gt; 7   0      2    1 series_3    2</span></span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a><span class="co">#&gt; 8   0      2    1 series_4    2</span></span>
+<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a><span class="co">#&gt; 9   0      3    1 series_1    3</span></span>
+<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a><span class="co">#&gt; 10  0      3    1 series_2    3</span></span>
+<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a><span class="co">#&gt; 11  1      3    1 series_3    3</span></span>
+<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a><span class="co">#&gt; 12  0      3    1 series_4    3</span></span>
+<span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a><span class="co">#&gt; 13  2      4    1 series_1    4</span></span>
+<span id="cb1-21"><a href="#cb1-21" tabindex="-1"></a><span class="co">#&gt; 14 NA      4    1 series_2    4</span></span>
+<span id="cb1-22"><a href="#cb1-22" tabindex="-1"></a><span class="co">#&gt; 15  1      4    1 series_3    4</span></span>
+<span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a><span class="co">#&gt; 16 NA      4    1 series_4    4</span></span></code></pre></div>
 <div id="series-as-a-factor-variable" class="section level3">
 <h3><code>series</code> as a <code>factor</code> variable</h3>
 <p>Notice how we have four different time series in these simulated
@@ -423,8 +430,9 @@ properly in the underlying modelling functions. Several of the main
 workhorse functions in the package (including <code>mvgam()</code> and
 <code>get_mvgam_priors()</code>) will give an error if this is not the
 case, but it may be worth checking anyway:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">all</span>(<span class="fu">levels</span>(simdat<span class="sc">$</span>data_train<span class="sc">$</span>series) <span class="sc">%in%</span> <span class="fu">unique</span>(simdat<span class="sc">$</span>data_train<span class="sc">$</span>series))</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">all</span>(<span class="fu">levels</span>(simdat<span class="sc">$</span>data_train<span class="sc">$</span>series) <span class="sc">%in%</span> </span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>      <span class="fu">unique</span>(simdat<span class="sc">$</span>data_train<span class="sc">$</span>series))</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
 <p>Note that you can technically supply data that does not have a
 <code>series</code> indicator, and the package will generally assume
 that you are only using a single time series. There are exceptions to
@@ -448,65 +456,63 @@ requirement in <code>mvgam</code>, but it shouldn’t be too unfamiliar to
 other regression modelling packages out there. The advantage of this
 format is that it is now very easy to specify effects that vary among
 time series:</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">summary</span>(<span class="fu">glm</span>(y <span class="sc">~</span> series <span class="sc">+</span> time,</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>            <span class="at">data =</span> simdat<span class="sc">$</span>data_train,</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>            <span class="at">family =</span> <span class="fu">poisson</span>()))</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt; Call:</span></span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="co">#&gt; glm(formula = y ~ series + time, family = poisson(), data = simdat$data_train)</span></span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co">#&gt; Deviance Residuals: </span></span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co">#&gt;     Min       1Q   Median       3Q      Max  </span></span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co">#&gt; -2.4457  -1.3139  -0.8355   0.5083   3.6376  </span></span>
-<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co">#&gt; Coefficients:</span></span>
-<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a><span class="co">#&gt;                 Estimate Std. Error z value Pr(&gt;|z|)    </span></span>
-<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a><span class="co">#&gt; (Intercept)    -0.104157   0.313984  -0.332  0.74010    </span></span>
-<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="co">#&gt; seriesseries_2 -0.426706   0.443192  -0.963  0.33565    </span></span>
-<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a><span class="co">#&gt; seriesseries_3  0.861397   0.325431   2.647  0.00812 ** </span></span>
-<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a><span class="co">#&gt; seriesseries_4  1.213169   0.304677   3.982 6.84e-05 ***</span></span>
-<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a><span class="co">#&gt; time           -0.003373   0.019019  -0.177  0.85923    </span></span>
-<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
-<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">summary</span>(<span class="fu">glm</span>(</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  y <span class="sc">~</span> series <span class="sc">+</span> time,</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">data =</span> simdat<span class="sc">$</span>data_train,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">family =</span> <span class="fu">poisson</span>()</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>))</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="co">#&gt; Call:</span></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co">#&gt; glm(formula = y ~ series + time, family = poisson(), data = simdat$data_train)</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co">#&gt; Coefficients:</span></span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co">#&gt;                Estimate Std. Error z value Pr(&gt;|z|)  </span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co">#&gt; (Intercept)    -0.88484    0.43147  -2.051   0.0403 *</span></span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a><span class="co">#&gt; seriesseries_2  0.46760    0.42275   1.106   0.2687  </span></span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a><span class="co">#&gt; seriesseries_3  0.23701    0.44988   0.527   0.5983  </span></span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="co">#&gt; seriesseries_4  0.40418    0.42796   0.944   0.3449  </span></span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a><span class="co">#&gt; time            0.04151    0.02865   1.449   0.1473  </span></span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a><span class="co">#&gt; (Dispersion parameter for poisson family taken to be 1)</span></span>
 <span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a><span class="co">#&gt; (Dispersion parameter for poisson family taken to be 1)</span></span>
-<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a><span class="co">#&gt;     Null deviance: 162.38  on 59  degrees of freedom</span></span>
-<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a><span class="co">#&gt; Residual deviance: 127.67  on 55  degrees of freedom</span></span>
-<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a><span class="co">#&gt;   (12 observations deleted due to missingness)</span></span>
-<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a><span class="co">#&gt; AIC: 232.6</span></span>
-<span id="cb4-28"><a href="#cb4-28" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb4-29"><a href="#cb4-29" tabindex="-1"></a><span class="co">#&gt; Number of Fisher Scoring iterations: 5</span></span></code></pre></div>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">summary</span>(mgcv<span class="sc">::</span><span class="fu">gam</span>(y <span class="sc">~</span> series <span class="sc">+</span> <span class="fu">s</span>(time, <span class="at">by =</span> series),</span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>            <span class="at">data =</span> simdat<span class="sc">$</span>data_train,</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>            <span class="at">family =</span> <span class="fu">poisson</span>()))</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co">#&gt; Family: poisson </span></span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co">#&gt; Link function: log </span></span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; Formula:</span></span>
-<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co">#&gt; y ~ series + s(time, by = series)</span></span>
-<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="co">#&gt; Parametric coefficients:</span></span>
-<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co">#&gt;                Estimate Std. Error z value Pr(&gt;|z|)  </span></span>
-<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co">#&gt; (Intercept)     -0.3290     0.3259  -1.009   0.3128  </span></span>
-<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="co">#&gt; seriesseries_2  -1.2621     1.1866  -1.064   0.2875  </span></span>
-<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co">#&gt; seriesseries_3   0.7772     0.4135   1.880   0.0602 .</span></span>
-<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="co">#&gt; seriesseries_4   0.5114     0.4941   1.035   0.3007  </span></span>
-<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
-<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a><span class="co">#&gt;     Null deviance: 79.023  on 58  degrees of freedom</span></span>
+<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a><span class="co">#&gt; Residual deviance: 75.133  on 54  degrees of freedom</span></span>
+<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a><span class="co">#&gt;   (13 observations deleted due to missingness)</span></span>
+<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a><span class="co">#&gt; AIC: 155.11</span></span>
+<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a><span class="co">#&gt; Number of Fisher Scoring iterations: 6</span></span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">summary</span>(mgcv<span class="sc">::</span><span class="fu">gam</span>(</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  y <span class="sc">~</span> series <span class="sc">+</span> <span class="fu">s</span>(time, <span class="at">by =</span> series),</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">data =</span> simdat<span class="sc">$</span>data_train,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">family =</span> <span class="fu">poisson</span>()</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>))</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co">#&gt; Family: poisson </span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; Link function: log </span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt; Formula:</span></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="co">#&gt; y ~ series + s(time, by = series)</span></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co">#&gt; Parametric coefficients:</span></span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="co">#&gt;                Estimate Std. Error z value Pr(&gt;|z|)</span></span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co">#&gt; (Intercept)     -0.5400     0.3465  -1.558    0.119</span></span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="co">#&gt; seriesseries_2   0.2529     0.4828   0.524    0.600</span></span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="co">#&gt; seriesseries_3   0.2963     0.4600   0.644    0.519</span></span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="co">#&gt; seriesseries_4   0.2388     0.4769   0.501    0.617</span></span>
 <span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="co">#&gt; </span></span>
 <span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a><span class="co">#&gt; Approximate significance of smooth terms:</span></span>
 <span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a><span class="co">#&gt;                          edf Ref.df Chi.sq p-value  </span></span>
-<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a><span class="co">#&gt; s(time):seriesseries_1 1.401  1.699  4.082  0.0619 .</span></span>
-<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="co">#&gt; s(time):seriesseries_2 5.765  6.657  4.869  0.6531  </span></span>
-<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a><span class="co">#&gt; s(time):seriesseries_3 7.680  8.481 15.297  0.0664 .</span></span>
-<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a><span class="co">#&gt; s(time):seriesseries_4 8.366  8.860 21.543  0.0128 *</span></span>
+<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a><span class="co">#&gt; s(time):seriesseries_1 1.000  1.000  0.166  0.6834  </span></span>
+<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="co">#&gt; s(time):seriesseries_2 1.294  1.531  6.063  0.0429 *</span></span>
+<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a><span class="co">#&gt; s(time):seriesseries_3 1.000  1.000  0.018  0.8923  </span></span>
+<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a><span class="co">#&gt; s(time):seriesseries_4 2.337  2.946  5.615  0.1285  </span></span>
 <span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
 <span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span>
 <span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a><span class="co">#&gt; R-sq.(adj) =  0.545   Deviance explained = 67.2%</span></span>
-<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a><span class="co">#&gt; UBRE = 0.79379  Scale est. = 1         n = 60</span></span></code></pre></div>
+<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a><span class="co">#&gt; R-sq.(adj) =  0.0916   Deviance explained = 22.3%</span></span>
+<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a><span class="co">#&gt; UBRE = 0.36673  Scale est. = 1         n = 59</span></span></code></pre></div>
 <p>Depending on the observation families you plan to use when building
 models, there may be some restrictions that need to be satisfied within
 the outcome variable. For example, a Beta regression can only handle
@@ -522,43 +528,48 @@ allowed. For example, we can simulate data from a zero-centred Gaussian
 distribution (ensuring that some of our values will be
 <code>&lt; 1</code>) and attempt a Beta regression in <code>mvgam</code>
 using the <code>betar</code> family:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>gauss_dat <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">outcome =</span> <span class="fu">rnorm</span>(<span class="dv">10</span>),</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>                        <span class="at">series =</span> <span class="fu">factor</span>(<span class="st">&#39;series1&#39;</span>,</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>                                        <span class="at">levels =</span> <span class="st">&#39;series1&#39;</span>),</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>                        <span class="at">time =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>)</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>gauss_dat</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="co">#&gt;       outcome  series time</span></span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="co">#&gt; 1  -0.7936265 series1    1</span></span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="co">#&gt; 2  -0.6781223 series1    2</span></span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="co">#&gt; 3   0.6835725 series1    3</span></span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="co">#&gt; 4   0.6362029 series1    4</span></span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="co">#&gt; 5   0.2567292 series1    5</span></span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="co">#&gt; 6   0.5799488 series1    6</span></span>
-<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="co">#&gt; 7  -0.5743933 series1    7</span></span>
-<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a><span class="co">#&gt; 8   0.2109827 series1    8</span></span>
-<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a><span class="co">#&gt; 9   1.3670083 series1    9</span></span>
-<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a><span class="co">#&gt; 10  1.3281568 series1   10</span></span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>gauss_dat <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="at">outcome =</span> <span class="fu">rnorm</span>(<span class="dv">10</span>),</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">series =</span> <span class="fu">factor</span>(<span class="st">&quot;series1&quot;</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>    <span class="at">levels =</span> <span class="st">&quot;series1&quot;</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  ),</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">time =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span></span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>)</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>gauss_dat</span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="co">#&gt;       outcome  series time</span></span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="co">#&gt; 1  -1.3118865 series1    1</span></span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="co">#&gt; 2   1.2438997 series1    2</span></span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="co">#&gt; 3   0.0677111 series1    3</span></span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="co">#&gt; 4   0.9289780 series1    4</span></span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a><span class="co">#&gt; 5  -0.1655907 series1    5</span></span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a><span class="co">#&gt; 6  -0.3463894 series1    6</span></span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a><span class="co">#&gt; 7   1.9459625 series1    7</span></span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a><span class="co">#&gt; 8  -0.8785205 series1    8</span></span>
+<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a><span class="co">#&gt; 9   1.6375181 series1    9</span></span>
+<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a><span class="co">#&gt; 10 -0.4529390 series1   10</span></span></code></pre></div>
 <p>A call to <code>gam()</code> using the <code>mgcv</code> package
 leads to a model that actually fits (though it does give an unhelpful
 warning message):</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>mgcv<span class="sc">::</span><span class="fu">gam</span>(outcome <span class="sc">~</span> time,</span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>    <span class="at">family =</span> <span class="fu">betar</span>(),</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>    <span class="at">data =</span> gauss_dat)</span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">#&gt; Family: Beta regression(0.219) </span></span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="co">#&gt; Link function: logit </span></span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co">#&gt; Formula:</span></span>
-<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="co">#&gt; outcome ~ time</span></span>
-<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="co">#&gt; Total model degrees of freedom 2 </span></span>
-<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="co">#&gt; REML score: -122.0893</span></span></code></pre></div>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  <span class="at">family =</span> <span class="fu">betar</span>(),</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">data =</span> gauss_dat</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>)</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="co">#&gt; Family: Beta regression(0.08) </span></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="co">#&gt; Link function: logit </span></span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="co">#&gt; Formula:</span></span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="co">#&gt; outcome ~ time</span></span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="co">#&gt; Total model degrees of freedom 2 </span></span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a><span class="co">#&gt; REML score: -206.9263</span></span></code></pre></div>
 <p>But the same call to <code>mvgam()</code> gives us something more
 useful:</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">mvgam</span>(outcome <span class="sc">~</span> time,</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>      <span class="at">family =</span> <span class="fu">betar</span>(),</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>      <span class="at">data =</span> gauss_dat)</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co">#&gt; Error: Values &lt;= 0 not allowed for beta responses</span></span></code></pre></div>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  <span class="at">family =</span> <span class="fu">betar</span>(),</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="at">data =</span> gauss_dat</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>)</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="co">#&gt; Error: Values &lt;= 0 not allowed for beta responses</span></span></code></pre></div>
 <p>Please see <code>?mvgam_families</code> for more information on the
 types of responses that the package can handle and their
 restrictions</p>
@@ -581,28 +592,34 @@ is useful to ensure you have no missing timepoint x series combinations
 in your data. You can generally do this with a simple <code>dplyr</code>
 call:</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># A function to ensure all timepoints within a sequence are identical</span></span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>all_times_avail <span class="ot">=</span> <span class="cf">function</span>(time, min_time, max_time){</span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>    <span class="fu">identical</span>(<span class="fu">as.numeric</span>(<span class="fu">sort</span>(time)),</span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>              <span class="fu">as.numeric</span>(<span class="fu">seq.int</span>(<span class="at">from =</span> min_time, <span class="at">to =</span> max_time)))</span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>}</span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a></span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="co"># Get min and max times from the data</span></span>
-<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>min_time <span class="ot">&lt;-</span> <span class="fu">min</span>(simdat<span class="sc">$</span>data_train<span class="sc">$</span>time)</span>
-<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>max_time <span class="ot">&lt;-</span> <span class="fu">max</span>(simdat<span class="sc">$</span>data_train<span class="sc">$</span>time)</span>
-<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a></span>
-<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a><span class="co"># Check that all times are recorded for each series</span></span>
-<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a><span class="fu">data.frame</span>(<span class="at">series =</span> simdat<span class="sc">$</span>data_train<span class="sc">$</span>series,</span>
-<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a>           <span class="at">time =</span> simdat<span class="sc">$</span>data_train<span class="sc">$</span>time) <span class="sc">%&gt;%</span></span>
-<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">group_by</span>(series) <span class="sc">%&gt;%</span></span>
-<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">summarise</span>(<span class="at">all_there =</span> <span class="fu">all_times_avail</span>(time,</span>
-<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a>                                                 min_time,</span>
-<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a>                                                 max_time)) <span class="ot">-&gt;</span> checked_times</span>
-<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a><span class="cf">if</span>(<span class="fu">any</span>(checked_times<span class="sc">$</span>all_there <span class="sc">==</span> <span class="cn">FALSE</span>)){</span>
-<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a>  <span class="fu">warning</span>(<span class="st">&quot;One or more series in is missing observations for one or more timepoints&quot;</span>)</span>
-<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a>} <span class="cf">else</span> {</span>
-<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="st">&#39;All series have observations at all timepoints :)&#39;</span>)</span>
-<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a>}</span>
-<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a><span class="co">#&gt; All series have observations at all timepoints :)</span></span></code></pre></div>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>all_times_avail <span class="ot">&lt;-</span> <span class="cf">function</span>(time, min_time, max_time) {</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>  <span class="fu">identical</span>(</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>    <span class="fu">as.numeric</span>(<span class="fu">sort</span>(time)),</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>    <span class="fu">as.numeric</span>(<span class="fu">seq.int</span>(<span class="at">from =</span> min_time, <span class="at">to =</span> max_time))</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>  )</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>}</span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a><span class="co"># Get min and max times from the data</span></span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>min_time <span class="ot">&lt;-</span> <span class="fu">min</span>(simdat<span class="sc">$</span>data_train<span class="sc">$</span>time)</span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a>max_time <span class="ot">&lt;-</span> <span class="fu">max</span>(simdat<span class="sc">$</span>data_train<span class="sc">$</span>time)</span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a></span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a><span class="co"># Check that all times are recorded for each series</span></span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a><span class="fu">data.frame</span>(</span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a>  <span class="at">series =</span> simdat<span class="sc">$</span>data_train<span class="sc">$</span>series,</span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a>  <span class="at">time =</span> simdat<span class="sc">$</span>data_train<span class="sc">$</span>time</span>
+<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(series) <span class="sc">%&gt;%</span></span>
+<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">summarise</span>(<span class="at">all_there =</span> <span class="fu">all_times_avail</span>(</span>
+<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a>    time,</span>
+<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a>    min_time,</span>
+<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a>    max_time</span>
+<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a>  )) <span class="ot">-&gt;</span> checked_times</span>
+<span id="cb9-24"><a href="#cb9-24" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">any</span>(checked_times<span class="sc">$</span>all_there <span class="sc">==</span> <span class="cn">FALSE</span>)) {</span>
+<span id="cb9-25"><a href="#cb9-25" tabindex="-1"></a>  <span class="fu">warning</span>(<span class="st">&quot;One or more series in is missing observations for one or more timepoints&quot;</span>)</span>
+<span id="cb9-26"><a href="#cb9-26" tabindex="-1"></a>} <span class="cf">else</span> {</span>
+<span id="cb9-27"><a href="#cb9-27" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="st">&quot;All series have observations at all timepoints :)&quot;</span>)</span>
+<span id="cb9-28"><a href="#cb9-28" tabindex="-1"></a>}</span>
+<span id="cb9-29"><a href="#cb9-29" tabindex="-1"></a><span class="co">#&gt; All series have observations at all timepoints :)</span></span></code></pre></div>
 <p>Note that models which use dynamic components will assume that
 smaller values of <code>time</code> are <em>older</em>
 (i.e. <code>time = 1</code> came <em>before</em> <code>time = 2</code>,
@@ -640,111 +657,129 @@ above (to check factor levels and timepoint x series combinations) with
 a single call to <code>get_mvgam_priors()</code>. Here we first simulate
 some data in which some of the timepoints in the <code>time</code>
 variable are not included in the data:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>bad_times <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">time =</span> <span class="fu">seq</span>(<span class="dv">1</span>, <span class="dv">16</span>, <span class="at">by =</span> <span class="dv">2</span>),</span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>                        <span class="at">series =</span> <span class="fu">factor</span>(<span class="st">&#39;series_1&#39;</span>),</span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>                        <span class="at">outcome =</span> <span class="fu">rnorm</span>(<span class="dv">8</span>))</span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>bad_times</span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="co">#&gt;   time   series    outcome</span></span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a><span class="co">#&gt; 1    1 series_1 -1.1192835</span></span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a><span class="co">#&gt; 2    3 series_1  1.3268590</span></span>
-<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="co">#&gt; 3    5 series_1  0.4156365</span></span>
-<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a><span class="co">#&gt; 4    7 series_1  0.7627381</span></span>
-<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a><span class="co">#&gt; 5    9 series_1 -0.2638690</span></span>
-<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a><span class="co">#&gt; 6   11 series_1 -0.7854078</span></span>
-<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a><span class="co">#&gt; 7   13 series_1  1.5077429</span></span>
-<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a><span class="co">#&gt; 8   15 series_1 -0.1963748</span></span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>bad_times <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  <span class="at">time =</span> <span class="fu">seq</span>(<span class="dv">1</span>, <span class="dv">16</span>, <span class="at">by =</span> <span class="dv">2</span>),</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="at">series =</span> <span class="fu">factor</span>(<span class="st">&quot;series_1&quot;</span>),</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  <span class="at">outcome =</span> <span class="fu">rnorm</span>(<span class="dv">8</span>)</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>)</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>bad_times</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a><span class="co">#&gt;   time   series     outcome</span></span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="co">#&gt; 1    1 series_1 -0.34136647</span></span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a><span class="co">#&gt; 2    3 series_1  0.91462991</span></span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a><span class="co">#&gt; 3    5 series_1 -1.19635373</span></span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a><span class="co">#&gt; 4    7 series_1  0.05270635</span></span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a><span class="co">#&gt; 5    9 series_1 -0.05586121</span></span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a><span class="co">#&gt; 6   11 series_1  1.22344733</span></span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a><span class="co">#&gt; 7   13 series_1 -0.14425579</span></span>
+<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a><span class="co">#&gt; 8   15 series_1 -0.32964559</span></span></code></pre></div>
 <p>Next we call <code>get_mvgam_priors()</code> by simply specifying an
 intercept-only model, which is enough to trigger all the checks:</p>
 <div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">get_mvgam_priors</span>(outcome <span class="sc">~</span> <span class="dv">1</span>,</span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>                 <span class="at">data =</span> bad_times,</span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>                 <span class="at">family =</span> <span class="fu">gaussian</span>())</span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co">#&gt; Error: One or more series in data is missing observations for one or more timepoints</span></span></code></pre></div>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  <span class="at">data =</span> bad_times,</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="at">family =</span> <span class="fu">gaussian</span>()</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>)</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="co">#&gt; Error: One or more series in data is missing observations for one or more timepoints</span></span></code></pre></div>
 <p>This error is useful as it tells us where the problem is. There are
 many ways to fill in missing timepoints, so the correct way will have to
 be left up to the user. But if you don’t have any covariates, it should
 be pretty easy using <code>expand.grid()</code>:</p>
 <div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>bad_times <span class="sc">%&gt;%</span></span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">right_join</span>(<span class="fu">expand.grid</span>(<span class="at">time =</span> <span class="fu">seq</span>(<span class="fu">min</span>(bad_times<span class="sc">$</span>time),</span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>                                           <span class="fu">max</span>(bad_times<span class="sc">$</span>time)),</span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>                                <span class="at">series =</span> <span class="fu">factor</span>(<span class="fu">unique</span>(bad_times<span class="sc">$</span>series),</span>
-<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>                                                <span class="at">levels =</span> <span class="fu">levels</span>(bad_times<span class="sc">$</span>series)))) <span class="sc">%&gt;%</span></span>
-<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(time) <span class="ot">-&gt;</span> good_times</span>
-<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>good_times</span>
-<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a><span class="co">#&gt;    time   series    outcome</span></span>
-<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a><span class="co">#&gt; 1     1 series_1 -1.1192835</span></span>
-<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a><span class="co">#&gt; 2     2 series_1         NA</span></span>
-<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a><span class="co">#&gt; 3     3 series_1  1.3268590</span></span>
-<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a><span class="co">#&gt; 4     4 series_1         NA</span></span>
-<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a><span class="co">#&gt; 5     5 series_1  0.4156365</span></span>
-<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a><span class="co">#&gt; 6     6 series_1         NA</span></span>
-<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a><span class="co">#&gt; 7     7 series_1  0.7627381</span></span>
-<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a><span class="co">#&gt; 8     8 series_1         NA</span></span>
-<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a><span class="co">#&gt; 9     9 series_1 -0.2638690</span></span>
-<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a><span class="co">#&gt; 10   10 series_1         NA</span></span>
-<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a><span class="co">#&gt; 11   11 series_1 -0.7854078</span></span>
-<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a><span class="co">#&gt; 12   12 series_1         NA</span></span>
-<span id="cb12-21"><a href="#cb12-21" tabindex="-1"></a><span class="co">#&gt; 13   13 series_1  1.5077429</span></span>
-<span id="cb12-22"><a href="#cb12-22" tabindex="-1"></a><span class="co">#&gt; 14   14 series_1         NA</span></span>
-<span id="cb12-23"><a href="#cb12-23" tabindex="-1"></a><span class="co">#&gt; 15   15 series_1 -0.1963748</span></span></code></pre></div>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">right_join</span>(<span class="fu">expand.grid</span>(</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>    <span class="at">time =</span> <span class="fu">seq</span>(</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>      <span class="fu">min</span>(bad_times<span class="sc">$</span>time),</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>      <span class="fu">max</span>(bad_times<span class="sc">$</span>time)</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>    ),</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>    <span class="at">series =</span> <span class="fu">factor</span>(<span class="fu">unique</span>(bad_times<span class="sc">$</span>series),</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>      <span class="at">levels =</span> <span class="fu">levels</span>(bad_times<span class="sc">$</span>series)</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>    )</span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>  )) <span class="sc">%&gt;%</span></span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(time) <span class="ot">-&gt;</span> good_times</span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>good_times</span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a><span class="co">#&gt;    time   series     outcome</span></span>
+<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a><span class="co">#&gt; 1     1 series_1 -0.34136647</span></span>
+<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a><span class="co">#&gt; 2     2 series_1          NA</span></span>
+<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a><span class="co">#&gt; 3     3 series_1  0.91462991</span></span>
+<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a><span class="co">#&gt; 4     4 series_1          NA</span></span>
+<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a><span class="co">#&gt; 5     5 series_1 -1.19635373</span></span>
+<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a><span class="co">#&gt; 6     6 series_1          NA</span></span>
+<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a><span class="co">#&gt; 7     7 series_1  0.05270635</span></span>
+<span id="cb12-21"><a href="#cb12-21" tabindex="-1"></a><span class="co">#&gt; 8     8 series_1          NA</span></span>
+<span id="cb12-22"><a href="#cb12-22" tabindex="-1"></a><span class="co">#&gt; 9     9 series_1 -0.05586121</span></span>
+<span id="cb12-23"><a href="#cb12-23" tabindex="-1"></a><span class="co">#&gt; 10   10 series_1          NA</span></span>
+<span id="cb12-24"><a href="#cb12-24" tabindex="-1"></a><span class="co">#&gt; 11   11 series_1  1.22344733</span></span>
+<span id="cb12-25"><a href="#cb12-25" tabindex="-1"></a><span class="co">#&gt; 12   12 series_1          NA</span></span>
+<span id="cb12-26"><a href="#cb12-26" tabindex="-1"></a><span class="co">#&gt; 13   13 series_1 -0.14425579</span></span>
+<span id="cb12-27"><a href="#cb12-27" tabindex="-1"></a><span class="co">#&gt; 14   14 series_1          NA</span></span>
+<span id="cb12-28"><a href="#cb12-28" tabindex="-1"></a><span class="co">#&gt; 15   15 series_1 -0.32964559</span></span></code></pre></div>
 <p>Now the call to <code>get_mvgam_priors()</code>, using our filled in
 data, should work:</p>
 <div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">get_mvgam_priors</span>(outcome <span class="sc">~</span> <span class="dv">1</span>,</span>
-<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>                 <span class="at">data =</span> good_times,</span>
-<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>                 <span class="at">family =</span> <span class="fu">gaussian</span>())</span>
-<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co">#&gt;                             param_name param_length           param_info</span></span>
-<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
-<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a><span class="co">#&gt; 2 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
-<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a><span class="co">#&gt;                                   prior                   example_change</span></span>
-<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a><span class="co">#&gt; 1 (Intercept) ~ student_t(3, 0.1, 2.5);      (Intercept) ~ normal(0, 1);</span></span>
-<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a><span class="co">#&gt; 2     sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(-0.99, 0.33);</span></span>
-<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
-<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a><span class="co">#&gt; 1             NA             NA</span></span>
-<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a><span class="co">#&gt; 2             NA             NA</span></span></code></pre></div>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>  <span class="at">data =</span> good_times,</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>  <span class="at">family =</span> <span class="fu">gaussian</span>()</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>)</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a><span class="co">#&gt;                             param_name param_length           param_info</span></span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a><span class="co">#&gt; 2 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a><span class="co">#&gt;                                    prior                  example_change</span></span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a><span class="co">#&gt; 1 (Intercept) ~ student_t(3, -0.1, 2.5);     (Intercept) ~ normal(0, 1);</span></span>
+<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a><span class="co">#&gt; 2   sigma_obs ~ inv_gamma(1.418, 0.452); sigma_obs ~ normal(0.22, 0.69);</span></span>
+<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
+<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a><span class="co">#&gt; 1             NA             NA</span></span>
+<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a><span class="co">#&gt; 2             NA             NA</span></span></code></pre></div>
 <p>This function should also pick up on misaligned factor levels for the
 <code>series</code> variable. We can check this by again simulating,
 this time adding an additional factor level that is not included in the
 data:</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>bad_levels <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">time =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">8</span>,</span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>                        <span class="at">series =</span> <span class="fu">factor</span>(<span class="st">&#39;series_1&#39;</span>,</span>
-<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>                                        <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">&#39;series_1&#39;</span>,</span>
-<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>                                                   <span class="st">&#39;series_2&#39;</span>)),</span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>                        <span class="at">outcome =</span> <span class="fu">rnorm</span>(<span class="dv">8</span>))</span>
-<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a></span>
-<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a><span class="fu">levels</span>(bad_levels<span class="sc">$</span>series)</span>
-<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a><span class="co">#&gt; [1] &quot;series_1&quot; &quot;series_2&quot;</span></span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>bad_levels <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>  <span class="at">time =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">8</span>,</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>  <span class="at">series =</span> <span class="fu">factor</span>(<span class="st">&quot;series_1&quot;</span>,</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>    <span class="at">levels =</span> <span class="fu">c</span>(</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>      <span class="st">&quot;series_1&quot;</span>,</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>      <span class="st">&quot;series_2&quot;</span></span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>    )</span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a>  ),</span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a>  <span class="at">outcome =</span> <span class="fu">rnorm</span>(<span class="dv">8</span>)</span>
+<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a>)</span>
+<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a></span>
+<span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a><span class="fu">levels</span>(bad_levels<span class="sc">$</span>series)</span>
+<span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a><span class="co">#&gt; [1] &quot;series_1&quot; &quot;series_2&quot;</span></span></code></pre></div>
 <p>Another call to <code>get_mvgam_priors()</code> brings up a useful
 error:</p>
 <div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="fu">get_mvgam_priors</span>(outcome <span class="sc">~</span> <span class="dv">1</span>,</span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>                 <span class="at">data =</span> bad_levels,</span>
-<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>                 <span class="at">family =</span> <span class="fu">gaussian</span>())</span>
-<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="co">#&gt; Error: Mismatch between factor levels of &quot;series&quot; and unique values of &quot;series&quot;</span></span>
-<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a><span class="co">#&gt; Use</span></span>
-<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a><span class="co">#&gt;   `setdiff(levels(data$series), unique(data$series))` </span></span>
-<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a><span class="co">#&gt; and</span></span>
-<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a><span class="co">#&gt;   `intersect(levels(data$series), unique(data$series))`</span></span>
-<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a><span class="co">#&gt; for guidance</span></span></code></pre></div>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>  <span class="at">data =</span> bad_levels,</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>  <span class="at">family =</span> <span class="fu">gaussian</span>()</span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>)</span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a><span class="co">#&gt; Error: Mismatch between factor levels of &quot;series&quot; and unique values of &quot;series&quot;</span></span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a><span class="co">#&gt; Use</span></span>
+<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a><span class="co">#&gt;   `setdiff(levels(data$series), unique(data$series))` </span></span>
+<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a><span class="co">#&gt; and</span></span>
+<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a><span class="co">#&gt;   `intersect(levels(data$series), unique(data$series))`</span></span>
+<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a><span class="co">#&gt; for guidance</span></span></code></pre></div>
 <p>Following the message’s advice tells us there is a level for
 <code>series_2</code> in the <code>series</code> variable, but there are
 no observations for this series in the data:</p>
-<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">setdiff</span>(<span class="fu">levels</span>(bad_levels<span class="sc">$</span>series), <span class="fu">unique</span>(bad_levels<span class="sc">$</span>series))</span>
-<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;series_2&quot;</span></span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">setdiff</span>(<span class="fu">levels</span>(bad_levels<span class="sc">$</span>series), </span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>        <span class="fu">unique</span>(bad_levels<span class="sc">$</span>series))</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;series_2&quot;</span></span></code></pre></div>
 <p>Re-assigning the levels fixes the issue:</p>
 <div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>bad_levels <span class="sc">%&gt;%</span></span>
 <span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">series =</span> <span class="fu">droplevels</span>(series)) <span class="ot">-&gt;</span> good_levels</span>
 <span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a><span class="fu">levels</span>(good_levels<span class="sc">$</span>series)</span>
 <span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a><span class="co">#&gt; [1] &quot;series_1&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="fu">get_mvgam_priors</span>(outcome <span class="sc">~</span> <span class="dv">1</span>,</span>
-<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>                 <span class="at">data =</span> good_levels,</span>
-<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>                 <span class="at">family =</span> <span class="fu">gaussian</span>())</span>
-<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a><span class="co">#&gt;                             param_name param_length           param_info</span></span>
-<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
-<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a><span class="co">#&gt; 2 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
-<span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a><span class="co">#&gt;                                    prior                   example_change</span></span>
-<span id="cb18-8"><a href="#cb18-8" tabindex="-1"></a><span class="co">#&gt; 1 (Intercept) ~ student_t(3, -0.1, 2.5);      (Intercept) ~ normal(0, 1);</span></span>
-<span id="cb18-9"><a href="#cb18-9" tabindex="-1"></a><span class="co">#&gt; 2      sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(-0.92, 0.85);</span></span>
-<span id="cb18-10"><a href="#cb18-10" tabindex="-1"></a><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
-<span id="cb18-11"><a href="#cb18-11" tabindex="-1"></a><span class="co">#&gt; 1             NA             NA</span></span>
-<span id="cb18-12"><a href="#cb18-12" tabindex="-1"></a><span class="co">#&gt; 2             NA             NA</span></span></code></pre></div>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="fu">get_mvgam_priors</span>(</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>  outcome <span class="sc">~</span> <span class="dv">1</span>,</span>
+<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>  <span class="at">data =</span> good_levels,</span>
+<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a>  <span class="at">family =</span> <span class="fu">gaussian</span>()</span>
+<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a>)</span>
+<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a><span class="co">#&gt;                             param_name param_length           param_info</span></span>
+<span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
+<span id="cb18-8"><a href="#cb18-8" tabindex="-1"></a><span class="co">#&gt; 2 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
+<span id="cb18-9"><a href="#cb18-9" tabindex="-1"></a><span class="co">#&gt;                                  prior                  example_change</span></span>
+<span id="cb18-10"><a href="#cb18-10" tabindex="-1"></a><span class="co">#&gt; 1  (Intercept) ~ student_t(3, 0, 2.5);     (Intercept) ~ normal(0, 1);</span></span>
+<span id="cb18-11"><a href="#cb18-11" tabindex="-1"></a><span class="co">#&gt; 2 sigma_obs ~ inv_gamma(1.418, 0.452); sigma_obs ~ normal(-0.85, 0.6);</span></span>
+<span id="cb18-12"><a href="#cb18-12" tabindex="-1"></a><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
+<span id="cb18-13"><a href="#cb18-13" tabindex="-1"></a><span class="co">#&gt; 1             NA             NA</span></span>
+<span id="cb18-14"><a href="#cb18-14" tabindex="-1"></a><span class="co">#&gt; 2             NA             NA</span></span></code></pre></div>
 <div id="covariates-with-no-nas" class="section level3">
 <h3>Covariates with no <code>NA</code>s</h3>
 <p>Covariates can be used in models just as you would when using
@@ -756,78 +791,88 @@ which is not helpful when debugging. Both the <code>mvgam()</code> and
 <code>get_mvgam_priors()</code> functions will run some simple checks
 for you, and hopefully will return useful errors if it finds in missing
 values:</p>
-<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>miss_dat <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">outcome =</span> <span class="fu">rnorm</span>(<span class="dv">10</span>),</span>
-<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>                       <span class="at">cov =</span> <span class="fu">c</span>(<span class="cn">NA</span>, <span class="fu">rnorm</span>(<span class="dv">9</span>)),</span>
-<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a>                       <span class="at">series =</span> <span class="fu">factor</span>(<span class="st">&#39;series1&#39;</span>,</span>
-<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a>                                       <span class="at">levels =</span> <span class="st">&#39;series1&#39;</span>),</span>
-<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a>                       <span class="at">time =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>)</span>
-<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a>miss_dat</span>
-<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a><span class="co">#&gt;       outcome        cov  series time</span></span>
-<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a><span class="co">#&gt; 1   1.5223125         NA series1    1</span></span>
-<span id="cb19-9"><a href="#cb19-9" tabindex="-1"></a><span class="co">#&gt; 2   1.0505400  0.6372743 series1    2</span></span>
-<span id="cb19-10"><a href="#cb19-10" tabindex="-1"></a><span class="co">#&gt; 3   1.0331035 -2.3831539 series1    3</span></span>
-<span id="cb19-11"><a href="#cb19-11" tabindex="-1"></a><span class="co">#&gt; 4  -0.3285665  0.1748325 series1    4</span></span>
-<span id="cb19-12"><a href="#cb19-12" tabindex="-1"></a><span class="co">#&gt; 5   1.2195748  1.1212681 series1    5</span></span>
-<span id="cb19-13"><a href="#cb19-13" tabindex="-1"></a><span class="co">#&gt; 6  -0.7720849 -1.8671000 series1    6</span></span>
-<span id="cb19-14"><a href="#cb19-14" tabindex="-1"></a><span class="co">#&gt; 7   0.1041740  0.2380126 series1    7</span></span>
-<span id="cb19-15"><a href="#cb19-15" tabindex="-1"></a><span class="co">#&gt; 8  -0.2014380 -0.5176756 series1    8</span></span>
-<span id="cb19-16"><a href="#cb19-16" tabindex="-1"></a><span class="co">#&gt; 9   0.9022995  0.8860855 series1    9</span></span>
-<span id="cb19-17"><a href="#cb19-17" tabindex="-1"></a><span class="co">#&gt; 10  2.3669162 -0.3099857 series1   10</span></span></code></pre></div>
-<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a><span class="fu">get_mvgam_priors</span>(outcome <span class="sc">~</span> cov,</span>
-<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>                 <span class="at">data =</span> miss_dat,</span>
-<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>                 <span class="at">family =</span> <span class="fu">gaussian</span>())</span>
-<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a><span class="co">#&gt;                             param_name param_length           param_info</span></span>
-<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
-<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a><span class="co">#&gt; 2                                  cov            1     cov fixed effect</span></span>
-<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a><span class="co">#&gt; 3 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
-<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a><span class="co">#&gt;                                 prior                   example_change</span></span>
-<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a><span class="co">#&gt; 1 (Intercept) ~ student_t(3, 1, 2.5);      (Intercept) ~ normal(0, 1);</span></span>
-<span id="cb20-10"><a href="#cb20-10" tabindex="-1"></a><span class="co">#&gt; 2           cov ~ student_t(3, 0, 2);              cov ~ normal(0, 1);</span></span>
-<span id="cb20-11"><a href="#cb20-11" tabindex="-1"></a><span class="co">#&gt; 3   sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(-0.61, 0.19);</span></span>
-<span id="cb20-12"><a href="#cb20-12" tabindex="-1"></a><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
-<span id="cb20-13"><a href="#cb20-13" tabindex="-1"></a><span class="co">#&gt; 1             NA             NA</span></span>
-<span id="cb20-14"><a href="#cb20-14" tabindex="-1"></a><span class="co">#&gt; 2             NA             NA</span></span>
-<span id="cb20-15"><a href="#cb20-15" tabindex="-1"></a><span class="co">#&gt; 3             NA             NA</span></span></code></pre></div>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>miss_dat <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>  <span class="at">outcome =</span> <span class="fu">rnorm</span>(<span class="dv">10</span>),</span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a>  <span class="at">cov =</span> <span class="fu">c</span>(<span class="cn">NA</span>, <span class="fu">rnorm</span>(<span class="dv">9</span>)),</span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a>  <span class="at">series =</span> <span class="fu">factor</span>(<span class="st">&quot;series1&quot;</span>,</span>
+<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a>    <span class="at">levels =</span> <span class="st">&quot;series1&quot;</span></span>
+<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a>  ),</span>
+<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a>  <span class="at">time =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span></span>
+<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a>)</span>
+<span id="cb19-9"><a href="#cb19-9" tabindex="-1"></a>miss_dat</span>
+<span id="cb19-10"><a href="#cb19-10" tabindex="-1"></a><span class="co">#&gt;       outcome        cov  series time</span></span>
+<span id="cb19-11"><a href="#cb19-11" tabindex="-1"></a><span class="co">#&gt; 1   0.6932572         NA series1    1</span></span>
+<span id="cb19-12"><a href="#cb19-12" tabindex="-1"></a><span class="co">#&gt; 2   0.2439107  0.5637476 series1    2</span></span>
+<span id="cb19-13"><a href="#cb19-13" tabindex="-1"></a><span class="co">#&gt; 3   0.2023784 -1.7441241 series1    3</span></span>
+<span id="cb19-14"><a href="#cb19-14" tabindex="-1"></a><span class="co">#&gt; 4   2.0214616 -0.8088920 series1    4</span></span>
+<span id="cb19-15"><a href="#cb19-15" tabindex="-1"></a><span class="co">#&gt; 5   0.2373302 -1.1971944 series1    5</span></span>
+<span id="cb19-16"><a href="#cb19-16" tabindex="-1"></a><span class="co">#&gt; 6  -0.6387349 -1.9779087 series1    6</span></span>
+<span id="cb19-17"><a href="#cb19-17" tabindex="-1"></a><span class="co">#&gt; 7  -0.3811196 -1.4809676 series1    7</span></span>
+<span id="cb19-18"><a href="#cb19-18" tabindex="-1"></a><span class="co">#&gt; 8   2.5308185 -0.4013272 series1    8</span></span>
+<span id="cb19-19"><a href="#cb19-19" tabindex="-1"></a><span class="co">#&gt; 9   2.1037136 -0.4598667 series1    9</span></span>
+<span id="cb19-20"><a href="#cb19-20" tabindex="-1"></a><span class="co">#&gt; 10 -0.5123787  0.1100437 series1   10</span></span></code></pre></div>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a><span class="fu">get_mvgam_priors</span>(</span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>  outcome <span class="sc">~</span> cov,</span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>  <span class="at">data =</span> miss_dat,</span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a>  <span class="at">family =</span> <span class="fu">gaussian</span>()</span>
+<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>)</span>
+<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a><span class="co">#&gt;                             param_name param_length           param_info</span></span>
+<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
+<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a><span class="co">#&gt; 2                                  cov            1     cov fixed effect</span></span>
+<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a><span class="co">#&gt; 3 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
+<span id="cb20-10"><a href="#cb20-10" tabindex="-1"></a><span class="co">#&gt;                                   prior                  example_change</span></span>
+<span id="cb20-11"><a href="#cb20-11" tabindex="-1"></a><span class="co">#&gt; 1 (Intercept) ~ student_t(3, 0.2, 2.5);     (Intercept) ~ normal(0, 1);</span></span>
+<span id="cb20-12"><a href="#cb20-12" tabindex="-1"></a><span class="co">#&gt; 2             cov ~ student_t(3, 0, 2);             cov ~ normal(0, 1);</span></span>
+<span id="cb20-13"><a href="#cb20-13" tabindex="-1"></a><span class="co">#&gt; 3  sigma_obs ~ inv_gamma(1.418, 0.452); sigma_obs ~ normal(0.71, 0.55);</span></span>
+<span id="cb20-14"><a href="#cb20-14" tabindex="-1"></a><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
+<span id="cb20-15"><a href="#cb20-15" tabindex="-1"></a><span class="co">#&gt; 1             NA             NA</span></span>
+<span id="cb20-16"><a href="#cb20-16" tabindex="-1"></a><span class="co">#&gt; 2             NA             NA</span></span>
+<span id="cb20-17"><a href="#cb20-17" tabindex="-1"></a><span class="co">#&gt; 3             NA             NA</span></span></code></pre></div>
 <p>Just like with the <code>mgcv</code> package, <code>mvgam</code> can
 also accept data as a <code>list</code> object. This is useful if you
 want to set up <a href="https://rdrr.io/cran/mgcv/man/linear.functional.terms.html">linear
 functional predictors</a> or even distributed lag predictors. The checks
 run by <code>mvgam</code> should still work on these data. Here we
 change the <code>cov</code> predictor to be a <code>matrix</code>:</p>
-<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>miss_dat <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">outcome =</span> <span class="fu">rnorm</span>(<span class="dv">10</span>),</span>
-<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>                 <span class="at">series =</span> <span class="fu">factor</span>(<span class="st">&#39;series1&#39;</span>,</span>
-<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a>                                 <span class="at">levels =</span> <span class="st">&#39;series1&#39;</span>),</span>
-<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a>                 <span class="at">time =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>)</span>
-<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a>miss_dat<span class="sc">$</span>cov <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(<span class="dv">50</span>), <span class="at">ncol =</span> <span class="dv">5</span>, <span class="at">nrow =</span> <span class="dv">10</span>)</span>
-<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a>miss_dat<span class="sc">$</span>cov[<span class="dv">2</span>,<span class="dv">3</span>] <span class="ot">&lt;-</span> <span class="cn">NA</span></span></code></pre></div>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>miss_dat <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>  <span class="at">outcome =</span> <span class="fu">rnorm</span>(<span class="dv">10</span>),</span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a>  <span class="at">series =</span> <span class="fu">factor</span>(<span class="st">&quot;series1&quot;</span>,</span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a>    <span class="at">levels =</span> <span class="st">&quot;series1&quot;</span></span>
+<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a>  ),</span>
+<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a>  <span class="at">time =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span></span>
+<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a>)</span>
+<span id="cb21-8"><a href="#cb21-8" tabindex="-1"></a>miss_dat<span class="sc">$</span>cov <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(<span class="dv">50</span>), <span class="at">ncol =</span> <span class="dv">5</span>, <span class="at">nrow =</span> <span class="dv">10</span>)</span>
+<span id="cb21-9"><a href="#cb21-9" tabindex="-1"></a>miss_dat<span class="sc">$</span>cov[<span class="dv">2</span>, <span class="dv">3</span>] <span class="ot">&lt;-</span> <span class="cn">NA</span></span></code></pre></div>
 <p>A call to <code>get_mvgam_priors()</code> returns the same error:</p>
-<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a><span class="fu">get_mvgam_priors</span>(outcome <span class="sc">~</span> cov,</span>
-<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>                 <span class="at">data =</span> miss_dat,</span>
-<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>                 <span class="at">family =</span> <span class="fu">gaussian</span>())</span>
-<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a><span class="co">#&gt;                             param_name param_length           param_info</span></span>
-<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
-<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a><span class="co">#&gt; 2                                 cov1            1    cov1 fixed effect</span></span>
-<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a><span class="co">#&gt; 3                                 cov2            1    cov2 fixed effect</span></span>
-<span id="cb22-8"><a href="#cb22-8" tabindex="-1"></a><span class="co">#&gt; 4                                 cov3            1    cov3 fixed effect</span></span>
-<span id="cb22-9"><a href="#cb22-9" tabindex="-1"></a><span class="co">#&gt; 5                                 cov4            1    cov4 fixed effect</span></span>
-<span id="cb22-10"><a href="#cb22-10" tabindex="-1"></a><span class="co">#&gt; 6                                 cov5            1    cov5 fixed effect</span></span>
-<span id="cb22-11"><a href="#cb22-11" tabindex="-1"></a><span class="co">#&gt; 7 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
-<span id="cb22-12"><a href="#cb22-12" tabindex="-1"></a><span class="co">#&gt;                                    prior                  example_change</span></span>
-<span id="cb22-13"><a href="#cb22-13" tabindex="-1"></a><span class="co">#&gt; 1 (Intercept) ~ student_t(3, -0.2, 2.5);     (Intercept) ~ normal(0, 1);</span></span>
-<span id="cb22-14"><a href="#cb22-14" tabindex="-1"></a><span class="co">#&gt; 2             cov1 ~ student_t(3, 0, 2);            cov1 ~ normal(0, 1);</span></span>
-<span id="cb22-15"><a href="#cb22-15" tabindex="-1"></a><span class="co">#&gt; 3             cov2 ~ student_t(3, 0, 2);            cov2 ~ normal(0, 1);</span></span>
-<span id="cb22-16"><a href="#cb22-16" tabindex="-1"></a><span class="co">#&gt; 4             cov3 ~ student_t(3, 0, 2);            cov3 ~ normal(0, 1);</span></span>
-<span id="cb22-17"><a href="#cb22-17" tabindex="-1"></a><span class="co">#&gt; 5             cov4 ~ student_t(3, 0, 2);            cov4 ~ normal(0, 1);</span></span>
-<span id="cb22-18"><a href="#cb22-18" tabindex="-1"></a><span class="co">#&gt; 6             cov5 ~ student_t(3, 0, 2);            cov5 ~ normal(0, 1);</span></span>
-<span id="cb22-19"><a href="#cb22-19" tabindex="-1"></a><span class="co">#&gt; 7      sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(0.08, 0.73);</span></span>
-<span id="cb22-20"><a href="#cb22-20" tabindex="-1"></a><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
-<span id="cb22-21"><a href="#cb22-21" tabindex="-1"></a><span class="co">#&gt; 1             NA             NA</span></span>
-<span id="cb22-22"><a href="#cb22-22" tabindex="-1"></a><span class="co">#&gt; 2             NA             NA</span></span>
-<span id="cb22-23"><a href="#cb22-23" tabindex="-1"></a><span class="co">#&gt; 3             NA             NA</span></span>
-<span id="cb22-24"><a href="#cb22-24" tabindex="-1"></a><span class="co">#&gt; 4             NA             NA</span></span>
-<span id="cb22-25"><a href="#cb22-25" tabindex="-1"></a><span class="co">#&gt; 5             NA             NA</span></span>
-<span id="cb22-26"><a href="#cb22-26" tabindex="-1"></a><span class="co">#&gt; 6             NA             NA</span></span>
-<span id="cb22-27"><a href="#cb22-27" tabindex="-1"></a><span class="co">#&gt; 7             NA             NA</span></span></code></pre></div>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a><span class="fu">get_mvgam_priors</span>(</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>  outcome <span class="sc">~</span> cov,</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>  <span class="at">data =</span> miss_dat,</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>  <span class="at">family =</span> <span class="fu">gaussian</span>()</span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a>)</span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a><span class="co">#&gt;                             param_name param_length           param_info</span></span>
+<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
+<span id="cb22-8"><a href="#cb22-8" tabindex="-1"></a><span class="co">#&gt; 2                                 cov1            1    cov1 fixed effect</span></span>
+<span id="cb22-9"><a href="#cb22-9" tabindex="-1"></a><span class="co">#&gt; 3                                 cov2            1    cov2 fixed effect</span></span>
+<span id="cb22-10"><a href="#cb22-10" tabindex="-1"></a><span class="co">#&gt; 4                                 cov3            1    cov3 fixed effect</span></span>
+<span id="cb22-11"><a href="#cb22-11" tabindex="-1"></a><span class="co">#&gt; 5                                 cov4            1    cov4 fixed effect</span></span>
+<span id="cb22-12"><a href="#cb22-12" tabindex="-1"></a><span class="co">#&gt; 6                                 cov5            1    cov5 fixed effect</span></span>
+<span id="cb22-13"><a href="#cb22-13" tabindex="-1"></a><span class="co">#&gt; 7 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
+<span id="cb22-14"><a href="#cb22-14" tabindex="-1"></a><span class="co">#&gt;                                    prior                   example_change</span></span>
+<span id="cb22-15"><a href="#cb22-15" tabindex="-1"></a><span class="co">#&gt; 1 (Intercept) ~ student_t(3, -0.2, 2.5);      (Intercept) ~ normal(0, 1);</span></span>
+<span id="cb22-16"><a href="#cb22-16" tabindex="-1"></a><span class="co">#&gt; 2             cov1 ~ student_t(3, 0, 2);             cov1 ~ normal(0, 1);</span></span>
+<span id="cb22-17"><a href="#cb22-17" tabindex="-1"></a><span class="co">#&gt; 3             cov2 ~ student_t(3, 0, 2);             cov2 ~ normal(0, 1);</span></span>
+<span id="cb22-18"><a href="#cb22-18" tabindex="-1"></a><span class="co">#&gt; 4             cov3 ~ student_t(3, 0, 2);             cov3 ~ normal(0, 1);</span></span>
+<span id="cb22-19"><a href="#cb22-19" tabindex="-1"></a><span class="co">#&gt; 5             cov4 ~ student_t(3, 0, 2);             cov4 ~ normal(0, 1);</span></span>
+<span id="cb22-20"><a href="#cb22-20" tabindex="-1"></a><span class="co">#&gt; 6             cov5 ~ student_t(3, 0, 2);             cov5 ~ normal(0, 1);</span></span>
+<span id="cb22-21"><a href="#cb22-21" tabindex="-1"></a><span class="co">#&gt; 7   sigma_obs ~ inv_gamma(1.418, 0.452); sigma_obs ~ normal(-0.52, 0.62);</span></span>
+<span id="cb22-22"><a href="#cb22-22" tabindex="-1"></a><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
+<span id="cb22-23"><a href="#cb22-23" tabindex="-1"></a><span class="co">#&gt; 1             NA             NA</span></span>
+<span id="cb22-24"><a href="#cb22-24" tabindex="-1"></a><span class="co">#&gt; 2             NA             NA</span></span>
+<span id="cb22-25"><a href="#cb22-25" tabindex="-1"></a><span class="co">#&gt; 3             NA             NA</span></span>
+<span id="cb22-26"><a href="#cb22-26" tabindex="-1"></a><span class="co">#&gt; 4             NA             NA</span></span>
+<span id="cb22-27"><a href="#cb22-27" tabindex="-1"></a><span class="co">#&gt; 5             NA             NA</span></span>
+<span id="cb22-28"><a href="#cb22-28" tabindex="-1"></a><span class="co">#&gt; 6             NA             NA</span></span>
+<span id="cb22-29"><a href="#cb22-29" tabindex="-1"></a><span class="co">#&gt; 7             NA             NA</span></span></code></pre></div>
 </div>
 </div>
 <div id="plotting-with-plot_mvgam_series" class="section level2">
@@ -840,23 +885,29 @@ take supplied data and plot either a series of line plots (if you choose
 distribution for a single time series. For example, to plot all of the
 time series in our data, and highlight a single series in each plot, we
 can use:</p>
-<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a><span class="fu">plot_mvgam_series</span>(<span class="at">data =</span> simdat<span class="sc">$</span>data_train, </span>
-<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a>                  <span class="at">y =</span> <span class="st">&#39;y&#39;</span>, </span>
-<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a>                  <span class="at">series =</span> <span class="st">&#39;all&#39;</span>)</span></code></pre></div>
-<p><img src="data:image/png;base64,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" alt="Plotting time series features for GAM models in mvgam" width="60%" style="display: block; margin: auto;" /></p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a><span class="fu">plot_mvgam_series</span>(</span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a>  <span class="at">data =</span> simdat<span class="sc">$</span>data_train,</span>
+<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a>  <span class="at">y =</span> <span class="st">&quot;y&quot;</span>,</span>
+<span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a>  <span class="at">series =</span> <span class="st">&quot;all&quot;</span></span>
+<span id="cb23-5"><a href="#cb23-5" tabindex="-1"></a>)</span></code></pre></div>
+<p><img src="data:image/png;base64,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" alt="Plotting time series features for GAM models in mvgam" width="60%" style="display: block; margin: auto;" /></p>
 <p>Or we can look more closely at the distribution for the first time
 series:</p>
-<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a><span class="fu">plot_mvgam_series</span>(<span class="at">data =</span> simdat<span class="sc">$</span>data_train, </span>
-<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>                  <span class="at">y =</span> <span class="st">&#39;y&#39;</span>, </span>
-<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a>                  <span class="at">series =</span> <span class="dv">1</span>)</span></code></pre></div>
-<p><img src="data:image/png;base64,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" alt="Plotting time series features for GAM models in mvgam" width="60%" style="display: block; margin: auto;" /></p>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a><span class="fu">plot_mvgam_series</span>(</span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>  <span class="at">data =</span> simdat<span class="sc">$</span>data_train,</span>
+<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a>  <span class="at">y =</span> <span class="st">&quot;y&quot;</span>,</span>
+<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a>  <span class="at">series =</span> <span class="dv">1</span></span>
+<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a>)</span></code></pre></div>
+<p><img src="data:image/png;base64,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" alt="Plotting time series features for GAM models in mvgam" width="60%" style="display: block; margin: auto;" /></p>
 <p>If you have split your data into training and testing folds (i.e. for
 forecast evaluation), you can include the test data in your plots:</p>
-<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a><span class="fu">plot_mvgam_series</span>(<span class="at">data =</span> simdat<span class="sc">$</span>data_train,</span>
-<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a>                  <span class="at">newdata =</span> simdat<span class="sc">$</span>data_test,</span>
-<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a>                  <span class="at">y =</span> <span class="st">&#39;y&#39;</span>, </span>
-<span id="cb25-4"><a href="#cb25-4" tabindex="-1"></a>                  <span class="at">series =</span> <span class="dv">1</span>)</span></code></pre></div>
-<p><img src="data:image/png;base64,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" alt="Plotting time series features for GAM models in mvgam" width="60%" style="display: block; margin: auto;" /></p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a><span class="fu">plot_mvgam_series</span>(</span>
+<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a>  <span class="at">data =</span> simdat<span class="sc">$</span>data_train,</span>
+<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a>  <span class="at">newdata =</span> simdat<span class="sc">$</span>data_test,</span>
+<span id="cb25-4"><a href="#cb25-4" tabindex="-1"></a>  <span class="at">y =</span> <span class="st">&quot;y&quot;</span>,</span>
+<span id="cb25-5"><a href="#cb25-5" tabindex="-1"></a>  <span class="at">series =</span> <span class="dv">1</span></span>
+<span id="cb25-6"><a href="#cb25-6" tabindex="-1"></a>)</span></code></pre></div>
+<p><img src="data:image/png;base64,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" alt="Plotting time series features for GAM models in mvgam" width="60%" style="display: block; margin: auto;" /></p>
 </div>
 <div id="example-with-neon-tick-data" class="section level2">
 <h2>Example with NEON tick data</h2>
@@ -913,10 +964,12 @@ data using the call <code>?all_neon_tick_data</code></p>
 <p>For this exercise, we will use the <code>epiWeek</code> variable as
 an index of seasonality, and we will only work with observations from a
 few sampling plots (labelled in the <code>plotID</code> column):</p>
-<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a>plotIDs <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&#39;SCBI_013&#39;</span>,<span class="st">&#39;SCBI_002&#39;</span>,</span>
-<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a>             <span class="st">&#39;SERC_001&#39;</span>,<span class="st">&#39;SERC_005&#39;</span>,</span>
-<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a>             <span class="st">&#39;SERC_006&#39;</span>,<span class="st">&#39;SERC_012&#39;</span>,</span>
-<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a>             <span class="st">&#39;BLAN_012&#39;</span>,<span class="st">&#39;BLAN_005&#39;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a>plotIDs <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a>  <span class="st">&quot;SCBI_013&quot;</span>, <span class="st">&quot;SCBI_002&quot;</span>,</span>
+<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a>  <span class="st">&quot;SERC_001&quot;</span>, <span class="st">&quot;SERC_005&quot;</span>,</span>
+<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a>  <span class="st">&quot;SERC_006&quot;</span>, <span class="st">&quot;SERC_012&quot;</span>,</span>
+<span id="cb27-5"><a href="#cb27-5" tabindex="-1"></a>  <span class="st">&quot;BLAN_012&quot;</span>, <span class="st">&quot;BLAN_005&quot;</span></span>
+<span id="cb27-6"><a href="#cb27-6" tabindex="-1"></a>)</span></code></pre></div>
 <p>Now we can select the target species we want (<em>I.
 scapularis</em>), filter to the correct plot IDs and convert the
 <code>epiWeek</code> variable from <code>character</code> to
@@ -934,26 +987,31 @@ are many particular weeks in which observations are not included in the
 data. But we can use <code>expand.grid()</code> again to take care of
 this:</p>
 <div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a>model_dat <span class="sc">%&gt;%</span></span>
-<span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a>  <span class="co"># Create all possible combos of plotID, Year and epiWeek; </span></span>
+<span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a>  <span class="co"># Create all possible combos of plotID, Year and epiWeek;</span></span>
 <span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a>  <span class="co"># missing outcomes will be filled in as NA</span></span>
-<span id="cb29-4"><a href="#cb29-4" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">full_join</span>(<span class="fu">expand.grid</span>(<span class="at">plotID =</span> <span class="fu">unique</span>(model_dat<span class="sc">$</span>plotID),</span>
-<span id="cb29-5"><a href="#cb29-5" tabindex="-1"></a>                               <span class="at">Year =</span> <span class="fu">unique</span>(model_dat<span class="sc">$</span>Year),</span>
-<span id="cb29-6"><a href="#cb29-6" tabindex="-1"></a>                               <span class="at">epiWeek =</span> <span class="fu">seq</span>(<span class="dv">1</span>, <span class="dv">52</span>))) <span class="sc">%&gt;%</span></span>
-<span id="cb29-7"><a href="#cb29-7" tabindex="-1"></a>  </span>
-<span id="cb29-8"><a href="#cb29-8" tabindex="-1"></a>  <span class="co"># left_join back to original data so plotID and siteID will</span></span>
-<span id="cb29-9"><a href="#cb29-9" tabindex="-1"></a>  <span class="co"># match up, in case you need the siteID for anything else later on</span></span>
-<span id="cb29-10"><a href="#cb29-10" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(all_neon_tick_data <span class="sc">%&gt;%</span></span>
-<span id="cb29-11"><a href="#cb29-11" tabindex="-1"></a>                     dplyr<span class="sc">::</span><span class="fu">select</span>(siteID, plotID) <span class="sc">%&gt;%</span></span>
-<span id="cb29-12"><a href="#cb29-12" tabindex="-1"></a>                     dplyr<span class="sc">::</span><span class="fu">distinct</span>()) <span class="ot">-&gt;</span> model_dat</span></code></pre></div>
+<span id="cb29-4"><a href="#cb29-4" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">full_join</span>(<span class="fu">expand.grid</span>(</span>
+<span id="cb29-5"><a href="#cb29-5" tabindex="-1"></a>    <span class="at">plotID =</span> <span class="fu">unique</span>(model_dat<span class="sc">$</span>plotID),</span>
+<span id="cb29-6"><a href="#cb29-6" tabindex="-1"></a>    <span class="at">Year =</span> <span class="fu">unique</span>(model_dat<span class="sc">$</span>Year),</span>
+<span id="cb29-7"><a href="#cb29-7" tabindex="-1"></a>    <span class="at">epiWeek =</span> <span class="fu">seq</span>(<span class="dv">1</span>, <span class="dv">52</span>)</span>
+<span id="cb29-8"><a href="#cb29-8" tabindex="-1"></a>  )) <span class="sc">%&gt;%</span></span>
+<span id="cb29-9"><a href="#cb29-9" tabindex="-1"></a>  <span class="co"># left_join back to original data so plotID and siteID will</span></span>
+<span id="cb29-10"><a href="#cb29-10" tabindex="-1"></a>  <span class="co"># match up, in case you need the siteID for anything else later on</span></span>
+<span id="cb29-11"><a href="#cb29-11" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(all_neon_tick_data <span class="sc">%&gt;%</span></span>
+<span id="cb29-12"><a href="#cb29-12" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(siteID, plotID) <span class="sc">%&gt;%</span></span>
+<span id="cb29-13"><a href="#cb29-13" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">distinct</span>()) <span class="ot">-&gt;</span> model_dat</span></code></pre></div>
 <p>Create the <code>series</code> variable needed for <code>mvgam</code>
 modelling:</p>
 <div class="sourceCode" id="cb30"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" tabindex="-1"></a>model_dat <span class="sc">%&gt;%</span></span>
-<span id="cb30-2"><a href="#cb30-2" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">series =</span> plotID,</span>
-<span id="cb30-3"><a href="#cb30-3" tabindex="-1"></a>                <span class="at">y =</span> target) <span class="sc">%&gt;%</span></span>
-<span id="cb30-4"><a href="#cb30-4" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">siteID =</span> <span class="fu">factor</span>(siteID),</span>
-<span id="cb30-5"><a href="#cb30-5" tabindex="-1"></a>                <span class="at">series =</span> <span class="fu">factor</span>(series)) <span class="sc">%&gt;%</span></span>
-<span id="cb30-6"><a href="#cb30-6" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>target, <span class="sc">-</span>plotID) <span class="sc">%&gt;%</span></span>
-<span id="cb30-7"><a href="#cb30-7" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(Year, epiWeek, series) <span class="ot">-&gt;</span> model_dat </span></code></pre></div>
+<span id="cb30-2"><a href="#cb30-2" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb30-3"><a href="#cb30-3" tabindex="-1"></a>    <span class="at">series =</span> plotID,</span>
+<span id="cb30-4"><a href="#cb30-4" tabindex="-1"></a>    <span class="at">y =</span> target</span>
+<span id="cb30-5"><a href="#cb30-5" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb30-6"><a href="#cb30-6" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb30-7"><a href="#cb30-7" tabindex="-1"></a>    <span class="at">siteID =</span> <span class="fu">factor</span>(siteID),</span>
+<span id="cb30-8"><a href="#cb30-8" tabindex="-1"></a>    <span class="at">series =</span> <span class="fu">factor</span>(series)</span>
+<span id="cb30-9"><a href="#cb30-9" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb30-10"><a href="#cb30-10" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>target, <span class="sc">-</span>plotID) <span class="sc">%&gt;%</span></span>
+<span id="cb30-11"><a href="#cb30-11" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(Year, epiWeek, series) <span class="ot">-&gt;</span> model_dat</span></code></pre></div>
 <p>Now create the <code>time</code> variable, which needs to track
 <code>Year</code> and <code>epiWeek</code> for each unique series. The
 <code>n</code> function from <code>dplyr</code> is often useful if
@@ -970,13 +1028,15 @@ generating a <code>time</code> index for grouped dataframes:</p>
 <span id="cb32-3"><a href="#cb32-3" tabindex="-1"></a><span class="co">#&gt; [8] &quot;SERC_012&quot;</span></span></code></pre></div>
 <p>This looks good, as does a more rigorous check using
 <code>get_mvgam_priors()</code>:</p>
-<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" tabindex="-1"></a><span class="fu">get_mvgam_priors</span>(y <span class="sc">~</span> <span class="dv">1</span>,</span>
-<span id="cb33-2"><a href="#cb33-2" tabindex="-1"></a>                 <span class="at">data =</span> model_dat,</span>
-<span id="cb33-3"><a href="#cb33-3" tabindex="-1"></a>                 <span class="at">family =</span> <span class="fu">poisson</span>())</span>
-<span id="cb33-4"><a href="#cb33-4" tabindex="-1"></a><span class="co">#&gt;    param_name param_length  param_info                                  prior</span></span>
-<span id="cb33-5"><a href="#cb33-5" tabindex="-1"></a><span class="co">#&gt; 1 (Intercept)            1 (Intercept) (Intercept) ~ student_t(3, -2.3, 2.5);</span></span>
-<span id="cb33-6"><a href="#cb33-6" tabindex="-1"></a><span class="co">#&gt;                example_change new_lowerbound new_upperbound</span></span>
-<span id="cb33-7"><a href="#cb33-7" tabindex="-1"></a><span class="co">#&gt; 1 (Intercept) ~ normal(0, 1);             NA             NA</span></span></code></pre></div>
+<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" tabindex="-1"></a><span class="fu">get_mvgam_priors</span>(</span>
+<span id="cb33-2"><a href="#cb33-2" tabindex="-1"></a>  y <span class="sc">~</span> <span class="dv">1</span>,</span>
+<span id="cb33-3"><a href="#cb33-3" tabindex="-1"></a>  <span class="at">data =</span> model_dat,</span>
+<span id="cb33-4"><a href="#cb33-4" tabindex="-1"></a>  <span class="at">family =</span> <span class="fu">poisson</span>()</span>
+<span id="cb33-5"><a href="#cb33-5" tabindex="-1"></a>)</span>
+<span id="cb33-6"><a href="#cb33-6" tabindex="-1"></a><span class="co">#&gt;    param_name param_length  param_info                                  prior</span></span>
+<span id="cb33-7"><a href="#cb33-7" tabindex="-1"></a><span class="co">#&gt; 1 (Intercept)            1 (Intercept) (Intercept) ~ student_t(3, -2.3, 2.5);</span></span>
+<span id="cb33-8"><a href="#cb33-8" tabindex="-1"></a><span class="co">#&gt;                example_change new_lowerbound new_upperbound</span></span>
+<span id="cb33-9"><a href="#cb33-9" tabindex="-1"></a><span class="co">#&gt; 1 (Intercept) ~ normal(0, 1);             NA             NA</span></span></code></pre></div>
 <p>We can also set up a model in <code>mvgam()</code> but use
 <code>run_model = FALSE</code> to further ensure all of the necessary
 steps for creating the modelling code and objects will run. It is
@@ -985,12 +1045,14 @@ as the auto-formatting options available in this package are very useful
 for checking the package-generated <code>Stan</code> code for any
 inefficiencies that can be fixed to lead to sampling performance
 improvements:</p>
-<div class="sourceCode" id="cb34"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" tabindex="-1"></a>testmod <span class="ot">&lt;-</span> <span class="fu">mvgam</span>(y <span class="sc">~</span> <span class="fu">s</span>(epiWeek, <span class="at">by =</span> series, <span class="at">bs =</span> <span class="st">&#39;cc&#39;</span>) <span class="sc">+</span></span>
-<span id="cb34-2"><a href="#cb34-2" tabindex="-1"></a>                   <span class="fu">s</span>(series, <span class="at">bs =</span> <span class="st">&#39;re&#39;</span>),</span>
-<span id="cb34-3"><a href="#cb34-3" tabindex="-1"></a>                 <span class="at">trend_model =</span> <span class="st">&#39;AR1&#39;</span>,</span>
-<span id="cb34-4"><a href="#cb34-4" tabindex="-1"></a>                 <span class="at">data =</span> model_dat,</span>
-<span id="cb34-5"><a href="#cb34-5" tabindex="-1"></a>                 <span class="at">backend =</span> <span class="st">&#39;cmdstanr&#39;</span>,</span>
-<span id="cb34-6"><a href="#cb34-6" tabindex="-1"></a>                 <span class="at">run_model =</span> <span class="cn">FALSE</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb34"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" tabindex="-1"></a>testmod <span class="ot">&lt;-</span> <span class="fu">mvgam</span>(</span>
+<span id="cb34-2"><a href="#cb34-2" tabindex="-1"></a>  y <span class="sc">~</span> <span class="fu">s</span>(epiWeek, <span class="at">by =</span> series, <span class="at">bs =</span> <span class="st">&quot;cc&quot;</span>) <span class="sc">+</span></span>
+<span id="cb34-3"><a href="#cb34-3" tabindex="-1"></a>    <span class="fu">s</span>(series, <span class="at">bs =</span> <span class="st">&quot;re&quot;</span>),</span>
+<span id="cb34-4"><a href="#cb34-4" tabindex="-1"></a>  <span class="at">trend_model =</span> <span class="fu">AR</span>(),</span>
+<span id="cb34-5"><a href="#cb34-5" tabindex="-1"></a>  <span class="at">data =</span> model_dat,</span>
+<span id="cb34-6"><a href="#cb34-6" tabindex="-1"></a>  <span class="at">backend =</span> <span class="st">&quot;cmdstanr&quot;</span>,</span>
+<span id="cb34-7"><a href="#cb34-7" tabindex="-1"></a>  <span class="at">run_model =</span> <span class="cn">FALSE</span></span>
+<span id="cb34-8"><a href="#cb34-8" tabindex="-1"></a>)</span></code></pre></div>
 <p>This call runs without issue, and the resulting object now contains
 the model code and data objects that are needed to initiate
 sampling:</p>
@@ -1013,7 +1075,7 @@ sampling:</p>
 <span id="cb35-17"><a href="#cb35-17" tabindex="-1"></a><span class="co">#&gt;  $ S8          : num [1:8, 1:8] 1.037 -0.416 0.419 0.117 0.188 ...</span></span>
 <span id="cb35-18"><a href="#cb35-18" tabindex="-1"></a><span class="co">#&gt;  $ p_coefs     : Named num 0</span></span>
 <span id="cb35-19"><a href="#cb35-19" tabindex="-1"></a><span class="co">#&gt;   ..- attr(*, &quot;names&quot;)= chr &quot;(Intercept)&quot;</span></span>
-<span id="cb35-20"><a href="#cb35-20" tabindex="-1"></a><span class="co">#&gt;  $ p_taus      : num 0.858</span></span>
+<span id="cb35-20"><a href="#cb35-20" tabindex="-1"></a><span class="co">#&gt;  $ p_taus      : num 0.845</span></span>
 <span id="cb35-21"><a href="#cb35-21" tabindex="-1"></a><span class="co">#&gt;  $ ytimes      : int [1:416, 1:8] 1 9 17 25 33 41 49 57 65 73 ...</span></span>
 <span id="cb35-22"><a href="#cb35-22" tabindex="-1"></a><span class="co">#&gt;  $ n_series    : int 8</span></span>
 <span id="cb35-23"><a href="#cb35-23" tabindex="-1"></a><span class="co">#&gt;  $ sp          : Named num [1:9] 0.368 0.368 0.368 0.368 0.368 ...</span></span>
@@ -1030,7 +1092,7 @@ sampling:</p>
 <span id="cb35-34"><a href="#cb35-34" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:400] &quot;705&quot; &quot;737&quot; &quot;777&quot; &quot;801&quot; ...</span></span>
 <span id="cb35-35"><a href="#cb35-35" tabindex="-1"></a><span class="co">#&gt;   .. ..$ : chr [1:73] &quot;X.Intercept.&quot; &quot;V2&quot; &quot;V3&quot; &quot;V4&quot; ...</span></span>
 <span id="cb35-36"><a href="#cb35-36" tabindex="-1"></a><span class="co">#&gt;  - attr(*, &quot;trend_model&quot;)= chr &quot;AR1&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a><span class="fu">code</span>(testmod)</span>
+<div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a><span class="fu">stancode</span>(testmod)</span>
 <span id="cb36-2"><a href="#cb36-2" tabindex="-1"></a><span class="co">#&gt; // Stan model code generated by package mvgam</span></span>
 <span id="cb36-3"><a href="#cb36-3" tabindex="-1"></a><span class="co">#&gt; data {</span></span>
 <span id="cb36-4"><a href="#cb36-4" tabindex="-1"></a><span class="co">#&gt;   int&lt;lower=0&gt; total_obs; // total number of observations</span></span>
@@ -1084,7 +1146,7 @@ sampling:</p>
 <span id="cb36-52"><a href="#cb36-52" tabindex="-1"></a><span class="co">#&gt; }</span></span>
 <span id="cb36-53"><a href="#cb36-53" tabindex="-1"></a><span class="co">#&gt; model {</span></span>
 <span id="cb36-54"><a href="#cb36-54" tabindex="-1"></a><span class="co">#&gt;   // prior for random effect population variances</span></span>
-<span id="cb36-55"><a href="#cb36-55" tabindex="-1"></a><span class="co">#&gt;   sigma_raw ~ student_t(3, 0, 2.5);</span></span>
+<span id="cb36-55"><a href="#cb36-55" tabindex="-1"></a><span class="co">#&gt;   sigma_raw ~ inv_gamma(1.418, 0.452);</span></span>
 <span id="cb36-56"><a href="#cb36-56" tabindex="-1"></a><span class="co">#&gt;   </span></span>
 <span id="cb36-57"><a href="#cb36-57" tabindex="-1"></a><span class="co">#&gt;   // prior for random effect population means</span></span>
 <span id="cb36-58"><a href="#cb36-58" tabindex="-1"></a><span class="co">#&gt;   mu_raw ~ std_normal();</span></span>
@@ -1133,7 +1195,7 @@ sampling:</p>
 <span id="cb36-101"><a href="#cb36-101" tabindex="-1"></a><span class="co">#&gt;   lambda ~ normal(5, 30);</span></span>
 <span id="cb36-102"><a href="#cb36-102" tabindex="-1"></a><span class="co">#&gt;   </span></span>
 <span id="cb36-103"><a href="#cb36-103" tabindex="-1"></a><span class="co">#&gt;   // priors for latent trend variance parameters</span></span>
-<span id="cb36-104"><a href="#cb36-104" tabindex="-1"></a><span class="co">#&gt;   sigma ~ student_t(3, 0, 2.5);</span></span>
+<span id="cb36-104"><a href="#cb36-104" tabindex="-1"></a><span class="co">#&gt;   sigma ~ inv_gamma(1.418, 0.452);</span></span>
 <span id="cb36-105"><a href="#cb36-105" tabindex="-1"></a><span class="co">#&gt;   </span></span>
 <span id="cb36-106"><a href="#cb36-106" tabindex="-1"></a><span class="co">#&gt;   // trend estimates</span></span>
 <span id="cb36-107"><a href="#cb36-107" tabindex="-1"></a><span class="co">#&gt;   trend[1, 1 : n_series] ~ normal(0, sigma);</span></span>
@@ -1166,6 +1228,33 @@ sampling:</p>
 <span id="cb36-134"><a href="#cb36-134" tabindex="-1"></a><span class="co">#&gt;     ypred[1 : n, s] = poisson_log_rng(mus[1 : n, s]);</span></span>
 <span id="cb36-135"><a href="#cb36-135" tabindex="-1"></a><span class="co">#&gt;   }</span></span>
 <span id="cb36-136"><a href="#cb36-136" tabindex="-1"></a><span class="co">#&gt; }</span></span></code></pre></div>
+</div>
+<div id="further-reading" class="section level2">
+<h2>Further reading</h2>
+<p>The following papers and resources offer useful material about
+Dynamic GAMs and how they can be applied in practice:</p>
+<p>Clark, Nicholas J. and Wells, K. <a href="https://doi.org/10.1111/2041-210X.13974">Dynamic Generalized
+Additive Models (DGAMs) for forecasting discrete ecological time
+series</a>. <em>Methods in Ecology and Evolution</em>. (2023): 14,
+771-784.</p>
+<p>Clark, Nicholas J., et al. <a href="https://peerj.com/articles/18929/">Beyond single-species models:
+leveraging multispecies forecasts to navigate the dynamics of ecological
+predictability</a>. <em>PeerJ</em>. (2025): 13:e18929</p>
+<p>de Sousa, Heitor C., et al. <a href="https://doi.org/10.1111/1365-2656.14188">Severe fire regimes
+decrease resilience of ectothermic populations</a>. <em>Journal of
+Animal Ecology</em> (2024): 93(11), 1656-1669.</p>
+<p>Hannaford, Naomi E., et al. <a href="https://doi.org/10.1016/j.csda.2022.107659">A sparse Bayesian
+hierarchical vector autoregressive model for microbial dynamics in a
+wastewater treatment plant.</a> <em>Computational Statistics &amp; Data
+Analysis</em> (2023): 179, 107659.</p>
+<p>Karunarathna, K.A.N.K., et al. <a href="https://doi.org/10.1016/j.ecolmodel.2024.110648">Modelling
+nonlinear responses of a desert rodent species to environmental change
+with hierarchical dynamic generalized additive models</a>.
+<em>Ecological Modelling</em> (2024): 490, 110648.</p>
+<p>Zhu, L., et al. <a href="https://doi.org/10.1111/1365-2435.14711">Responses of a widespread
+pest insect to extreme high temperatures are stage-dependent and
+divergent among seasonal cohorts</a>. <em>Functional Ecology</em>
+(2025): 39, 165–180. <a href="https://doi.org/10.1111/1365-2435.14711" class="uri">https://doi.org/10.1111/1365-2435.14711</a></p>
 </div>
 <div id="interested-in-contributing" class="section level2">
 <h2>Interested in contributing?</h2>
