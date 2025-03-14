@@ -1,5 +1,5 @@
 params <-
-list(EVAL = TRUE)
+  list(EVAL = TRUE)
 
 ## ----echo = FALSE----------------------------------------------------------------------------
 knitr::opts_chunk$set(
@@ -44,7 +44,7 @@ head(data$data_train, 12)
 
 ## ----Wrangle data for modelling--------------------------------------------------------------
 portal_data %>%
-  # Filter the data to only contain captures of the 'PP' 
+  # Filter the data to only contain captures of the 'PP'
   dplyr::filter(series == 'PP') %>%
   droplevels() %>%
   dplyr::mutate(count = captures) %>%
@@ -82,7 +82,8 @@ levels(model_data$year_fac)
 
 
 ## ----model1, include=FALSE, results='hide'---------------------------------------------------
-model1 <- mvgam(count ~ s(year_fac, bs = "re") - 1,
+model1 <- mvgam(
+  count ~ s(year_fac, bs = "re") - 1,
   family = poisson(),
   data = model_data,
   parallel = FALSE
@@ -95,9 +96,9 @@ model1 <- mvgam(count ~ s(year_fac, bs = "re") - 1,
 #   data = model_data
 # )
 
-
 ## --------------------------------------------------------------------------------------------
-get_mvgam_priors(count ~ s(year_fac, bs = "re") - 1,
+get_mvgam_priors(
+  count ~ s(year_fac, bs = "re") - 1,
   family = poisson(),
   data = model_data
 )
@@ -158,7 +159,8 @@ model_data %>%
 
 
 ## ----include=FALSE, message=FALSE, warning=FALSE---------------------------------------------
-model1b <- mvgam(count ~ s(year_fac, bs = "re") - 1,
+model1b <- mvgam(
+  count ~ s(year_fac, bs = "re") - 1,
   family = poisson(),
   data = data_train,
   newdata = data_test,
@@ -173,7 +175,6 @@ model1b <- mvgam(count ~ s(year_fac, bs = "re") - 1,
 #   newdata = data_test
 # )
 
-
 ## ----Plotting predictions against test data--------------------------------------------------
 plot(model1b, type = "forecast", newdata = data_test)
 
@@ -185,8 +186,10 @@ str(fc)
 
 ## ----model2, include=FALSE, message=FALSE, warning=FALSE-------------------------------------
 model2 <- mvgam(
-  count ~ s(year_fac, bs = "re") +
-    ndvi_ma12 - 1,
+  count ~
+    s(year_fac, bs = "re") +
+      ndvi_ma12 -
+      1,
   family = poisson(),
   data = data_train,
   newdata = data_test,
@@ -203,7 +206,6 @@ model2 <- mvgam(
 #   newdata = data_test
 # )
 
-
 ## ----class.output="scroll-300"---------------------------------------------------------------
 summary(model2)
 
@@ -218,7 +220,8 @@ dplyr::glimpse(beta_post)
 
 
 ## ----Histogram of NDVI effects---------------------------------------------------------------
-hist(beta_post$ndvi_ma12,
+hist(
+  beta_post$ndvi_ma12,
   xlim = c(
     -1 * max(abs(beta_post$ndvi_ma12)),
     max(abs(beta_post$ndvi))
@@ -240,8 +243,9 @@ conditional_effects(model2)
 
 ## ----model3, include=FALSE, message=FALSE, warning=FALSE-------------------------------------
 model3 <- mvgam(
-  count ~ s(time, bs = "bs", k = 15) +
-    ndvi_ma12,
+  count ~
+    s(time, bs = "bs", k = 15) +
+      ndvi_ma12,
   family = poisson(),
   data = data_train,
   newdata = data_test,
@@ -257,7 +261,6 @@ model3 <- mvgam(
 #   data = data_train,
 #   newdata = data_test
 # )
-
 
 ## --------------------------------------------------------------------------------------------
 summary(model3)
@@ -276,7 +279,8 @@ plot(model3, type = "forecast", newdata = data_test)
 
 
 ## ----Plot extrapolated temporal functions using newdata--------------------------------------
-plot_mvgam_smooth(model3,
+plot_mvgam_smooth(
+  model3,
   smooth = "s(time)",
   # feed newdata to the plot function to generate
   # predictions of the temporal smooth to the end of the
@@ -290,7 +294,8 @@ abline(v = max(data_train$time), lty = "dashed", lwd = 2)
 
 
 ## ----model4, include=FALSE-------------------------------------------------------------------
-model4 <- mvgam(count ~ s(ndvi_ma12, k = 6),
+model4 <- mvgam(
+  count ~ s(ndvi_ma12, k = 6),
   family = poisson(),
   data = data_train,
   newdata = data_test,
@@ -306,7 +311,6 @@ model4 <- mvgam(count ~ s(ndvi_ma12, k = 6),
 #   newdata = data_test,
 #   trend_model = AR()
 # )
-
 
 ## ----Summarise the mvgam autocorrelated error model, class.output="scroll-300"---------------
 summary(model4)
@@ -330,4 +334,3 @@ fc_mod4 <- forecast(model4)
 score_mod3 <- score(fc_mod3, score = "drps")
 score_mod4 <- score(fc_mod4, score = "drps")
 sum(score_mod4$PP$score, na.rm = TRUE) - sum(score_mod3$PP$score, na.rm = TRUE)
-
