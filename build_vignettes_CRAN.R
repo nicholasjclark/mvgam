@@ -19,8 +19,6 @@ purl_vignettes <- function(x) {
 
 # Build vignette htmls
 build_vignettes = function(x) {
-
-
   # Build the vignette html file
   devtools::build_rmd(
     paste0('vignettes/', x)
