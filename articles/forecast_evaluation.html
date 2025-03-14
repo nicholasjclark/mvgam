@@ -482,9 +482,10 @@ previously:</p>
 readily allow forecast evaluations for each series in the data, using a
 variety of possible scoring functions. See
 <code><a href="../reference/score.mvgam_forecast.html">?mvgam::score.mvgam_forecast</a></code> to view the types of scores
-that are available. A useful scoring metric is the <a href="https://www.annualreviews.org/content/journals/10.1146/annurev-statistics-062713-085831" target="_blank" class="external-link">Continuous Rank Probability Score (CRPS)</a>. A CRPS
-value is similar to what we might get if we calculated a weighted
-absolute error using the full forecast distribution.</p>
+that are available. A useful scoring metric is the Continuous Rank
+Probability Score (CRPS). A CRPS value is similar to what we might get
+if we calculated a weighted absolute error using the full forecast
+distribution.</p>
 <div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">crps_mod1</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">fc_mod1</span>, score <span class="op">=</span> <span class="st">"crps"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">crps_mod1</span><span class="op">)</span></span>
