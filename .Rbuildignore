@@ -12,6 +12,7 @@
 ^README\.Rmd$
 ^README-.*\.png$
 ^\README_cache$
+^man/figures/README-.*\.png$
 ^index\.Rmd
 ^index\.md
 ^Meta
