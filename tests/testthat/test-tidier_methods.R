@@ -22,10 +22,8 @@ test_that("`tidy()` snapshot value of `mvgam_example4`", {
 })
 
 test_that("`tidy()` snapshot value of `mvgam_example6`", {
+  local_edition(3)
   testthat::skip_on_cran()
-
-  SEED = 1234
-  set.seed(SEED)
 
   # Hierarchical dynamics example adapted from RW documentation example.
   # The difference is that this uses 4 species rather than 3.
@@ -56,11 +54,14 @@ test_that("`tidy()` snapshot value of `mvgam_example6`", {
 
   mvgam_example6 <- suppressWarnings(mvgam(formula = y ~ species,
                           trend_model = AR(gr = region, subgr = species),
-                          data = simdat_all,
-                          backend = 'rstan',
-                          seed = SEED))
-  local_edition(3)
-  expect_snapshot_value(tidy.mvgam(mvgam_example6), style = "json2")
+                          data = simdat_all))
+
+  tidyout = tidy.mvgam(mvgam_example6)
+
+  expect_equal(dim(tidyout), c(65, 7))
+  expect_equal(colnames(tidyout),
+               c("parameter", "type", "mean", "sd", "2.5%", "50%", "97.5%"))
+  expect_snapshot_value(tidyout[c("parameter", "type")], style = "json2")
 })
 
 # `augment()` tests

@@ -246,7 +246,7 @@
         "names": {
           "type": "character",
           "attributes": {},
-          "value": ["parameter", "type", "mean", "sd", "2.5%", "50%", "97.5%"]
+          "value": ["parameter", "type"]
         },
         "row.names": {
           "type": "integer",
@@ -269,31 +269,6 @@
           "type": "character",
           "attributes": {},
           "value": ["observation_beta", "observation_beta", "observation_beta", "observation_beta", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param", "trend_model_param"]
-        },
-        {
-          "type": "double",
-          "attributes": {},
-          "value": [1, 1, 2, 3, -0.22, 0.0061, -0.21, 0.58, 0.58, 0.23, -0.33, 0.13, -0.091, 0.8, 0.6, 0.69, 0.22, 0.83, -0.12, -0.12, 0.49, -0.12, 1.3, 0.049, 0.025, -0.12, 0.049, 0.8, -0.49, 0.49, 0.025, -0.49, 0.78, 0.49, 0.2, 0.14, -0.031, 0.2, 0.49, 0.41, -0.29, 0.14, 0.41, 0.7, -0.24, -0.031, -0.29, -0.24, 0.67, 0.61, 0.12, -0.053, 0.22, 0.12, 0.44, 0.11, 0.048, -0.053, 0.11, 0.43, -0.11, 0.22, 0.048, -0.11, 0.53]
-        },
-        {
-          "type": "double",
-          "attributes": {},
-          "value": [0.073, 0.1, 0.087, 0.099, 0.13, 0.17, 0.11, 0.087, 0.13, 0.097, 0.11, 0.11, 0.15, 0.094, 0.097, 0.1, 0.11, 0.2, 0.14, 0.11, 0.12, 0.14, 0.26, 0.13, 0.11, 0.11, 0.13, 0.15, 0.099, 0.12, 0.11, 0.099, 0.13, 0.15, 0.067, 0.079, 0.075, 0.067, 0.096, 0.086, 0.075, 0.079, 0.086, 0.12, 0.081, 0.075, 0.075, 0.081, 0.11, 0.15, 0.075, 0.067, 0.077, 0.075, 0.11, 0.062, 0.063, 0.067, 0.062, 0.093, 0.067, 0.077, 0.063, 0.067, 0.097]
-        },
-        {
-          "type": "double",
-          "attributes": {},
-          "value": [0.9, 0.81, 1.8, 2.8, -0.47, -0.31, -0.43, 0.41, 0.31, 0.036, -0.55, -0.099, -0.38, 0.6, 0.4, 0.49, 0.026, 0.49, -0.42, -0.35, 0.27, -0.42, 0.86, -0.19, -0.19, -0.35, -0.19, 0.56, -0.73, 0.27, -0.19, -0.73, 0.57, 0.26, 0.078, -0.0053, -0.18, 0.078, 0.33, 0.26, -0.45, -0.0053, 0.26, 0.5, -0.41, -0.18, -0.45, -0.41, 0.47, 0.36, -0.015, -0.19, 0.079, -0.015, 0.27, -0.007, -0.071, -0.19, -0.007, 0.28, -0.26, 0.079, -0.071, -0.26, 0.37]
-        },
-        {
-          "type": "double",
-          "attributes": {},
-          "value": [1, 0.99, 2, 3, -0.23, 0.0056, -0.21, 0.58, 0.58, 0.24, -0.33, 0.13, -0.092, 0.81, 0.6, 0.69, 0.22, 0.8, -0.12, -0.12, 0.48, -0.12, 1.2, 0.045, 0.024, -0.12, 0.045, 0.78, -0.48, 0.48, 0.024, -0.48, 0.77, 0.46, 0.19, 0.14, -0.032, 0.19, 0.48, 0.4, -0.29, 0.14, 0.4, 0.69, -0.24, -0.032, -0.29, -0.24, 0.66, 0.59, 0.11, -0.051, 0.21, 0.11, 0.43, 0.11, 0.045, -0.051, 0.11, 0.42, -0.11, 0.21, 0.045, -0.11, 0.52]
-        },
-        {
-          "type": "double",
-          "attributes": {},
-          "value": [1.2, 1.2, 2.2, 3.2, 0.037, 0.35, -0.003, 0.75, 0.82, 0.42, -0.1, 0.34, 0.22, 0.96, 0.78, 0.89, 0.43, 1.3, 0.16, 0.087, 0.74, 0.16, 1.9, 0.32, 0.24, 0.087, 0.32, 1.2, -0.33, 0.74, 0.24, -0.33, 1.1, 0.84, 0.34, 0.3, 0.12, 0.34, 0.7, 0.6, -0.16, 0.3, 0.6, 0.97, -0.098, 0.12, -0.16, -0.098, 0.92, 0.95, 0.28, 0.075, 0.38, 0.28, 0.7, 0.24, 0.18, 0.075, 0.24, 0.64, 0.0076, 0.38, 0.18, 0.0076, 0.75]
         }
       ]
     }
