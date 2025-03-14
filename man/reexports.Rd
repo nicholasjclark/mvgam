@@ -41,6 +41,7 @@
 \alias{posterior_linpred}
 \alias{stancode}
 \alias{standata}
+\alias{tidy}
 \alias{augment}
 \title{Objects exported from other packages}
 \keyword{internal}
@@ -51,7 +52,7 @@ below to see their documentation.
 \describe{
   \item{brms}{\code{\link[brms:conditional_effects.brmsfit]{conditional_effects}}, \code{\link[brms]{gp}}, \code{\link[brms:mcmc_plot.brmsfit]{mcmc_plot}}, \code{\link[brms:set_prior]{prior}}, \code{\link[brms:set_prior]{prior_}}, \code{\link[brms:set_prior]{prior_string}}, \code{\link[brms]{set_prior}}, \code{\link[brms]{stancode}}, \code{\link[brms]{standata}}}
 
-  \item{generics}{\code{\link[generics]{augment}}}
+  \item{generics}{\code{\link[generics]{augment}}, \code{\link[generics]{tidy}}}
 
   \item{insight}{\code{\link[insight]{get_data}}}
 
