@@ -120,5 +120,16 @@ utils::globalVariables(c(
   "shock",
   "irf_median",
   "irf_Qlower",
-  "irf_Qupper"
+  "irf_Qupper",
+  "lower_deriv",
+  "med_deriv",
+  "upper_deriv",
+  "sum_contribution",
+  "total",
+  "Contribution",
+  "Var1",
+  "lv",
+  "correlation",
+  "Factor",
+  "contribution"
 ))

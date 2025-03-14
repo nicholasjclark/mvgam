@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
 )
 library(mvgam)
 library(ggplot2)
-theme_set(theme_bw(base_size = 12, base_family = 'serif'))
+theme_set(theme_bw(base_size = 12, base_family = "serif"))
 
 
 ## --------------------------------------------------------------------------------------------
@@ -53,7 +53,7 @@ fake_mod <- mvgam(
 
   # process model formula, which has a shared seasonal smooth
   # (each latent process model shares the SAME smooth)
-  trend_formula = ~ s(season, bs = 'cc', k = 6),
+  trend_formula = ~ s(season, bs = "cc", k = 6),
 
   # AR1 dynamics (each latent process model has DIFFERENT)
   # dynamics; processes are estimated using the noncentred
@@ -72,7 +72,7 @@ fake_mod <- mvgam(
 
 
 ## --------------------------------------------------------------------------------------------
-code(fake_mod)
+stancode(fake_mod)
 
 
 ## --------------------------------------------------------------------------------------------
@@ -82,7 +82,7 @@ fake_mod$model_data$Z
 ## ----full_mod, include = FALSE, results='hide'-----------------------------------------------
 full_mod <- mvgam(
   y ~ series - 1,
-  trend_formula = ~ s(season, bs = 'cc', k = 6),
+  trend_formula = ~ s(season, bs = "cc", k = 6),
   trend_model = AR(),
   noncentred = TRUE,
   trend_map = trend_map,
@@ -93,27 +93,29 @@ full_mod <- mvgam(
 
 
 ## ----eval=FALSE------------------------------------------------------------------------------
-# full_mod <- mvgam(y ~ series - 1,
-#                   trend_formula = ~ s(season, bs = 'cc', k = 6),
-#                   trend_model = AR(),
-#                   noncentred = TRUE,
-#                   trend_map = trend_map,
-#                   family = poisson(),
-#                   data = simdat$data_train,
-#                   silent = 2)
+# full_mod <- mvgam(
+#   y ~ series - 1,
+#   trend_formula = ~ s(season, bs = "cc", k = 6),
+#   trend_model = AR(),
+#   noncentred = TRUE,
+#   trend_map = trend_map,
+#   family = poisson(),
+#   data = simdat$data_train,
+#   silent = 2
+# )
 
 ## --------------------------------------------------------------------------------------------
 summary(full_mod)
 
 
 ## --------------------------------------------------------------------------------------------
-plot(full_mod, type = 'trend', series = 1)
-plot(full_mod, type = 'trend', series = 2)
-plot(full_mod, type = 'trend', series = 3)
+plot(full_mod, type = "trend", series = 1)
+plot(full_mod, type = "trend", series = 2)
+plot(full_mod, type = "trend", series = 3)
 
 
 ## --------------------------------------------------------------------------------------------
-set.seed(0)
+set.seed(123)
 # simulate a nonlinear relationship using the mgcv function gamSim
 signal_dat <- mgcv::gamSim(n = 100, eg = 1, scale = 1)
 
@@ -132,18 +134,27 @@ true_signal <- as.vector(
 ## --------------------------------------------------------------------------------------------
 plot(
   true_signal,
-  type = 'l',
-  bty = 'l',
+  type = "l",
+  bty = "l",
   lwd = 2,
-  ylab = 'True signal',
-  xlab = 'Time'
+  ylab = "True signal",
+  xlab = "Time"
 )
 
 
 ## --------------------------------------------------------------------------------------------
-sim_series = function(n_series = 3, true_signal) {
-  temp_effects <- mgcv::gamSim(n = 100, eg = 7, scale = 0.1)
-  temperature <- temp_effects$y
+# Function to simulate a monotonic response to a covariate
+sim_monotonic <- function(x, a = 2.2, b = 2) {
+  out <- exp(a * x) / (6 + exp(b * x)) * -1
+  return(2.5 * as.vector(scale(out)))
+}
+
+# Simulated temperature covariate
+temperature <- runif(100, -2, 2)
+
+# Simulate the three series
+sim_series <- function(n_series = 3, true_signal) {
+  temp_effects <- mgcv::gamSim(n = 100, eg = 7, scale = 0.05)
   alphas <- rnorm(n_series, sd = 2)
 
   do.call(
@@ -153,11 +164,11 @@ sim_series = function(n_series = 3, true_signal) {
         observed = rnorm(
           length(true_signal),
           mean = alphas[series] +
-            1.5 * as.vector(scale(temp_effects[, series + 1])) +
+            sim_monotonic(temperature, runif(1, 2.2, 3), runif(1, 2.2, 3)) +
             true_signal,
           sd = runif(1, 1, 2)
         ),
-        series = paste0('sensor_', series),
+        series = paste0("sensor_", series),
         time = 1:length(true_signal),
         temperature = temperature,
         productivity = productivity,
@@ -171,36 +182,40 @@ model_dat <- sim_series(true_signal = true_signal) %>%
 
 
 ## --------------------------------------------------------------------------------------------
-plot_mvgam_series(data = model_dat, y = 'observed', series = 'all')
+plot_mvgam_series(
+  data = model_dat,
+  y = "observed",
+  series = "all"
+)
 
 
 ## --------------------------------------------------------------------------------------------
 plot(
   observed ~ temperature,
   data = model_dat %>%
-    dplyr::filter(series == 'sensor_1'),
+    dplyr::filter(series == "sensor_1"),
   pch = 16,
-  bty = 'l',
-  ylab = 'Sensor 1',
-  xlab = 'Temperature'
+  bty = "l",
+  ylab = "Sensor 1",
+  xlab = "Temperature"
 )
 plot(
   observed ~ temperature,
   data = model_dat %>%
-    dplyr::filter(series == 'sensor_2'),
+    dplyr::filter(series == "sensor_2"),
   pch = 16,
-  bty = 'l',
-  ylab = 'Sensor 2',
-  xlab = 'Temperature'
+  bty = "l",
+  ylab = "Sensor 2",
+  xlab = "Temperature"
 )
 plot(
   observed ~ temperature,
   data = model_dat %>%
-    dplyr::filter(series == 'sensor_3'),
+    dplyr::filter(series == "sensor_3"),
   pch = 16,
-  bty = 'l',
-  ylab = 'Sensor 3',
-  xlab = 'Temperature'
+  bty = "l",
+  ylab = "Sensor 3",
+  xlab = "Temperature"
 )
 
 
@@ -211,20 +226,20 @@ mod <- mvgam(
   formula = observed ~
     series +
       s(temperature, k = 10) +
-      s(series, temperature, bs = 'sz', k = 8),
-
+      s(series, temperature, bs = "sz", k = 8),
   # formula for the latent signal, which can depend
   # nonlinearly on productivity
   trend_formula = ~ s(productivity, k = 8) - 1,
-
   # in addition to productivity effects, the signal is
   # assumed to exhibit temporal autocorrelation
   trend_model = AR(),
   noncentred = TRUE,
-
   # trend_map forces all sensors to track the same
   # latent signal
-  trend_map = data.frame(series = unique(model_dat$series), trend = c(1, 1, 1)),
+  trend_map = data.frame(
+    series = unique(model_dat$series),
+    trend = c(1, 1, 1)
+  ),
 
   # informative priors on process error
   # and observation error will help with convergence
@@ -236,68 +251,70 @@ mod <- mvgam(
   # Gaussian observations
   family = gaussian(),
   burnin = 600,
-  adapt_delta = 0.95,
+  control = list(adapt_delta = 0.95),
   data = model_dat,
   silent = 2
 )
 
 
 ## ----eval=FALSE------------------------------------------------------------------------------
-# mod <- mvgam(formula =
-#                # formula for observations, allowing for different
-#                # intercepts and hierarchical smooth effects of temperature
-#                observed ~ series +
-#                s(temperature, k = 10) +
-#                s(series, temperature, bs = 'sz', k = 8),
+# mod <- mvgam(
+#   formula =
+#   # formula for observations, allowing for different
+#   # intercepts and hierarchical smooth effects of temperature
+#     observed ~ series +
+#       s(temperature, k = 10) +
+#       s(series, temperature, bs = "sz", k = 8),
+#   trend_formula =
+#   # formula for the latent signal, which can depend
+#   # nonlinearly on productivity
+#     ~ s(productivity, k = 8) - 1,
+#   trend_model =
+#   # in addition to productivity effects, the signal is
+#   # assumed to exhibit temporal autocorrelation
+#     AR(),
+#   noncentred = TRUE,
+#   trend_map =
+#   # trend_map forces all sensors to track the same
+#   # latent signal
+#     data.frame(
+#       series = unique(model_dat$series),
+#       trend = c(1, 1, 1)
+#     ),
 #
-#              trend_formula =
-#                # formula for the latent signal, which can depend
-#                # nonlinearly on productivity
-#                ~ s(productivity, k = 8) - 1,
+#   # informative priors on process error
+#   # and observation error will help with convergence
+#   priors = c(
+#     prior(normal(2, 0.5), class = sigma),
+#     prior(normal(1, 0.5), class = sigma_obs)
+#   ),
 #
-#              trend_model =
-#                # in addition to productivity effects, the signal is
-#                # assumed to exhibit temporal autocorrelation
-#                AR(),
-#              noncentred = TRUE,
-#
-#              trend_map =
-#                # trend_map forces all sensors to track the same
-#                # latent signal
-#                data.frame(series = unique(model_dat$series),
-#                           trend = c(1, 1, 1)),
-#
-#              # informative priors on process error
-#              # and observation error will help with convergence
-#              priors = c(prior(normal(2, 0.5), class = sigma),
-#                         prior(normal(1, 0.5), class = sigma_obs)),
-#
-#              # Gaussian observations
-#              family = gaussian(),
-#              data = model_dat,
-#              silent = 2)
+#   # Gaussian observations
+#   family = gaussian(),
+#   data = model_dat,
+#   silent = 2
+# )
 
 ## --------------------------------------------------------------------------------------------
 summary(mod, include_betas = FALSE)
 
 
 ## --------------------------------------------------------------------------------------------
-conditional_effects(mod, type = 'link')
+conditional_effects(mod, type = "link")
 
 
 ## --------------------------------------------------------------------------------------------
-require(marginaleffects)
 plot_predictions(
   mod,
-  condition = c('temperature', 'series', 'series'),
+  condition = c("temperature", "series", "series"),
   points = 0.5
 ) +
-  theme(legend.position = 'none')
+  theme(legend.position = "none")
 
 
 ## --------------------------------------------------------------------------------------------
-plot(mod, type = 'trend')
-
-# Overlay the true simulated signal
-points(true_signal, pch = 16, cex = 1, col = 'white')
-points(true_signal, pch = 16, cex = 0.8)
+plot(mod, type = "trend") +
+  ggplot2::geom_point(
+    data = data.frame(time = 1:100, y = true_signal),
+    mapping = ggplot2::aes(x = time, y = y)
+  )

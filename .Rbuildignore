@@ -12,6 +12,7 @@
 ^README\.Rmd$
 ^README-.*\.png$
 ^\README_cache$
+^man/figures/README-.*\.png$
 ^index\.Rmd
 ^index\.md
 ^Meta
@@ -22,4 +23,5 @@
 ^tests/testthat/Rplots\.pdf$
 ^tests/local$
 ^memcheck\.R$
+^build_vignettes_CRAN\.R$
 ^src\.gcda$
