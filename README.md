@@ -24,7 +24,7 @@ package does this by relying on functionalities from the impressive
 <a href="https://paulbuerkner.com/brms/"
 target="_blank"><code>brms</code></a> and
 <a href="https://cran.r-project.org/package=mgcv"
-target="_blank"><code>mgcv</code></a> packages. This allows `mvgam` to
+target="_blank"><code>mgcv</code></a> packages. Parameter estimation uses Stan, giving access to the most efficient Bayesian inference algorithms available. This allows `mvgam` to efficiently 
 fit a wide range of models, including:
 
 -   <a
