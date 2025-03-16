@@ -78,7 +78,7 @@ observations, if supplied in the original model. Otherwise <code>NULL</code></p>
 <li><p><code>priors</code> If the model priors were updated from their defaults, the prior <code>dataframe</code>
 will be returned. Otherwise <code>NULL</code></p></li>
 <li><p><code>model_output</code> The <code>MCMC</code> object returned by the fitting engine. If the model was fitted
-using <code>Stan</code>, this will be an object of class <code>stanfit</code> (see <code><a href="https://rdrr.io/pkg/rstan/man/stanfit-class.html" class="external-link">stanfit-class</a></code> for details).
+using <code>Stan</code>, this will be an object of class <code>stanfit</code> (see <code><a href="https://mc-stan.org/rstan/reference/stanfit-class.html" class="external-link">stanfit-class</a></code> for details).
 If <code>JAGS</code> was used as the backend, this will be an object of class <code>runjags</code>
 (see <code><a href="https://rdrr.io/pkg/runjags/man/runjags-class.html" class="external-link">runjags-class</a></code> for details)</p></li>
 <li><p><code>model_file</code> The <code>character</code> string model file used to describe the model in either
@@ -117,10 +117,10 @@ will be returned. Othwerise <code>NULL</code></p></li>
 <li><p><code>algorithm</code> <code>Character</code> describing the algorithm used for finding the posterior,
 either as <code>sampling</code>, <code>laplace</code>, <code>pathfinder</code>, <code>meanfield</code> or <code>fullrank</code></p></li>
 <li><p><code>max_treedepth</code> If the model was fitted using <code>Stan</code>, the value supplied for the maximum
-treedepth tuning parameter is returned (see <code><a href="https://rdrr.io/pkg/rstan/man/stan.html" class="external-link">stan</a></code> for details).
+treedepth tuning parameter is returned (see <code><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></code> for details).
 Otherwise <code>NULL</code></p></li>
 <li><p><code>adapt_delta</code> If the model was fitted using <code>Stan</code>, the value supplied for the adapt_delta
-tuning parameter is returned (see <code><a href="https://rdrr.io/pkg/rstan/man/stan.html" class="external-link">stan</a></code> for details).
+tuning parameter is returned (see <code><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></code> for details).
 Otherwise <code>NULL</code></p></li>
 </ul></div>
     <div class="section level2">
