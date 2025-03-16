@@ -1,4 +1,4 @@
-# mvgam (development version)
+# mvgam 1.1.51
 
 ## New functionalities
 * Changed default priors for scale parameters (i.e. process errors "sigma" and observation errors "sigma_obs") to inverse gammas to provide more sensible prior regularisation away from zero

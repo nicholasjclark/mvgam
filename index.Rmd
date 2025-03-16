@@ -7,16 +7,16 @@ always_allow_html: true
 
 > **M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
 
-The goal of the `mvgam` 📦 is to fit Bayesian Dynamic Generalized Additive Models (DGAMs) that can include highly flexible nonlinear predictor effects for both process and observation components. The package does this by relying on functionalities from the impressive [`brms`](https://paulbuerkner.com/brms/){target="_blank"} and [`mgcv`](https://cran.r-project.org/package=mgcv){target="_blank"} packages. This allows `mvgam` to fit a wide range of models, including:
+The goal of the `mvgam` 📦 is to fit Bayesian Dynamic Generalized Additive Models (DGAMs) that can include highly flexible nonlinear predictor effects for both process and observation components. The package does this by relying on functionalities from the impressive [`brms`](https://paulbuerkner.com/brms/){target="_blank"} and [`mgcv`](https://cran.r-project.org/package=mgcv){target="_blank"} packages. Parameters are estimated using the probabilistic programming language [`Stan`](https://mc-stan.org/), giving users access to the most advanced Bayesian inference algorithms available. This allows `mvgam` to fit a very wide range of models, including:
 
-* [Multivariate State-Space Time Series models](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html){target="_blank"}
-* [Hierarchical N-mixture models](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html){target="_blank"}
+* [Multivariate State-Space Time Series Models](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html){target="_blank"}
+* [Hierarchical N-mixture Models](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html){target="_blank"}
 * [Hierarchical Generalized Additive Models](https://www.youtube.com/watch?v=2POK_FVwCHk){target="_blank"}
 * [Joint Species Distribution Models](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html){target="_blank"}
   
 ## Installation
-Install the stable version from CRAN using: `install.packages('mvgam')`, or install the development version from `GitHub` using:
-`devtools::install_github("nicholasjclark/mvgam")`. Note that to actually condition models with MCMC sampling, the `Stan` software must be installed (along with either `rstan` and/or `cmdstanr`). Only `rstan` is listed as a dependency of `mvgam` to ensure that installation is less difficult. If users wish to fit the models using `mvgam`, please refer to installation links for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan), or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/). You will need a fairly recent version of `Stan` (preferably 2.29 or above) to ensure all the model syntax is recognized. We highly recommend you use `Cmdstan` through the `cmdstanr` interface as the backend. This is because `Cmdstan` is easier to install, is more up to date with new features, and uses less memory than `Rstan`. See [this documentation from the `Cmdstan` team for more information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan). 
+Install the stable version from `CRAN` using: `install.packages('mvgam')`, or install the development version from `GitHub` using:
+`devtools::install_github("nicholasjclark/mvgam")`. You will also need a working version of `Stan` installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}.
 
 ## Introductory seminar
 <center>
@@ -111,8 +111,7 @@ As `mvgam` acts as an interface to `Stan`, please additionally cite:
 
 > Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B., Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017). Stan: A probabilistic programming language. *Journal of Statistical Software*. 76(1). DOI: https://doi.org/10.18637/jss.v076.i01
 
-`mvgam` relies on several other `R` packages and, of course, on `R` itself. To
-find out how to cite `R` and its packages, use `citation()`. There are
+`mvgam` relies on several other `R` packages and, of course, on `R` itself. To find out how to cite `R` and its packages, use `citation()`. There are
 some features of `mvgam` which specifically rely on certain packages. The most important of these is the generation of data necessary to estimate smoothing splines and Gaussian Processes, which rely on the `mgcv`, `brms` and `splines2` packages. The `rstan` and `cmdstanr` packages together with `Rcpp` makes `Stan` conveniently accessible in `R`. If you use some of these features, please also consider citing the related packages.
 
 

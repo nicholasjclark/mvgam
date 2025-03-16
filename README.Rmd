@@ -31,16 +31,16 @@ knitr::opts_chunk$set(
 [![CRAN Version](https://www.r-pkg.org/badges/version/mvgam)](https://cran.r-project.org/package=mvgam)
 [![CRAN Downloads](https://cranlogs.r-pkg.org/badges/grand-total/mvgam?color=brightgreen)](https://cran.r-project.org/package=mvgam)
 
-The goal of the `mvgam` 📦 is to fit Bayesian Dynamic Generalized Additive Models (DGAMs) that can include highly flexible nonlinear predictor effects for both process and observation components. The package does this by relying on functionalities from the impressive [`brms`](https://paulbuerkner.com/brms/){target="_blank"} and [`mgcv`](https://cran.r-project.org/package=mgcv){target="_blank"} packages. This allows `mvgam` to fit a wide range of models, including:
+The goal of the `mvgam` 📦 is to fit Bayesian Dynamic Generalized Additive Models (DGAMs) that can include highly flexible nonlinear predictor effects for both process and observation components. The package does this by relying on functionalities from the impressive [`brms`](https://paulbuerkner.com/brms/){target="_blank"} and [`mgcv`](https://cran.r-project.org/package=mgcv){target="_blank"} packages. Parameters are estimated using the probabilistic programming language [`Stan`](https://mc-stan.org/), giving users access to the most advanced Bayesian inference algorithms available. This allows `mvgam` to fit a very wide range of models, including:
 
-* [Multivariate State-Space Time Series models](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html){target="_blank"}
-* [Hierarchical N-mixture models](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html){target="_blank"}
+* [Multivariate State-Space Time Series Models](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html){target="_blank"}
+* [Hierarchical N-mixture Models](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html){target="_blank"}
 * [Hierarchical Generalized Additive Models](https://www.youtube.com/watch?v=2POK_FVwCHk){target="_blank"}
 * [Joint Species Distribution Models](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html){target="_blank"}
 
 ## Installation
 Install the stable version from `CRAN` using: `install.packages('mvgam')`, or install the development version from `GitHub` using:
-`devtools::install_github("nicholasjclark/mvgam")`. To condition models on observed data, `Stan` must be installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}.
+`devtools::install_github("nicholasjclark/mvgam")`. You will also need a working version of `Stan` installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}.
 
 ## Cheatsheet
 [![`mvgam` usage cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
@@ -266,7 +266,7 @@ for (i in seq_along(description$other_citations)) {
 The post-processing methods we have shown above are just the tip of the iceberg. For a full list of methods to apply on fitted model objects, type `methods(class = "mvgam")`. 
 
 ## Extended observation families
-`mvgam` was originally designed to analyse and forecast non-negative integer-valued data. These data are traditionally challenging to analyse with existing time-series analysis packages. But further development of `mvgam` has resulted in support for a growing number of observation families. Currently, the package can handle data for the following:  
+`mvgam` was originally designed to analyse and forecast non-negative integer-valued data. But further development of `mvgam` has resulted in support for a growing number of observation families. Currently, the package can handle data for the following:  
   
 * `gaussian()` for real-valued data 
 * `student_t()` for heavy-tailed real-valued data
@@ -347,7 +347,7 @@ wrap_plots(
 )
 ```
 
-There are many more extended uses of `mvgam`, including the ability to fit hierarchical State-Space GAMs that include dynamic and spatially varying coefficient models, dynamic factors, Joint Species Distribution Models and much more. See the [package documentation](https://nicholasjclark.github.io/mvgam/){target="_blank"} for more details. The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using `Stan`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals. The [Stan Discourse](https://discourse.mc-stan.org/){target="_blank"} is a helpful place to troubleshoot.
+There are many more extended uses of `mvgam`, including the ability to fit hierarchical State-Space GAMs that include dynamic and spatially varying coefficient models, dynamic factors, Joint Species Distribution Models and much more. See the [package documentation](https://nicholasjclark.github.io/mvgam/){target="_blank"} for more details. The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using `Stan`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals. The [`Stan` Discourse](https://discourse.mc-stan.org/){target="_blank"} is a helpful place to troubleshoot.
 
 ## Citing `mvgam` and related software
 When using any software please make sure to appropriately acknowledge the hard work that developers and maintainers put into making these packages available. Citations are currently the best way to formally acknowledge this work (but feel free to ⭐ this repo as well), so we highly encourage you to cite any packages that you rely on for your research.
