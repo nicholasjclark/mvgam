@@ -10,14 +10,17 @@ package does this by relying on functionalities from the impressive
 <a href="https://paulbuerkner.com/brms/"
 target="_blank"><code>brms</code></a> and
 <a href="https://cran.r-project.org/package=mgcv"
-target="_blank"><code>mgcv</code></a> packages. This allows `mvgam` to
-fit a wide range of models, including:
+target="_blank"><code>mgcv</code></a> packages. Parameters are estimated
+using the probabilistic programming language
+[`Stan`](https://mc-stan.org/), giving users access to the most advanced
+Bayesian inference algorithms available. This allows `mvgam` to fit a
+very wide range of models, including:
 
 - <a
   href="https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html"
-  target="_blank">Multivariate State-Space Time Series models</a>
+  target="_blank">Multivariate State-Space Time Series Models</a>
 - <a href="https://nicholasjclark.github.io/mvgam/articles/nmixtures.html"
-  target="_blank">Hierarchical N-mixture models</a>
+  target="_blank">Hierarchical N-mixture Models</a>
 - <a href="https://www.youtube.com/watch?v=2POK_FVwCHk"
   target="_blank">Hierarchical Generalized Additive Models</a>
 - <a href="https://nicholasjclark.github.io/mvgam/reference/jsdgam.html"
@@ -25,23 +28,14 @@ fit a wide range of models, including:
 
 ## Installation
 
-Install the stable version from CRAN using: `install.packages('mvgam')`,
-or install the development version from `GitHub` using:
-`devtools::install_github("nicholasjclark/mvgam")`. Note that to
-actually condition models with MCMC sampling, the `Stan` software must
-be installed (along with either `rstan` and/or `cmdstanr`). Only `rstan`
-is listed as a dependency of `mvgam` to ensure that installation is less
-difficult. If users wish to fit the models using `mvgam`, please refer
-to installation links for `Stan` with `rstan`
-[here](https://mc-stan.org/users/interfaces/rstan), or for `Stan` with
-`cmdstandr` [here](https://mc-stan.org/cmdstanr/). You will need a
-fairly recent version of `Stan` (preferably 2.29 or above) to ensure all
-the model syntax is recognized. We highly recommend you use `Cmdstan`
-through the `cmdstanr` interface as the backend. This is because
-`Cmdstan` is easier to install, is more up to date with new features,
-and uses less memory than `Rstan`. See [this documentation from the
-`Cmdstan` team for more
-information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan).
+Install the stable version from `CRAN` using:
+`install.packages('mvgam')`, or install the development version from
+`GitHub` using: `devtools::install_github("nicholasjclark/mvgam")`. You
+will also need a working version of `Stan` installed (along with either
+`rstan` and/or `cmdstanr`). Please refer to installation links for
+`Stan` with `rstan` <a href="https://mc-stan.org/users/interfaces/rstan"
+target="_blank">here</a>, or for `Stan` with `cmdstandr`
+<a href="https://mc-stan.org/cmdstanr/" target="_blank">here</a>.
 
 ## Introductory seminar
 
