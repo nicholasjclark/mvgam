@@ -24,14 +24,17 @@ package does this by relying on functionalities from the impressive
 <a href="https://paulbuerkner.com/brms/"
 target="_blank"><code>brms</code></a> and
 <a href="https://cran.r-project.org/package=mgcv"
-target="_blank"><code>mgcv</code></a> packages. This allows `mvgam` to
-fit a wide range of models, including:
+target="_blank"><code>mgcv</code></a> packages. Parameters are estimated
+using the probabilistic programming language
+[`Stan`](https://mc-stan.org/), giving users access to the most advanced
+Bayesian inference algorithms available. This allows `mvgam` to fit a
+very wide range of models, including:
 
 -   <a
     href="https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html"
-    target="_blank">Multivariate State-Space Time Series models</a>
+    target="_blank">Multivariate State-Space Time Series Models</a>
 -   <a href="https://nicholasjclark.github.io/mvgam/articles/nmixtures.html"
-    target="_blank">Hierarchical N-mixture models</a>
+    target="_blank">Hierarchical N-mixture Models</a>
 -   <a href="https://www.youtube.com/watch?v=2POK_FVwCHk"
     target="_blank">Hierarchical Generalized Additive Models</a>
 -   <a href="https://nicholasjclark.github.io/mvgam/reference/jsdgam.html"
@@ -41,11 +44,10 @@ fit a wide range of models, including:
 
 Install the stable version from `CRAN` using:
 `install.packages('mvgam')`, or install the development version from
-`GitHub` using: `devtools::install_github("nicholasjclark/mvgam")`. To
-condition models on observed data, `Stan` must be installed (along with
-either `rstan` and/or `cmdstanr`). Please refer to installation links
-for `Stan` with `rstan`
-<a href="https://mc-stan.org/users/interfaces/rstan"
+`GitHub` using: `devtools::install_github("nicholasjclark/mvgam")`. You
+will also need a working version of `Stan` installed (along with either
+`rstan` and/or `cmdstanr`). Please refer to installation links for
+`Stan` with `rstan` <a href="https://mc-stan.org/users/interfaces/rstan"
 target="_blank">here</a>, or for `Stan` with `cmdstandr`
 <a href="https://mc-stan.org/cmdstanr/" target="_blank">here</a>.
 
@@ -235,13 +237,13 @@ proper scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.5609185
+    #> 8.364028
     #> Out of sample DRPS:
-    #> 5.33853325
+    #> 5.18135225
     #> Out of sample DRPS:
-    #> 8.424171
+    #> 8.78577925
     #> Out of sample DRPS:
-    #> 3.66161025
+    #> 3.4286675
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
@@ -390,10 +392,9 @@ type `methods(class = "mvgam")`.
 ## Extended observation families
 
 `mvgam` was originally designed to analyse and forecast non-negative
-integer-valued data. These data are traditionally challenging to analyse
-with existing time-series analysis packages. But further development of
-`mvgam` has resulted in support for a growing number of observation
-families. Currently, the package can handle data for the following:
+integer-valued data. But further development of `mvgam` has resulted in
+support for a growing number of observation families. Currently, the
+package can handle data for the following:
 
 -   `gaussian()` for real-valued data
 -   `student_t()` for heavy-tailed real-valued data
@@ -530,8 +531,9 @@ can also be used to generate all necessary data structures, initial
 value functions and modelling code necessary to fit DGAMs using `Stan`.
 This can be helpful if users wish to make changes to the model to better
 suit their own bespoke research / analysis goals. The
-<a href="https://discourse.mc-stan.org/" target="_blank">Stan
-Discourse</a> is a helpful place to troubleshoot.
+<a href="https://discourse.mc-stan.org/"
+target="_blank"><code>Stan</code> Discourse</a> is a helpful place to
+troubleshoot.
 
 ## Citing `mvgam` and related software
 
