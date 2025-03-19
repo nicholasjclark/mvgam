@@ -7,14 +7,12 @@
 \usage{
 \method{loo}{mvgam}(x, incl_dynamics = FALSE, ...)
 
-\method{loo_compare}{mvgam}(x, ..., model_names = NULL, incl_dynamics = TRUE)
+\method{loo_compare}{mvgam}(x, ..., model_names = NULL, incl_dynamics = FALSE)
 }
 \arguments{
 \item{x}{Object of class \code{mvgam}}
 
-\item{incl_dynamics}{Logical; indicates if any latent dynamic structures that
-were included in the model should be considered when calculating in-sample
-log-likelihoods. Defaults to \code{TRUE}}
+\item{incl_dynamics}{Deprecated and currently ignored}
 
 \item{...}{More \code{mvgam} objects.}
 
@@ -33,30 +31,18 @@ Extract the LOOIC (leave-one-out information criterion) using
 \details{
 When comparing two (or more) fitted \code{mvgam} models, we can estimate the
 difference in their in-sample predictive accuracies using the Expcted Log Predictive
-Density (ELPD). This metric can be approximated using Pareto Smoothed Importance Sampling, which
-is a method to re-weight posterior draws to approximate what predictions the models might have
-made for a given datapoint had that datapoint not been included in the original model fit (i.e.
-if we were to run a leave-one-out cross-validation and then made a prediction for the held-out
-datapoint). See details from \code{\link[loo:loo]{loo::loo()}} and \code{\link[loo:loo_compare]{loo::loo_compare()}} for further information
-on how this importance sampling works.
+Density (ELPD). This metric can be approximated using Pareto Smoothed Importance Sampling
+(PSIS), which is a method to re-weight posterior draws to approximate what predictions the
+models might have made for a given datapoint had that datapoint not been included in the
+original model fit (i.e. if we were to run a leave-one-out cross-validation and then made
+a prediction for the held-out datapoint). See details from \code{\link[loo:loo]{loo::loo()}} and \code{\link[loo:loo_compare]{loo::loo_compare()}}
+for further information on how this importance sampling works.
 
-There are two different ways to calculate ELPD from \code{mvgam} models that included latent state
-estimates (i.e. "trend_models" or latent factors). The first is to use the predictions that were
-generated when estimating these latent states by setting \code{incl_dynamics = TRUE}. This provides
-an estimate of the fit \emph{to the exact data that were modelled} because any unknown states
-(i.e. latent temporal states, latent residuals) are used exactly as they were estimated. But it is
-usually more desirable to compare predictions by considering that the latent states are nuisance
-parameters that we'd wish to ignore when making inferences about other processes in the
-model (i.e. the linear predictor effects). Setting \code{incl_dynamics = FALSE} will accomplish
-this by \emph{asking whether the model could generalize to new data}. This option matches up with
-what \code{mvgam}'s prediction functions return (i.e. \code{\link{predict.mvgam}}, \code{\link{ppc}},
-\code{\link{pp_check.mvgam}}, \code{\link{posterior_epred.mvgam}}) and will be far less forgiving
-of models that may be overfitting the training data due to highly flexible latent processes
-(such as Random Walks, for example). Note that setting \code{incl_dynamics = FALSE} will often result
-in less stable Pareto k diagnostics for models with dynamic trends, making ELPD comparisons
-difficult and unstable. It is therefore recommended to perhaps use
-forecast evaluations for further scrutiny of these models (see for example \code{\link{forecast.mvgam}},
-\code{\link{score.mvgam_forecast}} and \code{\link{lfo_cv}})
+Note that in-sample predictive metrics such as PSIS-LOO can sometimes be overly optimistic for
+models that included process error components (such as those with \code{trend_model},
+\code{trend_formula} or \code{factor_formula} included). It is therefore recommended to perhaps use
+out-of-sample evaluations for further scrutiny of these models (see for example
+\code{\link{forecast.mvgam}}, \code{\link{score.mvgam_forecast}} and \code{\link{lfo_cv}})
 }
 \examples{
 \donttest{

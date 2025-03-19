@@ -366,7 +366,7 @@ jsdgam = function(
 
   # Set up the model structure but leave autoformat off so that the
   # model file can be easily modified
-  mod <- mvgam(
+  mod <- suppressWarnings(mvgam(
     formula = formula,
     trend_formula = factor_formula,
     knots = knots,
@@ -382,7 +382,7 @@ jsdgam = function(
     autoformat = FALSE,
     backend = backend,
     ...
-  )
+  ))
   model_file <- mod$model_file
 
   #### Modify model data and model file ####

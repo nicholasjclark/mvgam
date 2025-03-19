@@ -4,10 +4,7 @@
 #' [loo::loo()]
 #' @importFrom loo loo is.loo
 #' @param x Object of class `mvgam` or `jsdgam`
-#' @param incl_dynamics Logical; indicates if any latent dynamic states that
-#' were estimated in the model should be considered when calculating in-sample
-#' log-likelihoods. Defaults to `FALSE`. See **Details** below for a broader explanation
-#' about what this argument fundamentally does.
+#' @param incl_dynamics Deprecated and currently ignored
 #' @param ... Additional arguments for [loo::loo()]
 #' @rdname loo.mvgam
 #' @return  for `loo.mvgam`, an object of class `psis_loo` (see [loo::loo()]
@@ -15,30 +12,18 @@
 #' [loo::loo_compare()] for details)
 #' @details When comparing two (or more) fitted `mvgam` models, we can estimate the
 #' difference in their in-sample predictive accuracies using the Expcted Log Predictive
-#' Density (ELPD). This metric can be approximated using Pareto Smoothed Importance Sampling, which
-#' is a method to re-weight posterior draws to approximate what predictions the models might have
-#' made for a given datapoint had that datapoint not been included in the original model fit (i.e.
-#' if we were to run a leave-one-out cross-validation and then made a prediction for the held-out
-#' datapoint). See details from [loo::loo()] and [loo::loo_compare()] for further information
-#' on how this importance sampling works.
+#' Density (ELPD). This metric can be approximated using Pareto Smoothed Importance Sampling
+#' (PSIS), which is a method to re-weight posterior draws to approximate what predictions the
+#' models might have made for a given datapoint had that datapoint not been included in the
+#' original model fit (i.e. if we were to run a leave-one-out cross-validation and then made
+#' a prediction for the held-out datapoint). See details from [loo::loo()] and [loo::loo_compare()]
+#' for further information on how this importance sampling works.
 #'
-#' There are two different ways to calculate ELPD from `mvgam` models that included latent state
-#' estimates (i.e. "trend_models" or latent factors). The first is to use the predictions that were
-#' generated when estimating these latent states by setting `incl_dynamics = TRUE`. This provides
-#' an estimate of the fit *to the exact data that were modelled* because any unknown states
-#' (i.e. latent temporal states, latent residuals) are used exactly as they were estimated. But it is
-#' usually more desirable to compare predictions by considering that the latent states are nuisance
-#' parameters that we'd wish to ignore when making inferences about other processes in the
-#' model (i.e. the linear predictor effects). Setting `incl_dynamics = FALSE` will accomplish
-#' this by *asking whether the model could generalize to new data*. This option matches up with
-#' what `mvgam`'s prediction functions return (i.e. \code{\link{predict.mvgam}}, \code{\link{ppc}},
-#' \code{\link{pp_check.mvgam}}, \code{\link{posterior_epred.mvgam}}) and will be far less forgiving
-#' of models that may be overfitting the training data due to highly flexible latent processes
-#' (such as Random Walks, for example). Note that setting `incl_dynamics = FALSE` will often result
-#' in less stable Pareto k diagnostics for models with dynamic trends, making ELPD comparisons
-#' difficult and unstable. It is therefore recommended to perhaps use
-#' forecast evaluations for further scrutiny of these models (see for example \code{\link{forecast.mvgam}},
-#' \code{\link{score.mvgam_forecast}} and \code{\link{lfo_cv}})
+#' Note that in-sample predictive metrics such as PSIS-LOO can sometimes be overly optimistic for
+#' models that included process error components (such as those with `trend_model`,
+#' `trend_formula` or `factor_formula` included). It is therefore recommended to perhaps use
+#' out-of-sample evaluations for further scrutiny of these models (see for example
+#' \code{\link{forecast.mvgam}}, \code{\link{score.mvgam_forecast}} and \code{\link{lfo_cv}})
 #'@examples
 #'\donttest{
 #'# Simulate 4 time series with hierarchical seasonality
@@ -103,6 +88,26 @@
 #'}
 #' @export
 loo.mvgam <- function(x, incl_dynamics = FALSE, ...) {
+
+  # Families with observation error components can give strange log-likelihood estimates
+  # if process error components were also included in the model (this is because the
+  # observation error estimates may be very small); use incl_dynamics = TRUE for these
+  # families to ensure all errors are propagated appropriately when calculating the
+  # log-likelihood
+  incl_dynamics <- FALSE
+  if(x$family %in% c(
+    'negative binomial',
+    'beta_binomial',
+    "tweedie",
+    "beta",
+    "gaussian",
+    "lognormal",
+    "student",
+    "Gamma"
+  )) {
+    incl_dynamics <- TRUE
+  }
+
   if (x$family == 'nmix' | incl_dynamics) {
     logliks <- logLik(x, include_forecast = FALSE)
   } else {
@@ -139,16 +144,14 @@ loo.mvgam <- function(x, incl_dynamics = FALSE, ...) {
 #' @param ... More \code{mvgam} objects.
 #' @param model_names If `NULL` (the default) will use model names derived
 #' from deparsing the call. Otherwise will use the passed values as model names.
-#' @param incl_dynamics Logical; indicates if any latent dynamic structures that
-#' were included in the model should be considered when calculating in-sample
-#' log-likelihoods. Defaults to `TRUE`
+#' @param incl_dynamics Deprecated and currently ignored
 #' @rdname loo.mvgam
 #' @export
 loo_compare.mvgam <- function(
   x,
   ...,
   model_names = NULL,
-  incl_dynamics = TRUE
+  incl_dynamics = FALSE
 ) {
   models <- split_mod_dots(x, ..., model_names = model_names)
   loos <- named_list(names(models))
