@@ -1,3 +1,9 @@
+# mvgam development version
+
+## Changing defaults
+* Changed the default argument about conditioning on estimated latent states in the `loo()` and `loo_compare()` functions to `incl_dynamics = FALSE`. This is more appropriate for asking which models will generalize better to "new" data
+
+
 # mvgam 1.1.51
 
 ## New functionalities

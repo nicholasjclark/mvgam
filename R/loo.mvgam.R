@@ -4,9 +4,10 @@
 #' [loo::loo()]
 #' @importFrom loo loo is.loo
 #' @param x Object of class `mvgam` or `jsdgam`
-#' @param incl_dynamics Logical; indicates if any latent dynamic structures that
-#' were included in the model should be considered when calculating in-sample
-#' log-likelihoods. Defaults to `TRUE`
+#' @param incl_dynamics Logical; indicates if any latent dynamic states that
+#' were estimated in the model should be considered when calculating in-sample
+#' log-likelihoods. Defaults to `FALSE`. See **Details** below for a broader explanation
+#' about what this argument fundamentally does.
 #' @param ... Additional arguments for [loo::loo()]
 #' @rdname loo.mvgam
 #' @return  for `loo.mvgam`, an object of class `psis_loo` (see [loo::loo()]
@@ -21,22 +22,22 @@
 #' datapoint). See details from [loo::loo()] and [loo::loo_compare()] for further information
 #' on how this importance sampling works.
 #'
-#' There are two fundamentally different ways to calculate ELPD from `mvgam` models that included
-#' dynamic latent processes (i.e. "trend_models"). The first is to use the predictions that were
-#' generated when estimating these latent processes by setting `incl_dynamics = TRUE`. This works
-#' in the same way that setting `incl_autocor = TRUE` in [brms::prepare_predictions()]. But it may
-#' also be desirable to compare predictions by considering that the dynamic processes are nuisance
-#' parameters that we'd wish to account for when making inferences about other processes in the
+#' There are two different ways to calculate ELPD from `mvgam` models that included latent state
+#' estimates (i.e. "trend_models" or latent factors). The first is to use the predictions that were
+#' generated when estimating these latent states by setting `incl_dynamics = TRUE`. This provides
+#' an estimate of the fit *to the exact data that were modelled* because any unknown states
+#' (i.e. latent temporal states, latent residuals) are used exactly as they were estimated. But it is
+#' usually more desirable to compare predictions by considering that the latent states are nuisance
+#' parameters that we'd wish to ignore when making inferences about other processes in the
 #' model (i.e. the linear predictor effects). Setting `incl_dynamics = FALSE` will accomplish
-#' this by ignoring the dynamic processes when making predictions. This option matches up with
+#' this by *asking whether the model could generalize to new data*. This option matches up with
 #' what `mvgam`'s prediction functions return (i.e. \code{\link{predict.mvgam}}, \code{\link{ppc}},
 #' \code{\link{pp_check.mvgam}}, \code{\link{posterior_epred.mvgam}}) and will be far less forgiving
-#' of models that may be overfitting the training data due to highly flexible dynamic processes
-#' (such as Random Walks, for example). However setting `incl_dynamics = FALSE` will often result
+#' of models that may be overfitting the training data due to highly flexible latent processes
+#' (such as Random Walks, for example). Note that setting `incl_dynamics = FALSE` will often result
 #' in less stable Pareto k diagnostics for models with dynamic trends, making ELPD comparisons
-#' difficult and unstable. It is therefore recommended to generally stick with
-#' `incl_dynamics = TRUE` when comparing models based on in-sample fits, and then to perhaps use
-#' forecast evaluations for further scrutiny of models (see for example \code{\link{forecast.mvgam}},
+#' difficult and unstable. It is therefore recommended to perhaps use
+#' forecast evaluations for further scrutiny of these models (see for example \code{\link{forecast.mvgam}},
 #' \code{\link{score.mvgam_forecast}} and \code{\link{lfo_cv}})
 #'@examples
 #'\donttest{
@@ -101,7 +102,7 @@
 #'abline(h = 0, lty = 'dashed')
 #'}
 #' @export
-loo.mvgam <- function(x, incl_dynamics = TRUE, ...) {
+loo.mvgam <- function(x, incl_dynamics = FALSE, ...) {
   if (x$family == 'nmix' | incl_dynamics) {
     logliks <- logLik(x, include_forecast = FALSE)
   } else {

@@ -5,7 +5,7 @@
 \alias{loo_compare.mvgam}
 \title{LOO information criteria for \pkg{mvgam} models}
 \usage{
-\method{loo}{mvgam}(x, incl_dynamics = TRUE, ...)
+\method{loo}{mvgam}(x, incl_dynamics = FALSE, ...)
 
 \method{loo_compare}{mvgam}(x, ..., model_names = NULL, incl_dynamics = TRUE)
 }
@@ -40,22 +40,22 @@ if we were to run a leave-one-out cross-validation and then made a prediction fo
 datapoint). See details from \code{\link[loo:loo]{loo::loo()}} and \code{\link[loo:loo_compare]{loo::loo_compare()}} for further information
 on how this importance sampling works.
 
-There are two fundamentally different ways to calculate ELPD from \code{mvgam} models that included
-dynamic latent processes (i.e. "trend_models"). The first is to use the predictions that were
-generated when estimating these latent processes by setting \code{incl_dynamics = TRUE}. This works
-in the same way that setting \code{incl_autocor = TRUE} in \code{\link[brms:prepare_predictions]{brms::prepare_predictions()}}. But it may
-also be desirable to compare predictions by considering that the dynamic processes are nuisance
-parameters that we'd wish to account for when making inferences about other processes in the
+There are two different ways to calculate ELPD from \code{mvgam} models that included latent state
+estimates (i.e. "trend_models" or latent factors). The first is to use the predictions that were
+generated when estimating these latent states by setting \code{incl_dynamics = TRUE}. This provides
+an estimate of the fit \emph{to the exact data that were modelled} because any unknown states
+(i.e. latent temporal states, latent residuals) are used exactly as they were estimated. But it is
+usually more desirable to compare predictions by considering that the latent states are nuisance
+parameters that we'd wish to ignore when making inferences about other processes in the
 model (i.e. the linear predictor effects). Setting \code{incl_dynamics = FALSE} will accomplish
-this by ignoring the dynamic processes when making predictions. This option matches up with
+this by \emph{asking whether the model could generalize to new data}. This option matches up with
 what \code{mvgam}'s prediction functions return (i.e. \code{\link{predict.mvgam}}, \code{\link{ppc}},
 \code{\link{pp_check.mvgam}}, \code{\link{posterior_epred.mvgam}}) and will be far less forgiving
-of models that may be overfitting the training data due to highly flexible dynamic processes
-(such as Random Walks, for example). However setting \code{incl_dynamics = FALSE} will often result
+of models that may be overfitting the training data due to highly flexible latent processes
+(such as Random Walks, for example). Note that setting \code{incl_dynamics = FALSE} will often result
 in less stable Pareto k diagnostics for models with dynamic trends, making ELPD comparisons
-difficult and unstable. It is therefore recommended to generally stick with
-\code{incl_dynamics = TRUE} when comparing models based on in-sample fits, and then to perhaps use
-forecast evaluations for further scrutiny of models (see for example \code{\link{forecast.mvgam}},
+difficult and unstable. It is therefore recommended to perhaps use
+forecast evaluations for further scrutiny of these models (see for example \code{\link{forecast.mvgam}},
 \code{\link{score.mvgam_forecast}} and \code{\link{lfo_cv}})
 }
 \examples{
