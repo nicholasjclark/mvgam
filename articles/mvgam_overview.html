@@ -1538,8 +1538,8 @@ value is preferred for this metric):</p>
 <div class="sourceCode" id="cb44"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo_compare</a></span><span class="op">(</span><span class="va">model3</span>, <span class="va">model4</span><span class="op">)</span></span>
 <span><span class="co">#&gt;        elpd_diff se_diff</span></span>
-<span><span class="co">#&gt; model4  0.0       0.0   </span></span>
-<span><span class="co">#&gt; model3 -3.1       5.4</span></span></code></pre></div>
+<span><span class="co">#&gt; model3     0.0       0.0</span></span>
+<span><span class="co">#&gt; model4 -1025.4     129.0</span></span></code></pre></div>
 <p>The higher estimated log predictive density (ELPD) value for the
 dynamic model suggests it provides a better fit to the in-sample
 data.</p>

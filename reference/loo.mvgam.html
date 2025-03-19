@@ -70,7 +70,7 @@ loo::loo()"><meta property="og:image" content="https://nicholasjclark.github.io/
 <span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo</a></span><span class="op">(</span><span class="va">x</span>, incl_dynamics <span class="op">=</span> <span class="cn">FALSE</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo_compare</a></span><span class="op">(</span><span class="va">x</span>, <span class="va">...</span>, model_names <span class="op">=</span> <span class="cn">NULL</span>, incl_dynamics <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo_compare</a></span><span class="op">(</span><span class="va">x</span>, <span class="va">...</span>, model_names <span class="op">=</span> <span class="cn">NULL</span>, incl_dynamics <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -80,9 +80,7 @@ loo::loo()"><meta property="og:image" content="https://nicholasjclark.github.io/
 
 
 <dt>incl_dynamics</dt>
-<dd><p>Logical; indicates if any latent dynamic structures that
-were included in the model should be considered when calculating in-sample
-log-likelihoods. Defaults to <code>TRUE</code></p></dd>
+<dd><p>Deprecated and currently ignored</p></dd>
 
 
 <dt>...</dt>
@@ -108,29 +106,17 @@ from deparsing the call. Otherwise will use the passed values as model names.</p
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>When comparing two (or more) fitted <code>mvgam</code> models, we can estimate the
 difference in their in-sample predictive accuracies using the Expcted Log Predictive
-Density (ELPD). This metric can be approximated using Pareto Smoothed Importance Sampling, which
-is a method to re-weight posterior draws to approximate what predictions the models might have
-made for a given datapoint had that datapoint not been included in the original model fit (i.e.
-if we were to run a leave-one-out cross-validation and then made a prediction for the held-out
-datapoint). See details from <code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo::loo()</a></code> and <code><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo::loo_compare()</a></code> for further information
-on how this importance sampling works.</p>
-<p>There are two different ways to calculate ELPD from <code>mvgam</code> models that included latent state
-estimates (i.e. "trend_models" or latent factors). The first is to use the predictions that were
-generated when estimating these latent states by setting <code>incl_dynamics = TRUE</code>. This provides
-an estimate of the fit <em>to the exact data that were modelled</em> because any unknown states
-(i.e. latent temporal states, latent residuals) are used exactly as they were estimated. But it is
-usually more desirable to compare predictions by considering that the latent states are nuisance
-parameters that we'd wish to ignore when making inferences about other processes in the
-model (i.e. the linear predictor effects). Setting <code>incl_dynamics = FALSE</code> will accomplish
-this by <em>asking whether the model could generalize to new data</em>. This option matches up with
-what <code>mvgam</code>'s prediction functions return (i.e. <code><a href="predict.mvgam.html">predict.mvgam</a></code>, <code><a href="ppc.mvgam.html">ppc</a></code>,
-<code><a href="pp_check.mvgam.html">pp_check.mvgam</a></code>, <code><a href="posterior_epred.mvgam.html">posterior_epred.mvgam</a></code>) and will be far less forgiving
-of models that may be overfitting the training data due to highly flexible latent processes
-(such as Random Walks, for example). Note that setting <code>incl_dynamics = FALSE</code> will often result
-in less stable Pareto k diagnostics for models with dynamic trends, making ELPD comparisons
-difficult and unstable. It is therefore recommended to perhaps use
-forecast evaluations for further scrutiny of these models (see for example <code><a href="forecast.mvgam.html">forecast.mvgam</a></code>,
-<code><a href="score.mvgam_forecast.html">score.mvgam_forecast</a></code> and <code><a href="lfo_cv.mvgam.html">lfo_cv</a></code>)</p>
+Density (ELPD). This metric can be approximated using Pareto Smoothed Importance Sampling
+(PSIS), which is a method to re-weight posterior draws to approximate what predictions the
+models might have made for a given datapoint had that datapoint not been included in the
+original model fit (i.e. if we were to run a leave-one-out cross-validation and then made
+a prediction for the held-out datapoint). See details from <code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo::loo()</a></code> and <code><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo::loo_compare()</a></code>
+for further information on how this importance sampling works.</p>
+<p>Note that in-sample predictive metrics such as PSIS-LOO can sometimes be overly optimistic for
+models that included process error components (such as those with <code>trend_model</code>,
+<code>trend_formula</code> or <code>factor_formula</code> included). It is therefore recommended to perhaps use
+out-of-sample evaluations for further scrutiny of these models (see for example
+<code><a href="forecast.mvgam.html">forecast.mvgam</a></code>, <code><a href="score.mvgam_forecast.html">score.mvgam_forecast</a></code> and <code><a href="lfo_cv.mvgam.html">lfo_cv</a></code>)</p>
     </div>
 
     <div class="section level2">
@@ -217,19 +203,19 @@ forecast evaluations for further scrutiny of these models (see for example <code
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 300 log-likelihood matrix.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate     SE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo  -5713.7  518.9</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo      5352.2  497.1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> looic     11427.3 1037.7</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate   SE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo   -240.6 10.3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo       179.0  7.6</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> looic       481.2 20.7</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> MCSE of elpd_loo is NA.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.0, 0.6]).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.0, 0.1]).</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Pareto k diagnostic values:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                           Count Pct.    Min. ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.67]   (good)      62   20.7%   9       </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.67, 1]   (bad)       28    9.3%   &lt;NA&gt;    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     (1, Inf)   (very bad) 210   70.0%   &lt;NA&gt;    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.67]   (good)     139   46.3%   2       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.67, 1]   (bad)      149   49.7%   &lt;NA&gt;    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     (1, Inf)   (very bad)  12    4.0%   &lt;NA&gt;    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> See help('pareto-k-diagnostic') for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Compare models using LOO</span></span></span>
@@ -273,18 +259,18 @@ forecast evaluations for further scrutiny of these models (see for example <code
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 1.0 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 1.2 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 1.0 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 1.1 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 1.3 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 1.2 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="va">lfo_mod3</span> <span class="op">&lt;-</span> <span class="fu"><a href="lfo_cv.mvgam.html">lfo_cv</a></span><span class="op">(</span><span class="va">mod3</span>, min_t <span class="op">=</span> <span class="fl">92</span><span class="op">)</span></span></span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
@@ -315,13 +301,13 @@ forecast evaluations for further scrutiny of these models (see for example <code
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 15.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 15.7 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 23.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 23.4 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 19.5 seconds.</span>
@@ -358,14 +344,14 @@ forecast evaluations for further scrutiny of these models (see for example <code
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 23.6 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 23.7 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 28.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 29.1 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 26.1 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 28.7 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 26.4 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 29.3 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
@@ -399,7 +385,7 @@ forecast evaluations for further scrutiny of these models (see for example <code
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 23.4 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 23.3 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 23.5 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -441,11 +427,11 @@ forecast evaluations for further scrutiny of these models (see for example <code
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 34.9 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 34.4 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 26.0 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 35.0 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 25.7 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 34.5 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Take the difference in forecast ELPDs; a model with higher ELPD is preferred,</span></span></span>
