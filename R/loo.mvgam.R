@@ -88,7 +88,6 @@
 #'}
 #' @export
 loo.mvgam <- function(x, incl_dynamics = FALSE, ...) {
-
   # Families with observation error components can give strange log-likelihood estimates
   # if process error components were also included in the model (this is because the
   # observation error estimates may be very small); use incl_dynamics = TRUE for these
@@ -100,6 +99,20 @@ loo.mvgam <- function(x, incl_dynamics = FALSE, ...) {
     "lognormal",
     "student"
   )) {
+
+  if (
+    x$family %in%
+      c(
+        'negative binomial',
+        'beta_binomial',
+        "tweedie",
+        "beta",
+        "gaussian",
+        "lognormal",
+        "student",
+        "Gamma"
+      )
+  ) {
     incl_dynamics <- TRUE
   }
 
