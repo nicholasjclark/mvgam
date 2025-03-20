@@ -3,6 +3,8 @@
 ## Changing defaults
 * Deprecated the `incl_dynamics` argument in the `loo()` and `loo_compare()` functions to ensure better consistency in log-likelihood and resulting LOO estimates from models with different observation families
 
+## Bug fixes
+* Bug fix to ensure piecewise trends are correctly predicted when using `process_error = TRUE` in `predict()`
 
 # mvgam 1.1.51
 

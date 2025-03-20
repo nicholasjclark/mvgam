@@ -386,6 +386,19 @@ predict.mvgam = function(
             sigma_obs = mcmc_chains(object$model_output, 'alpha_gp')
           )
         }
+        if (attr(object$model_data, 'trend_model') %in% c('PWlogistic',
+                                                          'PWlinear')) {
+          trend_hcs <- hindcast(object, type = 'trend')
+          sigma_obs <- unlist(
+            lapply(seq_along(trend_hcs$hindcasts), function(x){
+              mean(apply(trend_hcs$hindcasts[[x]], 2, sd))
+            }),
+            use.names = FALSE
+          )
+          family_pars <- list(
+            sigma_obs = sigma_obs
+          )
+        }
 
         # Indicators of which trend to use for each observation
         if (!is.null(object$trend_map)) {
