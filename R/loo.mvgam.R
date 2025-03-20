@@ -99,20 +99,6 @@ loo.mvgam <- function(x, incl_dynamics = FALSE, ...) {
     "lognormal",
     "student"
   )) {
-
-  if (
-    x$family %in%
-      c(
-        'negative binomial',
-        'beta_binomial',
-        "tweedie",
-        "beta",
-        "gaussian",
-        "lognormal",
-        "student",
-        "Gamma"
-      )
-  ) {
     incl_dynamics <- TRUE
   }
 
