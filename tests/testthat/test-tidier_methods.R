@@ -27,40 +27,54 @@ test_that("`tidy()` snapshot value of `mvgam_example6`", {
 
   # Hierarchical dynamics example adapted from RW documentation example.
   # The difference is that this uses 4 species rather than 3.
-  simdat1 <- sim_mvgam(trend_model = VAR(cor = TRUE),
-                       prop_trend = 0.95,
-                       n_series = 4,
-                       mu = c(1, 2, 3, 4))
-  simdat2 <- sim_mvgam(trend_model = VAR(cor = TRUE),
-                       prop_trend = 0.95,
-                       n_series = 4,
-                       mu = c(1, 2, 3, 4))
-  simdat3 <- sim_mvgam(trend_model = VAR(cor = TRUE),
-                       prop_trend = 0.95,
-                       n_series = 4,
-                       mu = c(1, 2, 3, 4))
+  simdat1 <- sim_mvgam(
+    trend_model = VAR(cor = TRUE),
+    prop_trend = 0.95,
+    n_series = 4,
+    mu = c(1, 2, 3, 4)
+  )
+  simdat2 <- sim_mvgam(
+    trend_model = VAR(cor = TRUE),
+    prop_trend = 0.95,
+    n_series = 4,
+    mu = c(1, 2, 3, 4)
+  )
+  simdat3 <- sim_mvgam(
+    trend_model = VAR(cor = TRUE),
+    prop_trend = 0.95,
+    n_series = 4,
+    mu = c(1, 2, 3, 4)
+  )
 
-  simdat_all <- rbind(simdat1$data_train %>%
-                        dplyr::mutate(region = 'qld'),
-                      simdat2$data_train %>%
-                        dplyr::mutate(region = 'nsw'),
-                      simdat3$data_train %>%
-                        dplyr::mutate(region = 'vic')) %>%
-    dplyr::mutate(species = gsub('series', 'species', series),
-                  species = as.factor(species),
-                  region = as.factor(region)) %>%
+  simdat_all <- rbind(
+    simdat1$data_train %>%
+      dplyr::mutate(region = 'qld'),
+    simdat2$data_train %>%
+      dplyr::mutate(region = 'nsw'),
+    simdat3$data_train %>%
+      dplyr::mutate(region = 'vic')
+  ) %>%
+    dplyr::mutate(
+      species = gsub('series', 'species', series),
+      species = as.factor(species),
+      region = as.factor(region)
+    ) %>%
     dplyr::arrange(series, time) %>%
     dplyr::select(-series)
 
-  mvgam_example6 <- suppressWarnings(mvgam(formula = y ~ species,
-                          trend_model = AR(gr = region, subgr = species),
-                          data = simdat_all))
+  mvgam_example6 <- suppressWarnings(mvgam(
+    formula = y ~ species,
+    trend_model = AR(gr = region, subgr = species),
+    data = simdat_all
+  ))
 
   tidyout = tidy.mvgam(mvgam_example6)
 
   expect_equal(dim(tidyout), c(65, 7))
-  expect_equal(colnames(tidyout),
-               c("parameter", "type", "mean", "sd", "2.5%", "50%", "97.5%"))
+  expect_equal(
+    colnames(tidyout),
+    c("parameter", "type", "mean", "sd", "2.5%", "50%", "97.5%")
+  )
   expect_snapshot_value(tidyout[c("parameter", "type")], style = "json2")
 })
 

@@ -79,15 +79,17 @@ generics::augment
 tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
   object <- x
   obj_vars <- variables(object)
-  digits <- 2  # TODO: Let user change?
-  partialized_mcmc_summary <- purrr::partial(mcmc_summary,
-                                             object$model_output,
-                                             ... =,
-                                             ISB = FALSE,  # Matches `x[i]`'s rather than `x`.
-                                             probs = probs,
-                                             digits = digits,
-                                             Rhat = FALSE,
-                                             n.eff = FALSE)
+  digits <- 2 # TODO: Let user change?
+  partialized_mcmc_summary <- purrr::partial(
+    mcmc_summary,
+    object$model_output,
+    ... = ,
+    ISB = FALSE, # Matches `x[i]`'s rather than `x`.
+    probs = probs,
+    digits = digits,
+    Rhat = FALSE,
+    n.eff = FALSE
+  )
   out <- tibble::tibble()
 
   # Observation family extra parameters --------
@@ -96,21 +98,30 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
   xp_names <- grep("vec", xp_names_all, value = TRUE, invert = TRUE)
   if (length(xp_names) > 0) {
     extra_params_out <- partialized_mcmc_summary(params = xp_names)
-    extra_params_out <- tibble::add_column(extra_params_out,
-                                          type = "observation_family_extra_param",
-                                          .before = 1)
+    extra_params_out <- tibble::add_column(
+      extra_params_out,
+      type = "observation_family_extra_param",
+      .before = 1
+    )
     out <- dplyr::bind_rows(out, extra_params_out)
   }
   # END Observation family extra parameters
 
   # obs non-smoother betas --------
   if (object$mgcv_model$nsdf > 0) {
-    obs_beta_name_map <- dplyr::slice_head(obj_vars$observation_betas, n = object$mgcv_model$nsdf)  # df("orig_name", "alias")
-    obs_betas_out <- partialized_mcmc_summary(params = obs_beta_name_map$orig_name)
+    obs_beta_name_map <- dplyr::slice_head(
+      obj_vars$observation_betas,
+      n = object$mgcv_model$nsdf
+    ) # df("orig_name", "alias")
+    obs_betas_out <- partialized_mcmc_summary(
+      params = obs_beta_name_map$orig_name
+    )
     row.names(obs_betas_out) <- obs_beta_name_map$alias
-    obs_betas_out <- tibble::add_column(obs_betas_out,
-                                       type = "observation_beta",
-                                       .before = 1)
+    obs_betas_out <- tibble::add_column(
+      obs_betas_out,
+      type = "observation_beta",
+      .before = 1
+    )
     out <- dplyr::bind_rows(out, obs_betas_out)
   }
   # END obs non-smoother betas
@@ -119,11 +130,15 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
   # TODO: names for random slopes
   re_param_name_map <- obj_vars$observation_re_params
   if (!is.null(re_param_name_map)) {
-    re_params_out <- partialized_mcmc_summary(params = re_param_name_map$orig_name)
+    re_params_out <- partialized_mcmc_summary(
+      params = re_param_name_map$orig_name
+    )
     row.names(re_params_out) <- re_param_name_map$alias
-    re_params_out <- tibble::add_column(re_params_out,
-                                          type = "random_effect_group_level",
-                                          .before = 1)
+    re_params_out <- tibble::add_column(
+      re_params_out,
+      type = "random_effect_group_level",
+      .before = 1
+    )
     out <- dplyr::bind_rows(out, re_params_out)
 
     # specific betas
@@ -133,11 +148,15 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
         betas_all <- obj_vars$observation_betas
         re_beta_idxs <- grep(re_label, betas_all$alias, fixed = TRUE)
         re_beta_name_map <- dplyr::slice(betas_all, re_beta_idxs)
-        re_betas_out <- partialized_mcmc_summary(params = re_beta_name_map$orig_name)
+        re_betas_out <- partialized_mcmc_summary(
+          params = re_beta_name_map$orig_name
+        )
         row.names(re_betas_out) <- re_beta_name_map$alias
-        re_betas_out <- tibble::add_column(re_betas_out,
-                                           type = "random_effect_beta",
-                                           .before = 1)
+        re_betas_out <- tibble::add_column(
+          re_betas_out,
+          type = "random_effect_beta",
+          .before = 1
+        )
         out <- dplyr::bind_rows(out, re_betas_out)
       }
     }
@@ -147,20 +166,27 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
   # GPs --------
   if (!is.null(obj_vars$trend_pars)) {
     tm_param_names_all <- obj_vars$trend_pars$orig_name
-    gp_param_names <- grep("^alpha_gp|^rho_gp", tm_param_names_all, value = TRUE)
+    gp_param_names <- grep(
+      "^alpha_gp|^rho_gp",
+      tm_param_names_all,
+      value = TRUE
+    )
     if (length(gp_param_names) > 0) {
       gp_params_out <- partialized_mcmc_summary(params = gp_param_names)
       # where is GP? can be in formula, trend_formula, or trend_model
       if (grepl("^(alpha|rho)_gp_trend", gp_param_names[[1]])) {
         param_type <- "trend_formula_param"
-      } else if (grepl("^(alpha|rho)_gp_", gp_param_names[[1]])) {  # hmph.
+      } else if (grepl("^(alpha|rho)_gp_", gp_param_names[[1]])) {
+        # hmph.
         param_type <- "observation_param"
       } else {
         param_type <- "trend_model_param"
       }
-      gp_params_out <- tibble::add_column(gp_params_out,
-                                          type = param_type,
-                                          .before = 1)
+      gp_params_out <- tibble::add_column(
+        gp_params_out,
+        type = param_type,
+        .before = 1
+      )
       out <- dplyr::bind_rows(out, gp_params_out)
     }
   }
@@ -168,9 +194,11 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
 
   # RW, AR, CAR, VAR, ZMVN --------
   # TODO: split out Sigma for heircor?
-  trend_model_name <- ifelse(inherits(object$trend_model, "mvgam_trend"),
-                       object$trend_model$trend_model,
-                       object$trend_model)  # str vs called obj as arg to mvgam
+  trend_model_name <- ifelse(
+    inherits(object$trend_model, "mvgam_trend"),
+    object$trend_model$trend_model,
+    object$trend_model
+  ) # str vs called obj as arg to mvgam
   if (grepl("^VAR|^CAR|^AR|^RW|^ZMVN", trend_model_name)) {
     # theta = MA terms
     # alpha_cor = heirarchical corr term
@@ -182,7 +210,8 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
     if (trend_model_name == "VAR") {
       trend_model_params <- c("^A\\[", "^alpha_cor", "^theta", "^Sigma")
     } else if (grepl("^CAR|^AR|^RW", trend_model_name)) {
-      cor <- inherits(object$trend_model, "mvgam_trend") && object$trend_model$cor
+      cor <- inherits(object$trend_model, "mvgam_trend") &&
+        object$trend_model$cor
       sigma_name <- ifelse(cor, "^Sigma", "^sigma")
       trend_model_params <- c("^ar", "^alpha_cor", "^theta", sigma_name)
     } else if (grepl("^ZMVN", trend_model_name)) {
@@ -194,9 +223,11 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
     tm_param_names_all <- obj_vars$trend_pars$orig_name
     tm_param_names <- grep(trend_model_params, tm_param_names_all, value = TRUE)
     tm_params_out <- partialized_mcmc_summary(params = tm_param_names)
-    tm_params_out <- tibble::add_column(tm_params_out,
-                                          type = "trend_model_param",
-                                          .before = 1)
+    tm_params_out <- tibble::add_column(
+      tm_params_out,
+      type = "trend_model_param",
+      .before = 1
+    )
     out <- dplyr::bind_rows(out, tm_params_out)
   }
   # END RW, AR, CAR, VAR
@@ -207,9 +238,11 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
     trend_pars_names <- grep("sigma", trend_pars_names_all, value = TRUE)
     if (length(trend_pars_names) > 0) {
       trend_params_out <- partialized_mcmc_summary(params = trend_pars_names)
-      trend_params_out <- tibble::add_column(trend_params_out,
-                                             type = "trend_model_param",
-                                             .before = 1)
+      trend_params_out <- tibble::add_column(
+        trend_params_out,
+        type = "trend_model_param",
+        .before = 1
+      )
       out <- dplyr::bind_rows(out, trend_params_out)
     }
   }
@@ -226,22 +259,30 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
     tm_param_names_all <- obj_vars$trend_pars$orig_name
     tm_param_names <- grep(trend_model_params, tm_param_names_all, value = TRUE)
     tm_params_out <- partialized_mcmc_summary(params = tm_param_names)
-    tm_params_out <- tibble::add_column(tm_params_out,
-                                          type = "trend_model_param",
-                                          .before = 1)
+    tm_params_out <- tibble::add_column(
+      tm_params_out,
+      type = "trend_model_param",
+      .before = 1
+    )
     out <- dplyr::bind_rows(out, tm_params_out)
   }
   # END Piecewise
 
   # Trend formula betas --------
   if (!is.null(object$trend_call) && object$trend_mgcv_model$nsdf > 0) {
-    trend_beta_name_map <- dplyr::slice_head(obj_vars$trend_betas,
-                                           n = object$trend_mgcv_model$nsdf)  # df("orig_name", "alias")
-    trend_betas_out <- partialized_mcmc_summary(params = trend_beta_name_map$orig_name)
+    trend_beta_name_map <- dplyr::slice_head(
+      obj_vars$trend_betas,
+      n = object$trend_mgcv_model$nsdf
+    ) # df("orig_name", "alias")
+    trend_betas_out <- partialized_mcmc_summary(
+      params = trend_beta_name_map$orig_name
+    )
     row.names(trend_betas_out) <- trend_beta_name_map$alias
-    trend_betas_out <- tibble::add_column(trend_betas_out,
-                                        type = "trend_beta",
-                                        .before = 1)
+    trend_betas_out <- tibble::add_column(
+      trend_betas_out,
+      type = "trend_beta",
+      .before = 1
+    )
     out <- dplyr::bind_rows(out, trend_betas_out)
   }
   # END Trend formula betas
@@ -249,11 +290,15 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
   # trend random effects --------
   trend_re_param_name_map <- obj_vars$trend_re_params
   if (!is.null(trend_re_param_name_map)) {
-    trend_re_params_out <- partialized_mcmc_summary(params = trend_re_param_name_map$orig_name)
+    trend_re_params_out <- partialized_mcmc_summary(
+      params = trend_re_param_name_map$orig_name
+    )
     row.names(trend_re_params_out) <- trend_re_param_name_map$alias
-    trend_re_params_out <- tibble::add_column(trend_re_params_out,
-                                        type = "trend_random_effect_group_level",
-                                        .before = 1)
+    trend_re_params_out <- tibble::add_column(
+      trend_re_params_out,
+      type = "trend_random_effect_group_level",
+      .before = 1
+    )
     out <- dplyr::bind_rows(out, trend_re_params_out)
 
     # specific betas
@@ -261,13 +306,24 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
       if (inherits(sp, "random.effect")) {
         trend_re_label <- sp$label
         trend_betas_all <- obj_vars$trend_betas
-        trend_re_beta_idxs <- grep(trend_re_label, trend_betas_all$alias, fixed = TRUE)
-        trend_re_beta_name_map <- dplyr::slice(trend_betas_all, trend_re_beta_idxs)
-        trend_re_betas_out <- partialized_mcmc_summary(params = trend_re_beta_name_map$orig_name)
+        trend_re_beta_idxs <- grep(
+          trend_re_label,
+          trend_betas_all$alias,
+          fixed = TRUE
+        )
+        trend_re_beta_name_map <- dplyr::slice(
+          trend_betas_all,
+          trend_re_beta_idxs
+        )
+        trend_re_betas_out <- partialized_mcmc_summary(
+          params = trend_re_beta_name_map$orig_name
+        )
         row.names(trend_re_betas_out) <- trend_re_beta_name_map$alias
-        trend_re_betas_out <- tibble::add_column(trend_re_betas_out,
-                                           type = "trend_random_effect_beta",
-                                           .before = 1)
+        trend_re_betas_out <- tibble::add_column(
+          trend_re_betas_out,
+          type = "trend_random_effect_beta",
+          .before = 1
+        )
         out <- dplyr::bind_rows(out, trend_re_betas_out)
       }
     }
@@ -315,12 +371,14 @@ split_hier_Sigma <- function(object, params) {
 
   # anything besides the dummy params should have non-zero sd
   params_Sigma <- dplyr::filter(params_Sigma, mean != 0, sd != 0)
-  index_strs <- sub("Sigma", "", params_Sigma$parameter)[1:(n_subgr ** 2)]
+  index_strs <- sub("Sigma", "", params_Sigma$parameter)[1:(n_subgr**2)]
 
   # new names
-  new_names <- paste0("Sigma_",
-                     rep(seq_len(n_gr), each = n_subgr ** 2),
-                     index_strs)
+  new_names <- paste0(
+    "Sigma_",
+    rep(seq_len(n_gr), each = n_subgr**2),
+    index_strs
+  )
   params_Sigma["parameter"] <- new_names
 
   dplyr::bind_rows(params_nonSigma, params_Sigma)
