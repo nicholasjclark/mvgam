@@ -2,6 +2,7 @@
 
 ## Changing defaults
 * Deprecated the `incl_dynamics` argument in the `loo()` and `loo_compare()` functions to ensure better consistency in log-likelihood and resulting LOO estimates from models with different observation families
+* Changed default `type` in `conditional_effects()` to `expected` to match behaviour of 'brms'
 
 ## Bug fixes
 * Bug fix to ensure piecewise trends are correctly predicted when using `process_error = TRUE` in `predict()`
