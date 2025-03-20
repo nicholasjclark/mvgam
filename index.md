@@ -1,7 +1,7 @@
 
 # mvgam
 
-> **M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
+> **M**ulti**V**ariate (Dynamic) **G**eneralized **A**dditive **M**odels
 
 The goal of the `mvgam` 📦 is to fit Bayesian Dynamic Generalized
 Additive Models (DGAMs) that can include highly flexible nonlinear
