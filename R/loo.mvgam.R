@@ -94,11 +94,14 @@ loo.mvgam <- function(x, incl_dynamics = FALSE, ...) {
   # families to ensure all errors are propagated appropriately when calculating the
   # log-likelihood
   incl_dynamics <- FALSE
-  if(x$family %in% c(
-    "gaussian",
-    "lognormal",
-    "student"
-  )) {
+  if (
+    x$family %in%
+      c(
+        "gaussian",
+        "lognormal",
+        "student"
+      )
+  ) {
     incl_dynamics <- TRUE
   }
 
