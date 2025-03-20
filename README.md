@@ -4,7 +4,7 @@
 
 # mvgam
 
-> **M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
+> **M**ulti**V**ariate (Dynamic) **G**eneralized **A**dditive **M**odels
 
 [![R-CMD-check](https://github.com/nicholasjclark/mvgam/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
 [![Coverage
@@ -237,13 +237,13 @@ proper scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.17268725
+    #> 8.585835
     #> Out of sample DRPS:
-    #> 5.41406825
+    #> 5.33402375
     #> Out of sample DRPS:
-    #> 8.79829925
+    #> 8.79655225
     #> Out of sample DRPS:
-    #> 3.4184625
+    #> 3.41807675
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
