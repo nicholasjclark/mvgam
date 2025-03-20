@@ -34,7 +34,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.51</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.52</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-03-19</h4>
+            <h4 data-toc-skip class="date">2025-03-20</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/time_varying_effects.Rmd" class="external-link"><code>vignettes/time_varying_effects.Rmd</code></a></small>
       <div class="d-none name"><code>time_varying_effects.Rmd</code></div>
@@ -637,8 +637,8 @@ leave-one-out cross-validation as implemented in the popular
 <div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo_compare</a></span><span class="op">(</span><span class="va">mod0</span>, <span class="va">mod1</span><span class="op">)</span></span>
 <span><span class="co">#&gt;      elpd_diff se_diff</span></span>
-<span><span class="co">#&gt; mod1  0.0       0.0   </span></span>
-<span><span class="co">#&gt; mod0 -9.3       3.1</span></span></code></pre></div>
+<span><span class="co">#&gt; mod0     0.0       0.0</span></span>
+<span><span class="co">#&gt; mod1 -1402.1     148.0</span></span></code></pre></div>
 <p>The second model has the larger Expected Log Predictive Density
 (ELPD), meaning that it is slightly favoured over the simpler model that
 did not include the time-varying upwelling effect. However, the two
@@ -660,9 +660,9 @@ more about how this process works in Bürkner et al. 2020).</p>
 better 1-step ahead forecasts, with a higher total forecast ELPD</p>
 <div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">lfo_mod0</span><span class="op">$</span><span class="va">elpds</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 35.72628</span></span>
+<span><span class="co">#&gt; [1] 35.65626</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">lfo_mod1</span><span class="op">$</span><span class="va">elpds</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 37.17856</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 37.10818</span></span></code></pre></div>
 <p>We can also plot the ELPDs for each model as a contrast. Here, values
 less than zero suggest the time-varying predictor model (Mod1) gives
 better 1-step ahead forecasts:</p>
