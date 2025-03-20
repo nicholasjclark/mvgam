@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
 
 # mvgam
 
-> **M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
+> **M**ulti**V**ariate (Dynamic) **G**eneralized **A**dditive **M**odels
 
 [![R-CMD-check](https://github.com/nicholasjclark/mvgam/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
 [![Coverage status](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://app.codecov.io/gh/nicholasjclark/mvgam)
