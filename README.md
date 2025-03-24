@@ -19,8 +19,8 @@ Downloads](https://cranlogs.r-pkg.org/badges/grand-total/mvgam?color=brightgreen
 
 The goal of the `mvgam` 📦 is to fit Bayesian Dynamic Generalized
 Additive Models (DGAMs) that can include highly flexible nonlinear
-predictor effects for both process and observation components. The
-package does this by relying on functionalities from the impressive
+predictor effects and latent dynamic processes. The package does this by
+relying on functionalities from the impressive
 <a href="https://paulbuerkner.com/brms/"
 target="_blank"><code>brms</code></a> and
 <a href="https://cran.r-project.org/package=mgcv"
@@ -238,13 +238,13 @@ proper scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.8375985
+    #> 8.30868025
     #> Out of sample DRPS:
-    #> 5.204349
+    #> 5.28094325
     #> Out of sample DRPS:
-    #> 8.46331775
+    #> 8.69913625
     #> Out of sample DRPS:
-    #> 3.547568
+    #> 3.46028675
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
