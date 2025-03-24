@@ -42,12 +42,13 @@ very wide range of models, including:
 
 ## Installation
 
-Install the stable version from `CRAN` using:
-`install.packages('mvgam')`, or install the development version from
-`GitHub` using: `devtools::install_github("nicholasjclark/mvgam")`. You
-will also need a working version of `Stan` installed (along with either
-`rstan` and/or `cmdstanr`). Please refer to installation links for
-`Stan` with `rstan` <a href="https://mc-stan.org/users/interfaces/rstan"
+Install the stable package version from `CRAN` using:
+`install.packages('mvgam')`, or install the latest development version
+from `GitHub` using: `devtools::install_github("nicholasjclark/mvgam")`.
+You will also need a working version of `Stan` installed (along with
+either `rstan` and/or `cmdstanr`). Please refer to installation links
+for `Stan` with `rstan`
+<a href="https://mc-stan.org/users/interfaces/rstan"
 target="_blank">here</a>, or for `Stan` with `cmdstandr`
 <a href="https://mc-stan.org/cmdstanr/" target="_blank">here</a>.
 
@@ -237,13 +238,13 @@ proper scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.585835
+    #> 8.8375985
     #> Out of sample DRPS:
-    #> 5.33402375
+    #> 5.204349
     #> Out of sample DRPS:
-    #> 8.79655225
+    #> 8.46331775
     #> Out of sample DRPS:
-    #> 3.41807675
+    #> 3.547568
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
