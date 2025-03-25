@@ -39,8 +39,7 @@ The goal of the `mvgam` 📦 is to fit Bayesian Dynamic Generalized Additive Mod
 * [Joint Species Distribution Models](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html){target="_blank"}
 
 ## Installation
-Install the stable package version from `CRAN` using: `install.packages('mvgam')`, or install the latest development version from `GitHub` using:
-`devtools::install_github("nicholasjclark/mvgam")`. You will also need a working version of `Stan` installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}.
+Install the stable package version from `CRAN` using: `install.packages('mvgam')`, or install the latest development version from `GitHub` using: `devtools::install_github("nicholasjclark/mvgam")`. You will also need a working version of `Stan` installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}.
 
 ## Cheatsheet
 [![`mvgam` usage cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
@@ -57,7 +56,7 @@ theme_set(theme_bw())
 library(mvgam)
 ```
 
-```{r, fig.alt = "Visualizing the multivariate time series in mvgam", warning=FALSE}
+```{r, fig.alt = "Visualizing multivariate time series in R using mvgam", warning=FALSE}
 data(portal_data)
 plot_mvgam_series(
   data = portal_data, 
