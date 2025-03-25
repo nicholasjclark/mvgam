@@ -73,7 +73,7 @@ time (see `?portal_data` for more details)
       series = 'all'
     )
 
-<img src="man/figures/README-unnamed-chunk-4-1.png" alt="Visualizing the multivariate time series in mvgam" width="100%" />
+<img src="man/figures/README-unnamed-chunk-4-1.png" alt="Visualizing multivariate time series in R using mvgam" width="100%" />
 
     plot_mvgam_series(
       data = portal_data, 
@@ -81,7 +81,7 @@ time (see `?portal_data` for more details)
       series = 1
     )
 
-<img src="man/figures/README-unnamed-chunk-4-2.png" alt="Visualizing the multivariate time series in mvgam" width="100%" />
+<img src="man/figures/README-unnamed-chunk-4-2.png" alt="Visualizing multivariate time series in R using mvgam" width="100%" />
 
     plot_mvgam_series(
       data = portal_data, 
@@ -89,7 +89,7 @@ time (see `?portal_data` for more details)
       series = 4
     )
 
-<img src="man/figures/README-unnamed-chunk-4-3.png" alt="Visualizing the multivariate time series in mvgam" width="100%" />
+<img src="man/figures/README-unnamed-chunk-4-3.png" alt="Visualizing multivariate time series in R using mvgam" width="100%" />
 
 These plots show that the time series are count-responses, with missing
 data, seasonality and temporal autocorrelation all present. These
@@ -238,13 +238,13 @@ proper scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.30868025
+    #> 8.76354925
     #> Out of sample DRPS:
-    #> 5.28094325
+    #> 5.35717175
     #> Out of sample DRPS:
-    #> 8.69913625
+    #> 8.6517525
     #> Out of sample DRPS:
-    #> 3.46028675
+    #> 3.46871175
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
