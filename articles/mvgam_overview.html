@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-03-25</h4>
+            <h4 data-toc-skip class="date">2025-03-27</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/mvgam_overview.Rmd" class="external-link"><code>vignettes/mvgam_overview.Rmd</code></a></small>
       <div class="d-none name"><code>mvgam_overview.Rmd</code></div>
@@ -952,7 +952,8 @@ example):</p>
 <span><span class="co">#&gt;  $ series_names      : chr "PP"</span></span>
 <span><span class="co">#&gt;  $ train_observations:List of 1</span></span>
 <span><span class="co">#&gt;   ..$ PP: int [1:80] 0 NA 0 1 7 7 8 8 4 NA ...</span></span>
-<span><span class="co">#&gt;  $ train_times       : int [1:80] 1 2 3 4 5 6 7 8 9 10 ...</span></span>
+<span><span class="co">#&gt;  $ train_times       :List of 1</span></span>
+<span><span class="co">#&gt;   ..$ PP: int [1:80] 1 2 3 4 5 6 7 8 9 10 ...</span></span>
 <span><span class="co">#&gt;  $ test_observations : NULL</span></span>
 <span><span class="co">#&gt;  $ test_times        : NULL</span></span>
 <span><span class="co">#&gt;  $ hindcasts         :List of 1</span></span>
@@ -1030,10 +1031,12 @@ hindcasts and forecasts for each series in the data:</p>
 <span><span class="co">#&gt;  $ series_names      : Factor w/ 1 level "PP": 1</span></span>
 <span><span class="co">#&gt;  $ train_observations:List of 1</span></span>
 <span><span class="co">#&gt;   ..$ PP: int [1:70] 0 NA 0 1 7 7 8 8 4 NA ...</span></span>
-<span><span class="co">#&gt;  $ train_times       : int [1:70] 1 2 3 4 5 6 7 8 9 10 ...</span></span>
+<span><span class="co">#&gt;  $ train_times       :List of 1</span></span>
+<span><span class="co">#&gt;   ..$ PP: int [1:70] 1 2 3 4 5 6 7 8 9 10 ...</span></span>
 <span><span class="co">#&gt;  $ test_observations :List of 1</span></span>
 <span><span class="co">#&gt;   ..$ PP: int [1:10] NA 4 11 8 5 2 5 8 14 14</span></span>
-<span><span class="co">#&gt;  $ test_times        : int [1:10] 71 72 73 74 75 76 77 78 79 80</span></span>
+<span><span class="co">#&gt;  $ test_times        :List of 1</span></span>
+<span><span class="co">#&gt;   ..$ PP: int [1:10] 71 72 73 74 75 76 77 78 79 80</span></span>
 <span><span class="co">#&gt;  $ hindcasts         :List of 1</span></span>
 <span><span class="co">#&gt;   ..$ PP: num [1:2000, 1:70] 6 3 2 2 3 3 4 4 4 0 ...</span></span>
 <span><span class="co">#&gt;   .. ..- attr(*, "dimnames")=List of 2</span></span>

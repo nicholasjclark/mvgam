@@ -81,11 +81,11 @@ shape, scale or overdispersion parameters). Only returned if <code>type = link</
 <li><p><code>series_names</code> Names of the time series, taken from <code>levels(data$series)</code> in the original
 model fit</p></li>
 <li><p><code>train_observations</code> A <code>list</code> of training observation vectors of length <code>n_series</code></p></li>
-<li><p><code>train_times</code> A <code>vector</code> of the unique training times</p></li>
+<li><p><code>train_times</code> A <code>list</code> of the unique training times of length <code>n_series</code></p></li>
 <li><p><code>test_observations</code> If the <code><a href="forecast.mvgam.html">forecast</a></code> function was used,
 a <code>list</code> of test observation vectors of length <code>n_series</code>. Otherwise <code>NULL</code></p></li>
 <li><p><code>test_times</code> If the <code><a href="forecast.mvgam.html">forecast</a></code> function was used, a
-<code>vector</code> of the unique validation (testing) times. Otherwise <code>NULL</code></p></li>
+<code>list</code> of the unique testing (validation) times of length <code>n_series</code>. Otherwise <code>NULL</code></p></li>
 <li><p><code>hindcasts</code> A <code>list</code> of posterior hindcast distributions of length <code>n_series</code>.</p></li>
 <li><p><code>forecasts</code> If the <code><a href="forecast.mvgam.html">forecast</a></code> function was used,
 a <code>list</code> of posterior forecast distributions of length <code>n_series</code>. Otherwise <code>NULL</code></p></li>

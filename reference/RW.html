@@ -156,8 +156,7 @@ arguments to be interpreted by the parsing functions in <span class="pkg">mvgam<
 <span class="r-in"><span>                      <span class="va">sigma</span> <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>                      <span class="va">sigma_obs</span> <span class="op">=</span> <span class="fl">0.75</span><span class="op">)</span><span class="op">{</span></span></span>
 <span class="r-in"><span><span class="co"># Sample irregularly spaced time intervals</span></span></span>
-<span class="r-in"><span><span class="va">time_dis</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="va">n</span> <span class="op">-</span> <span class="fl">1</span>, <span class="op">-</span><span class="fl">0.1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">time_dis</span><span class="op">[</span><span class="va">time_dis</span> <span class="op">&lt;</span> <span class="fl">0</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">0</span>; <span class="va">time_dis</span> <span class="op">&lt;-</span> <span class="va">time_dis</span> <span class="op">*</span> <span class="fl">5</span></span></span>
+<span class="r-in"><span><span class="va">time_dis</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="va">n</span> <span class="op">-</span> <span class="fl">1</span>, <span class="fl">0</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Set up the latent dynamic process</span></span></span>
 <span class="r-in"><span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/vector.html" class="external-link">vector</a></span><span class="op">(</span>length <span class="op">=</span> <span class="va">n</span><span class="op">)</span>; <span class="va">x</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="op">-</span><span class="fl">0.3</span></span></span>
@@ -165,9 +164,16 @@ arguments to be interpreted by the parsing functions in <span class="pkg">mvgam<
 <span class="r-in"><span> <span class="co"># zero-distances will cause problems in sampling, so mvgam uses a</span></span></span>
 <span class="r-in"><span> <span class="co"># minimum threshold; this simulation function emulates that process</span></span></span>
 <span class="r-in"><span> <span class="kw">if</span><span class="op">(</span><span class="va">time_dis</span><span class="op">[</span><span class="va">i</span><span class="op">]</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span><span class="op">{</span></span></span>
-<span class="r-in"><span>   <span class="va">x</span><span class="op">[</span><span class="va">i</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">1</span>, mean <span class="op">=</span> <span class="op">(</span><span class="va">phi</span> <span class="op">^</span> <span class="fl">1e-12</span><span class="op">)</span> <span class="op">*</span> <span class="va">x</span><span class="op">[</span><span class="va">i</span> <span class="op">-</span> <span class="fl">1</span><span class="op">]</span>, sd <span class="op">=</span> <span class="va">sigma</span><span class="op">)</span></span></span>
+<span class="r-in"><span>   <span class="va">x</span><span class="op">[</span><span class="va">i</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>     <span class="fl">1</span>, mean <span class="op">=</span> <span class="op">(</span><span class="va">phi</span><span class="op">^</span><span class="fl">1e-3</span><span class="op">)</span> <span class="op">*</span> <span class="va">x</span><span class="op">[</span><span class="va">i</span> <span class="op">-</span> <span class="fl">1</span><span class="op">]</span>,</span></span>
+<span class="r-in"><span>     sd <span class="op">=</span> <span class="va">sigma</span> <span class="op">*</span> <span class="op">(</span><span class="fl">1</span> <span class="op">-</span> <span class="va">phi</span><span class="op">^</span><span class="op">(</span><span class="fl">2</span><span class="op">*</span><span class="fl">1e-3</span><span class="op">)</span><span class="op">)</span> <span class="op">/</span> <span class="op">(</span><span class="fl">1</span> <span class="op">-</span> <span class="va">phi</span><span class="op">^</span><span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span>   <span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>    <span class="va">x</span><span class="op">[</span><span class="va">i</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">1</span>, mean <span class="op">=</span> <span class="op">(</span><span class="va">phi</span> <span class="op">^</span> <span class="va">time_dis</span><span class="op">[</span><span class="va">i</span><span class="op">]</span><span class="op">)</span> <span class="op">*</span> <span class="va">x</span><span class="op">[</span><span class="va">i</span> <span class="op">-</span> <span class="fl">1</span><span class="op">]</span>, sd <span class="op">=</span> <span class="va">sigma</span><span class="op">)</span></span></span>
+<span class="r-in"><span>   <span class="va">x</span><span class="op">[</span><span class="va">i</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>     <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>     mean <span class="op">=</span> <span class="op">(</span><span class="va">phi</span><span class="op">^</span><span class="va">time_dis</span><span class="op">[</span><span class="va">i</span><span class="op">]</span><span class="op">)</span> <span class="op">*</span> <span class="va">x</span><span class="op">[</span><span class="va">i</span> <span class="op">-</span> <span class="fl">1</span><span class="op">]</span>,</span></span>
+<span class="r-in"><span>     sd <span class="op">=</span> <span class="va">sigma</span> <span class="op">*</span> <span class="op">(</span><span class="fl">1</span> <span class="op">-</span> <span class="va">phi</span><span class="op">^</span><span class="op">(</span><span class="fl">2</span><span class="op">*</span><span class="va">time_dis</span><span class="op">[</span><span class="va">i</span><span class="op">]</span><span class="op">)</span><span class="op">)</span> <span class="op">/</span> <span class="op">(</span><span class="fl">1</span> <span class="op">-</span> <span class="va">phi</span><span class="op">^</span><span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span>   <span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="op">}</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-in"><span></span></span>
@@ -211,11 +217,11 @@ arguments to be interpreted by the parsing functions in <span class="pkg">mvgam<
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM observation formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ 1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55e5eecc6608&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55fd889d4ed0&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM process formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ~s(season, bs = "cc", k = 5, by = trend)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55e5eecc6608&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55fd889d4ed0&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> gaussian</span>
@@ -244,8 +250,8 @@ arguments to be interpreted by the parsing functions in <span class="pkg">mvgam<
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Observation error parameter estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>              2.5%  50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_obs[1] 0.30 0.56  0.83 1.02    42</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_obs[2] 0.22 0.49  0.79 1.03    36</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_obs[1] 0.21 0.49  0.82 1.05    24</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_obs[2] 0.29 0.53  0.82 1.06    31</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM observation model coefficient (beta) estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             2.5% 50% 97.5% Rhat n_eff</span>
@@ -253,28 +259,28 @@ arguments to be interpreted by the parsing functions in <span class="pkg">mvgam<
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Process model AR parameter estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>        2.5%  50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1] 0.60 0.74  0.85    1  1019</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[2] 0.72 0.81  0.88    1   800</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1] 0.58 0.73  0.83    1   969</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[2] 0.71 0.80  0.88    1   888</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Process error parameter estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>          2.5% 50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  1.6 1.9   2.2 1.00   371</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[2]  1.7 1.9   2.2 1.01   304</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  2.4 2.7   3.2    1   509</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[2]  3.0 3.4   3.9    1  1116</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM process model coefficient (beta) estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                2.5%    50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)_trend             -0.50  0.051  0.57    1   876</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend1.1_trend -0.71  0.044  0.71    1   682</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend1.2_trend -1.20 -0.310  0.40    1   948</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend1.3_trend -1.70 -0.480  0.17    1   456</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend2.1_trend -0.50  0.071  0.71    1   686</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend2.2_trend -1.00 -0.260  0.37    1   581</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend2.3_trend -1.10 -0.250  0.28    1   667</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                2.5%      50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)_trend             -0.72  0.00066  0.75 1.00  1292</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend1.1_trend -0.67  0.06400  0.80 1.00   792</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend1.2_trend -1.20 -0.21000  0.57 1.00   841</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend1.3_trend -1.90 -0.34000  0.30 1.00   294</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend2.1_trend -0.57  0.11000  1.00 1.00   866</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend2.2_trend -1.20 -0.15000  0.65 1.00   668</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend2.3_trend -1.40 -0.21000  0.39 1.01   543</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM process smooths:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                         edf Ref.df Chi.sq p-value</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriestrend1 1.77      3  13.95    0.62</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriestrend2 1.91      3   4.96    0.75</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriestrend1 1.84      3   6.55    0.85</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriestrend2 1.36      3   3.75    0.94</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ✔ No issues with effective samples per iteration</span>
@@ -369,7 +375,7 @@ arguments to be interpreted by the parsing functions in <span class="pkg">mvgam<
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ species</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55e5eecc6608&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55fd889d4ed0&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>

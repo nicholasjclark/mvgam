@@ -773,7 +773,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55e61343aed8&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55fdab093220&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -872,7 +872,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 16</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x55e61343aed8&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x55fdab093220&gt; </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family_pars       : NULL</span>
@@ -894,12 +894,18 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:60] 4 5 7 39 51 26 6 6 4 2 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:60] NA 2 12 16 6 31 9 15 5 3 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:60] 4 NA 4 NA NA 16 7 7 3 NA ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ train_times       : int [1:60] 1 2 3 4 5 6 7 8 9 10 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ train_times       :List of 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:60] 1 2 3 4 5 6 7 8 9 10 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:60] 1 2 3 4 5 6 7 8 9 10 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:60] 1 2 3 4 5 6 7 8 9 10 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_observations :List of 3</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:20] 1 NA NA 13 18 20 16 6 NA 4 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:20] 4 36 8 6 7 NA NA 1 6 4 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:20] 6 8 5 5 19 14 1 1 7 0 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_times        : int [1:20] 61 62 63 64 65 66 67 68 69 70 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_times        :List of 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:20] 61 62 63 64 65 66 67 68 69 70 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:20] 61 62 63 64 65 66 67 68 69 70 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:20] 61 62 63 64 65 66 67 68 69 70 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ hindcasts         :List of 3</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: num [1:1000, 1:60] 8 3 1 5 7 1 8 3 5 2 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
@@ -1182,7 +1188,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> out ~ gp(time, by = temp, c = 5/4, k = 40, scale = FALSE)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55e61343aed8&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55fdab093220&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> gaussian</span>
@@ -1500,7 +1506,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> cbind(y, ntrials) ~ series + s(x, by = series)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55e61343aed8&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55fdab093220&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> binomial</span>
