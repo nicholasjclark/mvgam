@@ -183,6 +183,7 @@ forecast.mvgam = function(
     } else {
       data_test <- data_test[idx, ]
     }
+    object$test_data <- data_test
   }
 
   # Only compute forecasts if they don't already exist!
@@ -709,6 +710,31 @@ forecast.mvgam = function(
     names(series_test) <- levels(data_train$series)
   }
 
+  series_train_times <- lapply(seq_len(n_series), function(series) {
+    s_name <- levels(object$obs_data$series)[series]
+    data.frame(
+      series = object$obs_data$series,
+      time = object$obs_data$time,
+      y = object$obs_data$y
+    ) %>%
+      dplyr::filter(series == s_name) %>%
+      dplyr::arrange(time) %>%
+      dplyr::pull(time)
+  })
+  names(series_train_times) <- levels(data_train$series)
+
+  series_test_times <- lapply(seq_len(n_series), function(series) {
+    s_name <- levels(object$obs_data$series)[series]
+    data.frame(
+      series = data_test$series,
+      time = data_test$time
+    ) %>%
+      dplyr::filter(series == s_name) %>%
+      dplyr::arrange(time) %>%
+      dplyr::pull(time)
+  })
+  names(series_test_times) <- levels(data_train$series)
+
   series_fcs <- structure(
     list(
       call = object$call,
@@ -729,9 +755,9 @@ forecast.mvgam = function(
         levels = levels(data_train$series)
       ),
       train_observations = series_obs,
-      train_times = unique(data_train$index..time..index),
+      train_times = series_train_times,
       test_observations = series_test,
-      test_times = unique(data_test$index..time..index),
+      test_times = series_test_times,
       hindcasts = series_hcs,
       forecasts = series_fcs
     ),

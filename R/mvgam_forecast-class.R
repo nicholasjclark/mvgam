@@ -18,11 +18,11 @@
 #'   \item `series_names` Names of the time series, taken from `levels(data$series)` in the original
 #'   model fit
 #'   \item `train_observations` A `list` of training observation vectors of length `n_series`
-#'   \item `train_times` A `vector` of the unique training times
+#'   \item `train_times` A `list` of the unique training times of length `n_series`
 #'   \item `test_observations` If the \code{\link{forecast}} function was used,
 #'   a `list` of test observation vectors of length `n_series`. Otherwise `NULL`
 #'   \item `test_times` If the \code{\link{forecast}} function was used, a
-#'   `vector` of the unique validation (testing) times. Otherwise `NULL`
+#'   `list` of the unique testing (validation) times of length `n_series`. Otherwise `NULL`
 #'   \item `hindcasts` A `list` of posterior hindcast distributions of length `n_series`.
 #'   \item `forecasts` If the \code{\link{forecast}} function was used,
 #'   a `list` of posterior forecast distributions of length `n_series`. Otherwise `NULL`

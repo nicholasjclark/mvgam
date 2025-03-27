@@ -736,7 +736,10 @@ plot.mvgam_forecast = function(
   # Create a base plot using posterior credible intervals and observations
   # for the specified series
   plot_dat <- data.frame(
-    time = c(object$train_times, object$test_times),
+    time = c(
+      object$train_times[[which(names(object$hindcasts) == s_name)]],
+      object$test_times[[which(names(object$hindcasts) == s_name)]]
+      ),
     med = cred[5, ],
     lower1 = cred[1, ],
     lower2 = cred[2, ],
@@ -766,7 +769,10 @@ plot.mvgam_forecast = function(
         ggplot2::geom_line(
           data = data.frame(
             y = preds[i, ],
-            time = c(object$train_times, object$test_times)
+            time = c(
+              object$train_times[[which(names(object$hindcasts) == s_name)]],
+              object$test_times[[which(names(object$hindcasts) == s_name)]]
+            )
           ),
           mapping = ggplot2::aes(x = time, y = y),
           col = "white",
@@ -775,7 +781,10 @@ plot.mvgam_forecast = function(
         ggplot2::geom_line(
           data = data.frame(
             y = preds[i, ],
-            time = c(object$train_times, object$test_times)
+            time = c(
+              object$train_times[[which(names(object$hindcasts) == s_name)]],
+              object$test_times[[which(names(object$hindcasts) == s_name)]]
+            )
           ),
           mapping = ggplot2::aes(x = time, y = y),
           col = sample(
@@ -812,13 +821,14 @@ plot.mvgam_forecast = function(
 
   # Show historical (hindcast) distribution in grey if this object
   # contains forecasts
+  train_times <- object$train_times[[s_name]]
   last_train <- length(object$train_observations[[s_name]])
   if (type == 'response' & !is.null(object$forecasts)) {
     if (!realisations) {
       base_plot <- base_plot +
         ggplot2::geom_line(
           data = data.frame(
-            time = 1:last_train,
+            time = train_times,
             lower1 = cred[1, 1:last_train],
             upper1 = cred[9, 1:last_train],
             med = cred[5, 1:last_train],
@@ -830,7 +840,7 @@ plot.mvgam_forecast = function(
         ) +
         ggplot2::geom_ribbon(
           data = data.frame(
-            time = 1:last_train,
+            time = train_times,
             lower1 = cred[1, 1:last_train],
             upper1 = cred[9, 1:last_train],
             truth = 0
@@ -893,7 +903,9 @@ plot.mvgam_forecast = function(
 
   if (!is.null(object$forecasts)) {
     base_plot <- base_plot +
-      ggplot2::geom_vline(xintercept = last_train, linetype = 'dashed')
+      ggplot2::geom_vline(
+        xintercept = max(train_times), linetype = 'dashed'
+      )
   }
 
   if (!missing(ylim)) {

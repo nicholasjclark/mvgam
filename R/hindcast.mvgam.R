@@ -207,6 +207,19 @@ hindcast.mvgam = function(object, type = 'response', ...) {
   })
   names(series_obs) <- levels(data_train$series)
 
+  series_train_times <- lapply(seq_len(n_series), function(series) {
+    s_name <- levels(data_train$series)[series]
+    data.frame(
+      series = data_train$series,
+      time = data_train$time,
+      y = data_train$y
+    ) %>%
+      dplyr::filter(series == s_name) %>%
+      dplyr::arrange(time) %>%
+      dplyr::pull(time)
+  })
+  names(series_train_times) <- levels(data_train$series)
+
   series_fcs <- structure(
     list(
       call = object$call,
@@ -219,7 +232,7 @@ hindcast.mvgam = function(object, type = 'response', ...) {
       type = type,
       series_names = levels(data_train$series),
       train_observations = series_obs,
-      train_times = unique(data_train$time),
+      train_times = series_train_times,
       test_observations = NULL,
       test_times = NULL,
       hindcasts = series_hcs,

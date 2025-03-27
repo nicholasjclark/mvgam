@@ -372,9 +372,7 @@ test_that("Each subgroup must exist within each site for ZMVN", {
 # Function to simulate CAR1 data with seasonality
 sim_corcar1 = function(n = 120, phi = 0.5, sigma = 1, sigma_obs = 0.75) {
   # Sample irregularly spaced time intervals
-  time_dis <- c(0, runif(n - 1, -0.1, 1))
-  time_dis[time_dis < 0] <- 0
-  time_dis <- time_dis * 5
+  time_dis <- c(1, runif(n - 1, 0, 5))
 
   # Set up the latent dynamic process
   x <- vector(length = n)
@@ -383,9 +381,16 @@ sim_corcar1 = function(n = 120, phi = 0.5, sigma = 1, sigma_obs = 0.75) {
     # zero-distances will cause problems in sampling, so mvgam uses a
     # minimum threshold; this simulation function emulates that process
     if (time_dis[i] == 0) {
-      x[i] <- rnorm(1, mean = (phi^1e-12) * x[i - 1], sd = sigma)
+      x[i] <- rnorm(
+        1, mean = (phi^1e-3) * x[i - 1],
+        sd = sigma * (1 - phi^(2*1e-3)) / (1 - phi^2)
+      )
     } else {
-      x[i] <- rnorm(1, mean = (phi^time_dis[i]) * x[i - 1], sd = sigma)
+      x[i] <- rnorm(
+        1,
+        mean = (phi^time_dis[i]) * x[i - 1],
+        sd = sigma * (1 - phi^(2*time_dis[i])) / (1 - phi^2)
+      )
     }
   }
 
@@ -433,9 +438,11 @@ test_that("CAR1 sets up correctly", {
   mod <- mvgam(
     formula = y ~ s(season, bs = 'cc', k = 5, by = series),
     trend_model = CAR(),
+    noncentred = FALSE,
     data = dat_train,
     family = gaussian(),
-    run_model = FALSE
+    run_model = FALSE,
+    backend = 'cmdstanr'
   )
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(exists('time_dis', mod$model_data))

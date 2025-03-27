@@ -20,8 +20,8 @@ add_corcar = function(model_data, data_train, data_test = NULL) {
       dplyr::mutate(
         time_lag = dplyr::lag(time),
         dis_time = time - time_lag,
-        dis_time = ifelse(is.na(dis_time), 0, dis_time),
-        dis_time = pmax(1e-12, dis_time)
+        dis_time = ifelse(is.na(dis_time), 1, dis_time),
+        dis_time = pmax(1e-3, dis_time)
       ) %>%
       dplyr::arrange(index..time..index, series)
   } else {
@@ -35,8 +35,8 @@ add_corcar = function(model_data, data_train, data_test = NULL) {
       dplyr::mutate(
         time_lag = dplyr::lag(time),
         dis_time = time - time_lag,
-        dis_time = ifelse(is.na(dis_time), 0, dis_time),
-        dis_time = pmax(1e-12, dis_time)
+        dis_time = ifelse(is.na(dis_time), 1, dis_time),
+        dis_time = pmax(1e-3, dis_time)
       ) %>%
       dplyr::ungroup() %>%
       dplyr::arrange(index..time..index, series)

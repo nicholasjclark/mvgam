@@ -65,7 +65,8 @@ test_that("`tidy()` snapshot value of `mvgam_example6`", {
   mvgam_example6 <- suppressWarnings(mvgam(
     formula = y ~ species,
     trend_model = AR(gr = region, subgr = species),
-    data = simdat_all
+    data = simdat_all,
+    silent = 2
   ))
 
   tidyout = tidy.mvgam(mvgam_example6)

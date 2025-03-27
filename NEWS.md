@@ -6,6 +6,10 @@
 
 ## Bug fixes
 * Bug fix to ensure piecewise trends are correctly predicted when using `process_error = TRUE` in `predict()`
+* Bug fix to ensure variance of continuous time autoregressive processes (using `CAR()`) scales appropriately with time lags (#107)
+
+## Deprecations
+* Altered the structure of objects of class `mvgam_forecast` so that the `train_times` and `test_times` slots now contain lists of length `n_series`. This allows for continuous time data to be better handled, where some series may have been sampled at different timepoints
 
 # mvgam 1.1.51
 

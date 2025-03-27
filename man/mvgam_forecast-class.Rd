@@ -24,11 +24,11 @@ shape, scale or overdispersion parameters). Only returned if \code{type = link}.
 \item \code{series_names} Names of the time series, taken from \code{levels(data$series)} in the original
 model fit
 \item \code{train_observations} A \code{list} of training observation vectors of length \code{n_series}
-\item \code{train_times} A \code{vector} of the unique training times
+\item \code{train_times} A \code{list} of the unique training times of length \code{n_series}
 \item \code{test_observations} If the \code{\link{forecast}} function was used,
 a \code{list} of test observation vectors of length \code{n_series}. Otherwise \code{NULL}
 \item \code{test_times} If the \code{\link{forecast}} function was used, a
-\code{vector} of the unique validation (testing) times. Otherwise \code{NULL}
+\code{list} of the unique testing (validation) times of length \code{n_series}. Otherwise \code{NULL}
 \item \code{hindcasts} A \code{list} of posterior hindcast distributions of length \code{n_series}.
 \item \code{forecasts} If the \code{\link{forecast}} function was used,
 a \code{list} of posterior forecast distributions of length \code{n_series}. Otherwise \code{NULL}

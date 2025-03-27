@@ -509,6 +509,7 @@ sim_corcar1 = function(
   )
 
   # Stochastic realisations (will move to c++ eventually)
+  d_A <- diag(A)
   states <- matrix(NA, nrow = h + 3, ncol = NCOL(A))
   states[1, ] <- last_trends[1, ]
   states[2, ] <- last_trends[2, ]
@@ -526,7 +527,8 @@ sim_corcar1 = function(
       drift +
 
       # stochastic errors
-      errors[t, ]
+      errors[t, ] *
+      (1 - d_A ^ (2 * time_dis[t - 3, ])) / (1 - d_A ^ 2)
   }
   states[4:NROW(states), ]
 }
