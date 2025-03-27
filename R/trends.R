@@ -528,7 +528,8 @@ sim_corcar1 = function(
 
       # stochastic errors
       errors[t, ] *
-      (1 - d_A ^ (2 * time_dis[t - 3, ])) / (1 - d_A ^ 2)
+        (1 - d_A^(2 * time_dis[t - 3, ])) /
+        (1 - d_A^2)
   }
   states[4:NROW(states), ]
 }
