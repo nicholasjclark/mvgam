@@ -130,7 +130,7 @@ organized into a convenient format</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 15</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x5583af8deab0&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x555913d5d080&gt; </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_model       :List of 7</span>
@@ -172,6 +172,22 @@ organized into a convenient format</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "ypred[1,3]" "ypred[2,3]" "ypred[3,3]" "ypred[4,3]" ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ forecasts         : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "class")= chr "mvgam_forecast"</span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span>, <span class="fl">12</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 12 × 7</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    series    time predQ50 predQ2.5 predQ97.5 truth type    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> series_1     1       2        0         7     1 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> series_1     2       1        0         5     2 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> series_1     3       1        0         4     1 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> series_1     4       0        0         2     0 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> series_1     5       0        0         2     0 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> series_1     6       0        0         3     0 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> series_1     7       0        0         3     1 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> series_1     8       1        0         4     0 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> series_1     9       1        0         5     2 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> series_1    10       2        0         6     2 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">11</span> series_1    11       2        0         6     2 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">12</span> series_1    12       1        0         5     0 response</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
 <span class="r-plt img"><img src="hindcast.mvgam-1.png" alt="" width="700" height="433"></span>
@@ -184,42 +200,22 @@ organized into a convenient format</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Hindcasts as expectations</span></span></span>
 <span class="r-in"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu">hindcast</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'expected'</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> List of 15</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x5583af8deab0&gt; </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_model       :List of 7</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ trend_model: chr "AR1"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ ma         : logi FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ cor        : logi FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ unit       : chr "time"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ gr         : chr "NA"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ subgr      : chr "series"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ label      : language AR()</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "class")= chr "mvgam_trend"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ drift             : logi FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ use_lv            : logi FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ fit_engine        : chr "stan"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ type              : chr "expected"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ series_names      : chr [1:3] "series_1" "series_2" "series_3"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ train_observations:List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:75] 1 2 1 0 0 0 1 0 2 2 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:75] 3 0 3 0 3 2 0 4 2 1 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:75] 3 0 3 1 1 1 0 2 1 1 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ train_times       :List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:75] 1 2 3 4 5 6 7 8 9 10 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:75] 1 2 3 4 5 6 7 8 9 10 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:75] 1 2 3 4 5 6 7 8 9 10 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_observations : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_times        : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ hindcasts         :List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: num [1:1000, 1:75] 1.52 1.14 1.62 1.93 1.38 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: num [1:1000, 1:75] 1.66 5.42 2.85 4.52 6.27 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: num [1:1000, 1:75] 4.25 4.42 2.57 4.91 3.43 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ forecasts         : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "class")= chr "mvgam_forecast"</span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span>, <span class="fl">12</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 12 × 6</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    series    time predQ50 predQ2.5 predQ97.5 type    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> series_1     1   2.28    0.758       5.18 expected</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> series_1     2   1.51    0.497       3.87 expected</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> series_1     3   0.829   0.218       2.35 expected</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> series_1     4   0.313   0.050<span style="text-decoration: underline;">0</span>      1.20 expected</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> series_1     5   0.272   0.036<span style="text-decoration: underline;">7</span>      1.11 expected</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> series_1     6   0.466   0.094<span style="text-decoration: underline;">2</span>      1.70 expected</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> series_1     7   0.697   0.152       2.25 expected</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> series_1     8   0.797   0.179       2.63 expected</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> series_1     9   1.27    0.356       3.65 expected</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> series_1    10   1.75    0.570       4.45 expected</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">11</span> series_1    11   1.84    0.624       4.66 expected</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">12</span> series_1    12   1.35    0.252       3.64 expected</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="hindcast.mvgam-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
@@ -229,51 +225,22 @@ organized into a convenient format</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Estimated latent trends</span></span></span>
 <span class="r-in"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu">hindcast</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'trend'</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> List of 15</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x5583af8deab0&gt; </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_model       :List of 7</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ trend_model: chr "AR1"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ ma         : logi FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ cor        : logi FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ unit       : chr "time"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ gr         : chr "NA"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ subgr      : chr "series"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ label      : language AR()</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "class")= chr "mvgam_trend"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ drift             : logi FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ use_lv            : logi FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ fit_engine        : chr "stan"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ type              : chr "trend"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ series_names      : chr [1:3] "series_1" "series_2" "series_3"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ train_observations:List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:75] 1 2 1 0 0 0 1 0 2 2 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:75] 3 0 3 0 3 2 0 4 2 1 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:75] 3 0 3 1 1 1 0 2 1 1 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ train_times       :List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:75] 1 2 3 4 5 6 7 8 9 10 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:75] 1 2 3 4 5 6 7 8 9 10 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:75] 1 2 3 4 5 6 7 8 9 10 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_observations : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_times        : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ hindcasts         :List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: num [1:1000, 1:75] -1.026 -1.301 -1.036 -0.748 -1.472 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "trend[1,1]" "trend[2,1]" "trend[3,1]" "trend[4,1]" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: num [1:1000, 1:75] -0.9363 0.2588 -0.468 0.1017 0.0427 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "trend[1,2]" "trend[2,2]" "trend[3,2]" "trend[4,2]" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: num [1:1000, 1:75] 0.00518 0.0561 -0.56982 0.18502 -0.56207 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "trend[1,3]" "trend[2,3]" "trend[3,3]" "trend[4,3]" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ forecasts         : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "class")= chr "mvgam_forecast"</span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span>, <span class="fl">12</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 12 × 6</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    series    time predQ50 predQ2.5 predQ97.5 type </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> series_1     1 -<span style="color: #BB0000;">0.591</span>    -<span style="color: #BB0000;">1.82</span>    0.282   trend</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> series_1     2 -<span style="color: #BB0000;">0.179</span>    -<span style="color: #BB0000;">1.35</span>    0.777   trend</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> series_1     3  0.056<span style="text-decoration: underline;">3</span>   -<span style="color: #BB0000;">1.37</span>    1.13    trend</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> series_1     4 -<span style="color: #BB0000;">0.423</span>    -<span style="color: #BB0000;">2.09</span>    0.979   trend</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> series_1     5 -<span style="color: #BB0000;">0.557</span>    -<span style="color: #BB0000;">2.54</span>    0.724   trend</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> series_1     6 -<span style="color: #BB0000;">0.440</span>    -<span style="color: #BB0000;">2.14</span>    0.864   trend</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> series_1     7 -<span style="color: #BB0000;">0.338</span>    -<span style="color: #BB0000;">1.98</span>    0.826   trend</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> series_1     8 -<span style="color: #BB0000;">0.418</span>    -<span style="color: #BB0000;">1.98</span>    0.672   trend</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> series_1     9  0.087<span style="text-decoration: underline;">7</span>   -<span style="color: #BB0000;">1.16</span>    1.14    trend</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> series_1    10  0.198    -<span style="color: #BB0000;">0.924</span>   1.13    trend</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">11</span> series_1    11 -<span style="color: #BB0000;">0.452</span>    -<span style="color: #BB0000;">1.71</span>    0.505   trend</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">12</span> series_1    12 -<span style="color: #BB0000;">1.14</span>     -<span style="color: #BB0000;">2.87</span>   -<span style="color: #BB0000;">0.008</span><span style="color: #BB0000; text-decoration: underline;">18</span> trend</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="hindcast.mvgam-7.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>

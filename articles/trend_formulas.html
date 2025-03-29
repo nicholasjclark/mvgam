@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-03-27</h4>
+            <h4 data-toc-skip class="date">2025-03-29</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/trend_formulas.Rmd" class="external-link"><code>vignettes/trend_formulas.Rmd</code></a></small>
       <div class="d-none name"><code>trend_formulas.Rmd</code></div>
@@ -755,18 +755,18 @@ timesteps:</p>
 <div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">irfs</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 300 × 5</span></span></span>
-<span><span class="co">#&gt;    shock                horizon irf_median irf_Qlower irf_Qupper</span></span>
-<span><span class="co">#&gt;    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                  <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> Process1 -&gt; Process1       1     0.353      0.270       0.446</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> Process1 -&gt; Process1       2     0.298      0.236       0.371</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> Process1 -&gt; Process1       3     0.252      0.196       0.318</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> Process1 -&gt; Process1       4     0.214      0.159       0.280</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> Process1 -&gt; Process1       5     0.181      0.126       0.250</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> Process1 -&gt; Process1       6     0.153      0.097<span style="text-decoration: underline;">1</span>      0.227</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> Process1 -&gt; Process1       7     0.130      0.073<span style="text-decoration: underline;">4</span>      0.204</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> Process1 -&gt; Process1       8     0.111      0.054<span style="text-decoration: underline;">1</span>      0.184</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> Process1 -&gt; Process1       9     0.095<span style="text-decoration: underline;">1</span>     0.039<span style="text-decoration: underline;">6</span>      0.169</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> Process1 -&gt; Process1      10     0.080<span style="text-decoration: underline;">8</span>     0.028<span style="text-decoration: underline;">8</span>      0.155</span></span>
+<span><span class="co">#&gt;    shock                horizon irfQ50 irfQ2.5 irfQ97.5</span></span>
+<span><span class="co">#&gt;    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                  <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> Process1 -&gt; Process1       1 0.353   0.270     0.446</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> Process1 -&gt; Process1       2 0.298   0.236     0.371</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> Process1 -&gt; Process1       3 0.252   0.196     0.318</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> Process1 -&gt; Process1       4 0.214   0.159     0.280</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> Process1 -&gt; Process1       5 0.181   0.126     0.250</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> Process1 -&gt; Process1       6 0.153   0.097<span style="text-decoration: underline;">1</span>    0.227</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> Process1 -&gt; Process1       7 0.130   0.073<span style="text-decoration: underline;">4</span>    0.204</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> Process1 -&gt; Process1       8 0.111   0.054<span style="text-decoration: underline;">1</span>    0.184</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> Process1 -&gt; Process1       9 0.095<span style="text-decoration: underline;">1</span>  0.039<span style="text-decoration: underline;">6</span>    0.169</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> Process1 -&gt; Process1      10 0.080<span style="text-decoration: underline;">8</span>  0.028<span style="text-decoration: underline;">8</span>    0.155</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># ℹ 290 more rows</span></span></span></code></pre></div>
 <p>But it is easier to understand these responses using plots. For
 example, we can plot the expected responses of the remaining series to a

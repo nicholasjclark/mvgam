@@ -773,7 +773,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x5583c2c2b4b0&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55590b5e3fe8&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -872,7 +872,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 16</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x5583c2c2b4b0&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x55590b5e3fe8&gt; </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family_pars       : NULL</span>
@@ -924,6 +924,23 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:1000, 1:20] 2 13 3 13 8 1 11 4 7 6 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:1000, 1:20] 15 1 12 3 6 7 7 5 33 10 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "class")= chr "mvgam_forecast"</span>
+<span class="r-in"><span><span class="va">fc_summary</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">fc_summary</span>, <span class="fl">12</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 12 × 7</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    series    time predQ50 predQ2.5 predQ97.5 truth type    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> series_1     1     4.5        1      11       4 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> series_1     2     4          1      11       5 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> series_1     3     8          3      17       7 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> series_1     4    36         22      53      39 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> series_1     5    50         31      71.0    51 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> series_1     6    24         13      39      26 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> series_1     7     7          2      16       6 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> series_1     8     5          1      13       6 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> series_1     9     4          1      10       4 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> series_1    10     3          0       8       2 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">11</span> series_1    11     4          0      11       5 response</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">12</span> series_1    12     5          1      12       5 response</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> 57.427275</span>
@@ -1188,7 +1205,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> out ~ gp(time, by = temp, c = 5/4, k = 40, scale = FALSE)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x5583c2c2b4b0&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55590b5e3fe8&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> gaussian</span>
@@ -1410,7 +1427,6 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Forecasts for the first two series will differ in magnitude</span></span></span>
 <span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span>, ncol <span class="op">=</span> <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span>, series <span class="op">=</span> <span class="fl">1</span>, ylim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">75</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> 26.650371</span>
@@ -1419,7 +1435,6 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> 101.645578</span>
 <span class="r-plt img"><img src="mvgam-22.png" alt="" width="700" height="433"></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Changing the offset for the testing data should lead to changes in</span></span></span>
 <span class="r-in"><span><span class="co"># the forecast</span></span></span>
@@ -1506,7 +1521,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> cbind(y, ntrials) ~ series + s(x, by = series)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x5583c2c2b4b0&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55590b5e3fe8&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> binomial</span>
@@ -1583,6 +1598,18 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"link"</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="mvgam-28.png" alt="" width="700" height="433"></span>
 <span class="r-plt img"><img src="mvgam-29.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># To view predictions on the probability scale,</span></span></span>
+<span class="r-in"><span><span class="co"># use ntrials = 1 in datagrid()</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">mod</span>,</span></span>
+<span class="r-in"><span>  by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'x'</span>, <span class="st">'series'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  newdata <span class="op">=</span> <span class="fu"><a href="https://marginaleffects.com/man/r/datagrid.html" class="external-link">datagrid</a></span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="fl">100</span>, <span class="op">-</span><span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                    series <span class="op">=</span> <span class="va">unique</span>,</span></span>
+<span class="r-in"><span>                    ntrials <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  type <span class="op">=</span> <span class="st">'expected'</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="mvgam-30.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
