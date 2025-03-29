@@ -55,6 +55,7 @@ forecast <- function(object, ...) {
 #' fc <- forecast(mod,
 #'                newdata = simdat$data_test,
 #'                type = 'expected')
+#' head(summary(fc), 12)
 #' plot(fc, series = 1)
 #' plot(fc, series = 2)
 #' plot(fc, series = 3)
@@ -63,6 +64,7 @@ forecast <- function(object, ...) {
 #' fc <- forecast(mod,
 #'                newdata = simdat$data_test,
 #'                type = 'trend')
+#' head(summary(fc), 12)
 #' plot(fc, series = 1)
 #' plot(fc, series = 2)
 #' plot(fc, series = 3)

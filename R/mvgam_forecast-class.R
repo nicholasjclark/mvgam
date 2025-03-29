@@ -31,3 +31,117 @@
 #' @author Nicholas J Clark
 #' @name mvgam_forecast-class
 NULL
+
+#' @title Posterior summary of hindcast and forecast objects
+#'
+#' @description This function takes an \code{mvgam_forecast} object and
+#' calculates a posterior summary of the hindcast and forecast distributions of each
+#' series, along with any true values that were included in `data` and `newdata` if
+#' `type = 'response'` was used in the call to \code{hindcast()} or \code{function()}
+#'
+#' @param object an object of class `mvgam_forecast` obtained using either the
+#' \code{hindcast()} or \code{function()} function. This object will contain draws
+#' from the posterior distribution of hindcasts and forecasts.
+#' @param probs The upper and lower percentiles to be computed by the `quantile` function,
+#' in addition to the median
+#' @param ... ignored
+#'
+#' @return A long-format `tibble` / `data.frame` reporting the posterior median,
+#' upper and lower percentiles of the predictions for each series at
+#' each of the timepoints that were originally supplied in `data` and, optionally,
+#' in `newdata`.
+#'
+#' @method summary mvgam_forecast
+#'
+#' @seealso \code{\link{forecast.mvgam}}, \code{\link{plot.mvgam_forecast}}
+#'
+#' @author Nicholas J Clark
+#'
+#' @export
+summary.mvgam_forecast = function(object, probs = c(0.025, 0.975), ...) {
+
+  if (length(probs) != 2L) {
+    stop("argument 'probs' must be a vector of length 2", call. = FALSE)
+  }
+  validate_proportional(min(probs))
+  validate_proportional(max(probs))
+
+  n_series <- length(object$series_names)
+  type <- object$type
+
+  # Extract predictions and truths (if type = 'response')
+  fc_preds <- do.call(
+    rbind,
+    lapply(1:n_series, function(x){
+      s_name <- object$series_names[x]
+      preds <- cbind(
+        object$hindcasts[[which(names(object$hindcasts) == s_name)]],
+        object$forecasts[[which(names(object$forecasts) == s_name)]]
+      )
+
+      # Calculate quantiles of the forecast distribution
+      cred <- sapply(
+        1:NCOL(preds),
+        function(n) quantile(preds[, n], probs = probs, na.rm = TRUE)
+      )
+      meds <- apply(preds, 2, median)
+
+      # Put into a long "tidy" dataframe
+      if(type == 'response'){
+        df <- data.frame(
+          series = s_name,
+          time = c(
+            object$train_times[[which(names(object$hindcasts) == s_name)]],
+            object$test_times[[which(names(object$hindcasts) == s_name)]]
+          ),
+          pred_median = meds,
+          pred_Qlower = cred[1, ],
+          pred_Qupper = cred[2, ],
+          truth = c(
+            object$train_observations[[s_name]],
+            object$test_observations[[s_name]]
+          ),
+          type = 'response'
+        )
+        colnames(df) <- c('series',
+                          'time',
+                          'predQ50',
+                          paste0('predQ', 100 * min(probs)),
+                          paste0('predQ', 100 * max(probs)),
+                          'truth',
+                          'type')
+        rownames(df) <- NULL
+      } else {
+        df <- data.frame(
+          series = s_name,
+          time = c(
+            object$train_times[[which(names(object$hindcasts) == s_name)]],
+            object$test_times[[which(names(object$hindcasts) == s_name)]]
+          ),
+          predQ50 = meds,
+          predQlower = cred[1, ],
+          predQupper = cred[2, ],
+          type = type
+        )
+        colnames(df) <- c('series',
+                          'time',
+                          'predQ50',
+                          paste0('predQ', 100 * min(probs)),
+                          paste0('predQ', 100 * max(probs)),
+                          'type')
+        rownames(df) <- NULL
+      }
+      df
+
+    })
+  ) %>%
+    dplyr::mutate(
+      series = factor(series,
+                      levels = object$series_names)
+    )
+  class(fc_preds) <- c("tbl_df",
+                       "tbl",
+                       "data.frame")
+
+  return(fc_preds)
+}

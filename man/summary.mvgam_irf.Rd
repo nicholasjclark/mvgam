@@ -17,7 +17,7 @@ in addition to the median}
 \item{...}{ignored}
 }
 \value{
-A long-format \code{tibble} reporting the posterior median,
+A long-format \code{tibble} / \code{data.frame} reporting the posterior median,
 upper and lower percentiles of the impulse responses of each series to shocks
 from each of the other series at all horizons.
 }

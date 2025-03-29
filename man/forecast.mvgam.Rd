@@ -83,6 +83,7 @@ plot(fc, series = 3)
 fc <- forecast(mod,
                newdata = simdat$data_test,
                type = 'expected')
+head(summary(fc), 12)
 plot(fc, series = 1)
 plot(fc, series = 2)
 plot(fc, series = 3)
@@ -91,6 +92,7 @@ plot(fc, series = 3)
 fc <- forecast(mod,
                newdata = simdat$data_test,
                type = 'trend')
+head(summary(fc), 12)
 plot(fc, series = 1)
 plot(fc, series = 2)
 plot(fc, series = 3)

@@ -23,7 +23,7 @@ NULL
 #' in addition to the median
 #' @param ... ignored
 #'
-#' @return A long-format `tibble` reporting the posterior median,
+#' @return A long-format `tibble` / `data.frame` reporting the posterior median,
 #' upper and lower percentiles of the error variance decompositions of
 #' each series at all horizons.
 #'
@@ -35,6 +35,13 @@ NULL
 #'
 #' @export
 summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
+
+  if (length(probs) != 2L) {
+    stop("argument 'probs' must be a vector of length 2", call. = FALSE)
+  }
+  validate_proportional(min(probs))
+  validate_proportional(max(probs))
+
   # Calculate posterior quantiles of error variance contributions
   ynames <- names(object[[1]])
   out <- do.call(
@@ -50,7 +57,7 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
     dplyr::mutate(evd = evd / total_evd) %>%
     dplyr::group_by(horizon, target, Series) %>%
     dplyr::mutate(
-      fevd_median = median(evd),
+      fevdQ50 = median(evd),
       fevd_Qlower = quantile(evd, min(probs)),
       fevd_Qupper = quantile(evd, max(probs))
     ) %>%
@@ -58,8 +65,13 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
     dplyr::mutate(
       shock = gsub('process', 'Process', paste0(Series, ' -> ', target))
     ) %>%
-    dplyr::select(shock, horizon, fevd_median, fevd_Qlower, fevd_Qupper) %>%
+    dplyr::select(shock, horizon, fevdQ50, fevd_Qlower, fevd_Qupper) %>%
     dplyr::distinct()
+  colnames(out) <- c('shock',
+                     'horizon',
+                     'fevdQ50',
+                     paste0('fevdQ', 100 * min(probs)),
+                     paste0('fevdQ', 100 * max(probs)))
 
   return(out)
 }

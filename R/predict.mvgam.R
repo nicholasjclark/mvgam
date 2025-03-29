@@ -109,6 +109,11 @@ predict.mvgam = function(
   if (missing(newdata)) {
     newdata <- object$obs_data
   }
+  if (length(probs) != 2L) {
+    stop("argument 'probs' must be a vector of length 2", call. = FALSE)
+  }
+  validate_proportional(min(probs))
+  validate_proportional(max(probs))
 
   # Check names of supplied variables against those required
   # for prediction

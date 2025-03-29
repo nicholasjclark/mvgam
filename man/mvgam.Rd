@@ -530,6 +530,8 @@ augment(mod1)
 # Compute the forecast using covariate information in data_test
 fc <- forecast(mod1, newdata = dat$data_test)
 str(fc)
+fc_summary <- summary(fc)
+head(fc_summary, 12)
 plot(fc)
 
 # Plot the estimated seasonal smooth function
@@ -677,10 +679,8 @@ code(mod)
 
 # Forecasts for the first two series will differ in magnitude
 fc <- forecast(mod, newdata = dat$data_test)
-layout(matrix(1:2, ncol = 2))
 plot(fc, series = 1, ylim = c(0, 75))
 plot(fc, series = 2, ylim = c(0, 75))
-layout(1)
 
 # Changing the offset for the testing data should lead to changes in
 # the forecast
@@ -766,6 +766,17 @@ pp_check(mod,
   group = "series", ndraws = 50
 )
 conditional_effects(mod, type = "link")
+
+# To view predictions on the probability scale,
+# use ntrials = 1 in datagrid()
+plot_predictions(
+  mod,
+  by = c('x', 'series'),
+  newdata = datagrid(x = runif(100, -2, 2),
+                    series = unique,
+                    ntrials = 1),
+  type = 'expected'
+)
 }
 }
 \references{

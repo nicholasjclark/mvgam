@@ -17,7 +17,7 @@ in addition to the median}
 \item{...}{ignored}
 }
 \value{
-A long-format \code{tibble} reporting the posterior median,
+A long-format \code{tibble} / \code{data.frame} reporting the posterior median,
 upper and lower percentiles of the error variance decompositions of
 each series at all horizons.
 }

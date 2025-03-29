@@ -118,6 +118,7 @@ test_that("variable extraction works correctly", {
 test_that("hindcast() works correctly", {
   hc <- hindcast(mvgam:::mvgam_example1)
   expect_true(inherits(hc$hindcasts, 'list'))
+  expect_true(inherits(summary(hc), 'data.frame'))
   expect_equal(
     NROW(mvgam:::mvgam_examp_dat$data_train) /
       NCOL(mvgam:::mvgam_example1$ytimes),
@@ -126,6 +127,7 @@ test_that("hindcast() works correctly", {
 
   hc <- hindcast(mvgam:::mvgam_example1, type = 'expected')
   expect_true(inherits(hc$hindcasts, 'list'))
+  expect_true(inherits(summary(hc), 'data.frame'))
   expect_equal(
     NROW(mvgam:::mvgam_examp_dat$data_train) /
       NCOL(mvgam:::mvgam_example1$ytimes),
@@ -500,6 +502,7 @@ test_that("forecast() works correctly", {
   )
   expect_true(inherits(fc$hindcasts, 'list'))
   expect_true(inherits(fc$forecasts, 'list'))
+  expect_true(inherits(summary(fc), 'data.frame'))
   expect_equal(
     NROW(mvgam:::mvgam_examp_dat$data_test) /
       NCOL(mvgam:::mvgam_example1$ytimes),

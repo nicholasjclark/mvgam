@@ -54,20 +54,21 @@ mod <- mvgam(y ~ s(season, bs = 'cc'),
 # Hindcasts on response scale
 hc <- hindcast(mod)
 str(hc)
+head(summary(hc), 12)
 plot(hc, series = 1)
 plot(hc, series = 2)
 plot(hc, series = 3)
 
 # Hindcasts as expectations
 hc <- hindcast(mod, type = 'expected')
-str(hc)
+head(summary(hc), 12)
 plot(hc, series = 1)
 plot(hc, series = 2)
 plot(hc, series = 3)
 
 # Estimated latent trends
 hc <- hindcast(mod, type = 'trend')
-str(hc)
+head(summary(hc), 12)
 plot(hc, series = 1)
 plot(hc, series = 2)
 plot(hc, series = 3)

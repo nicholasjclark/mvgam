@@ -22,7 +22,7 @@ NULL
 #' in addition to the median
 #' @param ... ignored
 #'
-#' @return A long-format `tibble` reporting the posterior median,
+#' @return A long-format `tibble` / `data.frame` reporting the posterior median,
 #' upper and lower percentiles of the impulse responses of each series to shocks
 #' from each of the other series at all horizons.
 #'
@@ -34,12 +34,15 @@ NULL
 #'
 #' @export
 summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
-  n_processes <- dim(object[[1]][[1]])[2]
-  h <- dim(object[[1]][[1]])[1]
-  n_draws <- length(object)
   if (length(probs) != 2L) {
     stop("argument 'probs' must be a vector of length 2", call. = FALSE)
   }
+  validate_proportional(min(probs))
+  validate_proportional(max(probs))
+
+  n_processes <- dim(object[[1]][[1]])[2]
+  h <- dim(object[[1]][[1]])[1]
+  n_draws <- length(object)
 
   out <- do.call(
     rbind,
@@ -67,12 +70,18 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
         # Calculate posterior empirical quantiles of impulse responses
         dplyr::group_by(shock, horizon) %>%
         dplyr::summarise(
-          irf_median = median(imp_resp),
-          irf_Qlower = quantile(imp_resp, min(probs)),
-          irf_Qupper = quantile(imp_resp, max(probs)),
+          irfQ50 = median(imp_resp),
+          irfQlower = quantile(imp_resp, min(probs)),
+          irfQupper = quantile(imp_resp, max(probs)),
           .groups = 'keep'
         ) %>%
         dplyr::ungroup()
+      colnames(responses) <- c('shock',
+                               'horizon',
+                               'irfQ50',
+                               paste0('irfQ', 100 * min(probs)),
+                               paste0('irfQ', 100 * max(probs)))
+      responses
     })
   )
 
