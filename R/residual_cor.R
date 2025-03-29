@@ -85,16 +85,18 @@ residual_cor <- function(object, ...) {
 #' @method residual_cor mvgam
 #' @export
 residual_cor.mvgam <- function(
-    object,
-    summary = TRUE,
-    robust = FALSE,
-    probs = c(0.025, 0.975),
-    ...
+  object,
+  summary = TRUE,
+  robust = FALSE,
+  probs = c(0.025, 0.975),
+  ...
 ) {
   # Only applicable if this is a dynamic factor model
-  if(!object$use_lv) {
-    stop('Cannot compute residual correlations if no latent factors were modelled',
-         call. = FALSE)
+  if (!object$use_lv) {
+    stop(
+      'Cannot compute residual correlations if no latent factors were modelled',
+      call. = FALSE
+    )
   } else {
     class(object) <- c('jsdgam', 'mvgam')
     return(residual_cor(
@@ -103,10 +105,9 @@ residual_cor.mvgam <- function(
       summary = summary,
       robust = robust,
       probs = probs,
-      ...)
-    )
+      ...
+    ))
   }
-
 }
 
 #' @rdname residual_cor.jsdgam
