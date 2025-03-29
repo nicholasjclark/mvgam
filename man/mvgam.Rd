@@ -204,7 +204,8 @@ simulations can be obtained}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 latent trends in a reduced dimension format. Only available for
-\code{RW()}, \code{AR()} and \code{GP()} trend models. Defaults to \code{FALSE}}
+\code{RW()}, \code{AR()} and \code{GP()} trend models. Defaults to \code{FALSE}. See
+\code{\link{lv_correlations}} for a worked example}
 
 \item{n_lv}{\code{integer} the number of latent dynamic factors to use if
 \code{use_lv == TRUE}. Cannot be \code{> n_series}. Defaults arbitrarily to
@@ -590,7 +591,6 @@ mod <- mvgam(
 
 # The mapping matrix is now supplied as data to the model in the 'Z' element
 mod$model_data$Z
-code(mod)
 
 # The first two series share an identical latent trend; the third is different
 plot(mod, type = "trend", series = 1)
@@ -626,7 +626,8 @@ data_test <- data[181:200, ]
 # Fit the model using the dynamic() formula helper
 mod <- mvgam(
   formula =
-    out ~ dynamic(temp,
+    out ~ dynamic(
+      temp,
       scale = FALSE,
       k = 40
     ),
@@ -675,7 +676,7 @@ mod <- mvgam(
 
 # Inspect the model file to see the modification to the linear predictor
 # (eta)
-code(mod)
+stancode(mod)
 
 # Forecasts for the first two series will differ in magnitude
 fc <- forecast(mod, newdata = dat$data_test)

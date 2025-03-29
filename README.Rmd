@@ -49,7 +49,7 @@ We can explore the package’s primary functions using one of it's built-in data
 ```{r include = FALSE}
 library(mvgam)
 library(ggplot2)
-theme_set(theme_bw())
+theme_set(theme_bw(base_size = 12))
 ```
 
 ```{r echo = FALSE}

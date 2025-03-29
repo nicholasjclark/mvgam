@@ -444,8 +444,21 @@ test_that("dynamic factor investigations work", {
   facconts <- plot_mvgam_factors(mvgam:::mvgam_example4, plot = FALSE)
   expect_true(inherits(facconts, 'data.frame'))
   expect_true(inherits(facconts, 'tbl_df'))
-})
 
+  lvcors <- residual_cor(mvgam:::mvgam_example4)
+  expect_true(inherits(lvcors, "mvgam_residcor"))
+  expect_no_error(plot(lvcors))
+
+  lvcors <- residual_cor(mvgam:::mvgam_example2)
+  expect_true(inherits(lvcors, "mvgam_residcor"))
+  expect_equal(rep(1, 4),
+               as.vector(lvcors$cor))
+
+  expect_error(
+    residual_cor(mvgam:::mvgam_example3),
+    'Cannot compute residual correlations if no latent factors were modelled'
+  )
+})
 
 test_that("evaluate() functions working", {
   mod <- mvgam:::mvgam_example1
@@ -502,7 +515,23 @@ test_that("forecast() works correctly", {
   )
   expect_true(inherits(fc$hindcasts, 'list'))
   expect_true(inherits(fc$forecasts, 'list'))
-  expect_true(inherits(summary(fc), 'data.frame'))
+  fc_summary <- summary(fc)
+  expect_true(inherits(fc_summary, 'data.frame'))
+  expect_equal(NROW(fc_summary),
+               NROW(rbind(mvgam:::mvgam_examp_dat$data_train,
+                          mvgam:::mvgam_examp_dat$data_test)))
+
+  expect_equal(
+    c(mvgam:::mvgam_examp_dat$data_train$y[
+      which(mvgam:::mvgam_examp_dat$data_train$series == 'series_2')
+    ],
+    mvgam:::mvgam_examp_dat$data_test$y[
+      which(mvgam:::mvgam_examp_dat$data_test$series == 'series_2')
+    ]),
+    fc_summary$truth[
+      which(fc_summary$series == 'series_2')
+    ]
+  )
   expect_equal(
     NROW(mvgam:::mvgam_examp_dat$data_test) /
       NCOL(mvgam:::mvgam_example1$ytimes),

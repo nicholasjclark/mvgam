@@ -7,22 +7,44 @@
 #'@param object \code{list} object of class \code{mvgam}
 #'@return A \code{list} object containing the mean posterior correlations
 #'and the full array of posterior correlations
+#'@details Although this function will still work, it is now recommended to use
+#'[residual_cor()] for to obtain residual correlation information in a more user-friendly
+#'format that allows for a deeper investigation of relationships among the time series.
+#'@seealso [residual_cor()], [plot.mvgam_residcor()]
 #'@examples
 #'\donttest{
-#'simdat <- sim_mvgam()
-#'mod <- mvgam(y ~ s(season, bs = 'cc',
-#'                   k = 6),
+#'# Simulate a set of four integer-valued time series
+#'set.seed(1)
+#'simdat <- sim_mvgam(n_series = 4,
+#'                    n_lv = 2,
+#'                    prop_trend = 1)
+#'
+#'# Fit a model that uses two AR(1) dynamic factors to model
+#'# the series' temporal dynamics
+#'mod <- mvgam(y ~ series,
 #'             trend_model = AR(),
 #'             use_lv = TRUE,
 #'             n_lv = 2,
 #'             data = simdat$data_train,
-#'             burnin = 300,
-#'             samples = 300,
 #'             chains = 2,
 #'             silent = 2)
+#'
+#'# Calculate correlations among the series using lv_correlations()
 #'lvcors <- lv_correlations(mod)
 #'names(lvcors)
 #'lapply(lvcors, class)
+#'
+#'# The above works, but it is now recommended to use the more
+#'# flexible and informative residual_cor() function to
+#'# calculate and work with these correlations
+#'lvcors <- residual_cor(mod)
+#'names(lvcors)
+#'lvcors$cor
+#'
+#'# For those correlations whose credible intervals did not incude
+#'# zero, plot them as a correlation matrix (all other correlations
+#'# are shown as zero on this plot)
+#'plot(lvcors)
 #'}
 #'@export
 lv_correlations = function(object) {

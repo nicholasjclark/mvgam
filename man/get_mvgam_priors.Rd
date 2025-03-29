@@ -171,7 +171,8 @@ Defaults to \code{series} to be consistent with other \code{mvgam} models}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 latent trends in a reduced dimension format. Only available for
-\code{RW()}, \code{AR()} and \code{GP()} trend models. Defaults to \code{FALSE}}
+\code{RW()}, \code{AR()} and \code{GP()} trend models. Defaults to \code{FALSE}. See
+\code{\link{lv_correlations}} for a worked example}
 
 \item{n_lv}{\code{integer} the number of latent dynamic factors to use if
 \code{use_lv == TRUE}. Cannot be \code{> n_series}. Defaults arbitrarily to

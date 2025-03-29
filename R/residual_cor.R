@@ -1,11 +1,12 @@
 #' Extract residual correlations based on latent factors from a fitted jsdgam
 #'
 #' Compute residual correlation estimates from Joint Species Distribution
-#' \code{jsdgam} models using latent factor loadings
+#' (\code{jsdgam}) or dynamic factor (\code{mvgam}) models using latent factor loadings
 #'
 #' @name residual_cor.jsdgam
 #' @inheritParams brms::residuals.brmsfit
 #' @param object \code{list} object of class \code{mvgam} resulting from a call to [jsdgam()]
+#' or a call to [mvgam()] in which `use_lv = TRUE`
 #' @param robust If `FALSE` (the default) the mean is used as a measure of central tendency.
 #' If `TRUE`, the median is used instead. Only used if `summary` is `TRUE`
 #' @param ... ignored
@@ -37,10 +38,10 @@
 #' Hui (2016) provides an excellent description of the quantities that this function calculates, so this passage
 #' is heavily paraphrased from his associated \pkg{boral} package.
 #'
-#' In Joint Species Distribution Models, the residual covariance matrix is calculated
+#' In latent factor models, the residual covariance matrix is calculated
 #' based on the matrix of latent factor loading matrix \eqn{\Theta}, where the residual covariance
 #' matrix \eqn{\Sigma = \Theta\Theta'}. A strong residual covariance/correlation matrix
-#' between two species can be interpreted as evidence of species interaction (e.g.,
+#' between two species can be interpreted as evidence of species interactions (e.g.,
 #' facilitation or competition),
 #' missing covariates, as well as any additional species correlation not accounted for by shared
 #' environmental captured in `formula`.
@@ -74,10 +75,38 @@
 #' Otso Ovaskainen et al. (2016). Using latent variable models to identify large networks of
 #' species-to-species associations at different spatial scales. Methods in Ecology and Evolution,
 #' 7, 549-555.
-#' @seealso [jsdgam()]
+#' @seealso [jsdgam()], [lv_correlations()]
 #' @export
 residual_cor <- function(object, ...) {
   UseMethod("residual_cor", object)
+}
+
+#' @rdname residual_cor.jsdgam
+#' @method residual_cor mvgam
+#' @export
+residual_cor.mvgam <- function(
+    object,
+    summary = TRUE,
+    robust = FALSE,
+    probs = c(0.025, 0.975),
+    ...
+) {
+  # Only applicable if this is a dynamic factor model
+  if(!object$use_lv) {
+    stop('Cannot compute residual correlations if no latent factors were modelled',
+         call. = FALSE)
+  } else {
+    class(object) <- c('jsdgam', 'mvgam')
+    return(residual_cor(
+      object,
+      object = object,
+      summary = summary,
+      robust = robust,
+      probs = probs,
+      ...)
+    )
+  }
+
 }
 
 #' @rdname residual_cor.jsdgam
@@ -91,6 +120,12 @@ residual_cor.jsdgam <- function(
   ...
 ) {
   insight::check_if_installed("corpcor")
+
+  if (length(probs) != 2L) {
+    stop("argument 'probs' must be a vector of length 2", call. = FALSE)
+  }
+  validate_proportional(min(probs))
+  validate_proportional(max(probs))
 
   # Take draws of factor loadings
   n_lv <- object$n_lv
@@ -214,16 +249,19 @@ residual_cor.jsdgam <- function(
   return(out)
 }
 
-#' Plot residual correlations based on latent factors from a fitted jsdgam
+#' Plot residual correlations based on latent factors
 #'
 #' Plot residual correlation estimates from Joint Species Distribution
-#' \code{jsdgam} models
+#' (\code{jsdgam}) or dynamic factor (\code{mvgam}) models
 #' @param x \code{list} object of class \code{mvgam_residcor} resulting from a
 #' call to `residual_cor(..., summary = TRUE)`
 #' @param ... ignored
 #' @method plot mvgam_residcor
 #' @details This function plots the significant residual correlations from a
-#' \code{mvgam_residcor} object
+#' \code{mvgam_residcor} object, whereby the posterior mean (if `robust = FALSE`)
+#' or posterior median (if `robust = TRUE`) correlations are shown
+#' only those correlations whose credible interval does not contain zero. All other
+#' correlations are set to zero in the returned plot
 #' @return A `ggplot` object
 #' @seealso \code{\link{jsdgam}}, \code{\link{residual_cor}}
 #'

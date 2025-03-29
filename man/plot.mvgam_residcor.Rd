@@ -2,7 +2,7 @@
 % Please edit documentation in R/residual_cor.R
 \name{plot.mvgam_residcor}
 \alias{plot.mvgam_residcor}
-\title{Plot residual correlations based on latent factors from a fitted jsdgam}
+\title{Plot residual correlations based on latent factors}
 \usage{
 \method{plot}{mvgam_residcor}(x, ...)
 }
@@ -17,11 +17,14 @@ A \code{ggplot} object
 }
 \description{
 Plot residual correlation estimates from Joint Species Distribution
-\code{jsdgam} models
+(\code{jsdgam}) or dynamic factor (\code{mvgam}) models
 }
 \details{
 This function plots the significant residual correlations from a
-\code{mvgam_residcor} object
+\code{mvgam_residcor} object, whereby the posterior mean (if \code{robust = FALSE})
+or posterior median (if \code{robust = TRUE}) correlations are shown
+only those correlations whose credible interval does not contain zero. All other
+correlations are set to zero in the returned plot
 }
 \seealso{
 \code{\link{jsdgam}}, \code{\link{residual_cor}}

@@ -39,6 +39,11 @@ forecast <- function(object, ...) {
 #' # Hindcasts on response scale
 #' hc <- hindcast(mod)
 #' str(hc)
+#'
+#' # Use summary() to extract hindcasts / forecasts for custom plotting
+#' head(summary(hc), 12)
+#'
+#' # Or just use the plot() function for quick plots
 #' plot(hc, series = 1)
 #' plot(hc, series = 2)
 #' plot(hc, series = 3)
@@ -47,6 +52,7 @@ forecast <- function(object, ...) {
 #' fc <- forecast(mod,
 #'                newdata = simdat$data_test)
 #' str(fc)
+#' head(summary(fc), 12)
 #' plot(fc, series = 1)
 #' plot(fc, series = 2)
 #' plot(fc, series = 3)

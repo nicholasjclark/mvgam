@@ -3,9 +3,18 @@
 \name{residual_cor.jsdgam}
 \alias{residual_cor.jsdgam}
 \alias{residual_cor}
+\alias{residual_cor.mvgam}
 \title{Extract residual correlations based on latent factors from a fitted jsdgam}
 \usage{
 residual_cor(object, ...)
+
+\method{residual_cor}{mvgam}(
+  object,
+  summary = TRUE,
+  robust = FALSE,
+  probs = c(0.025, 0.975),
+  ...
+)
 
 \method{residual_cor}{jsdgam}(
   object,
@@ -16,7 +25,8 @@ residual_cor(object, ...)
 )
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=jsdgam]{jsdgam()}}}
+\item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=jsdgam]{jsdgam()}}
+or a call to \code{\link[=mvgam]{mvgam()}} in which \code{use_lv = TRUE}}
 
 \item{...}{ignored}
 
@@ -56,16 +66,16 @@ residual precision matrix draws}
 }
 \description{
 Compute residual correlation estimates from Joint Species Distribution
-\code{jsdgam} models using latent factor loadings
+(\code{jsdgam}) or dynamic factor (\code{mvgam}) models using latent factor loadings
 }
 \details{
 Hui (2016) provides an excellent description of the quantities that this function calculates, so this passage
 is heavily paraphrased from his associated \pkg{boral} package.
 
-In Joint Species Distribution Models, the residual covariance matrix is calculated
+In latent factor models, the residual covariance matrix is calculated
 based on the matrix of latent factor loading matrix \eqn{\Theta}, where the residual covariance
 matrix \eqn{\Sigma = \Theta\Theta'}. A strong residual covariance/correlation matrix
-between two species can be interpreted as evidence of species interaction (e.g.,
+between two species can be interpreted as evidence of species interactions (e.g.,
 facilitation or competition),
 missing covariates, as well as any additional species correlation not accounted for by shared
 environmental captured in \code{formula}.
@@ -101,7 +111,7 @@ species-to-species associations at different spatial scales. Methods in Ecology 
 7, 549-555.
 }
 \seealso{
-\code{\link[=jsdgam]{jsdgam()}}
+\code{\link[=jsdgam]{jsdgam()}}, \code{\link[=lv_correlations]{lv_correlations()}}
 }
 \author{
 Nicholas J Clark
