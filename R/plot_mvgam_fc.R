@@ -739,7 +739,7 @@ plot.mvgam_forecast = function(
     time = c(
       object$train_times[[which(names(object$hindcasts) == s_name)]],
       object$test_times[[which(names(object$hindcasts) == s_name)]]
-      ),
+    ),
     med = cred[5, ],
     lower1 = cred[1, ],
     lower2 = cred[2, ],
@@ -904,7 +904,8 @@ plot.mvgam_forecast = function(
   if (!is.null(object$forecasts)) {
     base_plot <- base_plot +
       ggplot2::geom_vline(
-        xintercept = max(train_times), linetype = 'dashed'
+        xintercept = max(train_times),
+        linetype = 'dashed'
       )
   }
 

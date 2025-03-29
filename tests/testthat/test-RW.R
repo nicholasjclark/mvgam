@@ -382,14 +382,15 @@ sim_corcar1 = function(n = 120, phi = 0.5, sigma = 1, sigma_obs = 0.75) {
     # minimum threshold; this simulation function emulates that process
     if (time_dis[i] == 0) {
       x[i] <- rnorm(
-        1, mean = (phi^1e-3) * x[i - 1],
-        sd = sigma * (1 - phi^(2*1e-3)) / (1 - phi^2)
+        1,
+        mean = (phi^1e-3) * x[i - 1],
+        sd = sigma * (1 - phi^(2 * 1e-3)) / (1 - phi^2)
       )
     } else {
       x[i] <- rnorm(
         1,
         mean = (phi^time_dis[i]) * x[i - 1],
-        sd = sigma * (1 - phi^(2*time_dis[i])) / (1 - phi^2)
+        sd = sigma * (1 - phi^(2 * time_dis[i])) / (1 - phi^2)
       )
     }
   }
