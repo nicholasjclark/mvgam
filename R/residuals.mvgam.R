@@ -51,7 +51,6 @@ residuals.mvgam <- function(
   probs = c(0.025, 0.975),
   ...
 ) {
-
   if (length(probs) != 2L) {
     stop("argument 'probs' must be a vector of length 2", call. = FALSE)
   }

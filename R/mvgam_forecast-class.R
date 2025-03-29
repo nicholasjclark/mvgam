@@ -59,7 +59,6 @@ NULL
 #'
 #' @export
 summary.mvgam_forecast = function(object, probs = c(0.025, 0.975), ...) {
-
   if (length(probs) != 2L) {
     stop("argument 'probs' must be a vector of length 2", call. = FALSE)
   }
@@ -72,7 +71,7 @@ summary.mvgam_forecast = function(object, probs = c(0.025, 0.975), ...) {
   # Extract predictions and truths (if type = 'response')
   fc_preds <- do.call(
     rbind,
-    lapply(1:n_series, function(x){
+    lapply(1:n_series, function(x) {
       s_name <- object$series_names[x]
       preds <- cbind(
         object$hindcasts[[which(names(object$hindcasts) == s_name)]],
@@ -87,7 +86,7 @@ summary.mvgam_forecast = function(object, probs = c(0.025, 0.975), ...) {
       meds <- apply(preds, 2, median)
 
       # Put into a long "tidy" dataframe
-      if(type == 'response'){
+      if (type == 'response') {
         df <- data.frame(
           series = s_name,
           time = c(
@@ -103,13 +102,15 @@ summary.mvgam_forecast = function(object, probs = c(0.025, 0.975), ...) {
           ),
           type = 'response'
         )
-        colnames(df) <- c('series',
-                          'time',
-                          'predQ50',
-                          paste0('predQ', 100 * min(probs)),
-                          paste0('predQ', 100 * max(probs)),
-                          'truth',
-                          'type')
+        colnames(df) <- c(
+          'series',
+          'time',
+          'predQ50',
+          paste0('predQ', 100 * min(probs)),
+          paste0('predQ', 100 * max(probs)),
+          'truth',
+          'type'
+        )
         rownames(df) <- NULL
       } else {
         df <- data.frame(
@@ -123,25 +124,23 @@ summary.mvgam_forecast = function(object, probs = c(0.025, 0.975), ...) {
           predQupper = cred[2, ],
           type = type
         )
-        colnames(df) <- c('series',
-                          'time',
-                          'predQ50',
-                          paste0('predQ', 100 * min(probs)),
-                          paste0('predQ', 100 * max(probs)),
-                          'type')
+        colnames(df) <- c(
+          'series',
+          'time',
+          'predQ50',
+          paste0('predQ', 100 * min(probs)),
+          paste0('predQ', 100 * max(probs)),
+          'type'
+        )
         rownames(df) <- NULL
       }
       df
-
     })
   ) %>%
     dplyr::mutate(
-      series = factor(series,
-                      levels = object$series_names)
+      series = factor(series, levels = object$series_names)
     )
-  class(fc_preds) <- c("tbl_df",
-                       "tbl",
-                       "data.frame")
+  class(fc_preds) <- c("tbl_df", "tbl", "data.frame")
 
   return(fc_preds)
 }

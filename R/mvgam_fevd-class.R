@@ -35,7 +35,6 @@ NULL
 #'
 #' @export
 summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
-
   if (length(probs) != 2L) {
     stop("argument 'probs' must be a vector of length 2", call. = FALSE)
   }
@@ -67,11 +66,13 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
     ) %>%
     dplyr::select(shock, horizon, fevdQ50, fevd_Qlower, fevd_Qupper) %>%
     dplyr::distinct()
-  colnames(out) <- c('shock',
-                     'horizon',
-                     'fevdQ50',
-                     paste0('fevdQ', 100 * min(probs)),
-                     paste0('fevdQ', 100 * max(probs)))
+  colnames(out) <- c(
+    'shock',
+    'horizon',
+    'fevdQ50',
+    paste0('fevdQ', 100 * min(probs)),
+    paste0('fevdQ', 100 * max(probs))
+  )
 
   return(out)
 }

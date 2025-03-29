@@ -76,11 +76,13 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
           .groups = 'keep'
         ) %>%
         dplyr::ungroup()
-      colnames(responses) <- c('shock',
-                               'horizon',
-                               'irfQ50',
-                               paste0('irfQ', 100 * min(probs)),
-                               paste0('irfQ', 100 * max(probs)))
+      colnames(responses) <- c(
+        'shock',
+        'horizon',
+        'irfQ50',
+        paste0('irfQ', 100 * min(probs)),
+        paste0('irfQ', 100 * max(probs))
+      )
       responses
     })
   )
