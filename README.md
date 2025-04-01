@@ -17,9 +17,9 @@ Version](https://www.r-pkg.org/badges/version/mvgam)](https://cran.r-project.org
 [![CRAN
 Downloads](https://cranlogs.r-pkg.org/badges/grand-total/mvgam?color=brightgreen)](https://cran.r-project.org/package=mvgam)
 
-The goal of the `mvgam` 📦 is to fit Bayesian Dynamic Generalized
-Additive Models (DGAMs) that can include highly flexible nonlinear
-predictor effects and latent dynamic processes. The package does this by
+The `mvgam` 📦 fits Bayesian Dynamic Generalized Additive Models (DGAMs)
+that can include highly flexible nonlinear predictor effects, latent
+variables and multivariate time series models. The package does this by
 relying on functionalities from the impressive
 <a href="https://paulbuerkner.com/brms/"
 target="_blank"><code>brms</code></a> and
@@ -238,13 +238,13 @@ proper scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.59480975
+    #> 8.609583
     #> Out of sample DRPS:
-    #> 5.2296815
+    #> 5.4843955
     #> Out of sample DRPS:
-    #> 8.8308515
+    #> 8.3691115
     #> Out of sample DRPS:
-    #> 3.403928
+    #> 3.53661975
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
@@ -622,4 +622,4 @@ Conduct](https://dplyr.tidyverse.org/CODE_OF_CONDUCT).
 
 ## License
 
-This project is licensed under an `MIT` open source license
+The `mvgam` project is licensed under an `MIT` open source license
