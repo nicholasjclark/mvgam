@@ -31,7 +31,7 @@ knitr::opts_chunk$set(
 [![CRAN Version](https://www.r-pkg.org/badges/version/mvgam)](https://cran.r-project.org/package=mvgam)
 [![CRAN Downloads](https://cranlogs.r-pkg.org/badges/grand-total/mvgam?color=brightgreen)](https://cran.r-project.org/package=mvgam)
 
-The goal of the `mvgam` 📦 is to fit Bayesian Dynamic Generalized Additive Models (DGAMs) that can include highly flexible nonlinear predictor effects and latent dynamic processes. The package does this by relying on functionalities from the impressive [`brms`](https://paulbuerkner.com/brms/){target="_blank"} and [`mgcv`](https://cran.r-project.org/package=mgcv){target="_blank"} packages. Parameters are estimated using the probabilistic programming language [`Stan`](https://mc-stan.org/), giving users access to the most advanced Bayesian inference algorithms available. This allows `mvgam` to fit a very wide range of models, including:
+The `mvgam` 📦 fits Bayesian Dynamic Generalized Additive Models (DGAMs) that can include highly flexible nonlinear predictor effects, latent variables and multivariate time series models. The package does this by relying on functionalities from the impressive [`brms`](https://paulbuerkner.com/brms/){target="_blank"} and [`mgcv`](https://cran.r-project.org/package=mgcv){target="_blank"} packages. Parameters are estimated using the probabilistic programming language [`Stan`](https://mc-stan.org/), giving users access to the most advanced Bayesian inference algorithms available. This allows `mvgam` to fit a very wide range of models, including:
 
 * [Multivariate State-Space Time Series Models](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html){target="_blank"}
 * [Hierarchical N-mixture Models](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html){target="_blank"}
@@ -378,4 +378,4 @@ A series of [vignettes cover data formatting, forecasting and several extended c
 I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au). Other contributions are also very welcome, but please see [The Contributor Instructions](https://github.com/nicholasjclark/mvgam/blob/master/.github/CONTRIBUTING.md) for general guidelines. Note that by participating in this project you agree to abide by the terms of its [Contributor Code of Conduct](https://dplyr.tidyverse.org/CODE_OF_CONDUCT).
 
 ## License
-This project is licensed under an `MIT` open source license
+The `mvgam` project is licensed under an `MIT` open source license
