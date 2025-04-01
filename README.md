@@ -238,13 +238,13 @@ proper scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.609583
+    #> 8.57636325
     #> Out of sample DRPS:
-    #> 5.4843955
+    #> 5.27575475
     #> Out of sample DRPS:
-    #> 8.3691115
+    #> 8.86382975
     #> Out of sample DRPS:
-    #> 3.53661975
+    #> 3.59639425
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
@@ -322,7 +322,7 @@ details in scientific communications
     description
 
     #> Methods text skeleton
-    #> We used the R package mvgam (version 1.1.53; Clark & Wells, 2023) to
+    #> We used the R package mvgam (version 1.1.54; Clark & Wells, 2023) to
     #>   construct, fit and interrogate the model. mvgam fits Bayesian
     #>   State-Space models that can include flexible predictor effects in both
     #>   the process and observation components by incorporating functionalities
