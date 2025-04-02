@@ -107,8 +107,10 @@ plot.mvgam_residcor = function(x, cluster = FALSE, ...) {
     )
   ) +
     ggplot2::geom_tile(colour = 'grey50') +
-    ggplot2::scale_fill_gradient2(breaks = seq(-1, 1, by = 0.5),
-                                  limits = c(-1, 1)) +
+    ggplot2::scale_fill_gradient2(
+      breaks = seq(-1, 1, by = 0.5),
+      limits = c(-1, 1)
+    ) +
     ggplot2::labs(x = '', y = '') +
     ggplot2::scale_x_discrete(guide = ggplot2::guide_axis(angle = 45)) +
     ggplot2::theme_minimal()
