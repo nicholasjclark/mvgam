@@ -77,7 +77,7 @@ mvgam models with Vector Autoregressive dynamics"><meta property="og:image" cont
     <dl><dt>object</dt>
 <dd><p><code>list</code> object of class <code>mvgam</code> resulting from a call to <code><a href="mvgam.html">mvgam()</a></code>
 that used a Vector Autoregressive latent process model (either as <code>VAR(cor = FALSE)</code> or
-<code>VAR(cor = TRUE)</code>)</p></dd>
+<code>VAR(cor = TRUE)</code>; see <code><a href="RW.html">VAR()</a></code> for details)</p></dd>
 
 
 <dt>...</dt>
@@ -102,32 +102,22 @@ calculated. Note that the order of the variables matters when calculating these<
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     
 
-<p>An object of class <code>mvgam_irf</code> containing the posterior IRFs. This
-object can be used with the supplied S3 functions <code>plot</code></p>
+<p>An object of class mvgam_irf containing the posterior IRFs. This
+object can be used with the supplied S3 functions <code><a href="plot.mvgam_irf.html">plot.mvgam_irf()</a></code></p>
+
+
+<p>and <code><a href="summary.mvgam_irf.html">summary.mvgam_irf()</a></code></p>
 
 
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Generalized or Orthogonalized Impulse Response Functions can be computed
-using the posterior estimates of Vector Autoregressive parameters. This function
-generates a positive "shock" for a target process at time <code>t = 0</code> and then
-calculates how  each of the remaining processes in the latent VAR are expected
-to respond over the forecast horizon <code>h</code>. The function computes IRFs for all
-processes in the object and returns them in an array that can be plotted using
-the S3 <code>plot</code> function. To inspect community-level metrics of stability using latent
-VAR processes, you can use the related <code><a href="stability.mvgam.html">stability</a></code> function.</p>
-    </div>
-    <div class="section level2">
-    <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
-    <p>PH Pesaran &amp; Shin Yongcheol (1998).
-Generalized impulse response analysis in linear multivariate models.
-Economics Letters 58: 17–29.</p>
+    <p>See mvgam_irf for a full description of the quantities that are
+computed and returned by this function, along with key references.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="RW.html">VAR</a></code>, <code><a href="plot.mvgam_irf.html">plot.mvgam_irf</a></code>, <code><a href="stability.mvgam.html">stability</a></code>,
-<code><a href="fevd.mvgam.html">fevd</a></code></p></div>
+    <div class="dont-index"><p>mvgam_irf, <code><a href="RW.html">VAR()</a></code>, <code><a href="plot.mvgam_irf.html">plot.mvgam_irf()</a></code>, <code><a href="stability.mvgam.html">stability()</a></code>, <code><a href="fevd.mvgam.html">fevd()</a></code></p></div>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>

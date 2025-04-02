@@ -77,7 +77,7 @@ mvgam models with Vector Autoregressive dynamics"><meta property="og:image" cont
     <dl><dt>object</dt>
 <dd><p><code>list</code> object of class <code>mvgam</code> resulting from a call to <code><a href="mvgam.html">mvgam()</a></code>
 that used a Vector Autoregressive latent process model (either as <code>VAR(cor = FALSE)</code> or
-<code>VAR(cor = TRUE)</code>)</p></dd>
+<code>VAR(cor = TRUE)</code>; see <code><a href="RW.html">VAR()</a></code> for details)</p></dd>
 
 
 <dt>...</dt>
@@ -90,41 +90,13 @@ the IRF</p></dd>
 
 </dl></div>
     <div class="section level2">
-    <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    
-
-<p>An object of class <code>mvgam_fevd</code> containing the posterior forecast error
-variance decompositions. This
-object can be used with the supplied S3 functions <code>plot</code></p>
-
-
-    </div>
-    <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>A forecast error variance decomposition is useful for quantifying the amount
-of information each series that in a Vector Autoregression contributes to the forecast
-distributions of the other series in the autoregression. This function calculates
-the forecast error variance decomposition using the
-orthogonalised impulse response coefficient matrices \(\Psi_h\), which can be used to
-quantify the contribution of series \(j\) to the
-h-step forecast error variance of series \(k\):
-$$
-\sigma_k^2(h) = \sum_{j=1}^K(\psi_{kj, 0}^2 + \ldots + \psi_{kj,
-h-1}^2) \quad
-$$
-If the orthogonalised impulse reponses \((\psi_{kj, 0}^2 + \ldots + \psi_{kj, h-1}^2)\)
-are divided by the variance of the forecast error \(\sigma_k^2(h)\),
-this yields an interpretable percentage representing how much of the
-forecast error variance for \(k\) can be explained by an exogenous shock to \(j\).</p>
-    </div>
-    <div class="section level2">
-    <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
-    <p>Lütkepohl, H (2006).
-New Introduction to Multiple Time Series Analysis. Springer, New York.</p>
+    <p>See mvgam_fevd for a full description of the quantities that are
+computed and returned by this function, along with key references.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="RW.html">VAR</a></code>, <code><a href="irf.mvgam.html">irf</a></code>, <code><a href="stability.mvgam.html">stability</a></code></p></div>
+    <div class="dont-index"><p><code><a href="RW.html">VAR()</a></code>, <code><a href="irf.mvgam.html">irf()</a></code>, <code><a href="stability.mvgam.html">stability()</a></code></p></div>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>

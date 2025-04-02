@@ -67,8 +67,22 @@ Run <code>methods(class = "mvgam_irf")</code> to see an overview of available me
 
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>A <code>mvgam_irf</code> object contains a <code>list</code> of posterior impulse response
+    <p>Generalized or Orthogonalized Impulse Response Functions can be computed
+using the posterior estimates of Vector Autoregressive parameters. This function
+generates a positive "shock" for a target process at time <code>t = 0</code> and then
+calculates how  each of the remaining processes in the latent VAR are expected
+to respond over the forecast horizon <code>h</code>. The function computes IRFs for all
+processes in the object and returns them in an array that can be plotted using
+the S3 <code>plot</code> function. To inspect community-level metrics of stability using latent
+VAR processes, you can use the related <code><a href="stability.mvgam.html">stability()</a></code> function.
+A <code>mvgam_irf</code> object contains a <code>list</code> of posterior impulse response
 functions, each stored as its own <code>list</code></p>
+    </div>
+    <div class="section level2">
+    <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
+    <p>PH Pesaran &amp; Shin Yongcheol (1998).
+Generalized impulse response analysis in linear multivariate models.
+Economics Letters 58: 17–29.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
