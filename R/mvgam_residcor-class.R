@@ -87,12 +87,11 @@ NULL
 #'
 #' @export
 plot.mvgam_residcor = function(x, cluster = FALSE, ...) {
-
   # Extract significant correlations
   corrmat <- x$sig_cor
 
   # Re-order into clusters, if specified
-  if(cluster){
+  if (cluster) {
     idx <- cluster_cormat(corrmat)
   } else {
     idx <- 1:NROW(corrmat)
@@ -102,7 +101,9 @@ plot.mvgam_residcor = function(x, cluster = FALSE, ...) {
   ggplot2::ggplot(
     data = gather_matrix(corrmat[idx, idx]),
     mapping = ggplot2::aes(
-      x = Var1, y = Var2, fill = correlation
+      x = Var1,
+      y = Var2,
+      fill = correlation
     )
   ) +
     ggplot2::geom_tile(colour = 'grey50') +
@@ -253,4 +254,3 @@ reorder_clusters <- function(x, dis, ...) {
   x1$order <- clusters[[n]]
   return(x1)
 }
-
