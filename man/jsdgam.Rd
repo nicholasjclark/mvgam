@@ -420,6 +420,7 @@ names(post_cors)
 post_cors$cor[1:5, 1:5]
 post_cors$cor_upper[1:5, 1:5]
 post_cors$cor_lower[1:5, 1:5]
+
 # Plot of the posterior median correlations for those estimated
 # to be non-zero
 plot(post_cors)
@@ -436,12 +437,12 @@ loo(mod)
 # note this calculation takes a few minutes because of the need to calculate
 # draws from the stochastic latent factors
 newdata <- st_process \%>\%
-                   dplyr::mutate(species = factor(species,
-                                                  levels = paste0('species_',
-                                                                  1:N_species))) \%>\%
-                   dplyr::group_by(lat, lon) \%>\%
-                   dplyr::mutate(site = dplyr::cur_group_id()) \%>\%
-                   dplyr::ungroup()
+ dplyr::mutate(species = factor(species,
+                                levels = paste0('species_',
+                                                1:N_species))) \%>\%
+ dplyr::group_by(lat, lon) \%>\%
+ dplyr::mutate(site = dplyr::cur_group_id()) \%>\%
+ dplyr::ungroup()
 preds <- predict(mod, newdata = newdata)
 
 # Plot the median log(count) predictions on a grid

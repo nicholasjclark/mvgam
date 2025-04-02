@@ -12,7 +12,7 @@ irf(object, ...)
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
 that used a Vector Autoregressive latent process model (either as \code{VAR(cor = FALSE)} or
-\code{VAR(cor = TRUE)})}
+\code{VAR(cor = TRUE)}; see \code{\link[=VAR]{VAR()}} for details)}
 
 \item{...}{ignored}
 
@@ -25,22 +25,17 @@ the IRF}
 calculated. Note that the order of the variables matters when calculating these}
 }
 \value{
-An object of class \code{mvgam_irf} containing the posterior IRFs. This
-object can be used with the supplied S3 functions \code{plot}
+An object of class \link{mvgam_irf} containing the posterior IRFs. This
+object can be used with the supplied S3 functions \code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}
+and \code{\link[=summary.mvgam_irf]{summary.mvgam_irf()}}
 }
 \description{
 Compute Generalized or Orthogonalized Impulse Response Functions (IRFs) from
 \code{mvgam} models with Vector Autoregressive dynamics
 }
 \details{
-Generalized or Orthogonalized Impulse Response Functions can be computed
-using the posterior estimates of Vector Autoregressive parameters. This function
-generates a positive "shock" for a target process at time \code{t = 0} and then
-calculates how  each of the remaining processes in the latent VAR are expected
-to respond over the forecast horizon \code{h}. The function computes IRFs for all
-processes in the object and returns them in an array that can be plotted using
-the S3 \code{plot} function. To inspect community-level metrics of stability using latent
-VAR processes, you can use the related \code{\link{stability}} function.
+See \link{mvgam_irf} for a full description of the quantities that are
+computed and returned by this function, along with key references.
 }
 \examples{
 \donttest{
@@ -76,14 +71,8 @@ plot(irfs, series = 3)
 summary(irfs)
 }
 }
-\references{
-PH Pesaran & Shin Yongcheol (1998).
-Generalized impulse response analysis in linear multivariate models.
-Economics Letters 58: 17–29.
-}
 \seealso{
-\code{\link{VAR}}, \code{\link{plot.mvgam_irf}}, \code{\link{stability}},
-\code{\link{fevd}}
+\link{mvgam_irf}, \code{\link[=VAR]{VAR()}}, \code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}, \code{\link[=stability]{stability()}}, \code{\link[=fevd]{fevd()}}
 }
 \author{
 Nicholas J Clark

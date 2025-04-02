@@ -4,16 +4,35 @@
 \alias{mvgam_fevd-class}
 \title{\code{mvgam_fevd} object description}
 \description{
-A \code{mvgam_fevd} object returned by function \code{\link{fevd}}.
+A \code{mvgam_fevd} object returned by function \code{\link[=fevd]{fevd()}}.
 Run \code{methods(class = "mvgam_fevd")} to see an overview of available methods.
 }
 \details{
-A \code{mvgam_fevd} object contains a \code{list} of posterior forecast
-error variance decompositions, each stored as
-its own \code{list}
+A forecast error variance decomposition is useful for quantifying the amount
+of information each series that in a Vector Autoregression contributes to the forecast
+distributions of the other series in the autoregression. This object contains
+the forecast error variance decomposition using the
+orthogonalised impulse response coefficient matrices \eqn{\Psi_h}, which can be used to
+quantify the contribution of series \eqn{j} to the
+h-step forecast error variance of series \eqn{k}:
+\deqn{
+\sigma_k^2(h) = \sum_{j=1}^K(\psi_{kj, 0}^2 + \ldots + \psi_{kj,
+h-1}^2) \quad
+}
+If the orthogonalised impulse reponses \eqn{(\psi_{kj, 0}^2 + \ldots + \psi_{kj, h-1}^2)}
+are divided by the variance of the forecast error \eqn{\sigma_k^2(h)},
+this yields an interpretable percentage representing how much of the
+forecast error variance for \eqn{k} can be explained by an exogenous shock to \eqn{j}.
+This percentage is what is calculated and returned in objects of class \code{mvgam_fevd},
+where the posterior distribution of variance decompositions for each variable in the
+original model is contained in a separate slot within the returned \code{list} object
+}
+\references{
+Lütkepohl, H (2006).
+New Introduction to Multiple Time Series Analysis. Springer, New York.
 }
 \seealso{
-\link{mvgam}, \link{VAR}
+\code{\link[=mvgam]{mvgam()}}, \code{\link[=VAR]{VAR()}}
 }
 \author{
 Nicholas J Clark

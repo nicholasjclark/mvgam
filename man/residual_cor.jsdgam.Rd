@@ -69,50 +69,9 @@ Compute residual correlation estimates from Joint Species Distribution
 (\code{jsdgam}) or dynamic factor (\code{mvgam}) models using latent factor loadings
 }
 \details{
-Hui (2016) provides an excellent description of the quantities that this function calculates, so this passage
-is heavily paraphrased from his associated \pkg{boral} package.
-
-In latent factor models, the residual covariance matrix is calculated
-based on the matrix of latent factor loading matrix \eqn{\Theta}, where the residual covariance
-matrix \eqn{\Sigma = \Theta\Theta'}. A strong residual covariance/correlation matrix
-between two species can be interpreted as evidence of species interactions (e.g.,
-facilitation or competition),
-missing covariates, as well as any additional species correlation not accounted for by shared
-environmental captured in \code{formula}.
-
-The residual precision matrix (also known as partial correlation matrix, Ovaskainen et al., 2016)
-is defined as the inverse of the residual correlation matrix. The precision matrix is often used to
-identify direct or causal relationships between two species e.g., two species can have a zero
-precision but still be correlated, which can be interpreted as saying that two species are not
-directly associated, but they are still correlated \emph{through} other species. In other words, they
-are conditionally independent given the other species. It is important that the precision matrix
-does not exhibit the exact same properties of the correlation e.g., the diagonal elements are
-not equal to 1. Nevertheless, relatively larger values of precision may imply stronger
-direct relationships between two species.
-
-In addition to the residual correlation and precision matrices, the median or mean point estimator
-of trace of the residual covariance matrix is returned,
-\eqn{\sum\limits_{j=1}^p [\Theta\Theta']_{jj}}. Often used in other areas of multivariate
-statistics, the trace may be interpreted as the amount of covariation explained by the latent factors.
-One situation where the trace may be useful is when comparing a pure latent factor model
-(where no terms are suppled to \code{formula}) versus a model with latent
-factors and some additional predictors in \code{formula} -- the proportional difference in trace
-between these two models may be interpreted as the proportion of covariation between species explained
-by the predictors in \code{formula}. Of course, the trace itself is random due to the MCMC sampling, and so it
-is not always guaranteed to produce sensible answers.
-}
-\references{
-Francis KC Hui (2016). BORAL - Bayesian ordination and regression analysis of
-multivariate abundance data in R. Methods in Ecology and Evolution. 7, 744-750.
-\cr
-\cr
-Otso Ovaskainen et al. (2016). Using latent variable models to identify large networks of
-species-to-species associations at different spatial scales. Methods in Ecology and Evolution,
-7, 549-555.
+See \link{mvgam_residcor} for a full description of the quantities that are
+computed and returned by this function, along with key references.
 }
 \seealso{
-\code{\link[=jsdgam]{jsdgam()}}, \code{\link[=lv_correlations]{lv_correlations()}}
-}
-\author{
-Nicholas J Clark
+\code{\link[=jsdgam]{jsdgam()}}, \code{\link[=lv_correlations]{lv_correlations()}}, \link{mvgam_residcor}
 }

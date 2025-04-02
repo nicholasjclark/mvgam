@@ -35,47 +35,10 @@
 #'  \item{all_trace}{A \eqn{n_{draws}} `vector` of posterior covariance trace draws}
 #'
 #' @details
-#' Hui (2016) provides an excellent description of the quantities that this function calculates, so this passage
-#' is heavily paraphrased from his associated \pkg{boral} package.
+#' See [mvgam_residcor] for a full description of the quantities that are
+#' computed and returned by this function, along with key references.
 #'
-#' In latent factor models, the residual covariance matrix is calculated
-#' based on the matrix of latent factor loading matrix \eqn{\Theta}, where the residual covariance
-#' matrix \eqn{\Sigma = \Theta\Theta'}. A strong residual covariance/correlation matrix
-#' between two species can be interpreted as evidence of species interactions (e.g.,
-#' facilitation or competition),
-#' missing covariates, as well as any additional species correlation not accounted for by shared
-#' environmental captured in `formula`.
-#'
-#' The residual precision matrix (also known as partial correlation matrix, Ovaskainen et al., 2016)
-#' is defined as the inverse of the residual correlation matrix. The precision matrix is often used to
-#' identify direct or causal relationships between two species e.g., two species can have a zero
-#' precision but still be correlated, which can be interpreted as saying that two species are not
-#' directly associated, but they are still correlated *through* other species. In other words, they
-#' are conditionally independent given the other species. It is important that the precision matrix
-#' does not exhibit the exact same properties of the correlation e.g., the diagonal elements are
-#' not equal to 1. Nevertheless, relatively larger values of precision may imply stronger
-#' direct relationships between two species.
-#'
-#' In addition to the residual correlation and precision matrices, the median or mean point estimator
-#' of trace of the residual covariance matrix is returned,
-#' \eqn{\sum\limits_{j=1}^p [\Theta\Theta']_{jj}}. Often used in other areas of multivariate
-#' statistics, the trace may be interpreted as the amount of covariation explained by the latent factors.
-#' One situation where the trace may be useful is when comparing a pure latent factor model
-#' (where no terms are suppled to `formula`) versus a model with latent
-#' factors and some additional predictors in `formula` -- the proportional difference in trace
-#' between these two models may be interpreted as the proportion of covariation between species explained
-#' by the predictors in `formula`. Of course, the trace itself is random due to the MCMC sampling, and so it
-#' is not always guaranteed to produce sensible answers.
-#' @author Nicholas J Clark
-#' @references
-#' Francis KC Hui (2016). BORAL - Bayesian ordination and regression analysis of
-#' multivariate abundance data in R. Methods in Ecology and Evolution. 7, 744-750.
-#' \cr
-#' \cr
-#' Otso Ovaskainen et al. (2016). Using latent variable models to identify large networks of
-#' species-to-species associations at different spatial scales. Methods in Ecology and Evolution,
-#' 7, 549-555.
-#' @seealso [jsdgam()], [lv_correlations()]
+#' @seealso [jsdgam()], [lv_correlations()], [mvgam_residcor]
 #' @export
 residual_cor <- function(object, ...) {
   UseMethod("residual_cor", object)
@@ -247,49 +210,5 @@ residual_cor.jsdgam <- function(
       class = 'mvgam_residcor'
     )
   }
-  return(out)
-}
-
-#' Plot residual correlations based on latent factors
-#'
-#' Plot residual correlation estimates from Joint Species Distribution
-#' (\code{jsdgam}) or dynamic factor (\code{mvgam}) models
-#' @param x \code{list} object of class \code{mvgam_residcor} resulting from a
-#' call to `residual_cor(..., summary = TRUE)`
-#' @param ... ignored
-#' @method plot mvgam_residcor
-#' @details This function plots the significant residual correlations from a
-#' \code{mvgam_residcor} object, whereby the posterior mean (if `robust = FALSE`)
-#' or posterior median (if `robust = TRUE`) correlations are shown
-#' only those correlations whose credible interval does not contain zero. All other
-#' correlations are set to zero in the returned plot
-#' @return A `ggplot` object
-#' @seealso \code{\link{jsdgam}}, \code{\link{residual_cor}}
-#'
-#' @author Nicholas J Clark
-#'
-#' @export
-plot.mvgam_residcor = function(x, ...) {
-  # Plot the significant correlations
-  ggplot2::ggplot(
-    data = gather_matrix(x$sig_cor),
-    mapping = ggplot2::aes(x = Var1, y = Var2, fill = correlation)
-  ) +
-    ggplot2::geom_tile(colour = 'grey50') +
-    ggplot2::scale_fill_gradient2() +
-    ggplot2::labs(x = '', y = '')
-}
-
-#' Melt a symmetric matrix into a long data.frame
-#' @noRd
-gather_matrix <- function(mat) {
-  mat[upper.tri(mat)] <- NA
-  if (is.null(dimnames(mat))) {
-    grid <- expand.grid(seq.int(NROW(mat)), seq.int(NCOL(mat)))
-  } else {
-    grid <- expand.grid(dimnames(mat))
-  }
-  out <- as.data.frame(cbind(grid, value = as.vector(mat)))
-  colnames(out) <- c('Var1', 'Var2', 'correlation')
   return(out)
 }

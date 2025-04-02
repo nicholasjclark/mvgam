@@ -2,9 +2,21 @@
 #'
 #' A \code{mvgam_irf} object returned by function \code{\link{irf}}.
 #' Run `methods(class = "mvgam_irf")` to see an overview of available methods.
-#' @details A `mvgam_irf` object contains a `list` of posterior impulse response
+#' @details
+#' Generalized or Orthogonalized Impulse Response Functions can be computed
+#' using the posterior estimates of Vector Autoregressive parameters. This function
+#' generates a positive "shock" for a target process at time `t = 0` and then
+#' calculates how  each of the remaining processes in the latent VAR are expected
+#' to respond over the forecast horizon `h`. The function computes IRFs for all
+#' processes in the object and returns them in an array that can be plotted using
+#' the S3 `plot` function. To inspect community-level metrics of stability using latent
+#' VAR processes, you can use the related [stability()] function.
+#' A `mvgam_irf` object contains a `list` of posterior impulse response
 #' functions, each stored as its own `list`
 #' @seealso [mvgam], [VAR]
+#' @references PH Pesaran & Shin Yongcheol (1998).
+#' Generalized impulse response analysis in linear multivariate models.
+#' Economics Letters 58: 17–29.
 #' @author Nicholas J Clark
 #' @name mvgam_irf-class
 NULL
