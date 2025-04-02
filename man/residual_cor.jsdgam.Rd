@@ -4,7 +4,7 @@
 \alias{residual_cor.jsdgam}
 \alias{residual_cor}
 \alias{residual_cor.mvgam}
-\title{Extract residual correlations based on latent factors from a fitted jsdgam}
+\title{Extract residual correlations based on latent factors}
 \usage{
 residual_cor(object, ...)
 
@@ -26,7 +26,8 @@ residual_cor(object, ...)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=jsdgam]{jsdgam()}}
-or a call to \code{\link[=mvgam]{mvgam()}} in which \code{use_lv = TRUE}}
+or a call to \code{\link[=mvgam]{mvgam()}} in which either \code{use_lv = TRUE} or a multivariate process was used
+with \code{cor = TRUE} (see \code{\link[=RW]{RW()}} and \code{\link[=VAR]{VAR()}} for examples)}
 
 \item{...}{ignored}
 
@@ -40,7 +41,7 @@ If \code{TRUE}, the median is used instead. Only used if \code{summary} is \code
 function. Only used if \code{summary} is \code{TRUE}.}
 }
 \value{
-If \code{summary = TRUE}, a \code{list} of class \code{mvgam_residcor} with the following components:
+If \code{summary = TRUE}, a \code{list} of class \code{\link{mvgam_residcor}} with the following components:
 \item{cor, cor_lower, cor_upper}{A set of \eqn{p \times p} correlation matrices,
 containing either the posterior median or mean estimate, plus lower and upper limits
 of the corresponding credible intervals supplied to \code{probs}}
@@ -66,12 +67,13 @@ residual precision matrix draws}
 }
 \description{
 Compute residual correlation estimates from Joint Species Distribution
-(\code{jsdgam}) or dynamic factor (\code{mvgam}) models using latent factor loadings
+(\code{jsdgam}) or \code{mvgam} models that either used latent factors
+or included correlated process errors directly
 }
 \details{
 See \link{mvgam_residcor} for a full description of the quantities that are
 computed and returned by this function, along with key references.
 }
 \seealso{
-\code{\link[=jsdgam]{jsdgam()}}, \code{\link[=lv_correlations]{lv_correlations()}}, \link{mvgam_residcor}
+\code{\link[=jsdgam]{jsdgam()}}, \code{\link[=lv_correlations]{lv_correlations()}}, \code{\link{mvgam_residcor}}
 }

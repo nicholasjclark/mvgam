@@ -9,8 +9,7 @@ A \code{data.frame} containing the following fields:
 \describe{
 \item{time}{time of sampling, in lunar monthly cycles}
 \item{series}{factor indicator of the time series, i.e. the species}
-\item{captures}{total captures across all control plots}
-\item{mintemp}{monthly mean minimum temperature}
+\item{captures}{total captures across all control plots at each time point}
 \item{ndvi_ma12}{12-month moving average of the mean Normalised Difference Vegetation Index}
 \item{mintemp}{monthly mean of minimum temperature}
 }
@@ -22,6 +21,6 @@ A \code{data.frame} containing the following fields:
 portal_data
 }
 \description{
-A dataset containing timeseries of total captures (across all control plots) for select rodent species from the Portal Project
+A dataset containing time series of total captures (across all control plots) for select rodent species from the Portal Project
 }
 \keyword{datasets}

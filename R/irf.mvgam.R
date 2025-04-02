@@ -16,41 +16,49 @@
 #' @details
 #' See [mvgam_irf] for a full description of the quantities that are
 #' computed and returned by this function, along with key references.
-#' @return An object of class [mvgam_irf] containing the posterior IRFs. This
+#' @return An object of class \code{\link{mvgam_irf}} containing the posterior IRFs. This
 #' object can be used with the supplied S3 functions [plot.mvgam_irf()]
 #' and [summary.mvgam_irf()]
 #' @author Nicholas J Clark
-#' @seealso [mvgam_irf], [VAR()], [plot.mvgam_irf()], [stability()], [fevd()]
+#' @seealso \code{\link{mvgam_irf}}, [VAR()], [plot.mvgam_irf()], [stability()], [fevd()]
 #' @examples
 #' \donttest{
-#' # Simulate some time series that follow a latent VAR(1) process
-#' simdat <- sim_mvgam(
-#'   family = gaussian(),
-#'   n_series = 4,
+#' # Fit a model to the portal time series that uses a latent VAR(1)
+#' mod <- mvgam(
+#'   formula = captures ~ -1,
+#'   trend_formula = ~ trend,
 #'   trend_model = VAR(cor = TRUE),
-#'   prop_trend = 1
-#' )
-#' plot_mvgam_series(data = simdat$data_train, series = "all")
-#'
-#' # Fit a model that uses a latent VAR(1)
-#' mod <- mvgam(y ~ -1,
-#'   trend_formula = ~1,
-#'   trend_model = VAR(cor = TRUE),
-#'   family = gaussian(),
-#'   data = simdat$data_train,
+#'   family = poisson(),
+#'   data = portal_data,
 #'   chains = 2,
 #'   silent = 2
 #' )
 #'
+#' # Plot the autoregressive coefficient distributions;
+#' # use 'dir = "v"' to arrange the order of facets
+#' # correctly
+#' mcmc_plot(
+#'   mod,
+#'   variable = 'A',
+#'   regex = TRUE,
+#'   type = 'hist',
+#'   facet_args = list(dir = 'v')
+#' )
+#'
 #' # Calulate Generalized IRFs for each series
-#' irfs <- irf(mod, h = 12, cumulative = FALSE)
+#' irfs <- irf(
+#'   mod,
+#'   h = 12,
+#'   cumulative = FALSE
+#' )
 #'
 #' # Plot them
 #' plot(irfs, series = 1)
 #' plot(irfs, series = 2)
 #' plot(irfs, series = 3)
+#' plot(irfs, series = 4)
 #'
-#' # Calculate posterior median, upper and lower 90th quantiles
+#' # Calculate posterior median, upper and lower 95th quantiles
 #' # of the impulse responses
 #' summary(irfs)
 #' }

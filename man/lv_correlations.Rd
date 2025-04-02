@@ -24,19 +24,13 @@ format that allows for a deeper investigation of relationships among the time se
 }
 \examples{
 \donttest{
-# Simulate a set of four integer-valued time series
-set.seed(1)
-simdat <- sim_mvgam(n_series = 4,
-                   n_lv = 2,
-                   prop_trend = 1)
-
 # Fit a model that uses two AR(1) dynamic factors to model
-# the series' temporal dynamics
+# the temporal dynamics of the four rodent species in the portal_data
 mod <- mvgam(y ~ series,
             trend_model = AR(),
             use_lv = TRUE,
             n_lv = 2,
-            data = simdat$data_train,
+            data = portal_data,
             chains = 2,
             silent = 2)
 
@@ -52,10 +46,10 @@ lvcors <- residual_cor(mod)
 names(lvcors)
 lvcors$cor
 
-# For those correlations whose credible intervals did not incude
+# For those correlations whose credible intervals did not include
 # zero, plot them as a correlation matrix (all other correlations
 # are shown as zero on this plot)
-plot(lvcors)
+plot(lvcors, cluster = TRUE)
 }
 }
 \seealso{

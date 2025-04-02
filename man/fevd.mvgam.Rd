@@ -24,7 +24,7 @@ Compute forecast error variance decompositions from
 \code{mvgam} models with Vector Autoregressive dynamics
 }
 \details{
-See \link{mvgam_fevd} for a full description of the quantities that are
+See \code{\link{mvgam_fevd}} for a full description of the quantities that are
 computed and returned by this function, along with key references.
 }
 \examples{
@@ -39,13 +39,25 @@ simdat <- sim_mvgam(
 plot_mvgam_series(data = simdat$data_train, series = "all")
 
 # Fit a model that uses a latent VAR(1)
-mod <- mvgam(y ~ -1,
-  trend_formula = ~1,
+mod <- mvgam(
+  formula = y ~ -1,
+  trend_formula = ~ 1,
   trend_model = VAR(cor = TRUE),
   family = gaussian(),
   data = simdat$data_train,
   chains = 2,
   silent = 2
+)
+
+# Plot the autoregressive coefficient distributions;
+# use 'dir = "v"' to arrange the order of facets
+# correctly
+mcmc_plot(
+  mod,
+  variable = 'A',
+  regex = TRUE,
+  type = 'hist',
+  facet_args = list(dir = 'v')
 )
 
 # Calulate forecast error variance decompositions for each series
@@ -59,7 +71,7 @@ summary(fevds)
 }
 }
 \seealso{
-\code{\link[=VAR]{VAR()}}, \code{\link[=irf]{irf()}}, \code{\link[=stability]{stability()}}
+\code{\link[=VAR]{VAR()}}, \code{\link[=irf]{irf()}}, \code{\link[=stability]{stability()}}, \code{\link{mvgam_fevd}}
 }
 \author{
 Nicholas J Clark

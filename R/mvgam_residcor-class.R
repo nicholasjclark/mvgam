@@ -107,9 +107,11 @@ plot.mvgam_residcor = function(x, cluster = FALSE, ...) {
     )
   ) +
     ggplot2::geom_tile(colour = 'grey50') +
-    ggplot2::scale_fill_gradient2() +
+    ggplot2::scale_fill_gradient2(breaks = seq(-1, 1, by = 0.5),
+                                  limits = c(-1, 1)) +
     ggplot2::labs(x = '', y = '') +
-    ggplot2::scale_x_discrete(guide = ggplot2::guide_axis(angle = 45))
+    ggplot2::scale_x_discrete(guide = ggplot2::guide_axis(angle = 45)) +
+    ggplot2::theme_minimal()
 }
 
 #' Melt a symmetric matrix into a long data.frame
@@ -129,7 +131,7 @@ gather_matrix <- function(mat) {
 #' Order a symmetric correlation matrix using approximate Robinson
 #' ordering, for better visualisation of "clusters"
 #' Credit for these functions goes to the maintainers of the gclus R package
-#' @importFrom stats hclust
+#' @importFrom stats hclust as.dist
 #' @noRd
 cluster_cormat <- function(cormat, ...) {
   dis <- -cormat

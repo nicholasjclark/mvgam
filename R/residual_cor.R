@@ -1,16 +1,18 @@
-#' Extract residual correlations based on latent factors from a fitted jsdgam
+#' Extract residual correlations based on latent factors
 #'
 #' Compute residual correlation estimates from Joint Species Distribution
-#' (\code{jsdgam}) or dynamic factor (\code{mvgam}) models using latent factor loadings
+#' (\code{jsdgam}) or \code{mvgam} models that either used latent factors
+#' or included correlated process errors directly
 #'
 #' @name residual_cor.jsdgam
 #' @inheritParams brms::residuals.brmsfit
 #' @param object \code{list} object of class \code{mvgam} resulting from a call to [jsdgam()]
-#' or a call to [mvgam()] in which `use_lv = TRUE`
+#' or a call to [mvgam()] in which either `use_lv = TRUE` or a multivariate process was used
+#' with `cor = TRUE` (see [RW()] and [VAR()] for examples)
 #' @param robust If `FALSE` (the default) the mean is used as a measure of central tendency.
 #' If `TRUE`, the median is used instead. Only used if `summary` is `TRUE`
 #' @param ... ignored
-#' @return If `summary = TRUE`, a `list` of class `mvgam_residcor` with the following components:
+#' @return If `summary = TRUE`, a `list` of class \code{\link{mvgam_residcor}} with the following components:
 #'  \item{cor, cor_lower, cor_upper}{A set of \eqn{p \times p} correlation matrices,
 #'  containing either the posterior median or mean estimate, plus lower and upper limits
 #'  of the corresponding credible intervals supplied to `probs`}
@@ -38,7 +40,7 @@
 #' See [mvgam_residcor] for a full description of the quantities that are
 #' computed and returned by this function, along with key references.
 #'
-#' @seealso [jsdgam()], [lv_correlations()], [mvgam_residcor]
+#' @seealso [jsdgam()], [lv_correlations()], \code{\link{mvgam_residcor}}
 #' @export
 residual_cor <- function(object, ...) {
   UseMethod("residual_cor", object)
@@ -54,22 +56,32 @@ residual_cor.mvgam <- function(
   probs = c(0.025, 0.975),
   ...
 ) {
-  # Only applicable if this is a dynamic factor model
-  if (!object$use_lv) {
-    stop(
-      'Cannot compute residual correlations if no latent factors were modelled',
-      call. = FALSE
+  # Only applicable if this is a dynamic factor model or a model
+  # that included a process error variance-covariance matrix
+  if (any(
+    grepl(
+      'Sigma',
+      variables(object)$trend_pars$orig_name
+    )
+  ) | object$use_lv) {
+
+    class(object) <- c('jsdgam', 'mvgam')
+    return(
+      residual_cor(
+        object,
+        object = object,
+        summary = summary,
+        robust = robust,
+        probs = probs,
+        ...
+      )
     )
   } else {
-    class(object) <- c('jsdgam', 'mvgam')
-    return(residual_cor(
-      object,
-      object = object,
-      summary = summary,
-      robust = robust,
-      probs = probs,
-      ...
-    ))
+    stop(
+      paste0('Cannot compute residual correlations if no latent factors ',
+             'or correlated process errors were modelled'),
+      call. = FALSE
+    )
   }
 }
 
@@ -91,28 +103,64 @@ residual_cor.jsdgam <- function(
   validate_proportional(min(probs))
   validate_proportional(max(probs))
 
-  # Take draws of factor loadings
-  n_lv <- object$n_lv
+  # Initiate objects to store all posterior correlation and covariance matrices
   p <- NCOL(object$ytimes)
   sp_names <- levels(object$obs_data$series)
-  loadings <- as.matrix(object$model_output, 'lv_coefs')
-
-  # Initiate array to store all posterior correlation and covariance matrices
+  ndraws <- brms::ndraws(as_draws_array(object, variable = 'betas'))
   all_cormat <- all_covmat <- all_precmat <- array(
     0,
-    dim = c(nrow(loadings), p, p)
+    dim = c(ndraws, p, p)
   )
-  all_trace_rescor <- numeric(NROW(loadings))
+  all_trace_rescor <- numeric(ndraws)
 
-  # Calculate posterior covariance, correlation, precision and trace estimates
-  for (i in 1:NROW(loadings)) {
-    lv_coefs <- matrix(loadings[i, ], nrow = p, ncol = n_lv)
+  # Check whether this model included a full variance-covariance matrix
+  use_lv <- TRUE
+  if(any(
+    grepl(
+      'Sigma',
+      variables(object)$trend_pars$orig_name
+    )
+  )) {
+    use_lv <- FALSE
+  }
 
-    lambdalambdaT <- tcrossprod(lv_coefs)
-    all_covmat[i, , ] <- lambdalambdaT
-    all_trace_rescor[i] <- sum(diag(lambdalambdaT))
-    all_cormat[i, , ] <- cov2cor(lambdalambdaT)
-    all_precmat[i, , ] <- corpcor::cor2pcor(lambdalambdaT)
+  if(use_lv){
+    # Take draws of factor loadings to compute residual correlations,
+    # covariances, and precisions
+    n_lv <- object$n_lv
+    loadings <- as.matrix(object$model_output, 'lv_coefs')
+
+    # Calculate posterior covariance, correlation, precision and trace estimates
+    for (i in 1:ndraws) {
+      lv_coefs <- matrix(loadings[i, ], nrow = p, ncol = n_lv)
+
+      lambdalambdaT <- tcrossprod(lv_coefs)
+      all_covmat[i, , ] <- lambdalambdaT
+      all_trace_rescor[i] <- sum(diag(lambdalambdaT))
+      all_cormat[i, , ] <- cov2cor(lambdalambdaT)
+      all_precmat[i, , ] <- corpcor::cor2pcor(lambdalambdaT)
+    }
+
+  } else {
+    # If the model already included a variance-covariance matrix,
+    # compute directly
+    Sigma_post <- as.matrix(
+      object,
+      variable = "Sigma",
+      regex = TRUE
+    )
+
+    for (i in 1:ndraws) {
+      cov <- matrix(
+        Sigma_post[i, ],
+        nrow = p,
+        ncol = p
+      )
+      all_covmat[i, , ] <- cov
+      all_trace_rescor[i] <- sum(diag(cov))
+      all_cormat[i, , ] <- cov2cor(cov)
+      all_precmat[i, , ] <- corpcor::cor2pcor(cov)
+    }
   }
 
   if (!summary) {

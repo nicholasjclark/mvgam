@@ -401,8 +401,8 @@
 #'
 #' @examples
 #' \donttest{
-#' # Simulate a collection of three time series that have shared seasonal dynamics
-#' # and independent AR1 trends, with a Poisson observation process
+#' # Simulate three time series that have shared seasonal dynamics,
+#' # independent AR(1) trends, and Poisson observations
 #' set.seed(0)
 #' dat <- sim_mvgam(
 #'   T = 80,
@@ -503,6 +503,58 @@
 #' options(mc.cores = mc.cores.def)
 #'
 #'
+#'
+#' # Fit a model to the portal time series that uses a latent
+#' # Vector Autoregression of order 1
+#' mod <- mvgam(
+#'   formula = captures ~ -1,
+#'   trend_formula = ~ trend,
+#'   trend_model = VAR(cor = TRUE),
+#'   family = poisson(),
+#'   data = portal_data,
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' # Plot the autoregressive coefficient distributions;
+#' # use 'dir = "v"' to arrange the order of facets
+#' # correctly
+#' mcmc_plot(
+#'   mod,
+#'   variable = 'A',
+#'   regex = TRUE,
+#'   type = 'hist',
+#'   facet_args = list(dir = 'v')
+#' )
+#'
+#' # Plot the process error variance-covariance matrix in the same way;
+#' mcmc_plot(
+#'   mod,
+#'   variable = 'Sigma',
+#'   regex = TRUE,
+#'   type = 'hist',
+#'   facet_args = list(dir = 'v')
+#' )
+#'
+#' # Calulate Generalized IRFs for each series
+#' irfs <- irf(
+#'   mod,
+#'   h = 12,
+#'   cumulative = FALSE
+#' )
+#'
+#' # Plot some of them
+#' plot(irfs, series = 1)
+#' plot(irfs, series = 2)
+#'
+#' # Calulate forecast error variance decompositions for each series
+#' fevds <- fevd(mod, h = 12)
+#'
+#' # Plot median contributions to forecast error variance
+#' plot(fevds)
+#'
+#'
+#'
 #' # Example of supplying a trend_map so that some series can share
 #' # latent trend processes
 #' sim <- sim_mvgam(n_series = 3)
@@ -530,6 +582,7 @@
 #' mod$model_data$Z
 #'
 #' # The first two series share an identical latent trend; the third is different
+#' plot(residual_cor(mod))
 #' plot(mod, type = "trend", series = 1)
 #' plot(mod, type = "trend", series = 2)
 #' plot(mod, type = "trend", series = 3)

@@ -1,6 +1,7 @@
 # mvgam development version
 
 ## New functionalities
+* `residual_cor()` now supports models fitted with `mvgam()` in which latent factors were used or in which correlated dynamic processes were used
 * Added a `summary.mvgam_forecast()` function to compute and return prediction intervals of posterior hindcasts and forecasts in a `data.frame` format. This will make it easier for users to create their own custom plots of hindcast and forecast distributions (#108)
 
 ## Changing defaults

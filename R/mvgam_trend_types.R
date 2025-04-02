@@ -571,7 +571,7 @@ PW = function(
 #'                  0.5, 0.3, 1),
 #'                byrow = TRUE,
 #'                nrow = 3)
-#'                Sigma
+#'Sigma
 #'
 #'make_site_dat = function(...){
 #'  errors <- mgcv::rmvn(n = 30,

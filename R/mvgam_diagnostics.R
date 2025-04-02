@@ -84,8 +84,6 @@ neff_ratio.mvgam <- function(object, pars = NULL, ...) {
     "matrixStats",
     reason = 'to calculate effective sample sizes'
   )
-  # bayesplot uses outdated ess code from rstan
-  # bayesplot::neff_ratio(object$fit, pars = pars, ...)
   if (is.null(pars)) {
     vars_extract <- unlist(purrr::map(variables(object), 'orig_name'))
     vars_extract <- vars_extract[-grep('ypred', vars_extract)]

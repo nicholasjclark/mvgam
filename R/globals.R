@@ -121,6 +121,8 @@ utils::globalVariables(c(
   "irf_median",
   "irf_Qlower",
   "irf_Qupper",
+  "fevd_Q50",
+  "parameter",
   "pred_median",
   "pred_Qupper",
   "pred_Qlower",

@@ -11,10 +11,10 @@
 #' the IRF
 #' @param ... ignored
 #' @details
-#' See [mvgam_fevd] for a full description of the quantities that are
+#' See \code{\link{mvgam_fevd}} for a full description of the quantities that are
 #' computed and returned by this function, along with key references.
 #' @author Nicholas J Clark
-#' @seealso [VAR()], [irf()], [stability()]
+#' @seealso [VAR()], [irf()], [stability()], \code{\link{mvgam_fevd}}
 #' @examples
 #' \donttest{
 #' # Simulate some time series that follow a latent VAR(1) process
@@ -27,13 +27,25 @@
 #' plot_mvgam_series(data = simdat$data_train, series = "all")
 #'
 #' # Fit a model that uses a latent VAR(1)
-#' mod <- mvgam(y ~ -1,
-#'   trend_formula = ~1,
+#' mod <- mvgam(
+#'   formula = y ~ -1,
+#'   trend_formula = ~ 1,
 #'   trend_model = VAR(cor = TRUE),
 #'   family = gaussian(),
 #'   data = simdat$data_train,
 #'   chains = 2,
 #'   silent = 2
+#' )
+#'
+#' # Plot the autoregressive coefficient distributions;
+#' # use 'dir = "v"' to arrange the order of facets
+#' # correctly
+#' mcmc_plot(
+#'   mod,
+#'   variable = 'A',
+#'   regex = TRUE,
+#'   type = 'hist',
+#'   facet_args = list(dir = 'v')
 #' )
 #'
 #' # Calulate forecast error variance decompositions for each series
