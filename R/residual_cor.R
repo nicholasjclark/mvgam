@@ -58,13 +58,15 @@ residual_cor.mvgam <- function(
 ) {
   # Only applicable if this is a dynamic factor model or a model
   # that included a process error variance-covariance matrix
-  if (any(
-    grepl(
-      'Sigma',
-      variables(object)$trend_pars$orig_name
-    )
-  ) | object$use_lv) {
-
+  if (
+    any(
+      grepl(
+        'Sigma',
+        variables(object)$trend_pars$orig_name
+      )
+    ) |
+      object$use_lv
+  ) {
     class(object) <- c('jsdgam', 'mvgam')
     return(
       residual_cor(
@@ -78,8 +80,10 @@ residual_cor.mvgam <- function(
     )
   } else {
     stop(
-      paste0('Cannot compute residual correlations if no latent factors ',
-             'or correlated process errors were modelled'),
+      paste0(
+        'Cannot compute residual correlations if no latent factors ',
+        'or correlated process errors were modelled'
+      ),
       call. = FALSE
     )
   }
@@ -115,12 +119,14 @@ residual_cor.jsdgam <- function(
 
   # Check whether this model included a full variance-covariance matrix
   use_lv <- TRUE
-  if(any(
-    grepl(
-      'Sigma',
-      variables(object)$trend_pars$orig_name
+  if (
+    any(
+      grepl(
+        'Sigma',
+        variables(object)$trend_pars$orig_name
+      )
     )
-  )) {
+  ) {
     # Use the factors if they were supplied; otherwise
     # use the full variance-covariance matrix
     if(object$use_lv) {
@@ -130,7 +136,7 @@ residual_cor.jsdgam <- function(
     }
   }
 
-  if(use_lv){
+  if (use_lv) {
     # Take draws of factor loadings to compute residual correlations,
     # covariances, and precisions
     n_lv <- object$n_lv
@@ -146,7 +152,6 @@ residual_cor.jsdgam <- function(
       all_cormat[i, , ] <- cov2cor(lambdalambdaT)
       all_precmat[i, , ] <- corpcor::cor2pcor(lambdalambdaT)
     }
-
   } else {
     # If the model already included a variance-covariance matrix,
     # compute directly
