@@ -34,24 +34,26 @@
 #'\donttest{
 #' # Fit a JSDGAM to the portal_data captures
 #' mod <- jsdgam(
-#'   formula = captures ~ s(ndvi_ma12, by = series, k = 4),
+#'   formula = captures ~
+#'     # Fixed effects of NDVI and mintemp, row effect as a GP of time
+#'     ndvi_ma12:series + mintemp:series + gp(time, k = 15),
 #'   factor_formula = ~ -1,
 #'   data = portal_data,
 #'   unit = time,
 #'   species = series,
-#'   family = nb(),
+#'   family = poisson(),
 #'   n_lv = 2,
 #'   silent = 2,
 #'   chains = 2
 #' )
 #'
-#' # Plot an ordination biplot
+#' # Plot a residual ordination biplot
 #' ordinate(
 #'   mod,
 #'   alpha = 0.7
 #' )
 #'
-#' # Compare to a correlation plot
+#' # Compare to a residual correlation plot
 #' plot(
 #'   residual_cor(mod)
 #' )
@@ -64,7 +66,7 @@ ordinate <- function(object, ...) {
 
 #' @rdname ordinate.jsdgam
 #' @method ordinate jsdgam
-#' @importFrom grid arrow
+#' @importFrom grid arrow unit
 #' @export
 ordinate.jsdgam <- function(
   object,

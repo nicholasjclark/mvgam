@@ -106,6 +106,47 @@
 #'Use `methods(class = "mvgam")` for an overview on available methods
 #'@examples
 #'\donttest{
+#' # Fit a JSDGAM to the portal_data captures
+#' mod <- jsdgam(
+#'   formula = captures ~
+#'     # Fixed effects of NDVI and mintemp, row effect as a GP of time
+#'     ndvi_ma12:series + mintemp:series + gp(time, k = 15),
+#'   factor_formula = ~ -1,
+#'   data = portal_data,
+#'   unit = time,
+#'   species = series,
+#'   family = poisson(),
+#'   n_lv = 2,
+#'   silent = 2,
+#'   chains = 2
+#' )
+#'
+#' # Plot covariate effects
+#' plot_predictions(
+#'  mod,
+#'  condition = c('ndvi_ma12','series', 'series')
+#' )
+#'
+#' plot_predictions(
+#'  mod,
+#'  condition = c('mintemp','series', 'series')
+#' )
+#'
+#' # A residual correlation plot
+#' plot(
+#'   residual_cor(mod)
+#' )
+#'
+#' # An ordination biplot can also be constructed from the factor scores
+#' # and their loadings
+#' if(require(ggrepel)) {
+#'   ordinate(mod, alpha = 0.75)
+#' }
+#'
+#'
+#' # A more complicated example showing how to include predictors
+#' # in the factor_formula
+#'
 #' # Simulate latent count data for 500 spatial locations and 10 species
 #' set.seed(0)
 #' N_points <- 500
@@ -233,7 +274,7 @@
 #'               n_lv = 3,
 #'
 #'               # Change default priors for fixed random effect variances and
-#'               # factor P marginal deviations to standard normal
+#'               # factor GP marginal deviations to standard normal
 #'               priors = c(prior(std_normal(),
 #'                                class = sigma_raw),
 #'                          prior(std_normal(),
@@ -253,7 +294,7 @@
 #'               chains = 2,
 #'               silent = 2)
 #'
-#' # Plot species-level intercept estimates
+#' # Plot the implicit species-level intercept estimates
 #' plot_predictions(mod, condition = 'species',
 #'                  type = 'link')
 #'

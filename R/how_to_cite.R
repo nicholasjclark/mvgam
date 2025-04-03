@@ -173,6 +173,22 @@ how_to_cite.mvgam <- function(object, ...) {
     )
   }
 
+  # Was this a jsdgam?
+  if (
+    inherits(object, 'jsdgam')
+  ) {
+    specials_text <- c(
+      specials_text,
+      " To ensure identifiability of factors, factor loadings were constrained following Lopes & West (2004)."
+    )
+    citations <- append(
+      citations,
+      list(
+        "Lopes HF and West M (2014). Bayesian model assessment in factor analysis. Statistica Sinica 14(1) 41-67. https://www.jstor.org/stable/24307179"
+      )
+    )
+  }
+
   # Stan-specific methods
   citations <- append(
     citations,

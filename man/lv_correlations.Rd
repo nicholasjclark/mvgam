@@ -26,7 +26,7 @@ format that allows for a deeper investigation of relationships among the time se
 \donttest{
 # Fit a model that uses two AR(1) dynamic factors to model
 # the temporal dynamics of the four rodent species in the portal_data
-mod <- mvgam(y ~ series,
+mod <- mvgam(captures ~ series,
             trend_model = AR(),
             use_lv = TRUE,
             n_lv = 2,

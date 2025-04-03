@@ -101,7 +101,7 @@ fevd.mvgam <- function(object, h = 10, ...) {
       p = 1
     )
 
-    # Calculate the IRF
+    # Calculate the FEVD for this draw
     gen_fevd(x, h = h)
   })
   class(all_fevds) <- "mvgam_fevd"
