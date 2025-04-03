@@ -242,7 +242,9 @@ make_gp_additions = function(
   # the gp() eigenfunctions
   coefs_replace <- list()
   for (x in gp_terms) {
-    label <- attr(terms(formula(mgcv_model), keep.order = TRUE), 'term.labels')[x]
+    label <- attr(terms(formula(mgcv_model), keep.order = TRUE), 'term.labels')[
+      x
+    ]
     s_attributes <- eval(rlang::parse_expr(label))
     if (s_attributes$by != 'NA') {
       if (grepl('ti(', label, fixed = TRUE)) {

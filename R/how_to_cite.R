@@ -174,9 +174,7 @@ how_to_cite.mvgam <- function(object, ...) {
   }
 
   # Was this a jsdgam?
-  if (
-    inherits(object, 'jsdgam')
-  ) {
+  if (inherits(object, 'jsdgam')) {
     specials_text <- c(
       specials_text,
       " To ensure identifiability of factors, factor loadings were constrained following Lopes & West (2004)."
