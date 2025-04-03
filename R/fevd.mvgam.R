@@ -10,11 +10,11 @@
 #' @param h Positive \code{integer} specifying the forecast horizon over which to calculate
 #' the IRF
 #' @param ... ignored
-#' @details
-#' See \code{\link{mvgam_fevd}} for a full description of the quantities that are
+#' @return
+#' See \code{\link{mvgam_fevd-class}} for a full description of the quantities that are
 #' computed and returned by this function, along with key references.
 #' @author Nicholas J Clark
-#' @seealso [VAR()], [irf()], [stability()], \code{\link{mvgam_fevd}}
+#' @seealso [VAR()], [irf()], [stability()], \code{\link{mvgam_fevd-class}}
 #' @examples
 #' \donttest{
 #' # Simulate some time series that follow a latent VAR(1) process

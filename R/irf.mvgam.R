@@ -14,13 +14,13 @@
 #' calculated. Note that the order of the variables matters when calculating these
 #' @param ... ignored
 #' @details
-#' See [mvgam_irf] for a full description of the quantities that are
+#' See \code{\link{mvgam_irf-class}} for a full description of the quantities that are
 #' computed and returned by this function, along with key references.
-#' @return An object of class \code{\link{mvgam_irf}} containing the posterior IRFs. This
+#' @return An object of \code{\link{mvgam_irf-class}} containing the posterior IRFs. This
 #' object can be used with the supplied S3 functions [plot.mvgam_irf()]
 #' and [summary.mvgam_irf()]
 #' @author Nicholas J Clark
-#' @seealso \code{\link{mvgam_irf}}, [VAR()], [plot.mvgam_irf()], [stability()], [fevd()]
+#' @seealso \code{\link{mvgam_irf-class}}, [VAR()], [plot.mvgam_irf()], [stability()], [fevd()]
 #' @examples
 #' \donttest{
 #' # Fit a model to the portal time series that uses a latent VAR(1)

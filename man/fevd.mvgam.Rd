@@ -19,13 +19,13 @@ that used a Vector Autoregressive latent process model (either as \code{VAR(cor 
 \item{h}{Positive \code{integer} specifying the forecast horizon over which to calculate
 the IRF}
 }
+\value{
+See \code{\link{mvgam_fevd-class}} for a full description of the quantities that are
+computed and returned by this function, along with key references.
+}
 \description{
 Compute forecast error variance decompositions from
 \code{mvgam} models with Vector Autoregressive dynamics
-}
-\details{
-See \code{\link{mvgam_fevd}} for a full description of the quantities that are
-computed and returned by this function, along with key references.
 }
 \examples{
 \donttest{
@@ -71,7 +71,7 @@ summary(fevds)
 }
 }
 \seealso{
-\code{\link[=VAR]{VAR()}}, \code{\link[=irf]{irf()}}, \code{\link[=stability]{stability()}}, \code{\link{mvgam_fevd}}
+\code{\link[=VAR]{VAR()}}, \code{\link[=irf]{irf()}}, \code{\link[=stability]{stability()}}, \code{\link{mvgam_fevd-class}}
 }
 \author{
 Nicholas J Clark

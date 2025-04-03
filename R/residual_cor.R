@@ -12,7 +12,7 @@
 #' @param robust If `FALSE` (the default) the mean is used as a measure of central tendency.
 #' If `TRUE`, the median is used instead. Only used if `summary` is `TRUE`
 #' @param ... ignored
-#' @return If `summary = TRUE`, a `list` of class \code{\link{mvgam_residcor}} with the following components:
+#' @return If `summary = TRUE`, a `list` of  \code{\link{mvgam_residcor-class}} with the following components:
 #'  \item{cor, cor_lower, cor_upper}{A set of \eqn{p \times p} correlation matrices,
 #'  containing either the posterior median or mean estimate, plus lower and upper limits
 #'  of the corresponding credible intervals supplied to `probs`}
@@ -40,7 +40,7 @@
 #' See [mvgam_residcor] for a full description of the quantities that are
 #' computed and returned by this function, along with key references.
 #'
-#' @seealso [jsdgam()], [lv_correlations()], \code{\link{mvgam_residcor}}
+#' @seealso [jsdgam()], [lv_correlations()], \code{\link{mvgam_residcor-class}}
 #' @export
 residual_cor <- function(object, ...) {
   UseMethod("residual_cor", object)
@@ -121,7 +121,13 @@ residual_cor.jsdgam <- function(
       variables(object)$trend_pars$orig_name
     )
   )) {
-    use_lv <- FALSE
+    # Use the factors if they were supplied; otherwise
+    # use the full variance-covariance matrix
+    if(object$use_lv) {
+      use_lv <- TRUE
+    } else {
+      use_lv <- FALSE
+    }
   }
 
   if(use_lv){

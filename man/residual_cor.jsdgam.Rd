@@ -41,7 +41,7 @@ If \code{TRUE}, the median is used instead. Only used if \code{summary} is \code
 function. Only used if \code{summary} is \code{TRUE}.}
 }
 \value{
-If \code{summary = TRUE}, a \code{list} of class \code{\link{mvgam_residcor}} with the following components:
+If \code{summary = TRUE}, a \code{list} of  \code{\link{mvgam_residcor-class}} with the following components:
 \item{cor, cor_lower, cor_upper}{A set of \eqn{p \times p} correlation matrices,
 containing either the posterior median or mean estimate, plus lower and upper limits
 of the corresponding credible intervals supplied to \code{probs}}
@@ -75,5 +75,5 @@ See \link{mvgam_residcor} for a full description of the quantities that are
 computed and returned by this function, along with key references.
 }
 \seealso{
-\code{\link[=jsdgam]{jsdgam()}}, \code{\link[=lv_correlations]{lv_correlations()}}, \code{\link{mvgam_residcor}}
+\code{\link[=jsdgam]{jsdgam()}}, \code{\link[=lv_correlations]{lv_correlations()}}, \code{\link{mvgam_residcor-class}}
 }

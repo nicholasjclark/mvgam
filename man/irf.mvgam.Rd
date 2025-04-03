@@ -25,7 +25,7 @@ the IRF}
 calculated. Note that the order of the variables matters when calculating these}
 }
 \value{
-An object of class \code{\link{mvgam_irf}} containing the posterior IRFs. This
+An object of \code{\link{mvgam_irf-class}} containing the posterior IRFs. This
 object can be used with the supplied S3 functions \code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}
 and \code{\link[=summary.mvgam_irf]{summary.mvgam_irf()}}
 }
@@ -34,7 +34,7 @@ Compute Generalized or Orthogonalized Impulse Response Functions (IRFs) from
 \code{mvgam} models with Vector Autoregressive dynamics
 }
 \details{
-See \link{mvgam_irf} for a full description of the quantities that are
+See \code{\link{mvgam_irf-class}} for a full description of the quantities that are
 computed and returned by this function, along with key references.
 }
 \examples{
@@ -80,7 +80,7 @@ summary(irfs)
 }
 }
 \seealso{
-\code{\link{mvgam_irf}}, \code{\link[=VAR]{VAR()}}, \code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}, \code{\link[=stability]{stability()}}, \code{\link[=fevd]{fevd()}}
+\code{\link{mvgam_irf-class}}, \code{\link[=VAR]{VAR()}}, \code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}, \code{\link[=stability]{stability()}}, \code{\link[=fevd]{fevd()}}
 }
 \author{
 Nicholas J Clark

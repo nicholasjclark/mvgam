@@ -454,8 +454,8 @@ test_that("dynamic factor investigations work", {
   expect_equal(rep(1, 4), as.vector(lvcors$cor))
 
   expect_error(
-    residual_cor(mvgam:::mvgam_example3),
-    'Cannot compute residual correlations if no latent factors were modelled'
+    residual_cor(mvgam:::mvgam_example1),
+    'Cannot compute residual correlations if no latent factors or correlated process errors were modelled'
   )
 })
 
