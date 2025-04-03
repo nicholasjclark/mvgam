@@ -129,7 +129,7 @@ residual_cor.jsdgam <- function(
   ) {
     # Use the factors if they were supplied; otherwise
     # use the full variance-covariance matrix
-    if(object$use_lv) {
+    if (object$use_lv) {
       use_lv <- TRUE
     } else {
       use_lv <- FALSE
