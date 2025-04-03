@@ -37,7 +37,7 @@
 #'  \item{all_trace}{A \eqn{n_{draws}} `vector` of posterior covariance trace draws}
 #'
 #' @details
-#' See [mvgam_residcor] for a full description of the quantities that are
+#' See \code{\link{mvgam_residcor-class}} for a full description of the quantities that are
 #' computed and returned by this function, along with key references.
 #'
 #' @seealso [jsdgam()], [lv_correlations()], \code{\link{mvgam_residcor-class}}

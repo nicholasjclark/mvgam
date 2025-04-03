@@ -291,6 +291,12 @@
 #' # to be non-zero
 #' plot(post_cors, cluster = TRUE)
 #'
+#' # An ordination biplot can also be constructed from the factor scores
+#' # and their loadings
+#' if(require(ggrepel)) {
+#'   ordinate(mod)
+#' }
+#'
 #' # Posterior predictive checks and ELPD-LOO can ascertain model fit
 #' pp_check(mod,
 #'          type = "pit_ecdf_grouped",

@@ -3383,4 +3383,9 @@ test_that("jsdgam post-processing works correctly", {
   post_cors <- residual_cor(mod, summary = TRUE)
   expect_equal(dim(post_cors$cor)[1], nlevels(spiderdat$taxon))
   expect_ggplot(plot(post_cors))
+
+  # Ensure ordination works
+  expect_ggplot(ordinate(mod))
+  expect_ggplot(ordinate(mod, biplot = FALSE))
+  expect_ggplot(ordinate(mod, label_sites = FALSE))
 })

@@ -71,7 +71,7 @@ Compute residual correlation estimates from Joint Species Distribution
 or included correlated process errors directly
 }
 \details{
-See \link{mvgam_residcor} for a full description of the quantities that are
+See \code{\link{mvgam_residcor-class}} for a full description of the quantities that are
 computed and returned by this function, along with key references.
 }
 \seealso{
