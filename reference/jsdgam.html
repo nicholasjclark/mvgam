@@ -379,6 +379,52 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="co"># Fit a JSDGAM to the portal_data captures</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu">jsdgam</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  formula <span class="op">=</span> <span class="va">captures</span> <span class="op">~</span></span></span>
+<span class="r-in"><span>    <span class="co"># Fixed effects of NDVI and mintemp, row effect as a GP of time</span></span></span>
+<span class="r-in"><span>    <span class="va">ndvi_ma12</span><span class="op">:</span><span class="va">series</span> <span class="op">+</span> <span class="va">mintemp</span><span class="op">:</span><span class="va">series</span> <span class="op">+</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp</a></span><span class="op">(</span><span class="va">time</span>, k <span class="op">=</span> <span class="fl">15</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  factor_formula <span class="op">=</span> <span class="op">~</span> <span class="op">-</span><span class="fl">1</span>,</span></span>
+<span class="r-in"><span>  data <span class="op">=</span> <span class="va">portal_data</span>,</span></span>
+<span class="r-in"><span>  unit <span class="op">=</span> <span class="va">time</span>,</span></span>
+<span class="r-in"><span>  species <span class="op">=</span> <span class="va">series</span>,</span></span>
+<span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  n_lv <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Plot covariate effects</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span> <span class="va">mod</span>,</span></span>
+<span class="r-in"><span> condition <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'ndvi_ma12'</span>,<span class="st">'series'</span>, <span class="st">'series'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="jsdgam-1.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span> <span class="va">mod</span>,</span></span>
+<span class="r-in"><span> condition <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'mintemp'</span>,<span class="st">'series'</span>, <span class="st">'series'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="jsdgam-2.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># A residual correlation plot</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="residual_cor.jsdgam.html">residual_cor</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="jsdgam-3.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># An ordination biplot can also be constructed from the factor scores</span></span></span>
+<span class="r-in"><span><span class="co"># and their loadings</span></span></span>
+<span class="r-in"><span><span class="kw">if</span><span class="op">(</span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">require</a></span><span class="op">(</span><span class="va"><a href="https://ggrepel.slowkow.com/" class="external-link">ggrepel</a></span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="ordinate.jsdgam.html">ordinate</a></span><span class="op">(</span><span class="va">mod</span>, alpha <span class="op">=</span> <span class="fl">0.75</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Loading required package: ggrepel</span>
+<span class="r-plt img"><img src="jsdgam-4.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># A more complicated example showing how to include predictors</span></span></span>
+<span class="r-in"><span><span class="co"># in the factor_formula</span></span></span>
+<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Simulate latent count data for 500 spatial locations and 10 species</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">N_points</span> <span class="op">&lt;-</span> <span class="fl">500</span></span></span>
@@ -469,13 +515,13 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_histogram.html" class="external-link">geom_histogram</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span> <span class="va">species</span>, scales <span class="op">=</span> <span class="st">'free'</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</span>
-<span class="r-plt img"><img src="jsdgam-1.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="jsdgam-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">dat</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">lon</span>, y <span class="op">=</span> <span class="va">lat</span>, col <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="va">count</span> <span class="op">+</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>size <span class="op">=</span> <span class="fl">2.25</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span> <span class="va">species</span>, scales <span class="op">=</span> <span class="st">'free'</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_viridis.html" class="external-link">scale_color_viridis_c</a></span><span class="op">(</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="jsdgam-2.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="jsdgam-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect default priors for a joint species model with three spatial factors</span></span></span>
 <span class="r-in"><span><span class="va">priors</span> <span class="op">&lt;-</span> <span class="fu"><a href="get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span>formula <span class="op">=</span> <span class="va">count</span> <span class="op">~</span></span></span>
@@ -545,7 +591,7 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span>              n_lv <span class="op">=</span> <span class="fl">3</span>,</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>              <span class="co"># Change default priors for fixed random effect variances and</span></span></span>
-<span class="r-in"><span>              <span class="co"># factor P marginal deviations to standard normal</span></span></span>
+<span class="r-in"><span>              <span class="co"># factor GP marginal deviations to standard normal</span></span></span>
 <span class="r-in"><span>              priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                               class <span class="op">=</span> <span class="va">sigma_raw</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                         <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>,</span></span>
@@ -565,25 +611,25 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>              silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Plot species-level intercept estimates</span></span></span>
+<span class="r-in"><span><span class="co"># Plot the implicit species-level intercept estimates</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">'species'</span>,</span></span>
 <span class="r-in"><span>                 type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="jsdgam-3.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="jsdgam-7.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot species' hierarchical responses to temperature</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'temperature'</span>, <span class="st">'species'</span>, <span class="st">'species'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                 type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="jsdgam-4.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="jsdgam-8.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot posterior median estimates of the latent spatial factors</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'smooths'</span>, trend_effects <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="jsdgam-5.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="jsdgam-9.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Or using gratia, if you have it installed</span></span></span>
 <span class="r-in"><span><span class="kw">if</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">'gratia'</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span><span class="op">{</span></span></span>
 <span class="r-in"><span>  <span class="fu">gratia</span><span class="fu">::</span><span class="fu"><a href="https://gavinsimpson.github.io/gratia/reference/draw.html" class="external-link">draw</a></span><span class="op">(</span><span class="va">mod</span>, trend_effects <span class="op">=</span> <span class="cn">TRUE</span>, dist <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
-<span class="r-plt img"><img src="jsdgam-6.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="jsdgam-10.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot species' randomized quantile residual distributions</span></span></span>
 <span class="r-in"><span><span class="co"># as a function of latitude</span></span></span>
@@ -592,7 +638,7 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span>         group <span class="op">=</span> <span class="st">'species'</span>,</span></span>
 <span class="r-in"><span>         x <span class="op">=</span> <span class="st">'lat'</span>,</span></span>
 <span class="r-in"><span>         ndraws <span class="op">=</span> <span class="fl">200</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="jsdgam-7.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="jsdgam-11.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Calculate residual spatial correlations</span></span></span>
 <span class="r-in"><span><span class="va">post_cors</span> <span class="op">&lt;-</span> <span class="fu"><a href="residual_cor.jsdgam.html">residual_cor</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
@@ -626,22 +672,21 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span><span class="co"># Plot of the posterior median correlations for those estimated</span></span></span>
 <span class="r-in"><span><span class="co"># to be non-zero</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">post_cors</span>, cluster <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="jsdgam-8.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="jsdgam-12.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># An ordination biplot can also be constructed from the factor scores</span></span></span>
 <span class="r-in"><span><span class="co"># and their loadings</span></span></span>
 <span class="r-in"><span><span class="kw">if</span><span class="op">(</span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">require</a></span><span class="op">(</span><span class="va"><a href="https://ggrepel.slowkow.com/" class="external-link">ggrepel</a></span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="ordinate.jsdgam.html">ordinate</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Loading required package: ggrepel</span>
-<span class="r-plt img"><img src="jsdgam-9.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="jsdgam-13.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Posterior predictive checks and ELPD-LOO can ascertain model fit</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="pp_check.mvgam.html">pp_check</a></span><span class="op">(</span><span class="va">mod</span>,</span></span>
 <span class="r-in"><span>         type <span class="op">=</span> <span class="st">"pit_ecdf_grouped"</span>,</span></span>
 <span class="r-in"><span>         group <span class="op">=</span> <span class="st">"species"</span>,</span></span>
 <span class="r-in"><span>         ndraws <span class="op">=</span> <span class="fl">200</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="jsdgam-10.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="jsdgam-14.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -682,7 +727,7 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span> <span class="va">species</span>, scales <span class="op">=</span> <span class="st">'free'</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_viridis.html" class="external-link">scale_color_viridis_c</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_classic</a></span><span class="op">(</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="jsdgam-11.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="jsdgam-15.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
