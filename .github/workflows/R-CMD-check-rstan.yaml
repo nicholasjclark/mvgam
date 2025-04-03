@@ -57,6 +57,7 @@ jobs:
               tweedie
               corpcor
               splines2
+              ggrepel
               scoringRules
               matrixStats
               xts
@@ -73,7 +74,7 @@ jobs:
         run: |
           install.packages('mvgam', repos = "http://cran.rstudio.com")
         shell: Rscript {0}
-        
+
       - uses: r-lib/actions/check-r-package@v2
         with:
           build_args: 'c("--no-manual", "--no-build-vignettes")'

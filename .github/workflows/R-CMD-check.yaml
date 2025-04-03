@@ -62,6 +62,7 @@ jobs:
               rmarkdown
               ggplot2
               rjags
+              ggrepel
               coda
               stan-dev/cmdstanr
               testthat
