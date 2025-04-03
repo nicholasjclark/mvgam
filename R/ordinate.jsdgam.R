@@ -67,24 +67,24 @@ ordinate <- function(object, ...) {
 #' @importFrom grid arrow
 #' @export
 ordinate.jsdgam <- function(
-    object,
-    which_lvs = c(1, 2),
-    biplot = TRUE,
-    alpha = 0.5,
-    label_sites = TRUE,
-    ...
+  object,
+  which_lvs = c(1, 2),
+  biplot = TRUE,
+  alpha = 0.5,
+  label_sites = TRUE,
+  ...
 ) {
-
   insight::check_if_installed('ggrepel')
 
   # Check arguments
   if (length(which_lvs) != 2L) {
-    stop("argument 'which_lvs' must be a vector of length 2",
-         call. = FALSE)
+    stop("argument 'which_lvs' must be a vector of length 2", call. = FALSE)
   }
-  if (object$n_lv > 2 & any(which_lvs > object$n_lv)){
-    stop("Fewer latent variables available than those chosen by which_lvs",
-         call. = FALSE)
+  if (object$n_lv > 2 & any(which_lvs > object$n_lv)) {
+    stop(
+      "Fewer latent variables available than those chosen by which_lvs",
+      call. = FALSE
+    )
   }
   validate_proportional(alpha)
 
@@ -114,7 +114,6 @@ ordinate.jsdgam <- function(
 
       # Calculate posterior medians
       apply(preds, 2, median)
-
     })
   )
 
@@ -122,32 +121,35 @@ ordinate.jsdgam <- function(
   # Credit for much of this code goes to Francis Hui, original author of the BORAL
   # R package (https://github.com/emitanaka/boral)
   lv_estimates <- as.matrix(lv_estimates)
-  lv_coefs <- apply(mcmc_chains(object$model_output, 'lv_coefs'),
-                    2, median)
+  lv_coefs <- apply(mcmc_chains(object$model_output, 'lv_coefs'), 2, median)
   lv_coefs <- t(matrix(lv_coefs, nrow = object$n_lv))
   testcov <- tcrossprod(lv_estimates, lv_coefs)
   do_svd <- svd(testcov, object$n_lv, object$n_lv)
   choose_lvs <- scale(
     do_svd$u *
-      matrix(do_svd$d[1:object$n_lv] ^ alpha,
-             nrow = NROW(lv_estimates),
-             ncol = object$n_lv,
-             byrow = TRUE),
+      matrix(
+        do_svd$d[1:object$n_lv]^alpha,
+        nrow = NROW(lv_estimates),
+        ncol = object$n_lv,
+        byrow = TRUE
+      ),
     center = TRUE,
     scale = FALSE
   )
   choose_lv_coefs <- scale(
     do_svd$v *
-      matrix(do_svd$d[1:object$n_lv] ^ (1 - alpha),
-             nrow = NROW(lv_coefs),
-             ncol = object$n_lv,
-             byrow = TRUE),
+      matrix(
+        do_svd$d[1:object$n_lv]^(1 - alpha),
+        nrow = NROW(lv_coefs),
+        ncol = object$n_lv,
+        byrow = TRUE
+      ),
     center = TRUE,
     scale = FALSE
   )
 
   largest_lnorms <- order(
-    rowSums(choose_lv_coefs ^ 2),
+    rowSums(choose_lv_coefs^2),
     decreasing = TRUE
   )[1:NROW(lv_coefs)]
 
@@ -167,28 +169,28 @@ ordinate.jsdgam <- function(
   sp_names <- object$trend_map$series
 
   # Get site names
-  unit_name <- attr(object$model_data,
-                    'prepped_trend_model')$unit
+  unit_name <- attr(object$model_data, 'prepped_trend_model')$unit
   site_names <- unique(
     object$obs_data[[unit_name]]
   )
 
   # Create the base ggplot
-  base_plot <- ggplot2::ggplot(plot_dat,
-                               ggplot2::aes(x, y)) +
-    ggplot2::labs(x = paste("Latent variable", which_lvs[1]),
-                  y = paste("Latent variable", which_lvs[2]))
+  base_plot <- ggplot2::ggplot(plot_dat, ggplot2::aes(x, y)) +
+    ggplot2::labs(
+      x = paste("Latent variable", which_lvs[1]),
+      y = paste("Latent variable", which_lvs[2])
+    )
 
   # Add layers accordingly
-  if(label_sites) {
+  if (label_sites) {
     p <- base_plot +
-        ggrepel::geom_text_repel(
-          data = site_dat,
-          aes(label = site_names),
-          alpha = 0.75,
-          size = 3,
-          max.overlaps = 20
-        )
+      ggrepel::geom_text_repel(
+        data = site_dat,
+        aes(label = site_names),
+        alpha = 0.75,
+        size = 3,
+        max.overlaps = 20
+      )
   } else {
     p <- base_plot +
       ggplot2::geom_point(
@@ -199,12 +201,13 @@ ordinate.jsdgam <- function(
       )
   }
 
-  if(biplot) {
+  if (biplot) {
     p <- p +
       ggplot2::geom_segment(
         data = sp_dat,
         ggplot2::aes(
-          x = 0, y = 0,
+          x = 0,
+          y = 0,
           xend = x,
           yend = y
         ),
@@ -213,7 +216,8 @@ ordinate.jsdgam <- function(
           type = 'closed'
         ),
         alpha = 0.5,
-        color = 'darkred') +
+        color = 'darkred'
+      ) +
       ggrepel::geom_label_repel(
         data = sp_dat,
         ggplot2::aes(label = sp_names),
