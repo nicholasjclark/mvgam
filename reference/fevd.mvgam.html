@@ -91,12 +91,12 @@ the IRF</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>See mvgam_fevd for a full description of the quantities that are
+    <p>See <code>mvgam_fevd</code> for a full description of the quantities that are
 computed and returned by this function, along with key references.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="RW.html">VAR()</a></code>, <code><a href="irf.mvgam.html">irf()</a></code>, <code><a href="stability.mvgam.html">stability()</a></code></p></div>
+    <div class="dont-index"><p><code><a href="RW.html">VAR()</a></code>, <code><a href="irf.mvgam.html">irf()</a></code>, <code><a href="stability.mvgam.html">stability()</a></code>, <code>mvgam_fevd</code></p></div>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
@@ -117,8 +117,9 @@ computed and returned by this function, along with key references.</p>
 <span class="r-plt img"><img src="fevd.mvgam-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit a model that uses a latent VAR(1)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="op">-</span><span class="fl">1</span>,</span></span>
-<span class="r-in"><span>  trend_formula <span class="op">=</span> <span class="op">~</span><span class="fl">1</span>,</span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="op">-</span><span class="fl">1</span>,</span></span>
+<span class="r-in"><span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fl">1</span>,</span></span>
 <span class="r-in"><span>  trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">VAR</a></span><span class="op">(</span>cor <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
@@ -126,12 +127,25 @@ computed and returned by this function, along with key references.</p>
 <span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Plot the autoregressive coefficient distributions;</span></span></span>
+<span class="r-in"><span><span class="co"># use 'dir = "v"' to arrange the order of facets</span></span></span>
+<span class="r-in"><span><span class="co"># correctly</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/mcmc_plot.brmsfit.html" class="external-link">mcmc_plot</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">mod</span>,</span></span>
+<span class="r-in"><span>  variable <span class="op">=</span> <span class="st">'A'</span>,</span></span>
+<span class="r-in"><span>  regex <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
+<span class="r-in"><span>  type <span class="op">=</span> <span class="st">'hist'</span>,</span></span>
+<span class="r-in"><span>  facet_args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>dir <span class="op">=</span> <span class="st">'v'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</span>
+<span class="r-plt img"><img src="fevd.mvgam-2.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Calulate forecast error variance decompositions for each series</span></span></span>
 <span class="r-in"><span><span class="va">fevds</span> <span class="op">&lt;-</span> <span class="fu">fevd</span><span class="op">(</span><span class="va">mod</span>, h <span class="op">=</span> <span class="fl">12</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot median contributions to forecast error variance</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fevds</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="fevd.mvgam-2.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="fevd.mvgam-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># View a summary of the error variance decompositions</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fevds</span><span class="op">)</span></span></span>

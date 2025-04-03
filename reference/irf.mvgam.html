@@ -102,7 +102,7 @@ calculated. Note that the order of the variables matters when calculating these<
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     
 
-<p>An object of class mvgam_irf containing the posterior IRFs. This
+<p>An object of class <code>mvgam_irf</code> containing the posterior IRFs. This
 object can be used with the supplied S3 functions <code><a href="plot.mvgam_irf.html">plot.mvgam_irf()</a></code></p>
 
 
@@ -117,7 +117,7 @@ computed and returned by this function, along with key references.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p>mvgam_irf, <code><a href="RW.html">VAR()</a></code>, <code><a href="plot.mvgam_irf.html">plot.mvgam_irf()</a></code>, <code><a href="stability.mvgam.html">stability()</a></code>, <code><a href="fevd.mvgam.html">fevd()</a></code></p></div>
+    <div class="dont-index"><p><code>mvgam_irf</code>, <code><a href="RW.html">VAR()</a></code>, <code><a href="plot.mvgam_irf.html">plot.mvgam_irf()</a></code>, <code><a href="stability.mvgam.html">stability()</a></code>, <code><a href="fevd.mvgam.html">fevd()</a></code></p></div>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
@@ -127,28 +127,36 @@ computed and returned by this function, along with key references.</p>
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
-<span class="r-in"><span><span class="co"># Simulate some time series that follow a latent VAR(1) process</span></span></span>
-<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>  n_series <span class="op">=</span> <span class="fl">4</span>,</span></span>
+<span class="r-in"><span><span class="co"># Fit a model to the portal time series that uses a latent VAR(1)</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  formula <span class="op">=</span> <span class="va">captures</span> <span class="op">~</span> <span class="op">-</span><span class="fl">1</span>,</span></span>
+<span class="r-in"><span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="va">trend</span>,</span></span>
 <span class="r-in"><span>  trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">VAR</a></span><span class="op">(</span>cor <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>  prop_trend <span class="op">=</span> <span class="fl">1</span></span></span>
-<span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, series <span class="op">=</span> <span class="st">"all"</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="irf.mvgam-1.png" alt="" width="700" height="433"></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Fit a model that uses a latent VAR(1)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="op">-</span><span class="fl">1</span>,</span></span>
-<span class="r-in"><span>  trend_formula <span class="op">=</span> <span class="op">~</span><span class="fl">1</span>,</span></span>
-<span class="r-in"><span>  trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">VAR</a></span><span class="op">(</span>cor <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  data <span class="op">=</span> <span class="va">portal_data</span>,</span></span>
 <span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Plot the autoregressive coefficient distributions;</span></span></span>
+<span class="r-in"><span><span class="co"># use 'dir = "v"' to arrange the order of facets</span></span></span>
+<span class="r-in"><span><span class="co"># correctly</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/mcmc_plot.brmsfit.html" class="external-link">mcmc_plot</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">mod</span>,</span></span>
+<span class="r-in"><span>  variable <span class="op">=</span> <span class="st">'A'</span>,</span></span>
+<span class="r-in"><span>  regex <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
+<span class="r-in"><span>  type <span class="op">=</span> <span class="st">'hist'</span>,</span></span>
+<span class="r-in"><span>  facet_args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>dir <span class="op">=</span> <span class="st">'v'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</span>
+<span class="r-plt img"><img src="irf.mvgam-1.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Calulate Generalized IRFs for each series</span></span></span>
-<span class="r-in"><span><span class="va">irfs</span> <span class="op">&lt;-</span> <span class="fu">irf</span><span class="op">(</span><span class="va">mod</span>, h <span class="op">=</span> <span class="fl">12</span>, cumulative <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">irfs</span> <span class="op">&lt;-</span> <span class="fu">irf</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">mod</span>,</span></span>
+<span class="r-in"><span>  h <span class="op">=</span> <span class="fl">12</span>,</span></span>
+<span class="r-in"><span>  cumulative <span class="op">=</span> <span class="cn">FALSE</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot them</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">irfs</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
@@ -157,23 +165,25 @@ computed and returned by this function, along with key references.</p>
 <span class="r-plt img"><img src="irf.mvgam-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">irfs</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="irf.mvgam-4.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">irfs</span>, series <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="irf.mvgam-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Calculate posterior median, upper and lower 90th quantiles</span></span></span>
+<span class="r-in"><span><span class="co"># Calculate posterior median, upper and lower 95th quantiles</span></span></span>
 <span class="r-in"><span><span class="co"># of the impulse responses</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">irfs</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 192 × 5</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    shock                horizon  irfQ50 irfQ2.5 irfQ97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                  <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> Process1 -&gt; Process1       1  0.582   0.312    0.807 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> Process1 -&gt; Process1       2 -<span style="color: #BB0000;">0.018</span><span style="color: #BB0000; text-decoration: underline;">0</span> -<span style="color: #BB0000;">0.302</span>    0.288 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> Process1 -&gt; Process1       3 -<span style="color: #BB0000;">0.365</span>  -<span style="color: #BB0000;">0.606</span>   -<span style="color: #BB0000;">0.117</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> Process1 -&gt; Process1       4 -<span style="color: #BB0000;">0.062</span><span style="color: #BB0000; text-decoration: underline;">8</span> -<span style="color: #BB0000;">0.301</span>    0.196 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> Process1 -&gt; Process1       5  0.248   0.081<span style="text-decoration: underline;">9</span>   0.442 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> Process1 -&gt; Process1       6  0.117  -<span style="color: #BB0000;">0.056</span><span style="color: #BB0000; text-decoration: underline;">1</span>   0.291 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> Process1 -&gt; Process1       7 -<span style="color: #BB0000;">0.113</span>  -<span style="color: #BB0000;">0.323</span>    0.026<span style="text-decoration: underline;">7</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> Process1 -&gt; Process1       8 -<span style="color: #BB0000;">0.090</span><span style="color: #BB0000; text-decoration: underline;">8</span> -<span style="color: #BB0000;">0.278</span>    0.066<span style="text-decoration: underline;">8</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> Process1 -&gt; Process1       9  0.068<span style="text-decoration: underline;">9</span> -<span style="color: #BB0000;">0.081</span><span style="color: #BB0000; text-decoration: underline;">9</span>   0.231 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> Process1 -&gt; Process1      10  0.082<span style="text-decoration: underline;">9</span> -<span style="color: #BB0000;">0.024</span><span style="color: #BB0000; text-decoration: underline;">3</span>   0.254 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    shock                horizon irfQ50 irfQ2.5 irfQ97.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                  <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> Process1 -&gt; Process1       1 0.144  0.091<span style="text-decoration: underline;">6</span>     0.211</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> Process1 -&gt; Process1       2 0.131  0.087<span style="text-decoration: underline;">1</span>     0.192</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> Process1 -&gt; Process1       3 0.117  0.078<span style="text-decoration: underline;">4</span>     0.172</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> Process1 -&gt; Process1       4 0.105  0.066<span style="text-decoration: underline;">2</span>     0.157</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> Process1 -&gt; Process1       5 0.092<span style="text-decoration: underline;">6</span> 0.053<span style="text-decoration: underline;">6</span>     0.145</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> Process1 -&gt; Process1       6 0.081<span style="text-decoration: underline;">9</span> 0.041<span style="text-decoration: underline;">6</span>     0.137</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> Process1 -&gt; Process1       7 0.071<span style="text-decoration: underline;">6</span> 0.029<span style="text-decoration: underline;">2</span>     0.128</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> Process1 -&gt; Process1       8 0.063<span style="text-decoration: underline;">6</span> 0.019<span style="text-decoration: underline;">0</span>     0.120</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> Process1 -&gt; Process1       9 0.055<span style="text-decoration: underline;">4</span> 0.010<span style="text-decoration: underline;">8</span>     0.114</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> Process1 -&gt; Process1      10 0.048<span style="text-decoration: underline;">3</span> 0.003<span style="text-decoration: underline;">46</span>    0.108</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 182 more rows</span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>

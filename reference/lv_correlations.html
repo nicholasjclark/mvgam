@@ -96,69 +96,40 @@ format that allows for a deeper investigation of relationships among the time se
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
-<span class="r-in"><span><span class="co"># Simulate a set of four integer-valued time series</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">4</span>,</span></span>
-<span class="r-in"><span>                   n_lv <span class="op">=</span> <span class="fl">2</span>,</span></span>
-<span class="r-in"><span>                   prop_trend <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit a model that uses two AR(1) dynamic factors to model</span></span></span>
-<span class="r-in"><span><span class="co"># the series' temporal dynamics</span></span></span>
+<span class="r-in"><span><span class="co"># the temporal dynamics of the four rodent species in the portal_data</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">series</span>,</span></span>
 <span class="r-in"><span>            trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            use_lv <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
 <span class="r-in"><span>            n_lv <span class="op">=</span> <span class="fl">2</span>,</span></span>
-<span class="r-in"><span>            data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>            data <span class="op">=</span> <span class="va">portal_data</span>,</span></span>
 <span class="r-in"><span>            chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>            silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpwJ7SpK/model_795dbffd8ecf7338b8ef51fdc2ceb042.stan', line 20, column 31: Found</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>     int division:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>     Values will be rounded towards zero. If rounding is not desired you can</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>     write</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>     the division as</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2.0</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>     If rounding is intended please use the integer division operator %/%.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpwJ7SpK/model-22bb5730b257.stan', line 20, column 33: Found</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>     int division:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>     Values will be rounded towards zero. If rounding is not desired you can</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>     write</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>     the division as</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2.0</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>     If rounding is intended please use the integer division operator %/%.</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> variable y not found in data</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Calculate correlations among the series using lv_correlations()</span></span></span>
 <span class="r-in"><span><span class="va">lvcors</span> <span class="op">&lt;-</span> <span class="fu">lv_correlations</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> object 'mod' not found</span>
 <span class="r-in"><span><span class="fu"><a href="index-mvgam.html">names</a></span><span class="op">(</span><span class="va">lvcors</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "mean_correlations"      "posterior_correlations"</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> object 'lvcors' not found</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">lvcors</span>, <span class="va">class</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $mean_correlations</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "matrix" "array" </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> $posterior_correlations</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "list"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> object 'lvcors' not found</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The above works, but it is now recommended to use the more</span></span></span>
 <span class="r-in"><span><span class="co"># flexible and informative residual_cor() function to</span></span></span>
 <span class="r-in"><span><span class="co"># calculate and work with these correlations</span></span></span>
 <span class="r-in"><span><span class="va">lvcors</span> <span class="op">&lt;-</span> <span class="fu"><a href="residual_cor.jsdgam.html">residual_cor</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> object 'mod' not found</span>
 <span class="r-in"><span><span class="fu"><a href="index-mvgam.html">names</a></span><span class="op">(</span><span class="va">lvcors</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [1] "cor"        "cor_lower"  "cor_upper"  "sig_cor"    "cov"       </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [6] "prec"       "prec_lower" "prec_upper" "sig_prec"   "trace"     </span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> object 'lvcors' not found</span>
 <span class="r-in"><span><span class="va">lvcors</span><span class="op">$</span><span class="va">cor</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            series_1   series_2   series_3   series_4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> series_1  1.0000000  0.9452458 -0.3606610 -0.4699274</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> series_2  0.9452458  1.0000000 -0.3400209 -0.4567667</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> series_3 -0.3606610 -0.3400209  1.0000000  0.9464610</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> series_4 -0.4699274 -0.4567667  0.9464610  1.0000000</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> object 'lvcors' not found</span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># For those correlations whose credible intervals did not incude</span></span></span>
+<span class="r-in"><span><span class="co"># For those correlations whose credible intervals did not include</span></span></span>
 <span class="r-in"><span><span class="co"># zero, plot them as a correlation matrix (all other correlations</span></span></span>
 <span class="r-in"><span><span class="co"># are shown as zero on this plot)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">lvcors</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="lv_correlations-1.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">lvcors</span>, cluster <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> object 'lvcors' not found</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
