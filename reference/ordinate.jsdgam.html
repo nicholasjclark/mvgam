@@ -126,9 +126,11 @@ chosen latent variables are first re-rotated using singular value decomposition,
 so that the first plotted latent variable does not have to be the first latent variable
 that was estimated in the original model. Posterior median estimates of the variables
 and the species' loadings on these variables are then used to construct the resulting plot.
-Some attempt at de-cluttering the resulting plot is made by using <code><a href="https://ggrepel.slowkow.com/reference/geom_text_repel.html" class="external-link">geom_label_repel()</a></code> and
+Some attempt at de-cluttering the resulting plot is made by using <code>geom_label_repel()</code> and
 <code>geom_text_repel</code> from the <span class="pkg">ggrepel</span> package, but if there are many sites and/or species
-then some labels may be removed automatically</p>
+then some labels may be removed automatically. Note that you can typically get
+better, more readable plot layouts if you also have the <span class="pkg">ggarrow</span> and
+<span class="pkg">ggpp</span> packages installed</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
