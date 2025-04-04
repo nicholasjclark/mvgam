@@ -63,6 +63,8 @@ jobs:
               ggplot2
               rjags
               ggrepel
+              ggpp
+              ggarrow
               coda
               stan-dev/cmdstanr
               testthat

@@ -6,6 +6,7 @@
 #'observation model (if \code{FALSE}) or from the underlying process
 #'model (if\code{TRUE})
 #'@param ... Ignored
+#'@method model.frame mvgam
 #'@author Nicholas J Clark
 #'@return A \code{matrix} containing the fitted model frame
 #'@export
@@ -38,6 +39,21 @@ model.frame.mvgam = function(formula, trend_effects = FALSE, ...) {
     # Ensure 'cap' is included if this is an N-mixture model
     if (formula$family == 'nmix') {
       out$cap <- formula$obs_data$cap
+    }
+
+    # Check for offsets and add appropriately
+    if(!is.null(attr(terms(formula$call), "offset"))){
+      off_names <- grep(
+        'offset',
+        rownames(attr(terms.formula(formula$call), 'factors')),
+        value = TRUE
+      )
+      off_names <- sub("offset\\((.*)\\)$", "\\1",
+                       grep('offset', off_names, value = TRUE))
+
+      for(i in 1:length(off_names)){
+        out[[off_names[i]]] <- formula$obs_data[[off_names[i]]]
+      }
     }
 
     # Any other required variables, needed for grouped models
@@ -85,6 +101,7 @@ model.frame.mvgam = function(formula, trend_effects = FALSE, ...) {
 
 #' @inheritParams model.frame.mvgam
 #' @rdname model.frame.mvgam
+#' @method model.frame mvgam_prefit
 #' @export
 model.frame.mvgam_prefit = function(formula, trend_effects = FALSE, ...) {
   # Check trend_effects
@@ -115,6 +132,21 @@ model.frame.mvgam_prefit = function(formula, trend_effects = FALSE, ...) {
     # Ensure 'cap' is included if this is an N-mixture model
     if (formula$family == 'nmix') {
       out$cap <- formula$obs_data$cap
+    }
+
+    # Check for offsets and add appropriately
+    if(!is.null(attr(terms(formula$call), "offset"))){
+      off_names <- grep(
+        'offset',
+        rownames(attr(terms.formula(formula$call), 'factors')),
+        value = TRUE
+      )
+      off_names <- sub("offset\\((.*)\\)$", "\\1",
+                      grep('offset', off_names, value = TRUE))
+
+      for(i in 1:length(off_names)){
+        out[[off_names[i]]] <- formula$obs_data[[off_names[i]]]
+      }
     }
 
     # Any other required variables, needed for grouped models

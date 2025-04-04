@@ -43,6 +43,8 @@ jobs:
               wrswoR
               tweedie
               ggrepel
+              ggpp
+              ggarrow
               corpcor
               splines2
               scoringRules

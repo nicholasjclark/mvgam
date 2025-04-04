@@ -257,6 +257,7 @@ mod <- jsdgam(
 )
 
 # Plot covariate effects
+library(ggplot2); theme_set(theme_bw())
 plot_predictions(
  mod,
  condition = c('ndvi_ma12','series', 'series')
@@ -272,10 +273,10 @@ plot(
   residual_cor(mod)
 )
 
-# An ordination biplot can also be constructed from the factor scores
-# and their loadings
-if(require(ggrepel)) {
-  ordinate(mod, alpha = 0.75)
+# An ordination biplot can also be constructed
+# from the factor scores and their loadings
+if(requireNamespace('ggrepel', quietly = TRUE)){
+  ordinate(mod, alpha = 0.7)
 }
 
 
@@ -366,7 +367,6 @@ st_process \%>\%
   dplyr::group_by(lat, lon) -> dat
 
 # View the count distributions for each species
-library(ggplot2); theme_set(theme_bw())
 ggplot(dat, aes(x = count)) +
   geom_histogram() +
   facet_wrap(~ species, scales = 'free')
@@ -466,9 +466,9 @@ post_cors$cor_lower[1:5, 1:5]
 # to be non-zero
 plot(post_cors, cluster = TRUE)
 
-# An ordination biplot can also be constructed from the factor scores
-# and their loadings
-if(require(ggrepel)) {
+# An ordination biplot can also be constructed
+# from the factor scores and their loadings
+if(requireNamespace('ggrepel', quietly = TRUE)){
   ordinate(mod)
 }
 

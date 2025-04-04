@@ -58,6 +58,8 @@ jobs:
               corpcor
               splines2
               ggrepel
+              ggpp
+              ggarrow
               scoringRules
               matrixStats
               xts

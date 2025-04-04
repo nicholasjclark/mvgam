@@ -26,7 +26,9 @@
 #' and the species' loadings on these variables are then used to construct the resulting plot.
 #' Some attempt at de-cluttering the resulting plot is made by using `geom_label_repel()` and
 #' `geom_text_repel` from the \pkg{ggrepel} package, but if there are many sites and/or species
-#' then some labels may be removed automatically
+#' then some labels may be removed automatically. Note that you can typically get
+#' better, more readable plot layouts if you also have the \pkg{ggarrow} and
+#' \pkg{ggpp} packages installed
 #' @return An `ggplot` object
 #' @author Nicholas J Clark
 #' @seealso [jsdgam()], [residual_cor()]
@@ -76,7 +78,32 @@ ordinate.jsdgam <- function(
   label_sites = TRUE,
   ...
 ) {
-  insight::check_if_installed('ggrepel')
+  insight::check_if_installed(
+    'ggrepel',
+    reason = 'to adequately plot ordination scores'
+  )
+
+  if(!requireNamespace('ggpp', quietly = TRUE)){
+    rlang::inform(
+      message = paste0(
+        'Package "ggpp" can enable more readable ordination plots\n',
+        'Please consider installing it'
+      ),
+      .frequency = 'once',
+      .frequency_id = 'ggpp_ordinate'
+    )
+  }
+
+  if(!requireNamespace('ggarrow', quietly = TRUE)){
+    rlang::inform(
+      message = paste0(
+        'Package "ggarrow" can enable more readable ordination plots\n',
+        'Please consider installing it'
+      ),
+      .frequency = 'once',
+      .frequency_id = 'ggarrow_ordinate'
+    )
+  }
 
   # Check arguments
   if (length(which_lvs) != 2L) {
@@ -191,44 +218,96 @@ ordinate.jsdgam <- function(
         aes(label = site_names),
         alpha = 0.75,
         size = 3,
-        max.overlaps = 20
+        max.overlaps = 20,
+        colour = 'grey40',
+        segment.color = NA
+      ) +
+      ggplot2::geom_point(
+        data = site_dat,
+        pch = 21,
+        fill = 'grey20',
+        colour = 'white'
       )
   } else {
     p <- base_plot +
       ggplot2::geom_point(
         data = site_dat,
         pch = 21,
-        fill = 'black',
+        fill = 'grey20',
         colour = 'white'
       )
   }
 
   if (biplot) {
-    p <- p +
-      ggplot2::geom_segment(
-        data = sp_dat,
-        ggplot2::aes(
-          x = 0,
-          y = 0,
-          xend = x,
-          yend = y
-        ),
-        arrow = arrow(
-          length = unit(0.1, "cm"),
-          type = 'closed'
-        ),
-        alpha = 0.5,
-        color = 'darkred'
-      ) +
-      ggrepel::geom_label_repel(
-        data = sp_dat,
-        ggplot2::aes(label = sp_names),
-        color = 'darkred',
-        box.padding = 0.1,
-        label.size = 0.1,
-        alpha = 0.75,
-        max.overlaps = 20
-      )
+    if(requireNamespace('ggarrow', quietly = TRUE) &
+       requireNamespace('ggpp', quietly = TRUE)){
+
+      sp_dat$group <- paste('gr', 1:NROW(sp_dat))
+      sp_arrow_dat <- do.call(
+        rbind,
+        lapply(1:nlevels(sp_names), function(x){
+          data.frame(x = seq(0, sp_dat$x[x], length.out = 20),
+                     y = seq(0, sp_dat$y[x], length.out = 20),
+                     group = sp_dat$group[x]
+          )
+        }
+        )
+      ) %>%
+        dplyr::mutate(lw = abs(x) + abs(y))
+
+      p <- p +
+        ggarrow::geom_arrow(
+          data = sp_arrow_dat,
+          ggplot2::aes(
+            x = x,
+            y = y,
+            group = group,
+            linewidth = lw
+          ),
+          colour = 'darkred',
+          stroke_colour = 'white',
+          stroke_width = 0.1,
+          alpha = 0.5,
+          show.legend = FALSE) +
+        ggplot2::scale_linewidth(range = c(0.45, 1.75)) +
+        ggrepel::geom_label_repel(
+          data = sp_dat,
+          ggplot2::aes(label = sp_names),
+          color = 'darkred',
+          box.padding = 0.1,
+          label.size = 0.1,
+          alpha = 0.75,
+          max.overlaps = 20,
+          segment.color = NA,
+          position = ggpp::position_nudge_center(0.025, 0.025, 0, 0)
+        )
+    } else {
+      p <- p +
+        ggplot2::geom_segment(
+          data = sp_dat,
+          ggplot2::aes(
+            x = 0,
+            y = 0,
+            xend = x,
+            yend = y
+          ),
+          arrow = arrow(
+            length = unit(0.1, "cm"),
+            type = 'closed'
+          ),
+          alpha = 0.5,
+          color = 'darkred'
+        ) +
+        ggrepel::geom_label_repel(
+          data = sp_dat,
+          ggplot2::aes(label = sp_names),
+          color = 'darkred',
+          box.padding = 0.1,
+          label.size = 0.1,
+          alpha = 0.75,
+          max.overlaps = 20
+        )
+    }
   }
 
   # Return the plot

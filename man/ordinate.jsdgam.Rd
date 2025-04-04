@@ -52,7 +52,9 @@ that was estimated in the original model. Posterior median estimates of the vari
 and the species' loadings on these variables are then used to construct the resulting plot.
 Some attempt at de-cluttering the resulting plot is made by using \code{geom_label_repel()} and
 \code{geom_text_repel} from the \pkg{ggrepel} package, but if there are many sites and/or species
-then some labels may be removed automatically
+then some labels may be removed automatically. Note that you can typically get
+better, more readable plot layouts if you also have the \pkg{ggarrow} and
+\pkg{ggpp} packages installed
 }
 \examples{
 \donttest{

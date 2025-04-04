@@ -409,6 +409,27 @@ find_predictors.mvgam = function(
     }
   }
 
+  # Check for offsets and add appropriately
+  if(!is.null(attr(terms(x$call), "offset"))){
+    off_names <- grep(
+      'offset',
+      rownames(attr(terms.formula(x$call), 'factors')),
+      value = TRUE
+    )
+    off_names <- sub("offset\\((.*)\\)$", "\\1",
+                     grep('offset', off_names, value = TRUE))
+
+    if(flatten){
+      for(i in 1:length(off_names)){
+        preds <- c(preds, off_names[i])
+      }
+    } else {
+      for(i in 1:length(off_names)){
+        preds$conditional <- c(preds$conditional, off_names[i])
+      }
+    }
+  }
+
   # Any other required variables, needed for grouped models
   if (!inherits(attr(x$model_data, 'trend_model'), 'mvgam_trend')) {
     trend_model <- list(
