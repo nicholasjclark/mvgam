@@ -42,16 +42,19 @@ model.frame.mvgam = function(formula, trend_effects = FALSE, ...) {
     }
 
     # Check for offsets and add appropriately
-    if(!is.null(attr(terms(formula$call), "offset"))){
+    if (!is.null(attr(terms(formula$call), "offset"))) {
       off_names <- grep(
         'offset',
         rownames(attr(terms.formula(formula$call), 'factors')),
         value = TRUE
       )
-      off_names <- sub("offset\\((.*)\\)$", "\\1",
-                       grep('offset', off_names, value = TRUE))
+      off_names <- sub(
+        "offset\\((.*)\\)$",
+        "\\1",
+        grep('offset', off_names, value = TRUE)
+      )
 
-      for(i in 1:length(off_names)){
+      for (i in 1:length(off_names)) {
         out[[off_names[i]]] <- formula$obs_data[[off_names[i]]]
       }
     }
@@ -135,16 +138,19 @@ model.frame.mvgam_prefit = function(formula, trend_effects = FALSE, ...) {
     }
 
     # Check for offsets and add appropriately
-    if(!is.null(attr(terms(formula$call), "offset"))){
+    if (!is.null(attr(terms(formula$call), "offset"))) {
       off_names <- grep(
         'offset',
         rownames(attr(terms.formula(formula$call), 'factors')),
         value = TRUE
       )
-      off_names <- sub("offset\\((.*)\\)$", "\\1",
-                      grep('offset', off_names, value = TRUE))
+      off_names <- sub(
+        "offset\\((.*)\\)$",
+        "\\1",
+        grep('offset', off_names, value = TRUE)
+      )
 
-      for(i in 1:length(off_names)){
+      for (i in 1:length(off_names)) {
         out[[off_names[i]]] <- formula$obs_data[[off_names[i]]]
       }
     }

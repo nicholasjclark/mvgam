@@ -487,7 +487,7 @@ gp_to_s <- function(formula, data, family) {
     rownames(attr(terms.formula(formula), 'factors')),
     value = TRUE
   )
-  if(length(off_names) > 0L){
+  if (length(off_names) > 0L) {
     termlabs <- c(termlabs, off_names)
   }
 

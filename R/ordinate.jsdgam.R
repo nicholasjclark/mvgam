@@ -83,7 +83,7 @@ ordinate.jsdgam <- function(
     reason = 'to adequately plot ordination scores'
   )
 
-  if(!requireNamespace('ggpp', quietly = TRUE)){
+  if (!requireNamespace('ggpp', quietly = TRUE)) {
     rlang::inform(
       message = paste0(
         'Package "ggpp" can enable more readable ordination plots\n',
@@ -94,7 +94,7 @@ ordinate.jsdgam <- function(
     )
   }
 
-  if(!requireNamespace('ggarrow', quietly = TRUE)){
+  if (!requireNamespace('ggarrow', quietly = TRUE)) {
     rlang::inform(
       message = paste0(
         'Package "ggarrow" can enable more readable ordination plots\n',
@@ -239,19 +239,20 @@ ordinate.jsdgam <- function(
   }
 
   if (biplot) {
-    if(requireNamespace('ggarrow', quietly = TRUE) &
-       requireNamespace('ggpp', quietly = TRUE)){
-
+    if (
+      requireNamespace('ggarrow', quietly = TRUE) &
+        requireNamespace('ggpp', quietly = TRUE)
+    ) {
       sp_dat$group <- paste('gr', 1:NROW(sp_dat))
       sp_arrow_dat <- do.call(
         rbind,
-        lapply(1:nlevels(sp_names), function(x){
-          data.frame(x = seq(0, sp_dat$x[x], length.out = 20),
-                     y = seq(0, sp_dat$y[x], length.out = 20),
-                     group = sp_dat$group[x]
+        lapply(1:nlevels(sp_names), function(x) {
+          data.frame(
+            x = seq(0, sp_dat$x[x], length.out = 20),
+            y = seq(0, sp_dat$y[x], length.out = 20),
+            group = sp_dat$group[x]
           )
-        }
-        )
+        })
       ) %>%
         dplyr::mutate(lw = abs(x) + abs(y))
 
@@ -268,7 +269,8 @@ ordinate.jsdgam <- function(
           stroke_colour = 'white',
           stroke_width = 0.1,
           alpha = 0.5,
-          show.legend = FALSE) +
+          show.legend = FALSE
+        ) +
         ggplot2::scale_linewidth(range = c(0.45, 1.75)) +
         ggrepel::geom_label_repel(
           data = sp_dat,
