@@ -4480,7 +4480,10 @@ check_rhat <- function(
 
   no_warning <- TRUE
   rhats <- fit_summary[, 'Rhat']
-  if (max(rhats, na.rm = TRUE) > 1.05) no_warning <- FALSE
+  N = length(rhats[!is.na(rhats)])
+  n = length(which(rhats > 1.05))
+
+  if (round(100 * n / N, 4) > 2) no_warning <- FALSE
   if (no_warning) {
     if (!quiet) {
       insight::print_color('\u2714', "green")

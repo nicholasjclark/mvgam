@@ -498,31 +498,60 @@ jsdgam = function(
   )
   ends <- starts + 5
   model_file <- model_file[-(starts:ends)]
-  model_file[grep(
-    "// latent process linear predictors",
-    model_file,
-    fixed = TRUE
-  )] <- paste0(
-    "// latent process linear predictors\n",
-    "trend_mus = X_trend * b_trend;\n\n",
-    "// constraints allow identifiability of loadings\n",
-    "{\n",
-    "int idx;\n",
-    "idx = 0;\n",
-    "for(j in 1 : n_lv) lv_coefs[j, j] = L_diag[j];\n",
-    "for(j in 1 : n_lv) {\n",
-    "for(k in (j + 1) : n_series) {\n",
-    "idx = idx + 1;\n",
-    "lv_coefs[k, j] = L_lower[idx];\n",
-    "}\n",
-    "}\n",
-    "}\n\n",
-    "// raw latent factors (with linear predictors)\n",
-    "for (j in 1 : n_lv) {\n",
-    "for (i in 1 : n) {\n",
-    "LV[i, j] = trend_mus[ytimes_trend[i, j]] + LV_raw[i, j];\n",
-    "}\n}\n"
-  )
+
+  # Simplified latent variable creation if no terms in factor_formula
+  if(is.null(rownames(attr(terms.formula(factor_formula), 'factors'))) &
+     is.null(colnames(attr(terms.formula(factor_formula), 'factors')))) {
+    model_file[grep(
+      "// latent process linear predictors",
+      model_file,
+      fixed = TRUE
+    )] <- paste0(
+      "// latent process linear predictors\n",
+      "trend_mus = X_trend * b_trend;\n\n",
+      "// constraints allow identifiability of loadings\n",
+      "{\n",
+      "int idx;\n",
+      "idx = 0;\n",
+      "for(j in 1 : n_lv) lv_coefs[j, j] = L_diag[j];\n",
+      "for(j in 1 : n_lv) {\n",
+      "for(k in (j + 1) : n_series) {\n",
+      "idx = idx + 1;\n",
+      "lv_coefs[k, j] = L_lower[idx];\n",
+      "}\n",
+      "}\n",
+      "}\n\n",
+      "// raw latent factors\n",
+      "LV = LV_raw;\n"
+    )
+
+  } else {
+    model_file[grep(
+      "// latent process linear predictors",
+      model_file,
+      fixed = TRUE
+    )] <- paste0(
+      "// latent process linear predictors\n",
+      "trend_mus = X_trend * b_trend;\n\n",
+      "// constraints allow identifiability of loadings\n",
+      "{\n",
+      "int idx;\n",
+      "idx = 0;\n",
+      "for(j in 1 : n_lv) lv_coefs[j, j] = L_diag[j];\n",
+      "for(j in 1 : n_lv) {\n",
+      "for(k in (j + 1) : n_series) {\n",
+      "idx = idx + 1;\n",
+      "lv_coefs[k, j] = L_lower[idx];\n",
+      "}\n",
+      "}\n",
+      "}\n\n",
+      "// raw latent factors (with linear predictors)\n",
+      "for (j in 1 : n_lv) {\n",
+      "for (i in 1 : n) {\n",
+      "LV[i, j] = trend_mus[ytimes_trend[i, j]] + LV_raw[i, j];\n",
+      "}\n}\n"
+    )
+  }
 
   model_file <- model_file[
     -grep("// derived latent states", model_file, fixed = TRUE)
@@ -537,16 +566,32 @@ jsdgam = function(
   ) +
     1
   model_file <- model_file[-sigma_prior]
-  model_file[grep(
-    "// priors for latent state SD parameters",
-    model_file,
-    fixed = TRUE
-  )] <- paste0(
-    "// priors for factors and loading coefficients\n",
-    "L_lower ~ student_t(3, 0, 1);\n",
-    "L_diag ~ student_t(3, 0, 1);"
-  )
-  model_file <- readLines(textConnection(model_file), n = -1)
+
+  # Use standard normal for loadings in most models, apart from
+  # those using identify link
+  if(family_links(mod$family) != 'identity') {
+    model_file[grep(
+      "// priors for latent state SD parameters",
+      model_file,
+      fixed = TRUE
+    )] <- paste0(
+      "// priors for factors and loading coefficients\n",
+      "L_lower ~ std_normal();\n",
+      "L_diag ~ std_normal();"
+    )
+    model_file <- readLines(textConnection(model_file), n = -1)
+  } else {
+    model_file[grep(
+      "// priors for latent state SD parameters",
+      model_file,
+      fixed = TRUE
+    )] <- paste0(
+      "// priors for factors and loading coefficients\n",
+      "L_lower ~ student_t(3, 0, 1);\n",
+      "L_diag ~ student_t(3, 0, 1);"
+    )
+    model_file <- readLines(textConnection(model_file), n = -1)
+  }
 
   # Update generated quantities
   model_file[grep(
