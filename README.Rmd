@@ -39,7 +39,7 @@ The `mvgam` 📦 fits Bayesian Dynamic Generalized Additive Models (DGAMs) that 
 * [Joint Species Distribution Models](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html){target="_blank"}
 
 ## Installation
-Install the stable package version from `CRAN` using: `install.packages('mvgam')`, or install the latest development version from `GitHub` using: `devtools::install_github("nicholasjclark/mvgam")`. You will also need a working version of `Stan` installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}.
+You can install the stable package version from `CRAN` using: `install.packages('mvgam')`, or install the latest development version from `GitHub` using: `devtools::install_github("nicholasjclark/mvgam")`. You will also need a working version of `Stan` installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}.
 
 ## Cheatsheet
 [![`mvgam` usage cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
