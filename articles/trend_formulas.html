@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-04-04</h4>
+            <h4 data-toc-skip class="date">2025-04-07</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/trend_formulas.Rmd" class="external-link"><code>vignettes/trend_formulas.Rmd</code></a></small>
       <div class="d-none name"><code>trend_formulas.Rmd</code></div>
@@ -183,12 +183,12 @@ downloaded using the following:</p>
 <code class="sourceCode R"><span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://pillar.r-lib.org/reference/glimpse.html" class="external-link">glimpse</a></span><span class="op">(</span><span class="va">plankton_data</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Rows: 600</span></span>
 <span><span class="co">#&gt; Columns: 6</span></span>
-<span><span class="co">#&gt; $ year   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1965, 1965, 1965, 1965, 1965, 1965, 1965, 1965, 1965, 1965, 196…</span></span>
-<span><span class="co">#&gt; $ month  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, …</span></span>
-<span><span class="co">#&gt; $ y      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -0.54241769, -0.34410776, -0.07684901, -1.52243490, -0.49055442…</span></span>
-<span><span class="co">#&gt; $ series <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> Greens, Bluegreens, Diatoms, Unicells, Other.algae, Greens, Blu…</span></span>
-<span><span class="co">#&gt; $ temp   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -1.2306562, -1.2306562, -1.2306562, -1.2306562, -1.2306562, -1.…</span></span>
-<span><span class="co">#&gt; $ time   <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, …</span></span></code></pre></div>
+<span><span class="co">#&gt; $ year   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1965<span style="color: #949494;">, </span>1965<span style="color: #949494;">, </span>1965<span style="color: #949494;">, </span>1965<span style="color: #949494;">, </span>1965<span style="color: #949494;">, </span>1965<span style="color: #949494;">, </span>1965<span style="color: #949494;">, </span>1965<span style="color: #949494;">, </span>1965<span style="color: #949494;">, </span>1965<span style="color: #949494;">, </span>196…</span></span>
+<span><span class="co">#&gt; $ month  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>4<span style="color: #949494;">, </span>4<span style="color: #949494;">, </span>4<span style="color: #949494;">, </span>4<span style="color: #949494;">, </span>4<span style="color: #949494;">, </span>5<span style="color: #949494;">, </span>…</span></span>
+<span><span class="co">#&gt; $ y      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -0.54241769<span style="color: #949494;">, </span>-0.34410776<span style="color: #949494;">, </span>-0.07684901<span style="color: #949494;">, </span>-1.52243490<span style="color: #949494;">, </span>-0.49055442…</span></span>
+<span><span class="co">#&gt; $ series <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> Greens<span style="color: #949494;">, </span>Bluegreens<span style="color: #949494;">, </span>Diatoms<span style="color: #949494;">, </span>Unicells<span style="color: #949494;">, </span>Other.algae<span style="color: #949494;">, </span>Greens<span style="color: #949494;">, </span>Blu…</span></span>
+<span><span class="co">#&gt; $ temp   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -1.2306562<span style="color: #949494;">, </span>-1.2306562<span style="color: #949494;">, </span>-1.2306562<span style="color: #949494;">, </span>-1.2306562<span style="color: #949494;">, </span>-1.2306562<span style="color: #949494;">, </span>-1.…</span></span>
+<span><span class="co">#&gt; $ time   <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>4<span style="color: #949494;">, </span>4<span style="color: #949494;">, </span>4<span style="color: #949494;">, </span>4<span style="color: #949494;">, </span>4<span style="color: #949494;">, </span>5<span style="color: #949494;">, </span>…</span></span></code></pre></div>
 <p>Note that we have z-scored the counts in this example as that will
 make it easier to specify priors (though this is not completely
 necessary; it is often better to build a model that respects the
@@ -594,8 +594,7 @@ to interpret:</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
 <span><span class="co">#&gt; ✔ No issues with effective samples per iteration</span></span>
-<span><span class="co">#&gt; ✖ Rhats above 1.05 found for some parameters</span></span>
-<span><span class="co">#&gt;     Use pairs() and mcmc_plot() to investigate</span></span>
+<span><span class="co">#&gt; ✔ Rhat looks good for all parameters</span></span>
 <span><span class="co">#&gt; ✔ No issues with divergences</span></span>
 <span><span class="co">#&gt; ✔ No issues with maximum tree depth</span></span>
 <span><span class="co">#&gt; </span></span>

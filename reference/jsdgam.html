@@ -423,6 +423,7 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   method                  from   </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   heightDetails.titleGrob ggplot2</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   widthDetails.titleGrob  ggplot2</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>ggrepel: 12 unlabeled data points (too many overlaps). Consider increasing max.overlaps</span>
 <span class="r-plt img"><img src="jsdgam-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span></span></span>
@@ -651,26 +652,26 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span><span class="co"># Look at lower and upper credible interval estimates for</span></span></span>
 <span class="r-in"><span><span class="co"># some of the estimated correlations</span></span></span>
 <span class="r-in"><span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            species_1  species_2   species_3  species_4   species_5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000  0.7291417  0.76027390  0.7978305 -0.22083329</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_2  0.7291417  1.0000000  0.19472924  0.4094377 -0.47126350</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.7602739  0.1947292  1.00000000  0.8950572 -0.04920993</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.7978305  0.4094377  0.89505716  1.0000000 -0.44986856</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.2208333 -0.4712635 -0.04920993 -0.4498686  1.00000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            species_1  species_2  species_3  species_4  species_5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000  0.7478131  0.7077590  0.7584940 -0.2226666</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_2  0.7478131  1.0000000  0.1847152  0.4121104 -0.4646831</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.7077590  0.1847152  1.0000000  0.8893192 -0.0605947</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.7584940  0.4121104  0.8893192  1.0000000 -0.4702592</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.2226666 -0.4646831 -0.0605947 -0.4702592  1.0000000</span>
 <span class="r-in"><span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor_upper</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           species_1  species_2 species_3  species_4  species_5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_1 1.0000000  0.9218755 0.9575172  0.9586931  0.1808305</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_2 0.9218755  1.0000000 0.5643469  0.7418777 -0.1613867</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_3 0.9575172  0.5643469 1.0000000  0.9757988  0.2812268</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_4 0.9586931  0.7418777 0.9757988  1.0000000 -0.1193160</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 0.1808305 -0.1613867 0.2812268 -0.1193160  1.0000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_1 1.0000000  0.9490105 0.9502660  0.9530000  0.2554001</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_2 0.9490105  1.0000000 0.5245856  0.7150460 -0.1225558</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_3 0.9502660  0.5245856 1.0000000  0.9724250  0.3063924</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_4 0.9530000  0.7150460 0.9724250  1.0000000 -0.1192868</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 0.2554001 -0.1225558 0.3063924 -0.1192868  1.0000000</span>
 <span class="r-in"><span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor_lower</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            species_1   species_2  species_3   species_4  species_5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000  0.45542531  0.4367321  0.52755016 -0.5661061</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_2  0.4554253  1.00000000 -0.1983615 -0.02193048 -0.7169815</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.4367321 -0.19836146  1.0000000  0.74175701 -0.4062964</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.5275502 -0.02193048  0.7417570  1.00000000 -0.7236728</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.5661061 -0.71698145 -0.4062964 -0.72367280  1.0000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            species_1  species_2  species_3  species_4  species_5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000  0.4303950  0.2587196  0.2762048 -0.5832629</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_2  0.4303950  1.0000000 -0.2033176  0.0140300 -0.7246617</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.2587196 -0.2033176  1.0000000  0.7341198 -0.4171416</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.2762048  0.0140300  0.7341198  1.0000000 -0.7275820</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.5832629 -0.7246617 -0.4171416 -0.7275820  1.0000000</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot of the posterior median correlations for those estimated</span></span></span>
 <span class="r-in"><span><span class="co"># to be non-zero</span></span></span>
@@ -696,18 +697,18 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 600 log-likelihood matrix.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate    SE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo  -4401.5 227.0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo      2196.9 187.3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> looic      8803.1 454.0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo  -4466.9 231.6</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo      2267.8 191.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> looic      8933.8 463.3</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> MCSE of elpd_loo is NA.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.0, 1.1]).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.0, 1.0]).</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Pareto k diagnostic values:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                           Count Pct.    Min. ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.67]   (good)     316   52.7%   0       </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.67, 1]   (bad)       98   16.3%   &lt;NA&gt;    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     (1, Inf)   (very bad) 186   31.0%   &lt;NA&gt;    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.67]   (good)     322   53.7%   1       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.67, 1]   (bad)       88   14.7%   &lt;NA&gt;    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     (1, Inf)   (very bad) 190   31.7%   &lt;NA&gt;    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> See help('pareto-k-diagnostic') for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Forecast log(counts) for entire region (site value doesn't matter as long</span></span></span>
