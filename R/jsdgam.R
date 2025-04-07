@@ -500,8 +500,10 @@ jsdgam = function(
   model_file <- model_file[-(starts:ends)]
 
   # Simplified latent variable creation if no terms in factor_formula
-  if(is.null(rownames(attr(terms.formula(factor_formula), 'factors'))) &
-     is.null(colnames(attr(terms.formula(factor_formula), 'factors')))) {
+  if (
+    is.null(rownames(attr(terms.formula(factor_formula), 'factors'))) &
+      is.null(colnames(attr(terms.formula(factor_formula), 'factors')))
+  ) {
     model_file[grep(
       "// latent process linear predictors",
       model_file,
@@ -524,7 +526,6 @@ jsdgam = function(
       "// raw latent factors\n",
       "LV = LV_raw;\n"
     )
-
   } else {
     model_file[grep(
       "// latent process linear predictors",
@@ -569,7 +570,7 @@ jsdgam = function(
 
   # Use standard normal for loadings in most models, apart from
   # those using identify link
-  if(family_links(mod$family) != 'identity') {
+  if (family_links(mod$family) != 'identity') {
     model_file[grep(
       "// priors for latent state SD parameters",
       model_file,
