@@ -284,7 +284,7 @@ plot_mvgam_series = function(
     plot_hist <- dat %>%
       ggplot2::ggplot(ggplot2::aes(y)) +
       ggplot2::geom_histogram(bins = n_bins, fill = "#8F2727", col = 'white') +
-      ggplot2::labs(title = "Histogram", x = "y", y = "Count") +
+      ggplot2::labs(title = "Histogram", x = ylab, y = "Count") +
       ggplot2::theme_bw()
 
     # ACF
@@ -313,7 +313,7 @@ plot_mvgam_series = function(
       ggplot2::ggplot(ggplot2::aes(x, y)) +
       ggplot2::geom_line(colour = "#8F2727", linewidth = 0.75) +
       ggplot2::scale_y_continuous(limits = c(0, 1)) +
-      ggplot2::labs(title = "CDF", x = "y", y = "Empirical CDF") +
+      ggplot2::labs(title = "CDF", x = ylab, y = "Empirical CDF") +
       ggplot2::theme_bw()
 
     # plot
