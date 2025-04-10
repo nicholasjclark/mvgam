@@ -75,7 +75,7 @@ plot_mvgam_series(
 )
 ```
 
-These plots show that the time series are count-responses, with missing data, seasonality and temporal autocorrelation all present. These features make time series analysis and forecasting very difficult using conventional software. But `mvgam` shines in these tasks. 
+These plots show that the time series are count responses, with missing data, many zeroes, seasonality and temporal autocorrelation all present. These features make time series analysis and forecasting very difficult using conventional software. But `mvgam` shines in these tasks. 
 
 For most forecasting exercises, we'll want to split the data into training and testing folds
 ```{r}
