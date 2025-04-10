@@ -91,10 +91,10 @@ rodent species over time (see `?portal_data` for more details)
 
 <img src="man/figures/README-unnamed-chunk-4-3.png" alt="Visualizing multivariate time series in R using mvgam" width="100%" />
 
-These plots show that the time series are count-responses, with missing
-data, seasonality and temporal autocorrelation all present. These
-features make time series analysis and forecasting very difficult using
-conventional software. But `mvgam` shines in these tasks.
+These plots show that the time series are count responses, with missing
+data, many zeroes, seasonality and temporal autocorrelation all present.
+These features make time series analysis and forecasting very difficult
+using conventional software. But `mvgam` shines in these tasks.
 
 For most forecasting exercises, we’ll want to split the data into
 training and testing folds
@@ -237,13 +237,13 @@ proper scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.411079
+    #> 8.236903
     #> Out of sample DRPS:
-    #> 5.32458625
+    #> 5.37817425
     #> Out of sample DRPS:
-    #> 8.7484915
+    #> 8.6293105
     #> Out of sample DRPS:
-    #> 3.55841075
+    #> 3.5363825
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
