@@ -44,11 +44,10 @@ very wide range of models, including:
 
 You can install the stable package version from `CRAN` using:
 `install.packages('mvgam')`, or install the latest development version
-directly from `GitHub` using:
-`devtools::install_github("nicholasjclark/mvgam")`. You will also need a
-working version of `Stan` installed (along with either `rstan` and/or
-`cmdstanr`). Please refer to installation links for `Stan` with `rstan`
-<a href="https://mc-stan.org/users/interfaces/rstan"
+using: `devtools::install_github("nicholasjclark/mvgam")`. You will also
+need a working version of `Stan` installed (along with either `rstan`
+and/or `cmdstanr`). Please refer to installation links for `Stan` with
+`rstan` <a href="https://mc-stan.org/users/interfaces/rstan"
 target="_blank">here</a>, or for `Stan` with `cmdstandr`
 <a href="https://mc-stan.org/cmdstanr/" target="_blank">here</a>.
 
@@ -60,8 +59,8 @@ cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheats
 ## A simple example
 
 We can explore the package’s primary functions using one of it’s
-built-in datasets. Use `plot_mvgam_series()` to inspect features for the
-four time series from
+built-in datasets. Use `plot_mvgam_series()` to inspect features for
+time series from
 <a href="https://portal.weecology.org/" target="_blank">the Portal
 Project</a>, which represent counts of baited captures for four desert
 rodent species over time (see `?portal_data` for more details)
@@ -237,13 +236,13 @@ proper scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.236903
+    #> 8.20503375
     #> Out of sample DRPS:
-    #> 5.37817425
+    #> 5.379297
     #> Out of sample DRPS:
-    #> 8.6293105
+    #> 8.6094065
     #> Out of sample DRPS:
-    #> 3.5363825
+    #> 3.813427
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
