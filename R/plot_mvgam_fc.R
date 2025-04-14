@@ -858,8 +858,10 @@ plot.mvgam_forecast = function(
     base_plot <- base_plot +
       ggplot2::geom_point(pch = 21, col = 'white', fill = 'black')
 
-    # Calculate out of sample probabilistic score
-    fc <- object$forecasts[[s_name]]
+    # Calculate out of sample probabilistic score;
+    # need to ensure fc is a matrix, even if only a single
+    # out of sample observation was forecasted (#111)
+    fc <- as.matrix(object$forecasts[[s_name]])
     truth <- object$test_observations[[s_name]]
 
     if (all(is.na(truth))) {
