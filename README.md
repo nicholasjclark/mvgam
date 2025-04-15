@@ -136,7 +136,7 @@ outcome follows a Poisson distribution and will condition the model in
       backend = 'cmdstanr'
     )
 
-Using `print()` will return a quick summary of the object:
+Using `print()` returns a quick summary of the object:
 
     mod
     #> GAM observation formula:
@@ -170,8 +170,8 @@ Using `print()` will return a quick summary of the object:
     #> 4 chains, each with iter = 2000; warmup = 1500; thin = 1 
     #> Total post-warmup draws = 2000
 
-Split Rhat and effective sample size diagnostics show good convergence
-of the model estimates
+Split Rhat and Effective Sample Size diagnostics show good convergence
+of model estimates
 
     mcmc_plot(mod, 
               type = 'rhat_hist')
@@ -226,8 +226,8 @@ Or design more targeted plots using `plot_predictions()` from the
 <img src="man/figures/README-unnamed-chunk-14-1.png" alt="Using marginaleffects and mvgam to plot GAM smooth functions in R" width="100%" />
 
 We can also view the model’s posterior predictions for the entire series
-(testing and training). These forecasts can be scored using a range of
-proper scoring rules. See `?score.mvgam_forecast` for more details
+(testing and training). Forecasts can be scored using a range of proper
+scoring rules. See `?score.mvgam_forecast` for more details
 
     fcs <- forecast(mod, 
                     newdata = data_test)
@@ -236,13 +236,13 @@ proper scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.19482775
+    #> 8.43030175
     #> Out of sample DRPS:
-    #> 5.299588
+    #> 5.30260475
     #> Out of sample DRPS:
-    #> 9.11858275
+    #> 8.6198665
     #> Out of sample DRPS:
-    #> 3.468471
+    #> 3.6747555
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
@@ -275,14 +275,14 @@ processes over a horizon of 12 timepoints.
 <img src="man/figures/README-unnamed-chunk-16-2.png" alt="Impulse response functions computed using mvgam in R" width="100%" />
 
 Using the same logic as above, we can inspect forecast error variance
-decompositions (FEVDs) for each process using the `fevd()` function.
-This type of analysis asks how orthogonal shocks to all process in the
-system contribute to the variance of forecast uncertainty for a focal
-process over increasing horizons. In other words, the proportion of the
-forecast variance of each latent time series can be attributed to the
-effects of the other series in the VAR process. FEVDs are useful because
-some shocks may not be expected to cause variations in the short-term
-but may cause longer-term fluctuations
+decompositions (FEVDs) for each process using`fevd()`. This type of
+analysis asks how orthogonal shocks to all process in the system
+contribute to the variance of forecast uncertainty for a focal process
+over increasing horizons. In other words, the proportion of the forecast
+variance of each latent time series can be attributed to the effects of
+the other series in the VAR process. FEVDs are useful because some
+shocks may not be expected to cause variations in the short-term but may
+cause longer-term fluctuations
 
     fevds <- fevd(mod, 
                   h = 12)
