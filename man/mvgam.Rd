@@ -617,6 +617,44 @@ fevds <- fevd(mod, h = 12)
 plot(fevds)
 
 
+# Now fit a model that uses two RW dynamic factors to model
+# the temporal dynamics of the four rodent species
+mod <- mvgam(
+  captures ~ series,
+  trend_model = RW(),
+  use_lv = TRUE,
+  n_lv = 2,
+  data = portal_data,
+  chains = 2,
+  silent = 2
+)
+
+# Plot the factors
+plot(mod, type = 'factors')
+
+# Plot the hindcasts
+hcs <- hindcast(mod)
+plot(hcs,
+     series = 1)
+plot(hcs,
+     series = 2)
+plot(hcs,
+     series = 3)
+plot(hcs,
+     series = 4)
+
+# Use residual_cor() to calculate temporal correlations among the series
+# based on the factor loadings
+lvcors <- residual_cor(mod)
+names(lvcors)
+lvcors$cor
+
+# For those correlations whose credible intervals did not include
+# zero, plot them as a correlation matrix (all other correlations
+# are shown as zero on this plot)
+plot(lvcors, cluster = TRUE)
+
+
 
 # Example of supplying a trend_map so that some series can share
 # latent trend processes
