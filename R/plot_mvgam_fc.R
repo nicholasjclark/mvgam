@@ -861,7 +861,12 @@ plot.mvgam_forecast = function(
     # Calculate out of sample probabilistic score;
     # need to ensure fc is a matrix, even if only a single
     # out of sample observation was forecasted (#111)
-    fc <- as.matrix(object$forecasts[[s_name]])
+    if (!is.null(object$forecasts)) {
+      fc <- as.matrix(object$forecasts[[s_name]])
+    } else {
+      fc <- NULL
+    }
+
     truth <- object$test_observations[[s_name]]
 
     if (all(is.na(truth))) {
