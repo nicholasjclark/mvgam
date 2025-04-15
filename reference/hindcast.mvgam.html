@@ -130,7 +130,7 @@ organized into a convenient format</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 15</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x55ff53981c08&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x5584fd38ed10&gt; </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_model       :List of 7</span>
@@ -189,11 +189,14 @@ organized into a convenient format</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">11</span> series_1    11       2        0         6     2 response</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">12</span> series_1    12       1        0         5     0 response</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in array(x, c(length(x), 1L), if (!is.null(names(x))) list(names(x),     NULL) else NULL):</span> 'data' must be of a vector type, was 'NULL'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
+<span class="r-plt img"><img src="hindcast.mvgam-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in array(x, c(length(x), 1L), if (!is.null(names(x))) list(names(x),     NULL) else NULL):</span> 'data' must be of a vector type, was 'NULL'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
+<span class="r-plt img"><img src="hindcast.mvgam-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in array(x, c(length(x), 1L), if (!is.null(names(x))) list(names(x),     NULL) else NULL):</span> 'data' must be of a vector type, was 'NULL'</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
+<span class="r-plt img"><img src="hindcast.mvgam-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Hindcasts as expectations</span></span></span>
 <span class="r-in"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu">hindcast</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'expected'</span><span class="op">)</span></span></span>
@@ -214,11 +217,11 @@ organized into a convenient format</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">11</span> series_1    11   1.84    0.624       4.66 expected</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">12</span> series_1    12   1.35    0.252       3.64 expected</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="hindcast.mvgam-1.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="hindcast.mvgam-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="hindcast.mvgam-2.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="hindcast.mvgam-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="hindcast.mvgam-3.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="hindcast.mvgam-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Estimated latent trends</span></span></span>
 <span class="r-in"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu">hindcast</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'trend'</span><span class="op">)</span></span></span>
@@ -239,11 +242,11 @@ organized into a convenient format</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">11</span> series_1    11 -<span style="color: #BB0000;">0.452</span>    -<span style="color: #BB0000;">1.71</span>    0.505   trend</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">12</span> series_1    12 -<span style="color: #BB0000;">1.14</span>     -<span style="color: #BB0000;">2.87</span>   -<span style="color: #BB0000;">0.008</span><span style="color: #BB0000; text-decoration: underline;">18</span> trend</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="hindcast.mvgam-4.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="hindcast.mvgam-7.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="hindcast.mvgam-5.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="hindcast.mvgam-8.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="hindcast.mvgam-6.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="hindcast.mvgam-9.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
