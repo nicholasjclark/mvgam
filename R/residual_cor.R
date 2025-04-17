@@ -91,6 +91,35 @@ residual_cor.mvgam <- function(
 
 #' @rdname residual_cor.jsdgam
 #' @method residual_cor jsdgam
+#' @examples
+#'\donttest{
+#' # Fit a JSDGAM to the portal_data captures
+#' mod <- jsdgam(
+#'   formula = captures ~
+#'     # Fixed effects of NDVI and mintemp, row effect as a GP of time
+#'     ndvi_ma12:series + mintemp:series + gp(time, k = 15),
+#'   factor_formula = ~ -1,
+#'   data = portal_data,
+#'   unit = time,
+#'   species = series,
+#'   family = poisson(),
+#'   n_lv = 2,
+#'   silent = 2,
+#'   chains = 2
+#' )
+#'
+#' # Plot residual correlations
+#' plot(
+#'   residual_cor(mod)
+#' )
+#'
+#' # Compare to a residual ordination biplot
+#' ordinate(
+#'   mod,
+#'   alpha = 0.7
+#' )
+#'
+#' }
 #' @export
 residual_cor.jsdgam <- function(
   object,

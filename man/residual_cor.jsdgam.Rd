@@ -74,6 +74,36 @@ or included correlated process errors directly
 See \code{\link{mvgam_residcor-class}} for a full description of the quantities that are
 computed and returned by this function, along with key references.
 }
+\examples{
+\donttest{
+# Fit a JSDGAM to the portal_data captures
+mod <- jsdgam(
+  formula = captures ~
+    # Fixed effects of NDVI and mintemp, row effect as a GP of time
+    ndvi_ma12:series + mintemp:series + gp(time, k = 15),
+  factor_formula = ~ -1,
+  data = portal_data,
+  unit = time,
+  species = series,
+  family = poisson(),
+  n_lv = 2,
+  silent = 2,
+  chains = 2
+)
+
+# Plot residual correlations
+plot(
+  residual_cor(mod)
+)
+
+# Compare to a residual ordination biplot
+ordinate(
+  mod,
+  alpha = 0.7
+)
+
+}
+}
 \seealso{
 \code{\link[=jsdgam]{jsdgam()}}, \code{\link[=lv_correlations]{lv_correlations()}}, \code{\link{mvgam_residcor-class}}
 }
