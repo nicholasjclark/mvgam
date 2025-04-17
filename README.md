@@ -245,13 +245,13 @@ scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.75868675
+    #> 8.52350525
     #> Out of sample DRPS:
-    #> 5.3114895
+    #> 5.222029
     #> Out of sample DRPS:
-    #> 8.883584
+    #> 8.5023375
     #> Out of sample DRPS:
-    #> 3.4932045
+    #> 3.3873705
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
