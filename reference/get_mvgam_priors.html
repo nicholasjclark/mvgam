@@ -157,7 +157,7 @@ source of error; similarly to what is estimated by <code><a href="https://rdrr.i
 <li><p><code>'AR1'</code> or <code>AR(p = 1)</code></p></li>
 <li><p><code>'AR2'</code> or <code>AR(p = 2)</code></p></li>
 <li><p><code>'AR3'</code> or <code>AR(p = 3)</code></p></li>
-<li><p><code>'CAR1'</code> or <code>CAR(p = 1)</code></p></li>
+<li><p><code>'CAR1'</code> or <code>CAR(p = 1)</code> (also known as an Ornstein–Uhlenbeck process)</p></li>
 <li><p><code>'VAR1'</code>  or <code><a href="RW.html">VAR()</a></code>(only available in <code>Stan</code>)</p></li>
 <li><p><code>'PWlogistic</code>, <code>'PWlinear'</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
 <li><p><code>'GP'</code> or <code><a href="GP.html">GP()</a></code> (Gaussian Process with squared exponential kernel;
@@ -167,7 +167,7 @@ average and/or correlated process error terms can also be estimated (for
 example, <code>RW(cor = TRUE)</code> will set up a multivariate Random Walk if <code>n_series &gt; 1</code>).
 It is also possible for many multivariate trends to estimate hierarchical
 correlations if the data are structured among levels of a relevant grouping
-factor. See <a href="mvgam_trends.html">mvgam_trends</a> for more details and see <a href="ZMVN.html">ZMVN</a> for an example.</p></dd>
+factor. See <a href="mvgam_trends.html">mvgam_trends</a> for more details and see <code><a href="ZMVN.html">ZMVN()</a></code> for an example.</p></dd>
 
 
 <dt>family</dt>
@@ -214,14 +214,14 @@ use irregularly spaced intervals if using <code>trend_model = CAR(1)</code>, tho
 note that any
 temporal intervals that are exactly <code>0</code> will be adjusted to a very small number
 (<code>1e-12</code>) to prevent sampling errors. See an example of <code><a href="RW.html">CAR()</a></code> trends in
-<code><a href="RW.html">CAR</a></code></p></li>
+<code><a href="RW.html">CAR()</a></code></p></li>
 </ul><p>Note however that there are special cases where these identifiers are not
 needed. For
 example, models with hierarchical temporal correlation processes (e.g.
 <code>AR(gr = region, subgr = species)</code>)
 should NOT include a <code>series</code> identifier, as this will be constructed
 internally (see
-<code><a href="mvgam_trends.html">mvgam_trends</a></code> and <code><a href="RW.html">AR</a></code> for details). <code>mvgam</code> can also
+<code><a href="mvgam_trends.html">mvgam_trends</a></code> and <code><a href="RW.html">AR()</a></code> for details). <code><a href="mvgam.html">mvgam()</a></code> can also
 fit models that do not
 include a <code>time</code> variable if there are no temporal dynamic structures included
 (i.e. <code>trend_model = 'None'</code> or
@@ -269,7 +269,7 @@ trend each series should depend on. The <code>series</code> column should have a
 unique entry for each series in the data (names should perfectly match factor
 levels of the <code>series</code> variable in <code>data</code>). Note that if this is supplied,
 the intercept parameter in the process model will NOT be automatically suppressed.
-Not yet supported for models in wich the latent factors evolve in continuous time (<code><a href="RW.html">CAR()</a></code>).
+Not yet supported for models in which the latent factors evolve in continuous time (<code><a href="RW.html">CAR()</a></code>).
 See examples for details</p></dd>
 
 

@@ -195,7 +195,7 @@ source of error; similarly to what is estimated by <code><a href="https://rdrr.i
 <li><p><code>'AR1'</code> or <code>AR(p = 1)</code></p></li>
 <li><p><code>'AR2'</code> or <code>AR(p = 2)</code></p></li>
 <li><p><code>'AR3'</code> or <code>AR(p = 3)</code></p></li>
-<li><p><code>'CAR1'</code> or <code>CAR(p = 1)</code></p></li>
+<li><p><code>'CAR1'</code> or <code>CAR(p = 1)</code> (also known as an Ornstein–Uhlenbeck process)</p></li>
 <li><p><code>'VAR1'</code>  or <code><a href="RW.html">VAR()</a></code>(only available in <code>Stan</code>)</p></li>
 <li><p><code>'PWlogistic</code>, <code>'PWlinear'</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
 <li><p><code>'GP'</code> or <code><a href="GP.html">GP()</a></code> (Gaussian Process with squared exponential kernel;
@@ -205,7 +205,7 @@ average and/or correlated process error terms can also be estimated (for
 example, <code>RW(cor = TRUE)</code> will set up a multivariate Random Walk if <code>n_series &gt; 1</code>).
 It is also possible for many multivariate trends to estimate hierarchical
 correlations if the data are structured among levels of a relevant grouping
-factor. See <a href="mvgam_trends.html">mvgam_trends</a> for more details and see <a href="ZMVN.html">ZMVN</a> for an example.</p></dd>
+factor. See <a href="mvgam_trends.html">mvgam_trends</a> for more details and see <code><a href="ZMVN.html">ZMVN()</a></code> for an example.</p></dd>
 
 
 <dt>noncentred</dt>
@@ -277,14 +277,14 @@ use irregularly spaced intervals if using <code>trend_model = CAR(1)</code>, tho
 note that any
 temporal intervals that are exactly <code>0</code> will be adjusted to a very small number
 (<code>1e-12</code>) to prevent sampling errors. See an example of <code><a href="RW.html">CAR()</a></code> trends in
-<code><a href="RW.html">CAR</a></code></p></li>
+<code><a href="RW.html">CAR()</a></code></p></li>
 </ul><p>Note however that there are special cases where these identifiers are not
 needed. For
 example, models with hierarchical temporal correlation processes (e.g.
 <code>AR(gr = region, subgr = species)</code>)
 should NOT include a <code>series</code> identifier, as this will be constructed
 internally (see
-<code><a href="mvgam_trends.html">mvgam_trends</a></code> and <code><a href="RW.html">AR</a></code> for details). <code>mvgam</code> can also
+<code><a href="mvgam_trends.html">mvgam_trends</a></code> and <code><a href="RW.html">AR()</a></code> for details). <code>mvgam()</code> can also
 fit models that do not
 include a <code>time</code> variable if there are no temporal dynamic structures included
 (i.e. <code>trend_model = 'None'</code> or
@@ -326,15 +326,15 @@ trend each series should depend on. The <code>series</code> column should have a
 unique entry for each series in the data (names should perfectly match factor
 levels of the <code>series</code> variable in <code>data</code>). Note that if this is supplied,
 the intercept parameter in the process model will NOT be automatically suppressed.
-Not yet supported for models in wich the latent factors evolve in continuous time (<code><a href="RW.html">CAR()</a></code>).
+Not yet supported for models in which the latent factors evolve in continuous time (<code><a href="RW.html">CAR()</a></code>).
 See examples for details</p></dd>
 
 
 <dt>priors</dt>
 <dd><p>An optional <code>data.frame</code> with prior
 definitions or, preferentially, a vector containing
-objects of class <code>brmsprior</code> (see. <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></code> for details).
-See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and Details' for more information on changing default prior distributions</p></dd>
+objects of class <code>brmsprior</code> (see. <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a>()</code> for details).
+See <code><a href="get_mvgam_priors.html">get_mvgam_priors()</a></code> and Details' for more information on changing default prior distributions</p></dd>
 
 
 <dt>run_model</dt>
@@ -363,7 +363,7 @@ is needed to fit the
 model is returned, along with the initial values for smooth and AR parameters,
 once the model is fitted.
 This will be helpful if users wish to modify the model file to add
-other stochastic elements that are not currently available in <code>mvgam</code>.
+other stochastic elements that are not currently available in <span class="pkg">mvgam</span>.
 Default is <code>FALSE</code> to reduce
 the size of the returned object, unless <code>run_model == FALSE</code></p></dd>
 
@@ -452,7 +452,7 @@ can also set open_progress = FALSE to prevent opening additional progress bars.<
 
 
 <dt>refit</dt>
-<dd><p>Logical indicating whether this is a refit, called using <a href="update.mvgam.html">update.mvgam</a>. Users should leave
+<dd><p>Logical indicating whether this is a refit, called using <code><a href="update.mvgam.html">update.mvgam()</a></code>. Users should leave
 as <code>FALSE</code></p></dd>
 
 
@@ -466,7 +466,7 @@ leave this set as <code>FALSE</code></p></dd>
 <dt>...</dt>
 <dd><p>Further arguments passed to Stan.
 For <code>backend = "rstan"</code> the arguments are passed to
-<code><a href="https://mc-stan.org/rstan/reference/stanmodel-method-sampling.html" class="external-link">sampling</a></code> or <code><a href="https://mc-stan.org/rstan/reference/stanmodel-method-vb.html" class="external-link">vb</a></code>.
+<code><a href="https://mc-stan.org/rstan/reference/stanmodel-method-sampling.html" class="external-link">sampling</a>()</code> or <code><a href="https://mc-stan.org/rstan/reference/stanmodel-method-vb.html" class="external-link">vb</a>()</code>.
 For <code>backend = "cmdstanr"</code> the arguments are passed to the
 <code><a href="https://mc-stan.org/cmdstanr/reference/model-method-sample.html" class="external-link">cmdstanr::sample</a></code>, <code><a href="https://mc-stan.org/cmdstanr/reference/model-method-variational.html" class="external-link">cmdstanr::variational</a></code>,
 <code><a href="https://mc-stan.org/cmdstanr/reference/model-method-laplace.html" class="external-link">cmdstanr::laplace</a></code> or
@@ -507,7 +507,7 @@ can be found in <code><a href="mvgam_trends.html">mvgam_trends</a></code>.
 <br><br><em>Priors</em>: Default priors for intercepts and any variance parameters are chosen
 to be vaguely informative, but these should always be checked by the user.
 Prior distributions for most important model parameters can be altered
-(see <code><a href="get_mvgam_priors.html">get_mvgam_priors</a></code> for details).
+(see <code><a href="get_mvgam_priors.html">get_mvgam_priors()</a></code> for details).
 Note that latent trends are estimated on the link scale so choose priors
 accordingly. However more control over the model specification can be accomplished
 by setting <code>run_model = FALSE</code> and then editing the model code (
@@ -549,34 +549,34 @@ the <a href="https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html
 the <a href="https://nicholasjclark.github.io/mvgam/articles/shared_states.html">shared latent states vignette</a>,
 the <a href="https://nicholasjclark.github.io/mvgam/articles/time_varying_effects.html">time-varying effects vignette</a> and
 the <a href="https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html">State-Space models vignette</a> all provide
-useful information about how to structure, fit and interrogate Dynamic Generalized Additive Models in <code>mvgam</code>. Some
+useful information about how to structure, fit and interrogate Dynamic Generalized Additive Models in <span class="pkg">mvgam</span>. Some
 more specialized how-to articles include
 <a href="https://nicholasjclark.github.io/mvgam/articles/nmixtures.html">"Fitting N-mixture models in <code>mgam</code></a>,
 <a href="https://nicholasjclark.github.io/mvgam/reference/jsdgam.html">"Joint Species Distribution Models in <code>mgam</code></a>,
 <a href="https://ecogambler.netlify.app/blog/time-varying-seasonality/" class="external-link">"Incorporating time-varying seasonality in forecast models"</a>
 and <a href="https://ecogambler.netlify.app/blog/autocorrelated-gams/" class="external-link">"Temporal autocorrelation in GAMs and the <code>mvgam</code> package"</a></p></li>
-<li><p>3. Carefully think about how to structure linear predictor effects (i.e. smooth terms using <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></code>,
-<code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te</a></code> or <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti</a></code>, GPs using <code><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp</a></code>, dynamic time-varying effects using <code><a href="dynamic.html">dynamic</a></code>, and parametric terms), latent temporal trend components (see <code><a href="mvgam_trends.html">mvgam_trends</a></code>) and the appropriate
-observation family (see <code><a href="mvgam_families.html">mvgam_families</a></code>). Use <code><a href="get_mvgam_priors.html">get_mvgam_priors</a></code> to see default prior distributions
+<li><p>3. Carefully think about how to structure linear predictor effects (i.e. smooth terms using <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a>()</code>,
+<code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te</a>()</code> or <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti</a>()</code>, GPs using <code><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp</a>()</code>, dynamic time-varying effects using <code><a href="dynamic.html">dynamic()</a></code>, and parametric terms), latent temporal trend components (see <code><a href="mvgam_trends.html">mvgam_trends</a></code>) and the appropriate
+observation family (see <code><a href="mvgam_families.html">mvgam_families</a></code>). Use <code><a href="get_mvgam_priors.html">get_mvgam_priors()</a></code> to see default prior distributions
 for stochastic parameters</p></li>
-<li><p>4. Change default priors using appropriate prior knowledge (see <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></code>). When using State-Space models
+<li><p>4. Change default priors using appropriate prior knowledge (see <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a>()</code>). When using State-Space models
 with a <code>trend_formula</code>, pay particular attention to priors for any variance parameters such as process errors and observation
 errors. Default priors on these parameters are chosen to be vaguely informative and to avoid
 zero (using Inverse Gamma priors), but more informative priors will often help with
 model efficiency and convergence</p></li>
 <li><p>5. Fit the model using either Hamiltonian Monte Carlo or an approximation algorithm (i.e.
-change the <code>backend</code> argument) and use <code><a href="summary.mvgam.html">summary.mvgam</a></code>, <code><a href="conditional_effects.mvgam.html">conditional_effects.mvgam</a></code>,
-<code><a href="mcmc_plot.mvgam.html">mcmc_plot.mvgam</a></code>, <code><a href="pp_check.mvgam.html">pp_check.mvgam</a></code>, <code><a href="pairs.mvgam.html">pairs.mvgam</a></code> and
-<code><a href="plot.mvgam.html">plot.mvgam</a></code> to inspect / interrogate the model</p></li>
-<li><p>6. Update the model as needed and use <code><a href="loo.mvgam.html">loo_compare.mvgam</a></code> for in-sample model comparisons,
-or alternatively use <code><a href="forecast.mvgam.html">forecast.mvgam</a></code>, <code><a href="lfo_cv.mvgam.html">lfo_cv.mvgam</a></code> and
-<code><a href="score.mvgam_forecast.html">score.mvgam_forecast</a></code> to compare models based on out-of-sample forecasts
+change the <code>backend</code> argument) and use <code><a href="summary.mvgam.html">summary.mvgam()</a></code>, <code><a href="conditional_effects.mvgam.html">conditional_effects.mvgam()</a></code>,
+<code><a href="mcmc_plot.mvgam.html">mcmc_plot.mvgam()</a></code>, <code><a href="pp_check.mvgam.html">pp_check.mvgam()</a></code>, <code><a href="pairs.mvgam.html">pairs.mvgam()</a></code> and
+<code><a href="plot.mvgam.html">plot.mvgam()</a></code> to inspect / interrogate the model</p></li>
+<li><p>6. Update the model as needed and use <code><a href="loo.mvgam.html">loo_compare.mvgam()</a></code> for in-sample model comparisons,
+or alternatively use <code><a href="forecast.mvgam.html">forecast.mvgam()</a></code>, <code><a href="lfo_cv.mvgam.html">lfo_cv.mvgam()</a></code> and
+<code><a href="score.mvgam_forecast.html">score.mvgam_forecast()</a></code> to compare models based on out-of-sample forecasts
 (see the <a href="https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html">forecast evaluation vignette</a>
 for guidance)</p></li>
-<li><p>7. When satisfied with the model structure, use <code><a href="predict.mvgam.html">predict.mvgam</a></code>,
-<code><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></code> and/or <code><a href="https://marginaleffects.com/man/r/plot_slopes.html" class="external-link">plot_slopes</a></code> for
+<li><p>7. When satisfied with the model structure, use <code><a href="predict.mvgam.html">predict.mvgam()</a></code>,
+<code><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a>()</code> and/or <code><a href="https://marginaleffects.com/man/r/plot_slopes.html" class="external-link">plot_slopes</a>()</code> for
 more targeted inferences (see <a href="https://ecogambler.netlify.app/blog/interpreting-gams/" class="external-link">"How to interpret and report nonlinear effects from Generalized Additive Models"</a> for some guidance on interpreting GAMs)</p></li>
-<li><p>8. Use <code><a href="how_to_cite.mvgam.html">how_to_cite</a></code> to obtain a scaffold methods section (with full references) to begin describing this
+<li><p>8. Use <code><a href="how_to_cite.mvgam.html">how_to_cite()</a></code> to obtain a scaffold methods section (with full references) to begin describing this
 model in scientific publications</p></li>
 </ul></div>
     <div class="section level2">
@@ -591,8 +591,8 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/gam.models.html" class="external-link">gam.models</a></code>,
-<code><a href="get_mvgam_priors.html">get_mvgam_priors</a></code>, <code><a href="jsdgam.html">jsdgam</a></code></p></div>
+    <div class="dont-index"><p><code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a>()</code>, <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a>()</code>, <code><a href="https://rdrr.io/pkg/mgcv/man/gam.models.html" class="external-link">gam.models</a></code>,
+<code><a href="get_mvgam_priors.html">get_mvgam_priors()</a></code>, <code><a href="jsdgam.html">jsdgam()</a></code></p></div>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
@@ -774,7 +774,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55e3caa90f48&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x5594e8cc0378&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -873,7 +873,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 16</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x55e3caa90f48&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x5594e8cc0378&gt; </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family_pars       : NULL</span>
@@ -1091,7 +1091,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpLlOy59/model_fe1a9373f4bc428a5906ce7b23b30b3c.stan', line 20, column 31: Found</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpMholF8/model_fe1a9373f4bc428a5906ce7b23b30b3c.stan', line 20, column 31: Found</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     int division:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     Values will be rounded towards zero. If rounding is not desired you can</span>
@@ -1099,7 +1099,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     the division as</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2.0</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     If rounding is intended please use the integer division operator %/%.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpLlOy59/model-722f2348d64.stan', line 20, column 33: Found</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpMholF8/model-22d317305eb8.stan', line 20, column 33: Found</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     int division:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     Values will be rounded towards zero. If rounding is not desired you can</span>
@@ -1251,7 +1251,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> out ~ gp(time, by = temp, c = 5/4, k = 40, scale = FALSE)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55e3caa90f48&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x5594e8cc0378&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> gaussian</span>
@@ -1567,7 +1567,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> cbind(y, ntrials) ~ series + s(x, by = series)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55e3caa90f48&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x5594e8cc0378&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> binomial</span>
