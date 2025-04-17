@@ -144,12 +144,12 @@ mod <- mvgam(
 )
 ```
 
-Using `print()` will return a quick summary of the object:
+Using `print()` returns a quick summary of the object:
 ```{r}
 mod
 ```
 
-Split Rhat and effective sample size diagnostics show good convergence of the model estimates
+Split Rhat and Effective Sample Size diagnostics show good convergence of model estimates
 ```{r, fig.alt = "Rhats of parameters estimated with Stan in mvgam", warning=FALSE}
 mcmc_plot(mod, 
           type = 'rhat_hist')
@@ -194,7 +194,7 @@ plot_predictions(
 )
 ```
 
-We can also view the model's posterior predictions for the entire series (testing and training). These forecasts can be scored using a range of proper scoring rules. See `?score.mvgam_forecast` for more details
+We can also view the model's posterior predictions for the entire series (testing and training). Forecasts can be scored using a range of proper scoring rules. See `?score.mvgam_forecast` for more details
 ```{r, fig.alt = "Plotting forecast distributions using mvgam in R", warning=FALSE}
 fcs <- forecast(mod, 
                 newdata = data_test)
@@ -215,7 +215,7 @@ plot(irfs,
      series = 3)
 ```
 
-Using the same logic as above, we can inspect forecast error variance decompositions (FEVDs) for each process using the `fevd()` function. This type of analysis asks how orthogonal shocks to all process in the system contribute to the variance of forecast uncertainty for a focal process over increasing horizons. In other words, the proportion of the forecast variance of each latent time series can be attributed to the effects of the other series in the VAR process. FEVDs are useful because some shocks may not be expected to cause variations in the short-term but may cause longer-term fluctuations
+Using the same logic as above, we can inspect forecast error variance decompositions (FEVDs) for each process using`fevd()`. This type of analysis asks how orthogonal shocks to all process in the system contribute to the variance of forecast uncertainty for a focal process over increasing horizons. In other words, the proportion of the forecast variance of each latent time series can be attributed to the effects of the other series in the VAR process. FEVDs are useful because some shocks may not be expected to cause variations in the short-term but may cause longer-term fluctuations
 ```{r, fig.alt = "Forecast error variance decompositions computed using mvgam in R"}
 fevds <- fevd(mod, 
               h = 12)
