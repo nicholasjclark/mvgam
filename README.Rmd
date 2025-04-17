@@ -34,6 +34,8 @@ knitr::opts_chunk$set(
 The `mvgam` 📦 fits Bayesian Dynamic Generalized Additive Models (DGAMs) that can include highly flexible nonlinear predictor effects, latent variables and multivariate time series models. The package does this by relying on functionalities from the impressive [`brms`](https://paulbuerkner.com/brms/){target="_blank"} and [`mgcv`](https://cran.r-project.org/package=mgcv){target="_blank"} packages. Parameters are estimated using the probabilistic programming language [`Stan`](https://mc-stan.org/), giving users access to the most advanced Bayesian inference algorithms available. This allows `mvgam` to fit a very wide range of models, including:
 
 * [Multivariate State-Space Time Series Models](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html){target="_blank"}
+* [Continuous-Time Autoregressive Time Series Models](https://nicholasjclark.github.io/mvgam/reference/RW.html#ref-examples){target="_blank"}
+* [Shared Signal Time Series Models](https://nicholasjclark.github.io/mvgam/articles/shared_states.html){target="_blank"}
 * [Hierarchical N-mixture Models](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html){target="_blank"}
 * [Hierarchical Generalized Additive Models](https://www.youtube.com/watch?v=2POK_FVwCHk){target="_blank"}
 * [Joint Species Distribution Models](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html){target="_blank"}
