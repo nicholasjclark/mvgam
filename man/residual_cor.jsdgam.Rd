@@ -98,10 +98,8 @@ plot(
 
 # Compare to a residual ordination biplot
 ordinate(
-  mod,
-  alpha = 0.7
+  mod
 )
-
 }
 }
 \seealso{

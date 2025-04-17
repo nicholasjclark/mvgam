@@ -115,11 +115,9 @@ residual_cor.mvgam <- function(
 #'
 #' # Compare to a residual ordination biplot
 #' ordinate(
-#'   mod,
-#'   alpha = 0.7
+#'   mod
 #' )
-#'
-#' }
+#'}
 #' @export
 residual_cor.jsdgam <- function(
   object,
