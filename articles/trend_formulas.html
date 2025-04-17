@@ -34,7 +34,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.56</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.57</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -801,8 +801,8 @@ of sample forecasts to get a sense of which model does a better job of
 capturing the dependence structure in the true evaluation set:</p>
 <div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># create forecast objects for each model</span></span>
-<span><span class="va">fcvar</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">var_mod</span><span class="op">)</span></span>
-<span><span class="va">fcvarcor</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">varcor_mod</span><span class="op">)</span></span>
+<span><span class="va">fcvar</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">var_mod</span><span class="op">)</span></span>
+<span><span class="va">fcvarcor</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">varcor_mod</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># plot the difference in variogram scores; a negative value means the VAR1cor model is better, while a positive value means the VAR1 model is better</span></span>
 <span><span class="va">diff_scores</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">fcvarcor</span>, score <span class="op">=</span> <span class="st">"variogram"</span><span class="op">)</span><span class="op">$</span><span class="va">all_series</span><span class="op">$</span><span class="va">score</span> <span class="op">-</span></span>
@@ -855,7 +855,7 @@ stationary:</p>
 <div class="sourceCode" id="cb40"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">description</span></span></code></pre></div>
 <pre><code><span><span class="co">#&gt; Methods text skeleton</span></span>
-<span><span class="co">#&gt; We used the R package mvgam (version 1.1.56; Clark &amp; Wells, 2023) to</span></span>
+<span><span class="co">#&gt; We used the R package mvgam (version 1.1.57; Clark &amp; Wells, 2023) to</span></span>
 <span><span class="co">#&gt;   construct, fit and interrogate the model. mvgam fits Bayesian</span></span>
 <span><span class="co">#&gt;   State-Space models that can include flexible predictor effects in both</span></span>
 <span><span class="co">#&gt;   the process and observation components by incorporating functionalities</span></span>

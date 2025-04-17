@@ -34,7 +34,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.56</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.57</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -356,21 +356,21 @@ two models, but below we will see if they produce similar forecasts</p>
 <code>mvgam</code>. The first is to take a model that was fit only to
 training data (as we did above in the two example models) and produce
 temporal predictions from the posterior predictive distribution by
-feeding <code>newdata</code> to the <code><a href="../reference/forecast.mvgam.html">forecast()</a></code> function. It
+feeding <code>newdata</code> to the <code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code> function. It
 is crucial that any <code>newdata</code> fed to the
-<code><a href="../reference/forecast.mvgam.html">forecast()</a></code> function follows on sequentially from the data
+<code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code> function follows on sequentially from the data
 that was used to fit the model (this is not internally checked by the
 package because it might be a headache to do so when data are not
 supplied in a specific time-order). When calling the
-<code><a href="../reference/forecast.mvgam.html">forecast()</a></code> function, you have the option to generate
+<code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code> function, you have the option to generate
 different kinds of predictions (i.e. predicting on the link scale,
 response scale or to produce expectations; see
 <code><a href="../reference/forecast.mvgam.html">?forecast.mvgam</a></code> for details). We will use the default and
 produce forecasts on the response scale, which is the most common way to
 evaluate forecast distributions</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">fc_mod1</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod1</span>, newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span>
-<span><span class="va">fc_mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod2</span>, newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">fc_mod1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">mod1</span>, newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span>
+<span><span class="va">fc_mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">mod2</span>, newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></code></pre></div>
 <p>The objects we have created are of class <code>mvgam_forecast</code>,
 which contain information on hindcast distributions, forecast
 distributions and true observations for each series in the data:</p>
@@ -471,10 +471,10 @@ forecasts:</p>
 <span>  silent <span class="op">=</span> <span class="fl">2</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Because the model already contains a forecast distribution, we do not
-need to feed <code>newdata</code> to the <code><a href="../reference/forecast.mvgam.html">forecast()</a></code>
+need to feed <code>newdata</code> to the <code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code>
 function:</p>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">fc_mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod2</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">fc_mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">mod2</span><span class="op">)</span></span></code></pre></div>
 <p>The forecasts will be nearly identical to those calculated
 previously:</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
@@ -590,9 +590,9 @@ log score)</a>. The ELPD is a strictly proper scoring rule that can be
 applied to any distributional forecast, but to compute it we need
 predictions on the link scale rather than on the outcome scale. This is
 where it is advantageous to change the type of prediction we can get
-using the <code><a href="../reference/forecast.mvgam.html">forecast()</a></code> function:</p>
+using the <code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code> function:</p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">link_mod1</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod1</span>, newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span>, type <span class="op">=</span> <span class="st">"link"</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">link_mod1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">mod1</span>, newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span>, type <span class="op">=</span> <span class="st">"link"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">link_mod1</span>, score <span class="op">=</span> <span class="st">"elpd"</span><span class="op">)</span><span class="op">$</span><span class="va">series_1</span></span>
 <span><span class="co">#&gt;         score eval_horizon score_type</span></span>
 <span><span class="co">#&gt; 1   -2.232486            1       elpd</span></span>
