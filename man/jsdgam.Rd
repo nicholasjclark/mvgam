@@ -179,7 +179,7 @@ is needed to fit the
 model is returned, along with the initial values for smooth and AR parameters,
 once the model is fitted.
 This will be helpful if users wish to modify the model file to add
-other stochastic elements that are not currently available in \code{mvgam}.
+other stochastic elements that are not currently available in \pkg{mvgam}.
 Default is \code{FALSE} to reduce
 the size of the returned object, unless \code{run_model == FALSE}}
 

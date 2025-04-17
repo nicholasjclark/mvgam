@@ -41,6 +41,9 @@
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #' arguments to be interpreted by the parsing functions in \pkg{mvgam}
 #' @rdname RW
+#' @details Use `vignette("mvgam_overview")` to see the full details of available
+#' stochastic trend types in \pkg{mvgam}, or view the rendered version on the package
+#' website at: https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html
 #' @author Nicholas J Clark
 #'@examples
 #'\donttest{

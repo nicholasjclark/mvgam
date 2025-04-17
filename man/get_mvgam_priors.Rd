@@ -84,7 +84,7 @@ source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
 \item \code{'AR1'} or \code{AR(p = 1)}
 \item \code{'AR2'} or \code{AR(p = 2)}
 \item \code{'AR3'} or \code{AR(p = 3)}
-\item \code{'CAR1'} or \code{CAR(p = 1)}
+\item \code{'CAR1'} or \code{CAR(p = 1)} (also known as an Ornstein–Uhlenbeck process)
 \item \code{'VAR1'}  or \code{VAR()}(only available in \code{Stan})
 \item \verb{'PWlogistic}, \code{'PWlinear'} or \code{PW()} (only available in \code{Stan})
 \item \code{'GP'} or \code{GP()} (Gaussian Process with squared exponential kernel;
@@ -95,7 +95,7 @@ average and/or correlated process error terms can also be estimated (for
 example, \code{RW(cor = TRUE)} will set up a multivariate Random Walk if \code{n_series > 1}).
 It is also possible for many multivariate trends to estimate hierarchical
 correlations if the data are structured among levels of a relevant grouping
-factor. See \link{mvgam_trends} for more details and see \link{ZMVN} for an example.}
+factor. See \link{mvgam_trends} for more details and see \code{\link[=ZMVN]{ZMVN()}} for an example.}
 
 \item{family}{\code{family} specifying the exponential observation family for
 the series. Currently supported
@@ -142,7 +142,7 @@ use irregularly spaced intervals if using \code{trend_model = CAR(1)}, though
 note that any
 temporal intervals that are exactly \code{0} will be adjusted to a very small number
 (\code{1e-12}) to prevent sampling errors. See an example of \code{CAR()} trends in
-\code{\link{CAR}}
+\code{\link[=CAR]{CAR()}}
 }
 Note however that there are special cases where these identifiers are not
 needed. For
@@ -150,7 +150,7 @@ example, models with hierarchical temporal correlation processes (e.g.
 \code{AR(gr = region, subgr = species)})
 should NOT include a \code{series} identifier, as this will be constructed
 internally (see
-\code{\link{mvgam_trends}} and \code{\link{AR}} for details). \code{mvgam} can also
+\code{\link{mvgam_trends}} and \code{\link[=AR]{AR()}} for details). \code{mvgam()} can also
 fit models that do not
 include a \code{time} variable if there are no temporal dynamic structures included
 (i.e. \code{trend_model = 'None'} or
@@ -188,7 +188,7 @@ trend each series should depend on. The \code{series} column should have a singl
 unique entry for each series in the data (names should perfectly match factor
 levels of the \code{series} variable in \code{data}). Note that if this is supplied,
 the intercept parameter in the process model will NOT be automatically suppressed.
-Not yet supported for models in wich the latent factors evolve in continuous time (\code{CAR()}).
+Not yet supported for models in which the latent factors evolve in continuous time (\code{CAR()}).
 See examples for details}
 
 \item{...}{Not currently used}

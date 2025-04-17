@@ -163,7 +163,7 @@ Most trend models in the `mvgam()` function expect time to be measured in regula
 \begin{align*}
 z_{i,t} & \sim \text{Normal}(ar1_i^{distance} * z_{i,t-1}, \sigma_i) \end{align*}
 
-Where $distance$ is a vector of non-negative measurements of the time differences between successive observations. See the **Examples** section in `?CAR` for an illustration of how to set these models up. 
+Where $distance$ is a vector of non-negative measurements of the time differences between successive observations. These models are perhaps more widely known as Ornstein–Uhlenbeck processes. See the **Examples** section in `?CAR` for an illustration of how to set these models up. 
 
 ## Regression formulae
 `mvgam` supports an observation model regression formula, built off the `mgcv` package, as well as an optional process model regression formula. The formulae supplied to \code{\link{mvgam}} are exactly like those supplied to `glm()` except that smooth terms, `s()`,
@@ -262,7 +262,8 @@ model1 <- mvgam(count ~ s(year_fac, bs = "re") - 1,
 ```
 
 ```{r eval=FALSE}
-model1 <- mvgam(count ~ s(year_fac, bs = "re") - 1,
+model1 <- mvgam(
+  count ~ s(year_fac, bs = "re") - 1,
   family = poisson(),
   data = model_data
 )
@@ -294,9 +295,9 @@ beta_post <- as.data.frame(model1, variable = "betas")
 dplyr::glimpse(beta_post)
 ```
 
-With any model fitted in `mvgam`, the underlying `Stan` code can be viewed using the `code` function:
+With any model fitted in `mvgam`, the underlying `Stan` code can be viewed using the `stancode()` function:
 ```{r}
-code(model1)
+stancode(model1)
 ```
 
 ### Plotting effects and residuals
@@ -362,7 +363,8 @@ model1b <- mvgam(count ~ s(year_fac, bs = "re") - 1,
 ```
 
 ```{r eval=FALSE}
-model1b <- mvgam(count ~ s(year_fac, bs = "re") - 1,
+model1b <- mvgam(
+  count ~ s(year_fac, bs = "re") - 1,
   family = poisson(),
   data = data_train,
   newdata = data_test
@@ -496,7 +498,7 @@ conditional_effects(model3, type = "link")
 
 Inspect the underlying `Stan` code to gain some idea of how the spline is being penalized:
 ```{r, class.output="scroll-300"}
-code(model3)
+stancode(model3)
 ```
 
 The line below `// prior for s(time)...` shows how the spline basis coefficients are drawn from a zero-centred multivariate normal distribution. The precision matrix $S$ is penalized by two different smoothing parameters (the $\lambda$'s) to enforce smoothness and reduce overfitting
@@ -510,7 +512,8 @@ plot(model3, type = "forecast", newdata = data_test)
 
 Why is this happening? The forecasts are driven almost entirely by variation in the temporal spline, which is extrapolating linearly *forever* beyond the edge of the training data. Any slight wiggles near the end of the training set will result in wildly different forecasts. To visualize this, we can plot the extrapolated temporal functions into the out-of-sample test set for the two models. Here are the extrapolated functions for the first model, with 15 basis functions:
 ```{r Plot extrapolated temporal functions using newdata}
-plot_mvgam_smooth(model3,
+plot_mvgam_smooth(
+  model3,
   smooth = "s(time)",
   # feed newdata to the plot function to generate
   # predictions of the temporal smooth to the end of the
@@ -535,7 +538,8 @@ model4 <- mvgam(count ~ s(ndvi_ma12, k = 6),
 ```
 
 ```{r eval=FALSE}
-model4 <- mvgam(count ~ s(ndvi_ma12, k = 6),
+model4 <- mvgam(
+  count ~ s(ndvi_ma12, k = 6),
   family = poisson(),
   data = data_train,
   newdata = data_test,
@@ -581,7 +585,8 @@ fc_mod3 <- forecast(model3)
 fc_mod4 <- forecast(model4)
 score_mod3 <- score(fc_mod3, score = "drps")
 score_mod4 <- score(fc_mod4, score = "drps")
-sum(score_mod4$PP$score, na.rm = TRUE) - sum(score_mod3$PP$score, na.rm = TRUE)
+sum(score_mod4$PP$score, na.rm = TRUE) - 
+  sum(score_mod3$PP$score, na.rm = TRUE)
 ```
 
 A strongly negative value here suggests the score for the dynamic model (model 4) is much smaller than the score for the model with a smooth function of time (model 3)

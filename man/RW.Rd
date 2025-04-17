@@ -65,6 +65,11 @@ in \pkg{mvgam}. These functions do not evaluate their arguments –
 they exist purely to help set up a model with particular autoregressive
 trend models.
 }
+\details{
+Use \code{vignette("mvgam_overview")} to see the full details of available
+stochastic trend types in \pkg{mvgam}, or view the rendered version on the package
+website at: https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html
+}
 \examples{
 \donttest{
 # A short example to illustrate CAR(1) models
