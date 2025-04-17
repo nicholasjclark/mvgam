@@ -499,6 +499,11 @@ ggplot(newdata, aes(x = lon, y = lat, col = log_count)) +
   facet_wrap(~ species, scales = 'free') +
   scale_color_viridis_c() +
   theme_classic()
+
+\dontshow{
+# For R CMD check: make sure any open connections are closed afterward
+ closeAllConnections()
+}
 }
 }
 \references{

@@ -114,9 +114,13 @@ residual_cor.mvgam <- function(
 #' )
 #'
 #' # Compare to a residual ordination biplot
-#' ordinate(
-#'   mod
-#' )
+#' if(requireNamespace('ggrepel', quietly = TRUE)){
+#'   ordinate(mod)
+#' }
+#' \dontshow{
+#' # For R CMD check: make sure any open connections are closed afterward
+#'  closeAllConnections()
+#' }
 #'}
 #' @export
 residual_cor.jsdgam <- function(

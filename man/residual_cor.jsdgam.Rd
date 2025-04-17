@@ -97,9 +97,13 @@ plot(
 )
 
 # Compare to a residual ordination biplot
-ordinate(
-  mod
-)
+if(requireNamespace('ggrepel', quietly = TRUE)){
+  ordinate(mod)
+}
+\dontshow{
+# For R CMD check: make sure any open connections are closed afterward
+ closeAllConnections()
+}
 }
 }
 \seealso{

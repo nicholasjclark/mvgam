@@ -50,6 +50,11 @@ lvcors$cor
 # zero, plot them as a correlation matrix (all other correlations
 # are shown as zero on this plot)
 plot(lvcors, cluster = TRUE)
+
+\dontshow{
+# For R CMD check: make sure any open connections are closed afterward
+ closeAllConnections()
+}
 }
 }
 \seealso{
