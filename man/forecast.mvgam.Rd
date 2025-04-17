@@ -2,17 +2,12 @@
 % Please edit documentation in R/forecast.mvgam.R
 \name{forecast.mvgam}
 \alias{forecast.mvgam}
-\alias{forecast}
 \title{Extract or compute hindcasts and forecasts for a fitted \code{mvgam} object}
 \usage{
-forecast(object, ...)
-
 \method{forecast}{mvgam}(object, newdata, data_test, n_cores = 1, type = "response", ...)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}. See \code{\link[=mvgam]{mvgam()}}}
-
-\item{...}{Ignored}
 
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same variables
 that were included in the original \code{data} used to fit the model. If included, the
@@ -43,6 +38,8 @@ Two special cases are also allowed:
 type \code{latent_N} will return the estimated latent abundances from an
 N-mixture distribution, while type \code{detection} will return the estimated
 detection probability from an N-mixture distribution}
+
+\item{...}{Ignored}
 }
 \value{
 An object of class \code{mvgam_forecast} containing hindcast and forecast distributions.

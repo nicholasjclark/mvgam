@@ -1,5 +1,10 @@
+#' @importFrom generics forecast
+#' @export
+generics::forecast
+
 #'@title Extract or compute hindcasts and forecasts for a fitted \code{mvgam} object
 #'@name forecast.mvgam
+#'@method forecast mvgam
 #'@importFrom stats predict
 #'@importFrom rlang missing_arg
 #'@inheritParams predict.mvgam
@@ -19,13 +24,6 @@
 #'@return An object of class \code{mvgam_forecast} containing hindcast and forecast distributions.
 #'See \code{\link{mvgam_forecast-class}} for details.
 #'@seealso \code{\link{hindcast}}, \code{\link{score}}, \code{\link{ensemble}}
-#'@export
-forecast <- function(object, ...) {
-  UseMethod("forecast", object)
-}
-
-#'@rdname forecast.mvgam
-#'@method forecast mvgam
 #' @examples
 #' \donttest{
 #' simdat <- sim_mvgam(n_series = 3, trend_model = AR())

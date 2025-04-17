@@ -6,6 +6,7 @@
 * Added a `summary.mvgam_forecast()` function to compute and return prediction intervals of posterior hindcasts and forecasts in a `data.frame` format. This will make it easier for users to create their own custom plots of hindcast and forecast distributions (#108)
 
 ## Changing defaults
+* The `forecast()` method is now imported from 'generics' to help avoid conflict issues with other forecasting packages
 * Deprecated the `incl_dynamics` argument in the `loo()` and `loo_compare()` functions to ensure better consistency in log-likelihood and resulting LOO estimates from models with different observation families
 * Changed default `type` in `conditional_effects()` to `expected` to match behaviour of 'brms'
 

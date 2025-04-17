@@ -714,7 +714,7 @@ data <- data.frame(out, temp, time = seq_along(temp))
 data_train <- data[1:180, ]
 data_test <- data[181:200, ]
 
-# Fit the model using the dynamic() formula helper
+# Fit the model using the dynamic() function
 mod <- mvgam(
   formula =
     out ~ dynamic(
@@ -869,6 +869,11 @@ plot_predictions(
                     ntrials = 1),
   type = 'expected'
 )
+
+\dontshow{
+# For R CMD check: make sure any open connections are closed afterward
+ closeAllConnections()
+}
 }
 }
 \references{

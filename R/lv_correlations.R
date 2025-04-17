@@ -1,14 +1,16 @@
 #'Calculate trend correlations based on latent factor loadings for \pkg{mvgam} models
 #'
-#'This function uses samples of latent trends for each series from a fitted
-#'mvgam model to calculates correlations among series' trends
+#'This function uses factor loadings from a fitted dynamic factor
+#'\code{mvgam} model to calculate temporal correlations among series' trends
 #'
 #'@importFrom stats cov2cor cov
-#'@param object \code{list} object of class \code{mvgam}
+#'@param object \code{list} object of class \code{mvgam} that used latent factors, either
+#'with `use_lv = TRUE` or by supplying a `trend_map`. See [mvgam()] for details and for
+#'an example
 #'@return A \code{list} object containing the mean posterior correlations
 #'and the full array of posterior correlations
 #'@details Although this function will still work, it is now recommended to use
-#'[residual_cor()] for to obtain residual correlation information in a more user-friendly
+#'[residual_cor()] to obtain residual correlation information in a more user-friendly
 #'format that allows for a deeper investigation of relationships among the time series.
 #'@seealso [residual_cor()], [plot.mvgam_residcor()]
 #'@examples
@@ -22,6 +24,9 @@
 #'             data = portal_data,
 #'             chains = 2,
 #'             silent = 2)
+#'
+#'# Plot the two dynamic factors
+#'plot(mod, type = 'factors')
 #'
 #'# Calculate correlations among the series using lv_correlations()
 #'lvcors <- lv_correlations(mod)
