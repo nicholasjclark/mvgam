@@ -33,6 +33,15 @@ very wide range of models, including:
 -   <a
     href="https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html"
     target="_blank">Multivariate State-Space Time Series Models</a>
+-   <a
+    href="https://nicholasjclark.github.io/mvgam/reference/RW.html#ref-examples"
+    target="_blank">Continuous-Time Autoregressive Time Series Models</a>
+-   <a
+    href="https://nicholasjclark.github.io/mvgam/articles/shared_states.html"
+    target="_blank">Shared Signal Time Series Models</a>
+-   <a
+    href="https://nicholasjclark.github.io/mvgam/reference/lv_correlations.html"
+    target="_blank">Dynamic Factor Models</a>
 -   <a href="https://nicholasjclark.github.io/mvgam/articles/nmixtures.html"
     target="_blank">Hierarchical N-mixture Models</a>
 -   <a href="https://www.youtube.com/watch?v=2POK_FVwCHk"
@@ -236,13 +245,13 @@ scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.43030175
+    #> 8.75868675
     #> Out of sample DRPS:
-    #> 5.30260475
+    #> 5.3114895
     #> Out of sample DRPS:
-    #> 8.6198665
+    #> 8.883584
     #> Out of sample DRPS:
-    #> 3.6747555
+    #> 3.4932045
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
