@@ -245,13 +245,13 @@ scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.4879155
+    #> 8.083962
     #> Out of sample DRPS:
-    #> 5.23837175
+    #> 5.406667
     #> Out of sample DRPS:
-    #> 8.66020725
+    #> 8.83165225
     #> Out of sample DRPS:
-    #> 3.58032425
+    #> 3.7393005
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
@@ -534,12 +534,11 @@ fit hierarchical State-Space GAMs that include dynamic and spatially
 varying coefficient models, dynamic factors, Joint Species Distribution
 Models and much more. See the
 <a href="https://nicholasjclark.github.io/mvgam/"
-target="_blank">package documentation</a> for more details. The package
-can also be used to generate all necessary data structures, initial
-value functions and modelling code necessary to fit DGAMs using `Stan`.
-This can be helpful if users wish to make changes to the model to better
-suit their own bespoke research / analysis goals. The
-<a href="https://discourse.mc-stan.org/"
+target="_blank">package documentation</a> for more details. `mvgam` can
+also be used to generate all necessary data structures and modelling
+code necessary to fit DGAMs using `Stan`. This can be helpful if users
+wish to make changes to the model to better suit their own bespoke
+research / analysis goals. The <a href="https://discourse.mc-stan.org/"
 target="_blank"><code>Stan</code> Discourse</a> is a helpful place to
 troubleshoot.
 
@@ -548,9 +547,7 @@ troubleshoot.
 When using any software please make sure to appropriately acknowledge
 the hard work that developers and maintainers put into making these
 packages available. Citations are currently the best way to formally
-acknowledge this work (but feel free to ⭐ this repo as well), so we
-highly encourage you to cite any packages that you rely on for your
-research.
+acknowledge this work (but feel free to ⭐ this repo as well).
 
 When using `mvgam`, please cite the following:
 
@@ -566,14 +563,8 @@ As `mvgam` acts as an interface to `Stan`, please additionally cite:
 > Software*. 76(1). DOI: <https://doi.org/10.18637/jss.v076.i01>
 
 `mvgam` relies on several other `R` packages and, of course, on `R`
-itself. To find out how to cite `R` and its packages, use `citation()`.
-There are some features of `mvgam` which specifically rely on certain
-packages. The most important of these is the generation of data
-necessary to estimate smoothing splines and Gaussian Processes, which
-rely on the `mgcv`, `brms` and `splines2` packages. The `rstan` and
-`cmdstanr` packages together with `Rcpp` makes `Stan` conveniently
-accessible in `R`. If you use some of these features, please also
-consider citing the related packages.
+itself. Use `how_to_cite()` to simplify the process of finding
+appropriate citations for your software setup.
 
 ## Getting help
 
