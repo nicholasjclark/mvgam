@@ -44,8 +44,10 @@ jobs:
           cmdstanr::install_cmdstan()
         shell: Rscript {0}
 
-      - name: Render README and pkgdown index Rmd files
+      - name: Render README
         run: Rscript -e 'rmarkdown::render("README.Rmd", output_format = "md_document")'
+
+      - name: Render pkgdown index
         run: Rscript -e 'rmarkdown::render("index.Rmd", output_format = "md_document")'
 
       - name: Commit results
