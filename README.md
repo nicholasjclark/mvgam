@@ -72,7 +72,8 @@ built-in datasets. Use `plot_mvgam_series()` to inspect features for
 time series from
 <a href="https://portal.weecology.org/" target="_blank">the Portal
 Project</a>, which represent counts of baited captures for four desert
-rodent species over time (see `?portal_data` for more details)
+rodent species over time (see `?portal_data` for more details about the
+dataset).
 
     data(portal_data)
     plot_mvgam_series(
@@ -245,13 +246,13 @@ scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.342653
+    #> 8.05834925
     #> Out of sample DRPS:
-    #> 5.41392375
+    #> 5.1680075
     #> Out of sample DRPS:
-    #> 8.53696875
+    #> 8.8344255
     #> Out of sample DRPS:
-    #> 3.74436375
+    #> 3.452894
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
