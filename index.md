@@ -1,12 +1,11 @@
-
 # mvgam
 
 > **M**ulti**V**ariate (Dynamic) **G**eneralized **A**dditive **M**odels
 
-The goal of the `mvgam` 📦 is to fit Bayesian Dynamic Generalized
-Additive Models (DGAMs) that can include highly flexible nonlinear
-predictor effects for both process and observation components. The
-package does this by relying on functionalities from the impressive
+The `mvgam` 📦 fits Bayesian Dynamic Generalized Additive Models (DGAMs)
+that can include highly flexible nonlinear predictor effects, latent
+variables and multivariate time series models. The package does this by
+relying on functionalities from the impressive
 <a href="https://paulbuerkner.com/brms/"
 target="_blank"><code>brms</code></a> and
 <a href="https://cran.r-project.org/package=mgcv"
@@ -16,15 +15,24 @@ using the probabilistic programming language
 Bayesian inference algorithms available. This allows `mvgam` to fit a
 very wide range of models, including:
 
-- <a
-  href="https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html"
-  target="_blank">Multivariate State-Space Time Series Models</a>
-- <a href="https://nicholasjclark.github.io/mvgam/articles/nmixtures.html"
-  target="_blank">Hierarchical N-mixture Models</a>
-- <a href="https://www.youtube.com/watch?v=2POK_FVwCHk"
-  target="_blank">Hierarchical Generalized Additive Models</a>
-- <a href="https://nicholasjclark.github.io/mvgam/reference/jsdgam.html"
-  target="_blank">Joint Species Distribution Models</a>
+-   <a
+    href="https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html"
+    target="_blank">Multivariate State-Space Time Series Models</a>
+-   <a
+    href="https://nicholasjclark.github.io/mvgam/reference/RW.html#ref-examples"
+    target="_blank">Continuous-Time Autoregressive Time Series Models</a>
+-   <a
+    href="https://nicholasjclark.github.io/mvgam/articles/shared_states.html"
+    target="_blank">Shared Signal Time Series Models</a>
+-   <a
+    href="https://nicholasjclark.github.io/mvgam/reference/lv_correlations.html"
+    target="_blank">Dynamic Factor Models</a>
+-   <a href="https://nicholasjclark.github.io/mvgam/articles/nmixtures.html"
+    target="_blank">Hierarchical N-mixture Models</a>
+-   <a href="https://www.youtube.com/watch?v=2POK_FVwCHk"
+    target="_blank">Hierarchical Generalized Additive Models</a>
+-   <a href="https://nicholasjclark.github.io/mvgam/reference/jsdgam.html"
+    target="_blank">Joint Species Distribution Models</a>
 
 ## Installation
 
@@ -41,13 +49,9 @@ target="_blank">here</a>, or for `Stan` with `cmdstandr`
 
 <center>
 
-<div style="display: flex; justify-content: center;">
-
 <iframe style="aspect-ratio: 16 / 9; width: 100% !important;" src="https://www.youtube.com/embed/0zZopLlomsQ?si=fWBVTPRDMi9TXcIy" data-external="1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen>
 </iframe>
 </center>
-
-</div>
 
 ## Cheatsheet
 
@@ -63,44 +67,40 @@ development of `mvgam` has resulted in support for a growing number of
 observation families that extend to other types of data. Currently, the
 package can handle data for the following families:
 
-- `gaussian()` for real-valued data
-- `student_t()` for heavy-tailed real-valued data
-- `lognormal()` for non-negative real-valued data
-- `Gamma()` for non-negative real-valued data
-- `betar()` for proportional data on `(0,1)`
-- `bernoulli()` for binary data
-- `poisson()` for count data
-- `nb()` for overdispersed count data
-- `binomial()` for count data with known number of trials
-- `beta_binomial()` for overdispersed count data with known number of
-  trials
-- `nmix()` for count data with imperfect detection (unknown number of
-  trials)
+-   `gaussian()` for real-valued data
+-   `student_t()` for heavy-tailed real-valued data
+-   `lognormal()` for non-negative real-valued data
+-   `Gamma()` for non-negative real-valued data
+-   `betar()` for proportional data on `(0,1)`
+-   `bernoulli()` for binary data
+-   `poisson()` for count data
+-   `nb()` for overdispersed count data
+-   `binomial()` for count data with known number of trials
+-   `beta_binomial()` for overdispersed count data with known number of
+    trials
+-   `nmix()` for count data with imperfect detection (unknown number of
+    trials)
 
 See `?mvgam_families` for more information. Below is a simple example
 for simulating and modelling proportional data with `Beta` observations
 over a set of seasonal series with independent Gaussian Process dynamic
 trends:
 
-``` r
-set.seed(100)
-data <- sim_mvgam(
-  family = betar(),
-  T = 80,
-  trend_model = GP(),
-  prop_trend = 0.5, 
-  seasonality = 'shared'
-)
-```
+    set.seed(100)
+    data <- sim_mvgam(
+      family = betar(),
+      T = 80,
+      trend_model = GP(),
+      prop_trend = 0.5, 
+      seasonality = 'shared'
+    )
 
 Plot the series to see how they evolve over time
 
-``` r
-plot_mvgam_series(
-  data = data$data_train, 
-  series = 'all'
-)
-```
+    plot_mvgam_series(
+      data = data$data_train, 
+      series = 'all'
+    )
 
 <figure>
 <img src="man/figures/README-beta_sim-1.png"
@@ -114,30 +114,26 @@ seasonal smooth term to capture variation in seasonality among series.
 The model also includes series-specific latent Gaussian Processes with
 squared exponential covariance functions to capture temporal dynamics
 
-``` r
-mod <- mvgam(
-  y ~ s(season, bs = 'cc', k = 7) +
-    s(season, by = series, m = 1, k = 5),
-  trend_model = GP(),
-  data = data$data_train,
-  newdata = data$data_test,
-  family = betar()
-)
-```
+    mod <- mvgam(
+      y ~ s(season, bs = 'cc', k = 7) +
+        s(season, by = series, m = 1, k = 5),
+      trend_model = GP(),
+      data = data$data_train,
+      newdata = data$data_test,
+      family = betar()
+    )
 
 Plot the estimated posterior hindcast and forecast distributions for
 each series
 
-``` r
-library(patchwork)
-fc <- forecast(mod)
-wrap_plots(
-  plot(fc, series = 1), 
-  plot(fc, series = 2), 
-  plot(fc, series = 3), 
-  ncol = 2
-)
-```
+    library(patchwork)
+    fc <- forecast(mod)
+    wrap_plots(
+      plot(fc, series = 1), 
+      plot(fc, series = 2), 
+      plot(fc, series = 3), 
+      ncol = 2
+    )
 
 <figure>
 <img src="man/figures/README-beta_fc-1.png"
@@ -197,27 +193,27 @@ A number of case studies and step-by-step webinars have been compiled to
 highlight how GAMs and DGAMs can be useful for analysing multivariate
 data:
 
-- <a
-  href="https://www.youtube.com/playlist?list=PLzFHNoUxkCvsFIg6zqogylUfPpaxau_a3"
-  target="_blank">Time series in R and Stan using the <code>mvgam</code>
-  package</a>
-- <a href="https://www.youtube.com/watch?v=0zZopLlomsQ"
-  target="_blank">Ecological Forecasting with Dynamic Generalized Additive
-  Models</a>
-- <a href="https://ecogambler.netlify.app/blog/vector-autoregressions/"
-  target="_blank">State-Space Vector Autoregressions in
-  <code>mvgam</code></a>
-- <a href="https://ecogambler.netlify.app/blog/interpreting-gams/"
-  target="_blank">How to interpret and report nonlinear effects from
-  Generalized Additive Models</a>
-- <a href="https://ecogambler.netlify.app/blog/phylogenetic-smooths-mgcv/"
-  target="_blank">Phylogenetic smoothing using mgcv</a>
-- <a href="https://ecogambler.netlify.app/blog/distributed-lags-mgcv/"
-  target="_blank">Distributed lags (and hierarchical distributed lags)
-  using mgcv and mvgam</a>
-- <a href="https://ecogambler.netlify.app/blog/time-varying-seasonality/"
-  target="_blank">Incorporating time-varying seasonality in forecast
-  models</a>
+-   <a
+    href="https://www.youtube.com/playlist?list=PLzFHNoUxkCvsFIg6zqogylUfPpaxau_a3"
+    target="_blank">Time series in R and Stan using the <code>mvgam</code>
+    package</a>
+-   <a href="https://www.youtube.com/watch?v=0zZopLlomsQ"
+    target="_blank">Ecological Forecasting with Dynamic Generalized Additive
+    Models</a>
+-   <a href="https://ecogambler.netlify.app/blog/vector-autoregressions/"
+    target="_blank">State-Space Vector Autoregressions in
+    <code>mvgam</code></a>
+-   <a href="https://ecogambler.netlify.app/blog/interpreting-gams/"
+    target="_blank">How to interpret and report nonlinear effects from
+    Generalized Additive Models</a>
+-   <a href="https://ecogambler.netlify.app/blog/phylogenetic-smooths-mgcv/"
+    target="_blank">Phylogenetic smoothing using mgcv</a>
+-   <a href="https://ecogambler.netlify.app/blog/distributed-lags-mgcv/"
+    target="_blank">Distributed lags (and hierarchical distributed lags)
+    using mgcv and mvgam</a>
+-   <a href="https://ecogambler.netlify.app/blog/time-varying-seasonality/"
+    target="_blank">Incorporating time-varying seasonality in forecast
+    models</a>
 
 ## Getting help
 
