@@ -80,7 +80,7 @@ plot_mvgam_series(
 
 These plots show that the time series are count responses, with missing data, many zeroes, seasonality and temporal autocorrelation all present. These features make time series analysis and forecasting very difficult using conventional software. But `mvgam` shines in these tasks. 
 
-For most forecasting exercises, we'll want to split the data into training and testing folds
+For most forecasting exercises, we'll want to split the data into training and testing folds:
 ```{r}
 data_train <- portal_data %>%
   dplyr::filter(time <= 60)
@@ -89,7 +89,7 @@ data_test <- portal_data %>%
                   time <= 65)
 ```
 
-Formulate an `mvgam` model; this model fits a State-Space GAM in which each species has its own intercept, linear association with `ndvi_ma12` and potentially nonlinear association with `mintemp`. These effects are estimated jointly with a full time series model for the temporal dynamics (in this case an Vector Autoregressive process). We assume the outcome follows a Poisson distribution and will condition the model in `Stan` using MCMC sampling with the `Cmdstan` interface:
+Formulate an `mvgam` model; this model fits a State-Space GAM in which each species has its own intercept, linear association with `ndvi_ma12` and potentially nonlinear association with `mintemp`. These effects are estimated jointly with a full time series model for the temporal dynamics (in this case a Vector Autoregressive process). We assume the outcome follows a Poisson distribution and will condition the model in `Stan` using MCMC sampling with `Cmdstan`:
 ```{r, include=FALSE}
 mod <- mvgam(
   # Observation model is empty as we don't have any
