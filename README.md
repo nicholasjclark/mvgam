@@ -106,7 +106,7 @@ These features make time series analysis and forecasting very difficult
 using conventional software. But `mvgam` shines in these tasks.
 
 For most forecasting exercises, we’ll want to split the data into
-training and testing folds
+training and testing folds:
 
     data_train <- portal_data %>%
       dplyr::filter(time <= 60)
@@ -118,9 +118,9 @@ Formulate an `mvgam` model; this model fits a State-Space GAM in which
 each species has its own intercept, linear association with `ndvi_ma12`
 and potentially nonlinear association with `mintemp`. These effects are
 estimated jointly with a full time series model for the temporal
-dynamics (in this case an Vector Autoregressive process). We assume the
+dynamics (in this case a Vector Autoregressive process). We assume the
 outcome follows a Poisson distribution and will condition the model in
-`Stan` using MCMC sampling with the `Cmdstan` interface:
+`Stan` using MCMC sampling with `Cmdstan`:
 
     mod <- mvgam(
       # Observation model is empty as we don't have any
@@ -246,13 +246,13 @@ scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.05834925
+    #> 8.399866
     #> Out of sample DRPS:
-    #> 5.1680075
+    #> 5.192179
     #> Out of sample DRPS:
-    #> 8.8344255
+    #> 8.462293
     #> Out of sample DRPS:
-    #> 3.452894
+    #> 3.521577
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
