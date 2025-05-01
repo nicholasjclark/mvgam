@@ -178,14 +178,8 @@ As `mvgam` acts as an interface to `Stan`, please additionally cite:
 > Software*. 76(1). DOI: <https://doi.org/10.18637/jss.v076.i01>
 
 `mvgam` relies on several other `R` packages and, of course, on `R`
-itself. To find out how to cite `R` and its packages, use `citation()`.
-There are some features of `mvgam` which specifically rely on certain
-packages. The most important of these is the generation of data
-necessary to estimate smoothing splines and Gaussian Processes, which
-rely on the `mgcv`, `brms` and `splines2` packages. The `rstan` and
-`cmdstanr` packages together with `Rcpp` makes `Stan` conveniently
-accessible in `R`. If you use some of these features, please also
-consider citing the related packages.
+itself. Use `how_to_cite()` after you have fitted a model to simplify
+the process of finding appropriate citations for your software setup.
 
 ## Other resources
 
