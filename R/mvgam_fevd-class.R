@@ -152,9 +152,17 @@ fevd_df = function(x, ynames) {
       data.frame(
         horizon = 1:NROW(x[[process]]),
         evd = as.vector(x[[process]]),
-        Series = sort(rep(colnames(x[[process]]), NROW(x[[process]]))),
+        Series = paste0(
+          'process_',
+          sort(rep(
+            1:length(ynames),
+            NROW(x[[process]])
+          ))
+        ),
         target = ynames[process]
       )
     })
   )
 }
+
+

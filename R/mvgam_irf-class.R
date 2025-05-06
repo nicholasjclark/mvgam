@@ -70,10 +70,13 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
           data.frame(
             horizon = 1:h,
             imp_resp = as.vector(impulse_responses[[j]][[1]]),
-            resp_var = sort(rep(
-              paste0('Process', 1:n_processes),
-              NROW(impulse_responses[[j]][[1]])
-            ))
+            resp_var = paste0(
+              'Process',
+              sort(rep(
+                1:n_processes,
+                NROW(impulse_responses[[j]][[1]])
+              ))
+            )
           )
         })
       ) %>%
