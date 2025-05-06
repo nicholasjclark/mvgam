@@ -164,5 +164,3 @@ fevd_df = function(x, ynames) {
     })
   )
 }
-
-
