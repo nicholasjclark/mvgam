@@ -71,7 +71,7 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
             horizon = 1:h,
             imp_resp = as.vector(impulse_responses[[j]][[1]]),
             resp_var = paste0(
-              'Process',
+              'Process_',
               sort(rep(
                 1:n_processes,
                 NROW(impulse_responses[[j]][[1]])
@@ -80,7 +80,7 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
           )
         })
       ) %>%
-        dplyr::mutate(shock = paste0('Process', series, ' -> ', resp_var)) %>%
+        dplyr::mutate(shock = paste0('Process_', series, ' -> ', resp_var)) %>%
 
         # Calculate posterior empirical quantiles of impulse responses
         dplyr::group_by(shock, horizon) %>%
@@ -139,13 +139,13 @@ plot.mvgam_irf = function(x, series = 1, ...) {
         horizon = 1:h,
         imp_resp = as.vector(impulse_responses[[j]][[1]]),
         resp_var = sort(rep(
-          paste0('Process~', 1:n_processes),
+          paste0('Process_~', 1:n_processes),
           NROW(impulse_responses[[j]][[1]])
         ))
       )
     })
   ) %>%
-    dplyr::mutate(resp_var = paste0('Process~', series, ' %->% ', resp_var)) %>%
+    dplyr::mutate(resp_var = paste0('Process_~', series, ' %->% ', resp_var)) %>%
 
     # Calculate posterior empirical quantiles of impulse responses
     dplyr::group_by(resp_var, horizon) %>%
