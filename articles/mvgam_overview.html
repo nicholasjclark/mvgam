@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-05-07</h4>
+            <h4 data-toc-skip class="date">2025-05-08</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/mvgam_overview.Rmd" class="external-link"><code>vignettes/mvgam_overview.Rmd</code></a></small>
       <div class="d-none name"><code>mvgam_overview.Rmd</code></div>
@@ -485,9 +485,9 @@ up.</p>
 </h2>
 <p><code>mvgam</code> supports an observation model regression formula,
 built off the <code>mgcv</code> package, as well as an optional process
-model regression formula. The formulae supplied to are exactly like
-those supplied to <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code> except that smooth terms,
-<code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti()</a></code> and
+model regression formula. The formulae supplied to <code><a href="../reference/mvgam.html">mvgam()</a></code>
+are exactly like those supplied to <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code> except that smooth
+terms, <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti()</a></code> and
 <code><a href="https://rdrr.io/pkg/mgcv/man/t2.html" class="external-link">t2()</a></code>, time-varying effects using <code><a href="../reference/dynamic.html">dynamic()</a></code>,
 monotonically increasing (using <code>s(x, bs = 'moi')</code>) or
 decreasing splines (using <code>s(x, bs = 'mod')</code>; see
@@ -518,7 +518,8 @@ disruptions etc…). You can read about the full sampling protocol <a href="http
 <p>As the data come pre-loaded with the <code>mvgam</code> package, you
 can read a little about it in the help page using
 <code><a href="../reference/portal_data.html">?portal_data</a></code>. Before working with data, it is important to
-inspect how the data are structured, first using <code>head</code>:</p>
+inspect how the data are structured, first using
+<code><a href="https://rdrr.io/r/utils/head.html" class="external-link">head()</a></code>:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">portal_data</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   time series captures  ndvi_ma12    mintemp</span></span>
@@ -528,7 +529,7 @@ inspect how the data are structured, first using <code>head</code>:</p>
 <span><span class="co">#&gt; 4    1     PP        0 -0.1721441 -0.7963381</span></span>
 <span><span class="co">#&gt; 5    2     DM       NA -0.2373635 -1.3347160</span></span>
 <span><span class="co">#&gt; 6    2     DO       NA -0.2373635 -1.3347160</span></span></code></pre></div>
-<p>But the <code>glimpse</code> function in <code>dplyr</code> is also
+<p>But the <code>glimpse()</code> function in <code>dplyr</code> is also
 useful for understanding how variables are structured</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://pillar.r-lib.org/reference/glimpse.html" class="external-link">glimpse</a></span><span class="op">(</span><span class="va">portal_data</span><span class="op">)</span></span>
@@ -553,7 +554,7 @@ in <code>mvgam</code>. By ‘long’ format, we mean that each
 <code>series x time</code> observation needs to have its own entry in
 the <code>dataframe</code> or <code>list</code> object that we wish to
 use as data for modelling. A simple example can be viewed by simulating
-data using the <code>sim_mvgam</code> function. See
+data using the <code><a href="../reference/sim_mvgam.html">sim_mvgam()</a></code> function. See
 <code><a href="../reference/sim_mvgam.html">?sim_mvgam</a></code> for more details</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">4</span>, T <span class="op">=</span> <span class="fl">24</span><span class="op">)</span></span>
@@ -750,7 +751,7 @@ following code:</p>
 <span><span class="co">#&gt; 2             NA             NA</span></span></code></pre></div>
 <p>See examples in <code><a href="../reference/get_mvgam_priors.html">?get_mvgam_priors</a></code> to find out different
 ways that priors can be altered. Once the model has finished, the first
-step is to inspect the <code>summary</code> to ensure no major
+step is to inspect the <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> to ensure no major
 diagnostic warnings have been produced and to quickly summarise
 posterior distributions for key parameters</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
@@ -896,7 +897,7 @@ function:</p>
 <p>Now for interrogating the model. We can get some sense of the
 variation in yearly intercepts from the summary above, but it is easier
 to understand them using targeted plots. Plot posterior distributions of
-the temporal random effects using <code>plot.mvgam</code> with
+the temporal random effects using <code><a href="../reference/plot.mvgam.html">plot.mvgam()</a></code> with
 <code>type = 're'</code>. See <code><a href="../reference/plot.mvgam.html">?plot.mvgam</a></code> for more details
 about the types of plots that can be produced from fitted
 <code>mvgam</code> objects</p>
@@ -928,14 +929,14 @@ available in <code>bayesplot</code> (see
 <p>There is clearly some variation in these yearly intercept estimates.
 But how do these translate into time-varying predictions? To understand
 this, we can plot posterior hindcasts from this model for the training
-period using <code>plot.mvgam</code> with
+period using <code><a href="../reference/plot.mvgam.html">plot.mvgam()</a></code> with
 <code>type = 'forecast'</code></p>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model1</span>, type <span class="op">=</span> <span class="st">"forecast"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="mvgam_overview_files/figure-html/Plot%20posterior%20hindcasts-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>If you wish to extract these hindcasts for other downstream analyses,
-the <code>hindcast</code> function can be used. This will return a list
-object of class <code>mvgam_forecast</code>. In the
+the <code><a href="../reference/hindcast.mvgam.html">hindcast()</a></code> function can be used. This will return a
+list object of class <code>mvgam_forecast</code>. In the
 <code>hindcasts</code> slot, a matrix of posterior retrodictions will be
 returned for each series in the data (only one series in our
 example):</p>
@@ -978,7 +979,7 @@ questions about drivers of variation:</p>
 show any patterns that can be indicative of un-modelled sources of
 variation. For GLMs, we can use a modified residual called the <a href="https://www.jstor.org/stable/1390802" target="_blank" class="external-link">Dunn-Smyth,
 or randomized quantile, residual</a>. Inspect Dunn-Smyth residuals from
-the model using <code>plot.mvgam</code> with
+the model using <code><a href="../reference/plot.mvgam.html">plot.mvgam()</a></code> with
 <code>type = 'residuals'</code></p>
 <div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model1</span>, type <span class="op">=</span> <span class="st">"residuals"</span><span class="op">)</span></span></code></pre></div>
@@ -995,7 +996,7 @@ evident when we predict for a new year. To do this, we can repeat the
 exercise above but this time will split the data into training and
 testing sets before re-running the model. We can then supply the test
 set as <code>newdata</code>. For splitting, we will make use of the
-<code>filter</code> function from <code>dplyr</code></p>
+<code><a href="https://rdrr.io/r/stats/filter.html" class="external-link">filter()</a></code> function from <code>dplyr</code></p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">model_data</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">time</span> <span class="op">&lt;=</span> <span class="fl">70</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">data_train</span></span>
@@ -1013,8 +1014,8 @@ predictions do not capture the temporal variation in the test set</p>
 <div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model1b</span>, type <span class="op">=</span> <span class="st">"forecast"</span>, newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></code></pre></div>
 <p><img src="mvgam_overview_files/figure-html/Plotting%20predictions%20against%20test%20data-1.png" width="60%" style="display: block; margin: auto;"></p>
-<p>As with the <code>hindcast</code> function, we can use the
-<code>forecast</code> function to automatically extract the posterior
+<p>As with the <code><a href="../reference/hindcast.mvgam.html">hindcast()</a></code> function, we can use the
+<code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code> function to automatically extract the posterior
 distributions for these predictions. This also returns an object of
 class <code>mvgam_forecast</code>, but now it will contain both the
 hindcasts and forecasts for each series in the data:</p>
@@ -1168,10 +1169,10 @@ coefficients:</p>
 <span><span class="co">#&gt; $ `s(year_fac).5` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.49968<span style="color: #949494;">, </span>1.45541<span style="color: #949494;">, </span>1.40851<span style="color: #949494;">, </span>1.39896<span style="color: #949494;">, </span>1.48283<span style="color: #949494;">, </span>1.51829<span style="color: #949494;">, </span>…</span></span>
 <span><span class="co">#&gt; $ `s(year_fac).6` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.87853<span style="color: #949494;">, </span>1.90285<span style="color: #949494;">, </span>1.79225<span style="color: #949494;">, </span>1.76814<span style="color: #949494;">, </span>1.93750<span style="color: #949494;">, </span>1.87616<span style="color: #949494;">, </span>…</span></span>
 <span><span class="co">#&gt; $ `s(year_fac).7` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.384440<span style="color: #949494;">, </span>1.273460<span style="color: #949494;">, </span>0.672738<span style="color: #949494;">, </span>1.240540<span style="color: #949494;">, </span>0.947571<span style="color: #949494;">, </span>1.05…</span></span></code></pre></div>
-<p>The posterior distribution for the effect of <code>ndvi</code> is
-stored in the <code>ndvi_ma12</code> column. A quick histogram confirms
-our inference that <code>log(counts)</code> respond positively to
-increases in <code>ndvi</code>:</p>
+<p>The posterior distribution for the effect of <code>ndvi_ma12</code>
+is stored in the <code>ndvi_ma12</code> column. A quick histogram
+confirms our inference that <code>log(counts)</code> respond positively
+to increases in <code>ndvi</code>:</p>
 <div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/hist.html" class="external-link">hist</a></span><span class="op">(</span><span class="va">beta_post</span><span class="op">$</span><span class="va">ndvi_ma12</span>,</span>
 <span>  xlim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
@@ -1200,10 +1201,11 @@ this relatively straightforward. Objects of class <code>mvgam</code> can
 be used with <code>marginaleffects</code> to inspect contrasts,
 scenario-based predictions, conditional and marginal effects, all on the
 outcome scale. Like <code>brms</code>, <code>mvgam</code> has the simple
-<code>conditional_effects</code> function to make quick and informative
-plots for main effects, which rely on <code>marginaleffects</code>
-support. This will likely be your go-to function for quickly
-understanding patterns from fitted <code>mvgam</code> models</p>
+<code><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects()</a></code> function to make quick and
+informative plots for main effects, which rely on
+<code>marginaleffects</code> support. This will likely be your go-to
+function for quickly understanding patterns from fitted
+<code>mvgam</code> models</p>
 <div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">model2</span><span class="op">)</span></span></code></pre></div>
 <p><img src="mvgam_overview_files/figure-html/unnamed-chunk-21-1.png" width="60%" style="display: block; margin: auto;"><img src="mvgam_overview_files/figure-html/unnamed-chunk-21-2.png" width="60%" style="display: block; margin: auto;"></p>
@@ -1427,7 +1429,7 @@ functions:</p>
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_smooth.html">plot_mvgam_smooth</a></span><span class="op">(</span></span>
 <span>  <span class="va">model3</span>,</span>
 <span>  smooth <span class="op">=</span> <span class="st">"s(time)"</span>,</span>
-<span>  <span class="co"># feed newdata to the plot function to generate</span></span>
+<span>  <span class="co"># pass newdata to the plot function to generate</span></span>
 <span>  <span class="co"># predictions of the temporal smooth to the end of the</span></span>
 <span>  <span class="co"># testing period</span></span>
 <span>  newdata <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>

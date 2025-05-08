@@ -124,11 +124,14 @@ See <code><a href="mvgam_forecast-class.html">mvgam_forecast-class</a></code> fo
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Posterior predictions are drawn from the fitted <code>mvgam</code> and used to simulate a forecast distribution</p>
+    <p>Posterior predictions are drawn from the fitted <code>mvgam</code> and used
+to simulate a forecast distribution</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="hindcast.mvgam.html">hindcast</a></code>, <code><a href="score.mvgam_forecast.html">score</a></code>, <code><a href="ensemble.mvgam_forecast.html">ensemble</a></code></p></div>
+    <div class="dont-index"><p><code><a href="hindcast.mvgam.html">hindcast.mvgam()</a></code>, <code><a href="plot_mvgam_forecasts.html">plot.mvgam_forecast()</a></code>,
+<code><a href="summary.mvgam_forecast.html">summary.mvgam_forecast()</a></code>, <code><a href="score.mvgam_forecast.html">score.mvgam_forecast()</a></code>
+<code><a href="ensemble.mvgam_forecast.html">ensemble.mvgam_forecast()</a></code></p></div>
     </div>
 
     <div class="section level2">
@@ -147,7 +150,7 @@ See <code><a href="mvgam_forecast-class.html">mvgam_forecast-class</a></code> fo
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 15</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x5627d9d4d4f0&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x56368f7c5650&gt; </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_model       :List of 7</span>
@@ -225,7 +228,7 @@ See <code><a href="mvgam_forecast-class.html">mvgam_forecast-class</a></code> fo
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 16</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x5627d9d4d4f0&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x56368f7c5650&gt; </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family_pars       : NULL</span>

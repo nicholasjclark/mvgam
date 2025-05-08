@@ -115,7 +115,9 @@ detection probability from an N-mixture distribution</p></dd>
 <dt>process_error</dt>
 <dd><p>Logical. If <code>TRUE</code> and a dynamic trend model was fit,
 expected uncertainty in the process model is accounted for by using draws
-from the latent trend SD parameters. If <code>FALSE</code>, uncertainty in the latent trend
+from a stationary, zero-centred multivariate Normal distribution using any
+estimated process variance-covariance parameters.
+If <code>FALSE</code>, uncertainty in the latent trend
 component is ignored when calculating predictions</p></dd>
 
 
@@ -179,18 +181,23 @@ the interval: <code>(max(probs) - min(probs)) / 2</code>) are returned in a sepa
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Note that for all types of predictions for models that did not include
-a <code>trend_formula</code>, uncertainty in the dynamic trend
-component can be ignored by setting <code>process_error = FALSE</code>. However,
-if a <code>trend_formula</code> was supplied in the model, predictions for this component cannot be
-ignored. If <code>process_error = TRUE</code>, trend predictions will ignore autocorrelation
-coefficients or GP length scale coefficients, ultimately assuming the process is stationary.
-This method is similar to the types of posterior predictions returned from <code>brms</code> models
-when using autocorrelated error predictions for newdata.
-This function is therefore more suited to posterior simulation from the GAM components
-of a <code>mvgam</code> model, while the forecasting functions
-<code><a href="plot_mvgam_forecasts.html">plot_mvgam_fc</a></code> and <code><a href="forecast.mvgam.html">forecast.mvgam</a></code> are better suited to generate h-step ahead forecasts
-that respect the temporal dynamics of estimated latent trends.</p>
+    <p>Note that if your model included a latent temporal trend (i.e. if
+you used something other than <code>"None"</code> for the <code>trend_model</code> argument), the predictions
+returned by this function will ignore autocorrelation
+coefficients or GP length scale coefficients by <em>assuming the process is stationary</em>.
+This approach is similar to how predictions are computed from other types of
+regression models that can include correlated residuals,
+<em>ultimately treating the temporal dynamics as random effect nuisance parameters</em>.
+The <code>predict</code> function is therefore more suited to scenario-based
+posterior simulation from the GAM components
+of a <code>mvgam</code> model, while the hindcast / forecast functions
+<code><a href="hindcast.mvgam.html">hindcast.mvgam()</a></code> and <code><a href="forecast.mvgam.html">forecast.mvgam()</a></code> are better suited to generate predictions
+that respect the temporal dynamics of estimated latent trends at the actual
+time points supplied in <code>data</code> and <code>newdata</code>.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p><code><a href="hindcast.mvgam.html">hindcast.mvgam()</a></code>, <code><a href="forecast.mvgam.html">forecast.mvgam()</a></code>, <code><a href="fitted.mvgam.html">fitted.mvgam()</a></code>, <code><a href="augment.mvgam.html">augment.mvgam()</a></code></p></div>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
@@ -202,44 +209,76 @@ that respect the temporal dynamics of estimated latent trends.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate 4 time series with hierarchical seasonality</span></span></span>
 <span class="r-in"><span><span class="co"># and independent AR1 dynamic processes</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>seasonality <span class="op">=</span> <span class="st">'hierarchical'</span>,</span></span>
+<span class="r-in"><span>prop_trend <span class="op">=</span> <span class="fl">0.75</span>,</span></span>
+<span class="r-in"><span>trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">111</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>seasonality <span class="op">=</span> <span class="st">'hierarchical'</span>,</span></span>
-<span class="r-in"><span>                   trend_model <span class="op">=</span> <span class="st">'AR1'</span>,</span></span>
-<span class="r-in"><span>                   family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit a model with shared seasonality</span></span></span>
-<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>             trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>             noncentred <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
-<span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
-<span class="r-in"><span>             silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># and AR(1) dynamics</span></span></span>
+<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>noncentred <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
+<span class="r-in"><span>chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>silent <span class="op">=</span> <span class="fl">2</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Generate predictions against observed data</span></span></span>
-<span class="r-in"><span><span class="va">preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">mod1</span>,</span></span>
-<span class="r-in"><span>                summary <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span><span class="va">mod1</span>,</span></span>
+<span class="r-in"><span>summary <span class="op">=</span> <span class="cn">TRUE</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">preds</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate Est.Error       Q2.5       Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] -0.008915377 0.1113811 -0.2359634  0.19933611</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] -0.008915377 0.1113811 -0.2359634  0.19933611</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.008915377 0.1113811 -0.2359634  0.19933611</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -0.224003798 0.1024206 -0.4350552 -0.03151531</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,] -0.224003798 0.1024206 -0.4350552 -0.03151531</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,] -0.224003798 0.1024206 -0.4350552 -0.03151531</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>        Estimate  Est.Error       Q2.5      Q97.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] -0.6322340 0.09297519 -0.8128206 -0.4453673</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] -0.6322340 0.09297519 -0.8128206 -0.4453673</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.6322340 0.09297519 -0.8128206 -0.4453673</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -0.6978479 0.09575656 -0.8851124 -0.5058719</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,] -0.6978479 0.09575656 -0.8851124 -0.5058719</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,] -0.6978479 0.09575656 -0.8851124 -0.5058719</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Generate predictions against test data</span></span></span>
-<span class="r-in"><span><span class="va">preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">mod1</span>,</span></span>
-<span class="r-in"><span>                newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
-<span class="r-in"><span>                summary <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span><span class="va">mod1</span>,</span></span>
+<span class="r-in"><span>newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
+<span class="r-in"><span>summary <span class="op">=</span> <span class="cn">TRUE</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">preds</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>        Estimate Est.Error        Q2.5      Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] -0.1716277 0.1117367 -0.38581602 0.04014399</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] -0.1716277 0.1117367 -0.38581602 0.04014399</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.1716277 0.1117367 -0.38581602 0.04014399</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,]  0.2923566 0.1278500  0.03420638 0.53215879</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,]  0.2923566 0.1278500  0.03420638 0.53215879</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,]  0.2923566 0.1278500  0.03420638 0.53215879</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>        Estimate Est.Error       Q2.5      Q97.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] -0.6209420 0.1107312 -0.8243132 -0.3948167</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] -0.6209420 0.1107312 -0.8243132 -0.3948167</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.6209420 0.1107312 -0.8243132 -0.3948167</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -0.4739291 0.1166200 -0.6863414 -0.2293952</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,] -0.4739291 0.1166200 -0.6863414 -0.2293952</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,] -0.4739291 0.1166200 -0.6863414 -0.2293952</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Use plot_predictions(), which relies on predict()</span></span></span>
+<span class="r-in"><span><span class="co"># to more easily see how the latent AR(1) dynamics are</span></span></span>
+<span class="r-in"><span><span class="co"># being ignored when using predict()</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span><span class="va">mod1</span>,</span></span>
+<span class="r-in"><span>by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'time'</span>, <span class="st">'series'</span>, <span class="st">'series'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>points <span class="op">=</span> <span class="fl">0.5</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="predict.mvgam-1.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Using the hindcast() function will give a more accurate</span></span></span>
+<span class="r-in"><span><span class="co"># representation of how the AR(1) processes were estimated to give</span></span></span>
+<span class="r-in"><span><span class="co"># accurate predictions to the in-sample training data</span></span></span>
+<span class="r-in"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu"><a href="hindcast.mvgam.html">hindcast</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
+<span class="r-plt img"><img src="predict.mvgam-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

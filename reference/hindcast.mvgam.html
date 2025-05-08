@@ -106,12 +106,13 @@ See <code><a href="mvgam_forecast-class.html">mvgam_forecast-class</a></code> fo
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Posterior retrodictions are drawn from the fitted <code>mvgam</code> and
-organized into a convenient format</p>
+    <p>Posterior hindcasts (i.e. retrodictions) are drawn from the fitted <code>mvgam</code> and
+organized into a convenient format for plotting</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="forecast.mvgam.html">forecast.mvgam</a></code></p></div>
+    <div class="dont-index"><p><code><a href="plot_mvgam_forecasts.html">plot.mvgam_forecast()</a></code>, <code><a href="summary.mvgam_forecast.html">summary.mvgam_forecast()</a></code>,
+<code><a href="forecast.mvgam.html">forecast.mvgam()</a></code>, <code><a href="fitted.mvgam.html">fitted.mvgam()</a></code>, <code><a href="predict.mvgam.html">predict.mvgam()</a></code></p></div>
     </div>
 
     <div class="section level2">
@@ -130,7 +131,7 @@ organized into a convenient format</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 15</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x5627d76462c0&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x5636975ad070&gt; </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_model       :List of 7</span>

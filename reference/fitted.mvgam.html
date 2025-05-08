@@ -93,7 +93,9 @@ for obtaining summaries of the computed draws.</p>
 <dt>process_error</dt>
 <dd><p>Logical. If <code>TRUE</code> and a dynamic trend model was fit,
 expected uncertainty in the process model is accounted for by using draws
-from the latent trend SD parameters. If <code>FALSE</code>, uncertainty in the latent trend
+from a stationary, zero-centred multivariate Normal distribution using any
+estimated process variance-covariance parameters.
+If <code>FALSE</code>, uncertainty in the latent trend
 component is ignored when calculating predictions</p></dd>
 
 
