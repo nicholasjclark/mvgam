@@ -378,7 +378,11 @@
 #'   for guidance)
 #'   \item 7. When satisfied with the model structure, use [predict.mvgam()],
 #'   \code{\link[marginaleffects]{plot_predictions}()} and/or \code{\link[marginaleffects]{plot_slopes}()} for
-#'   more targeted inferences (see ["How to interpret and report nonlinear effects from Generalized Additive Models"](https://ecogambler.netlify.app/blog/interpreting-gams/) for some guidance on interpreting GAMs)
+#'   more targeted simulation-based inferences
+#'   (see ["How to interpret and report nonlinear effects from Generalized Additive Models"](https://ecogambler.netlify.app/blog/interpreting-gams/)
+#'   for some guidance on interpreting GAMs). For time series models, use [hindcast.mvgam()],
+#'   [fitted.mvgam()], [augment.mvgam()] and [forecast.mvgam()] to inspect
+#'   posterior hindcast / forecast distributions
 #'   \item 8. Use [how_to_cite()] to obtain a scaffold methods section (with full references) to begin describing this
 #'   model in scientific publications
 #'   }
@@ -392,7 +396,7 @@
 #' multispecies forecasts to navigate the dynamics of ecological predictability. PeerJ.
 #' 13:e18929 https://doi.org/10.7717/peerj.18929
 #' @seealso \code{\link[mgcv]{jagam}()}, \code{\link[mgcv]{gam}()}, \code{\link[mgcv]{gam.models}},
-#' [get_mvgam_priors()], [jsdgam()]
+#' [get_mvgam_priors()], [jsdgam()], [hindcast.mvgam()], [forecast.mvgam()], [predict.mvgam()]
 #' @return A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
 #' the mgcv model output (for easily generating simulations at
 #' unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
@@ -453,16 +457,19 @@
 #' # Extract the model summary
 #' summary(mod1)
 #'
-#' # Plot the estimated historical trend and forecast for one series
-#' plot(mod1, type = "trend", series = 1)
-#' plot(mod1, type = "forecast", series = 1)
+#' # Plot the historical trend and hindcast distributions for one series
+#' hc_trend <- hindcast(mod1, type = "trend")
+#' plot(hc_trend)
+#'
+#' hc_predicted <- hindcast(mod1, type = "response")
+#' plot(hc_predicted)
 #'
 #' # Residual diagnostics
 #' plot(mod1, type = "residuals", series = 1)
 #' resids <- residuals(mod1)
 #' str(resids)
 #'
-#' # Fitted values and residuals can also be added to training data
+#' # Fitted values and residuals can be added directly to the training data
 #' augment(mod1)
 #'
 #' # Compute the forecast using covariate information in data_test
@@ -536,7 +543,7 @@
 #'   facet_args = list(dir = 'v')
 #' )
 #'
-#' # Calulate Generalized IRFs for each series
+#' # Calulate Generalized Impulse Response Functions for each series
 #' irfs <- irf(
 #'   mod,
 #'   h = 12,
@@ -569,7 +576,7 @@
 #' # Plot the factors
 #' plot(mod, type = 'factors')
 #'
-#' # Plot the hindcasts
+#' # Plot the hindcast distributions
 #' hcs <- hindcast(mod)
 #' plot(hcs,
 #'      series = 1)

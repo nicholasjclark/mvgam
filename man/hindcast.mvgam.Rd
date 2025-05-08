@@ -38,8 +38,8 @@ See \code{\link{mvgam_forecast-class}} for details.
 Extract hindcasts for a fitted \code{mvgam} object
 }
 \details{
-Posterior retrodictions are drawn from the fitted \code{mvgam} and
-organized into a convenient format
+Posterior hindcasts (i.e. retrodictions) are drawn from the fitted \code{mvgam} and
+organized into a convenient format for plotting
 }
 \examples{
 \donttest{
@@ -75,5 +75,6 @@ plot(hc, series = 3)
 }
 }
 \seealso{
-\code{\link{forecast.mvgam}}
+\code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}}, \code{\link[=summary.mvgam_forecast]{summary.mvgam_forecast()}},
+\code{\link[=forecast.mvgam]{forecast.mvgam()}}, \code{\link[=fitted.mvgam]{fitted.mvgam()}}, \code{\link[=predict.mvgam]{predict.mvgam()}}
 }

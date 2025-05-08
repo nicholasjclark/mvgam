@@ -19,7 +19,9 @@
 
 \item{process_error}{Logical. If \code{TRUE} and a dynamic trend model was fit,
 expected uncertainty in the process model is accounted for by using draws
-from the latent trend SD parameters. If \code{FALSE}, uncertainty in the latent trend
+from a stationary, zero-centred multivariate Normal distribution using any
+estimated process variance-covariance parameters.
+If \code{FALSE}, uncertainty in the latent trend
 component is ignored when calculating predictions}
 
 \item{scale}{Either \code{"response"} or \code{"linear"}.

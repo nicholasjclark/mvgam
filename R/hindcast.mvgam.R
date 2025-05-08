@@ -3,12 +3,13 @@
 #'@importFrom stats predict
 #'@inheritParams predict.mvgam
 #'@param ... Ignored
-#'@details Posterior retrodictions are drawn from the fitted \code{mvgam} and
-#'organized into a convenient format
+#'@details Posterior hindcasts (i.e. retrodictions) are drawn from the fitted \code{mvgam} and
+#'organized into a convenient format for plotting
 #'@return An object of class \code{mvgam_forecast} containing hindcast distributions.
 #'See \code{\link{mvgam_forecast-class}} for details.
 #'
-#'@seealso \code{\link{forecast.mvgam}}
+#'@seealso [plot.mvgam_forecast()], [summary.mvgam_forecast()],
+#'[forecast.mvgam()], [fitted.mvgam()], [predict.mvgam()]
 #'@export
 hindcast <- function(object, ...) {
   UseMethod("hindcast", object)

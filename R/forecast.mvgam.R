@@ -20,10 +20,13 @@ generics::forecast
 #'\code{newdata} instead for more seamless integration into `R` workflows
 #'@param n_cores Deprecated. Parallel processing is no longer supported
 #'@param ... Ignored
-#'@details Posterior predictions are drawn from the fitted \code{mvgam} and used to simulate a forecast distribution
+#'@details Posterior predictions are drawn from the fitted \code{mvgam} and used
+#'to simulate a forecast distribution
 #'@return An object of class \code{mvgam_forecast} containing hindcast and forecast distributions.
 #'See \code{\link{mvgam_forecast-class}} for details.
-#'@seealso \code{\link{hindcast}}, \code{\link{score}}, \code{\link{ensemble}}
+#'@seealso [hindcast.mvgam()], [plot.mvgam_forecast()],
+#'[summary.mvgam_forecast()], [score.mvgam_forecast()]
+#'[ensemble.mvgam_forecast()]
 #' @examples
 #' \donttest{
 #' simdat <- sim_mvgam(n_series = 3, trend_model = AR())

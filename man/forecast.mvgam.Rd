@@ -49,7 +49,8 @@ See \code{\link{mvgam_forecast-class}} for details.
 Extract or compute hindcasts and forecasts for a fitted \code{mvgam} object
 }
 \details{
-Posterior predictions are drawn from the fitted \code{mvgam} and used to simulate a forecast distribution
+Posterior predictions are drawn from the fitted \code{mvgam} and used
+to simulate a forecast distribution
 }
 \examples{
 \donttest{
@@ -102,5 +103,7 @@ plot(fc, series = 3)
 }
 }
 \seealso{
-\code{\link{hindcast}}, \code{\link{score}}, \code{\link{ensemble}}
+\code{\link[=hindcast.mvgam]{hindcast.mvgam()}}, \code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}},
+\code{\link[=summary.mvgam_forecast]{summary.mvgam_forecast()}}, \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}
+\code{\link[=ensemble.mvgam_forecast]{ensemble.mvgam_forecast()}}
 }

@@ -166,7 +166,7 @@ z_{i,t} & \sim \text{Normal}(ar1_i^{distance} * z_{i,t-1}, \sigma_i) \end{align*
 Where $distance$ is a vector of non-negative measurements of the time differences between successive observations. These models are perhaps more widely known as Ornstein–Uhlenbeck processes. See the **Examples** section in `?CAR` for an illustration of how to set these models up. 
 
 ## Regression formulae
-`mvgam` supports an observation model regression formula, built off the `mgcv` package, as well as an optional process model regression formula. The formulae supplied to \code{\link{mvgam}} are exactly like those supplied to `glm()` except that smooth terms, `s()`,
+`mvgam` supports an observation model regression formula, built off the `mgcv` package, as well as an optional process model regression formula. The formulae supplied to `mvgam()` are exactly like those supplied to `glm()` except that smooth terms, `s()`,
 `te()`, `ti()` and `t2()`, time-varying effects using `dynamic()`, monotonically increasing (using `s(x, bs = 'moi')`) or decreasing splines (using `s(x, bs = 'mod')`; see `?smooth.construct.moi.smooth.spec` for details), as well as Gaussian Process functions using `gp()`, can be added to the right hand side (and `.` is not supported in `mvgam` formulae). See `?mvgam_formulae` for more guidance.
   
 For setting up State-Space models, the optional process model formula can be used (see [the State-Space model vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html) and [the shared latent states vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html) for guidance on using trend formulae).
@@ -177,12 +177,12 @@ The 'portal_data' object contains time series of rodent captures from the Portal
 data("portal_data")
 ```
 
-As the data come pre-loaded with the `mvgam` package, you can read a little about it in the help page using `?portal_data`. Before working with data, it is important to inspect how the data are structured, first using `head`:
+As the data come pre-loaded with the `mvgam` package, you can read a little about it in the help page using `?portal_data`. Before working with data, it is important to inspect how the data are structured, first using `head()`:
 ```{r Inspect data format and structure}
 head(portal_data)
 ```
 
-But the `glimpse` function in `dplyr` is also useful for understanding how variables are structured
+But the `glimpse()` function in `dplyr` is also useful for understanding how variables are structured
 ```{r}
 dplyr::glimpse(portal_data)
 ```
@@ -191,7 +191,7 @@ We will focus analyses on the time series of captures for one specific rodent sp
 
 ## Manipulating data for modelling
 
-Manipulating the data into a 'long' format is necessary for modelling in `mvgam`. By 'long' format, we mean that each `series x time` observation needs to have its own entry in the `dataframe` or `list` object that we wish to use as data for modelling. A simple example can be viewed by simulating data using the `sim_mvgam` function. See `?sim_mvgam` for more details
+Manipulating the data into a 'long' format is necessary for modelling in `mvgam`. By 'long' format, we mean that each `series x time` observation needs to have its own entry in the `dataframe` or `list` object that we wish to use as data for modelling. A simple example can be viewed by simulating data using the `sim_mvgam()` function. See `?sim_mvgam` for more details
 ```{r}
 data <- sim_mvgam(n_series = 4, T = 24)
 head(data$data_train, 12)
@@ -284,7 +284,7 @@ get_mvgam_priors(count ~ s(year_fac, bs = "re") - 1,
 ```
 
 See examples in `?get_mvgam_priors` to find out different ways that priors can be altered.
-Once the model has finished, the first step is to inspect the `summary` to ensure no major diagnostic warnings have been produced and to quickly summarise posterior distributions for key parameters
+Once the model has finished, the first step is to inspect the `summary()` to ensure no major diagnostic warnings have been produced and to quickly summarise posterior distributions for key parameters
 ```{r}
 summary(model1)
 ```
@@ -302,7 +302,7 @@ stancode(model1)
 
 ### Plotting effects and residuals
 
-Now for interrogating the model. We can get some sense of the variation in yearly intercepts from the summary above, but it is easier to understand them using targeted plots. Plot posterior distributions of the temporal random effects using `plot.mvgam` with `type = 're'`. See `?plot.mvgam` for more details about the types of plots that can be produced from fitted `mvgam` objects
+Now for interrogating the model. We can get some sense of the variation in yearly intercepts from the summary above, but it is easier to understand them using targeted plots. Plot posterior distributions of the temporal random effects using `plot.mvgam()` with `type = 're'`. See `?plot.mvgam` for more details about the types of plots that can be produced from fitted `mvgam` objects
 ```{r Plot random effect estimates}
 plot(model1, type = "re")
 ```
@@ -322,12 +322,12 @@ We can also use the wide range of posterior checking functions available in `bay
 pp_check(object = model1)
 ```
 
-There is clearly some variation in these yearly intercept estimates. But how do these translate into time-varying predictions? To understand this, we can plot posterior hindcasts from this model for the training period using `plot.mvgam` with `type = 'forecast'`
+There is clearly some variation in these yearly intercept estimates. But how do these translate into time-varying predictions? To understand this, we can plot posterior hindcasts from this model for the training period using `plot.mvgam()` with `type = 'forecast'`
 ```{r Plot posterior hindcasts}
 plot(model1, type = "forecast")
 ```
 
-If you wish to extract these hindcasts for other downstream analyses, the `hindcast` function can be used. This will return a list object of class `mvgam_forecast`. In the `hindcasts` slot, a matrix of posterior retrodictions will be returned for each series in the data (only one series in our example): 
+If you wish to extract these hindcasts for other downstream analyses, the `hindcast()` function can be used. This will return a list object of class `mvgam_forecast`. In the `hindcasts` slot, a matrix of posterior retrodictions will be returned for each series in the data (only one series in our example): 
 ```{r Extract posterior hindcast}
 hc <- hindcast(model1)
 str(hc)
@@ -339,13 +339,13 @@ hc <- hindcast(model1, type = "link")
 range(hc$hindcasts$PP)
 ```
 
-In any regression analysis, a key question is whether the residuals show any patterns that can be indicative of un-modelled sources of variation. For GLMs, we can use a modified residual called the [Dunn-Smyth, or randomized quantile, residual](https://www.jstor.org/stable/1390802){target="_blank"}. Inspect Dunn-Smyth residuals from the model using `plot.mvgam` with `type = 'residuals'`
+In any regression analysis, a key question is whether the residuals show any patterns that can be indicative of un-modelled sources of variation. For GLMs, we can use a modified residual called the [Dunn-Smyth, or randomized quantile, residual](https://www.jstor.org/stable/1390802){target="_blank"}. Inspect Dunn-Smyth residuals from the model using `plot.mvgam()` with `type = 'residuals'`
 ```{r Plot posterior residuals}
 plot(model1, type = "residuals")
 ```
 
 ## Automatic forecasting for new data
-These temporal random effects do not have a sense of "time". Because of this, each yearly random intercept is not restricted in some way to be similar to the previous yearly intercept. This drawback becomes evident when we predict for a new year. To do this, we can repeat the exercise above but this time will split the data into training and testing sets before re-running the model. We can then supply the test set as `newdata`. For splitting, we will make use of the `filter` function from `dplyr`
+These temporal random effects do not have a sense of "time". Because of this, each yearly random intercept is not restricted in some way to be similar to the previous yearly intercept. This drawback becomes evident when we predict for a new year. To do this, we can repeat the exercise above but this time will split the data into training and testing sets before re-running the model. We can then supply the test set as `newdata`. For splitting, we will make use of the `filter()` function from `dplyr`
 ```{r}
 model_data %>%
   dplyr::filter(time <= 70) -> data_train
@@ -376,7 +376,7 @@ We can view the test data in the forecast plot to see that the predictions do no
 plot(model1b, type = "forecast", newdata = data_test)
 ```
 
-As with the `hindcast` function, we can use the `forecast` function to automatically extract the posterior distributions for these predictions. This also returns an object of class `mvgam_forecast`, but now it will contain both the hindcasts and forecasts for each series in the data:
+As with the `hindcast()` function, we can use the `forecast()` function to automatically extract the posterior distributions for these predictions. This also returns an object of class `mvgam_forecast`, but now it will contain both the hindcasts and forecasts for each series in the data:
 ```{r Extract posterior forecasts}
 fc <- forecast(model1b)
 str(fc)
@@ -429,7 +429,7 @@ beta_post <- as.data.frame(model2, variable = "betas")
 dplyr::glimpse(beta_post)
 ```
 
-The posterior distribution for the effect of `ndvi` is stored in the `ndvi_ma12` column. A quick histogram confirms our inference that `log(counts)` respond positively to increases in `ndvi`:
+The posterior distribution for the effect of `ndvi_ma12` is stored in the `ndvi_ma12` column. A quick histogram confirms our inference that `log(counts)` respond positively to increases in `ndvi`:
 ```{r Histogram of NDVI effects}
 hist(beta_post$ndvi_ma12,
   xlim = c(
@@ -448,7 +448,7 @@ abline(v = 0, lwd = 2.5)
 ```
 
 ### `marginaleffects` support
-Given our model used a nonlinear link function (log link in this example), it can still be difficult to fully understand what relationship our model is estimating between a predictor and the response. Fortunately, the `marginaleffects` package makes this relatively straightforward. Objects of class `mvgam` can be used with `marginaleffects` to inspect contrasts, scenario-based predictions, conditional and marginal effects, all on the outcome scale. Like `brms`, `mvgam` has the simple `conditional_effects` function to make quick and informative plots for main effects, which rely on `marginaleffects` support. This will likely be your go-to function for quickly understanding patterns from fitted `mvgam` models
+Given our model used a nonlinear link function (log link in this example), it can still be difficult to fully understand what relationship our model is estimating between a predictor and the response. Fortunately, the `marginaleffects` package makes this relatively straightforward. Objects of class `mvgam` can be used with `marginaleffects` to inspect contrasts, scenario-based predictions, conditional and marginal effects, all on the outcome scale. Like `brms`, `mvgam` has the simple `conditional_effects()` function to make quick and informative plots for main effects, which rely on `marginaleffects` support. This will likely be your go-to function for quickly understanding patterns from fitted `mvgam` models
 ```{r warning=FALSE}
 conditional_effects(model2)
 ```
@@ -515,7 +515,7 @@ Why is this happening? The forecasts are driven almost entirely by variation in 
 plot_mvgam_smooth(
   model3,
   smooth = "s(time)",
-  # feed newdata to the plot function to generate
+  # pass newdata to the plot function to generate
   # predictions of the temporal smooth to the end of the
   # testing period
   newdata = data.frame(

@@ -24,21 +24,24 @@
 #' detection probability from an N-mixture distribution
 #'@param process_error Logical. If \code{TRUE} and a dynamic trend model was fit,
 #'expected uncertainty in the process model is accounted for by using draws
-#'from the latent trend SD parameters. If \code{FALSE}, uncertainty in the latent trend
+#'from a stationary, zero-centred multivariate Normal distribution using any
+#'estimated process variance-covariance parameters.
+#'If \code{FALSE}, uncertainty in the latent trend
 #'component is ignored when calculating predictions
 #'@param ... Ignored
-#'@details Note that for all types of predictions for models that did not include
-#'a `trend_formula`, uncertainty in the dynamic trend
-#'component can be ignored by setting \code{process_error = FALSE}. However,
-#'if a `trend_formula` was supplied in the model, predictions for this component cannot be
-#'ignored. If \code{process_error = TRUE}, trend predictions will ignore autocorrelation
-#'coefficients or GP length scale coefficients, ultimately assuming the process is stationary.
-#'This method is similar to the types of posterior predictions returned from `brms` models
-#'when using autocorrelated error predictions for newdata.
-#'This function is therefore more suited to posterior simulation from the GAM components
-#'of a \code{mvgam} model, while the forecasting functions
-#'\code{\link{plot_mvgam_fc}} and \code{\link{forecast.mvgam}} are better suited to generate h-step ahead forecasts
-#'that respect the temporal dynamics of estimated latent trends.
+#'@details Note that if your model included a latent temporal trend (i.e. if
+#'you used something other than `"None"` for the `trend_model` argument), the predictions
+#'returned by this function will ignore autocorrelation
+#'coefficients or GP length scale coefficients by *assuming the process is stationary*.
+#'This approach is similar to how predictions are computed from other types of
+#'regression models that can include correlated residuals,
+#'*ultimately treating the temporal dynamics as random effect nuisance parameters*.
+#'The `predict` function is therefore more suited to scenario-based
+#'posterior simulation from the GAM components
+#'of a \code{mvgam} model, while the hindcast / forecast functions
+#'[hindcast.mvgam()] and [forecast.mvgam()] are better suited to generate predictions
+#'that respect the temporal dynamics of estimated latent trends at the actual
+#'time points supplied in `data` and `newdata`.
 #' @return Predicted values on the appropriate scale.
 #'   If \code{summary = FALSE} and `type != "terms"`,
 #'   the output is a matrix of dimension `n_draw x n_observations`
@@ -61,34 +64,62 @@
 #'   from each effect are returned in `matrix` form while standard errors (representing
 #'   the interval: `(max(probs) - min(probs)) / 2`) are returned in a separate `matrix`
 #' @author Nicholas J Clark
+#' @seealso [hindcast.mvgam()], [forecast.mvgam()], [fitted.mvgam()], [augment.mvgam()]
 #'@examples
 #'\donttest{
 #'# Simulate 4 time series with hierarchical seasonality
 #'# and independent AR1 dynamic processes
+#'set.seed(123)
+#'simdat <- sim_mvgam(
+#' seasonality = 'hierarchical',
+#' prop_trend = 0.75,
+#' trend_model = AR(),
+#' family = gaussian()
+#')
 #'set.seed(111)
-#'simdat <- sim_mvgam(seasonality = 'hierarchical',
-#'                    trend_model = 'AR1',
-#'                    family = gaussian())
-#'
 #'# Fit a model with shared seasonality
-#'mod1 <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-#'              data = simdat$data_train,
-#'              family = gaussian(),
-#'              trend_model = AR(),
-#'              noncentred = TRUE,
-#'              chains = 2,
-#'              silent = 2)
+#'# and AR(1) dynamics
+#'mod1 <- mvgam(
+#' y ~ s(season, bs = 'cc', k = 6),
+#' data = simdat$data_train,
+#' family = gaussian(),
+#' trend_model = AR(),
+#' noncentred = TRUE,
+#' chains = 2,
+#' silent = 2
+#')
 #'
 #'# Generate predictions against observed data
-#'preds <- predict(mod1,
-#'                 summary = TRUE)
+#'preds <- predict(
+#' mod1,
+#' summary = TRUE
+#')
 #'head(preds)
 #'
 #'# Generate predictions against test data
-#'preds <- predict(mod1,
-#'                 newdata = simdat$data_test,
-#'                 summary = TRUE)
+#'preds <- predict(
+#' mod1,
+#' newdata = simdat$data_test,
+#' summary = TRUE
+#')
 #'head(preds)
+#'
+#'# Use plot_predictions(), which relies on predict()
+#'# to more easily see how the latent AR(1) dynamics are
+#'# being ignored when using predict()
+#'plot_predictions(
+#' mod1,
+#' by = c('time', 'series', 'series'),
+#' points = 0.5
+#')
+#'
+#'# Using the hindcast() function will give a more accurate
+#'# representation of how the AR(1) processes were estimated to give
+#'# accurate predictions to the in-sample training data
+#'hc <- hindcast(mod1)
+#'plot(hc) +
+#' plot(hc, series = 2) +
+#' plot(hc, series = 3)
 #'}
 #'@export
 predict.mvgam = function(
