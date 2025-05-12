@@ -9,7 +9,7 @@ articles:
   shared_states: shared_states.html
   time_varying_effects: time_varying_effects.html
   trend_formulas: trend_formulas.html
-last_built: 2025-05-08T22:43Z
+last_built: 2025-05-12T01:00Z
 urls:
   reference: https://nicholasjclark.github.io/mvgam/reference
   article: https://nicholasjclark.github.io/mvgam/articles
