@@ -339,6 +339,9 @@
     }
     if (parallel) {
       c(args) <- nlist(cores = min(c(chains, parallel::detectCores() - 1)))
+    } else {
+      # Explicitly set cores = 1 if parallel = FALSE (#113)
+      c(args) <- nlist(cores = 1)
     }
 
     c(args) <- nlist(
