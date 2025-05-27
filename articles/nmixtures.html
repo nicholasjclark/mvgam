@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-05-19</h4>
+            <h4 data-toc-skip class="date">2025-05-27</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/nmixtures.Rmd" class="external-link"><code>vignettes/nmixtures.Rmd</code></a></small>
       <div class="d-none name"><code>nmixtures.Rmd</code></div>
@@ -935,10 +935,10 @@ inspect the estimated average detection probability</p>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/r/predictions.html" class="external-link">avg_predictions</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"detection"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;  Estimate 2.5 % 97.5 %</span></span>
-<span><span class="co">#&gt;     0.591 0.522  0.655</span></span>
+<span><span class="co">#&gt;  Estimate 2.5 % 97.5 %  Df</span></span>
+<span><span class="co">#&gt;     0.591 0.522  0.655 Inf</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Type:  detection</span></span></code></pre></div>
+<span><span class="co">#&gt; Type: detection</span></span></code></pre></div>
 <p>Next investigate estimated effects of covariates on latent abundance
 using the <code><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects()</a></code> function and specifying
 <code>type = 'link'</code>; this will return plots on the expectation
