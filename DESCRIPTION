@@ -5,7 +5,7 @@ Date: 2025-05-12
 Authors@R: c(person("Nicholas J", "Clark", , "nicholas.j.clark1214@gmail.com", 
                     role = c("aut", "cre"), comment = c(ORCID = "0000-0001-7131-3301")),
              person("KANK", "Karunarathna", role = c("ctb"),
-                    comment = c("ARMA parameterisations", ORCID = "0000-0002-8995-5502")),
+                    comment = c("ARMA parameterisations", "factor models", ORCID = "0000-0002-8995-5502")),
              person("Sarah", "Heaps", role = c("ctb"),
                     comment = c("VARMA parameterisations", ORCID = "0000-0002-5543-037X")),
              person("Scott", "Pease", role = c("ctb"),
