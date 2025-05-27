@@ -21,7 +21,7 @@ jobs:
           # Cmdstan isntall not working on win-latest release; check back later
           - {os: ubuntu-latest, r: 'devel', http-user-agent: 'release'}
           - {os: ubuntu-latest, r: 'release'}
-          - {os: windows-latest, r: 'release'}
+          - {os: macos-latest, r: 'release'}
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
