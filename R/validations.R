@@ -193,9 +193,15 @@ validate_series_groups = function(data, trend_model, name = 'data') {
   # Checks only needed if trend_model isn't 'None'
   if (trend_model$trend_model != 'None') {
     # Check that unit and subgr exist in data and are the correct type
-    if (is.null(trend_model$gr)) trend_model$gr <- 'NA'
-    if (is.null(trend_model$unit)) trend_model$unit <- 'time'
-    if (is.null(trend_model$subgr)) trend_model$subgr <- 'series'
+    if (is.null(trend_model$gr)) {
+      trend_model$gr <- 'NA'
+    }
+    if (is.null(trend_model$unit)) {
+      trend_model$unit <- 'time'
+    }
+    if (is.null(trend_model$subgr)) {
+      trend_model$subgr <- 'series'
+    }
 
     if (
       trend_model$gr == 'NA' &
@@ -428,41 +434,55 @@ validate_silent <- function(silent) {
 #'@noRd
 validate_family = function(family, use_stan = TRUE) {
   if (is.character(family)) {
-    if (family == 'beta') family <- betar()
+    if (family == 'beta') {
+      family <- betar()
+    }
 
     family <- try(eval(parse(text = family)), silent = TRUE)
 
-    if (inherits(family, 'try-error'))
+    if (inherits(family, 'try-error')) {
       stop("family not recognized", call. = FALSE)
+    }
   }
 
-  if (is.function(family)) family <- family()
+  if (is.function(family)) {
+    family <- family()
+  }
 
-  if (is.null(family$family)) stop("family not recognized", call. = FALSE)
+  if (is.null(family$family)) {
+    stop("family not recognized", call. = FALSE)
+  }
 
-  if (!inherits(family, 'family')) stop('family not recognized', call. = FALSE)
+  if (!inherits(family, 'family')) {
+    stop('family not recognized', call. = FALSE)
+  }
 
-  if (family$family == 'Beta regression') family$family <- 'beta'
+  if (family$family == 'Beta regression') {
+    family$family <- 'beta'
+  }
 
-  if (family$family == 'tweedie')
+  if (family$family == 'tweedie') {
     insight::check_if_installed(
       "tweedie",
       reason = 'to simulate from Tweedie distributions'
     )
+  }
 
   if (
     !family$family %in% c('poisson', 'negative binomial', 'tweedie') & !use_stan
-  )
+  ) {
     stop(
       'JAGS only supports poisson(), nb() or tweedie() families',
       call. = FALSE
     )
+  }
 
   # Stan cannot support Tweedie
-  if (use_stan & family$family == 'tweedie')
+  if (use_stan & family$family == 'tweedie') {
     stop('Tweedie family not supported for stan', call. = FALSE)
+  }
 
-  if (family$family %in% c('binomial', 'beta_binomial'))
+  if (family$family %in% c('binomial', 'beta_binomial')) {
     rlang::warn(
       paste0(
         "Binomial and Beta-binomial families require cbind(n_successes, n_trials)\n",
@@ -471,6 +491,7 @@ validate_family = function(family, use_stan = TRUE) {
       .frequency = "once",
       .frequency_id = 'cbind_binomials'
     )
+  }
   return(family)
 }
 
@@ -538,7 +559,9 @@ validate_trend_model = function(
     } else {
       NULL
     }
-    if (is.null(trend_model$gr)) trend_model$gr <- 'NA'
+    if (is.null(trend_model$gr)) {
+      trend_model$gr <- 'NA'
+    }
     if (trend_model$gr != 'NA') {
       gr_term <- 'hier'
     } else {
@@ -585,11 +608,12 @@ validate_trend_model = function(
     message('Non-centering of trends currently not available for this model')
   }
 
-  if (trend_model %in% c('PWlinear', 'PWlogistic'))
+  if (trend_model %in% c('PWlinear', 'PWlogistic')) {
     insight::check_if_installed(
       "extraDistr",
       reason = 'to simulate from piecewise trends'
     )
+  }
   return(trend_model)
 }
 
@@ -963,11 +987,12 @@ validate_trend_restrictions = function(
         )
       }
 
-      if (use_lv)
+      if (use_lv) {
         stop(
           'Cannot estimate piecewise trends using dynamic factors',
           call. = FALSE
         )
+      }
     }
   }
 
@@ -1122,15 +1147,20 @@ check_gp_terms = function(formula, data_train, family) {
   # Check for proper binomial specification
   if (!missing(family)) {
     if (is.character(family)) {
-      if (family == 'beta') family <- betar()
+      if (family == 'beta') {
+        family <- betar()
+      }
 
       family <- try(eval(parse(text = family)), silent = TRUE)
 
-      if (inherits(family, 'try-error'))
+      if (inherits(family, 'try-error')) {
         stop("family not recognized", call. = FALSE)
+      }
     }
 
-    if (is.function(family)) family <- family()
+    if (is.function(family)) {
+      family <- family()
+    }
 
     if (family$family %in% c('binomial', 'beta_binomial')) {
       # Check that response terms use the cbind() syntax
@@ -1141,8 +1171,7 @@ check_gp_terms = function(formula, data_train, family) {
           call. = FALSE
         )
       } else {
-        if (any(grepl('cbind', resp_terms))) {
-        } else {
+        if (any(grepl('cbind', resp_terms))) {} else {
           stop(
             'Binomial family requires cbind() syntax in the formula left-hand side',
             call. = FALSE
@@ -1217,7 +1246,9 @@ check_obs_intercept = function(formula, orig_formula) {
     drop_obs_intercept <- TRUE
   }
 
-  if (is.null(orig_formula)) orig_formula <- formula
+  if (is.null(orig_formula)) {
+    orig_formula <- formula
+  }
 
   return(list(
     orig_formula = orig_formula,

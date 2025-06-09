@@ -151,7 +151,9 @@ cluster_cormat <- function(cormat, ...) {
 
 #' @noRd
 reorder_clusters <- function(x, dis, ...) {
-  if (!is.matrix(dis)) dis <- as.matrix(dis)
+  if (!is.matrix(dis)) {
+    dis <- as.matrix(dis)
+  }
   merges <- x$merge
   n <- NROW(merges)
   endpoints <- matrix(0, n, 2)

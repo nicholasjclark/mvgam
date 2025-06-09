@@ -409,7 +409,9 @@ mvgam_predict = function(
         )
       }
     } else if (type == 'latent_N') {
-      if (missing(min_cap)) min_cap <- 0
+      if (missing(min_cap)) {
+        min_cap <- 0
+      }
       min_cap <- as.vector(min_cap)
       if (missing(truth)) {
         out <- extraDistr::rtpois(

@@ -6,15 +6,20 @@ interpret_mvgam = function(formula, N, family) {
   # Check for proper binomial specification
   if (!missing(family)) {
     if (is.character(family)) {
-      if (family == 'beta') family <- betar()
+      if (family == 'beta') {
+        family <- betar()
+      }
 
       family <- try(eval(parse(text = family)), silent = TRUE)
 
-      if (inherits(family, 'try-error'))
+      if (inherits(family, 'try-error')) {
         stop("family not recognized", call. = FALSE)
+      }
     }
 
-    if (is.function(family)) family <- family()
+    if (is.function(family)) {
+      family <- family()
+    }
 
     if (family$family %in% c('binomial', 'beta_binomial')) {
       # Check that response terms use the cbind() syntax
@@ -25,8 +30,7 @@ interpret_mvgam = function(formula, N, family) {
           call. = FALSE
         )
       } else {
-        if (any(grepl('cbind', resp_terms))) {
-        } else {
+        if (any(grepl('cbind', resp_terms))) {} else {
           stop(
             'Binomial family requires cbind() syntax in the formula left-hand side',
             call. = FALSE

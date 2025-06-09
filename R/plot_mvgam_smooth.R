@@ -690,9 +690,13 @@ plot_mvgam_smooth = function(
 
           x <- sapply(
             1:length(idx),
-            function(k)
-              if (k %% 2 == 0) repped_x[k] + min(diff(sorted_x)) / 2 else
+            function(k) {
+              if (k %% 2 == 0) {
+                repped_x[k] + min(diff(sorted_x)) / 2
+              } else {
                 repped_x[k] - min(diff(sorted_x)) / 2
+              }
+            }
           )
 
           rect(
@@ -982,9 +986,13 @@ plot_mvgam_smooth = function(
 
         x <- sapply(
           1:length(idx),
-          function(k)
-            if (k %% 2 == 0) repped_x[k] + min(diff(sorted_x)) / 2 else
+          function(k) {
+            if (k %% 2 == 0) {
+              repped_x[k] + min(diff(sorted_x)) / 2
+            } else {
               repped_x[k] - min(diff(sorted_x)) / 2
+            }
+          }
         )
 
         rect(

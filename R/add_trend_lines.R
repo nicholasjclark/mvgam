@@ -956,8 +956,7 @@ add_trend_lines = function(
           )
         ]
 
-        if (drift) {
-        } else {
+        if (drift) {} else {
           model_file[grep('## latent factors evolve', model_file) + 9] <-
             'LV_raw[i, j] ~ dnorm(ar1[j]*LV_raw[i - 1, j], penalty[j])\n}'
           model_file <- model_file[-grep('drift\\[s\\] ~', model_file)]
@@ -998,8 +997,7 @@ add_trend_lines = function(
       }
 
       if (trend_model == 'AR3') {
-        if (drift) {
-        } else {
+        if (drift) {} else {
           model_file[grep('## latent factors evolve', model_file) + 7] <-
             'LV_raw[2, j] ~ dnorm(ar1[j]*LV_raw[1, j], penalty[j])'
           model_file[grep('## latent factors evolve', model_file) + 11] <-

@@ -75,8 +75,7 @@ posterior_epred.mvgam = function(
 
   if (!is.null(ndraws)) {
     validate_pos_integer(ndraws)
-    if (ndraws > NROW(out)) {
-    } else {
+    if (ndraws > NROW(out)) {} else {
       idx <- sample(1:NROW(out), ndraws, replace = FALSE)
       out <- out[idx, ]
     }
@@ -155,8 +154,7 @@ posterior_linpred.mvgam = function(
 
   if (!is.null(ndraws)) {
     validate_pos_integer(ndraws)
-    if (ndraws > NROW(out)) {
-    } else {
+    if (ndraws > NROW(out)) {} else {
       idx <- sample(1:NROW(out), ndraws, replace = FALSE)
       out <- out[idx, ]
     }
@@ -232,8 +230,7 @@ posterior_predict.mvgam = function(
 
   if (!is.null(ndraws)) {
     validate_pos_integer(ndraws)
-    if (ndraws > NROW(out)) {
-    } else {
+    if (ndraws > NROW(out)) {} else {
       idx <- sample(1:NROW(out), ndraws, replace = FALSE)
       out <- out[idx, ]
     }

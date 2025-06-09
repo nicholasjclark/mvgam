@@ -278,13 +278,19 @@ get_mvgam_priors = function(
     priors = TRUE
   )
   list2env(trend_val, envir = environment())
-  if (is.null(trend_map)) trend_map <- rlang::missing_arg()
-  if (is.null(n_lv)) n_lv <- rlang::missing_arg()
+  if (is.null(trend_map)) {
+    trend_map <- rlang::missing_arg()
+  }
+  if (is.null(n_lv)) {
+    n_lv <- rlang::missing_arg()
+  }
 
   # If trend_formula supplied, first run get_mvgam_priors for the observation model
   # and then modify the resulting output
   if (!missing(trend_formula)) {
-    if (trend_model == 'None') trend_model <- 'RW'
+    if (trend_model == 'None') {
+      trend_model <- 'RW'
+    }
     validate_trend_formula(trend_formula)
     prior_df <- get_mvgam_priors(
       formula = orig_formula,
@@ -309,9 +315,14 @@ get_mvgam_priors = function(
 
     # Drop any intercept from the formula if this is not an N-mixture model or if a
     # trend_map was not originally supplied
-    if (family_char == 'nmix') drop_trend_int <- FALSE else
+    if (family_char == 'nmix') {
+      drop_trend_int <- FALSE
+    } else {
       drop_trend_int <- TRUE
-    if (!missing(trend_map)) drop_trend_int <- FALSE
+    }
+    if (!missing(trend_map)) {
+      drop_trend_int <- FALSE
+    }
     if (drop_trend_int) {
       if (attr(terms(trend_formula), 'intercept') == 1) {
         trend_formula <- update(trend_formula, trend_y ~ . - 1)
@@ -452,13 +463,14 @@ get_mvgam_priors = function(
     )
     out[] <- lapply(
       out,
-      function(x)
+      function(x) {
         gsub(
           "vector<lower=0>[n_series] sigma;",
           "vector<lower=0>[n_lv] sigma;",
           x,
           fixed = TRUE
         )
+      }
     )
 
     # Remove intercept prior if an intercept was suppressed from the

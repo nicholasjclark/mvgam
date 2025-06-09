@@ -211,11 +211,12 @@ plot.mvgam = function(
     )
 
     n_smooths <- NROW(smooth_labs)
-    if (n_smooths == 0)
+    if (n_smooths == 0) {
       stop(
         "No smooth terms to plot. Use plot_predictions() to visualise other effects",
         call. = FALSE
       )
+    }
     smooth_labs$smooth_index <- 1:NROW(smooth_labs)
 
     # Leave out random effects and MRF smooths, and any others that are not
@@ -242,28 +243,43 @@ plot.mvgam = function(
 
     # For remaining plots, get the needed page numbers
     n_plots <- n_smooths
-    if (n_plots == 0)
+    if (n_plots == 0) {
       stop(
         "No suitable terms to plot - plot.mvgam() only handles smooths of 2 or fewer dimensions."
       )
+    }
     pages <- 1
 
-    if (n_plots > 4) pages <- 2
-    if (n_plots > 8) pages <- 3
-    if (n_plots > 12) pages <- 4
+    if (n_plots > 4) {
+      pages <- 2
+    }
+    if (n_plots > 8) {
+      pages <- 3
+    }
+    if (n_plots > 12) {
+      pages <- 4
+    }
     if (pages != 0) {
       ppp <- n_plots %/% pages
 
       if (n_plots %% pages != 0) {
         ppp <- ppp + 1
-        while (ppp * (pages - 1) >= n_plots) pages <- pages - 1
+        while (ppp * (pages - 1) >= n_plots) {
+          pages <- pages - 1
+        }
       }
 
       # Configure layout matrix
       c <- r <- trunc(sqrt(ppp))
-      if (c < 1) r <- c <- 1
-      if (c * r < ppp) c <- c + 1
-      if (c * r < ppp) r <- r + 1
+      if (c < 1) {
+        r <- c <- 1
+      }
+      if (c * r < ppp) {
+        c <- c + 1
+      }
+      if (c * r < ppp) {
+        r <- r + 1
+      }
 
       .pardefault <- par(no.readonly = T)
       on.exit(par(.pardefault))

@@ -46,8 +46,9 @@ summary.mvgam = function(
     attr(object$model_data, 'trend_model') == 'None' &
       object$use_lv &
       object$family != 'nmix'
-  )
+  ) {
     attr(object$model_data, 'trend_model') <- 'RW'
+  }
   variational <- object$algorithm %in%
     c('fullrank', 'meanfield', 'laplace', 'pathfinder')
 
@@ -306,8 +307,7 @@ summary.mvgam = function(
     }
   }
 
-  if (all(is.na(object$sp_names))) {
-  } else {
+  if (all(is.na(object$sp_names))) {} else {
     if (
       any(unlist(purrr::map(
         object$mgcv_model$smooth,
@@ -398,8 +398,7 @@ summary.mvgam = function(
         all(
           rownames(gam_sig_table) %in% gsub('gp(', 's(', gp_names, fixed = TRUE)
         )
-      ) {
-      } else {
+      ) {} else {
         gam_sig_table <- gam_sig_table[
           !rownames(gam_sig_table) %in%
             gsub('gp(', 's(', gp_names, fixed = TRUE),
@@ -464,8 +463,7 @@ summary.mvgam = function(
               trend_model == 'None' &
                 object$family == 'nmix' |
                 inherits(object, 'jsdgam')
-            ) {
-            } else {
+            ) {} else {
               cat("\nProcess error parameter estimates:\n")
               print(suppressWarnings(mcmc_summary(
                 object$model_output,
@@ -877,8 +875,7 @@ summary.mvgam = function(
       }
     }
 
-    if (all(is.na(object$trend_sp_names))) {
-    } else {
+    if (all(is.na(object$trend_sp_names))) {} else {
       if (
         any(unlist(purrr::map(
           object$trend_mgcv_model$smooth,
@@ -965,8 +962,7 @@ summary.mvgam = function(
             rownames(gam_sig_table) %in%
               gsub('gp(', 's(', gp_names, fixed = TRUE)
           )
-        ) {
-        } else {
+        ) {} else {
           gam_sig_table <- gam_sig_table[
             !rownames(gam_sig_table) %in%
               gsub('gp(', 's(', gp_names, fixed = TRUE),
@@ -1012,7 +1008,9 @@ summary.mvgam = function(
     )
 
     sampler <- attr(object$model_output@sim$samples[[1]], "args")$sampler_t
-    if (sampler == "NUTS(diag_e)") sampler <- 'sampling(hmc)'
+    if (sampler == "NUTS(diag_e)") {
+      sampler <- 'sampling(hmc)'
+    }
     cat(
       insight::format_message(
         paste0(

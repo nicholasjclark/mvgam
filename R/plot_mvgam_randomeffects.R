@@ -98,9 +98,13 @@ plot_mvgam_randomeffects = function(object, trend_effects = FALSE) {
       repped_x <- rep(x, each = 2)
       x <- sapply(
         1:length(idx),
-        function(k)
-          if (k %% 2 == 0) repped_x[k] + min(diff(x)) / 2 else
+        function(k) {
+          if (k %% 2 == 0) {
+            repped_x[k] + min(diff(x)) / 2
+          } else {
             repped_x[k] - min(diff(x)) / 2
+          }
+        }
       )
 
       plot(

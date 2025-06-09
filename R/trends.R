@@ -99,15 +99,25 @@ trend_model_choices = function() {
 #' @noRd
 ma_cor_additions = function(trend_model) {
   use_var1 <- use_var1cor <- add_ma <- add_cor <- FALSE
-  if (grepl('MA', trend_model, fixed = TRUE)) add_ma <- TRUE
+  if (grepl('MA', trend_model, fixed = TRUE)) {
+    add_ma <- TRUE
+  }
 
-  if (trend_model == 'RWMA') trend_model <- 'RW'
+  if (trend_model == 'RWMA') {
+    trend_model <- 'RW'
+  }
 
-  if (trend_model == 'AR1MA') trend_model <- 'AR1'
+  if (trend_model == 'AR1MA') {
+    trend_model <- 'AR1'
+  }
 
-  if (trend_model == 'AR2MA') trend_model <- 'AR2'
+  if (trend_model == 'AR2MA') {
+    trend_model <- 'AR2'
+  }
 
-  if (trend_model == 'AR3MA') trend_model <- 'AR3'
+  if (trend_model == 'AR3MA') {
+    trend_model <- 'AR3'
+  }
 
   if (trend_model %in% c('RWcor', 'RWhiercor', 'RWMAcor')) {
     add_cor <- TRUE
@@ -134,7 +144,9 @@ ma_cor_additions = function(trend_model) {
     trend_model <- 'AR3'
   }
 
-  if (trend_model == 'VAR1') use_var1 <- TRUE
+  if (trend_model == 'VAR1') {
+    use_var1 <- TRUE
+  }
 
   if (trend_model %in% c('VAR1cor', 'VAR1hiercor', 'VARMA1,1cor')) {
     use_var1cor <- TRUE
@@ -635,7 +647,9 @@ stationary_VAR_phi <- function(p = 1, n_series = 3, ar_scale = 1) {
 
     # Enforce diagonal AR terms to be positive if this is
     # the first phi matrix
-    if (i == 1) diag(A) <- abs(diag(A))
+    if (i == 1) {
+      diag(A) <- abs(diag(A))
+    }
     B <- t(chol(Id + tcrossprod(A, A)))
     all_P[,, i] <- solve(B, A)
   }

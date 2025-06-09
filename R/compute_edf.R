@@ -109,7 +109,9 @@ compute_edf = function(
     if (!conservative) {
       w <- as.numeric(mgcv_model$family$mu.eta(as.vector(eta))^2 / mu_variance)
       XWX <- t(X) %*% (w * X)
-    } else XWX <- t(X) %*% X
+    } else {
+      XWX <- t(X) %*% X
+    }
 
     lambda <- mgcv_model$sp
     XWXS <- XWX

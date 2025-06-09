@@ -102,7 +102,9 @@ ppc.mvgam <- function(
       "prop_zero"
     )
   )
-  if (type == "histogram") type <- "hist"
+  if (type == "histogram") {
+    type <- "hist"
+  }
 
   if (type == "rootogram") {
     if (
@@ -803,8 +805,7 @@ ppc.mvgam <- function(
 
   if (type == "cdf") {
     ecdf_plotdat <- function(vals, x) {
-      if (length(which(is.na(vals))) > (length(vals) - 3)) {
-      } else {
+      if (length(which(is.na(vals))) > (length(vals) - 3)) {} else {
         func <- ecdf(vals)
         func(x)
       }

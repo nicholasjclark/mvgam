@@ -182,7 +182,9 @@ gen_irf <- function(x, h = 6, cumulative = TRUE, orthogonal = FALSE) {
     irs[[ii]] <- matrix(irf[1:(h), impulse, impulse[ii]], nrow = h)
     colnames(irs[[ii]]) <- impulse
     if (cumulative) {
-      if (length(impulse) > 1) irs[[ii]] <- apply(irs[[ii]], 2, cumsum)
+      if (length(impulse) > 1) {
+        irs[[ii]] <- apply(irs[[ii]], 2, cumsum)
+      }
       if (length(impulse) == 1) {
         tmp <- matrix(cumsum(irs[[ii]]))
         colnames(tmp) <- impulse

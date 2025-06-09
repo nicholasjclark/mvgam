@@ -111,9 +111,13 @@
 dynamic = function(variable, k, rho = 5, stationary = TRUE, scale = TRUE) {
   # Check that only one variable is supplied
   vars <- as.list(substitute(list(variable)))[-1]
-  if (length(vars) > 1) stop("dynamic() can only handle one term at a time.")
+  if (length(vars) > 1) {
+    stop("dynamic() can only handle one term at a time.")
+  }
   term <- deparse(vars[[1]])
-  if (term[1] == ".") stop("dynamic(.) not supported.")
+  if (term[1] == ".") {
+    stop("dynamic(.) not supported.")
+  }
 
   # Check rho
   if (missing(rho)) {

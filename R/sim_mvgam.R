@@ -546,7 +546,7 @@ lkj_corr <- function(n_series, eta = 0.8) {
   R[1, 1] <- 1
   R[1, 2] <- r12
   R[2, 2] <- sqrt(1 - r12^2)
-  if (n_series > 2)
+  if (n_series > 2) {
     for (m in 2:(n_series - 1)) {
       alpha <- alpha - 0.5
       y <- rbeta(1, m / 2, alpha)
@@ -555,6 +555,7 @@ lkj_corr <- function(n_series, eta = 0.8) {
       R[1:m, m + 1] <- sqrt(y) * z
       R[m + 1, m + 1] <- sqrt(1 - y)
     }
+  }
   return(crossprod(R))
 }
 

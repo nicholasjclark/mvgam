@@ -878,8 +878,12 @@ mvgam <- function(
     }
   }
 
-  if (!missing("data")) data_train <- data
-  if (!missing("newdata")) data_test <- newdata
+  if (!missing("data")) {
+    data_train <- data
+  }
+  if (!missing("newdata")) {
+    data_test <- newdata
+  }
   orig_data <- data_train
 
   # Check sampler arguments
@@ -999,7 +1003,9 @@ mvgam <- function(
   }
 
   # Lighten the final object if this is an lfo run
-  if (lfo) return_model_data <- FALSE
+  if (lfo) {
+    return_model_data <- FALSE
+  }
 
   # Validate observation formula
   formula <- interpret_mvgam(formula, N = max(data_train$index..time..index))
@@ -1015,8 +1021,12 @@ mvgam <- function(
   }
 
   # Ensure fitting software can be located
-  if (!use_stan & run_model) find_jags()
-  if (use_stan & run_model) find_stan()
+  if (!use_stan & run_model) {
+    find_jags()
+  }
+  if (use_stan & run_model) {
+    find_stan()
+  }
 
   # Validate the family and threads arguments
   family <- validate_family(family, use_stan = use_stan)
@@ -1050,8 +1060,12 @@ mvgam <- function(
     use_stan = use_stan
   )
   list2env(trend_val, envir = environment())
-  if (is.null(trend_map)) trend_map <- rlang::missing_arg()
-  if (is.null(n_lv)) n_lv <- rlang::missing_arg()
+  if (is.null(trend_map)) {
+    trend_map <- rlang::missing_arg()
+  }
+  if (is.null(n_lv)) {
+    n_lv <- rlang::missing_arg()
+  }
 
   # Some general family-level restrictions can now be checked
   orig_y <- data_train$y
@@ -1162,7 +1176,9 @@ mvgam <- function(
     ss_jagam$jags.ini$lambda <- ss_gam$sp
     ss_jagam$jags.ini$lambda[log(ss_jagam$jags.ini$lambda) > 10] <- exp(10)
   }
-  if (length(ss_gam$smooth) == 0) ss_jagam$jags.ini$lambda <- NULL
+  if (length(ss_gam$smooth) == 0) {
+    ss_jagam$jags.ini$lambda <- NULL
+  }
 
   # Fill y with NAs if this is a simulation from the priors;
   # otherwise replace with the original supplied values
@@ -1587,7 +1603,9 @@ mvgam <- function(
     }
   }
 
-  if (missing(upper_bounds)) upper_bounds <- NULL
+  if (missing(upper_bounds)) {
+    upper_bounds <- NULL
+  }
 
   if (use_lv) {
     n_lv <- ss_jagam$jags.data$n_lv
@@ -1597,7 +1615,9 @@ mvgam <- function(
     }
   }
 
-  if (missing(data_test)) data_test <- NULL
+  if (missing(data_test)) {
+    data_test <- NULL
+  }
 
   # Remove Smooth penalty matrix if no smooths were used in the formula
   if (!smooths_included) {
@@ -1898,7 +1918,9 @@ mvgam <- function(
 
       # If trend formula specified, add the predictors for the trend models
       if (!missing(trend_formula)) {
-        if (missing(trend_knots)) trend_knots <- missing_arg()
+        if (missing(trend_knots)) {
+          trend_knots <- missing_arg()
+        }
 
         trend_pred_setup <- add_trend_predictors(
           trend_formula = trend_formula,
@@ -1932,8 +1954,7 @@ mvgam <- function(
         }
 
         trend_sp_names <- trend_pred_setup$trend_sp_names
-      } else {
-      }
+      } else {}
 
       if (trend_model == "VAR1") {
         param <- c(param, "lv_coefs", "LV")

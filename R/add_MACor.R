@@ -25,8 +25,7 @@ add_MaCor = function(
 
   if (trend_char == 'ZMVN') {
     # Update transformed data
-    if (any(grepl('[n_lv] sigma;', model_file, fixed = TRUE))) {
-    } else {
+    if (any(grepl('[n_lv] sigma;', model_file, fixed = TRUE))) {} else {
       if (any(grepl('transformed data {', model_file, fixed = TRUE))) {
         model_file[grep('transformed data {', model_file, fixed = TRUE)] <-
           paste0(
@@ -113,8 +112,7 @@ add_MaCor = function(
       last <- grep('model {', model_file, fixed = TRUE)
       for (i in last:(last - 5)) {
         last <- i
-        if (trimws(model_file[i]) != '}') {
-        } else {
+        if (trimws(model_file[i]) != '}') {} else {
           break
         }
       }
@@ -1054,8 +1052,7 @@ add_MaCor = function(
         last <- grep('model {', model_file, fixed = TRUE)
         for (i in last:(last - 5)) {
           last <- i
-          if (trimws(model_file[i]) != '}') {
-          } else {
+          if (trimws(model_file[i]) != '}') {} else {
             break
           }
         }

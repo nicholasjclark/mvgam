@@ -128,27 +128,34 @@ smooth.construct.moi.smooth.spec <- function(object, data, knots) {
 
   # Check arguments
   object$p.order <- 1
-  if (object$bs.dim < 0) object$bs.dim <- 10
+  if (object$bs.dim < 0) {
+    object$bs.dim <- 10
+  }
   `k(bs = 'moi')` <- object$bs.dim
-  if (`k(bs = 'moi')` <= 1) stop("Basis dimension is too small", call. = FALSE)
+  if (`k(bs = 'moi')` <= 1) {
+    stop("Basis dimension is too small", call. = FALSE)
+  }
   validate_pos_integer(`k(bs = 'moi')`)
   validate_even(`k(bs = 'moi')`)
 
   # Number of knots must be k / 2
   nk <- object$bs.dim / 2L
 
-  if (!is.null(object$id))
+  if (!is.null(object$id)) {
     stop("Monotonic splines don't work with ids", call. = FALSE)
+  }
 
   # Check basis dimension
-  if (length(object$term) != 1)
+  if (length(object$term) != 1) {
     stop("Monotonic basis only handles 1D smooths", call. = FALSE)
+  }
 
   # Find the data and specified knots
   x <- data[[object$term]]
   k <- knots[[object$term]]
-  if (length(unique(x)) < nk)
+  if (length(unique(x)) < nk) {
     warning("basis dimension is larger than number of unique covariates")
+  }
 
   # Checks on knots
   if (is.null(k)) {
@@ -157,15 +164,18 @@ smooth.construct.moi.smooth.spec <- function(object, data, knots) {
   } else {
     xl <- min(k)
     xu <- max(k)
-    if (xl > min(x) || xu < max(x))
+    if (xl > min(x) || xu < max(x)) {
       stop("knot range does not include data", call. = FALSE)
-    if (length(k) != nk)
+    }
+    if (length(k) != nk) {
       stop(paste("there should be ", nk - 1, " supplied knots"), call. = FALSE)
+    }
   }
 
   if (!is.null(k)) {
-    if (sum(colSums(object$X) == 0) > 0)
+    if (sum(colSums(object$X) == 0) > 0) {
       warning("there is *no* information about some basis coefficients")
+    }
   }
 
   if (is.null(k)) {
@@ -194,11 +204,12 @@ smooth.construct.moi.smooth.spec <- function(object, data, knots) {
   object$knots <- k
   class(object) <- c("moi.smooth")
   object$X <- i_spline_basis
-  if (!is.null(object$xt$S))
+  if (!is.null(object$xt$S)) {
     stop(
       'Cannot accept supplied penalty matrices for monotonic splines',
       call. = FALSE
     )
+  }
   object$S <- list(diag(object$bs.dim))
   object$rank <- object$bs.dim
   object$null.space.dim <- 0
@@ -215,27 +226,34 @@ smooth.construct.mod.smooth.spec <- function(object, data, knots) {
 
   # Check arguments
   object$p.order <- 1
-  if (object$bs.dim < 0) object$bs.dim <- 10
+  if (object$bs.dim < 0) {
+    object$bs.dim <- 10
+  }
   `k(bs = 'moi')` <- object$bs.dim
-  if (`k(bs = 'moi')` <= 1) stop("Basis dimension is too small", call. = FALSE)
+  if (`k(bs = 'moi')` <= 1) {
+    stop("Basis dimension is too small", call. = FALSE)
+  }
   validate_pos_integer(`k(bs = 'moi')`)
   validate_even(`k(bs = 'moi')`)
 
   # Number of knots must be k / 2
   nk <- object$bs.dim / 2L
 
-  if (!is.null(object$id))
+  if (!is.null(object$id)) {
     stop("Monotonic splines don't work with ids", call. = FALSE)
+  }
 
   # Check basis dimension
-  if (length(object$term) != 1)
+  if (length(object$term) != 1) {
     stop("Monotonic basis only handles 1D smooths", call. = FALSE)
+  }
 
   # Find the data and specified knots
   x <- data[[object$term]]
   k <- knots[[object$term]]
-  if (length(unique(x)) < nk)
+  if (length(unique(x)) < nk) {
     warning("basis dimension is larger than number of unique covariates")
+  }
 
   # Checks on knots
   if (is.null(k)) {
@@ -244,15 +262,18 @@ smooth.construct.mod.smooth.spec <- function(object, data, knots) {
   } else {
     xl <- min(k)
     xu <- max(k)
-    if (xl > min(x) || xu < max(x))
+    if (xl > min(x) || xu < max(x)) {
       stop("knot range does not include data", call. = FALSE)
-    if (length(k) != nk)
+    }
+    if (length(k) != nk) {
       stop(paste("there should be ", nk - 1, " supplied knots"), call. = FALSE)
+    }
   }
 
   if (!is.null(k)) {
-    if (sum(colSums(object$X) == 0) > 0)
+    if (sum(colSums(object$X) == 0) > 0) {
       warning("there is *no* information about some basis coefficients")
+    }
   }
 
   if (is.null(k)) {
@@ -281,11 +302,12 @@ smooth.construct.mod.smooth.spec <- function(object, data, knots) {
   object$knots <- k
   class(object) <- c("mod.smooth")
   object$X <- i_spline_basis
-  if (!is.null(object$xt$S))
+  if (!is.null(object$xt$S)) {
     stop(
       'Cannot accept supplied penalty matrices for monotonic splines',
       call. = FALSE
     )
+  }
   object$S <- list(diag(object$bs.dim))
   object$rank <- object$bs.dim
   object$null.space.dim <- 0

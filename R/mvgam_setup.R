@@ -198,9 +198,15 @@ init_gam <- function(
   diagonalize = FALSE,
   sp = NULL
 ) {
-  if (is.character(family)) family <- eval(parse(text = family))
-  if (is.function(family)) family <- family()
-  if (is.null(family$family)) stop("family not recognized")
+  if (is.character(family)) {
+    family <- eval(parse(text = family))
+  }
+  if (is.function(family)) {
+    family <- family()
+  }
+  if (is.null(family$family)) {
+    stop("family not recognized")
+  }
   gp <- mgcv::interpret.gam(formula) # interpret the formula
   cl <- match.call() # call needed in gam object for update to work
   mf <- match.call(expand.dots = FALSE)
@@ -217,14 +223,18 @@ init_gam <- function(
   rm(pmf)
 
   mf <- eval(mf, parent.frame())
-  if (nrow(mf) < 2) stop("Not enough (non-NA) data to do anything meaningful")
+  if (nrow(mf) < 2) {
+    stop("Not enough (non-NA) data to do anything meaningful")
+  }
   terms <- attr(mf, "terms")
 
   ## summarize the *raw* input variables
   ## note can't use get_all_vars here -- buggy with matrices
   vars <- all.vars(gp$fake.formula[-2]) ## drop response here
   inp <- parse(text = paste("list(", paste(vars, collapse = ","), ")"))
-  if (!is.list(data) && !is.data.frame(data)) data <- as.data.frame(data)
+  if (!is.list(data) && !is.data.frame(data)) {
+    data <- as.data.frame(data)
+  }
 
   dl <- eval(inp, data, parent.frame())
   if (!control$keepData) {
@@ -313,15 +323,21 @@ gam_setup <- function(
   list.call = FALSE,
   modCon = 0
 ) {
-  if (inherits(formula, "split.gam.formula")) split <- formula else if (
-    inherits(formula, "formula")
-  )
-    split <- mgcv::interpret.gam(formula) else
+  if (inherits(formula, "split.gam.formula")) {
+    split <- formula
+  } else if (inherits(formula, "formula")) {
+    split <- mgcv::interpret.gam(formula)
+  } else {
     stop("First argument is no sort of formula!")
+  }
   if (length(split$smooth.spec) == 0) {
-    if (split$pfok == 0) stop("You've got no model....")
+    if (split$pfok == 0) {
+      stop("You've got no model....")
+    }
     m <- 0
-  } else m <- length(split$smooth.spec)
+  } else {
+    m <- length(split$smooth.spec)
+  }
   G <- list(
     m = m,
     min.sp = min.sp,
@@ -331,18 +347,26 @@ gam_setup <- function(
     n.true = -1,
     pterms = pterms
   )
-  if (is.null(attr(data, "terms")))
-    mf <- model.frame(split$pf, data, drop.unused.levels = FALSE) else
+  if (is.null(attr(data, "terms"))) {
+    mf <- model.frame(split$pf, data, drop.unused.levels = FALSE)
+  } else {
     mf <- data
+  }
   G$intercept <- attr(attr(mf, "terms"), "intercept") > 0
   if (list.call) {
     offi <- attr(pterms, "offset")
     if (!is.null(offi)) {
       G$offset <- mf[[names(attr(pterms, "dataClasses"))[offi]]]
     }
-  } else G$offset <- model.offset(mf)
-  if (!is.null(G$offset)) G$offset <- as.numeric(G$offset)
-  if (drop.intercept) attr(pterms, "intercept") <- 1
+  } else {
+    G$offset <- model.offset(mf)
+  }
+  if (!is.null(G$offset)) {
+    G$offset <- as.numeric(G$offset)
+  }
+  if (drop.intercept) {
+    attr(pterms, "intercept") <- 1
+  }
   X <- model.matrix(pterms, mf)
   if (drop.intercept) {
     xat <- attributes(X)
@@ -362,7 +386,9 @@ gam_setup <- function(
   PP <- parametric_penalty(pterms, G$assign, paraPen, sp)
   if (!is.null(PP)) {
     ind <- 1:length(PP$sp)
-    if (!is.null(sp)) sp <- sp[-ind]
+    if (!is.null(sp)) {
+      sp <- sp[-ind]
+    }
     if (!is.null(min.sp)) {
       PP$min.sp <- min.sp[ind]
       min.sp <- min.sp[-ind]
@@ -371,11 +397,15 @@ gam_setup <- function(
   G$smooth <- list()
   G$S <- list()
   if (gamm.call) {
-    if (m > 0) for (i in 1:m) attr(split$smooth.spec[[i]], "gamm") <- TRUE
+    if (m > 0) {
+      for (i in 1:m) {
+        attr(split$smooth.spec[[i]], "gamm") <- TRUE
+      }
+    }
   }
   if (m > 0 && idLinksBases) {
     id.list <- list()
-    for (i in 1:m)
+    for (i in 1:m) {
       if (!is.null(split$smooth.spec[[i]]$id)) {
         id <- as.character(split$smooth.spec[[i]]$id)
         if (length(id.list) && id %in% names(id.list)) {
@@ -387,29 +417,32 @@ gam_setup <- function(
             split$smooth.spec[[i]]
           )
           temp.term <- split$smooth.spec[[i]]$term
-          for (j in 1:length(temp.term))
+          for (j in 1:length(temp.term)) {
             id.list[[id]]$data[[j]] <- cbind(
               id.list[[id]]$data[[j]],
               mgcv::get.var(temp.term[j], data, vecMat = FALSE)
             )
+          }
         } else {
           id.list[[id]] <- list(sm.i = i)
           id.list[[id]]$data <- list()
           term <- split$smooth.spec[[i]]$term
-          for (j in 1:length(term))
+          for (j in 1:length(term)) {
             id.list[[id]]$data[[j]] <- mgcv::get.var(
               term[j],
               data,
               vecMat = FALSE
             )
+          }
         }
       }
+    }
   }
   G$off <- array(0, 0)
   first.para <- G$nsdf + 1
   sm <- list()
   newm <- 0
-  if (m > 0)
+  if (m > 0) {
     for (i in 1:m) {
       id <- split$smooth.spec[[i]]$id
       if (is.null(id) || !idLinksBases) {
@@ -446,33 +479,45 @@ gam_setup <- function(
       sm[ind + newm] <- sml[ind]
       newm <- newm + length(sml)
     }
+  }
   G$m <- m <- newm
   if (m > 0) {
     sm <- mgcv::gam.side(sm, X, tol = .Machine$double.eps^0.5)
-    if (!apply.by)
+    if (!apply.by) {
       for (i in 1:length(sm)) {
         if (!is.null(sm[[i]]$X0)) {
           ind <- attr(sm[[i]], "del.index")
-          sm[[i]]$X <- if (is.null(ind)) sm[[i]]$X0 else
+          sm[[i]]$X <- if (is.null(ind)) {
+            sm[[i]]$X0
+          } else {
             sm[[i]]$X0[, -ind, drop = FALSE]
+          }
         }
       }
+    }
   }
   idx <- list()
   L <- matrix(0, 0, 0)
   lsp.names <- sp.names <- rep("", 0)
-  if (m > 0)
+  if (m > 0) {
     for (i in 1:m) {
       id <- sm[[i]]$id
-      length.S <- if (is.null(sm[[i]]$updateS)) length(sm[[i]]$S) else
+      length.S <- if (is.null(sm[[i]]$updateS)) {
+        length(sm[[i]]$S)
+      } else {
         sm[[i]]$n.sp
+      }
       Li <- if (is.null(sm[[i]]$L)) diag(length.S) else sm[[i]]$L
       if (length.S > 0) {
-        if (length.S == 1) lspn <- sm[[i]]$label else {
+        if (length.S == 1) {
+          lspn <- sm[[i]]$label
+        } else {
           Sname <- names(sm[[i]]$S)
-          lspn <- if (is.null(Sname))
-            paste(sm[[i]]$label, 1:length.S, sep = "") else
+          lspn <- if (is.null(Sname)) {
+            paste(sm[[i]]$label, 1:length.S, sep = "")
+          } else {
             paste(sm[[i]]$label, Sname, sep = "")
+          }
         }
         spn <- lspn[1:ncol(Li)]
       }
@@ -503,8 +548,9 @@ gam_setup <- function(
         }
       }
     }
+  }
   Xp <- NULL
-  if (m > 0)
+  if (m > 0) {
     for (i in 1:m) {
       n.para <- ncol(sm[[i]]$X)
       sm[[i]]$first.para <- first.para
@@ -517,7 +563,9 @@ gam_setup <- function(
       if (is.null(sm[[i]]$Xp)) {
         if (!is.null(Xp)) Xp <- cbind2(Xp, sm[[i]]$X)
       } else {
-        if (is.null(Xp)) Xp <- X
+        if (is.null(Xp)) {
+          Xp <- X
+        }
         Xp <- cbind2(Xp, sm[[i]]$Xp)
         sm[[i]]$Xp <- NULL
       }
@@ -525,6 +573,7 @@ gam_setup <- function(
       sm[[i]]$X <- NULL
       G$smooth[[i]] <- sm[[i]]
     }
+  }
   if (is.null(Xp)) {
     G$cmX <- colMeans(X)
   } else {
@@ -560,21 +609,28 @@ gam_setup <- function(
       warning("NA's in supplied smoothing parameter vector - ignoring.")
       ok <- FALSE
     }
-  } else ok <- FALSE
+  } else {
+    ok <- FALSE
+  }
   G$sp <- if (ok) sp[1:ncol(L)] else rep(-1, ncol(L))
   names(G$sp) <- sp.names
   k <- 1
-  if (m > 0)
+  if (m > 0) {
     for (i in 1:m) {
       id <- sm[[i]]$id
-      if (is.null(sm[[i]]$L)) Li <- diag(length(sm[[i]]$S)) else Li <- sm[[i]]$L
+      if (is.null(sm[[i]]$L)) {
+        Li <- diag(length(sm[[i]]$S))
+      } else {
+        Li <- sm[[i]]$L
+      }
       if (is.null(id)) {
         spi <- sm[[i]]$sp
         if (!is.null(spi)) {
-          if (length(spi) != ncol(Li))
+          if (length(spi) != ncol(Li)) {
             stop(
               "incorrect number of smoothing parameters supplied for a smooth term"
             )
+          }
           G$sp[k:(k + ncol(Li) - 1)] <- spi
         }
         k <- k + ncol(Li)
@@ -582,10 +638,11 @@ gam_setup <- function(
         spi <- sm[[i]]$sp
         if (is.null(idx[[id]]$sp.done)) {
           if (!is.null(spi)) {
-            if (length(spi) != ncol(Li))
+            if (length(spi) != ncol(Li)) {
               stop(
                 "incorrect number of smoothing parameters supplied for a smooth term"
               )
+            }
             G$sp[idx[[id]]$c:(idx[[id]]$c + idx[[id]]$nc - 1)] <- spi
           }
           idx[[id]]$sp.done <- TRUE
@@ -593,9 +650,14 @@ gam_setup <- function(
         }
       }
     }
+  }
   k <- 1
-  if (length(idx)) for (i in 1:length(idx)) idx[[i]]$sp.done <- FALSE
-  if (m > 0)
+  if (length(idx)) {
+    for (i in 1:length(idx)) {
+      idx[[i]]$sp.done <- FALSE
+    }
+  }
+  if (m > 0) {
     for (i in 1:m) {
       id <- sm[[i]]$id
       if (!is.null(id)) {
@@ -611,31 +673,45 @@ gam_setup <- function(
           k <- k + idx[[id]]$nc
         }
       } else {
-        if (is.null(sm[[i]]$L)) nc <- length(sm[[i]]$S) else
+        if (is.null(sm[[i]]$L)) {
+          nc <- length(sm[[i]]$S)
+        } else {
           nc <- ncol(sm[[i]]$L)
-        if (nc > 0) G$smooth[[i]]$sp <- G$sp[k:(k + nc - 1)]
+        }
+        if (nc > 0) {
+          G$smooth[[i]]$sp <- G$sp[k:(k + nc - 1)]
+        }
         k <- k + nc
       }
     }
+  }
   if (!is.null(min.sp)) {
-    if (length(min.sp) < nrow(L)) stop("length of min.sp is wrong.")
-    if (nrow(L) > 0) min.sp <- min.sp[1:nrow(L)]
-    if (sum(is.na(min.sp))) stop("NA's in min.sp.")
+    if (length(min.sp) < nrow(L)) {
+      stop("length of min.sp is wrong.")
+    }
+    if (nrow(L) > 0) {
+      min.sp <- min.sp[1:nrow(L)]
+    }
+    if (sum(is.na(min.sp))) {
+      stop("NA's in min.sp.")
+    }
     if (sum(min.sp < 0)) stop("elements of min.sp must be non negative.")
   }
   k.sp <- 0
   G$rank <- array(0, 0)
-  if (m > 0)
+  if (m > 0) {
     for (i in 1:m) {
       sm <- G$smooth[[i]]
-      if (length(sm$S) > 0)
+      if (length(sm$S) > 0) {
         for (j in 1:length(sm$S)) {
           k.sp <- k.sp + 1
           G$off[k.sp] <- sm$first.para
           G$S[[k.sp]] <- sm$S[[j]]
           G$rank[k.sp] <- sm$rank[j]
           if (!is.null(min.sp)) {
-            if (is.null(H)) H <- matrix(0, n.p, n.p)
+            if (is.null(H)) {
+              H <- matrix(0, n.p, n.p)
+            }
             H[sm$first.para:sm$last.para, sm$first.para:sm$last.para] <- H[
               sm$first.para:sm$last.para,
               sm$first.para:sm$last.para
@@ -644,7 +720,9 @@ gam_setup <- function(
                 sm$S[[j]]
           }
         }
+      }
     }
+  }
   if (!is.null(PP)) {
     L <- rbind(
       cbind(L, matrix(0, nrow(L), ncol(PP$L))),
@@ -657,19 +735,23 @@ gam_setup <- function(
     lsp.names <- c(PP$full.sp.names, lsp.names)
     G$n.paraPen <- length(PP$off)
     if (!is.null(PP$min.sp)) {
-      if (is.null(H)) H <- matrix(0, n.p, n.p)
+      if (is.null(H)) {
+        H <- matrix(0, n.p, n.p)
+      }
       for (i in 1:length(PP$S)) {
         ind <- PP$off[i]:(PP$off[i] + ncol(PP$S[[i]]) - 1)
         H[ind, ind] <- H[ind, ind] + PP$min.sp[i] * PP$S[[i]]
       }
     }
-  } else G$n.paraPen <- 0
+  } else {
+    G$n.paraPen <- 0
+  }
   fix.ind <- G$sp >= 0
   if (sum(fix.ind)) {
     lsp0 <- G$sp[fix.ind]
     ind <- lsp0 == 0
     ef0 <- indi <- (1:length(ind))[ind]
-    if (length(indi) > 0)
+    if (length(indi) > 0) {
       for (i in 1:length(indi)) {
         ii <- G$off[i]:(G$off[i] + ncol(G$S[[i]]) - 1)
         ef0[i] <- norm(G$X[, ii], type = "F")^2 /
@@ -677,6 +759,7 @@ gam_setup <- function(
           .Machine$double.eps *
           0.1
       }
+    }
     lsp0[!ind] <- log(lsp0[!ind])
     lsp0[ind] <- log(ef0)
     lsp0 <- as.numeric(L[, fix.ind, drop = FALSE] %*% lsp0)
@@ -686,7 +769,9 @@ gam_setup <- function(
     lsp0 <- rep(0, nrow(L))
   }
   G$H <- H
-  if (ncol(L) == nrow(L) && !sum(L != diag(ncol(L)))) L <- NULL
+  if (ncol(L) == nrow(L) && !sum(L != diag(ncol(L)))) {
+    L <- NULL
+  }
   G$L <- L
   G$lsp0 <- lsp0
   names(G$lsp0) <- lsp.names
@@ -694,8 +779,11 @@ gam_setup <- function(
     G$C <- matrix(0, 0, n.p)
     if (m > 0) {
       for (i in 1:m) {
-        if (is.null(G$smooth[[i]]$C)) n.con <- 0 else
+        if (is.null(G$smooth[[i]]$C)) {
+          n.con <- 0
+        } else {
           n.con <- nrow(G$smooth[[i]]$C)
+        }
         C <- matrix(0, n.con, n.p)
         C[, G$smooth[[i]]$first.para:G$smooth[[i]]$last.para] <- G$smooth[[i]]$C
         G$C <- rbind(G$C, C)
@@ -706,18 +794,27 @@ gam_setup <- function(
   }
   G$y <- drop(data[[split$response]])
   ydim <- dim(G$y)
-  if (!is.null(ydim) && length(ydim) < 2) dim(G$y) <- NULL
+  if (!is.null(ydim) && length(ydim) < 2) {
+    dim(G$y) <- NULL
+  }
   G$n <- nrow(data)
-  if (is.null(data$"(weights)")) G$w <- rep(1, G$n) else G$w <- data$"(weights)"
-  if (G$nsdf > 0) term.names <- colnames(G$X)[1:G$nsdf] else
+  if (is.null(data$"(weights)")) {
+    G$w <- rep(1, G$n)
+  } else {
+    G$w <- data$"(weights)"
+  }
+  if (G$nsdf > 0) {
+    term.names <- colnames(G$X)[1:G$nsdf]
+  } else {
     term.names <- array("", 0)
+  }
   n.smooth <- length(G$smooth)
   n.sp0 <- 0
-  if (n.smooth)
+  if (n.smooth) {
     for (i in 1:n.smooth) {
       k <- 1
       jj <- G$smooth[[i]]$first.para:G$smooth[[i]]$last.para
-      if (G$smooth[[i]]$df > 0)
+      if (G$smooth[[i]]$df > 0) {
         for (j in jj) {
           term.names[j] <- paste(
             G$smooth[[i]]$label,
@@ -727,16 +824,20 @@ gam_setup <- function(
           )
           k <- k + 1
         }
+      }
       n.sp <- length(G$smooth[[i]]$S)
       if (n.sp) {
         G$smooth[[i]]$first.sp <- n.sp0 + 1
         n.sp0 <- G$smooth[[i]]$last.sp <- n.sp0 + n.sp
       }
       if (!is.null(G$smooth[[i]]$g.index)) {
-        if (is.null(G$g.index)) G$g.index <- rep(FALSE, n.p)
+        if (is.null(G$g.index)) {
+          G$g.index <- rep(FALSE, n.p)
+        }
         G$g.index[jj] <- G$smooth[[i]]$g.index
       }
     }
+  }
   G$term.names <- term.names
   G$pP <- PP
   G
@@ -753,8 +854,8 @@ parametric_penalty <- function(pterms, assign, paraPen, sp0) {
   k <- 0
   tind <- unique(assign)
   n.t <- length(tind)
-  if (n.t > 0)
-    for (j in 1:n.t)
+  if (n.t > 0) {
+    for (j in 1:n.t) {
       if (tind[j] > 0) {
         term.label <- attr(pterms[tind[j]], "term.label")
         P <- paraPen[[term.label]]
@@ -767,23 +868,32 @@ parametric_penalty <- function(pterms, assign, paraPen, sp0) {
           ranki <- P$rank
           P$rank <- NULL
           np <- length(P)
-          if (!is.null(ranki) && length(ranki) != np)
+          if (!is.null(ranki) && length(ranki) != np) {
             stop("`rank' has wrong length in `paraPen'")
-          if (np)
+          }
+          if (np) {
             for (i in 1:np) {
               k <- k + 1
               S[[k]] <- P[[i]]
               off[k] <- min(ind)
-              if (ncol(P[[i]]) != nrow(P[[i]]) || nrow(P[[i]]) != length(ind))
+              if (ncol(P[[i]]) != nrow(P[[i]]) || nrow(P[[i]]) != length(ind)) {
                 stop(" a parametric penalty has wrong dimension")
+              }
               if (is.null(ranki)) {
                 ev <- eigen(S[[k]], symmetric = TRUE, only.values = TRUE)$values
                 rank[k] <- sum(ev > max(ev) * .Machine$double.eps * 10)
-              } else rank[k] <- ranki[i]
+              } else {
+                rank[k] <- ranki[i]
+              }
             }
+          }
           if (np) {
-            if (is.null(Li)) Li <- diag(np)
-            if (nrow(Li) != np) stop("L has wrong dimension in `paraPen'")
+            if (is.null(Li)) {
+              Li <- diag(np)
+            }
+            if (nrow(Li) != np) {
+              stop("L has wrong dimension in `paraPen'")
+            }
             L <- rbind(
               cbind(L, matrix(0, nrow(L), ncol(Li))),
               cbind(matrix(0, nrow(Li), ncol(L)), Li)
@@ -793,30 +903,43 @@ parametric_penalty <- function(pterms, assign, paraPen, sp0) {
             if (is.null(spi)) {
               sp[ind] <- -1
             } else {
-              if (length(spi) != ncol(Li))
+              if (length(spi) != ncol(Li)) {
                 stop("`sp' dimension wrong in `paraPen'")
+              }
               sp[ind] <- spi
             }
-            if (length(ind) > 1)
+            if (length(ind) > 1) {
               names(sp)[ind] <- paste(
                 term.label,
                 ind -
                   ind[1] +
                   1,
                 sep = ""
-              ) else names(sp)[ind] <- term.label
-            if (length(ind2) > 1)
+              )
+            } else {
+              names(sp)[ind] <- term.label
+            }
+            if (length(ind2) > 1) {
               full.sp.names[ind2] <- paste(
                 term.label,
                 ind2 - ind2[1] + 1,
                 sep = ""
-              ) else full.sp.names[ind2] <- term.label
+              )
+            } else {
+              full.sp.names[ind2] <- term.label
+            }
           }
         }
       }
-  if (k == 0) return(NULL)
+    }
+  }
+  if (k == 0) {
+    return(NULL)
+  }
   if (!is.null(sp0)) {
-    if (length(sp0) < length(sp)) stop("`sp' too short")
+    if (length(sp0) < length(sp)) {
+      stop("`sp' too short")
+    }
     sp0 <- sp0[1:length(sp)]
     sp[sp < 0] <- sp0[sp < 0]
   }
@@ -832,8 +955,9 @@ parametric_penalty <- function(pterms, assign, paraPen, sp0) {
 
 #' @noRd
 clone_smooth_spec <- function(specb, spec) {
-  if (specb$dim != spec$dim)
+  if (specb$dim != spec$dim) {
     stop("`id' linked smooths must have same number of arguments")
+  }
   if (inherits(specb, c("tensor.smooth.spec", "t2.smooth.spec"))) {
     specb$term <- spec$term
     specb$label <- spec$label
@@ -872,19 +996,24 @@ variable_summary <- function(pf, dl, n) {
   v.name <- v.name1 <- names(dl)
   if (v.n) {
     k <- 0
-    for (i in 1:v.n)
+    for (i in 1:v.n) {
       if (length(dl[[i]]) >= n) {
         k <- k + 1
         v.name[k] <- v.name1[i]
       }
+    }
     if (k > 0) v.name <- v.name[1:k] else v.name <- rep("", k)
   }
   p.name <- all.vars(pf[-2])
   vs <- list()
   v.n <- length(v.name)
-  if (v.n > 0)
+  if (v.n > 0) {
     for (i in 1:v.n) {
-      if (v.name[i] %in% p.name) para <- TRUE else para <- FALSE
+      if (v.name[i] %in% p.name) {
+        para <- TRUE
+      } else {
+        para <- FALSE
+      }
       if (para && is.matrix(dl[[v.name[i]]]) && ncol(dl[[v.name[i]]]) > 1) {
         x <- matrix(
           apply(
@@ -900,7 +1029,9 @@ variable_summary <- function(pf, dl, n) {
         )
       } else {
         x <- dl[[v.name[i]]]
-        if (is.character(x)) x <- as.factor(x)
+        if (is.character(x)) {
+          x <- as.factor(x)
+        }
         if (is.factor(x)) {
           x <- x[!is.na(x)]
           lx <- levels(x)
@@ -918,6 +1049,7 @@ variable_summary <- function(pf, dl, n) {
       }
       vs[[v.name[i]]] <- x
     }
+  }
   vs
 }
 
@@ -941,9 +1073,15 @@ initial_spg <- function(
   E = NULL,
   ...
 ) {
-  if (length(S) == 0) return(rep(0, 0))
+  if (length(S) == 0) {
+    return(rep(0, 0))
+  }
   nobs <- nrow(x)
-  if (is.null(mustart)) mukeep <- NULL else mukeep <- mustart
+  if (is.null(mustart)) {
+    mukeep <- NULL
+  } else {
+    mukeep <- mustart
+  }
   eval(family$initialize)
   if (inherits(family, "general.family")) {
     lbb <- family$ll(
@@ -986,8 +1124,9 @@ initial_spg <- function(
             )
         ) >
           0.4
-      )
+      ) {
         lami <- lami * 5
+      }
       while (
         sqrt(
           mean(dlb / (dlb + lami * dS * rm)) *
@@ -998,27 +1137,33 @@ initial_spg <- function(
             )
         ) <
           0.4
-      )
+      ) {
         lami <- lami / 5
+      }
       lambda[i] <- lami
     }
   } else {
     if (is.null(mukeep)) {
-      if (!is.null(start)) etastart <- drop(x %*% start)
+      if (!is.null(start)) {
+        etastart <- drop(x %*% start)
+      }
       if (!is.null(etastart)) mustart <- family$linkinv(etastart)
-    } else mustart <- mukeep
+    } else {
+      mustart <- mukeep
+    }
     if (inherits(family, "extended.family")) {
       theta <- family$getTheta()
       Ddo <- family$Dd(y, mustart, theta, weights)
       mu.eta2 <- family$mu.eta(family$linkfun(mustart))^2
       w <- 0.5 * as.numeric(Ddo$Dmu2 * mu.eta2)
       if (any(w < 0)) w <- 0.5 * as.numeric(Ddo$EDmu2 * mu.eta2)
-    } else
+    } else {
       w <- as.numeric(
         weights *
           family$mu.eta(family$linkfun(mustart))^2 /
           family$variance(mustart)
       )
+    }
     w <- sqrt(w)
     if (type == 1) {
       lambda <- mgcv::initial.sp(w * x, S, off)
@@ -1033,7 +1178,9 @@ initial_spg <- function(
   }
   if (!is.null(L)) {
     lsp <- log(lambda)
-    if (is.null(lsp0)) lsp0 <- rep(0, nrow(L))
+    if (is.null(lsp0)) {
+      lsp0 <- rep(0, nrow(L))
+    }
     lsp <- as.numeric(coef(lm(lsp ~ L - 1 + offset(lsp0))))
     lambda <- exp(lsp)
   }
@@ -1067,9 +1214,15 @@ jagam <- function(
   sp.prior <- 'gamma'
 
   # Evaluate family
-  if (is.character(family)) family <- eval(parse(text = family))
-  if (is.function(family)) family <- family()
-  if (is.null(family$family)) stop("family not recognized")
+  if (is.character(family)) {
+    family <- eval(parse(text = family))
+  }
+  if (is.function(family)) {
+    family <- family()
+  }
+  if (is.null(family$family)) {
+    stop("family not recognized")
+  }
 
   # Interpret the formula and initialize the model.frame object
   gp <- mgcv::interpret.gam(formula)
@@ -1093,7 +1246,9 @@ jagam <- function(
       pmf$formula <- gp[[i]]$pf
       pterms[[i]] <- attr(eval(pmf, parent.frame()), "terms")
       tlabi <- attr(pterms[[i]], "term.labels")
-      if (i > 1 && length(tlabi) > 0) tlabi <- paste(tlabi, i - 1, sep = ".")
+      if (i > 1 && length(tlabi) > 0) {
+        tlabi <- paste(tlabi, i - 1, sep = ".")
+      }
       tlab <- c(tlab, tlabi)
     }
     attr(pterms, "term.labels") <- tlab
@@ -1106,13 +1261,17 @@ jagam <- function(
   }
 
   mf <- eval(mf, parent.frame())
-  if (nrow(mf) < 2) stop("Not enough (non-NA) data to do anything meaningful")
+  if (nrow(mf) < 2) {
+    stop("Not enough (non-NA) data to do anything meaningful")
+  }
   terms <- attr(mf, "terms")
 
   # Summarize the *raw* input variables
   vars <- all.vars(gp$fake.formula[-2])
   inp <- parse(text = paste("list(", paste(vars, collapse = ","), ")"))
-  if (!is.list(data) && !is.data.frame(data)) data <- as.data.frame(data)
+  if (!is.list(data) && !is.data.frame(data)) {
+    data <- as.data.frame(data)
+  }
   dl <- eval(inp, data, parent.frame())
   rm(data)
   names(dl) <- vars
@@ -1155,13 +1314,19 @@ jagam <- function(
     !is.null(G$offset)
   )
 
-  if (is.null(weights) && use.weights) weights <- rep(1, nrow(G$X))
+  if (is.null(weights) && use.weights) {
+    weights <- rep(1, nrow(G$X))
+  }
 
   ## start the JAGS data list...
 
   jags.stuff <- list(y = G$y, n = length(G$y), X = G$X)
-  if (!is.null(G$offset)) jags.stuff$offset <- G$offset
-  if (use.weights) jags.stuff$w <- weights
+  if (!is.null(G$offset)) {
+    jags.stuff$offset <- G$offset
+  }
+  if (use.weights) {
+    jags.stuff$w <- weights
+  }
 
   if (family$family == "binomial") {
     jags.stuff$y <- G$y * weights
@@ -1249,23 +1414,29 @@ jagam <- function(
     seperable <- FALSE
     M <- length(G$smooth[[i]]$S)
     p <- G$smooth[[i]]$last.para - G$smooth[[i]]$first.para + 1 ## number of params
-    if (M <= 1) seperable <- TRUE else {
+    if (M <= 1) {
+      seperable <- TRUE
+    } else {
       overlap <- rowSums(G$smooth[[i]]$S[[1]])
-      for (j in 2:M) overlap <- overlap & rowSums(G$smooth[[i]]$S[[j]])
+      for (j in 2:M) {
+        overlap <- overlap & rowSums(G$smooth[[i]]$S[[j]])
+      }
       if (!sum(overlap)) seperable <- TRUE
     }
     if (seperable) {
       ## double check that they are diagonal
-      if (M > 0)
+      if (M > 0) {
         for (j in 1:M) {
           if (
             max(abs(
               G$smooth[[i]]$S[[j]] - diag(diag(G$smooth[[i]]$S[[j]]), nrow = p)
             )) >
               0
-          )
+          ) {
             seperable <- FALSE
+          }
         }
+      }
     }
     cat(
       "  ## prior for ",
@@ -1301,7 +1472,7 @@ jagam <- function(
           append = TRUE,
           sep = ""
         )
-      } else
+      } else {
         for (j in 1:M) {
           D <- diag(G$smooth[[i]]$S[[j]]) > 0
           #b1 <- sum(as.numeric(D)) + b0 - 1
@@ -1319,6 +1490,7 @@ jagam <- function(
             sep = ""
           )
         }
+      }
     } else {
       ## inseperable - requires the penalty matrices to be supplied to JAGS...
       b0 <- G$smooth[[i]]$first.para
@@ -1343,7 +1515,7 @@ jagam <- function(
       )
       if (M > 1) {
         ## code to form total precision matrix...
-        for (j in 2:M)
+        for (j in 2:M) {
           cat(
             " + ",
             Sname,
@@ -1360,6 +1532,7 @@ jagam <- function(
             append = TRUE,
             sep = ""
           )
+        }
       }
       cat(
         "\n  b[",
@@ -1379,7 +1552,11 @@ jagam <- function(
       )
       n.sp <- n.sp + M
       Sc <- G$smooth[[i]]$S[[1]]
-      if (M > 1) for (j in 2:M) Sc <- cbind(Sc, G$smooth[[i]]$S[[j]])
+      if (M > 1) {
+        for (j in 2:M) {
+          Sc <- cbind(Sc, G$smooth[[i]]$S[[j]])
+        }
+      }
       jags.stuff[[Sname]] <- Sc
       jags.stuff$zero <- rep(0, ncol(G$X))
     }
@@ -1440,14 +1617,16 @@ jagam <- function(
         append = TRUE,
         sep = ""
       )
-      if (rho.lo)
+      if (rho.lo) {
         cat(
           "  rho <- rho.lo + L %*% rho0\n",
           file = file,
           append = TRUE,
           sep = ""
-        ) else
+        )
+      } else {
         cat("  rho <- L %*% rho0\n", file = file, append = TRUE, sep = "")
+      }
       cat(
         "  for (i in 1:",
         n.sp,
@@ -1473,14 +1652,16 @@ jagam <- function(
         sep = ""
       )
       cat("  }\n", file = file, append = TRUE, sep = "")
-      if (rho.lo)
+      if (rho.lo) {
         cat(
           "  rho <- rho.lo + L %*% rho0\n",
           file = file,
           append = TRUE,
           sep = ""
-        ) else
+        )
+      } else {
         cat("  rho <- L %*% rho0\n", file = file, append = TRUE, sep = "")
+      }
       cat(
         "  for (i in 1:",
         n.sp,
@@ -1531,9 +1712,12 @@ gam_setup.list <- function(
   # "lpi", which is a list
   # of column indices for each linear predictor
   d <- length(pterms)
-  if (is.null(drop.intercept)) drop.intercept <- rep(FALSE, d)
-  if (length(drop.intercept) != d)
+  if (is.null(drop.intercept)) {
+    drop.intercept <- rep(FALSE, d)
+  }
+  if (length(drop.intercept) != d) {
     stop("length(drop.intercept) should be equal to number of model formulas")
+  }
 
   lp.overlap <- if (formula$nlp < d) TRUE else FALSE
 
@@ -1564,23 +1748,31 @@ gam_setup.list <- function(
   G$assign <- list(G$assign)
   used.sp <- length(G$lsp0)
 
-  if (!is.null(sp) && used.sp > 0) sp <- sp[-(1:used.sp)]
-  if (!is.null(min.sp) && nrow(G$L) > 0) min.sp <- min.sp[-(1:nrow(G$L))]
+  if (!is.null(sp) && used.sp > 0) {
+    sp <- sp[-(1:used.sp)]
+  }
+  if (!is.null(min.sp) && nrow(G$L) > 0) {
+    min.sp <- min.sp[-(1:nrow(G$L))]
+  }
 
   flpi <- lpi <- list()
-  for (i in 1:formula$nlp) lpi[[i]] <- rep(0, 0)
+  for (i in 1:formula$nlp) {
+    lpi[[i]] <- rep(0, 0)
+  }
   lpi[[1]] <- 1:ncol(G$X)
   flpi[[1]] <- formula[[1]]$lpi
 
   pof <- ncol(G$X)
   pstart <- rep(0, d)
   pstart[1] <- 1
-  if (d > 1)
+  if (d > 1) {
     for (i in 2:d) {
       if (is.null(formula[[i]]$response)) {
         formula[[i]]$response <- formula$response
         mv.response <- FALSE
-      } else mv.response <- TRUE
+      } else {
+        mv.response <- TRUE
+      }
       formula[[i]]$pfok <- 1
       um <- gam_setup(
         formula[[i]],
@@ -1603,38 +1795,51 @@ gam_setup.list <- function(
         modCon = modCon
       )
       used.sp <- length(um$lsp0)
-      if (!is.null(sp) && used.sp > 0) sp <- sp[-(1:used.sp)]
-      if (!is.null(min.sp) && nrow(um$L) > 0) min.sp <- min.sp[-(1:nrow(um$L))]
+      if (!is.null(sp) && used.sp > 0) {
+        sp <- sp[-(1:used.sp)]
+      }
+      if (!is.null(min.sp) && nrow(um$L) > 0) {
+        min.sp <- min.sp[-(1:nrow(um$L))]
+      }
 
       flpi[[i]] <- formula[[i]]$lpi
       for (j in formula[[i]]$lpi) {
         lpi[[j]] <- c(lpi[[j]], pof + 1:ncol(um$X))
       }
-      if (mv.response) G$y <- cbind(G$y, um$y)
+      if (mv.response) {
+        G$y <- cbind(G$y, um$y)
+      }
       if (i > formula$nlp && !is.null(um$offset)) {
         stop("shared offsets not allowed")
       }
       G$offset[[i]] <- um$offset
-      if (!is.null(um$contrasts)) G$contrasts <- c(G$contrasts, um$contrasts)
+      if (!is.null(um$contrasts)) {
+        G$contrasts <- c(G$contrasts, um$contrasts)
+      }
       G$xlevels[[i]] <- um$xlevels
       G$assign[[i]] <- um$assign
       G$rank <- c(G$rank, um$rank)
       pstart[i] <- pof + 1
       G$X <- cbind(G$X, um$X)
       k <- G$m
-      if (um$m)
+      if (um$m) {
         for (j in 1:um$m) {
           um$smooth[[j]]$first.para <- um$smooth[[j]]$first.para + pof
           um$smooth[[j]]$last.para <- um$smooth[[j]]$last.para + pof
           k <- k + 1
           G$smooth[[k]] <- um$smooth[[j]]
         }
+      }
       ks <- length(G$S)
       M <- length(um$S)
 
       if (!is.null(um$L) || !is.null(G$L)) {
-        if (is.null(G$L)) G$L <- diag(1, nrow = ks)
-        if (is.null(um$L)) um$L <- diag(1, nrow = M)
+        if (is.null(G$L)) {
+          G$L <- diag(1, nrow = ks)
+        }
+        if (is.null(um$L)) {
+          um$L <- diag(1, nrow = M)
+        }
         G$L <- rbind(
           cbind(G$L, matrix(0, nrow(G$L), ncol(um$L))),
           cbind(matrix(0, nrow(um$L), ncol(G$L)), um$L)
@@ -1642,35 +1847,42 @@ gam_setup.list <- function(
       }
 
       G$off <- c(G$off, um$off + pof)
-      if (M)
+      if (M) {
         for (j in 1:M) {
           ks <- ks + 1
           G$S[[ks]] <- um$S[[j]]
         }
+      }
 
       G$m <- G$m + um$m
       G$nsdf[i] <- um$nsdf
       if (!is.null(um$P) || !is.null(G$P)) {
-        if (is.null(G$P)) G$P <- diag(1, nrow = pof)
+        if (is.null(G$P)) {
+          G$P <- diag(1, nrow = pof)
+        }
         k <- ncol(um$X)
-        if (is.null(um$P)) um$P <- diag(1, nrow = k)
+        if (is.null(um$P)) {
+          um$P <- diag(1, nrow = k)
+        }
         G$P <- rbind(
           cbind(G$P, matrix(0, pof, k)),
           cbind(matrix(0, k, pof), um$P)
         )
       }
       G$cmX <- c(G$cmX, um$cmX)
-      if (um$nsdf > 0)
+      if (um$nsdf > 0) {
         um$term.names[1:um$nsdf] <- paste(
           um$term.names[1:um$nsdf],
           i - 1,
           sep = "."
         )
+      }
       G$term.names <- c(G$term.names, um$term.names)
       G$lsp0 <- c(G$lsp0, um$lsp0)
       G$sp <- c(G$sp, um$sp)
       pof <- ncol(G$X)
     }
+  }
 
   ## If there is overlap then there is a danger of lack of identifiability of the
   ## parameteric terms, especially if there are factors present in shared components.
@@ -1690,7 +1902,9 @@ gam_setup.list <- function(
         G$smooth[[i]]$first.para <- G$smooth[[i]]$first.para - k
         G$smooth[[i]]$last.para <- G$smooth[[i]]$last.para - k
       }
-      for (i in 1:length(G$off)) G$off[i] <- G$off[i] - sum(rt$dind < G$off[i])
+      for (i in 1:length(G$off)) {
+        G$off[i] <- G$off[i] - sum(rt$dind < G$off[i])
+      }
       attr(G$nsdf, "drop.ind") <- rt$dind ## store drop index
     }
   }
@@ -1700,7 +1914,7 @@ gam_setup.list <- function(
 
   G$g.index <- rep(FALSE, ncol(G$X))
   n.sp0 <- 0
-  if (length(G$smooth))
+  if (length(G$smooth)) {
     for (i in 1:length(G$smooth)) {
       if (!is.null(G$smooth[[i]]$g.index)) {
         G$g.index[
@@ -1713,7 +1927,10 @@ gam_setup.list <- function(
         n.sp0 <- G$smooth[[i]]$last.sp <- n.sp0 + n.sp
       }
     }
-  if (!any(G$g.index)) G$g.index <- NULL
+  }
+  if (!any(G$g.index)) {
+    G$g.index <- NULL
+  }
 
   G
 }
@@ -1784,7 +2001,9 @@ olid <- function(X, nsdf, pstart, flpi, lpi) {
       #if (k<nf) pstart[(k+1):nf] <-  pstart[(k+1):nf] - 1 ## later block starts move down 1
       for (i in 1:nlp) {
         k <- which(d == lpi[[i]])
-        if (length(k) > 0) lpi[[i]] <- lpi[[i]][-k] ## drop row
+        if (length(k) > 0) {
+          lpi[[i]] <- lpi[[i]][-k]
+        } ## drop row
         k <- which(lpi[[i]] > d)
         if (length(k) > 0) lpi[[i]][k] <- lpi[[i]][k] - 1 ## close up
       }
@@ -1813,25 +2032,31 @@ write_jagslp <- function(resp, family, file, use.weights, offset = FALSE) {
       "eta[i]^2"
     )
   names(iltab) <- c("identity", "log", "logit", "probit", "inverse", "sqrt")
-  if (!family$link %in% names(iltab)) stop("sorry link not yet handled")
+  if (!family$link %in% names(iltab)) {
+    stop("sorry link not yet handled")
+  }
 
   ## code linear predictor and expected response...
   if (family$link == "identity") {
-    if (offset)
+    if (offset) {
       cat(
         "  mu <- X %*% b + offset ## expected response\n",
         file = file,
         append = TRUE
-      ) else
+      )
+    } else {
       cat("  mu <- X %*% b ## expected response\n", file = file, append = TRUE)
+    }
   } else {
-    if (offset)
+    if (offset) {
       cat(
         "  eta <- X %*% b + offset ## linear predictor\n",
         file = file,
         append = TRUE
-      ) else
+      )
+    } else {
       cat("  eta <- X %*% b ## linear predictor\n", file = file, append = TRUE)
+    }
     cat(
       "  for (i in 1:n) { mu[i] <- ",
       iltab[family$link],
@@ -1844,14 +2069,15 @@ write_jagslp <- function(resp, family, file, use.weights, offset = FALSE) {
   #scale <- TRUE ## is scale parameter free?
   cat("  for (i in 1:n) { ", file = file, append = TRUE)
   if (family$family == "gaussian") {
-    if (use.weights)
+    if (use.weights) {
       cat(
         resp,
         "[i] ~ dnorm(mu[i],tau*w[i]) } ## response \n",
         sep = "",
         file = file,
         append = TRUE
-      ) else
+      )
+    } else {
       cat(
         resp,
         "[i] ~ dnorm(mu[i],tau) } ## response \n",
@@ -1859,6 +2085,7 @@ write_jagslp <- function(resp, family, file, use.weights, offset = FALSE) {
         file = file,
         append = TRUE
       )
+    }
     cat(
       "  scale <- 1/tau ## convert tau to standard GLM scale\n",
       file = file,
@@ -1878,7 +2105,9 @@ write_jagslp <- function(resp, family, file, use.weights, offset = FALSE) {
       file = file,
       append = TRUE
     )
-    if (use.weights) warning("weights ignored")
+    if (use.weights) {
+      warning("weights ignored")
+    }
     use.weights <- FALSE
   } else if (family$family == "binomial") {
     # scale <- FALSE
@@ -1891,14 +2120,15 @@ write_jagslp <- function(resp, family, file, use.weights, offset = FALSE) {
     )
     use.weights <- TRUE
   } else if (family$family == "Gamma") {
-    if (use.weights)
+    if (use.weights) {
       cat(
         resp,
         "[i] ~ dgamma(r*w[i],r*w[i]/mu[i]) } ## response \n",
         sep = "",
         file = file,
         append = TRUE
-      ) else
+      )
+    } else {
       cat(
         resp,
         "[i] ~ dgamma(r,r/mu[i]) } ## response \n",
@@ -1906,6 +2136,7 @@ write_jagslp <- function(resp, family, file, use.weights, offset = FALSE) {
         file = file,
         append = TRUE
       )
+    }
     cat(
       "  r ~ dgamma(.05,.005) ## scale parameter prior \n",
       file = file,
@@ -1916,6 +2147,8 @@ write_jagslp <- function(resp, family, file, use.weights, offset = FALSE) {
       file = file,
       append = TRUE
     )
-  } else stop("family not implemented yet")
+  } else {
+    stop("family not implemented yet")
+  }
   use.weights
 }

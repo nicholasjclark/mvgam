@@ -166,8 +166,11 @@ mcmc_summary = function(
       ch_bind <- object2
     } else {
       np <- NCOL(object2[[1]])
-      if (np > 1) ch_bind <- do.call("rbind", object2) else
+      if (np > 1) {
+        ch_bind <- do.call("rbind", object2)
+      } else {
         ch_bind <- as.matrix(object2)
+      }
     }
 
     x <- list()
@@ -311,11 +314,12 @@ mcmc_summary = function(
           # If > 750 params use loop to calculate Rhat
           if (NCOL(object2[[1]]) > 750) {
             r_hat <- c(rep(NA, NCOL(object2[[1]])))
-            for (v in 1:length(r_hat))
+            for (v in 1:length(r_hat)) {
               r_hat[v] <- round(
                 coda::gelman.diag(object2[, v])$psrf[, 1],
                 digits = 2
               )
+            }
             r_hat <- data.frame(r_hat)
             colnames(r_hat) <- "Rhat"
           } else {
@@ -2194,8 +2198,7 @@ vectorise_stan_lik = function(
       model_file[init_trend_line] <-
         'LV_raw[1, 1:n_lv] ~ normal(0, 0.1);'
 
-      if (drift) {
-      } else {
+      if (drift) {} else {
         remainder_line <- grep(
           'LV_raw[2:n, j] ~ normal(LV_raw[1:(n - 1), j], 0.1)',
           model_file,
@@ -2223,8 +2226,7 @@ vectorise_stan_lik = function(
       model_file[init_trend_line] <-
         'trend[1, 1:n_series] ~ normal(0, sigma);'
 
-      if (drift) {
-      } else {
+      if (drift) {} else {
         remainder_line <- grep(
           'trend[2:n, s] ~ normal(trend[1:(n - 1), s], sigma[s])',
           model_file,
@@ -2311,8 +2313,7 @@ vectorise_stan_lik = function(
       model_file[init_trend_line] <-
         'LV_raw[1, 1:n_lv] ~ normal(0, 0.1);'
 
-      if (drift) {
-      } else {
+      if (drift) {} else {
         remainder_line <- grepws(
           'LV_raw[2:n, j] ~ normal(ar1[j] * LV_raw[1:(n - 1), j], 0.1)',
           model_file,
@@ -2340,8 +2341,7 @@ vectorise_stan_lik = function(
       model_file[init_trend_line] <-
         'trend[1, 1:n_series] ~ normal(0, sigma);'
 
-      if (drift) {
-      } else {
+      if (drift) {} else {
         remainder_line <- grepws(
           'trend[2:n, s] ~ normal(ar1[s] * trend[1:(n - 1), s], sigma[s])',
           model_file,
@@ -2372,8 +2372,7 @@ vectorise_stan_lik = function(
       model_file[init_trend_line] <-
         'LV_raw[1, 1:n_lv] ~ normal(0, 0.1);'
 
-      if (drift) {
-      } else {
+      if (drift) {} else {
         second_line <- grepws(
           'LV_raw[2, j] ~ normal(LV_raw[1, j] * ar1[j], 0.1)',
           model_file,
@@ -2410,8 +2409,7 @@ vectorise_stan_lik = function(
       model_file[init_trend_line] <-
         'trend[1, 1:n_series] ~ normal(0, sigma);'
 
-      if (drift) {
-      } else {
+      if (drift) {} else {
         second_line <- grep(
           'trend[2, s] ~ normal(trend[1, s] * ar1[s], sigma[s])',
           model_file,
@@ -2452,8 +2450,7 @@ vectorise_stan_lik = function(
       model_file[init_trend_line] <-
         'LV_raw[1, 1:n_lv] ~ normal(0, 0.1);'
 
-      if (drift) {
-      } else {
+      if (drift) {} else {
         second_line <- grep(
           'LV_raw[2, j] ~ normal(LV_raw[1, j] * ar1[j], 0.1)',
           model_file,
@@ -2501,8 +2498,7 @@ vectorise_stan_lik = function(
       model_file[init_trend_line] <-
         'trend[1, 1:n_series] ~ normal(0, sigma);'
 
-      if (drift) {
-      } else {
+      if (drift) {} else {
         second_line <- grepws(
           'trend[2, s] ~ normal(trend[1, s] * ar1[s], sigma[s])',
           model_file,
@@ -2705,7 +2701,9 @@ trend_map_mods = function(
   data_train,
   ytimes
 ) {
-  if (trend_model == 'ZMVN') trend_model <- 'RW'
+  if (trend_model == 'ZMVN') {
+    trend_model <- 'RW'
+  }
   if (trend_model != 'VAR1') {
     # Model code should be modified to remove any priors and modelling for the
     # latent variable coefficients and sign corrections
@@ -3065,7 +3063,9 @@ add_trend_predictors = function(
   drift = FALSE
 ) {
   #### Creating the trend mvgam model file and data structures ####
-  if (trend_model == 'ZMVN') trend_model <- 'RW'
+  if (trend_model == 'ZMVN') {
+    trend_model <- 'RW'
+  }
   # Replace any terms labelled 'trend' with 'series' for creating the necessary
   # structures
   trend_formula <- formula(paste(
@@ -3481,8 +3481,7 @@ add_trend_predictors = function(
     all_gp_prior_lines = function(model_file, prior_line, max_break = 10) {
       last <- prior_line + max_break
       for (i in prior_line:(prior_line + max_break)) {
-        if (!grepl('b_raw[', model_file[i], fixed = TRUE)) {
-        } else {
+        if (!grepl('b_raw[', model_file[i], fixed = TRUE)) {} else {
           last <- i
           break
         }
@@ -4269,7 +4268,7 @@ check_div <- function(fit, quiet = FALSE, sampler_params) {
   N = length(divergent)
 
   if (round(100 * n / N, 4) > 2) {
-    if (!quiet)
+    if (!quiet) {
       insight::print_color(
         sprintf(
           '\u2716 %s of %s iterations ended with a divergence (%s%%)\n',
@@ -4279,6 +4278,7 @@ check_div <- function(fit, quiet = FALSE, sampler_params) {
         ),
         "bred"
       )
+    }
     insight::print_color(
       '    Try a larger adapt_delta to remove divergences\n',
       "bred"
@@ -4312,7 +4312,7 @@ check_treedepth <- function(
   N = length(treedepths)
 
   if (round(100 * n / N, 4) > 2) {
-    if (!quiet)
+    if (!quiet) {
       insight::print_color(
         sprintf(
           '\u2716 %s of %s iterations saturated the maximum tree depth of %s (%s%%)\n',
@@ -4323,6 +4323,7 @@ check_treedepth <- function(
         ),
         "bred"
       )
+    }
     insight::print_color(
       '    Try a larger max_treedepth to avoid saturation\n',
       "bred"
@@ -4399,7 +4400,9 @@ check_n_eff <- function(
   neffs <- fit_summary[, 'n_eff']
   ratios <- neffs / iter
   no_warning <- TRUE
-  if (min(ratios, na.rm = TRUE) < 0.001) no_warning <- FALSE
+  if (min(ratios, na.rm = TRUE) < 0.001) {
+    no_warning <- FALSE
+  }
   if (no_warning) {
     if (!quiet) {
       insight::print_color('\u2714', "green")
@@ -4483,7 +4486,9 @@ check_rhat <- function(
   N = length(rhats[!is.na(rhats)])
   n = length(which(rhats > 1.05))
 
-  if (round(100 * n / N, 4) > 2) no_warning <- FALSE
+  if (round(100 * n / N, 4) > 2) {
+    no_warning <- FALSE
+  }
   if (no_warning) {
     if (!quiet) {
       insight::print_color('\u2714', "green")
@@ -4578,7 +4583,9 @@ nlist = function(...) {
   dots <- list(...)
   no_names <- is.null(names(dots))
   has_name <- if (no_names) FALSE else nzchar(names(dots))
-  if (all(has_name)) return(dots)
+  if (all(has_name)) {
+    return(dots)
+  }
   nms <- as.character(m)[-1]
   if (no_names) {
     names(dots) <- nms
