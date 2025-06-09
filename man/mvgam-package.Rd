@@ -23,6 +23,7 @@ Useful links:
 
 Other contributors:
 \itemize{
+  \item KANK Karunarathna (\href{https://orcid.org/0000-0002-8995-5502}{ORCID}) (ARMA parameterisations and factor models) [contributor]
   \item Sarah Heaps (\href{https://orcid.org/0000-0002-5543-037X}{ORCID}) (VARMA parameterisations) [contributor]
   \item Scott Pease (\href{https://orcid.org/0009-0006-8977-9285}{ORCID}) (broom enhancements) [contributor]
   \item Matthijs Hollanders (\href{https://orcid.org/0000-0003-0796-1018}{ORCID}) (ggplot visualizations) [contributor]

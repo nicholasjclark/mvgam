@@ -1203,68 +1203,68 @@ add_gp_spd_funs = function(model_file, kernel) {
   model_file <- readLines(textConnection(model_file), n = -1)
 }
 
+#' Evaluate Laplacian eigenfunction for a given GP basis function
+#' @noRd
+phi = function(boundary, m, centred_covariate) {
+  1 / sqrt(boundary) * sin((m * pi)/(2 * boundary) *
+                             (centred_covariate + boundary))
+}
+
+#' Evaluate eigenvalues for a given GP basis function
+#' @noRd
+lambda = function(boundary, m) {
+  ((m * pi) / (2 * boundary))^2
+}
+
+#' Spectral density squared exponential Gaussian Process kernel
+#' @noRd
+spd = function(alpha_gp, rho_gp, eigenvalues) {
+  (alpha_gp^2) * sqrt(2 * pi) * rho_gp *
+    exp(-0.5 * (rho_gp^2) * (eigenvalues^2))
+}
+
+#' @noRd
+sim_hilbert_gp = function(alpha_gp,
+                          rho_gp,
+                          b_gp,
+                          last_trends,
+                          fc_times,
+                          train_times,
+                          mean_train_times){
+
+  num_gp_basis <- length(b_gp)
+
+  # Get vector of eigenvalues of covariance matrix
+  eigenvalues <- vector()
+  for(m in 1:num_gp_basis){
+    eigenvalues[m] <- lambda(boundary = (5.0/4) *
+                               (max(train_times) - min(train_times)),
+                             m = m)
+  }
+
+  # Get vector of eigenfunctions
+  eigenfunctions <- matrix(NA, nrow = length(fc_times),
+                           ncol = num_gp_basis)
+  for(m in 1:num_gp_basis){
+    eigenfunctions[, m] <- phi(boundary = (5.0/4) *
+                                 (max(train_times) - min(train_times)),
+                               m = m,
+                               centred_covariate = fc_times - mean_train_times)
+  }
+
+  # Compute diagonal of covariance matrix
+  diag_SPD <- sqrt(spd(alpha_gp = alpha_gp,
+                       rho_gp = rho_gp,
+                       sqrt(eigenvalues)))
+
+  # Compute GP trend forecast
+  as.vector((diag_SPD * b_gp) %*% t(eigenfunctions))
+}
+
 #### Old gp() prepping functions; these are now redundant because
 # brms is used to evaluate gp() effects and produce the relevant
 # eigenfunctions / eigenvalues, but keeping the functions here for
 # now in case they are needed for later work ####
-
-#' #' Evaluate Laplacian eigenfunction for a given GP basis function
-#' #' @noRd
-#' phi = function(boundary, m, centred_covariate) {
-#'   1 / sqrt(boundary) * sin((m * pi)/(2 * boundary) *
-#'                              (centred_covariate + boundary))
-#' }
-#'
-#' #' Evaluate eigenvalues for a given GP basis function
-#' #' @noRd
-#' lambda = function(boundary, m) {
-#'   ((m * pi)/(2 * boundary))^2
-#' }
-#'
-#' #' Spectral density squared exponential Gaussian Process kernel
-#' #' @noRd
-#' spd = function(alpha_gp, rho_gp, eigenvalues) {
-#'   (alpha_gp^2) * sqrt(2 * pi) * rho_gp *
-#'     exp(-0.5 * (rho_gp^2) * (eigenvalues^2))
-#' }
-#'
-#' #' @noRd
-#' sim_hilbert_gp = function(alpha_gp,
-#'                           rho_gp,
-#'                           b_gp,
-#'                           last_trends,
-#'                           fc_times,
-#'                           train_times,
-#'                           mean_train_times){
-#'
-#'   num_gp_basis <- length(b_gp)
-#'
-#'   # Get vector of eigenvalues of covariance matrix
-#'   eigenvalues <- vector()
-#'   for(m in 1:num_gp_basis){
-#'     eigenvalues[m] <- lambda(boundary = (5.0/4) *
-#'                                (max(train_times) - min(train_times)),
-#'                              m = m)
-#'   }
-#'
-#'   # Get vector of eigenfunctions
-#'   eigenfunctions <- matrix(NA, nrow = length(fc_times),
-#'                            ncol = num_gp_basis)
-#'   for(m in 1:num_gp_basis){
-#'     eigenfunctions[, m] <- phi(boundary = (5.0/4) *
-#'                                  (max(train_times) - min(train_times)),
-#'                                m = m,
-#'                                centred_covariate = fc_times - mean_train_times)
-#'   }
-#'
-#'   # Compute diagonal of covariance matrix
-#'   diag_SPD <- sqrt(spd(alpha_gp = alpha_gp,
-#'                        rho_gp = rho_gp,
-#'                        sqrt(eigenvalues)))
-#'
-#'   # Compute GP trend forecast
-#'   as.vector((diag_SPD * b_gp) %*% t(eigenfunctions))
-#' }
 
 #' #' Compute the mth eigen function of an approximate GP
 #' #' Credit to Paul Burkner from brms: https://github.com/paul-buerkner/brms/R/formula-gp.R#L289
