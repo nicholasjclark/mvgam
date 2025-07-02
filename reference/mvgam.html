@@ -778,7 +778,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55e8d90f14c8&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x560f38c732f8&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -883,7 +883,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 16</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x55e8d90f14c8&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x560f38c732f8&gt; </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family_pars       : NULL</span>
@@ -1011,24 +1011,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="va">mc.cores.def</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">"mc.cores"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>mc.cores <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 164 log-likelihood matrix.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate    SE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo   -812.9  97.8</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo       128.3  34.8</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> looic      1625.8 195.7</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE of elpd_loo is NA.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.3, 1.0]).</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Pareto k diagnostic values:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                           Count Pct.    Min. ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.67]   (good)     150   91.5%   46      </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.67, 1]   (bad)       10    6.1%   &lt;NA&gt;    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     (1, Inf)   (very bad)   4    2.4%   &lt;NA&gt;    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> See help('pareto-k-diagnostic') for details.</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> Can't mix NA and not NA values in 'r_eff'.</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>mc.cores <span class="op">=</span> <span class="va">mc.cores.def</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span></span></span>
@@ -1101,7 +1084,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpFbGT4m/model_fe1a9373f4bc428a5906ce7b23b30b3c.stan', line 20, column 31: Found</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpgJ7Cmr/model_fe1a9373f4bc428a5906ce7b23b30b3c.stan', line 20, column 31: Found</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     int division:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     Values will be rounded towards zero. If rounding is not desired you can</span>
@@ -1109,7 +1092,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     the division as</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2.0</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     If rounding is intended please use the integer division operator %/%.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpFbGT4m/model-245121ea78ae.stan', line 20, column 33: Found</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpgJ7Cmr/model-25af597f42c8.stan', line 20, column 33: Found</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     int division:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     Values will be rounded towards zero. If rounding is not desired you can</span>
@@ -1261,7 +1244,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> out ~ gp(time, by = temp, c = 5/4, k = 40, scale = FALSE)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55e8d90f14c8&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x560f38c732f8&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> gaussian</span>
@@ -1577,7 +1560,7 @@ multispecies forecasts to navigate the dynamics of ecological predictability. Pe
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> cbind(y, ntrials) ~ series + s(x, by = series)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55e8d90f14c8&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x560f38c732f8&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> binomial</span>

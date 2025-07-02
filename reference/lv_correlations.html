@@ -107,7 +107,7 @@ format that allows for a deeper investigation of relationships among the time se
 <span class="r-in"><span>            data <span class="op">=</span> <span class="va">portal_data</span>,</span></span>
 <span class="r-in"><span>            chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>            silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpFbGT4m/model_fd0fdfeaee023a8e623b5071c6b9ec02.stan', line 20, column 31: Found</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpgJ7Cmr/model_fd0fdfeaee023a8e623b5071c6b9ec02.stan', line 20, column 31: Found</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     int division:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     Values will be rounded towards zero. If rounding is not desired you can</span>
@@ -115,7 +115,7 @@ format that allows for a deeper investigation of relationships among the time se
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     the division as</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2.0</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     If rounding is intended please use the integer division operator %/%.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpFbGT4m/model-2451128b82ca.stan', line 20, column 33: Found</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpgJ7Cmr/model-25af69c18229.stan', line 20, column 33: Found</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     int division:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     Values will be rounded towards zero. If rounding is not desired you can</span>
@@ -130,8 +130,8 @@ format that allows for a deeper investigation of relationships among the time se
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 2 × 2</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Factor   Contribution</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>           <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> Factor 1        0.532</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> Factor 2        0.468</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> Factor 1        0.527</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> Factor 2        0.473</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Calculate correlations among the series using lv_correlations()</span></span></span>
 <span class="r-in"><span><span class="va">lvcors</span> <span class="op">&lt;-</span> <span class="fu">lv_correlations</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
@@ -153,11 +153,11 @@ format that allows for a deeper investigation of relationships among the time se
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [1] "cor"        "cor_lower"  "cor_upper"  "sig_cor"    "cov"       </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [6] "prec"       "prec_lower" "prec_upper" "sig_prec"   "trace"     </span>
 <span class="r-in"><span><span class="va">lvcors</span><span class="op">$</span><span class="va">cor</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            DM          DO         PB           PP</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> DM  1.0000000 0.538926931 -0.5026149 -0.813423512</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> DO  0.5389269 1.000000000  0.4153731  0.005680965</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> PB -0.5026149 0.415373088  1.0000000  0.895825721</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> PP -0.8134235 0.005680965  0.8958257  1.000000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            DM           DO         PB            PP</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> DM  1.0000000 5.518870e-01 -0.4884034 -8.069210e-01</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> DO  0.5518870 1.000000e+00  0.4143197  2.716395e-05</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> PB -0.4884034 4.143197e-01  1.0000000  8.930669e-01</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> PP -0.8069210 2.716395e-05  0.8930669  1.000000e+00</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># For those correlations whose credible intervals did not include</span></span></span>
 <span class="r-in"><span><span class="co"># zero, plot them as a correlation matrix (all other correlations</span></span></span>

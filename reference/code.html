@@ -190,7 +190,7 @@ to fit the model in Stan.</p>
 <span class="r-in"><span><span class="va">sdata</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/standata.html" class="external-link">standata</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">sdata</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 21</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ y           : num [1:75, 1:3] 3 7 2 1 0 0 0 1 1 0 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ y           : num [1:75, 1:3] 2 3 0 0 1 2 2 1 1 0 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ n           : int 75</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ X           : num [1:225, 1:37] 1 1 1 1 1 1 1 1 1 1 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "dimnames")=List of 2</span>
@@ -203,7 +203,7 @@ to fit the model in Stan.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ S4          : num [1:9, 1:18] 8.555 1.22 4.352 -0.822 -5.594 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ p_coefs     : Named num 0</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "names")= chr "(Intercept)"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ p_taus      : num 1.04</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ p_taus      : num 1.05</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ ytimes      : int [1:75, 1:3] 1 4 7 10 13 16 19 22 25 28 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ n_series    : int 3</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ sp          : Named num [1:8] 0.368 0.368 0.368 0.368 0.368 ...</span>
@@ -214,7 +214,7 @@ to fit the model in Stan.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ n_sp        : num 8</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ n_nonmissing: int 225</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ obs_ind     : int [1:225] 1 2 3 4 5 6 7 8 9 10 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ flat_ys     : num [1:225] 3 7 2 1 0 0 0 1 1 0 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ flat_ys     : num [1:225] 2 3 0 0 1 2 2 1 1 0 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ flat_xs     : num [1:225, 1:37] 1 1 1 1 1 1 1 1 1 1 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ : NULL</span>
