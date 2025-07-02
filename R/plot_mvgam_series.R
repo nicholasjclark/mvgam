@@ -120,7 +120,6 @@ plot_mvgam_series <- function(
 
     # Return
     return(plot_ts)
-
   } else {
     # Return multiple plots for one time series
     s_name <- levels(data_train$series)[series]
@@ -209,7 +208,6 @@ plot_time_series <- function(
   ylab = 'y',
   series = 'all'
 ) {
-
   # Determine scale and y label
   if (log_scale) {
     dat$y <- log(dat$y + 1)
@@ -228,7 +226,6 @@ plot_time_series <- function(
     } else {
       p <- p + ggplot2::geom_point(colour = "#8F2727")
     }
-
   } else {
     p <- ggplot2::ggplot(dat, ggplot2::aes(time, y, colour = data)) +
       ggplot2::labs(title = "Time series", x = "Time", y = ylab) +
@@ -248,7 +245,6 @@ plot_time_series <- function(
     } else {
       p <- p + ggplot2::geom_point(show.legend = F)
     }
-
   }
   return(p)
 }
@@ -256,7 +252,6 @@ plot_time_series <- function(
 #' Function to create histogram of observed values
 #' @noRd
 plot_histogram <- function(dat, ylab = 'y', n_bins = NULL) {
-
   # Determine bins
   if (is.null(n_bins)) {
     n_bins <- max(c(length(hist(c(dat$y), plot = F)$breaks), 20))
@@ -272,7 +267,6 @@ plot_histogram <- function(dat, ylab = 'y', n_bins = NULL) {
 #' Function to compute and plot autocorrelation
 #' @noRd
 plot_acf <- function(dat) {
-
   # Compute empirical ACF
   acf_y <- acf(dat$y, plot = F, na.action = na.pass)
 
@@ -296,7 +290,6 @@ plot_acf <- function(dat) {
 #' Function to generate empirical cumulative distribution
 #' @noRd
 plot_ecdf <- function(dat, ylab = 'y') {
-
   # Compute empriical ECDF
   range_y <- range(dat$y, na.rm = T)
   data.frame(x = seq(range_y[1], range_y[2], length.out = 100)) %>%
