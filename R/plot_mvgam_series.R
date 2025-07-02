@@ -43,9 +43,16 @@
 #'                      prop_trend = 0.6, phi = 10)
 #'plot_mvgam_series(data = sim_data$data_train, series = 'all')
 #'@export
-plot_mvgam_series <- function(object, data, newdata, y =
-                                'y', lines = TRUE, series = 1, n_bins = NULL, log_scale =
-                                FALSE) {
+plot_mvgam_series <- function(
+  object,
+  data,
+  newdata,
+  y = 'y',
+  lines = TRUE,
+  series = 1,
+  n_bins = NULL,
+  log_scale = FALSE
+) {
   # Validate series
   if (is.character(series)) {
     if (series != 'all') {
@@ -86,8 +93,7 @@ plot_mvgam_series <- function(object, data, newdata, y =
       y <- as.character(terms(object$call)[[2]])
     } else {
       if (any(grepl('cbind', resp_terms))) {
-        resp_terms <- resp_terms[-grepl('cbind',
-                                        resp_terms)]
+        resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
         y <- resp_terms[1]
       }
     }
@@ -103,16 +109,12 @@ plot_mvgam_series <- function(object, data, newdata, y =
 
   # Determine what to plot
   if (is.character(series) && series == 'all') {
-
     # Only return a plot of time series
     dat <- dplyr::as_tibble(data_train) %>%
       dplyr::distinct(time, y, series)
-    plot_ts <- plot_time_series(dat, lines, log_scale, y,
-                                series)
+    plot_ts <- plot_time_series(dat, lines, log_scale, y, series)
     return(plot_ts)
-
   } else {
-
     # Return multiple plots for one time series
     s_name <- levels(data_train$series)[series]
     dat <- dplyr::as_tibble(data_train) %>%
@@ -128,8 +130,7 @@ plot_mvgam_series <- function(object, data, newdata, y =
           dplyr::mutate(data = "validate")
       )
     }
-    plot_ts <- plot_time_series(dat, lines, log_scale, y,
-                                series)
+    plot_ts <- plot_time_series(dat, lines, log_scale, y, series)
     plot_hist <- plot_histogram(dat, y, n_bins)
     plot_acf_obj <- plot_acf(dat)
     plot_ecdf_obj <- plot_ecdf(dat, y)
@@ -158,8 +159,7 @@ validate_plot_data <- function(data, y) {
     }
     # If 'time' column is missing, stop with error
     if (!'time' %in% colnames(data)) {
-      stop('data does not contain a "time" column',
-           call. = FALSE)
+      stop('data does not contain a "time" column', call. = FALSE)
     }
   } else {
     # If data is a list, check for 'series' and 'time' in names
@@ -173,8 +173,7 @@ validate_plot_data <- function(data, y) {
 
   # Check if the outcome variable 'y' exists in data
   if (!y %in% names(data)) {
-    stop(paste0('variable "', y, '" not found in data'),
-         call. = FALSE)
+    stop(paste0('variable "', y, '" not found in data'), call. = FALSE)
   } else {
     # Assign the outcome variable to a standard column 'y'
     data$y <- data[[y]]
@@ -189,8 +188,13 @@ validate_plot_data <- function(data, y) {
 
 #' Function to generate time series plots
 #' @noRd
-plot_time_series <- function(dat, lines = TRUE, log_scale =
-                               FALSE, ylab = 'y', series = 'all') {
+plot_time_series <- function(
+  dat,
+  lines = TRUE,
+  log_scale = FALSE,
+  ylab = 'y',
+  series = 'all'
+) {
   if (log_scale) {
     dat$y <- log(dat$y + 1)
     ylab <- paste0('log(', ylab, ' + 1)')
@@ -201,15 +205,13 @@ plot_time_series <- function(dat, lines = TRUE, log_scale =
       ggplot2::labs(x = "Time", y = ylab) +
       ggplot2::theme_bw()
     if (lines) {
-      p <- p + ggplot2::geom_line(colour = "#8F2727",
-                                  linewidth = 0.75)
+      p <- p + ggplot2::geom_line(colour = "#8F2727", linewidth = 0.75)
     } else {
       p <- p + ggplot2::geom_point(colour = "#8F2727")
     }
   } else {
     p <- ggplot2::ggplot(dat, ggplot2::aes(time, y, colour = data)) +
-      ggplot2::labs(title = "Time series", x = "Time", y =
-                      ylab) +
+      ggplot2::labs(title = "Time series", x = "Time", y = ylab) +
       ggplot2::geom_vline(
         xintercept = dat %>%
           dplyr::filter(data == "validate") %>%
@@ -233,14 +235,11 @@ plot_time_series <- function(dat, lines = TRUE, log_scale =
 #' @noRd
 plot_histogram <- function(dat, ylab = 'y', n_bins = NULL) {
   if (is.null(n_bins)) {
-    n_bins <- max(c(length(hist(c(dat$y), plot = F)$breaks),
-                    20))
+    n_bins <- max(c(length(hist(c(dat$y), plot = F)$breaks), 20))
   }
   ggplot2::ggplot(dat, ggplot2::aes(y)) +
-    ggplot2::geom_histogram(bins = n_bins, fill = "#8F2727",
-                            col = 'white') +
-    ggplot2::labs(title = "Histogram", x = ylab, y =
-                    "Count") +
+    ggplot2::geom_histogram(bins = n_bins, fill = "#8F2727", col = 'white') +
+    ggplot2::labs(title = "Histogram", x = ylab, y = "Count") +
     ggplot2::theme_bw()
 }
 
@@ -249,11 +248,9 @@ plot_histogram <- function(dat, ylab = 'y', n_bins = NULL) {
 plot_acf <- function(dat) {
   acf_y <- acf(dat$y, plot = F, na.action = na.pass)
   data.frame(acf = acf_y$acf[,, 1], lag = acf_y$lag[, 1, 1]) %>%
-    ggplot2::ggplot(ggplot2::aes(x = lag, y = 0, yend =
-                                   acf)) +
+    ggplot2::ggplot(ggplot2::aes(x = lag, y = 0, yend = acf)) +
     ggplot2::geom_hline(
-      yintercept = c(-1, 1) * qnorm((1 + 0.95) / 2) /
-        sqrt(acf_y$n.used),
+      yintercept = c(-1, 1) * qnorm((1 + 0.95) / 2) / sqrt(acf_y$n.used),
       linetype = "dashed"
     ) +
     ggplot2::geom_hline(
@@ -262,8 +259,7 @@ plot_acf <- function(dat) {
       linewidth = 0.25
     ) +
     ggplot2::geom_segment(colour = "#8F2727", linewidth = 1) +
-    ggplot2::labs(title = "ACF", x = "Lag", y =
-                    "Autocorrelation") +
+    ggplot2::labs(title = "ACF", x = "Lag", y = "Autocorrelation") +
     ggplot2::theme_bw()
 }
 
@@ -271,14 +267,15 @@ plot_acf <- function(dat) {
 #' @noRd
 plot_ecdf <- function(dat, ylab = 'y') {
   range_y <- range(dat$y, na.rm = T)
-  data.frame(x = seq(range_y[1], range_y[2], length.out =
-                       100)) %>%
+  data.frame(x = seq(range_y[1], range_y[2], length.out = 100)) %>%
     dplyr::mutate(y = ecdf(dat$y)(x)) %>%
     ggplot2::ggplot(ggplot2::aes(x, y)) +
     ggplot2::geom_line(colour = "#8F2727", linewidth = 0.75) +
     ggplot2::scale_y_continuous(limits = c(0, 1)) +
     ggplot2::labs(
-      title = "CDF", x = ylab,
-      y = "Empirical CDF") +
+      title = "CDF",
+      x = ylab,
+      y = "Empirical CDF"
+    ) +
     ggplot2::theme_bw()
 }
