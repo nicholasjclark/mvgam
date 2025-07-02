@@ -88,6 +88,8 @@ plot_mvgam_series <- function(
     }
 
     data_train <- object$obs_data
+
+    # What is the response variable?
     resp_terms <- as.character(terms(formula(object$call))[[2]])
     if (length(resp_terms) == 1) {
       y <- as.character(terms(object$call)[[2]])
@@ -109,18 +111,26 @@ plot_mvgam_series <- function(
 
   # Determine what to plot
   if (is.character(series) && series == 'all') {
-    # Only return a plot of time series
+    # Only return a plot of the time series
     dat <- dplyr::as_tibble(data_train) %>%
       dplyr::distinct(time, y, series)
+
+    # Create time series plot
     plot_ts <- plot_time_series(dat, lines, log_scale, y, series)
+
+    # Return
     return(plot_ts)
+
   } else {
     # Return multiple plots for one time series
     s_name <- levels(data_train$series)[series]
+
+    # Bind test data if supplied
     dat <- dplyr::as_tibble(data_train) %>%
       dplyr::filter(series == s_name) %>%
       dplyr::distinct(time, y) %>%
       dplyr::mutate(data = "train")
+
     if (!missing(newdata)) {
       dat <- dplyr::bind_rows(
         dat,
@@ -130,10 +140,14 @@ plot_mvgam_series <- function(
           dplyr::mutate(data = "validate")
       )
     }
+
+    # Create each plot component
     plot_ts <- plot_time_series(dat, lines, log_scale, y, series)
     plot_hist <- plot_histogram(dat, y, n_bins)
     plot_acf_obj <- plot_acf(dat)
     plot_ecdf_obj <- plot_ecdf(dat, y)
+
+    # Wrap plots using patchwork
     return(
       patchwork::wrap_plots(
         plot_ts,
@@ -195,20 +209,26 @@ plot_time_series <- function(
   ylab = 'y',
   series = 'all'
 ) {
+
+  # Determine scale and y label
   if (log_scale) {
     dat$y <- log(dat$y + 1)
     ylab <- paste0('log(', ylab, ' + 1)')
   }
+
+  # Create time series plot
   if (series == 'all') {
     p <- ggplot2::ggplot(dat, ggplot2::aes(time, y)) +
       ggplot2::facet_wrap(~series) +
       ggplot2::labs(x = "Time", y = ylab) +
       ggplot2::theme_bw()
+
     if (lines) {
       p <- p + ggplot2::geom_line(colour = "#8F2727", linewidth = 0.75)
     } else {
       p <- p + ggplot2::geom_point(colour = "#8F2727")
     }
+
   } else {
     p <- ggplot2::ggplot(dat, ggplot2::aes(time, y, colour = data)) +
       ggplot2::labs(title = "Time series", x = "Time", y = ylab) +
@@ -222,11 +242,13 @@ plot_time_series <- function(
       ) +
       ggplot2::scale_colour_manual(values = c("#8F2727", "black")) +
       ggplot2::theme_bw()
+
     if (lines) {
       p <- p + ggplot2::geom_line(show.legend = F, linewidth = 0.75)
     } else {
       p <- p + ggplot2::geom_point(show.legend = F)
     }
+
   }
   return(p)
 }
@@ -234,9 +256,13 @@ plot_time_series <- function(
 #' Function to create histogram of observed values
 #' @noRd
 plot_histogram <- function(dat, ylab = 'y', n_bins = NULL) {
+
+  # Determine bins
   if (is.null(n_bins)) {
     n_bins <- max(c(length(hist(c(dat$y), plot = F)$breaks), 20))
   }
+
+  # Plot the histogram
   ggplot2::ggplot(dat, ggplot2::aes(y)) +
     ggplot2::geom_histogram(bins = n_bins, fill = "#8F2727", col = 'white') +
     ggplot2::labs(title = "Histogram", x = ylab, y = "Count") +
@@ -246,7 +272,11 @@ plot_histogram <- function(dat, ylab = 'y', n_bins = NULL) {
 #' Function to compute and plot autocorrelation
 #' @noRd
 plot_acf <- function(dat) {
+
+  # Compute empirical ACF
   acf_y <- acf(dat$y, plot = F, na.action = na.pass)
+
+  # Plot
   data.frame(acf = acf_y$acf[,, 1], lag = acf_y$lag[, 1, 1]) %>%
     ggplot2::ggplot(ggplot2::aes(x = lag, y = 0, yend = acf)) +
     ggplot2::geom_hline(
@@ -266,9 +296,13 @@ plot_acf <- function(dat) {
 #' Function to generate empirical cumulative distribution
 #' @noRd
 plot_ecdf <- function(dat, ylab = 'y') {
+
+  # Compute empriical ECDF
   range_y <- range(dat$y, na.rm = T)
   data.frame(x = seq(range_y[1], range_y[2], length.out = 100)) %>%
     dplyr::mutate(y = ecdf(dat$y)(x)) %>%
+
+    # Plot
     ggplot2::ggplot(ggplot2::aes(x, y)) +
     ggplot2::geom_line(colour = "#8F2727", linewidth = 0.75) +
     ggplot2::scale_y_continuous(limits = c(0, 1)) +
