@@ -64,7 +64,8 @@ Suggests:
     coda,
     runjags,
     usethis,
-    testthat
+    testthat,
+    colorspace
 Enhances:
     gratia (>= 0.9.0),
     tidyr
