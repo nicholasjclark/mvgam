@@ -138,5 +138,6 @@ utils::globalVariables(c(
   "Factor",
   "contribution",
   "unit",
-  "lw"
+  "lw",
+  "data"
 ))
