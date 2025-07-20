@@ -156,7 +156,7 @@ has additional family-specific observation parameters (e.g. variance
 components in
 \code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or
 \code{betar()}), these parameters will be shared across all outcome variables. This is handy
-if you have multiple outcomes (time series in most \code{mvgam} models) that you
+if you have multiple outcomes (time series in most \code{mvgam()} models) that you
 believe share some properties,
 such as being from the same species over different spatial units. Default is
 \code{FALSE}.}
@@ -253,9 +253,9 @@ Default is \code{FALSE} to reduce
 the size of the returned object, unless \code{run_model == FALSE}}
 
 \item{backend}{Character string naming the package to use as the backend for fitting
-the Stan model. Options are "cmdstanr" (the default) or "rstan". Can be set globally
+the Stan model. Options are \code{"cmdstanr"} (the default) or \code{"rstan"}. Can be set globally
 for the current R session via the \code{"brms.backend"} option (see \code{\link{options}}). Details on
-the rstan and cmdstanr packages are available at https://mc-stan.org/rstan/ and
+the \pkg{rstan} and \pkg{cmdstanr} packages are available at https://mc-stan.org/rstan/ and
 https://mc-stan.org/cmdstanr/, respectively}
 
 \item{algorithm}{Character string naming the estimation approach to use.
@@ -263,8 +263,8 @@ Options are \code{"sampling"} for MCMC (the default), \code{"meanfield"} for
 variational inference with factorized normal distributions,
 \code{"fullrank"} for variational inference with a multivariate normal
 distribution, \code{"laplace"} for a Laplace approximation (only available
-when using cmdstanr as the backend) or \code{"pathfinder"} for the pathfinder
-algorithm (only currently available when using cmdstanr as the backend).
+when using \pkg{cmdstanr} as the backend) or \code{"pathfinder"} for the pathfinder
+algorithm (only currently available when using \pkg{cmdstanr} as the backend).
 Can be set globally for the current \R session via the
 \code{"brms.algorithm"} option (see \code{\link{options}}). Limited testing
 suggests that \code{"meanfield"} performs best out of the non-MCMC approximations for
@@ -351,10 +351,12 @@ Dynamic GAMs are useful when we wish to predict future values from time series t
 but we do not want to rely on extrapolating from a smooth term (which can sometimes lead to unpredictable and unrealistic behaviours).
 In addition, smooths can often try to wiggle excessively to capture any autocorrelation that is present in a time series,
 which exacerbates the problem of forecasting ahead. As GAMs are very naturally viewed through a Bayesian lens, and we often
-must model time series that show complex distributional features and missing data, parameters for \code{mvgam} models are estimated
+must model time series that show complex distributional features and missing data, parameters for \pkg{mvgam} models are estimated
 in a Bayesian framework using Markov Chain Monte Carlo by default. A general overview is provided
 in the primary vignettes: \code{vignette("mvgam_overview")} and \code{vignette("data_in_mvgam")}.
-For a full list of available vignettes see \code{vignette(package = "mvgam")}
+For a full list of available vignettes see \code{vignette(package = "mvgam")}. See also
+\code{\link{mvgam_use_cases}} for a list of online resources that demonstrate how to use
+\pkg{mvgam} for a variety of real-world modelling applications.
 \cr
 \cr
 \emph{Formula syntax}: Details of the formula syntax used by \pkg{mvgam} can be found in
@@ -408,7 +410,7 @@ autocorrelation will be evident. When a particular observation is missing, the r
 draws from the model's posterior distribution
 \cr
 \cr
-\emph{Using Stan}: \code{mvgam} is primarily designed to use Hamiltonian Monte Carlo for parameter estimation
+\emph{Using Stan}: \pkg{mvgam} is primarily designed to use Hamiltonian Monte Carlo for parameter estimation
 via the software \code{Stan} (using either the \code{cmdstanr} or \code{rstan} interface).
 There are great advantages when using \code{Stan} over Gibbs / Metropolis Hastings samplers, which includes the option
 to estimate nonlinear effects via \href{https://arxiv.org/abs/2004.11408}{Hilbert space approximate Gaussian Processes},
@@ -424,7 +426,7 @@ variety of trend models. Users are strongly encouraged to opt for \code{Stan} ov
 good starting place if you are just learning to use the package. It gives an overview of the package's key functions and objects,
 as well as providing a reasonable workflow that new users can follow. In general it is recommended to
 \itemize{
-\item 1. Check that your time series data are in a suitable tidy format for \code{mvgam} modeling (see the \href{https://nicholasjclark.github.io/mvgam/articles/data_in_mvgam.html}{data formatting vignette} for guidance)
+\item 1. Check that your data are in a suitable tidy format for \pkg{mvgam} modeling (see the \href{https://nicholasjclark.github.io/mvgam/articles/data_in_mvgam.html}{data formatting vignette} for guidance)
 \item 2. Inspect features of the data using \code{\link{plot_mvgam_series}}. Now is also a good time to familiarise yourself
 with the package's example workflows that are detailed in the vignettes. In particular,
 the \href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{getting started vignette},

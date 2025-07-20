@@ -103,7 +103,7 @@ has additional family-specific observation parameters (e.g. variance
 components in
 \code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or
 \code{betar()}), these parameters will be shared across all outcome variables. This is handy
-if you have multiple outcomes (time series in most \code{mvgam} models) that you
+if you have multiple outcomes (time series in most \code{mvgam()} models) that you
 believe share some properties,
 such as being from the same species over different spatial units. Default is
 \code{FALSE}.}
@@ -118,9 +118,9 @@ residual associations.
 Cannot be \verb{> n_species}. Defaults arbitrarily to \code{2}}
 
 \item{backend}{Character string naming the package to use as the backend for fitting
-the Stan model. Options are "cmdstanr" (the default) or "rstan". Can be set globally
+the Stan model. Options are \code{"cmdstanr"} (the default) or \code{"rstan"}. Can be set globally
 for the current R session via the \code{"brms.backend"} option (see \code{\link{options}}). Details on
-the rstan and cmdstanr packages are available at https://mc-stan.org/rstan/ and
+the \pkg{rstan} and \pkg{cmdstanr} packages are available at https://mc-stan.org/rstan/ and
 https://mc-stan.org/cmdstanr/, respectively}
 
 \item{algorithm}{Character string naming the estimation approach to use.
@@ -128,8 +128,8 @@ Options are \code{"sampling"} for MCMC (the default), \code{"meanfield"} for
 variational inference with factorized normal distributions,
 \code{"fullrank"} for variational inference with a multivariate normal
 distribution, \code{"laplace"} for a Laplace approximation (only available
-when using cmdstanr as the backend) or \code{"pathfinder"} for the pathfinder
-algorithm (only currently available when using cmdstanr as the backend).
+when using \pkg{cmdstanr} as the backend) or \code{"pathfinder"} for the pathfinder
+algorithm (only currently available when using \pkg{cmdstanr} as the backend).
 Can be set globally for the current \R session via the
 \code{"brms.algorithm"} option (see \code{\link{options}}). Limited testing
 suggests that \code{"meanfield"} performs best out of the non-MCMC approximations for
@@ -160,7 +160,7 @@ generating MCMC simulations in parallel. If \code{TRUE}, the number of cores to 
 \item{threads}{\code{integer} Experimental option to use multithreading for within-chain
 parallelisation in \code{Stan}. We recommend its use only if you are experienced with
 \code{Stan}'s \code{reduce_sum} function and have a slow running model that cannot be sped
-up by any other means. Currently works for all families when using \code{Cmdstan}
+up by any other means. Currently works for all families when using \pkg{cmdstanr}
 as the backend}
 
 \item{silent}{Verbosity level between \code{0} and \code{2}. If \code{1} (the default), most

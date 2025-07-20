@@ -4,6 +4,7 @@
 * Added a new function `ordinate.jsdgam()` to plot two-dimensional ordinations of site and species scores from latent factor models estimated in `jsdgam()`
 * `residual_cor()` now supports models fitted with `mvgam()` in which latent factors were used or in which correlated dynamic processes were used
 * Added a `summary.mvgam_forecast()` function to compute and return prediction intervals of posterior hindcasts and forecasts in a `data.frame` format. This will make it easier for users to create their own custom plots of hindcast and forecast distributions (#108)
+* Added a `mvgam_use_cases` help file to provide links to online resources that discuss how to use 'mvgam' in practice
 
 ## Changing defaults
 * The `forecast()` method is now imported from 'generics' to help avoid conflict issues with other forecasting packages
@@ -22,7 +23,7 @@
 # mvgam 1.1.51
 
 ## New functionalities
-* Changed default priors for scale parameters (i.e. process errors "sigma" and observation errors "sigma_obs") to inverse gammas to provide more sensible prior regularisation away from zero
+* Changed default priors for scale parameters (i.e. process errors `"sigma"` and observation errors `"sigma_obs"`) to inverse gammas to provide more sensible prior regularisation away from zero
 * Improved messaging in `summary()` for better guidance on how to investigate poor HMC sampler behaviours
 * Converted several more plotting functions to return `ggplot` objects in place of base R plots for broader customisation
 * Added four new `type`s to the `pp_check()` function to allow more targeted investigations of randomized quantile residual distributions

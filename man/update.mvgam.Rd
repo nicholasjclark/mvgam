@@ -151,7 +151,7 @@ has additional family-specific observation parameters (e.g. variance
 components in
 \code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or
 \code{betar()}), these parameters will be shared across all outcome variables. This is handy
-if you have multiple outcomes (time series in most \code{mvgam} models) that you
+if you have multiple outcomes (time series in most \code{mvgam()} models) that you
 believe share some properties,
 such as being from the same species over different spatial units. Default is
 \code{FALSE}.}
@@ -245,8 +245,8 @@ Options are \code{"sampling"} for MCMC (the default), \code{"meanfield"} for
 variational inference with factorized normal distributions,
 \code{"fullrank"} for variational inference with a multivariate normal
 distribution, \code{"laplace"} for a Laplace approximation (only available
-when using cmdstanr as the backend) or \code{"pathfinder"} for the pathfinder
-algorithm (only currently available when using cmdstanr as the backend).
+when using \pkg{cmdstanr} as the backend) or \code{"pathfinder"} for the pathfinder
+algorithm (only currently available when using \pkg{cmdstanr} as the backend).
 Can be set globally for the current \R session via the
 \code{"brms.algorithm"} option (see \code{\link{options}}). Limited testing
 suggests that \code{"meanfield"} performs best out of the non-MCMC approximations for

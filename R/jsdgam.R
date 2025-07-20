@@ -51,7 +51,7 @@
 #'@param threads \code{integer} Experimental option to use multithreading for within-chain
 #'parallelisation in \code{Stan}. We recommend its use only if you are experienced with
 #'\code{Stan}'s `reduce_sum` function and have a slow running model that cannot be sped
-#'up by any other means. Currently works for all families when using \code{Cmdstan}
+#'up by any other means. Currently works for all families when using \pkg{cmdstanr}
 #'as the backend
 #'@param priors An optional \code{data.frame} with prior
 #'definitions (in Stan syntax) or, preferentially, a vector containing

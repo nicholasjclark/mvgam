@@ -11,7 +11,7 @@ plot_mvgam_series(
   y = "y",
   lines = TRUE,
   series = 1,
-  n_bins,
+  n_bins = NULL,
   log_scale = FALSE
 )
 }
