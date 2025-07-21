@@ -18,8 +18,6 @@
 #' @importFrom stats formula terms rnorm update.formula predict
 #' @importFrom rlang missing_arg
 #'
-#' @section Model Specification Parameters:
-#'
 #' @param formula A `formula` object specifying the GAM observation model formula.
 #'   These are exactly like the formula for a GLM except that smooth terms, `s()`,
 #'   `te()`, `ti()`, `t2()`, as well as time-varying `dynamic()` terms,
@@ -45,8 +43,6 @@
 #'   - Consider dropping one intercept using `- 1` convention to avoid
 #'     estimation challenges
 #'
-#' @section Spline knots:
-#'
 #' @param knots An optional `list` containing user specified knot values for
 #'   basis construction. For most bases the user simply supplies the knots to be
 #'   used, which must match up with the `k` value supplied. Different terms can
@@ -54,8 +50,6 @@
 #'
 #' @param trend_knots As for `knots` above, this is an optional `list` of knot
 #'   values for smooth functions within the `trend_formula`.
-#'
-#' @section Data:
 #'
 #' @param data A `dataframe` or `list` containing the model response variable
 #'   and covariates required by the GAM `formula` and optional `trend_formula`.
@@ -78,8 +72,6 @@
 #'   variables as in `data`. If included, observations in variable `y` will be
 #'   set to `NA` when fitting the model so that posterior simulations can be obtained.
 #'
-#' @section Model Execution Parameters:
-#'
 #' @param run_model `logical`. If `FALSE`, the model is not fitted but instead
 #'   the function returns the model file and the data/initial values needed to
 #'   fit the model outside of `mvgam`.
@@ -91,8 +83,6 @@
 #'   the model is returned, along with initial values for smooth and AR parameters,
 #'   once the model is fitted. Helpful for users who wish to modify the model file
 #'   to add other stochastic elements. Default is `FALSE` unless `run_model == FALSE`.
-#'
-#' @section Distribution Family:
 #'
 #' @param family `family` specifying the exponential observation family for the series.
 #'
@@ -117,8 +107,6 @@
 #'   family-specific observation parameters (e.g., variance components, dispersion
 #'   parameters), these will be shared across all outcome variables. Useful when
 #'   multiple outcomes share properties. Default is `FALSE`.
-#'
-#' @section Trend Model Specification:
 #'
 #' @param use_lv `logical`. If `TRUE`, use dynamic factors to estimate series'
 #'   latent trends in a reduced dimension format. Only available for `RW()`,
@@ -168,8 +156,6 @@
 #'   or `trend = 'None'` with `trend_formula`. Not available for moving average
 #'   or correlated error models.
 #'
-#' @section MCMC Parameters:
-#'
 #' @param chains `integer` specifying the number of parallel chains for the model.
 #'   Ignored for variational inference algorithms.
 #'
@@ -190,8 +176,6 @@
 #'   slow models. Currently works for all families except `nmix()` and when using
 #'   Cmdstan backend.
 #'
-#' @section Prior and Model Configuration:
-#'
 #' @param priors An optional `data.frame` with prior definitions or, preferably,
 #'   a vector of `brmsprior` objects (see \code{\link[brms]{prior}()}).
 #'   See [get_mvgam_priors()] and Details for more information.
@@ -205,8 +189,6 @@
 #' @param residuals `logical`. Whether to compute series-level randomized quantile
 #'   residuals. Default is `TRUE`. Set to `FALSE` to save time and reduce object
 #'   size (can add later using [add_residuals]).
-#'
-#' @section Backend and Algorithm Parameters:
 #'
 #' @param backend Character string naming the package for Stan model fitting.
 #'   Options are `"cmdstanr"` (default) or `"rstan"`. Can be set globally via
@@ -228,8 +210,6 @@
 #'
 #' @param save_all_pars `logical`. Save draws from all variables defined in Stan's
 #'   `parameters` block. Default is `FALSE`.
-#'
-#' @section Control Parameters:
 #'
 #' @param control Named `list` for controlling sampler behaviour. Valid elements
 #'   include `max_treedepth`, `adapt_delta` and `init`.

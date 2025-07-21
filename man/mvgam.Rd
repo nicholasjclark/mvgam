@@ -312,46 +312,6 @@ Markov Chain Monte Carlo by default.
 \item Quick reference: \href{https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf}{mvgam cheatsheet}
 }
 }
-\section{Model Specification Parameters}{
-
-}
-
-\section{Spline knots}{
-
-}
-
-\section{Data}{
-
-}
-
-\section{Model Execution Parameters}{
-
-}
-
-\section{Distribution Family}{
-
-}
-
-\section{Trend Model Specification}{
-
-}
-
-\section{MCMC Parameters}{
-
-}
-
-\section{Prior and Model Configuration}{
-
-}
-
-\section{Backend and Algorithm Parameters}{
-
-}
-
-\section{Control Parameters}{
-
-}
-
 \section{Model Specification Details}{
 
 
