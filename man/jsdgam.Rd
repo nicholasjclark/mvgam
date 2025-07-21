@@ -46,13 +46,10 @@ effects for the latent factors. Use \code{by = trend} within calls to functional
 (i.e. \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, \code{dynamic()}, or \code{gp()}) to ensure that each factor
 captures a different axis of variation. See the example below as an illustration}
 
-\item{knots}{An optional \code{list} containing user specified knot values to
-be used for basis construction.
-For most bases the user simply supplies the knots to be used, which must match
-up with the \code{k} value supplied
-(note that the number of knots is not always just \code{k}). Different terms can
-use different numbers of knots,
-unless they share a covariate}
+\item{knots}{An optional \code{list} containing user specified knot values for
+basis construction. For most bases the user simply supplies the knots to be
+used, which must match up with the \code{k} value supplied. Different terms can
+use different numbers of knots, unless they share a covariate.}
 
 \item{factor_knots}{An optional \code{list} containing user specified knot values to
 be used for basis construction of any smooth terms in \code{factor_formula}.
@@ -63,12 +60,9 @@ unless they share a covariate}
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula} and \code{factor_formula} objects}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing
-the same variables
-as in \code{data}. If included, the
-observations in variable \code{y} will be set to \code{NA} when fitting the
-model so that posterior
-simulations can be obtained}
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same
+variables as in \code{data}. If included, observations in variable \code{y} will be
+set to \code{NA} when fitting the model so that posterior simulations can be obtained.}
 
 \item{family}{\code{family} specifying the observation family for the outcomes. Currently supported
 families are:
@@ -98,15 +92,10 @@ for further details and explanations}
 the different response units in \code{data} (usually \code{'species'} in a JSDM).
 Defaults to \code{series} to be consistent with other \code{mvgam} models}
 
-\item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family}
-has additional family-specific observation parameters (e.g. variance
-components in
-\code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or
-\code{betar()}), these parameters will be shared across all outcome variables. This is handy
-if you have multiple outcomes (time series in most \code{mvgam()} models) that you
-believe share some properties,
-such as being from the same species over different spatial units. Default is
-\code{FALSE}.}
+\item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family} has additional
+family-specific observation parameters (e.g., variance components, dispersion
+parameters), these will be shared across all outcome variables. Useful when
+multiple outcomes share properties. Default is \code{FALSE}.}
 
 \item{priors}{An optional \code{data.frame} with prior
 definitions (in Stan syntax) or, preferentially, a vector containing
@@ -117,45 +106,40 @@ See \link{get_mvgam_priors} and for more information on changing default prior d
 residual associations.
 Cannot be \verb{> n_species}. Defaults arbitrarily to \code{2}}
 
-\item{backend}{Character string naming the package to use as the backend for fitting
-the Stan model. Options are \code{"cmdstanr"} (the default) or \code{"rstan"}. Can be set globally
-for the current R session via the \code{"brms.backend"} option (see \code{\link{options}}). Details on
-the \pkg{rstan} and \pkg{cmdstanr} packages are available at https://mc-stan.org/rstan/ and
-https://mc-stan.org/cmdstanr/, respectively}
+\item{backend}{Character string naming the package for Stan model fitting.
+Options are \code{"cmdstanr"} (default) or \code{"rstan"}. Can be set globally via
+\code{"brms.backend"} option. See https://mc-stan.org/rstan/ and
+https://mc-stan.org/cmdstanr/ for details.}
 
-\item{algorithm}{Character string naming the estimation approach to use.
-Options are \code{"sampling"} for MCMC (the default), \code{"meanfield"} for
-variational inference with factorized normal distributions,
-\code{"fullrank"} for variational inference with a multivariate normal
-distribution, \code{"laplace"} for a Laplace approximation (only available
-when using \pkg{cmdstanr} as the backend) or \code{"pathfinder"} for the pathfinder
-algorithm (only currently available when using \pkg{cmdstanr} as the backend).
-Can be set globally for the current \R session via the
-\code{"brms.algorithm"} option (see \code{\link{options}}). Limited testing
-suggests that \code{"meanfield"} performs best out of the non-MCMC approximations for
-dynamic GAMs, possibly because of the difficulties estimating covariances among the
-many spline parameters and latent trend parameters. But rigorous testing has not
-been carried out}
+\item{algorithm}{Character string naming the estimation approach:
+\itemize{
+\item \code{"sampling"}: MCMC (default)
+\item \code{"meanfield"}: Variational inference with factorized normal distributions
+\item \code{"fullrank"}: Variational inference with multivariate normal distribution
+\item \code{"laplace"}: Laplace approximation (cmdstanr only)
+\item \code{"pathfinder"}: Pathfinder algorithm (cmdstanr only)
+}
 
-\item{control}{A named \code{list} for controlling the sampler's behaviour. Valid
-elements include \code{max_treedepth}, \code{adapt_delta} and \code{init}}
+Can be set globally via \code{"brms.algorithm"} option. Limited testing suggests
+\code{"meanfield"} performs best among non-MCMC approximations for dynamic GAMs.}
 
-\item{chains}{\code{integer} specifying the number of parallel chains for the model. Ignored
-if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}
+\item{control}{Named \code{list} for controlling sampler behaviour. Valid elements
+include \code{max_treedepth}, \code{adapt_delta} and \code{init}.}
 
-\item{burnin}{\code{integer} specifying the number of warmup iterations of the Markov chain to run
-to tune sampling algorithms. Ignored
-if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}
+\item{chains}{\code{integer} specifying the number of parallel chains for the model.
+Ignored for variational inference algorithms.}
 
-\item{samples}{\code{integer} specifying the number of post-warmup iterations of the Markov chain to run for
-sampling the posterior distribution}
+\item{burnin}{\code{integer} specifying the number of warmup iterations to tune
+sampling algorithms. Ignored for variational inference algorithms.}
 
-\item{thin}{Thinning interval for monitors.  Ignored
-if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}
+\item{samples}{\code{integer} specifying the number of post-warmup iterations for
+sampling the posterior distribution.}
 
-\item{parallel}{\code{logical} specifying whether multiple cores should be used for
-generating MCMC simulations in parallel. If \code{TRUE}, the number of cores to use will be
-\code{min(c(chains, parallel::detectCores() - 1))}}
+\item{thin}{Thinning interval for monitors. Ignored for variational inference
+algorithms.}
+
+\item{parallel}{\code{logical} specifying whether to use multiple cores for parallel
+MCMC simulation. If \code{TRUE}, uses \code{min(c(chains, parallel::detectCores() - 1))} cores.}
 
 \item{threads}{\code{integer} Experimental option to use multithreading for within-chain
 parallelisation in \code{Stan}. We recommend its use only if you are experienced with
@@ -163,30 +147,24 @@ parallelisation in \code{Stan}. We recommend its use only if you are experienced
 up by any other means. Currently works for all families when using \pkg{cmdstanr}
 as the backend}
 
-\item{silent}{Verbosity level between \code{0} and \code{2}. If \code{1} (the default), most
-of the informational messages of compiler and sampler are suppressed. If \code{2},
-even more messages are suppressed. The actual sampling progress is still printed.
-Set \code{refresh = 0} to turn this off as well. If using \code{backend = "rstan"} you
-can also set open_progress = FALSE to prevent opening additional progress bars.}
+\item{silent}{Verbosity level between \code{0} and \code{2}. If \code{1} (default), most
+informational messages are suppressed. If \code{2}, even more messages are
+suppressed. Sampling progress is still printed - set \code{refresh = 0} to
+disable. For \code{backend = "rstan"}, also set \code{open_progress = FALSE} to
+prevent additional progress bars.}
 
-\item{run_model}{\code{logical}. If \code{FALSE}, the model is not fitted but
-instead the function will
-return the model file and the data / initial values that are needed to fit the
-model outside of \code{mvgam}}
+\item{run_model}{\code{logical}. If \code{FALSE}, the model is not fitted but instead
+the function returns the model file and the data/initial values needed to
+fit the model outside of \code{mvgam}.}
 
-\item{return_model_data}{\code{logical}. If \code{TRUE}, the list of data that
-is needed to fit the
-model is returned, along with the initial values for smooth and AR parameters,
-once the model is fitted.
-This will be helpful if users wish to modify the model file to add
-other stochastic elements that are not currently available in \pkg{mvgam}.
-Default is \code{FALSE} to reduce
-the size of the returned object, unless \code{run_model == FALSE}}
+\item{return_model_data}{\code{logical}. If \code{TRUE}, the list of data needed to fit
+the model is returned, along with initial values for smooth and AR parameters,
+once the model is fitted. Helpful for users who wish to modify the model file
+to add other stochastic elements. Default is \code{FALSE} unless \code{run_model == FALSE}.}
 
-\item{residuals}{Logical indicating whether to compute series-level randomized quantile residuals and include
-them as part of the returned object. Defaults to \code{TRUE}, but you can set to \code{FALSE} to save
-computational time and reduce the size of the returned object (users can always add residuals to
-an object of class \code{mvgam} using \link{add_residuals})}
+\item{residuals}{\code{logical}. Whether to compute series-level randomized quantile
+residuals. Default is \code{TRUE}. Set to \code{FALSE} to save time and reduce object
+size (can add later using \link{add_residuals}).}
 
 \item{...}{Other arguments to pass to \link{mvgam}}
 }

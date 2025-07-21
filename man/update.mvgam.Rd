@@ -57,207 +57,162 @@
 updates such as removal of specific terms with \code{- term}. When updating, the entire formula needs
 to be supplied}
 
-\item{trend_formula}{An optional \code{formula} object specifying the GAM
-process model formula. If
-supplied, a linear predictor will be modelled for the latent trends to capture
-process model evolution
-separately from the observation model. Should not have a response variable
-specified on the left-hand side
-of the formula (i.e. a valid option would be \code{~ season + s(year)}). Also note
-that you should not use
-the identifier \code{series} in this formula to specify effects that vary across
-time series. Instead you should use
-\code{trend}. This will ensure that models in which a \code{trend_map} is supplied will
-still work consistently
-(i.e. by allowing effects to vary across process models, even when some time
-series share the same underlying
-process model). This feature is only currently available for \code{RW()}, \code{AR()}
-and \code{VAR()} trend models.
-In \code{nmix()} family models, the \code{trend_formula} is used to set up a linear
-predictor for the underlying
-latent abundance. Be aware that it can be very challenging to simultaneously
-estimate intercept parameters
-for both the observation mode (captured by \code{formula}) and the process model
-(captured by \code{trend_formula}).
-Users are recommended to drop one of these using the \code{- 1} convention in the
-formula right hand side.}
+\item{trend_formula}{An optional \code{formula} object specifying the GAM process
+model formula. If supplied, a linear predictor will be modelled for the
+latent trends to capture process model evolution separately from the
+observation model.
 
-\item{knots}{An optional \code{list} containing user specified knot values to
-be used for basis construction.
-For most bases the user simply supplies the knots to be used, which must match
-up with the \code{k} value supplied
-(note that the number of knots is not always just \code{k}). Different terms can
-use different numbers of knots,
-unless they share a covariate}
-
-\item{trend_knots}{As for \code{knots} above, this is an optional \code{list} of
-knot values for smooth
-functions within the \code{trend_formula}}
-
-\item{trend_model}{\code{character} or  \code{function} specifying the time
-series dynamics for the latent trend. Options are:
+\strong{Important notes:}
 \itemize{
-\item \code{None} (no latent trend component; i.e. the GAM component is all that
-contributes to the linear predictor, and the observation process is the only
-source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
-\item \code{ZMVN} or \code{ZMVN()} (Zero-Mean Multivariate Normal; only available in
-\code{Stan})
-\item \code{'RW'} or \code{RW()}
-\item \code{'AR1'} or \code{AR(p = 1)}
-\item \code{'AR2'} or \code{AR(p = 2)}
-\item \code{'AR3'} or \code{AR(p = 3)}
-\item \code{'CAR1'} or \code{CAR(p = 1)} (also known as an Ornstein–Uhlenbeck process)
-\item \code{'VAR1'}  or \code{VAR()}(only available in \code{Stan})
-\item \verb{'PWlogistic}, \code{'PWlinear'} or \code{PW()} (only available in \code{Stan})
-\item \code{'GP'} or \code{GP()} (Gaussian Process with squared exponential kernel;
-only available in \code{Stan})}
+\item Should not have a response variable specified on the left-hand side
+(e.g., \code{~ season + s(year)})
+\item Use \code{trend} instead of \code{series} for effects that vary across time series
+\item Only available for \code{RW()}, \code{AR()} and \code{VAR()} trend models
+\item In \code{nmix()} family models, sets up linear predictor for latent abundance
+\item Consider dropping one intercept using \code{- 1} convention to avoid
+estimation challenges
+}}
 
-For all trend types apart from \code{ZMVN()}, \code{GP()}, \code{CAR()} and \code{PW()}, moving
-average and/or correlated process error terms can also be estimated (for
-example, \code{RW(cor = TRUE)} will set up a multivariate Random Walk if \code{n_series > 1}).
-It is also possible for many multivariate trends to estimate hierarchical
-correlations if the data are structured among levels of a relevant grouping
-factor. See \link{mvgam_trends} for more details and see \code{\link[=ZMVN]{ZMVN()}} for an example.}
+\item{knots}{An optional \code{list} containing user specified knot values for
+basis construction. For most bases the user simply supplies the knots to be
+used, which must match up with the \code{k} value supplied. Different terms can
+use different numbers of knots, unless they share a covariate.}
 
-\item{family}{\code{family} specifying the exponential observation family for
-the series. Currently supported
-families are:
+\item{trend_knots}{As for \code{knots} above, this is an optional \code{list} of knot
+values for smooth functions within the \code{trend_formula}.}
+
+\item{trend_model}{\code{character} or \code{function} specifying the time series dynamics
+for the latent trend.
+
+\strong{Available options:}
 \itemize{
-\item\code{gaussian()} for real-valued data
-\item\code{betar()} for proportional data on \verb{(0,1)}
-\item\code{lognormal()} for non-negative real-valued data
-\item\code{student_t()} for real-valued data
-\item\code{Gamma()} for non-negative real-valued data
-\item\code{bernoulli()} for binary data
-\item\code{poisson()} for count data
-\item\code{nb()} for overdispersed count data
-\item\code{binomial()} for count data with imperfect detection when the number
-of trials is known;
-note that the \code{cbind()} function must be used to bind the discrete
-observations and the discrete number
-of trials
-\item\code{beta_binomial()} as for \code{binomial()} but allows for overdispersion
-\item\code{nmix()} for count data with imperfect detection when the number of
-trials is unknown and should be modeled via a State-Space N-Mixture model.
-The latent states are Poisson, capturing the 'true' latent
-abundance, while the observation process is Binomial to account for
-imperfect detection.
-See \code{\link{mvgam_families}} for an example of how to use this family}
-Default is \code{poisson()}.
-See \code{\link{mvgam_families}} for more details}
-
-\item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family}
-has additional family-specific observation parameters (e.g. variance
-components in
-\code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or
-\code{betar()}), these parameters will be shared across all outcome variables. This is handy
-if you have multiple outcomes (time series in most \code{mvgam()} models) that you
-believe share some properties,
-such as being from the same species over different spatial units. Default is
-\code{FALSE}.}
-
-\item{data}{A \code{dataframe} or \code{list} containing the model response
-variable and covariates
-required by the GAM \code{formula} and optional \code{trend_formula}. Most
-models should include columns:
-\itemize{
-\item\code{series} (a \code{factor} index of the series IDs; the number of
-levels should be identical
-to the number of unique series labels (i.e. \code{n_series = length(levels(data$series))}))
-\item\code{time} (\code{numeric} or \code{integer} index of the time point for
-each observation).
-For most dynamic trend types available in \code{mvgam} (see argument \code{trend_model}),
-time should be
-measured in discrete, regularly spaced intervals (i.e. \code{c(1, 2, 3, ...)}).
-However you can
-use irregularly spaced intervals if using \code{trend_model = CAR(1)}, though
-note that any
-temporal intervals that are exactly \code{0} will be adjusted to a very small number
-(\code{1e-12}) to prevent sampling errors. See an example of \code{CAR()} trends in
-\code{\link[=CAR]{CAR()}}
+\item \code{None}: No latent trend component (GAM component only, like \code{\link[mgcv]{gam}})
+\item \code{ZMVN} or \code{ZMVN()}: Zero-Mean Multivariate Normal (Stan only)
+\item \code{'RW'} or \code{RW()}: Random Walk
+\item \code{'AR1'}, \code{'AR2'}, \code{'AR3'} or \code{AR(p = 1, 2, 3)}: Autoregressive models
+\item \code{'CAR1'} or \code{CAR(p = 1)}: Continuous-time AR (Ornstein–Uhlenbeck process)
+\item \code{'VAR1'} or \code{VAR()}: Vector Autoregressive (Stan only)
+\item \code{'PWlogistic'}, \code{'PWlinear'} or \code{PW()}: Piecewise trends (Stan only)
+\item \code{'GP'} or \code{GP()}: Gaussian Process with squared exponential kernel (Stan only)
 }
-Note however that there are special cases where these identifiers are not
-needed. For
-example, models with hierarchical temporal correlation processes (e.g.
-\code{AR(gr = region, subgr = species)})
-should NOT include a \code{series} identifier, as this will be constructed
-internally (see
-\code{\link{mvgam_trends}} and \code{\link[=AR]{AR()}} for details). \code{mvgam()} can also
-fit models that do not
-include a \code{time} variable if there are no temporal dynamic structures included
-(i.e. \code{trend_model = 'None'} or
-\code{trend_model = ZMVN()}). \code{data} should also include any other variables to be
-included in
-the linear predictor of \code{formula}}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing
-the same variables
-as in \code{data}. If included, the
-observations in variable \code{y} will be set to \code{NA} when fitting the
-model so that posterior
-simulations can be obtained}
+\strong{Additional features:}
+\itemize{
+\item Moving average and/or correlated process error terms available for most types
+(e.g., \code{RW(cor = TRUE)} for multivariate Random Walk)
+\item Hierarchical correlations possible for structured data
+\item See \link{mvgam_trends} for details and \code{\link[=ZMVN]{ZMVN()}} for examples
+}}
 
-\item{trend_map}{Optional \code{data.frame} specifying which series should depend
-on which latent trends. Useful for allowing multiple series to depend on the
-same latent trend process, but with different observation processes. If
-supplied, a latent factor model is set up by setting \code{use_lv = TRUE} and
-using the mapping to set up the shared trends. Needs to have column names
-\code{series} and \code{trend}, with integer values in the \code{trend} column to state which
-trend each series should depend on. The \code{series} column should have a single
-unique entry for each series in the data (names should perfectly match factor
-levels of the \code{series} variable in \code{data}). Note that if this is supplied,
-the intercept parameter in the process model will NOT be automatically suppressed.
-Not yet supported for models in which the latent factors evolve in continuous time (\code{CAR()}).
-See examples for details}
+\item{family}{\code{family} specifying the exponential observation family for the series.
+
+\strong{Supported families:}
+\itemize{
+\item \code{gaussian()}: Real-valued data
+\item \code{betar()}: Proportional data on \verb{(0,1)}
+\item \code{lognormal()}: Non-negative real-valued data
+\item \code{student_t()}: Real-valued data
+\item \code{Gamma()}: Non-negative real-valued data
+\item \code{bernoulli()}: Binary data
+\item \code{poisson()}: Count data (default)
+\item \code{nb()}: Overdispersed count data
+\item \code{binomial()}: Count data with imperfect detection when number of trials is known
+(use \code{cbind()} to bind observations and trials)
+\item \code{beta_binomial()}: As \code{binomial()} but allows for overdispersion
+\item \code{nmix()}: Count data with imperfect detection when number of trials is unknown
+(State-Space N-Mixture model with Poisson latent states and Binomial observations)
+}
+
+See \code{\link{mvgam_families}} for more details.}
+
+\item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family} has additional
+family-specific observation parameters (e.g., variance components, dispersion
+parameters), these will be shared across all outcome variables. Useful when
+multiple outcomes share properties. Default is \code{FALSE}.}
+
+\item{data}{A \code{dataframe} or \code{list} containing the model response variable
+and covariates required by the GAM \code{formula} and optional \code{trend_formula}.
+
+\strong{Required columns for most models:}
+\itemize{
+\item \code{series}: A \code{factor} index of the series IDs (number of levels should equal
+number of unique series labels)
+\item \code{time}: \code{numeric} or \code{integer} index of time points. For most dynamic trend
+types, time should be measured in discrete, regularly spaced intervals
+(i.e., \code{c(1, 2, 3, ...)}). Irregular spacing is allowed for \code{trend_model = CAR(1)},
+but zero intervals are adjusted to \code{1e-12} to prevent sampling errors.
+}
+
+\strong{Special cases:}
+\itemize{
+\item Models with hierarchical temporal correlation (e.g., \code{AR(gr = region, subgr = species)})
+should NOT include a \code{series} identifier
+\item Models without temporal dynamics (\code{trend_model = 'None'} or \code{trend_model = ZMVN()})
+don't require a \code{time} variable
+}}
+
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same
+variables as in \code{data}. If included, observations in variable \code{y} will be
+set to \code{NA} when fitting the model so that posterior simulations can be obtained.}
+
+\item{trend_map}{Optional \code{data.frame} specifying which series should depend on
+which latent trends. Enables multiple series to depend on the same latent
+trend process with different observation processes.
+
+\strong{Required structure:}
+\itemize{
+\item Column \code{series}: Single unique entry for each series (matching factor levels in data)
+\item Column \code{trend}: Integer values indicating which trend each series depends on
+}
+
+\strong{Notes:}
+\itemize{
+\item Sets up latent factor model by enabling \code{use_lv = TRUE}
+\item Process model intercept is NOT automatically suppressed
+\item Not yet supported for continuous time models (\code{CAR()})
+}}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
-latent trends in a reduced dimension format. Only available for
-\code{RW()}, \code{AR()} and \code{GP()} trend models. Defaults to \code{FALSE}. See
-\code{\link{lv_correlations}} for a worked example}
+latent trends in a reduced dimension format. Only available for \code{RW()},
+\code{AR()} and \code{GP()} trend models. Default is \code{FALSE}.
+See \code{\link{lv_correlations}} for examples.}
 
-\item{n_lv}{\code{integer} the number of latent dynamic factors to use if
-\code{use_lv == TRUE}. Cannot be \code{> n_series}. Defaults arbitrarily to
-\code{min(2, floor(n_series / 2))}}
+\item{n_lv}{\code{integer} specifying the number of latent dynamic factors to use
+if \code{use_lv == TRUE}. Cannot exceed \code{n_series}. Default is
+\code{min(2, floor(n_series / 2))}.}
 
-\item{priors}{An optional \code{data.frame} with prior
-definitions or, preferentially, a vector containing
-objects of class \code{brmsprior} (see. \code{\link[brms]{prior}()} for details).
-See \code{\link[=get_mvgam_priors]{get_mvgam_priors()}} and Details' for more information on changing default prior distributions}
+\item{priors}{An optional \code{data.frame} with prior definitions or, preferably,
+a vector of \code{brmsprior} objects (see \code{\link[brms]{prior}()}).
+See \code{\link[=get_mvgam_priors]{get_mvgam_priors()}} and Details for more information.}
 
-\item{chains}{\code{integer} specifying the number of parallel chains for the model. Ignored
-if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}
+\item{chains}{\code{integer} specifying the number of parallel chains for the model.
+Ignored for variational inference algorithms.}
 
-\item{burnin}{\code{integer} specifying the number of warmup iterations of the Markov chain to run
-to tune sampling algorithms. Ignored
-if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}
+\item{burnin}{\code{integer} specifying the number of warmup iterations to tune
+sampling algorithms. Ignored for variational inference algorithms.}
 
-\item{samples}{\code{integer} specifying the number of post-warmup iterations of the Markov chain to run for
-sampling the posterior distribution}
+\item{samples}{\code{integer} specifying the number of post-warmup iterations for
+sampling the posterior distribution.}
 
-\item{threads}{\code{integer} Experimental option to use multithreading for within-chain
-parallelisation in \code{Stan}. We recommend its use only if you are experienced with
-\code{Stan}'s \code{reduce_sum} function and have a slow running model that cannot be sped
-up by any other means. Currently works for all families apart from \code{nmix()} and
-when using \code{Cmdstan} as the backend}
+\item{threads}{\code{integer}. Experimental option for within-chain parallelisation
+in Stan using \code{reduce_sum}. Recommended only for experienced Stan users with
+slow models. Currently works for all families except \code{nmix()} and when using
+Cmdstan backend.}
 
-\item{algorithm}{Character string naming the estimation approach to use.
-Options are \code{"sampling"} for MCMC (the default), \code{"meanfield"} for
-variational inference with factorized normal distributions,
-\code{"fullrank"} for variational inference with a multivariate normal
-distribution, \code{"laplace"} for a Laplace approximation (only available
-when using \pkg{cmdstanr} as the backend) or \code{"pathfinder"} for the pathfinder
-algorithm (only currently available when using \pkg{cmdstanr} as the backend).
-Can be set globally for the current \R session via the
-\code{"brms.algorithm"} option (see \code{\link{options}}). Limited testing
-suggests that \code{"meanfield"} performs best out of the non-MCMC approximations for
-dynamic GAMs, possibly because of the difficulties estimating covariances among the
-many spline parameters and latent trend parameters. But rigorous testing has not
-been carried out}
+\item{algorithm}{Character string naming the estimation approach:
+\itemize{
+\item \code{"sampling"}: MCMC (default)
+\item \code{"meanfield"}: Variational inference with factorized normal distributions
+\item \code{"fullrank"}: Variational inference with multivariate normal distribution
+\item \code{"laplace"}: Laplace approximation (cmdstanr only)
+\item \code{"pathfinder"}: Pathfinder algorithm (cmdstanr only)
+}
 
-\item{lfo}{Logical indicating whether this is part of a call to \link{lfo_cv.mvgam}. Returns a
-lighter version of the model with no residuals and fewer monitored parameters to speed up
-post-processing. But other downstream functions will not work properly, so users should always
-leave this set as \code{FALSE}}
+Can be set globally via \code{"brms.algorithm"} option. Limited testing suggests
+\code{"meanfield"} performs best among non-MCMC approximations for dynamic GAMs.}
+
+\item{lfo}{\code{logical}. Indicates whether this is part of \link{lfo_cv.mvgam} call.
+Returns lighter model version for speed. Users should leave as \code{FALSE}.}
 
 \item{...}{Other arguments to be passed to \code{\link{mvgam}} or \code{\link{jsdgam}}}
 

@@ -1,412 +1,439 @@
-#' Fit a Bayesian dynamic GAM to a univariate or multivariate set of time series
+#' Fit a Bayesian Dynamic GAM to Univariate or Multivariate Time Series
 #'
+#' @description
 #' This function estimates the posterior distribution for Generalised Additive
 #' Models (GAMs) that can include smooth spline functions, specified in the GAM
 #' formula, as well as latent temporal processes, specified by `trend_model`.
+#'
 #' Further modelling options include State-Space representations to allow covariates
 #' and dynamic processes to occur on the latent 'State' level while also capturing
 #' observation-level effects. Prior specifications are flexible and explicitly
 #' encourage users to apply prior distributions that actually reflect their beliefs.
-#' In addition, model fits can easily be assessed and
-#' compared with posterior predictive checks, forecast comparisons and
-#' leave-one-out / leave-future-out cross-validation.
+#'
+#' In addition, model fits can easily be assessed and compared with posterior
+#' predictive checks, forecast comparisons and leave-one-out / leave-future-out
+#' cross-validation.
 #'
 #' @importFrom parallel clusterExport stopCluster setDefaultCluster
 #' @importFrom stats formula terms rnorm update.formula predict
 #' @importFrom rlang missing_arg
-#' @param formula A \code{formula} object specifying the GAM observation model
-#' formula. These are exactly like the formula
-#' for a GLM except that smooth terms, `s()`, `te()`, `ti()`, `t2()`, as well
-#' as time-varying `dynamic()` terms, nonparametric `gp()` terms and offsets using `offset()`,
-#' can be added to the right hand side to specify that the linear predictor
-#' depends on smooth functions of predictors (or linear functionals of these).
-#' In `nmix()` family models, the `formula` is used to set up a linear predictor
-#' for the detection probability. Details of the formula
-#' syntax used by \pkg{mvgam} can be found in \code{\link{mvgam_formulae}}
-#' @param trend_formula An optional \code{formula} object specifying the GAM
-#' process model formula. If
-#' supplied, a linear predictor will be modelled for the latent trends to capture
-#' process model evolution
-#' separately from the observation model. Should not have a response variable
-#' specified on the left-hand side
-#' of the formula (i.e. a valid option would be `~ season + s(year)`). Also note
-#' that you should not use
-#' the identifier `series` in this formula to specify effects that vary across
-#' time series. Instead you should use
-#' `trend`. This will ensure that models in which a `trend_map` is supplied will
-#' still work consistently
-#' (i.e. by allowing effects to vary across process models, even when some time
-#' series share the same underlying
-#' process model). This feature is only currently available for `RW()`, `AR()`
-#' and `VAR()` trend models.
-#' In `nmix()` family models, the `trend_formula` is used to set up a linear
-#' predictor for the underlying
-#' latent abundance. Be aware that it can be very challenging to simultaneously
-#' estimate intercept parameters
-#' for both the observation mode (captured by `formula`) and the process model
-#' (captured by `trend_formula`).
-#' Users are recommended to drop one of these using the `- 1` convention in the
-#' formula right hand side.
-#' @param knots An optional \code{list} containing user specified knot values to
-#' be used for basis construction.
-#' For most bases the user simply supplies the knots to be used, which must match
-#' up with the `k` value supplied
-#' (note that the number of knots is not always just `k`). Different terms can
-#' use different numbers of knots,
-#' unless they share a covariate
-#' @param trend_knots As for `knots` above, this is an optional \code{list} of
-#' knot values for smooth
-#' functions within the `trend_formula`
-#' @param data A \code{dataframe} or \code{list} containing the model response
-#' variable and covariates
-#' required by the GAM \code{formula} and optional \code{trend_formula}. Most
-#' models should include columns:
-#' \itemize{
-#'   \item`series` (a \code{factor} index of the series IDs; the number of
-#'   levels should be identical
-#'   to the number of unique series labels (i.e. `n_series = length(levels(data$series))`))
-#'   \item`time` (\code{numeric} or \code{integer} index of the time point for
-#'   each observation).
-#'   For most dynamic trend types available in `mvgam` (see argument `trend_model`),
-#'   time should be
-#'   measured in discrete, regularly spaced intervals (i.e. `c(1, 2, 3, ...)`).
-#'   However you can
-#'   use irregularly spaced intervals if using `trend_model = CAR(1)`, though
-#'   note that any
-#' temporal intervals that are exactly `0` will be adjusted to a very small number
-#' (`1e-12`) to prevent sampling errors. See an example of `CAR()` trends in
-#' [CAR()]
-#'   }
-#' Note however that there are special cases where these identifiers are not
-#' needed. For
-#' example, models with hierarchical temporal correlation processes (e.g.
-#' `AR(gr = region, subgr = species)`)
-#' should NOT include a `series` identifier, as this will be constructed
-#' internally (see
-#' \code{\link{mvgam_trends}} and [AR()] for details). `mvgam()` can also
-#' fit models that do not
-#' include a `time` variable if there are no temporal dynamic structures included
-#' (i.e. `trend_model = 'None'` or
-#' `trend_model = ZMVN()`). `data` should also include any other variables to be
-#' included in
-#' the linear predictor of \code{formula}
-#' @param newdata Optional \code{dataframe} or \code{list} of test data containing
-#' the same variables
-#' as in `data`. If included, the
-#' observations in variable \code{y} will be set to \code{NA} when fitting the
-#' model so that posterior
-#' simulations can be obtained
-#' @param run_model \code{logical}. If \code{FALSE}, the model is not fitted but
-#' instead the function will
-#' return the model file and the data / initial values that are needed to fit the
-#' model outside of \code{mvgam}
 #'
-#' @param prior_simulation \code{logical}. If \code{TRUE}, no observations are
-#' fed to the model, and instead
-#' simulations from prior distributions are returned
-#' @param return_model_data \code{logical}. If \code{TRUE}, the list of data that
-#' is needed to fit the
-#' model is returned, along with the initial values for smooth and AR parameters,
-#' once the model is fitted.
-#' This will be helpful if users wish to modify the model file to add
-#' other stochastic elements that are not currently available in \pkg{mvgam}.
-#' Default is \code{FALSE} to reduce
-#' the size of the returned object, unless \code{run_model == FALSE}
-#' @param family \code{family} specifying the exponential observation family for
-#' the series. Currently supported
-#' families are:
-#' \itemize{
-#'   \item`gaussian()` for real-valued data
-#'   \item`betar()` for proportional data on `(0,1)`
-#'   \item`lognormal()` for non-negative real-valued data
-#'   \item`student_t()` for real-valued data
-#'   \item`Gamma()` for non-negative real-valued data
-#'   \item`bernoulli()` for binary data
-#'   \item`poisson()` for count data
-#'   \item`nb()` for overdispersed count data
-#'   \item`binomial()` for count data with imperfect detection when the number
-#'   of trials is known;
-#'   note that the `cbind()` function must be used to bind the discrete
-#'   observations and the discrete number
-#'   of trials
-#'   \item`beta_binomial()` as for `binomial()` but allows for overdispersion
-#'   \item`nmix()` for count data with imperfect detection when the number of
-#'   trials is unknown and should be modeled via a State-Space N-Mixture model.
-#'   The latent states are Poisson, capturing the 'true' latent
-#'   abundance, while the observation process is Binomial to account for
-#'   imperfect detection.
-#'   See \code{\link{mvgam_families}} for an example of how to use this family}
-#' Default is `poisson()`.
-#' See \code{\link{mvgam_families}} for more details
-#' @param share_obs_params \code{logical}. If \code{TRUE} and the \code{family}
-#' has additional family-specific observation parameters (e.g. variance
-#' components in
-#' `student_t()` or `gaussian()`, or dispersion parameters in `nb()` or
-#' `betar()`), these parameters will be shared across all outcome variables. This is handy
-#' if you have multiple outcomes (time series in most `mvgam()` models) that you
-#' believe share some properties,
-#' such as being from the same species over different spatial units. Default is
-#' \code{FALSE}.
-#' @param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
-#' latent trends in a reduced dimension format. Only available for
-#' `RW()`, `AR()` and `GP()` trend models. Defaults to \code{FALSE}. See
-#' \code{\link{lv_correlations}} for a worked example
-#' @param n_lv \code{integer} the number of latent dynamic factors to use if
-#' \code{use_lv == TRUE}. Cannot be \code{> n_series}. Defaults arbitrarily to
-#' \code{min(2, floor(n_series / 2))}
-#' @param trend_model \code{character} or  \code{function} specifying the time
-#' series dynamics for the latent trend. Options are:
-#' \itemize{
-#'   \item `None` (no latent trend component; i.e. the GAM component is all that
-#'   contributes to the linear predictor, and the observation process is the only
-#'   source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
-#'   \item `ZMVN` or `ZMVN()` (Zero-Mean Multivariate Normal; only available in
-#'   \code{Stan})
-#'   \item `'RW'` or `RW()`
-#'   \item `'AR1'` or `AR(p = 1)`
-#'   \item `'AR2'` or `AR(p = 2)`
-#'   \item `'AR3'` or `AR(p = 3)`
-#'   \item `'CAR1'` or `CAR(p = 1)` (also known as an Ornstein–Uhlenbeck process)
-#'   \item `'VAR1'`  or `VAR()`(only available in \code{Stan})
-#'   \item `'PWlogistic`, `'PWlinear'` or `PW()` (only available in \code{Stan})
-#'   \item `'GP'` or `GP()` (Gaussian Process with squared exponential kernel;
-#' only available in \code{Stan})}
+#' @section Model Specification Parameters:
 #'
-#' For all trend types apart from `ZMVN()`, `GP()`, `CAR()` and `PW()`, moving
-#' average and/or correlated process error terms can also be estimated (for
-#' example, `RW(cor = TRUE)` will set up a multivariate Random Walk if `n_series > 1`).
-#' It is also possible for many multivariate trends to estimate hierarchical
-#' correlations if the data are structured among levels of a relevant grouping
-#' factor. See [mvgam_trends] for more details and see [ZMVN()] for an example.
-#' @param trend_map Optional `data.frame` specifying which series should depend
-#' on which latent trends. Useful for allowing multiple series to depend on the
-#' same latent trend process, but with different observation processes. If
-#' supplied, a latent factor model is set up by setting `use_lv = TRUE` and
-#' using the mapping to set up the shared trends. Needs to have column names
-#' `series` and `trend`, with integer values in the `trend` column to state which
-#' trend each series should depend on. The `series` column should have a single
-#' unique entry for each series in the data (names should perfectly match factor
-#' levels of the `series` variable in `data`). Note that if this is supplied,
-#' the intercept parameter in the process model will NOT be automatically suppressed.
-#' Not yet supported for models in which the latent factors evolve in continuous time (`CAR()`).
-#' See examples for details
-#' @param noncentred \code{logical} Use the non-centred parameterisation for autoregressive
-#' trend models? Setting to `TRUE` will reparameterise the model to avoid possible
-#' degeneracies that can show up when estimating the latent dynamic random effects. For some
-#' models, this can produce big gains in efficiency, meaning that fewer burnin and sampling
-#' iterations are required for posterior exploration. But for other models, where the data
-#' are highly informative about the latent dynamic processes, this can actually lead to worse
-#' performance. Only available for certain trend models
-#' (i.e. `RW()`, `AR()`, or `CAR()`, or for
-#' `trend = 'None'` when using a `trend_formula`). Not yet available for moving average or
-#' correlated error models
-#' @param chains \code{integer} specifying the number of parallel chains for the model. Ignored
-#' if `algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')`
-#' @param burnin \code{integer} specifying the number of warmup iterations of the Markov chain to run
-#' to tune sampling algorithms. Ignored
-#' if `algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')`
-#' @param samples \code{integer} specifying the number of post-warmup iterations of the Markov chain to run for
-#' sampling the posterior distribution
-#' @param thin Thinning interval for monitors.  Ignored
-#' if `algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')`
-#' @param parallel \code{logical} specifying whether multiple cores should be used for
-#' generating MCMC simulations in parallel. If \code{TRUE}, the number of cores to use will be
-#' \code{min(c(chains, parallel::detectCores() - 1))}
-#' @param threads \code{integer} Experimental option to use multithreading for within-chain
-#' parallelisation in \code{Stan}. We recommend its use only if you are experienced with
-#' \code{Stan}'s `reduce_sum` function and have a slow running model that cannot be sped
-#' up by any other means. Currently works for all families apart from `nmix()` and
-#' when using \code{Cmdstan} as the backend
-#' @param priors An optional \code{data.frame} with prior
-#' definitions or, preferentially, a vector containing
-#' objects of class `brmsprior` (see. \code{\link[brms]{prior}()} for details).
-#' See [get_mvgam_priors()] and Details' for more information on changing default prior distributions
-#' @param refit Logical indicating whether this is a refit, called using [update.mvgam()]. Users should leave
-#' as `FALSE`
-#' @param lfo Logical indicating whether this is part of a call to [lfo_cv.mvgam]. Returns a
-#' lighter version of the model with no residuals and fewer monitored parameters to speed up
-#' post-processing. But other downstream functions will not work properly, so users should always
-#' leave this set as `FALSE`
-#' @param residuals Logical indicating whether to compute series-level randomized quantile residuals and include
-#' them as part of the returned object. Defaults to `TRUE`, but you can set to `FALSE` to save
-#' computational time and reduce the size of the returned object (users can always add residuals to
-#' an object of class `mvgam` using [add_residuals])
-#' @param backend Character string naming the package to use as the backend for fitting
-#' the Stan model. Options are `"cmdstanr"` (the default) or `"rstan"`. Can be set globally
-#' for the current R session via the \code{"brms.backend"} option (see \code{\link{options}}). Details on
-#' the \pkg{rstan} and \pkg{cmdstanr} packages are available at https://mc-stan.org/rstan/ and
-#' https://mc-stan.org/cmdstanr/, respectively
-#' @param algorithm Character string naming the estimation approach to use.
-#'  Options are \code{"sampling"} for MCMC (the default), \code{"meanfield"} for
-#'  variational inference with factorized normal distributions,
-#'  \code{"fullrank"} for variational inference with a multivariate normal
-#'  distribution, \code{"laplace"} for a Laplace approximation (only available
-#'  when using \pkg{cmdstanr} as the backend) or \code{"pathfinder"} for the pathfinder
-#'  algorithm (only currently available when using \pkg{cmdstanr} as the backend).
-#'  Can be set globally for the current \R session via the
-#'  \code{"brms.algorithm"} option (see \code{\link{options}}). Limited testing
-#'  suggests that `"meanfield"` performs best out of the non-MCMC approximations for
-#'  dynamic GAMs, possibly because of the difficulties estimating covariances among the
-#'  many spline parameters and latent trend parameters. But rigorous testing has not
-#'  been carried out
-#' @param autoformat \code{Logical}. Use the `stanc` parser to automatically format the
-#' `Stan` code and check for deprecations. Only for development purposes, so leave to `TRUE`
-#' @param save_all_pars \code{Logical} flag to indicate if draws from all
-#'   variables defined in Stan's \code{parameters} block should be saved
-#'   (default is \code{FALSE}).
-#' @param control A named `list` for controlling the sampler's behaviour. Valid
-#' elements include `max_treedepth`, `adapt_delta` and `init`
-#' @param silent Verbosity level between `0` and `2`. If `1` (the default), most
-#' of the informational messages of compiler and sampler are suppressed. If `2`,
-#' even more messages are suppressed. The actual sampling progress is still printed.
-#' Set `refresh = 0` to turn this off as well. If using `backend = "rstan"` you
-#' can also set open_progress = FALSE to prevent opening additional progress bars.
-#' @param ... Further arguments passed to Stan.
-#' For \code{backend = "rstan"} the arguments are passed to
-#' \code{\link[rstan]{sampling}()} or \code{\link[rstan]{vb}()}.
-#' For \code{backend = "cmdstanr"} the arguments are passed to the
-#' \code{cmdstanr::sample}, \code{cmdstanr::variational},
-#' \code{cmdstanr::laplace} or
-#' \code{cmdstanr::pathfinder} method
-#' @details Dynamic GAMs are useful when we wish to predict future values from time series that show temporal dependence
-#' but we do not want to rely on extrapolating from a smooth term (which can sometimes lead to unpredictable and unrealistic behaviours).
-#' In addition, smooths can often try to wiggle excessively to capture any autocorrelation that is present in a time series,
-#' which exacerbates the problem of forecasting ahead. As GAMs are very naturally viewed through a Bayesian lens, and we often
-#' must model time series that show complex distributional features and missing data, parameters for \pkg{mvgam} models are estimated
-#' in a Bayesian framework using Markov Chain Monte Carlo by default. A general overview is provided
-#' in the primary vignettes: `vignette("mvgam_overview")` and `vignette("data_in_mvgam")`.
-#' For a full list of available vignettes see `vignette(package = "mvgam")`. See also
-#' \code{\link{mvgam_use_cases}} for a list of online resources that demonstrate how to use
-#' \pkg{mvgam} for a variety of real-world modelling applications.
-#' \cr
-#' \cr
-#' *Formula syntax*: Details of the formula syntax used by \pkg{mvgam} can be found in
-#' \code{\link{mvgam_formulae}}. Note that it is possible to supply an empty formula where
-#' there are no predictors or intercepts in the observation model (i.e. `y ~ 0` or `y ~ -1`).
-#' In this case, an intercept-only observation model will be set up but the intercept coefficient
-#' will be fixed at zero. This can be handy if you wish to fit pure State-Space models where
-#' the variation in the dynamic trend controls the average expectation, and/or where intercepts
-#' are non-identifiable (as in piecewise trends, see examples below)
-#' \cr
-#' \cr
-#' *Families and link functions*: Details of families supported by \pkg{mvgam}
+#' @param formula A `formula` object specifying the GAM observation model formula.
+#'   These are exactly like the formula for a GLM except that smooth terms, `s()`,
+#'   `te()`, `ti()`, `t2()`, as well as time-varying `dynamic()` terms,
+#'   nonparametric `gp()` terms and offsets using `offset()`, can be added to the
+#'   right hand side to specify that the linear predictor depends on smooth
+#'   functions of predictors (or linear functionals of these).
+#'
+#'   In `nmix()` family models, the `formula` is used to set up a linear predictor
+#'   for the detection probability. Details of the formula syntax used by
+#'   \pkg{mvgam} can be found in \code{\link{mvgam_formulae}}
+#'
+#' @param trend_formula An optional `formula` object specifying the GAM process
+#'   model formula. If supplied, a linear predictor will be modelled for the
+#'   latent trends to capture process model evolution separately from the
+#'   observation model.
+#'
+#'   **Important notes:**
+#'   - Should not have a response variable specified on the left-hand side
+#'     (e.g., `~ season + s(year)`)
+#'   - Use `trend` instead of `series` for effects that vary across time series
+#'   - Only available for `RW()`, `AR()` and `VAR()` trend models
+#'   - In `nmix()` family models, sets up linear predictor for latent abundance
+#'   - Consider dropping one intercept using `- 1` convention to avoid
+#'     estimation challenges
+#'
+#' @section Spline knots:
+#'
+#' @param knots An optional `list` containing user specified knot values for
+#'   basis construction. For most bases the user simply supplies the knots to be
+#'   used, which must match up with the `k` value supplied. Different terms can
+#'   use different numbers of knots, unless they share a covariate.
+#'
+#' @param trend_knots As for `knots` above, this is an optional `list` of knot
+#'   values for smooth functions within the `trend_formula`.
+#'
+#' @section Data:
+#'
+#' @param data A `dataframe` or `list` containing the model response variable
+#'   and covariates required by the GAM `formula` and optional `trend_formula`.
+#'
+#'   **Required columns for most models:**
+#'   - `series`: A `factor` index of the series IDs (number of levels should equal
+#'     number of unique series labels)
+#'   - `time`: `numeric` or `integer` index of time points. For most dynamic trend
+#'     types, time should be measured in discrete, regularly spaced intervals
+#'     (i.e., `c(1, 2, 3, ...)`). Irregular spacing is allowed for `trend_model = CAR(1)`,
+#'     but zero intervals are adjusted to `1e-12` to prevent sampling errors.
+#'
+#'   **Special cases:**
+#'   - Models with hierarchical temporal correlation (e.g., `AR(gr = region, subgr = species)`)
+#'     should NOT include a `series` identifier
+#'   - Models without temporal dynamics (`trend_model = 'None'` or `trend_model = ZMVN()`)
+#'     don't require a `time` variable
+#'
+#' @param newdata Optional `dataframe` or `list` of test data containing the same
+#'   variables as in `data`. If included, observations in variable `y` will be
+#'   set to `NA` when fitting the model so that posterior simulations can be obtained.
+#'
+#' @section Model Execution Parameters:
+#'
+#' @param run_model `logical`. If `FALSE`, the model is not fitted but instead
+#'   the function returns the model file and the data/initial values needed to
+#'   fit the model outside of `mvgam`.
+#'
+#' @param prior_simulation `logical`. If `TRUE`, no observations are fed to the
+#'   model, and instead simulations from prior distributions are returned.
+#'
+#' @param return_model_data `logical`. If `TRUE`, the list of data needed to fit
+#'   the model is returned, along with initial values for smooth and AR parameters,
+#'   once the model is fitted. Helpful for users who wish to modify the model file
+#'   to add other stochastic elements. Default is `FALSE` unless `run_model == FALSE`.
+#'
+#' @section Distribution Family:
+#'
+#' @param family `family` specifying the exponential observation family for the series.
+#'
+#'   **Supported families:**
+#'   - `gaussian()`: Real-valued data
+#'   - `betar()`: Proportional data on `(0,1)`
+#'   - `lognormal()`: Non-negative real-valued data
+#'   - `student_t()`: Real-valued data
+#'   - `Gamma()`: Non-negative real-valued data
+#'   - `bernoulli()`: Binary data
+#'   - `poisson()`: Count data (default)
+#'   - `nb()`: Overdispersed count data
+#'   - `binomial()`: Count data with imperfect detection when number of trials is known
+#'     (use `cbind()` to bind observations and trials)
+#'   - `beta_binomial()`: As `binomial()` but allows for overdispersion
+#'   - `nmix()`: Count data with imperfect detection when number of trials is unknown
+#'     (State-Space N-Mixture model with Poisson latent states and Binomial observations)
+#'
+#'   See \code{\link{mvgam_families}} for more details.
+#'
+#' @param share_obs_params `logical`. If `TRUE` and the `family` has additional
+#'   family-specific observation parameters (e.g., variance components, dispersion
+#'   parameters), these will be shared across all outcome variables. Useful when
+#'   multiple outcomes share properties. Default is `FALSE`.
+#'
+#' @section Trend Model Specification:
+#'
+#' @param use_lv `logical`. If `TRUE`, use dynamic factors to estimate series'
+#'   latent trends in a reduced dimension format. Only available for `RW()`,
+#'   `AR()` and `GP()` trend models. Default is `FALSE`.
+#'   See \code{\link{lv_correlations}} for examples.
+#'
+#' @param n_lv `integer` specifying the number of latent dynamic factors to use
+#'   if `use_lv == TRUE`. Cannot exceed `n_series`. Default is
+#'   `min(2, floor(n_series / 2))`.
+#'
+#' @param trend_model `character` or `function` specifying the time series dynamics
+#'   for the latent trend.
+#'
+#'   **Available options:**
+#'   - `None`: No latent trend component (GAM component only, like \code{\link[mgcv]{gam}})
+#'   - `ZMVN` or `ZMVN()`: Zero-Mean Multivariate Normal (Stan only)
+#'   - `'RW'` or `RW()`: Random Walk
+#'   - `'AR1'`, `'AR2'`, `'AR3'` or `AR(p = 1, 2, 3)`: Autoregressive models
+#'   - `'CAR1'` or `CAR(p = 1)`: Continuous-time AR (Ornstein–Uhlenbeck process)
+#'   - `'VAR1'` or `VAR()`: Vector Autoregressive (Stan only)
+#'   - `'PWlogistic'`, `'PWlinear'` or `PW()`: Piecewise trends (Stan only)
+#'   - `'GP'` or `GP()`: Gaussian Process with squared exponential kernel (Stan only)
+#'
+#'   **Additional features:**
+#'   - Moving average and/or correlated process error terms available for most types
+#'     (e.g., `RW(cor = TRUE)` for multivariate Random Walk)
+#'   - Hierarchical correlations possible for structured data
+#'   - See [mvgam_trends] for details and [ZMVN()] for examples
+#'
+#' @param trend_map Optional `data.frame` specifying which series should depend on
+#'   which latent trends. Enables multiple series to depend on the same latent
+#'   trend process with different observation processes.
+#'
+#'   **Required structure:**
+#'   - Column `series`: Single unique entry for each series (matching factor levels in data)
+#'   - Column `trend`: Integer values indicating which trend each series depends on
+#'
+#'   **Notes:**
+#'   - Sets up latent factor model by enabling `use_lv = TRUE`
+#'   - Process model intercept is NOT automatically suppressed
+#'   - Not yet supported for continuous time models (`CAR()`)
+#'
+#' @param noncentred `logical`. Use non-centred parameterisation for autoregressive
+#'   trend models? Can improve efficiency by avoiding degeneracies in latent dynamic
+#'   random effects estimation. Benefits vary by model - highly informative data
+#'   may perform worse with this option. Available for `RW()`, `AR()`, `CAR()`,
+#'   or `trend = 'None'` with `trend_formula`. Not available for moving average
+#'   or correlated error models.
+#'
+#' @section MCMC Parameters:
+#'
+#' @param chains `integer` specifying the number of parallel chains for the model.
+#'   Ignored for variational inference algorithms.
+#'
+#' @param burnin `integer` specifying the number of warmup iterations to tune
+#'   sampling algorithms. Ignored for variational inference algorithms.
+#'
+#' @param samples `integer` specifying the number of post-warmup iterations for
+#'   sampling the posterior distribution.
+#'
+#' @param thin Thinning interval for monitors. Ignored for variational inference
+#'   algorithms.
+#'
+#' @param parallel `logical` specifying whether to use multiple cores for parallel
+#'   MCMC simulation. If `TRUE`, uses `min(c(chains, parallel::detectCores() - 1))` cores.
+#'
+#' @param threads `integer`. Experimental option for within-chain parallelisation
+#'   in Stan using `reduce_sum`. Recommended only for experienced Stan users with
+#'   slow models. Currently works for all families except `nmix()` and when using
+#'   Cmdstan backend.
+#'
+#' @section Prior and Model Configuration:
+#'
+#' @param priors An optional `data.frame` with prior definitions or, preferably,
+#'   a vector of `brmsprior` objects (see \code{\link[brms]{prior}()}).
+#'   See [get_mvgam_priors()] and Details for more information.
+#'
+#' @param refit `logical`. Indicates whether this is a refit called using
+#'   [update.mvgam()]. Users should leave as `FALSE`.
+#'
+#' @param lfo `logical`. Indicates whether this is part of [lfo_cv.mvgam] call.
+#'   Returns lighter model version for speed. Users should leave as `FALSE`.
+#'
+#' @param residuals `logical`. Whether to compute series-level randomized quantile
+#'   residuals. Default is `TRUE`. Set to `FALSE` to save time and reduce object
+#'   size (can add later using [add_residuals]).
+#'
+#' @section Backend and Algorithm Parameters:
+#'
+#' @param backend Character string naming the package for Stan model fitting.
+#'   Options are `"cmdstanr"` (default) or `"rstan"`. Can be set globally via
+#'   `"brms.backend"` option. See https://mc-stan.org/rstan/ and
+#'   https://mc-stan.org/cmdstanr/ for details.
+#'
+#' @param algorithm Character string naming the estimation approach:
+#'   - `"sampling"`: MCMC (default)
+#'   - `"meanfield"`: Variational inference with factorized normal distributions
+#'   - `"fullrank"`: Variational inference with multivariate normal distribution
+#'   - `"laplace"`: Laplace approximation (cmdstanr only)
+#'   - `"pathfinder"`: Pathfinder algorithm (cmdstanr only)
+#'
+#'   Can be set globally via `"brms.algorithm"` option. Limited testing suggests
+#'   `"meanfield"` performs best among non-MCMC approximations for dynamic GAMs.
+#'
+#' @param autoformat `logical`. Use `stanc` parser to automatically format Stan
+#'   code and check for deprecations. For development purposes - leave as `TRUE`.
+#'
+#' @param save_all_pars `logical`. Save draws from all variables defined in Stan's
+#'   `parameters` block. Default is `FALSE`.
+#'
+#' @section Control Parameters:
+#'
+#' @param control Named `list` for controlling sampler behaviour. Valid elements
+#'   include `max_treedepth`, `adapt_delta` and `init`.
+#'
+#' @param silent Verbosity level between `0` and `2`. If `1` (default), most
+#'   informational messages are suppressed. If `2`, even more messages are
+#'   suppressed. Sampling progress is still printed - set `refresh = 0` to
+#'   disable. For `backend = "rstan"`, also set `open_progress = FALSE` to
+#'   prevent additional progress bars.
+#'
+#' @param ... Further arguments passed to Stan:
+#'   - For `backend = "rstan"`: passed to \code{\link[rstan]{sampling}()} or
+#'     \code{\link[rstan]{vb}()}
+#'   - For `backend = "cmdstanr"`: passed to `cmdstanr::sample`,
+#'     `cmdstanr::variational`, `cmdstanr::laplace` or `cmdstanr::pathfinder` methods
+#'
+#' @details
+#' Dynamic GAMs are useful when we wish to predict future values from time series
+#' that show temporal dependence but we do not want to rely on extrapolating from
+#' a smooth term (which can sometimes lead to unpredictable and unrealistic behaviours).
+#' In addition, smooths can often try to wiggle excessively to capture any
+#' autocorrelation that is present in a time series, which exacerbates the problem
+#' of forecasting ahead.
+#'
+#' As GAMs are very naturally viewed through a Bayesian lens, and we often must
+#' model time series that show complex distributional features and missing data,
+#' parameters for \pkg{mvgam} models are estimated in a Bayesian framework using
+#' Markov Chain Monte Carlo by default.
+#'
+#' **Getting Started Resources:**
+#' - General overview: `vignette("mvgam_overview")` and `vignette("data_in_mvgam")`
+#' - Full list of vignettes: `vignette(package = "mvgam")`
+#' - Real-world examples: \code{\link{mvgam_use_cases}}
+#' - Quick reference: [mvgam cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
+#'
+#' @section Model Specification Details:
+#'
+#' **Formula Syntax:** Details of the formula syntax used by \pkg{mvgam} can be
+#' found in \code{\link{mvgam_formulae}}. Note that it is possible to supply an
+#' empty formula where there are no predictors or intercepts in the observation
+#' model (i.e. `y ~ 0` or `y ~ -1`). In this case, an intercept-only observation
+#' model will be set up but the intercept coefficient will be fixed at zero. This
+#' can be handy if you wish to fit pure State-Space models where the variation in
+#' the dynamic trend controls the average expectation, and/or where intercepts are
+#' non-identifiable (as in piecewise trends).
+#'
+#' **Families and Link Functions:** Details of families supported by \pkg{mvgam}
 #' can be found in \code{\link{mvgam_families}}.
-#' \cr
-#' \cr
-#' *Trend models*: Details of latent error process models supported by \pkg{mvgam}
+#'
+#' **Trend Models:** Details of latent error process models supported by \pkg{mvgam}
 #' can be found in \code{\link{mvgam_trends}}.
-#' \cr
-#' \cr
-#' *Priors*: Default priors for intercepts and any variance parameters are chosen
-#' to be vaguely informative, but these should always be checked by the user.
-#' Prior distributions for most important model parameters can be altered
-#' (see [get_mvgam_priors()] for details).
-#' Note that latent trends are estimated on the link scale so choose priors
-#' accordingly. However more control over the model specification can be accomplished
-#' by setting \code{run_model = FALSE} and then editing the model code (
-#' found in the `model_file` slot in the returned object) before running the
-#' model using either \pkg{rstan} or \pkg{cmdstanr}. This is encouraged for
-#' complex modelling tasks. Note, no priors are formally checked to ensure
-#' they are in the right syntax so it is up to the user to ensure these are correct
-#' \cr
-#' \cr
-#' *Random effects*: For any smooth terms using the random effect basis (\code{\link[mgcv]{smooth.construct.re.smooth.spec}}),
-#' a non-centred parameterisation is automatically employed to avoid degeneracies that are common in hierarchical models.
-#' Note however that centred versions may perform better for series that are particularly informative, so as with any
-#' foray into Bayesian modelling, it is worth building an understanding of the model's assumptions and limitations by following a
-#' principled workflow. Also note that models are parameterised using `drop.unused.levels = FALSE` in \code{\link[mgcv]{jagam}}
-#' to ensure predictions can be made for all levels of the supplied factor variable
-#' \cr
-#' \cr
-#' *Observation level parameters*: When more than one series is included in \code{data} and an
-#' observation family that contains more than one parameter is used, additional observation family parameters
-#' (i.e. `phi` for `nb()` or `sigma` for `gaussian()`) are
-#' by default estimated independently for each series. But if you wish for the series to share
-#' the same observation parameters, set `share_obs_params = TRUE`
-#' \cr
-#' \cr
-#' *Residuals*: For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics
-#' If the fitted model is appropriate then Dunn-Smyth residuals will be standard normal in distribution and no
-#' autocorrelation will be evident. When a particular observation is missing, the residual is calculated by comparing independent
-#' draws from the model's posterior distribution
-#' \cr
-#' \cr
-#' *Using Stan*: \pkg{mvgam} is primarily designed to use Hamiltonian Monte Carlo for parameter estimation
-#' via the software `Stan` (using either the `cmdstanr` or `rstan` interface).
-#' There are great advantages when using `Stan` over Gibbs / Metropolis Hastings samplers, which includes the option
-#' to estimate nonlinear effects via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408),
-#' the availability of a variety of inference algorithms (i.e. variational inference, laplacian inference etc...) and
-#' [capabilities to enforce stationarity for complex Vector Autoregressions](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648).
-#' Because of the many advantages of `Stan` over `JAGS`,
-#' *further development of the package will only be applied to `Stan`*. This includes the planned addition
-#' of more response distributions, plans to handle zero-inflation, and plans to incorporate a greater
-#' variety of trend models. Users are strongly encouraged to opt for `Stan` over `JAGS` in any proceeding workflows
-#' \cr
-#' \cr
-#' *How to start?*: The [`mvgam` cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf) is a
-#' good starting place if you are just learning to use the package. It gives an overview of the package's key functions and objects,
-#' as well as providing a reasonable workflow that new users can follow. In general it is recommended to
-#' \itemize{
-#'   \item 1. Check that your data are in a suitable tidy format for \pkg{mvgam} modeling (see the [data formatting vignette](https://nicholasjclark.github.io/mvgam/articles/data_in_mvgam.html) for guidance)
-#'   \item 2. Inspect features of the data using \code{\link{plot_mvgam_series}}. Now is also a good time to familiarise yourself
-#'   with the package's example workflows that are detailed in the vignettes. In particular,
-#'   the [getting started vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html),
-#'   the [shared latent states vignette](https://nicholasjclark.github.io/mvgam/articles/shared_states.html),
-#'   the [time-varying effects vignette](https://nicholasjclark.github.io/mvgam/articles/time_varying_effects.html) and
-#'   the [State-Space models vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html) all provide
-#'   useful information about how to structure, fit and interrogate Dynamic Generalized Additive Models in \pkg{mvgam}. Some
-#'   more specialized how-to articles include
-#'   ["Fitting N-mixture models in `mgam`](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html),
-#'   ["Joint Species Distribution Models in `mgam`](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html),
-#'   ["Incorporating time-varying seasonality in forecast models"](https://ecogambler.netlify.app/blog/time-varying-seasonality/)
-#'   and ["Temporal autocorrelation in GAMs and the `mvgam` package"](https://ecogambler.netlify.app/blog/autocorrelated-gams/)
-#'   \item 3. Carefully think about how to structure linear predictor effects (i.e. smooth terms using \code{\link[mgcv]{s}()},
-#'   \code{\link[mgcv]{te}()} or \code{\link[mgcv]{ti}()}, GPs using \code{\link[brms]{gp}()}, dynamic time-varying effects using [dynamic()], and parametric terms), latent temporal trend components (see \code{\link{mvgam_trends}}) and the appropriate
-#'   observation family (see \code{\link{mvgam_families}}). Use [get_mvgam_priors()] to see default prior distributions
-#'   for stochastic parameters
-#'   \item 4. Change default priors using appropriate prior knowledge (see \code{\link[brms]{prior}()}). When using State-Space models
-#'   with a `trend_formula`, pay particular attention to priors for any variance parameters such as process errors and observation
-#'   errors. Default priors on these parameters are chosen to be vaguely informative and to avoid
-#'   zero (using Inverse Gamma priors), but more informative priors will often help with
-#'   model efficiency and convergence
-#'   \item 5. Fit the model using either Hamiltonian Monte Carlo or an approximation algorithm (i.e.
-#'   change the `backend` argument) and use [summary.mvgam()], [conditional_effects.mvgam()],
-#'   [mcmc_plot.mvgam()], [pp_check.mvgam()], [pairs.mvgam()] and
-#'   [plot.mvgam()] to inspect / interrogate the model
-#'   \item 6. Update the model as needed and use [loo_compare.mvgam()] for in-sample model comparisons,
-#'   or alternatively use [forecast.mvgam()], [lfo_cv.mvgam()] and
-#'   [score.mvgam_forecast()] to compare models based on out-of-sample forecasts
-#'   (see the [forecast evaluation vignette](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
-#'   for guidance)
-#'   \item 7. When satisfied with the model structure, use [predict.mvgam()],
-#'   \code{\link[marginaleffects]{plot_predictions}()} and/or \code{\link[marginaleffects]{plot_slopes}()} for
-#'   more targeted simulation-based inferences
-#'   (see ["How to interpret and report nonlinear effects from Generalized Additive Models"](https://ecogambler.netlify.app/blog/interpreting-gams/)
-#'   for some guidance on interpreting GAMs). For time series models, use [hindcast.mvgam()],
-#'   [fitted.mvgam()], [augment.mvgam()] and [forecast.mvgam()] to inspect
-#'   posterior hindcast / forecast distributions
-#'   \item 8. Use [how_to_cite()] to obtain a scaffold methods section (with full references) to begin describing this
-#'   model in scientific publications
-#'   }
+#'
+#' @section Prior Specifications:
+#' Default priors for intercepts and any variance parameters are chosen to be
+#' vaguely informative, but these should always be checked by the user. Prior
+#' distributions for most important model parameters can be altered (see
+#' [get_mvgam_priors()] for details). Note that latent trends are estimated on
+#' the link scale so choose priors accordingly.
+#'
+#' However more control over the model specification can be accomplished by setting
+#' \code{run_model = FALSE} and then editing the model code (found in the
+#' `model_file` slot in the returned object) before running the model using either
+#' \pkg{rstan} or \pkg{cmdstanr}. This is encouraged for complex modelling tasks.
+#'
+#' **Important:** No priors are formally checked to ensure they are in the right
+#' syntax so it is up to the user to ensure these are correct.
+#'
+#' @section Model Components:
+#'
+#' **Random Effects:** For any smooth terms using the random effect basis
+#' (\code{\link[mgcv]{smooth.construct.re.smooth.spec}}), a non-centred
+#' parameterisation is automatically employed to avoid degeneracies that are common
+#' in hierarchical models. Note however that centred versions may perform better
+#' for series that are particularly informative, so as with any foray into Bayesian
+#' modelling, it is worth building an understanding of the model's assumptions and
+#' limitations by following a principled workflow. Also note that models are
+#' parameterised using `drop.unused.levels = FALSE` in \code{\link[mgcv]{jagam}}
+#' to ensure predictions can be made for all levels of the supplied factor variable.
+#'
+#' **Observation Level Parameters:** When more than one series is included in
+#' \code{data} and an observation family that contains more than one parameter is
+#' used, additional observation family parameters (i.e. `phi` for `nb()` or `sigma`
+#' for `gaussian()`) are by default estimated independently for each series. But if
+#' you wish for the series to share the same observation parameters, set
+#' `share_obs_params = TRUE`.
+#'
+#' @section Model Diagnostics:
+#'
+#' **Residuals:** For each series, randomized quantile (i.e. Dunn-Smyth) residuals
+#' are calculated for inspecting model diagnostics. If the fitted model is
+#' appropriate then Dunn-Smyth residuals will be standard normal in distribution
+#' and no autocorrelation will be evident. When a particular observation is missing,
+#' the residual is calculated by comparing independent draws from the model's
+#' posterior distribution.
+#'
+#' @section Computational Backend:
+#'
+#' **Using Stan:** \pkg{mvgam} is primarily designed to use Hamiltonian Monte Carlo
+#' for parameter estimation via the software `Stan` (using either the `cmdstanr`
+#' or `rstan` interface). There are great advantages when using `Stan` over Gibbs /
+#' Metropolis Hastings samplers, which includes the option to estimate nonlinear
+#' effects via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408),
+#' the availability of a variety of inference algorithms (i.e. variational inference,
+#' laplacian inference etc...) and [capabilities to enforce stationarity for complex Vector Autoregressions](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648).
+#'
+#' Because of the many advantages of `Stan` over `JAGS`, **further development of
+#' the package will only be applied to `Stan`**. This includes the planned addition
+#' of more response distributions, plans to handle zero-inflation, and plans to
+#' incorporate a greater variety of trend models. Users are strongly encouraged to
+#' opt for `Stan` over `JAGS` in any proceeding workflows.
+#'
+#' @section Recommended Workflow:
+#'
+#' **How to Start:** The [`mvgam` cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
+#' is a good starting place if you are just learning to use the package. It gives
+#' an overview of the package's key functions and objects, as well as providing a
+#' reasonable workflow that new users can follow.
+#'
+#' **Recommended Steps:**
+#'
+#' 1. **Data Preparation:** Check that your data are in a suitable tidy format for
+#'    \pkg{mvgam} modeling (see the [data formatting vignette](https://nicholasjclark.github.io/mvgam/articles/data_in_mvgam.html)
+#'    for guidance)
+#'
+#' 2. **Data Exploration:** Inspect features of the data using \code{\link{plot_mvgam_series}}.
+#'    Now is also a good time to familiarise yourself with the package's example
+#'    workflows that are detailed in the vignettes:
+#'    - [Getting started vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+#'    - [Shared latent states vignette](https://nicholasjclark.github.io/mvgam/articles/shared_states.html)
+#'    - [Time-varying effects vignette](https://nicholasjclark.github.io/mvgam/articles/time_varying_effects.html)
+#'    - [State-Space models vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html)
+#'    - ["Fitting N-mixture models in `mgam`"](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html)
+#'    - ["Joint Species Distribution Models in `mgam`"](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html)
+#'    - ["Incorporating time-varying seasonality in forecast models"](https://ecogambler.netlify.app/blog/time-varying-seasonality/)
+#'    - ["Temporal autocorrelation in GAMs and the `mvgam` package"](https://ecogambler.netlify.app/blog/autocorrelated-gams/)
+#'
+#' 3. **Model Structure:** Carefully think about how to structure linear predictor
+#'    effects (i.e. smooth terms using \code{\link[mgcv]{s}()}, \code{\link[mgcv]{te}()}
+#'    or \code{\link[mgcv]{ti}()}, GPs using \code{\link[brms]{gp}()}, dynamic
+#'    time-varying effects using [dynamic()], and parametric terms), latent temporal
+#'    trend components (see \code{\link{mvgam_trends}}) and the appropriate
+#'    observation family (see \code{\link{mvgam_families}}). Use [get_mvgam_priors()]
+#'    to see default prior distributions for stochastic parameters.
+#'
+#' 4. **Prior Specification:** Change default priors using appropriate prior knowledge
+#'    (see \code{\link[brms]{prior}()}). When using State-Space models with a
+#'    `trend_formula`, pay particular attention to priors for any variance parameters
+#'    such as process errors and observation errors. Default priors on these parameters
+#'    are chosen to be vaguely informative and to avoid zero (using Inverse Gamma
+#'    priors), but more informative priors will often help with model efficiency
+#'    and convergence.
+#'
+#' 5. **Model Fitting:** Fit the model using either Hamiltonian Monte Carlo or an
+#'    approximation algorithm (i.e. change the `backend` argument) and use
+#'    [summary.mvgam()], [conditional_effects.mvgam()], [mcmc_plot.mvgam()],
+#'    [pp_check.mvgam()], [pairs.mvgam()] and [plot.mvgam()] to inspect /
+#'    interrogate the model.
+#'
+#' 6. **Model Comparison:** Update the model as needed and use [loo_compare.mvgam()]
+#'    for in-sample model comparisons, or alternatively use [forecast.mvgam()],
+#'    [lfo_cv.mvgam()] and [score.mvgam_forecast()] to compare models based on
+#'    out-of-sample forecasts (see the [forecast evaluation vignette](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+#'    for guidance).
+#'
+#' 7. **Inference and Prediction:** When satisfied with the model structure, use
+#'    [predict.mvgam()], \code{\link[marginaleffects]{plot_predictions}()} and/or
+#'    \code{\link[marginaleffects]{plot_slopes}()} for more targeted simulation-based
+#'    inferences (see ["How to interpret and report nonlinear effects from Generalized Additive Models"](https://ecogambler.netlify.app/blog/interpreting-gams/)
+#'    for some guidance on interpreting GAMs). For time series models, use
+#'    [hindcast.mvgam()], [fitted.mvgam()], [augment.mvgam()] and [forecast.mvgam()]
+#'    to inspect posterior hindcast / forecast distributions.
+#'
+#' 8. **Documentation:** Use [how_to_cite()] to obtain a scaffold methods section
+#'    (with full references) to begin describing this model in scientific publications.
+#'
 #' @author Nicholas J Clark
-#' @references Nicholas J Clark & Konstans Wells (2023). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
-#' Methods in Ecology and Evolution. 14:3, 771-784.
-#' \cr
-#' \cr
+#'
+#' @references
+#' Nicholas J Clark & Konstans Wells (2023). Dynamic generalised additive models
+#' (DGAMs) for forecasting discrete ecological time series. Methods in Ecology and
+#' Evolution. 14:3, 771-784.
+#'
 #' Nicholas J Clark, SK Morgan Ernest, Henry Senyondo, Juniper Simonis, Ethan P White,
 #' Glenda M Yenni, KANK Karunarathna (2025). Beyond single-species models: leveraging
-#' multispecies forecasts to navigate the dynamics of ecological predictability. PeerJ.
-#' 13:e18929 https://doi.org/10.7717/peerj.18929
-#' @seealso \code{\link[mgcv]{jagam}()}, \code{\link[mgcv]{gam}()}, \code{\link[mgcv]{gam.models}},
-#' [get_mvgam_priors()], [jsdgam()], [hindcast.mvgam()], [forecast.mvgam()], [predict.mvgam()]
-#' @return A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
-#' the mgcv model output (for easily generating simulations at
-#' unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
-#' for other functions in the package. See \code{\link{mvgam-class}} for details.
-#' Use `methods(class = "mvgam")` for an overview on available methods.
+#' multispecies forecasts to navigate the dynamics of ecological predictability.
+#' PeerJ. 13:e18929 https://doi.org/10.7717/peerj.18929
+#'
+#' @seealso \code{\link[mgcv]{jagam}()}, \code{\link[mgcv]{gam}()},
+#' \code{\link[mgcv]{gam.models}}, [get_mvgam_priors()], [jsdgam()],
+#' [hindcast.mvgam()], [forecast.mvgam()], [predict.mvgam()]
+#'
+#' @return A `list` object of class `mvgam` containing model output, the text
+#' representation of the model file, the mgcv model output (for easily generating
+#' simulations at unsampled covariate values), Dunn-Smyth residuals for each
+#' series and key information needed for other functions in the package. See
+#' \code{\link{mvgam-class}} for details. Use `methods(class = "mvgam")` for an
+#' overview on available methods.
 #'
 #' @examples
 #' \donttest{
+#' # =============================================================================
+#' # Basic Multi-Series Time Series Modeling
+#' # =============================================================================
+#'
 #' # Simulate three time series that have shared seasonal dynamics,
 #' # independent AR(1) trends, and Poisson observations
 #' set.seed(0)
@@ -512,6 +539,9 @@
 #' options(mc.cores = mc.cores.def)
 #'
 #'
+#' # =============================================================================
+#' # Vector Autoregressive (VAR) Models
+#' # =============================================================================
 #'
 #' # Fit a model to the portal time series that uses a latent
 #' # Vector Autoregression of order 1
@@ -526,8 +556,7 @@
 #' )
 #'
 #' # Plot the autoregressive coefficient distributions;
-#' # use 'dir = "v"' to arrange the order of facets
-#' # correctly
+#' # use 'dir = "v"' to arrange the order of facets correctly
 #' mcmc_plot(
 #'   mod,
 #'   variable = 'A',
@@ -536,7 +565,7 @@
 #'   facet_args = list(dir = 'v')
 #' )
 #'
-#' # Plot the process error variance-covariance matrix in the same way;
+#' # Plot the process error variance-covariance matrix in the same way
 #' mcmc_plot(
 #'   mod,
 #'   variable = 'Sigma',
@@ -545,7 +574,7 @@
 #'   facet_args = list(dir = 'v')
 #' )
 #'
-#' # Calulate Generalized Impulse Response Functions for each series
+#' # Calculate Generalized Impulse Response Functions for each series
 #' irfs <- irf(
 #'   mod,
 #'   h = 12,
@@ -556,12 +585,16 @@
 #' plot(irfs, series = 1)
 #' plot(irfs, series = 2)
 #'
-#' # Calulate forecast error variance decompositions for each series
+#' # Calculate forecast error variance decompositions for each series
 #' fevds <- fevd(mod, h = 12)
 #'
 #' # Plot median contributions to forecast error variance
 #' plot(fevds)
 #'
+#'
+#' # =============================================================================
+#' # Dynamic Factor Models
+#' # =============================================================================
 #'
 #' # Now fit a model that uses two RW dynamic factors to model
 #' # the temporal dynamics of the four rodent species
@@ -580,14 +613,10 @@
 #'
 #' # Plot the hindcast distributions
 #' hcs <- hindcast(mod)
-#' plot(hcs,
-#'      series = 1)
-#' plot(hcs,
-#'      series = 2)
-#' plot(hcs,
-#'      series = 3)
-#' plot(hcs,
-#'      series = 4)
+#' plot(hcs, series = 1)
+#' plot(hcs, series = 2)
+#' plot(hcs, series = 3)
+#' plot(hcs, series = 4)
 #'
 #' # Use residual_cor() to calculate temporal correlations among the series
 #' # based on the factor loadings
@@ -601,6 +630,9 @@
 #' plot(lvcors, cluster = TRUE)
 #'
 #'
+#' # =============================================================================
+#' # Shared Latent Trends with Custom Trend Mapping
+#' # =============================================================================
 #'
 #' # Example of supplying a trend_map so that some series can share
 #' # latent trend processes
@@ -608,7 +640,7 @@
 #' mod_data <- sim$data_train
 #'
 #' # Here, we specify only two latent trends; series 1 and 2 share a trend,
-#' # while series 3 has it's own unique latent trend
+#' # while series 3 has its own unique latent trend
 #' trend_map <- data.frame(
 #'   series = unique(mod_data$series),
 #'   trend = c(1, 1, 2)
@@ -634,6 +666,10 @@
 #' plot(mod, type = "trend", series = 2)
 #' plot(mod, type = "trend", series = 3)
 #'
+#'
+#' # =============================================================================
+#' # Time-Varying (Dynamic) Coefficients
+#' # =============================================================================
 #'
 #' # Example of how to use dynamic coefficients
 #' # Simulate a time-varying coefficient for the effect of temperature
@@ -662,12 +698,11 @@
 #'
 #' # Fit the model using the dynamic() function
 #' mod <- mvgam(
-#'   formula =
-#'     out ~ dynamic(
-#'       temp,
-#'       scale = FALSE,
-#'       k = 40
-#'     ),
+#'   formula = out ~ dynamic(
+#'     temp,
+#'     scale = FALSE,
+#'     k = 40
+#'   ),
 #'   family = gaussian(),
 #'   data = data_train,
 #'   newdata = data_test,
@@ -687,11 +722,16 @@
 #' points(beta_temp, pch = 16)
 #'
 #'
+#' # =============================================================================
+#' # Working with Offset Terms
+#' # =============================================================================
+#'
 #' # Example showing how to incorporate an offset; simulate some count data
 #' # with different means per series
 #' set.seed(100)
 #' dat <- sim_mvgam(
-#'   prop_trend = 0, mu = c(0, 2, 2),
+#'   prop_trend = 0,
+#'   mu = c(0, 2, 2),
 #'   seasonality = "hierarchical"
 #' )
 #'
@@ -711,8 +751,7 @@
 #'   silent = 2
 #' )
 #'
-#' # Inspect the model file to see the modification to the linear predictor
-#' # (eta)
+#' # Inspect the model file to see the modification to the linear predictor (eta)
 #' stancode(mod)
 #'
 #' # Forecasts for the first two series will differ in magnitude
@@ -730,7 +769,8 @@
 #' # for each series
 #' dat$data_test$offset <- rep(1, NROW(dat$data_test))
 #' preds_rr <- predict(mod,
-#'   type = "link", newdata = dat$data_test,
+#'   type = "link",
+#'   newdata = dat$data_test,
 #'   summary = FALSE
 #' )
 #' series1_inds <- which(dat$data_test$series == "series_1")
@@ -757,6 +797,10 @@
 #' }
 #' layout(1)
 #'
+#'
+#' # =============================================================================
+#' # Binomial Family Models
+#' # =============================================================================
 #'
 #' # Example showcasing how cbind() is needed for Binomial observations
 #' # Simulate two time series of Binomial trials
@@ -787,8 +831,7 @@
 #' # Fit a model using the binomial() family; must specify observations
 #' # and number of trials in the cbind() wrapper
 #' mod <- mvgam(
-#'   formula =
-#'     cbind(y, ntrials) ~ series + s(x, by = series),
+#'   formula = cbind(y, ntrials) ~ series + s(x, by = series),
 #'   family = binomial(),
 #'   data = dat,
 #'   chains = 2,
@@ -810,15 +853,17 @@
 #' plot_predictions(
 #'   mod,
 #'   by = c('x', 'series'),
-#'   newdata = datagrid(x = runif(100, -2, 2),
-#'                     series = unique,
-#'                     ntrials = 1),
+#'   newdata = datagrid(
+#'     x = runif(100, -2, 2),
+#'     series = unique,
+#'     ntrials = 1
+#'   ),
 #'   type = 'expected'
 #' )
 #'
 #' \dontshow{
 #' # For R CMD check: make sure any open connections are closed afterward
-#'  closeAllConnections()
+#' closeAllConnections()
 #' }
 #' }
 #' @export
