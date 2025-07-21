@@ -5,42 +5,63 @@
 #' or included correlated process errors directly
 #'
 #' @name residual_cor.jsdgam
-#' @inheritParams brms::residuals.brmsfit
-#' @param object \code{list} object of class \code{mvgam} resulting from a call to [jsdgam()]
-#' or a call to [mvgam()] in which either `use_lv = TRUE` or a multivariate process was used
-#' with `cor = TRUE` (see [RW()] and [VAR()] for examples)
-#' @param robust If `FALSE` (the default) the mean is used as a measure of central tendency.
-#' If `TRUE`, the median is used instead. Only used if `summary` is `TRUE`
-#' @param ... ignored
-#' @return If `summary = TRUE`, a `list` of  \code{\link{mvgam_residcor-class}} with the following components:
-#'  \item{cor, cor_lower, cor_upper}{A set of \eqn{p \times p} correlation matrices,
-#'  containing either the posterior median or mean estimate, plus lower and upper limits
-#'  of the corresponding credible intervals supplied to `probs`}
-#'  \item{sig_cor}{A \eqn{p \times p} correlation matrix containing only those correlations whose credible
-#'  interval does not contain zero. All other correlations are set to zero}
-#'  \item{prec, prec_lower, prec_upper}{A set of \eqn{p \times p} precision matrices,
-#'  containing either the posterior median or mean estimate, plus lower and upper limits
-#'  of the corresponding credible intervals supplied to `probs`}
-#'  \item{sig_prec}{A \eqn{p \times p} precision matrix containing only those precisions whose credible
-#'  interval does not contain zero. All other precisions are set to zero}
-#'   \item{cov}{A \eqn{p \times p} posterior median or mean covariance matrix}
-#'   \item{trace}{The median/mean point estimator of the trace (sum of the diagonal elements)
-#'   of the residual covariance matrix `cov`}
 #'
-#'   If `summary = FALSE`, this function returns a `list` containing the following components:
-#'  \item{all_cormat}{A \eqn{n_{draws} \times p \times p} `array` of posterior
-#'  residual correlation matrix draws}
-#'  \item{all_covmat}{A \eqn{n_{draws} \times p \times p} `array` of posterior
-#'  residual covariance matrix draws}
-#'  \item{all_presmat}{A \eqn{n_{draws} \times p \times p} `array` of posterior
-#'  residual precision matrix draws}
-#'  \item{all_trace}{A \eqn{n_{draws}} `vector` of posterior covariance trace draws}
+#' @inheritParams brms::residuals.brmsfit
+#'
+#' @param object \code{list} object of class \code{mvgam} resulting from a
+#'   call to [jsdgam()] or a call to [mvgam()] in which either
+#'   `use_lv = TRUE` or a multivariate process was used with `cor = TRUE`
+#'   (see [RW()] and [VAR()] for examples)
+#'
+#' @param robust If `FALSE` (the default) the mean is used as a measure of
+#'   central tendency. If `TRUE`, the median is used instead. Only used if
+#'   `summary` is `TRUE`
+#'
+#' @param ... ignored
+#'
+#' @return If `summary = TRUE`, a `list` of
+#'   \code{\link{mvgam_residcor-class}} with the following components:
+#'   \item{cor, cor_lower, cor_upper}{A set of \eqn{p \times p} correlation
+#'   matrices, containing either the posterior median or mean estimate, plus
+#'   lower and upper limits of the corresponding credible intervals supplied
+#'   to `probs`}
+#'   \item{sig_cor}{A \eqn{p \times p} correlation matrix containing only
+#'   correlations whose credible interval does not contain zero. All other
+#'   correlations are set to zero}
+#'   \item{prec, prec_lower, prec_upper}{A set of \eqn{p \times p} precision
+#'   matrices, containing either the posterior median or mean estimate, plus
+#'   lower and upper limits of the corresponding credible intervals supplied
+#'   to `probs`}
+#'   \item{sig_prec}{A \eqn{p \times p} precision matrix containing only
+#'   precisions whose credible interval does not contain zero. All other
+#'   precisions are set to zero}
+#'   \item{cov}{A \eqn{p \times p} posterior median or mean covariance
+#'   matrix}
+#'   \item{trace}{The median/mean point estimator of the trace (sum of the
+#'   diagonal elements) of the residual covariance matrix `cov`}
+#'
+#'   If `summary = FALSE`, this function returns a `list` containing the
+#'   following components:
+#'   \item{all_cormat}{A \eqn{n_{draws} \times p \times p} `array` of
+#'   posterior residual correlation matrix draws}
+#'   \item{all_covmat}{A \eqn{n_{draws} \times p \times p} `array` of
+#'   posterior residual covariance matrix draws}
+#'   \item{all_presmat}{A \eqn{n_{draws} \times p \times p} `array` of
+#'   posterior residual precision matrix draws}
+#'   \item{all_trace}{A \eqn{n_{draws}} `vector` of posterior covariance
+#'   trace draws}
 #'
 #' @details
-#' See \code{\link{mvgam_residcor-class}} for a full description of the quantities that are
-#' computed and returned by this function, along with key references.
+#' See \code{\link{mvgam_residcor-class}} for a description of the quantities
+#' that are computed and returned by this function, along with key references.
+#'
+#' @references Hui, F. K. C. (2016). boral – Bayesian Ordination and
+#'   Regression Analysis of Multivariate Abundance Data in r. \emph{Methods
+#'   in Ecology and Evolution}, 7(6), 744-750.
+#'   \doi{10.1111/2041-210X.12514}
 #'
 #' @seealso [jsdgam()], [lv_correlations()], \code{\link{mvgam_residcor-class}}
+#'
 #' @export
 residual_cor <- function(object, ...) {
   UseMethod("residual_cor", object)

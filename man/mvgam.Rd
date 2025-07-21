@@ -419,8 +419,8 @@ workflows that are detailed in the vignettes:
 \item \href{https://nicholasjclark.github.io/mvgam/articles/shared_states.html}{Shared latent states vignette}
 \item \href{https://nicholasjclark.github.io/mvgam/articles/time_varying_effects.html}{Time-varying effects vignette}
 \item \href{https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html}{State-Space models vignette}
-\item \href{https://nicholasjclark.github.io/mvgam/articles/nmixtures.html}{"Fitting N-mixture models in \code{mgam}"}
-\item \href{https://nicholasjclark.github.io/mvgam/reference/jsdgam.html}{"Joint Species Distribution Models in \code{mgam}"}
+\item \href{https://nicholasjclark.github.io/mvgam/articles/nmixtures.html}{"Fitting N-mixture models in \code{mvgam}"}
+\item \href{https://nicholasjclark.github.io/mvgam/reference/jsdgam.html}{"Joint Species Distribution Models in \code{mvgam}"}
 \item \href{https://ecogambler.netlify.app/blog/time-varying-seasonality/}{"Incorporating time-varying seasonality in forecast models"}
 \item \href{https://ecogambler.netlify.app/blog/autocorrelated-gams/}{"Temporal autocorrelation in GAMs and the \code{mvgam} package"}
 }

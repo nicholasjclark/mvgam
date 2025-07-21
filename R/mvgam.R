@@ -341,8 +341,8 @@
 #'    - [Shared latent states vignette](https://nicholasjclark.github.io/mvgam/articles/shared_states.html)
 #'    - [Time-varying effects vignette](https://nicholasjclark.github.io/mvgam/articles/time_varying_effects.html)
 #'    - [State-Space models vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html)
-#'    - ["Fitting N-mixture models in `mgam`"](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html)
-#'    - ["Joint Species Distribution Models in `mgam`"](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html)
+#'    - ["Fitting N-mixture models in `mvgam`"](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html)
+#'    - ["Joint Species Distribution Models in `mvgam`"](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html)
 #'    - ["Incorporating time-varying seasonality in forecast models"](https://ecogambler.netlify.app/blog/time-varying-seasonality/)
 #'    - ["Temporal autocorrelation in GAMs and the `mvgam` package"](https://ecogambler.netlify.app/blog/autocorrelated-gams/)
 #'

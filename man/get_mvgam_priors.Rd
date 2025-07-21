@@ -132,8 +132,8 @@ Defaults to \code{time} to be consistent with other functionalities
 in \pkg{mvgam}, though note that the data need not be time series in this case. See examples below
 for further details and explanations}
 
-\item{species}{The unquoted name of the \code{factor} variable that indexes
-the different response units in \code{data} (usually \code{'species'} in a JSDM).
+\item{species}{The unquoted name of the \code{factor} variable that indexes the
+different response units in \code{data} (usually \code{'species'} in a JSDM).
 Defaults to \code{series} to be consistent with other \code{mvgam} models}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'

@@ -25,45 +25,55 @@ residual_cor(object, ...)
 )
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=jsdgam]{jsdgam()}}
-or a call to \code{\link[=mvgam]{mvgam()}} in which either \code{use_lv = TRUE} or a multivariate process was used
-with \code{cor = TRUE} (see \code{\link[=RW]{RW()}} and \code{\link[=VAR]{VAR()}} for examples)}
+\item{object}{\code{list} object of class \code{mvgam} resulting from a
+call to \code{\link[=jsdgam]{jsdgam()}} or a call to \code{\link[=mvgam]{mvgam()}} in which either
+\code{use_lv = TRUE} or a multivariate process was used with \code{cor = TRUE}
+(see \code{\link[=RW]{RW()}} and \code{\link[=VAR]{VAR()}} for examples)}
 
 \item{...}{ignored}
 
 \item{summary}{Should summary statistics be returned
 instead of the raw values? Default is \code{TRUE}..}
 
-\item{robust}{If \code{FALSE} (the default) the mean is used as a measure of central tendency.
-If \code{TRUE}, the median is used instead. Only used if \code{summary} is \code{TRUE}}
+\item{robust}{If \code{FALSE} (the default) the mean is used as a measure of
+central tendency. If \code{TRUE}, the median is used instead. Only used if
+\code{summary} is \code{TRUE}}
 
 \item{probs}{The percentiles to be computed by the \code{quantile}
 function. Only used if \code{summary} is \code{TRUE}.}
 }
 \value{
-If \code{summary = TRUE}, a \code{list} of  \code{\link{mvgam_residcor-class}} with the following components:
-\item{cor, cor_lower, cor_upper}{A set of \eqn{p \times p} correlation matrices,
-containing either the posterior median or mean estimate, plus lower and upper limits
-of the corresponding credible intervals supplied to \code{probs}}
-\item{sig_cor}{A \eqn{p \times p} correlation matrix containing only those correlations whose credible
-interval does not contain zero. All other correlations are set to zero}
-\item{prec, prec_lower, prec_upper}{A set of \eqn{p \times p} precision matrices,
-containing either the posterior median or mean estimate, plus lower and upper limits
-of the corresponding credible intervals supplied to \code{probs}}
-\item{sig_prec}{A \eqn{p \times p} precision matrix containing only those precisions whose credible
-interval does not contain zero. All other precisions are set to zero}
-\item{cov}{A \eqn{p \times p} posterior median or mean covariance matrix}
-\item{trace}{The median/mean point estimator of the trace (sum of the diagonal elements)
-of the residual covariance matrix \code{cov}}
+If \code{summary = TRUE}, a \code{list} of
+\code{\link{mvgam_residcor-class}} with the following components:
+\item{cor, cor_lower, cor_upper}{A set of \eqn{p \times p} correlation
+matrices, containing either the posterior median or mean estimate, plus
+lower and upper limits of the corresponding credible intervals supplied
+to \code{probs}}
+\item{sig_cor}{A \eqn{p \times p} correlation matrix containing only
+correlations whose credible interval does not contain zero. All other
+correlations are set to zero}
+\item{prec, prec_lower, prec_upper}{A set of \eqn{p \times p} precision
+matrices, containing either the posterior median or mean estimate, plus
+lower and upper limits of the corresponding credible intervals supplied
+to \code{probs}}
+\item{sig_prec}{A \eqn{p \times p} precision matrix containing only
+precisions whose credible interval does not contain zero. All other
+precisions are set to zero}
+\item{cov}{A \eqn{p \times p} posterior median or mean covariance
+matrix}
+\item{trace}{The median/mean point estimator of the trace (sum of the
+diagonal elements) of the residual covariance matrix \code{cov}}
 
-If \code{summary = FALSE}, this function returns a \code{list} containing the following components:
-\item{all_cormat}{A \eqn{n_{draws} \times p \times p} \code{array} of posterior
-residual correlation matrix draws}
-\item{all_covmat}{A \eqn{n_{draws} \times p \times p} \code{array} of posterior
-residual covariance matrix draws}
-\item{all_presmat}{A \eqn{n_{draws} \times p \times p} \code{array} of posterior
-residual precision matrix draws}
-\item{all_trace}{A \eqn{n_{draws}} \code{vector} of posterior covariance trace draws}
+If \code{summary = FALSE}, this function returns a \code{list} containing the
+following components:
+\item{all_cormat}{A \eqn{n_{draws} \times p \times p} \code{array} of
+posterior residual correlation matrix draws}
+\item{all_covmat}{A \eqn{n_{draws} \times p \times p} \code{array} of
+posterior residual covariance matrix draws}
+\item{all_presmat}{A \eqn{n_{draws} \times p \times p} \code{array} of
+posterior residual precision matrix draws}
+\item{all_trace}{A \eqn{n_{draws}} \code{vector} of posterior covariance
+trace draws}
 }
 \description{
 Compute residual correlation estimates from Joint Species Distribution
@@ -71,8 +81,8 @@ Compute residual correlation estimates from Joint Species Distribution
 or included correlated process errors directly
 }
 \details{
-See \code{\link{mvgam_residcor-class}} for a full description of the quantities that are
-computed and returned by this function, along with key references.
+See \code{\link{mvgam_residcor-class}} for a description of the quantities
+that are computed and returned by this function, along with key references.
 }
 \examples{
 \donttest{
@@ -105,6 +115,12 @@ if(requireNamespace('ggrepel', quietly = TRUE)){
  closeAllConnections()
 }
 }
+}
+\references{
+Hui, F. K. C. (2016). boral – Bayesian Ordination and
+Regression Analysis of Multivariate Abundance Data in r. \emph{Methods
+in Ecology and Evolution}, 7(6), 744-750.
+\doi{10.1111/2041-210X.12514}
 }
 \seealso{
 \code{\link[=jsdgam]{jsdgam()}}, \code{\link[=lv_correlations]{lv_correlations()}}, \code{\link{mvgam_residcor-class}}

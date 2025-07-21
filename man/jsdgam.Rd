@@ -34,38 +34,43 @@ jsdgam(
 )
 }
 \arguments{
-\item{formula}{A \code{formula} object specifying the GAM observation model formula. These are exactly like the formula
-for a GLM except that smooth terms, \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, as well as time-varying
-\code{dynamic()} terms, nonparametric \code{gp()} terms and offsets using \code{offset()}, can be added to the right hand side
-to specify that the linear predictor depends on smooth functions of predictors
-(or linear functionals of these). Details of the formula syntax used by \pkg{mvgam}
-can be found in \code{\link{mvgam_formulae}}}
+\item{formula}{A \code{formula} object specifying the GAM observation model
+formula. These are exactly like the formula for a GLM except that smooth
+terms, \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, as well as time-varying \code{dynamic()}
+terms, nonparametric \code{gp()} terms and offsets using \code{offset()}, can be
+added to the right hand side to specify that the linear predictor depends
+on smooth functions of predictors (or linear functionals of these).
+Details of the formula syntax used by \pkg{mvgam} can be found in
+\code{\link{mvgam_formulae}}}
 
 \item{factor_formula}{A \code{formula} object specifying the linear predictor
-effects for the latent factors. Use \code{by = trend} within calls to functional terms
-(i.e. \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, \code{dynamic()}, or \code{gp()}) to ensure that each factor
-captures a different axis of variation. See the example below as an illustration}
+effects for the latent factors. Use \code{by = trend} within calls to functional
+terms (i.e. \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, \code{dynamic()}, or \code{gp()}) to
+ensure that each factor captures a different axis of variation. See the
+example below as an illustration}
 
 \item{knots}{An optional \code{list} containing user specified knot values for
 basis construction. For most bases the user simply supplies the knots to be
 used, which must match up with the \code{k} value supplied. Different terms can
 use different numbers of knots, unless they share a covariate.}
 
-\item{factor_knots}{An optional \code{list} containing user specified knot values to
-be used for basis construction of any smooth terms in \code{factor_formula}.
-For most bases the user simply supplies the knots to be used, which must match up with the \code{k} value supplied
-(note that the number of knots is not always just \code{k}). Different terms can use different numbers of knots,
-unless they share a covariate}
+\item{factor_knots}{An optional \code{list} containing user specified knot
+values to be used for basis construction of any smooth terms in
+\code{factor_formula}. For most bases the user simply supplies the knots to be
+used, which must match up with the \code{k} value supplied (note that the
+number of knots is not always just \code{k}). Different terms can use different
+numbers of knots, unless they share a covariate}
 
-\item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
-required by the GAM \code{formula} and \code{factor_formula} objects}
+\item{data}{A \code{dataframe} or \code{list} containing the model response
+variable and covariates required by the GAM \code{formula} and
+\code{factor_formula} objects}
 
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same
 variables as in \code{data}. If included, observations in variable \code{y} will be
 set to \code{NA} when fitting the model so that posterior simulations can be obtained.}
 
-\item{family}{\code{family} specifying the observation family for the outcomes. Currently supported
-families are:
+\item{family}{\code{family} specifying the observation family for the
+outcomes. Currently supported families are:
 \itemize{
 \item\code{gaussian()} for real-valued data
 \item\code{betar()} for proportional data on \verb{(0,1)}
@@ -75,9 +80,9 @@ families are:
 \item\code{bernoulli()} for binary data
 \item\code{poisson()} for count data
 \item\code{nb()} for overdispersed count data
-\item\code{binomial()} for count data with imperfect detection when the number of trials is known;
-note that the \code{cbind()} function must be used to bind the discrete observations and the discrete number
-of trials
+\item\code{binomial()} for count data with imperfect detection when the number
+of trials is known; note that the \code{cbind()} function must be used to
+bind the discrete observations and the discrete number of trials
 \item\code{beta_binomial()} as for \code{binomial()} but allows for overdispersion}
 Default is \code{poisson()}. See \code{\link{mvgam_families}} for more details}
 
@@ -88,8 +93,8 @@ Defaults to \code{time} to be consistent with other functionalities
 in \pkg{mvgam}, though note that the data need not be time series in this case. See examples below
 for further details and explanations}
 
-\item{species}{The unquoted name of the \code{factor} variable that indexes
-the different response units in \code{data} (usually \code{'species'} in a JSDM).
+\item{species}{The unquoted name of the \code{factor} variable that indexes the
+different response units in \code{data} (usually \code{'species'} in a JSDM).
 Defaults to \code{series} to be consistent with other \code{mvgam} models}
 
 \item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family} has additional
@@ -97,14 +102,14 @@ family-specific observation parameters (e.g., variance components, dispersion
 parameters), these will be shared across all outcome variables. Useful when
 multiple outcomes share properties. Default is \code{FALSE}.}
 
-\item{priors}{An optional \code{data.frame} with prior
-definitions (in Stan syntax) or, preferentially, a vector containing
-objects of class \code{brmsprior} (see. \code{\link[brms]{prior}} for details).
-See \link{get_mvgam_priors} and for more information on changing default prior distributions}
+\item{priors}{An optional \code{data.frame} with prior definitions (in Stan
+syntax) or, preferentially, a vector containing objects of class
+\code{brmsprior} (see. \code{\link[brms]{prior}} for details). See
+\link{get_mvgam_priors} and for more information on changing default prior
+distributions}
 
 \item{n_lv}{\code{integer} the number of latent factors to use for modelling
-residual associations.
-Cannot be \verb{> n_species}. Defaults arbitrarily to \code{2}}
+residual associations. Cannot be \verb{> n_species}. Defaults arbitrarily to \code{2}}
 
 \item{backend}{Character string naming the package for Stan model fitting.
 Options are \code{"cmdstanr"} (default) or \code{"rstan"}. Can be set globally via
@@ -141,11 +146,11 @@ algorithms.}
 \item{parallel}{\code{logical} specifying whether to use multiple cores for parallel
 MCMC simulation. If \code{TRUE}, uses \code{min(c(chains, parallel::detectCores() - 1))} cores.}
 
-\item{threads}{\code{integer} Experimental option to use multithreading for within-chain
-parallelisation in \code{Stan}. We recommend its use only if you are experienced with
-\code{Stan}'s \code{reduce_sum} function and have a slow running model that cannot be sped
-up by any other means. Currently works for all families when using \pkg{cmdstanr}
-as the backend}
+\item{threads}{\code{integer} Experimental option to use multithreading for
+within-chain parallelisation in \code{Stan}. We recommend its use only if
+you are experienced with \code{Stan}'s \code{reduce_sum} function and have a
+slow running model that cannot be sped up by any other means. Currently
+works for all families when using \pkg{cmdstanr} as the backend}
 
 \item{silent}{Verbosity level between \code{0} and \code{2}. If \code{1} (default), most
 informational messages are suppressed. If \code{2}, even more messages are
@@ -170,55 +175,65 @@ size (can add later using \link{add_residuals}).}
 }
 \value{
 A \code{list} object of class \code{mvgam} containing model output,
-the text representation of the model file,
-the mgcv model output (for easily generating simulations at
-unsampled covariate values), Dunn-Smyth residuals for each species and key information needed
-for other functions in the package. See \code{\link{mvgam-class}} for details.
-Use \code{methods(class = "mvgam")} for an overview on available methods
+the text representation of the model file, the mgcv model output (for easily
+generating simulations at unsampled covariate values), Dunn-Smyth residuals
+for each species and key information needed for other functions in the
+package. See \code{\link{mvgam-class}} for details. Use
+\code{methods(class = "mvgam")} for an overview on available methods
 }
 \description{
-This function sets up a Joint Species Distribution Model whereby the residual associations among
-species can be modelled in a reduced-rank format using a set of latent factors. The factor
-specification is extremely flexible, allowing users to include spatial, temporal or any other type
-of predictor effects to more efficiently capture unmodelled residual associations, while the
-observation model can also be highly flexible (including all smooth, GP and other effects that
-\pkg{mvgam} can handle)
+This function sets up a Joint Species Distribution Model whereby the residual
+associations among species can be modelled in a reduced-rank format using a
+set of latent factors. The factor specification is extremely flexible,
+allowing users to include spatial, temporal or any other type of predictor
+effects to more efficiently capture unmodelled residual associations, while
+the observation model can also be highly flexible (including all smooth, GP
+and other effects that \pkg{mvgam} can handle)
 }
 \details{
-Joint Species Distribution Models allow for responses of multiple species to be
-learned hierarchically, whereby responses to environmental variables in \code{formula} can be partially
-pooled and any latent, unmodelled residual associations can also be learned. In \pkg{mvgam}, both of
-these effects can be modelled with the full power of latent factor Hierarchical GAMs, providing unmatched
-flexibility to model full communities of species. When calling \link{jsdgam}, an initial State-Space model using
-\code{trend = 'None'} is set up and then modified to include the latent factors and their linear predictors.
-Consequently, you can inspect priors for these models using \link{get_mvgam_priors} by supplying the relevant
-\code{formula}, \code{factor_formula}, \code{data} and \code{family} arguments and keeping the default \code{trend = 'None'}.
+Joint Species Distribution Models allow for responses of multiple
+species to be learned hierarchically, whereby responses to environmental
+variables in \code{formula} can be partially pooled and any latent, unmodelled
+residual associations can also be learned. In \pkg{mvgam}, both of these
+effects can be modelled with the full power of latent factor Hierarchical
+GAMs, providing unmatched flexibility to model full communities of species.
+When calling \link{jsdgam}, an initial State-Space model using \code{trend = 'None'} is
+set up and then modified to include the latent factors and their linear
+predictors. Consequently, you can inspect priors for these models using
+\link{get_mvgam_priors} by supplying the relevant \code{formula}, \code{factor_formula},
+\code{data} and \code{family} arguments and keeping the default \code{trend = 'None'}.
 
 In a JSDGAM, the expectation of response \eqn{Y_{ij}} is modelled with
 
 \deqn{g(\mu_{ij}) = X_i\beta + u_i\theta_j,}
 
 where \eqn{g(.)} is a known link function,
-\eqn{X} is a design matrix of linear predictors (with associated \eqn{\beta} coefficients),
-\eqn{u} are \eqn{n_{lv}}-variate latent factors
-(\eqn{n_{lv}}<<\eqn{n_{species}}) and
-\eqn{\theta_j} are species-specific loadings on the latent factors, respectively. The design matrix
-\eqn{X} and \eqn{\beta} coefficients are constructed and modelled using \code{formula} and can contain
-any of \code{mvgam}'s predictor effects, including random intercepts and slopes, multidimensional penalized
-smooths, GP effects etc... The factor loadings \eqn{\theta_j} are constrained for identifiability but can
-be used to reconstruct an estimate of the species' residual variance-covariance matrix
-using \eqn{\Theta \Theta'} (see the example below and \code{\link[=residual_cor]{residual_cor()}} for details).
-The latent factors are further modelled using:
+\eqn{X} is a design matrix of linear predictors (with associated \eqn{\beta}
+coefficients), \eqn{u} are \eqn{n_{lv}}-variate latent factors
+(\eqn{n_{lv}}<<\eqn{n_{species}}) and \eqn{\theta_j} are species-specific
+loadings on the latent factors, respectively. The design matrix \eqn{X} and
+\eqn{\beta} coefficients are constructed and modelled using \code{formula} and
+can contain any of \code{mvgam}'s predictor effects, including random intercepts
+and slopes, multidimensional penalized smooths, GP effects etc... The factor
+loadings \eqn{\theta_j} are constrained for identifiability but can be used
+to reconstruct an estimate of the species' residual variance-covariance
+matrix using \eqn{\Theta \Theta'} (see the example below and
+\code{\link[=residual_cor]{residual_cor()}} for details). The latent factors are further modelled using:
 \deqn{
 u_i \sim \text{Normal}(Q_i\beta_{factor}, 1) \quad
 }
-where the second design matrix \eqn{Q} and associated \eqn{\beta_{factor}} coefficients are
-constructed and modelled using \code{factor_formula}. Again, the effects that make up this linear
-predictor can contain any of \code{mvgam}'s allowed predictor effects, providing enormous flexibility for
-modelling species' communities.
+where the second design matrix \eqn{Q} and associated \eqn{\beta_{factor}}
+coefficients are constructed and modelled using \code{factor_formula}. Again, the
+effects that make up this linear predictor can contain any of \code{mvgam}'s
+allowed predictor effects, providing enormous flexibility for modelling
+species' communities.
 }
 \examples{
 \donttest{
+# ========================================================================
+# Example 1: Basic JSDGAM with Portal Data
+# ========================================================================
+
 # Fit a JSDGAM to the portal_data captures
 mod <- jsdgam(
   formula = captures ~
@@ -237,19 +252,17 @@ mod <- jsdgam(
 # Plot covariate effects
 library(ggplot2); theme_set(theme_bw())
 plot_predictions(
- mod,
- condition = c('ndvi_ma12','series', 'series')
+  mod,
+  condition = c('ndvi_ma12', 'series', 'series')
 )
 
 plot_predictions(
- mod,
- condition = c('mintemp','series', 'series')
+  mod,
+  condition = c('mintemp', 'series', 'series')
 )
 
 # A residual correlation plot
-plot(
-  residual_cor(mod)
-)
+plot(residual_cor(mod))
 
 # An ordination biplot can also be constructed
 # from the factor scores and their loadings
@@ -257,9 +270,9 @@ if(requireNamespace('ggrepel', quietly = TRUE)){
   ordinate(mod, alpha = 0.7)
 }
 
-
-# A more complicated example showing how to include predictors
-# in the factor_formula
+# ========================================================================
+# Example 2: Advanced JSDGAM with Spatial Predictors
+# ========================================================================
 
 # Simulate latent count data for 500 spatial locations and 10 species
 set.seed(0)
@@ -278,9 +291,11 @@ lon <- runif(N_points, min = 150, max = 155)
 lat <- runif(N_points, min = -20, max = -19)
 
 # Set up spatial basis functions as a tensor product of lat and lon
-sm <- mgcv::smoothCon(mgcv::te(lon, lat, k = 5),
-                      data = data.frame(lon, lat),
-                      knots = NULL)[[1]]
+sm <- mgcv::smoothCon(
+  mgcv::te(lon, lat, k = 5),
+  data = data.frame(lon, lat),
+  knots = NULL
+)[[1]]
 
 # The design matrix for this smooth is in the 'X' slot
 des_mat <- sm$X
@@ -314,34 +329,40 @@ basis_coefs <- matrix(NA, nrow = N_species, ncol = NCOL(Sigma))
 base_field <- mgcv::rmvn(1, mu = rep(0, NCOL(Sigma)), V = Sigma)
 for(t in 1:N_species){
   corOmega <- (cov2cor(Sigma) * 0.7) +
-                 (0.3 * cov2cor(random_Sigma(N = NCOL(des_mat))))
+    (0.3 * cov2cor(random_Sigma(N = NCOL(des_mat))))
   basis_coefs[t, ] <- mgcv::rmvn(1, mu = rep(0, NCOL(Sigma)), V = corOmega)
 }
 
 # Simulate the latent spatial processes
 st_process <- do.call(rbind, lapply(seq_len(N_species), function(t){
-  data.frame(lat = lat,
-             lon = lon,
-             species = paste0('species_', t),
-             temperature = temperature,
-             process = alphas[t] +
-               betas[t] * temperature +
-               des_mat \%*\% basis_coefs[t,])
+  data.frame(
+    lat = lat,
+    lon = lon,
+    species = paste0('species_', t),
+    temperature = temperature,
+    process = alphas[t] +
+      betas[t] * temperature +
+      des_mat \%*\% basis_coefs[t,]
+  )
 }))
 
 # Now take noisy observations at some of the points (60)
 obs_points <- sample(1:N_points, size = 60, replace = FALSE)
-obs_points <- data.frame(lat = lat[obs_points],
-                         lon = lon[obs_points],
-                         site = 1:60)
+obs_points <- data.frame(
+  lat = lat[obs_points],
+  lon = lon[obs_points],
+  site = 1:60
+)
 
 # Keep only the process data at these points
 st_process \%>\%
   dplyr::inner_join(obs_points, by = c('lat', 'lon')) \%>\%
   # now take noisy Poisson observations of the process
   dplyr::mutate(count = rpois(NROW(.), lambda = exp(process))) \%>\%
-  dplyr::mutate(species = factor(species,
-                                 levels = paste0('species_', 1:N_species))) \%>\%
+  dplyr::mutate(species = factor(
+    species,
+    levels = paste0('species_', 1:N_species)
+  )) \%>\%
   dplyr::group_by(lat, lon) -> dat
 
 # View the count distributions for each species
@@ -354,66 +375,78 @@ ggplot(dat, aes(x = lon, y = lat, col = log(count + 1))) +
   facet_wrap(~ species, scales = 'free') +
   scale_color_viridis_c()
 
+# ------------------------------------------------------------------------
+# Model Fitting with Custom Priors
+# ------------------------------------------------------------------------
+
 # Inspect default priors for a joint species model with three spatial factors
-priors <- get_mvgam_priors(formula = count ~
-                            # Environmental model includes random slopes for
-                            # a linear effect of temperature
-                            s(species, bs = 're', by = temperature),
+priors <- get_mvgam_priors(
+  formula = count ~
+    # Environmental model includes random slopes for
+    # a linear effect of temperature
+    s(species, bs = 're', by = temperature),
 
-                          # Each factor estimates a different nonlinear spatial process, using
-                          # 'by = trend' as in other mvgam State-Space models
-                          factor_formula = ~ gp(lon, lat, k = 6, by = trend) - 1,
-                          n_lv = 3,
+  # Each factor estimates a different nonlinear spatial process, using
+  # 'by = trend' as in other mvgam State-Space models
+  factor_formula = ~ gp(lon, lat, k = 6, by = trend) - 1,
+  n_lv = 3,
 
-                          # The data and grouping variables
-                          data = dat,
-                          unit = site,
-                          species = species,
+  # The data and grouping variables
+  data = dat,
+  unit = site,
+  species = species,
 
-                          # Poisson observations
-                          family = poisson())
+  # Poisson observations
+  family = poisson()
+)
 head(priors)
 
 # Fit a JSDM that estimates hierarchical temperature responses
 # and that uses three latent spatial factors
-mod <- jsdgam(formula = count ~
-                # Environmental model includes random slopes for a
-                # linear effect of temperature
-                s(species, bs = 're', by = temperature),
+mod <- jsdgam(
+  formula = count ~
+    # Environmental model includes random slopes for a
+    # linear effect of temperature
+    s(species, bs = 're', by = temperature),
 
-              # Each factor estimates a different nonlinear spatial process, using
-              # 'by = trend' as in other mvgam State-Space models
-              factor_formula = ~ gp(lon, lat, k = 6, by = trend) - 1,
-              n_lv = 3,
+  # Each factor estimates a different nonlinear spatial process, using
+  # 'by = trend' as in other mvgam State-Space models
+  factor_formula = ~ gp(lon, lat, k = 6, by = trend) - 1,
+  n_lv = 3,
 
-              # Change default priors for fixed random effect variances and
-              # factor GP marginal deviations to standard normal
-              priors = c(prior(std_normal(),
-                               class = sigma_raw),
-                         prior(std_normal(),
-                               class = `alpha_gp_trend(lon, lat):trendtrend1`),
-                         prior(std_normal(),
-                               class = `alpha_gp_trend(lon, lat):trendtrend2`),
-                         prior(std_normal(),
-                               class = `alpha_gp_trend(lon, lat):trendtrend3`)),
+  # Change default priors for fixed random effect variances and
+  # factor GP marginal deviations to standard normal
+  priors = c(
+    prior(std_normal(), class = sigma_raw),
+    prior(std_normal(), class = `alpha_gp_trend(lon, lat):trendtrend1`),
+    prior(std_normal(), class = `alpha_gp_trend(lon, lat):trendtrend2`),
+    prior(std_normal(), class = `alpha_gp_trend(lon, lat):trendtrend3`)
+  ),
 
-              # The data and the grouping variables
-              data = dat,
-              unit = site,
-              species = species,
+  # The data and the grouping variables
+  data = dat,
+  unit = site,
+  species = species,
 
-              # Poisson observations
-              family = poisson(),
-              chains = 2,
-              silent = 2)
+  # Poisson observations
+  family = poisson(),
+  chains = 2,
+  silent = 2
+)
+
+# ------------------------------------------------------------------------
+# Model Visualization and Diagnostics
+# ------------------------------------------------------------------------
 
 # Plot the implicit species-level intercept estimates
-plot_predictions(mod, condition = 'species',
-                 type = 'link')
+plot_predictions(mod, condition = 'species', type = 'link')
 
 # Plot species' hierarchical responses to temperature
-plot_predictions(mod, condition = c('temperature', 'species', 'species'),
-                 type = 'link')
+plot_predictions(
+  mod,
+  condition = c('temperature', 'species', 'species'),
+  type = 'link'
+)
 
 # Plot posterior median estimates of the latent spatial factors
 plot(mod, type = 'smooths', trend_effects = TRUE)
@@ -425,15 +458,22 @@ if(requireNamespace('gratia', quietly = TRUE)){
 
 # Plot species' randomized quantile residual distributions
 # as a function of latitude
-pp_check(mod,
-         type = 'resid_ribbon_grouped',
-         group = 'species',
-         x = 'lat',
-         ndraws = 200)
+pp_check(
+  mod,
+  type = 'resid_ribbon_grouped',
+  group = 'species',
+  x = 'lat',
+  ndraws = 200
+)
+
+# ------------------------------------------------------------------------
+# Residual Correlation Analysis
+# ------------------------------------------------------------------------
 
 # Calculate residual spatial correlations
 post_cors <- residual_cor(mod)
 names(post_cors)
+
 # Look at lower and upper credible interval estimates for
 # some of the estimated correlations
 post_cors$cor[1:5, 1:5]
@@ -450,11 +490,17 @@ if(requireNamespace('ggrepel', quietly = TRUE)){
   ordinate(mod)
 }
 
+# ------------------------------------------------------------------------
+# Model Validation and Prediction
+# ------------------------------------------------------------------------
+
 # Posterior predictive checks and ELPD-LOO can ascertain model fit
-pp_check(mod,
-         type = "pit_ecdf_grouped",
-         group = "species",
-         ndraws = 200)
+pp_check(
+  mod,
+  type = "pit_ecdf_grouped",
+  group = "species",
+  ndraws = 200
+)
 loo(mod)
 
 # Forecast log(counts) for entire region (site value doesn't matter as long
@@ -462,12 +508,13 @@ loo(mod)
 # note this calculation takes a few minutes because of the need to calculate
 # draws from the stochastic latent factors
 newdata <- st_process \%>\%
- dplyr::mutate(species = factor(species,
-                                levels = paste0('species_',
-                                                1:N_species))) \%>\%
- dplyr::group_by(lat, lon) \%>\%
- dplyr::mutate(site = dplyr::cur_group_id()) \%>\%
- dplyr::ungroup()
+  dplyr::mutate(species = factor(
+    species,
+    levels = paste0('species_', 1:N_species)
+  )) \%>\%
+  dplyr::group_by(lat, lon) \%>\%
+  dplyr::mutate(site = dplyr::cur_group_id()) \%>\%
+  dplyr::ungroup()
 preds <- predict(mod, newdata = newdata)
 
 # Plot the median log(count) predictions on a grid
@@ -480,18 +527,19 @@ ggplot(newdata, aes(x = lon, y = lat, col = log_count)) +
 
 \dontshow{
 # For R CMD check: make sure any open connections are closed afterward
- closeAllConnections()
+  closeAllConnections()
 }
 }
 }
 \references{
-Nicholas J Clark & Konstans Wells (2023). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
+Nicholas J Clark & Konstans Wells (2023). Dynamic generalised
+additive models (DGAMs) for forecasting discrete ecological time series.
 Methods in Ecology and Evolution. 14:3, 771-784.
 \cr
 \cr
-David I Warton, F Guillaume Blanchet, Robert B O’Hara, Otso Ovaskainen, Sara Taskinen, Steven C
-Walker & Francis KC Hui (2015). So many variables: joint modeling in community ecology.
-Trends in Ecology & Evolution 30:12, 766-779.
+David I Warton, F Guillaume Blanchet, Robert B O'Hara, Otso Ovaskainen, Sara
+Taskinen, Steven C Walker & Francis KC Hui (2015). So many variables: joint
+modeling in community ecology. Trends in Ecology & Evolution 30:12, 766-779.
 }
 \seealso{
 \code{\link[=mvgam]{mvgam()}}, \code{\link[=residual_cor]{residual_cor()}}

@@ -4,34 +4,49 @@
 #' \code{jsdgam} models
 #'
 #' @name ordinate.jsdgam
-#' @param object \code{list} object of class \code{jsdgam} resulting from a call to [jsdgam()]
-#' @param which_lvs A `vector` of indices indicating the two latent variables to be plotted
-#' (if number of the latent variables specified in the model was more than 2).
-#' Defaults to \code{c(1, 2)}
-#' @param biplot  `Logical`. If `TRUE`, both the site and the species
-#' scores will be plotted, with names for the taxa interpreted based on the `species`
-#' argument in the original call to [jsdgam()]. If `FALSE`, only the site scores
-#' will be plotted
-#' @param alpha A proportional numeric scalar between `0` and `1` that controls the relative
-#' scaling of the latent variables and their loading coefficients
+#'
+#' @param object \code{list} object of class \code{jsdgam} resulting from a
+#'   call to [jsdgam()]
+#'
+#' @param which_lvs A `vector` of indices indicating the two latent variables
+#'   to be plotted (if number of the latent variables specified in the model
+#'   was more than 2). Defaults to \code{c(1, 2)}
+#'
+#' @param biplot `Logical`. If `TRUE`, both the site and the species scores
+#'   will be plotted, with names for the taxa interpreted based on the
+#'   `species` argument in the original call to [jsdgam()]. If `FALSE`, only
+#'   the site scores will be plotted
+#'
+#' @param alpha A proportional numeric scalar between `0` and `1` that
+#'   controls the relative scaling of the latent variables and their loading
+#'   coefficients
+#'
 #' @param label_sites \code{Logical} flag. If `TRUE`, site scores will be
-#' plotted as labels using names based on the `unit` argument in the original call to [jsdgam()].
-#' If `FALSE`, site scores will be shown as points only
+#'   plotted as labels using names based on the `unit` argument in the
+#'   original call to [jsdgam()]. If `FALSE`, site scores will be shown as
+#'   points only
+#'
 #' @param ... ignored
+#'
 #' @details
-#' This function constructs a two-dimensional scatterplot in ordination space. The
-#' chosen latent variables are first re-rotated using singular value decomposition,
-#' so that the first plotted latent variable does not have to be the first latent variable
-#' that was estimated in the original model. Posterior median estimates of the variables
-#' and the species' loadings on these variables are then used to construct the resulting plot.
-#' Some attempt at de-cluttering the resulting plot is made by using `geom_label_repel()` and
-#' `geom_text_repel` from the \pkg{ggrepel} package, but if there are many sites and/or species
-#' then some labels may be removed automatically. Note that you can typically get
-#' better, more readable plot layouts if you also have the \pkg{ggarrow} and
-#' \pkg{ggpp} packages installed
+#' This function constructs a two-dimensional scatterplot in ordination space.
+#' The chosen latent variables are first re-rotated using singular value
+#' decomposition, so that the first plotted latent variable does not have to
+#' be the first latent variable that was estimated in the original model.
+#' Posterior median estimates of the variables and the species' loadings on
+#' these variables are then used to construct the resulting plot. Some attempt
+#' at de-cluttering the resulting plot is made by using `geom_label_repel()`
+#' and `geom_text_repel` from the \pkg{ggrepel} package, but if there are many
+#' sites and/or species then some labels may be removed automatically. Note
+#' that you can typically get better, more readable plot layouts if you also
+#' have the \pkg{ggarrow} and \pkg{ggpp} packages installed
+#'
 #' @return An `ggplot` object
+#'
 #' @author Nicholas J Clark
+#'
 #' @seealso [jsdgam()], [residual_cor()]
+#'
 #' @examples
 #'\donttest{
 #' # Fit a JSDGAM to the portal_data captures

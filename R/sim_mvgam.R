@@ -1,87 +1,125 @@
-#'Simulate a set of time series for modelling in \pkg{mvgam}
+#' Simulate a set of time series for modelling in \pkg{mvgam}
 #'
-#'This function simulates sets of time series data for fitting a multivariate GAM that includes
-#'shared seasonality and dependence on state-space latent dynamic factors. Random
-#'dependencies among series, i.e. correlations in their long-term trends, are included
-#'in the form of correlated loadings on the latent dynamic factors
+#' This function simulates sets of time series data for fitting a
+#' multivariate GAM that includes shared seasonality and dependence on
+#' State-Space latent dynamic factors. Random dependencies among series,
+#' i.e. correlations in their long-term trends, are included in the form of
+#' correlated loadings on the latent dynamic factors
 #'
-#'@importFrom stats rnorm rbeta rpois rlnorm rgamma cor cov2cor cov ts
-#'@importFrom brms lognormal
-#'@param T \code{integer}. Number of observations (timepoints)
-#'@param n_series \code{integer}. Number of discrete time series
-#'@param seasonality \code{character}. Either \code{shared}, meaning that
-#'all series share the exact same seasonal pattern,
-#'or \code{hierarchical}, meaning that there is a global seasonality but
-#'each series' pattern can deviate slightly
-#'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
-#'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent
-#'latent trends for each series
-#'@param n_lv \code{integer}. Number of latent dynamic factors for generating the series' trends.
-#'Defaults to `0`, meaning that dynamics are estimated independently for each series
-#'@param trend_model \code{character} specifying the time series dynamics for the latent trend.
-#'Options are:
-#'\itemize{
-#'   \item `None` (no latent trend component; i.e. the GAM component is all that
-#'   contributes to the linear predictor, and the observation process is the only
-#'   source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
-#'   \item `RW` (random walk with possible drift)
-#'   \item `AR1` (with possible drift)
-#'   \item `AR2` (with possible drift)
-#'   \item `AR3` (with possible drift)
-#'   \item `VAR1` (contemporaneously uncorrelated VAR1)
-#'   \item `VAR1cor` (contemporaneously correlated VAR1)
-#'   \item `GP` (Gaussian Process with squared exponential kernel)} See [mvgam_trends] for more details
-#'@param drift \code{logical}, simulate a drift term for each trend
-#'@param prop_trend \code{numeric}. Relative importance of the trend for each series.
-#'Should be between \code{0} and \code{1}
-#'@param trend_rel Deprecated. Use `prop_trend` instead
-#'@param freq \code{integer}. The seasonal frequency of the series
-#'@param family \code{family} specifying the exponential observation family for the series.
-#'Currently supported
-#'families are: `nb()`, `poisson()`, `bernoulli()`, `tweedie()`, `gaussian()`,
-#'`betar()`, `lognormal()`, `student()` and `Gamma()`
-#'@param phi \code{vector} of dispersion parameters for the series
-#'(i.e. `size` for `nb()` or
-#'`phi` for `betar()`). If \code{length(phi) < n_series},
-#'the first element of `phi` will
-#'be replicated `n_series` times.
-#'Defaults to \code{5} for `nb()` and `tweedie()`; \code{10} for
-#'`betar()`
-#'@param shape \code{vector} of shape parameters for the series
-#'(i.e. `shape` for `gamma()`)
-#'If \code{length(shape) < n_series}, the first element of `shape` will
-#'be replicated `n_series` times. Defaults to \code{10}
-#'@param sigma \code{vector} of scale parameters for the series
-#'(i.e. `sd` for `gaussian()` or `student()`,
-#'`log(sd)` for `lognormal()`). If \code{length(sigma) < n_series}, the first element of `sigma` will
-#'be replicated `n_series` times. Defaults to \code{0.5} for `gaussian()` and
-#'`student()`; \code{0.2} for `lognormal()`
-#'@param nu \code{vector} of degrees of freedom parameters for the
-#'series (i.e. `nu` for `student()`)
-#'If \code{length(nu) < n_series}, the first element of `nu` will
-#'be replicated `n_series` times. Defaults to \code{3}
-#'@param mu \code{vector} of location parameters for the series.
-#'If \code{length(mu) < n_series}, the first element of `mu` will
-#'be replicated `n_series` times. Defaults to small random values
-#'between `-0.5` and `0.5` on the link scale
-#'@param prop_missing \code{numeric} stating proportion of observations that are missing.
-#'Should be between
-#'\code{0} and \code{0.8}, inclusive
-#'@param prop_train \code{numeric} stating the proportion of data to use for training.
-#'Should be between \code{0.2} and \code{1}
-#'@return A \code{list} object containing outputs needed for \code{\link{mvgam}},
-#'including 'data_train' and 'data_test', as well as some additional information
-#'about the simulated seasonality and trend dependencies
-#'@examples
-#'# Simulate series with observations bounded at 0 and 1 (Beta responses)
-#'sim_data <- sim_mvgam(family = betar(), trend_model = RW(), prop_trend = 0.6)
-#'plot_mvgam_series(data = sim_data$data_train, series = 'all')
+#' @importFrom stats rnorm rbeta rpois rlnorm rgamma cor cov2cor cov ts
+#' @importFrom brms lognormal
 #'
-#'# Now simulate series with overdispersed discrete observations
-#'sim_data <- sim_mvgam(family = nb(), trend_model = RW(), prop_trend = 0.6, phi = 10)
-#'plot_mvgam_series(data = sim_data$data_train, series = 'all')
-#'@export
-
+#' @param T \code{integer}. Number of observations (timepoints)
+#'
+#' @param n_series \code{integer}. Number of discrete time series
+#'
+#' @param seasonality \code{character}. Either \code{shared}, meaning that
+#'   all series share the exact same seasonal pattern, or
+#'   \code{hierarchical}, meaning that there is a global seasonality but
+#'   each series' pattern can deviate slightly
+#'
+#' @param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to
+#'   estimate series' latent trends in a reduced dimension format. If
+#'   \code{FALSE}, estimate independent latent trends for each series
+#'
+#' @param n_lv \code{integer}. Number of latent dynamic factors for
+#'   generating the series' trends. Defaults to `0`, meaning that dynamics
+#'   are estimated independently for each series
+#'
+#' @param trend_model \code{character} specifying the time series dynamics
+#'   for the latent trend. Options are:
+#'   \itemize{
+#'     \item `None` (no latent trend component; i.e. the GAM component is
+#'     all that contributes to the linear predictor, and the observation
+#'     process is the only source of error; similarly to what is estimated
+#'     by \code{\link[mgcv]{gam}})
+#'     \item `RW` (random walk with possible drift)
+#'     \item `AR1` (with possible drift)
+#'     \item `AR2` (with possible drift)
+#'     \item `AR3` (with possible drift)
+#'     \item `VAR1` (contemporaneously uncorrelated VAR1)
+#'     \item `VAR1cor` (contemporaneously correlated VAR1)
+#'     \item `GP` (Gaussian Process with squared exponential kernel)
+#'   }
+#'   See [mvgam_trends] for more details
+#'
+#' @param drift \code{logical}, simulate a drift term for each trend
+#'
+#' @param prop_trend \code{numeric}. Relative importance of the trend for
+#'   each series. Should be between \code{0} and \code{1}
+#'
+#' @param trend_rel Deprecated. Use `prop_trend` instead
+#'
+#' @param freq \code{integer}. The seasonal frequency of the series
+#'
+#' @param family \code{family} specifying the exponential observation
+#'   family for the series. Currently supported families are: `nb()`,
+#'   `poisson()`, `bernoulli()`, `tweedie()`, `gaussian()`, `betar()`,
+#'   `lognormal()`, `student()` and `Gamma()`
+#'
+#' @param phi \code{vector} of dispersion parameters for the series
+#'   (i.e. `size` for `nb()` or `phi` for `betar()`). If
+#'   \code{length(phi) < n_series}, the first element of `phi` will be
+#'   replicated `n_series` times. Defaults to \code{5} for `nb()` and
+#'   `tweedie()`; \code{10} for `betar()`
+#'
+#' @param shape \code{vector} of shape parameters for the series
+#'   (i.e. `shape` for `gamma()`). If \code{length(shape) < n_series},
+#'   the first element of `shape` will be replicated `n_series` times.
+#'   Defaults to \code{10}
+#'
+#' @param sigma \code{vector} of scale parameters for the series
+#'   (i.e. `sd` for `gaussian()` or `student()`, `log(sd)` for
+#'   `lognormal()`). If \code{length(sigma) < n_series}, the first element
+#'   of `sigma` will be replicated `n_series` times. Defaults to
+#'   \code{0.5} for `gaussian()` and `student()`; \code{0.2} for
+#'   `lognormal()`
+#'
+#' @param nu \code{vector} of degrees of freedom parameters for the series
+#'   (i.e. `nu` for `student()`). If \code{length(nu) < n_series}, the
+#'   first element of `nu` will be replicated `n_series` times. Defaults
+#'   to \code{3}
+#'
+#' @param mu \code{vector} of location parameters for the series. If
+#'   \code{length(mu) < n_series}, the first element of `mu` will be
+#'   replicated `n_series` times. Defaults to small random values between
+#'   `-0.5` and `0.5` on the link scale
+#'
+#' @param prop_missing \code{numeric} stating proportion of observations
+#'   that are missing. Should be between \code{0} and \code{0.8}, inclusive
+#'
+#' @param prop_train \code{numeric} stating the proportion of data to use
+#'   for training. Should be between \code{0.2} and \code{1}
+#'
+#' @return A \code{list} object containing outputs needed for
+#'   \code{\link{mvgam}}, including 'data_train' and 'data_test', as well
+#'   as some additional information about the simulated seasonality and
+#'   trend dependencies
+#'
+#' @references Clark, N. J. and Wells, K. (2022). Dynamic generalised
+#'   additive models (DGAMs) for forecasting discrete ecological time
+#'   series. \emph{Methods in Ecology and Evolution}, 13(11), 2388-2404.
+#'   \doi{10.1111/2041-210X.13974}
+#'
+#' @examples
+#' # Simulate series with observations bounded at 0 and 1 (Beta responses)
+#' sim_data <- sim_mvgam(
+#'   family = betar(),
+#'   trend_model = RW(),
+#'   prop_trend = 0.6
+#' )
+#' plot_mvgam_series(data = sim_data$data_train, series = 'all')
+#'
+#' # Now simulate series with overdispersed discrete observations
+#' sim_data <- sim_mvgam(
+#'   family = nb(),
+#'   trend_model = RW(),
+#'   prop_trend = 0.6,
+#'   phi = 10
+#' )
+#' plot_mvgam_series(data = sim_data$data_train, series = 'all')
+#'
+#' @export
 sim_mvgam = function(
   T = 100,
   n_series = 3,

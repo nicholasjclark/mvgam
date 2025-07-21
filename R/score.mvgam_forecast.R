@@ -1,80 +1,112 @@
-#'@title Compute probabilistic forecast scores for \pkg{mvgam} models
-#'@param object `mvgam_forecast` object. See [forecast.mvgam()].
-#'If the test data
-#'supplied to \code{forecast.mvgam} contained out of sample test observations, the calibration
-#'of probabilistic forecasts can be scored using proper scoring rules
-#'@param ... Ignored
-#'@param score \code{character} specifying the type of proper scoring rule to use for evaluation. Options are:
-#'`sis` (i.e. the Scaled Interval Score), `energy`, `variogram`, `elpd`
-#'(i.e. the Expected log pointwise Predictive Density),
-#'`drps` (i.e. the Discrete Rank Probability Score), `crps` (the Continuous Rank Probability Score)
-#'or `brier` (the latter of which is only applicable for `bernoulli` models.
-#'Note that when choosing `elpd`, the supplied object must have forecasts on the `link` scale so that
-#'expectations can be calculated prior to scoring. If choosing `brier`, the object must have forecasts
-#'on the `expected` scale (i.e. probability predictions). For all other scores, forecasts should be supplied
-#'on the `response` scale (i.e. posterior predictions)
-#'@param log \code{logical}. Should the forecasts and truths be logged prior to scoring?
-#'This is often appropriate for comparing
-#'performance of models when series vary in their observation ranges. Ignored if `score = 'brier'`
-#'@param weights optional \code{vector} of weights (where \code{length(weights) == n_series})
-#'for weighting pairwise correlations when evaluating the variogram score for multivariate
-#'forecasts. Useful for down-weighting series that have larger magnitude observations or that
-#'are of less interest when forecasting. Ignored if \code{score != 'variogram'}
-#'@param interval_width proportional value on `[0.05,0.95]` defining the forecast interval
-#'for calculating coverage and, if `score = 'sis'`, for calculating the interval score.
-#'Ignored if `score = 'brier'`
-#'@param n_cores \code{integer} specifying number of cores for calculating scores in parallel
-#'@param ... Ignored
-#'@return a \code{list} containing scores and interval coverages per forecast horizon.
-#'If \code{score %in% c('drps', 'crps', 'elpd', 'brier')},
-#'the list will also contain return the sum of all series-level scores per horizon. If
-#'\code{score %in% c('energy','variogram')}, no series-level scores are computed and the only score returned
-#'will be for all series. For all scores apart from `elpd` and `brier`, the `in_interval` column in each series-level
-#'slot is a binary indicator of whether or not the true value was within the forecast's corresponding
-#'posterior empirical quantiles. Intervals are not calculated when using `elpd` because forecasts
-#'will only contain the linear predictors
+#' @title Compute probabilistic forecast scores for \pkg{mvgam} models
+#'
+#' @param object `mvgam_forecast` object. See [forecast.mvgam()]. If the test
+#'   data supplied to \code{forecast.mvgam} contained out of sample test
+#'   observations, the calibration of probabilistic forecasts can be scored
+#'   using proper scoring rules
+#'
+#' @param ... Ignored
+#'
+#' @param score \code{character} specifying the type of proper scoring rule
+#'   to use for evaluation. Options are: `sis` (i.e. the Scaled Interval
+#'   Score), `energy`, `variogram`, `elpd` (i.e. the Expected log pointwise
+#'   Predictive Density), `drps` (i.e. the Discrete Rank Probability Score),
+#'   `crps` (the Continuous Rank Probability Score) or `brier` (the latter
+#'   of which is only applicable for `bernoulli` models. Note that when
+#'   choosing `elpd`, the supplied object must have forecasts on the `link`
+#'   scale so that expectations can be calculated prior to scoring. If
+#'   choosing `brier`, the object must have forecasts on the `expected` scale
+#'   (i.e. probability predictions). For all other scores, forecasts should
+#'   be supplied on the `response` scale (i.e. posterior predictions)
+#'
+#' @param log \code{logical}. Should the forecasts and truths be logged
+#'   prior to scoring? This is often appropriate for comparing performance
+#'   of models when series vary in their observation ranges. Ignored if
+#'   `score = 'brier'`
+#'
+#' @param weights optional \code{vector} of weights (where
+#'   \code{length(weights) == n_series}) for weighting pairwise correlations
+#'   when evaluating the variogram score for multivariate forecasts. Useful
+#'   for down-weighting series that have larger magnitude observations or
+#'   that are of less interest when forecasting. Ignored if
+#'   \code{score != 'variogram'}
+#'
+#' @param interval_width proportional value on `[0.05,0.95]` defining the
+#'   forecast interval for calculating coverage and, if `score = 'sis'`, for
+#'   calculating the interval score. Ignored if `score = 'brier'`
+#'
+#' @param n_cores \code{integer} specifying number of cores for calculating
+#'   scores in parallel
+#'
+#' @return A \code{list} containing scores and interval coverages per
+#'   forecast horizon. If \code{score %in% c('drps', 'crps', 'elpd', 'brier')},
+#'   the list will also contain return the sum of all series-level scores
+#'   per horizon. If \code{score %in% c('energy','variogram')}, no
+#'   series-level scores are computed and the only score returned will be
+#'   for all series. For all scores apart from `elpd` and `brier`, the
+#'   `in_interval` column in each series-level slot is a binary indicator of
+#'   whether or not the true value was within the forecast's corresponding
+#'   posterior empirical quantiles. Intervals are not calculated when using
+#'   `elpd` because forecasts will only contain the linear predictors
+#'
 #' @author Nicholas J Clark
-#'@examples
-#'\donttest{
-#'# Simulate observations for three count-valued time series
-#'data <- sim_mvgam()
-#'# Fit a dynamic model using 'newdata' to automatically produce forecasts
-#'mod <- mvgam(y ~ 1,
-#'             trend_model = RW(),
-#'             data = data$data_train,
-#'             newdata = data$data_test,
-#'             chains = 2,
-#'             silent = 2)
 #'
-#'# Extract forecasts into a 'mvgam_forecast' object
-#'fc <- forecast(mod)
-#'plot(fc)
+#' @method score mvgam_forecast
 #'
-#'# Compute Discrete Rank Probability Scores and 0.90 interval coverages
-#'fc_scores <- score(fc, score = 'drps')
-#'str(fc_scores)
+#' @references Gneiting, T. and Raftery, A. E. (2007). Strictly Proper
+#'   Scoring Rules, Prediction, and Estimation. \emph{Journal of the American
+#'   Statistical Association}, 102(477), 359-378.
+#'   \doi{10.1198/016214506000001437}
 #'
-#'# An example using binary data
-#'data <- sim_mvgam(family = bernoulli())
-#'mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-#'             trend_model = AR(),
-#'             data = data$data_train,
-#'             newdata = data$data_test,
-#'             family = bernoulli(),
-#'             chains = 2,
-#'             silent = 2)
+#' @seealso \code{\link{forecast.mvgam}}, \code{\link{ensemble}}
 #'
-#'# Extract forecasts on the expectation (probability) scale
-#'fc <- forecast(mod, type = 'expected')
-#'plot(fc)
+#' @examples
+#' \donttest{
+#' # Simulate observations for three count-valued time series
+#' data <- sim_mvgam()
 #'
-#'# Compute Brier scores
-#'fc_scores <- score(fc, score = 'brier')
-#'str(fc_scores)
-#'}
-#'@method score mvgam_forecast
-#'@seealso \code{\link{forecast.mvgam}}, \code{\link{ensemble}}
-#'@export
+#' # Fit a dynamic model using 'newdata' to automatically produce forecasts
+#' mod <- mvgam(
+#'   y ~ 1,
+#'   trend_model = RW(),
+#'   data = data$data_train,
+#'   newdata = data$data_test,
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' # Extract forecasts into a 'mvgam_forecast' object
+#' fc <- forecast(mod)
+#' plot(fc)
+#'
+#' # Compute Discrete Rank Probability Scores and 0.90 interval coverages
+#' fc_scores <- score(fc, score = 'drps')
+#' str(fc_scores)
+#'
+#' # An example using binary data
+#' data <- sim_mvgam(family = bernoulli())
+#'
+#' mod <- mvgam(
+#'   y ~ s(season, bs = 'cc', k = 6),
+#'   trend_model = AR(),
+#'   data = data$data_train,
+#'   newdata = data$data_test,
+#'   family = bernoulli(),
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' # Extract forecasts on the expectation (probability) scale
+#' fc <- forecast(mod, type = 'expected')
+#' plot(fc)
+#'
+#' # Compute Brier scores
+#' fc_scores <- score(fc, score = 'brier')
+#' str(fc_scores)
+#' }
+#'
+#'
+#' @export
 score.mvgam_forecast = function(
   object,
   score = 'crps',
@@ -349,4 +381,6 @@ score.mvgam_forecast = function(
 #'@param object `mvgam_forecast` object. See [forecast.mvgam()].
 #'@param ... Ignored
 #'@export
-score = function(object, ...) UseMethod("score", object)
+score = function(object, ...){
+  UseMethod("score", object)
+}

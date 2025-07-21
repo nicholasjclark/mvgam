@@ -218,11 +218,12 @@ Returns lighter model version for speed. Users should leave as \code{FALSE}.}
 
 \item{factor_formula}{Optional new \code{formula} object for the factor linear predictors}
 
-\item{factor_knots}{An optional \code{list} containing user specified knot values to
-be used for basis construction of any smooth terms in \code{factor_formula}.
-For most bases the user simply supplies the knots to be used, which must match up with the \code{k} value supplied
-(note that the number of knots is not always just \code{k}). Different terms can use different numbers of knots,
-unless they share a covariate}
+\item{factor_knots}{An optional \code{list} containing user specified knot
+values to be used for basis construction of any smooth terms in
+\code{factor_formula}. For most bases the user simply supplies the knots to be
+used, which must match up with the \code{k} value supplied (note that the
+number of knots is not always just \code{k}). Different terms can use different
+numbers of knots, unless they share a covariate}
 }
 \value{
 A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,

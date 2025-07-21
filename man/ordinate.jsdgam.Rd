@@ -17,25 +17,28 @@ ordinate(object, ...)
 )
 }
 \arguments{
-\item{object}{\code{list} object of class \code{jsdgam} resulting from a call to \code{\link[=jsdgam]{jsdgam()}}}
+\item{object}{\code{list} object of class \code{jsdgam} resulting from a
+call to \code{\link[=jsdgam]{jsdgam()}}}
 
 \item{...}{ignored}
 
-\item{which_lvs}{A \code{vector} of indices indicating the two latent variables to be plotted
-(if number of the latent variables specified in the model was more than 2).
-Defaults to \code{c(1, 2)}}
+\item{which_lvs}{A \code{vector} of indices indicating the two latent variables
+to be plotted (if number of the latent variables specified in the model
+was more than 2). Defaults to \code{c(1, 2)}}
 
-\item{biplot}{\code{Logical}. If \code{TRUE}, both the site and the species
-scores will be plotted, with names for the taxa interpreted based on the \code{species}
-argument in the original call to \code{\link[=jsdgam]{jsdgam()}}. If \code{FALSE}, only the site scores
-will be plotted}
+\item{biplot}{\code{Logical}. If \code{TRUE}, both the site and the species scores
+will be plotted, with names for the taxa interpreted based on the
+\code{species} argument in the original call to \code{\link[=jsdgam]{jsdgam()}}. If \code{FALSE}, only
+the site scores will be plotted}
 
-\item{alpha}{A proportional numeric scalar between \code{0} and \code{1} that controls the relative
-scaling of the latent variables and their loading coefficients}
+\item{alpha}{A proportional numeric scalar between \code{0} and \code{1} that
+controls the relative scaling of the latent variables and their loading
+coefficients}
 
 \item{label_sites}{\code{Logical} flag. If \code{TRUE}, site scores will be
-plotted as labels using names based on the \code{unit} argument in the original call to \code{\link[=jsdgam]{jsdgam()}}.
-If \code{FALSE}, site scores will be shown as points only}
+plotted as labels using names based on the \code{unit} argument in the
+original call to \code{\link[=jsdgam]{jsdgam()}}. If \code{FALSE}, site scores will be shown as
+points only}
 }
 \value{
 An \code{ggplot} object
@@ -45,16 +48,17 @@ Plot an ordination of latent variables and their factor loadings from
 \code{jsdgam} models
 }
 \details{
-This function constructs a two-dimensional scatterplot in ordination space. The
-chosen latent variables are first re-rotated using singular value decomposition,
-so that the first plotted latent variable does not have to be the first latent variable
-that was estimated in the original model. Posterior median estimates of the variables
-and the species' loadings on these variables are then used to construct the resulting plot.
-Some attempt at de-cluttering the resulting plot is made by using \code{geom_label_repel()} and
-\code{geom_text_repel} from the \pkg{ggrepel} package, but if there are many sites and/or species
-then some labels may be removed automatically. Note that you can typically get
-better, more readable plot layouts if you also have the \pkg{ggarrow} and
-\pkg{ggpp} packages installed
+This function constructs a two-dimensional scatterplot in ordination space.
+The chosen latent variables are first re-rotated using singular value
+decomposition, so that the first plotted latent variable does not have to
+be the first latent variable that was estimated in the original model.
+Posterior median estimates of the variables and the species' loadings on
+these variables are then used to construct the resulting plot. Some attempt
+at de-cluttering the resulting plot is made by using \code{geom_label_repel()}
+and \code{geom_text_repel} from the \pkg{ggrepel} package, but if there are many
+sites and/or species then some labels may be removed automatically. Note
+that you can typically get better, more readable plot layouts if you also
+have the \pkg{ggarrow} and \pkg{ggpp} packages installed
 }
 \examples{
 \donttest{
