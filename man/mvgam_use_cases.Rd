@@ -6,9 +6,6 @@
 
 This help page provides external links to example applications and discussions relevant to the use of \pkg{mvgam} models. These examples span non-Gaussian time series modelling, multivariate abundance forecasting, and the use of complex predictors such as time-varying seasonality, monotonic nonlinear effects and Gaussian processes.
 }
-\usage{
-mvgam_use_cases
-}
 \details{
 \strong{Non-Gaussian time series modelling and forecasting}
 
