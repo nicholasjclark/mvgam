@@ -124,233 +124,163 @@ to be supplied</p></dd>
 
 
 <dt>trend_formula</dt>
-<dd><p>An optional <code>formula</code> object specifying the GAM
-process model formula. If
-supplied, a linear predictor will be modelled for the latent trends to capture
-process model evolution
-separately from the observation model. Should not have a response variable
-specified on the left-hand side
-of the formula (i.e. a valid option would be <code>~ season + s(year)</code>). Also note
-that you should not use
-the identifier <code>series</code> in this formula to specify effects that vary across
-time series. Instead you should use
-<code>trend</code>. This will ensure that models in which a <code>trend_map</code> is supplied will
-still work consistently
-(i.e. by allowing effects to vary across process models, even when some time
-series share the same underlying
-process model). This feature is only currently available for <code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code>
-and <code><a href="RW.html">VAR()</a></code> trend models.
-In <code><a href="mvgam_families.html">nmix()</a></code> family models, the <code>trend_formula</code> is used to set up a linear
-predictor for the underlying
-latent abundance. Be aware that it can be very challenging to simultaneously
-estimate intercept parameters
-for both the observation mode (captured by <code>formula</code>) and the process model
-(captured by <code>trend_formula</code>).
-Users are recommended to drop one of these using the <code>- 1</code> convention in the
-formula right hand side.</p></dd>
+<dd><p>An optional <code>formula</code> object specifying the GAM process
+model formula. If supplied, a linear predictor will be modelled for the
+latent trends to capture process model evolution separately from the
+observation model.</p>
+<p><strong>Important notes:</strong></p><ul><li><p>Should not have a response variable specified on the left-hand side
+(e.g., <code>~ season + s(year)</code>)</p></li>
+<li><p>Use <code>trend</code> instead of <code>series</code> for effects that vary across time series</p></li>
+<li><p>Only available for <code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code> and <code><a href="RW.html">VAR()</a></code> trend models</p></li>
+<li><p>In <code><a href="mvgam_families.html">nmix()</a></code> family models, sets up linear predictor for latent abundance</p></li>
+<li><p>Consider dropping one intercept using <code>- 1</code> convention to avoid
+estimation challenges</p></li>
+</ul></dd>
 
 
 <dt>knots</dt>
-<dd><p>An optional <code>list</code> containing user specified knot values to
-be used for basis construction.
-For most bases the user simply supplies the knots to be used, which must match
-up with the <code>k</code> value supplied
-(note that the number of knots is not always just <code>k</code>). Different terms can
-use different numbers of knots,
-unless they share a covariate</p></dd>
+<dd><p>An optional <code>list</code> containing user specified knot values for
+basis construction. For most bases the user simply supplies the knots to be
+used, which must match up with the <code>k</code> value supplied. Different terms can
+use different numbers of knots, unless they share a covariate.</p></dd>
 
 
 <dt>trend_knots</dt>
-<dd><p>As for <code>knots</code> above, this is an optional <code>list</code> of
-knot values for smooth
-functions within the <code>trend_formula</code></p></dd>
+<dd><p>As for <code>knots</code> above, this is an optional <code>list</code> of knot
+values for smooth functions within the <code>trend_formula</code>.</p></dd>
 
 
 <dt>trend_model</dt>
-<dd><p><code>character</code> or  <code>function</code> specifying the time
-series dynamics for the latent trend. Options are:</p><ul><li><p><code>None</code> (no latent trend component; i.e. the GAM component is all that
-contributes to the linear predictor, and the observation process is the only
-source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>)</p></li>
-<li><p><code>ZMVN</code> or <code><a href="ZMVN.html">ZMVN()</a></code> (Zero-Mean Multivariate Normal; only available in
-<code>Stan</code>)</p></li>
-<li><p><code>'RW'</code> or <code><a href="RW.html">RW()</a></code></p></li>
-<li><p><code>'AR1'</code> or <code>AR(p = 1)</code></p></li>
-<li><p><code>'AR2'</code> or <code>AR(p = 2)</code></p></li>
-<li><p><code>'AR3'</code> or <code>AR(p = 3)</code></p></li>
-<li><p><code>'CAR1'</code> or <code>CAR(p = 1)</code> (also known as an Ornstein–Uhlenbeck process)</p></li>
-<li><p><code>'VAR1'</code>  or <code><a href="RW.html">VAR()</a></code>(only available in <code>Stan</code>)</p></li>
-<li><p><code>'PWlogistic</code>, <code>'PWlinear'</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
-<li><p><code>'GP'</code> or <code><a href="GP.html">GP()</a></code> (Gaussian Process with squared exponential kernel;
-only available in <code>Stan</code>)</p></li>
-</ul><p>For all trend types apart from <code><a href="ZMVN.html">ZMVN()</a></code>, <code><a href="GP.html">GP()</a></code>, <code><a href="RW.html">CAR()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving
-average and/or correlated process error terms can also be estimated (for
-example, <code>RW(cor = TRUE)</code> will set up a multivariate Random Walk if <code>n_series &gt; 1</code>).
-It is also possible for many multivariate trends to estimate hierarchical
-correlations if the data are structured among levels of a relevant grouping
-factor. See <a href="mvgam_trends.html">mvgam_trends</a> for more details and see <code><a href="ZMVN.html">ZMVN()</a></code> for an example.</p></dd>
+<dd><p><code>character</code> or <code>function</code> specifying the time series dynamics
+for the latent trend.</p>
+<p><strong>Available options:</strong></p><ul><li><p><code>None</code>: No latent trend component (GAM component only, like <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>)</p></li>
+<li><p><code>ZMVN</code> or <code><a href="ZMVN.html">ZMVN()</a></code>: Zero-Mean Multivariate Normal (Stan only)</p></li>
+<li><p><code>'RW'</code> or <code><a href="RW.html">RW()</a></code>: Random Walk</p></li>
+<li><p><code>'AR1'</code>, <code>'AR2'</code>, <code>'AR3'</code> or <code>AR(p = 1, 2, 3)</code>: Autoregressive models</p></li>
+<li><p><code>'CAR1'</code> or <code>CAR(p = 1)</code>: Continuous-time AR (Ornstein–Uhlenbeck process)</p></li>
+<li><p><code>'VAR1'</code> or <code><a href="RW.html">VAR()</a></code>: Vector Autoregressive (Stan only)</p></li>
+<li><p><code>'PWlogistic'</code>, <code>'PWlinear'</code> or <code><a href="piecewise_trends.html">PW()</a></code>: Piecewise trends (Stan only)</p></li>
+<li><p><code>'GP'</code> or <code><a href="GP.html">GP()</a></code>: Gaussian Process with squared exponential kernel (Stan only)</p></li>
+</ul><p><strong>Additional features:</strong></p><ul><li><p>Moving average and/or correlated process error terms available for most types
+(e.g., <code>RW(cor = TRUE)</code> for multivariate Random Walk)</p></li>
+<li><p>Hierarchical correlations possible for structured data</p></li>
+<li><p>See <a href="mvgam_trends.html">mvgam_trends</a> for details and <code><a href="ZMVN.html">ZMVN()</a></code> for examples</p></li>
+</ul></dd>
 
 
 <dt>family</dt>
-<dd><p><code>family</code> specifying the exponential observation family for
-the series. Currently supported
-families are:</p><ul><li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code> for real-valued data</p></li>
-<li><p><code><a href="mvgam_families.html">betar()</a></code> for proportional data on <code>(0,1)</code></p></li>
-<li><p><code><a href="mvgam_families.html">lognormal()</a></code> for non-negative real-valued data</p></li>
-<li><p><code><a href="mvgam_families.html">student_t()</a></code> for real-valued data</p></li>
-<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code> for non-negative real-valued data</p></li>
-<li><p><code><a href="mvgam_families.html">bernoulli()</a></code> for binary data</p></li>
-<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> for count data</p></li>
-<li><p><code><a href="mvgam_families.html">nb()</a></code> for overdispersed count data</p></li>
-<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> for count data with imperfect detection when the number
-of trials is known;
-note that the <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind()</a></code> function must be used to bind the discrete
-observations and the discrete number
-of trials</p></li>
-<li><p><code><a href="mvgam_families.html">beta_binomial()</a></code> as for <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> but allows for overdispersion</p></li>
-<li><p><code><a href="mvgam_families.html">nmix()</a></code> for count data with imperfect detection when the number of
-trials is unknown and should be modeled via a State-Space N-Mixture model.
-The latent states are Poisson, capturing the 'true' latent
-abundance, while the observation process is Binomial to account for
-imperfect detection.
-See <code><a href="mvgam_families.html">mvgam_families</a></code> for an example of how to use this family</p></li>
-</ul><p>Default is <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>.
-See <code><a href="mvgam_families.html">mvgam_families</a></code> for more details</p></dd>
+<dd><p><code>family</code> specifying the exponential observation family for the series.</p>
+<p><strong>Supported families:</strong></p><ul><li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>: Real-valued data</p></li>
+<li><p><code><a href="mvgam_families.html">betar()</a></code>: Proportional data on <code>(0,1)</code></p></li>
+<li><p><code><a href="mvgam_families.html">lognormal()</a></code>: Non-negative real-valued data</p></li>
+<li><p><code><a href="mvgam_families.html">student_t()</a></code>: Real-valued data</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code>: Non-negative real-valued data</p></li>
+<li><p><code><a href="mvgam_families.html">bernoulli()</a></code>: Binary data</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>: Count data (default)</p></li>
+<li><p><code><a href="mvgam_families.html">nb()</a></code>: Overdispersed count data</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code>: Count data with imperfect detection when number of trials is known
+(use <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind()</a></code> to bind observations and trials)</p></li>
+<li><p><code><a href="mvgam_families.html">beta_binomial()</a></code>: As <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> but allows for overdispersion</p></li>
+<li><p><code><a href="mvgam_families.html">nmix()</a></code>: Count data with imperfect detection when number of trials is unknown
+(State-Space N-Mixture model with Poisson latent states and Binomial observations)</p></li>
+</ul><p>See <code><a href="mvgam_families.html">mvgam_families</a></code> for more details.</p></dd>
 
 
 <dt>share_obs_params</dt>
-<dd><p><code>logical</code>. If <code>TRUE</code> and the <code>family</code>
-has additional family-specific observation parameters (e.g. variance
-components in
-<code><a href="mvgam_families.html">student_t()</a></code> or <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>, or dispersion parameters in <code><a href="mvgam_families.html">nb()</a></code> or
-<code><a href="mvgam_families.html">betar()</a></code>), these parameters will be shared across all outcome variables. This is handy
-if you have multiple outcomes (time series in most <code><a href="mvgam.html">mvgam()</a></code> models) that you
-believe share some properties,
-such as being from the same species over different spatial units. Default is
-<code>FALSE</code>.</p></dd>
+<dd><p><code>logical</code>. If <code>TRUE</code> and the <code>family</code> has additional
+family-specific observation parameters (e.g., variance components, dispersion
+parameters), these will be shared across all outcome variables. Useful when
+multiple outcomes share properties. Default is <code>FALSE</code>.</p></dd>
 
 
 <dt>data</dt>
-<dd><p>A <code>dataframe</code> or <code>list</code> containing the model response
-variable and covariates
-required by the GAM <code>formula</code> and optional <code>trend_formula</code>. Most
-models should include columns:</p><ul><li><p><code>series</code> (a <code>factor</code> index of the series IDs; the number of
-levels should be identical
-to the number of unique series labels (i.e. <code>n_series = length(levels(data$series))</code>))</p></li>
-<li><p><code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for
-each observation).
-For most dynamic trend types available in <code>mvgam</code> (see argument <code>trend_model</code>),
-time should be
-measured in discrete, regularly spaced intervals (i.e. <code>c(1, 2, 3, ...)</code>).
-However you can
-use irregularly spaced intervals if using <code>trend_model = CAR(1)</code>, though
-note that any
-temporal intervals that are exactly <code>0</code> will be adjusted to a very small number
-(<code>1e-12</code>) to prevent sampling errors. See an example of <code><a href="RW.html">CAR()</a></code> trends in
-<code><a href="RW.html">CAR()</a></code></p></li>
-</ul><p>Note however that there are special cases where these identifiers are not
-needed. For
-example, models with hierarchical temporal correlation processes (e.g.
-<code>AR(gr = region, subgr = species)</code>)
-should NOT include a <code>series</code> identifier, as this will be constructed
-internally (see
-<code><a href="mvgam_trends.html">mvgam_trends</a></code> and <code><a href="RW.html">AR()</a></code> for details). <code><a href="mvgam.html">mvgam()</a></code> can also
-fit models that do not
-include a <code>time</code> variable if there are no temporal dynamic structures included
-(i.e. <code>trend_model = 'None'</code> or
-<code>trend_model = ZMVN()</code>). <code>data</code> should also include any other variables to be
-included in
-the linear predictor of <code>formula</code></p></dd>
+<dd><p>A <code>dataframe</code> or <code>list</code> containing the model response variable
+and covariates required by the GAM <code>formula</code> and optional <code>trend_formula</code>.</p>
+<p><strong>Required columns for most models:</strong></p><ul><li><p><code>series</code>: A <code>factor</code> index of the series IDs (number of levels should equal
+number of unique series labels)</p></li>
+<li><p><code>time</code>: <code>numeric</code> or <code>integer</code> index of time points. For most dynamic trend
+types, time should be measured in discrete, regularly spaced intervals
+(i.e., <code>c(1, 2, 3, ...)</code>). Irregular spacing is allowed for <code>trend_model = CAR(1)</code>,
+but zero intervals are adjusted to <code>1e-12</code> to prevent sampling errors.</p></li>
+</ul><p><strong>Special cases:</strong></p><ul><li><p>Models with hierarchical temporal correlation (e.g., <code>AR(gr = region, subgr = species)</code>)
+should NOT include a <code>series</code> identifier</p></li>
+<li><p>Models without temporal dynamics (<code>trend_model = 'None'</code> or <code>trend_model = ZMVN()</code>)
+don't require a <code>time</code> variable</p></li>
+</ul></dd>
 
 
 <dt>newdata</dt>
-<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data containing
-the same variables
-as in <code>data</code>. If included, the
-observations in variable <code>y</code> will be set to <code>NA</code> when fitting the
-model so that posterior
-simulations can be obtained</p></dd>
+<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data containing the same
+variables as in <code>data</code>. If included, observations in variable <code>y</code> will be
+set to <code>NA</code> when fitting the model so that posterior simulations can be obtained.</p></dd>
 
 
 <dt>trend_map</dt>
-<dd><p>Optional <code>data.frame</code> specifying which series should depend
-on which latent trends. Useful for allowing multiple series to depend on the
-same latent trend process, but with different observation processes. If
-supplied, a latent factor model is set up by setting <code>use_lv = TRUE</code> and
-using the mapping to set up the shared trends. Needs to have column names
-<code>series</code> and <code>trend</code>, with integer values in the <code>trend</code> column to state which
-trend each series should depend on. The <code>series</code> column should have a single
-unique entry for each series in the data (names should perfectly match factor
-levels of the <code>series</code> variable in <code>data</code>). Note that if this is supplied,
-the intercept parameter in the process model will NOT be automatically suppressed.
-Not yet supported for models in which the latent factors evolve in continuous time (<code><a href="RW.html">CAR()</a></code>).
-See examples for details</p></dd>
+<dd><p>Optional <code>data.frame</code> specifying which series should depend on
+which latent trends. Enables multiple series to depend on the same latent
+trend process with different observation processes.</p>
+<p><strong>Required structure:</strong></p><ul><li><p>Column <code>series</code>: Single unique entry for each series (matching factor levels in data)</p></li>
+<li><p>Column <code>trend</code>: Integer values indicating which trend each series depends on</p></li>
+</ul><p><strong>Notes:</strong></p><ul><li><p>Sets up latent factor model by enabling <code>use_lv = TRUE</code></p></li>
+<li><p>Process model intercept is NOT automatically suppressed</p></li>
+<li><p>Not yet supported for continuous time models (<code><a href="RW.html">CAR()</a></code>)</p></li>
+</ul></dd>
 
 
 <dt>use_lv</dt>
 <dd><p><code>logical</code>. If <code>TRUE</code>, use dynamic factors to estimate series'
-latent trends in a reduced dimension format. Only available for
-<code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code> and <code><a href="GP.html">GP()</a></code> trend models. Defaults to <code>FALSE</code>. See
-<code><a href="lv_correlations.html">lv_correlations</a></code> for a worked example</p></dd>
+latent trends in a reduced dimension format. Only available for <code><a href="RW.html">RW()</a></code>,
+<code><a href="RW.html">AR()</a></code> and <code><a href="GP.html">GP()</a></code> trend models. Default is <code>FALSE</code>.
+See <code><a href="lv_correlations.html">lv_correlations</a></code> for examples.</p></dd>
 
 
 <dt>n_lv</dt>
-<dd><p><code>integer</code> the number of latent dynamic factors to use if
-<code>use_lv == TRUE</code>. Cannot be <code>&gt; n_series</code>. Defaults arbitrarily to
-<code>min(2, floor(n_series / 2))</code></p></dd>
+<dd><p><code>integer</code> specifying the number of latent dynamic factors to use
+if <code>use_lv == TRUE</code>. Cannot exceed <code>n_series</code>. Default is
+<code>min(2, floor(n_series / 2))</code>.</p></dd>
 
 
 <dt>priors</dt>
-<dd><p>An optional <code>data.frame</code> with prior
-definitions or, preferentially, a vector containing
-objects of class <code>brmsprior</code> (see. <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a>()</code> for details).
-See <code><a href="get_mvgam_priors.html">get_mvgam_priors()</a></code> and Details' for more information on changing default prior distributions</p></dd>
+<dd><p>An optional <code>data.frame</code> with prior definitions or, preferably,
+a vector of <code>brmsprior</code> objects (see <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a>()</code>).
+See <code><a href="get_mvgam_priors.html">get_mvgam_priors()</a></code> and Details for more information.</p></dd>
 
 
 <dt>chains</dt>
-<dd><p><code>integer</code> specifying the number of parallel chains for the model. Ignored
-if <code>algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')</code></p></dd>
+<dd><p><code>integer</code> specifying the number of parallel chains for the model.
+Ignored for variational inference algorithms.</p></dd>
 
 
 <dt>burnin</dt>
-<dd><p><code>integer</code> specifying the number of warmup iterations of the Markov chain to run
-to tune sampling algorithms. Ignored
-if <code>algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')</code></p></dd>
+<dd><p><code>integer</code> specifying the number of warmup iterations to tune
+sampling algorithms. Ignored for variational inference algorithms.</p></dd>
 
 
 <dt>samples</dt>
-<dd><p><code>integer</code> specifying the number of post-warmup iterations of the Markov chain to run for
-sampling the posterior distribution</p></dd>
+<dd><p><code>integer</code> specifying the number of post-warmup iterations for
+sampling the posterior distribution.</p></dd>
 
 
 <dt>threads</dt>
-<dd><p><code>integer</code> Experimental option to use multithreading for within-chain
-parallelisation in <code>Stan</code>. We recommend its use only if you are experienced with
-<code>Stan</code>'s <code>reduce_sum</code> function and have a slow running model that cannot be sped
-up by any other means. Currently works for all families apart from <code><a href="mvgam_families.html">nmix()</a></code> and
-when using <code>Cmdstan</code> as the backend</p></dd>
+<dd><p><code>integer</code>. Experimental option for within-chain parallelisation
+in Stan using <code>reduce_sum</code>. Recommended only for experienced Stan users with
+slow models. Currently works for all families except <code><a href="mvgam_families.html">nmix()</a></code> and when using
+Cmdstan backend.</p></dd>
 
 
 <dt>algorithm</dt>
-<dd><p>Character string naming the estimation approach to use.
-Options are <code>"sampling"</code> for MCMC (the default), <code>"meanfield"</code> for
-variational inference with factorized normal distributions,
-<code>"fullrank"</code> for variational inference with a multivariate normal
-distribution, <code>"laplace"</code> for a Laplace approximation (only available
-when using <span class="pkg">cmdstanr</span> as the backend) or <code>"pathfinder"</code> for the pathfinder
-algorithm (only currently available when using <span class="pkg">cmdstanr</span> as the backend).
-Can be set globally for the current <span style="R">R</span> session via the
-<code>"brms.algorithm"</code> option (see <code><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></code>). Limited testing
-suggests that <code>"meanfield"</code> performs best out of the non-MCMC approximations for
-dynamic GAMs, possibly because of the difficulties estimating covariances among the
-many spline parameters and latent trend parameters. But rigorous testing has not
-been carried out</p></dd>
+<dd><p>Character string naming the estimation approach:</p><ul><li><p><code>"sampling"</code>: MCMC (default)</p></li>
+<li><p><code>"meanfield"</code>: Variational inference with factorized normal distributions</p></li>
+<li><p><code>"fullrank"</code>: Variational inference with multivariate normal distribution</p></li>
+<li><p><code>"laplace"</code>: Laplace approximation (cmdstanr only)</p></li>
+<li><p><code>"pathfinder"</code>: Pathfinder algorithm (cmdstanr only)</p></li>
+</ul><p>Can be set globally via <code>"brms.algorithm"</code> option. Limited testing suggests
+<code>"meanfield"</code> performs best among non-MCMC approximations for dynamic GAMs.</p></dd>
 
 
 <dt>lfo</dt>
-<dd><p>Logical indicating whether this is part of a call to <a href="lfo_cv.mvgam.html">lfo_cv.mvgam</a>. Returns a
-lighter version of the model with no residuals and fewer monitored parameters to speed up
-post-processing. But other downstream functions will not work properly, so users should always
-leave this set as <code>FALSE</code></p></dd>
+<dd><p><code>logical</code>. Indicates whether this is part of <a href="lfo_cv.mvgam.html">lfo_cv.mvgam</a> call.
+Returns lighter model version for speed. Users should leave as <code>FALSE</code>.</p></dd>
 
 
 <dt>...</dt>
@@ -426,8 +356,8 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.4 seconds.</span>
@@ -440,7 +370,7 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55da8c142880&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55ecb33a6108&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -512,28 +442,28 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.4 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.4 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.4 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
@@ -543,7 +473,7 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">updated_mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55da8c142880&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55ecb33a6108&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -619,10 +549,10 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
@@ -631,10 +561,10 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
@@ -650,7 +580,7 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">updated_mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> cbind(y, trials) ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55da8c142880&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55ecb33a6108&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> binomial</span>
