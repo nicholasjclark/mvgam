@@ -381,6 +381,6 @@ score.mvgam_forecast = function(
 #'@param object `mvgam_forecast` object. See [forecast.mvgam()].
 #'@param ... Ignored
 #'@export
-score = function(object, ...){
+score = function(object, ...) {
   UseMethod("score", object)
 }
