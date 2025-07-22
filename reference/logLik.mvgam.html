@@ -74,25 +74,26 @@
 
 
 <dt>linpreds</dt>
-<dd><p>Optional <code>matrix</code> of linear predictor draws to use for calculating
-pointwise log-likelihoods</p></dd>
+<dd><p>Optional <code>matrix</code> of linear predictor draws to use for
+calculating pointwise log-likelihoods.</p></dd>
 
 
 <dt>newdata</dt>
-<dd><p>Optional <code>data.frame</code> or <code>list</code> object specifying which series each column
-in <code>linpreds</code> belongs to. If <code>linpreds</code> is supplied, then <code>newdata</code> must also be supplied</p></dd>
+<dd><p>Optional <code>data.frame</code> or <code>list</code> object specifying which series
+each column in <code>linpreds</code> belongs to. If <code>linpreds</code> is supplied, then
+<code>newdata</code> must also be supplied.</p></dd>
 
 
 <dt>family_pars</dt>
 <dd><p>Optional <code>list</code> containing posterior draws of
-family-specific parameters (i.e. shape, scale or overdispersion parameters). Required if
-<code>linpreds</code> and <code>newdata</code> are supplied</p></dd>
+family-specific parameters (i.e. shape, scale or overdispersion parameters).
+Required if <code>linpreds</code> and <code>newdata</code> are supplied.</p></dd>
 
 
 <dt>include_forecast</dt>
-<dd><p>Logical. If <code>newdata</code> were fed to the model to compute
-forecasts, should the log-likelihood draws for these observations also be returned.
-Defaults to <code>TRUE</code></p></dd>
+<dd><p>Logical. If <code>newdata</code> were fed to the model to
+compute forecasts, should the log-likelihood draws for these observations
+also be returned. Defaults to <code>TRUE</code>.</p></dd>
 
 
 <dt>...</dt>
@@ -103,30 +104,41 @@ Defaults to <code>TRUE</code></p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     
 
-<p>A <code>matrix</code> of dimension <code>n_samples x n_observations</code> containing the pointwise
-log-likelihood draws for all observations in <code>newdata</code>. If no <code>newdata</code> is supplied,
-log-likelihood draws are returned for all observations that were originally fed to
-the model (training observations and, if supplied to the
-original model via the <code>newdata</code> argument in <code><a href="mvgam.html">mvgam</a></code>,
-testing observations)</p>
+<p>A <code>matrix</code> of dimension <code>n_samples x n_observations</code> containing the
+pointwise log-likelihood draws for all observations in <code>newdata</code>. If no
+<code>newdata</code> is supplied, log-likelihood draws are returned for all observations
+that were originally fed to the model (training observations and, if supplied
+to the original model via the <code>newdata</code> argument in <code><a href="mvgam.html">mvgam</a></code>,
+testing observations).</p>
+    </div>
+    <div class="section level2">
+    <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
+    <p>Nicholas J Clark</p>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate some data and fit a model</span></span></span>
-<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">1</span>, trend_model <span class="op">=</span> <span class="st">'AR1'</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>             trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
-<span class="r-in"><span>             silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  n_series <span class="op">=</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>  trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Extract logLikelihood values</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Extract log-likelihood values</span></span></span>
 <span class="r-in"><span><span class="va">lls</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/logLik.html" class="external-link">logLik</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">lls</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  num [1:1000, 1:75] -0.541 -0.575 -0.265 -0.424 -0.494 ...</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
+<span class="r-in"><span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
