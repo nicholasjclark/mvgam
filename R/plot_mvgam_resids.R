@@ -1,39 +1,63 @@
-#'Residual diagnostics for a fitted \pkg{mvgam} object
+#' Residual diagnostics for a fitted \pkg{mvgam} object
 #'
-#'This function takes a fitted \code{mvgam} object and returns various residual diagnostic plots
+#' This function takes a fitted \code{mvgam} object and returns various
+#' residual diagnostic plots
 #'
-#'@importFrom graphics layout title
-#'@importFrom stats complete.cases qqnorm qqline acf pacf na.pass
-#'@importFrom mgcv bam
-#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
-#'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param n_draws \code{integer} specifying the number of posterior residual draws
-#'to use for calculating uncertainty in the "ACF" and "pACF" frames. Default is `100`
-#'@param n_points \code{integer} specifying the maximum number of points to show in the
-#'"Resids vs Fitted" and "Normal Q-Q Plot" frames. Default is `1000`
-#'@author Nicholas J Clark
-#'@details A total of four ggplot plots are generated to examine posterior
-#'Dunn-Smyth residuals for the specified series. Plots include a residuals vs fitted values plot,
-#'a Q-Q plot, and two plots to check for any remaining temporal autocorrelation in the residuals.
-#'Note, all plots only report statistics from a sample of up to 100 posterior
-#'draws (to save computational time), so uncertainty in these relationships may not be adequately represented.
-#'@return A series of facetted ggplot object
-#'@author Nicholas J Clark and Matthijs Hollanders
+#' @importFrom graphics layout title
+#'
+#' @importFrom stats complete.cases qqnorm qqline acf pacf na.pass
+#'
+#' @importFrom mgcv bam
+#'
+#' @param object \code{list} object returned from \code{mvgam}. See [mvgam()]
+#'
+#' @param series \code{integer} specifying which series in the set is to be
+#'   plotted
+#'
+#' @param n_draws \code{integer} specifying the number of posterior residual
+#'   draws to use for calculating uncertainty in the `"ACF"` and `"pACF"` frames.
+#'   Default is `100`
+#'
+#' @param n_points \code{integer} specifying the maximum number of points to
+#'   show in the "Resids vs Fitted" and "Normal Q-Q Plot" frames. Default is
+#'   `1000`
+#'
+#' @author Nicholas J Clark
+#'
+#' @details A total of four ggplot plots are generated to examine posterior
+#'   Dunn-Smyth residuals for the specified series. Plots include a residuals
+#'   vs fitted values plot, a Q-Q plot, and two plots to check for any
+#'   remaining temporal autocorrelation in the residuals. Note, all plots only
+#'   report statistics from a sample of up to `100` posterior draws (to save
+#'   computational time), so uncertainty in these relationships may not be
+#'   adequately represented.
+#'
+#' @return A facetted `ggplot` object
+#'
+#' @author Nicholas J Clark and Matthijs Hollanders
+#'
 #' @examples
 #' \donttest{
-#' simdat <- sim_mvgam(n_series = 3, trend_model = AR())
-#' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-#'             trend_model = AR(),
-#'             noncentred = TRUE,
-#'             data = simdat$data_train,
-#'             chains = 2,
-#'             silent = 2)
+#' simdat <- sim_mvgam(
+#'   n_series = 3,
+#'   trend_model = AR()
+#' )
+#'
+#' mod <- mvgam(
+#'   y ~ s(season, bs = 'cc', k = 6),
+#'   trend_model = AR(),
+#'   noncentred = TRUE,
+#'   data = simdat$data_train,
+#'   chains = 2,
+#'   silent = 2
+#' )
 #'
 #' # Plot Dunn Smyth residuals for some series
 #' plot_mvgam_resids(mod)
 #' plot_mvgam_resids(mod, series = 2)
 #' }
-#'@export
+#'
+#' @export
 plot_mvgam_resids = function(
   object,
   series = 1,

@@ -1,36 +1,46 @@
 #' Convert timeseries object to format necessary for \pkg{mvgam} models
 #'
-#'This function converts univariate or multivariate time series (\code{xts} or \code{ts} objects)
-#'to the format necessary for \code{\link{mvgam}}
+#' This function converts univariate or multivariate time series (\code{xts} or
+#' \code{ts} objects) to the format necessary for \code{\link{mvgam}}.
 #'
-#'@importFrom stats is.ts ts start time frequency
-#'@importFrom utils head
-#'@param series \code{\link[xts]{xts}} or \code{\link[stats]{ts}} object to be converted to \code{\link{mvgam}} format
-#'@param freq \code{integer}. The seasonal frequency of the series
-#'@param train_prop \code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.95}
-#'@return A \code{list} object containing outputs needed for \code{\link{mvgam}},
-#'including 'data_train' and 'data_test'
+#' @importFrom stats is.ts ts start time frequency
 #'
-#'@examples
-#'# A ts object example
-#'data("sunspots")
-#'series <- cbind(sunspots, sunspots)
-#'colnames(series) <- c('blood', 'bone')
-#'head(series)
-#'series_to_mvgam(series, frequency(series), 0.85)
+#' @importFrom utils head
 #'
-#'# An xts object example
-#'library(xts)
-#'dates <- seq(as.Date("2001-05-01"), length=30, by="quarter")
-#'data  <- cbind(c(gas = rpois(30, cumprod(1+rnorm(30, mean = 0.01, sd = 0.001)))),
-#'c(oil = rpois(30, cumprod(1+rnorm(30, mean = 0.01, sd = 0.001)))))
-#'series <- xts(x = data, order.by = dates)
-#'colnames(series) <- c('gas', 'oil')
-#'head(series)
-#'series_to_mvgam(series, freq = 4, train_prop = 0.85)
+#' @param series \code{\link[xts]{xts}} or \code{\link[stats]{ts}} object to be
+#'   converted to \code{\link{mvgam}} format
 #'
-#'@export
+#' @param freq \code{integer}. The seasonal frequency of the series
 #'
+#' @param train_prop \code{numeric} stating the proportion of data to use for
+#'   training. Should be between \code{0.25} and \code{0.95}
+#'
+#' @return A \code{list} object containing outputs needed for
+#'   \code{\link{mvgam}}, including 'data_train' and 'data_test'
+#'
+#' @examples
+#' # A ts object example
+#' data("sunspots")
+#' series <- cbind(sunspots, sunspots)
+#' colnames(series) <- c('blood', 'bone')
+#' head(series)
+#' series_to_mvgam(series, frequency(series), 0.85)
+#'
+#' # An xts object example
+#' library(xts)
+#' dates <- seq(as.Date("2001-05-01"), length = 30, by = "quarter")
+#'
+#' data <- cbind(
+#'   c(gas = rpois(30, cumprod(1 + rnorm(30, mean = 0.01, sd = 0.001)))),
+#'   c(oil = rpois(30, cumprod(1 + rnorm(30, mean = 0.01, sd = 0.001))))
+#' )
+#'
+#' series <- xts(x = data, order.by = dates)
+#' colnames(series) <- c('gas', 'oil')
+#' head(series)
+#' series_to_mvgam(series, freq = 4, train_prop = 0.85)
+#'
+#' @export
 series_to_mvgam <- function(series, freq, train_prop = 0.85) {
   # Check for xts and lubridate packages
   insight::check_if_installed("xts")

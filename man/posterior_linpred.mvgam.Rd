@@ -15,35 +15,39 @@
 )
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}.
+See \code{\link[=mvgam]{mvgam()}}}
 
-\item{transform}{Logical; if \code{FALSE}
-(the default), draws of the linear predictor are returned.
-If \code{TRUE}, draws of the transformed linear predictor,
-i.e. the conditional expectation, are returned.}
+\item{transform}{\code{logical}; if \code{FALSE} (the default), draws of
+the linear predictor are returned. If \code{TRUE}, draws of the
+transformed linear predictor, i.e. the conditional expectation, are
+returned.}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same variables
-that were included in the original \code{data} used to fit the model. If not supplied,
-predictions are generated for the original observations used for the model fit.}
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data
+containing the same variables that were included in the original \code{data}
+used to fit the model. If not supplied, predictions are generated for the
+original observations used for the model fit.}
 
-\item{ndraws}{Positive \code{integer} indicating how many posterior draws should be used.
-If \code{NULL} (the default) all draws are used.}
+\item{ndraws}{Positive \code{integer} indicating how many posterior draws
+should be used. If \code{NULL} (the default) all draws are used.}
 
-\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
-\code{newdata} instead for more seamless integration into \code{R} workflows}
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but
+users are recommended to use \code{newdata} instead for more seamless
+integration into \code{R} workflows}
 
-\item{process_error}{Logical. If \code{TRUE} and \code{newdata} is supplied,
-expected uncertainty in the process model is accounted for by using draws
-from any latent trend SD parameters. If \code{FALSE}, uncertainty in the latent
-trend component is ignored when calculating predictions. If no \code{newdata} is
-supplied, draws from the fitted model's posterior predictive distribution will be used
-(which will always include uncertainty in any latent trend components)}
+\item{process_error}{\code{logical}. If \code{TRUE} and \code{newdata} is
+supplied, expected uncertainty in the process model is accounted for by
+using draws from any latent trend SD parameters. If \code{FALSE},
+uncertainty in the latent trend component is ignored when calculating
+predictions. If no \code{newdata} is supplied, draws from the fitted
+model's posterior predictive distribution will be used (which will always
+include uncertainty in any latent trend components)}
 
 \item{...}{Ignored}
 }
 \value{
-A \code{matrix} of dimension \code{n_samples x new_obs},
-where \code{n_samples} is the number of posterior samples from the fitted object
+A \code{matrix} of dimension \code{n_samples x n_obs}, where
+\code{n_samples} is the number of posterior samples from the fitted object
 and \code{n_obs} is the number of observations in \code{newdata}
 }
 \description{
@@ -52,37 +56,49 @@ applying any link functions or other transformations. Can be performed for
 the data used to fit the model (posterior predictive checks) or for new data.
 }
 \details{
-Note that for all types of predictions for models that did not include
-a \code{trend_formula}, uncertainty in the dynamic trend
-component can be ignored by setting \code{process_error = FALSE}. However,
-if a \code{trend_formula} was supplied in the model, predictions for this component cannot be
-ignored. If \code{process_error = TRUE}, trend predictions will ignore autocorrelation
-coefficients or GP length scale coefficients, ultimately assuming the process is stationary.
-This method is similar to the types of posterior predictions returned from \code{brms} models
-when using autocorrelated error predictions for newdata.
-This function is therefore more suited to posterior simulation from the GAM components
-of a \code{mvgam} model, while the forecasting functions
-\code{\link{plot_mvgam_fc}} and \code{\link{forecast.mvgam}} are better suited to generate h-step ahead forecasts
-that respect the temporal dynamics of estimated latent trends.
+Note that for all types of predictions for models that did not
+include a \code{trend_formula}, uncertainty in the dynamic trend component can
+be ignored by setting \code{process_error = FALSE}. However, if a
+\code{trend_formula} was supplied in the model, predictions for this component
+cannot be ignored. If \code{process_error = TRUE}, trend predictions will
+ignore autocorrelation coefficients or GP length scale coefficients,
+ultimately assuming the process is stationary. This method is similar to
+the types of posterior predictions returned from \code{brms} models when using
+autocorrelated error predictions for newdata. This function is therefore
+more suited to posterior simulation from the GAM components of a
+\code{mvgam} model, while the forecasting functions
+\code{\link{plot_mvgam_fc}} and \code{\link{forecast.mvgam}} are better
+suited to generate h-step ahead forecasts that respect the temporal
+dynamics of estimated latent trends.
 }
 \examples{
 \donttest{
 # Simulate some data and fit a model
-simdat <- sim_mvgam(n_series = 1, trend_model = AR())
-mod <- mvgam(y ~ s(season, bs = 'cc'),
-             trend_model = AR(),
-             noncentred = TRUE,
-             data = simdat$data_train,
-             chains = 2,
-             silent = 2)
+simdat <- sim_mvgam(
+  n_series = 1,
+  trend_model = AR()
+)
+
+mod <- mvgam(
+  y ~ s(season, bs = 'cc'),
+  trend_model = AR(),
+  noncentred = TRUE,
+  data = simdat$data_train,
+  chains = 2,
+  silent = 2
+)
 
 # Extract linear predictor values
 linpreds <- posterior_linpred(mod)
 str(linpreds)
 }
+
 }
 \seealso{
-\code{\link{posterior_epred.mvgam}} \code{\link{posterior_predict.mvgam}}
-
-\code{\link{hindcast.mvgam}} \code{\link{posterior_epred.mvgam}} \code{\link{posterior_predict.mvgam}}
+\code{\link{hindcast.mvgam}},
+\code{\link{posterior_epred.mvgam}},
+\code{\link{posterior_predict.mvgam}}
+}
+\author{
+Nicholas J Clark
 }

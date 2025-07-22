@@ -37,84 +37,112 @@ plot_mvgam_fc(
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
-\item{series}{\code{integer} specifying which series in the set is to be plotted}
+\item{series}{\code{integer} specifying which series in the set is to be
+plotted}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
-in addition to any other variables included in the linear predictor of the original \code{formula}. If included, the
-covariate information in \code{newdata} will be used to generate forecasts from the fitted model equations. If
-this same \code{newdata} was originally included in the call to \code{mvgam}, then forecasts have already been
-produced by the generative model and these will simply be extracted and plotted. However if no \code{newdata} was
-supplied to the original model call, an assumption is made that the \code{newdata} supplied here comes sequentially
-after the data supplied as \code{data} in the original model (i.e. we assume there is no time gap between the last
-observation of series 1 in \code{data} and the first observation for series 1 in \code{newdata}). If
-\code{newdata} contains observations in column \code{y}, these observations will be used to compute a Discrete Rank
-Probability Score for the forecast distribution}
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data
+containing at least 'series' and 'time' in addition to any other
+variables included in the linear predictor of the original
+\code{formula}. If included, the covariate information in \code{newdata}
+will be used to generate forecasts from the fitted model equations. If
+this same \code{newdata} was originally included in the call to
+\code{mvgam}, then forecasts have already been produced by the generative
+model and these will simply be extracted and plotted. However if no
+\code{newdata} was supplied to the original model call, an assumption is
+made that the \code{newdata} supplied here comes sequentially after the
+data supplied as \code{data} in the original model (i.e. we assume there
+is no time gap between the last observation of series 1 in \code{data}
+and the first observation for series 1 in \code{newdata}). If
+\code{newdata} contains observations in column \code{y}, these
+observations will be used to compute a Discrete Rank Probability Score
+for the forecast distribution}
 
-\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
-\code{newdata} instead for more seamless integration into \code{R} workflows}
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but
+users are recommended to use \code{newdata} instead for more seamless
+integration into \code{R} workflows}
 
-\item{realisations}{\code{logical}. If \code{TRUE}, forecast realisations are shown as a spaghetti plot,
-making it easier to visualise the diversity of possible forecasts. If \code{FALSE}, the default,
-empirical quantiles of the forecast distribution are shown}
+\item{realisations}{\code{logical}. If \code{TRUE}, forecast realisations
+are shown as a spaghetti plot, making it easier to visualise the
+diversity of possible forecasts. If \code{FALSE}, the default, empirical
+quantiles of the forecast distribution are shown}
 
-\item{n_realisations}{\code{integer} specifying the number of posterior realisations to plot, if
-\code{realisations = TRUE}. Ignored otherwise}
+\item{n_realisations}{\code{integer} specifying the number of posterior
+realisations to plot, if \code{realisations = TRUE}. Ignored otherwise}
 
-\item{hide_xlabels}{\code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
-\code{axis} from base \code{R}}
+\item{hide_xlabels}{\code{logical}. If \code{TRUE}, no xlabels are printed
+to allow the user to add custom labels using \code{axis} from base
+\code{R}}
 
-\item{xlab}{label for x axis.}
+\item{xlab}{Label for x axis}
 
-\item{ylab}{label for y axis.}
+\item{ylab}{Label for y axis}
 
 \item{ylim}{Optional \code{vector} of y-axis limits (min, max)}
 
-\item{n_cores}{\code{integer} specifying number of cores for generating forecasts in parallel}
+\item{n_cores}{\code{integer} specifying number of cores for generating
+forecasts in parallel}
 
-\item{return_forecasts}{\code{logical}. If \code{TRUE}, the function will plot the forecast
-as well as returning the forecast object (as a \code{matrix} of dimension \code{n_samples} x \code{horizon})}
+\item{return_forecasts}{\code{logical}. If \code{TRUE}, the function will
+plot the forecast as well as returning the forecast object (as a
+\code{matrix} of dimension \code{n_samples} x \code{horizon})}
 
-\item{return_score}{\code{logical}. If \code{TRUE} and out of sample test data is provided as
-\code{newdata}, a probabilistic score will be calculated and returned. The score used will depend on the
-observation family from the fitted model. Discrete families (\code{poisson}, \code{negative binomial}, \code{tweedie})
-use the Discrete Rank Probability Score. Other families use the Continuous Rank Probability Score. The value
-returned is the \code{sum} of all scores within the out of sample forecast horizon}
+\item{return_score}{\code{logical}. If \code{TRUE} and out of sample test
+data is provided as \code{newdata}, a probabilistic score will be
+calculated and returned. The score used will depend on the observation
+family from the fitted model. Discrete families (\code{poisson},
+\code{negative binomial}, \code{tweedie}) use the Discrete Rank
+Probability Score. Other families use the Continuous Rank Probability
+Score. The value returned is the \code{sum} of all scores within the out
+of sample forecast horizon}
 
-\item{...}{further \code{\link[graphics]{par}} graphical parameters.}
+\item{...}{Further \code{\link[graphics]{par}} graphical parameters}
 
 \item{x}{Object of class \code{mvgam_forecast}}
 }
 \value{
-A base \code{R} graphics plot (for \code{plot_mvgam_fc}) or a \code{ggplot} object (for \code{plot.mvgam_forecast}) and an optional \code{list} containing the forecast distribution
-and the out of sample probabilistic forecast score
+A base \code{R} graphics plot (for \code{plot_mvgam_fc}) or a \code{ggplot}
+object (for \code{plot.mvgam_forecast}) and an optional \code{list} containing
+the forecast distribution and the out of sample probabilistic forecast
+score
 }
 \description{
 Plot posterior forecast predictions from \pkg{mvgam} models
 }
 \details{
-\code{plot_mvgam_fc} generates posterior predictions from an object of class \code{mvgam}, calculates posterior
-empirical quantiles and plots them against the observed data. If \code{realisations = FALSE}, the returned plot shows
-90, 60, 40 and 20 percent posterior quantiles (as ribbons of increasingly darker shades or red)
-as well as the posterior median (as a dark red line). If \code{realisations = FALSE}, a set of \code{n_realisations} posterior
-draws are shown. This function produces an older style base \code{R} plot, as opposed to \code{plot.mvgam_forecast}
+\code{plot_mvgam_fc} generates posterior predictions from an object of
+class \code{mvgam}, calculates posterior empirical quantiles and plots
+them against the observed data. If \code{realisations = FALSE}, the returned
+plot shows 90, 60, 40 and 20 percent posterior quantiles (as ribbons of
+increasingly darker shades of red) as well as the posterior median (as a
+dark red line). If \code{realisations = TRUE}, a set of \code{n_realisations}
+posterior draws are shown. This function produces an older style base
+\code{R} plot, as opposed to \code{plot.mvgam_forecast}
 
-\code{plot.mvgam_forecast} takes an object of class \code{mvgam_forecast}, in which forecasts have already
-been computed, and plots the resulting forecast distribution as a \code{ggplot} object. This function is therefore more
-versatile and is recommended over the older and clunkier \code{plot_mvgam_fc} version
+\code{plot.mvgam_forecast} takes an object of class \code{mvgam_forecast}, in which
+forecasts have already been computed, and plots the resulting forecast
+distribution as a \code{ggplot} object. This function is therefore more
+versatile and is recommended over the older and clunkier
+\code{plot_mvgam_fc} version
 
-If \code{realisations = FALSE}, these posterior quantiles are plotted along
-with the true observed data that was used to train the model. Otherwise, a spaghetti plot is returned
-to show possible forecast paths.
+If \code{realisations = FALSE}, these posterior quantiles are plotted
+along with the true observed data that was used to train the model.
+Otherwise, a spaghetti plot is returned to show possible forecast paths.
 }
 \examples{
 \donttest{
-simdat <- sim_mvgam(n_series = 3, trend_model = AR())
-mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-            trend_model = AR(),
-            noncentred = TRUE,
-            data = simdat$data_train,
-            chains = 2,
-            silent = 2)
+simdat <- sim_mvgam(
+  n_series = 3,
+  trend_model = AR()
+)
+
+mod <- mvgam(
+  y ~ s(season, bs = 'cc', k = 6),
+  trend_model = AR(),
+  noncentred = TRUE,
+  data = simdat$data_train,
+  chains = 2,
+  silent = 2
+)
 
 # Hindcasts on response scale
 hc <- hindcast(mod)
@@ -124,22 +152,37 @@ plot(hc, series = 2)
 plot(hc, series = 3)
 
 # Forecasts on response scale
-fc <- forecast(mod, newdata = simdat$data_test)
+fc <- forecast(
+  mod,
+  newdata = simdat$data_test
+)
 str(fc)
 plot(fc, series = 1)
 plot(fc, series = 2)
 plot(fc, series = 3)
 
 # Forecasts as expectations
-fc <- forecast(mod, newdata = simdat$data_test, type = 'expected')
+fc <- forecast(
+  mod,
+  newdata = simdat$data_test,
+  type = 'expected'
+)
 plot(fc, series = 1)
 plot(fc, series = 2)
 plot(fc, series = 3)
 
 # Dynamic trend extrapolations
-fc <- forecast(mod, newdata = simdat$data_test, type = 'trend')
+fc <- forecast(
+  mod,
+  newdata = simdat$data_test,
+  type = 'trend'
+)
 plot(fc, series = 1)
 plot(fc, series = 2)
 plot(fc, series = 3)
 }
+
+}
+\author{
+Nicholas J Clark
 }

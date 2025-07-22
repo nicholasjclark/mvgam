@@ -23,69 +23,87 @@ ppc(object, ...)
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
-\item{...}{further \code{\link[graphics]{par}} graphical parameters.}
+\item{...}{Further \code{\link[graphics]{par}} graphical parameters}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
-for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
-included, the observed values in the test data are compared to the model's forecast distribution for exploring
-biases in model predictions.
-Note this is only useful if the same \code{newdata} was also included when fitting the original model.}
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data
+containing at least 'series' and 'time' for the forecast horizon, in
+addition to any other variables included in the linear predictor of
+\code{formula}. If included, the observed values in the test data are
+compared to the model's forecast distribution for exploring biases in
+model predictions. Note this is only useful if the same \code{newdata}
+was also included when fitting the original model.}
 
-\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
-\code{newdata} instead for more seamless integration into \code{R} workflows}
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but
+users are recommended to use \code{newdata} instead for more seamless
+integration into \code{R} workflows}
 
-\item{series}{\code{integer} specifying which series in the set is to be plotted}
+\item{series}{\code{integer} specifying which series in the set is to be
+plotted}
 
-\item{type}{\code{character} specifying the type of posterior predictive check to calculate and plot.
-Valid options are: 'rootogram', 'mean', 'hist', 'density', 'prop_zero', 'pit' and 'cdf'}
+\item{type}{\code{character} specifying the type of posterior predictive
+check to calculate and plot. Valid options are: 'rootogram', 'mean',
+'hist', 'density', 'prop_zero', 'pit' and 'cdf'}
 
-\item{n_bins}{\code{integer} specifying the number of bins to use for binning observed values when plotting
-a rootogram or histogram. Default is \code{50} bins for a rootogram, which means that if
-there are \verb{>50} unique observed values, bins will
-be used to prevent overplotting and facilitate interpretation. Default for a histogram is to use the
-number of bins returned by a call to \code{hist} in base \code{R}}
+\item{n_bins}{\code{integer} specifying the number of bins to use for
+binning observed values when plotting a rootogram or histogram. Default
+is \code{50} bins for a rootogram, which means that if there are >50 unique
+observed values, bins will be used to prevent overplotting and facilitate
+interpretation. Default for a histogram is to use the number of bins
+returned by a call to \code{hist} in base \code{R}}
 
-\item{legend_position}{The location may also be specified by setting x to a single keyword from the
-list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
-This places the legend on the inside of the plot frame at the given location. Or alternatively,
-use "none" to hide the legend.}
+\item{legend_position}{The location may also be specified by setting x to a
+single keyword from the list "bottomright", "bottom", "bottomleft",
+"left", "topleft", "top", "topright", "right" and "center". This places
+the legend on the inside of the plot frame at the given location. Or
+alternatively, use "none" to hide the legend.}
 
-\item{xlab}{label for x axis.}
+\item{xlab}{Label for x axis}
 
-\item{ylab}{label for y axis.}
+\item{ylab}{Label for y axis}
 }
 \value{
-A base \code{R} graphics plot showing either a posterior rootogram (for \code{type == 'rootogram'}),
-the predicted vs observed mean for the
-series (for \code{type == 'mean'}), predicted vs observed proportion of zeroes for the
-series (for \code{type == 'prop_zero'}),predicted vs observed histogram for the
-series (for \code{type == 'hist'}), kernel density or empirical CDF estimates for
-posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or a Probability
+A base \code{R} graphics plot showing either a posterior rootogram
+(for \code{type == 'rootogram'}), the predicted vs observed mean for the
+series (for \code{type == 'mean'}), predicted vs observed proportion of
+zeroes for the series (for \code{type == 'prop_zero'}), predicted vs
+observed histogram for the series (for \code{type == 'hist'}), kernel
+density or empirical CDF estimates for posterior predictions (for
+\code{type == 'density'} or \code{type == 'cdf'}) or a Probability
 Integral Transform histogram (for \code{type == 'pit'}).
 }
 \description{
 Plot conditional posterior predictive checks from \pkg{mvgam} models
 }
 \details{
-Conditional posterior predictions are drawn from the fitted \code{mvgam} and compared against
-the empirical distribution of the observed data for a specified series to help evaluate the model's
-ability to generate unbiased predictions. For all plots apart from \code{type = 'rootogram'}, posterior predictions
-can also be compared to out of sample observations as long as these observations were included as
-' data_test' in the original model fit and supplied here. Rootograms are currently only plotted using the
-' hanging' style.
-\cr
-Note that the predictions used for these plots are \emph{conditional on the observed data}, i.e. they
-are those predictions that have been generated directly within
-the \code{mvgam()} model. They can be misleading if the model included flexible dynamic trend components. For
-a broader range of posterior checks that are created using \emph{unconditional} "new data" predictions, see
-\code{\link{pp_check.mvgam}}
+Conditional posterior predictions are drawn from the fitted
+\code{mvgam} and compared against the empirical distribution of the
+observed data for a specified series to help evaluate the model's ability
+to generate unbiased predictions. For all plots apart from
+\code{type = 'rootogram'}, posterior predictions can also be compared to out
+of sample observations as long as these observations were included as
+'data_test' in the original model fit and supplied here. Rootograms are
+currently only plotted using the 'hanging' style.
+
+\cr Note that the predictions used for these plots are \emph{conditional on
+the observed data}, i.e. they are those predictions that have been
+generated directly within the \code{mvgam()} model. They can be misleading if
+the model included flexible dynamic trend components. For a broader range
+of posterior checks that are created using \emph{unconditional} "new data"
+predictions, see \code{\link{pp_check.mvgam}}
 }
 \examples{
 \donttest{
 # Simulate some smooth effects and fit a model
 set.seed(0)
-dat <- mgcv::gamSim(1, n = 200, scale = 2)
-mod <- mvgam(y ~ s(x0) + s(x1) + s(x2) + s(x3),
+
+dat <- mgcv::gamSim(
+  1,
+  n = 200,
+  scale = 2
+)
+
+mod <- mvgam(
+  y ~ s(x0) + s(x1) + s(x2) + s(x3),
   data = dat,
   family = gaussian(),
   chains = 2,
@@ -102,6 +120,7 @@ pp_check(mod)
 pp_check(mod, type = "ecdf_overlay")
 pp_check(mod, type = "freqpoly")
 }
+
 }
 \seealso{
 \code{\link{pp_check.mvgam}}, \code{\link{predict.mvgam}}

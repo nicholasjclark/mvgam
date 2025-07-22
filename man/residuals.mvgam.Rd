@@ -21,10 +21,11 @@ Only used if \code{summary} is \code{TRUE}.}
 \item{probs}{The percentiles to be computed by the \code{quantile}
 function. Only used if \code{summary} is \code{TRUE}.}
 
-\item{...}{ignored}
+\item{...}{Ignored}
 }
 \value{
 An \code{array} of randomized quantile residual values.
+
 If \code{summary = FALSE} the output resembles those of
 \code{\link{posterior_epred.mvgam}} and \code{\link{predict.mvgam}}.
 
@@ -39,24 +40,28 @@ quantile estimates as specified via argument \code{probs}.
 }
 \description{
 This method extracts posterior draws of Dunn-Smyth (randomized quantile)
-residuals in the order in which the data were supplied to the model. It included
-additional arguments for obtaining summaries of the computed residuals
+residuals in the order in which the data were supplied to the model. It
+includes additional arguments for obtaining summaries of the computed
+residuals.
 }
 \details{
-This method gives residuals as Dunn-Smyth (randomized quantile) residuals. Any
-observations that were missing (i.e. \code{NA}) in the original data will have missing values
-in the residuals
+This method gives residuals as Dunn-Smyth (randomized quantile)
+residuals. Any observations that were missing (i.e. \code{NA}) in the original
+data will have missing values in the residuals.
 }
 \examples{
 \donttest{
 # Simulate some data and fit a model
 simdat <- sim_mvgam(n_series = 1, trend_model = AR())
-mod <- mvgam(y ~ s(season, bs = 'cc'),
-             trend_model = AR(),
-             noncentred = TRUE,
-             data = simdat$data_train,
-             chains = 2,
-             silent = 2)
+
+mod <- mvgam(
+  y ~ s(season, bs = 'cc'),
+  trend_model = AR(),
+  noncentred = TRUE,
+  data = simdat$data_train,
+  chains = 2,
+  silent = 2
+)
 
 # Extract posterior residuals
 resids <- residuals(mod)
@@ -65,6 +70,7 @@ str(resids)
 # Or add them directly to the observed data, along with fitted values
 augment(mod, robust = FALSE, probs = c(0.25, 0.75))
 }
+
 }
 \seealso{
 \code{\link{augment.mvgam}}

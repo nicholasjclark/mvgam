@@ -7,19 +7,21 @@
 series_to_mvgam(series, freq, train_prop = 0.85)
 }
 \arguments{
-\item{series}{\code{\link[xts]{xts}} or \code{\link[stats]{ts}} object to be converted to \code{\link{mvgam}} format}
+\item{series}{\code{\link[xts]{xts}} or \code{\link[stats]{ts}} object to be
+converted to \code{\link{mvgam}} format}
 
 \item{freq}{\code{integer}. The seasonal frequency of the series}
 
-\item{train_prop}{\code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.95}}
+\item{train_prop}{\code{numeric} stating the proportion of data to use for
+training. Should be between \code{0.25} and \code{0.95}}
 }
 \value{
-A \code{list} object containing outputs needed for \code{\link{mvgam}},
-including 'data_train' and 'data_test'
+A \code{list} object containing outputs needed for
+\code{\link{mvgam}}, including 'data_train' and 'data_test'
 }
 \description{
-This function converts univariate or multivariate time series (\code{xts} or \code{ts} objects)
-to the format necessary for \code{\link{mvgam}}
+This function converts univariate or multivariate time series (\code{xts} or
+\code{ts} objects) to the format necessary for \code{\link{mvgam}}.
 }
 \examples{
 # A ts object example
@@ -31,9 +33,13 @@ series_to_mvgam(series, frequency(series), 0.85)
 
 # An xts object example
 library(xts)
-dates <- seq(as.Date("2001-05-01"), length=30, by="quarter")
-data  <- cbind(c(gas = rpois(30, cumprod(1+rnorm(30, mean = 0.01, sd = 0.001)))),
-c(oil = rpois(30, cumprod(1+rnorm(30, mean = 0.01, sd = 0.001)))))
+dates <- seq(as.Date("2001-05-01"), length = 30, by = "quarter")
+
+data <- cbind(
+  c(gas = rpois(30, cumprod(1 + rnorm(30, mean = 0.01, sd = 0.001)))),
+  c(oil = rpois(30, cumprod(1 + rnorm(30, mean = 0.01, sd = 0.001))))
+)
+
 series <- xts(x = data, order.by = dates)
 colnames(series) <- c('gas', 'oil')
 head(series)

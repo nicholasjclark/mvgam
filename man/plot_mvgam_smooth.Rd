@@ -20,64 +20,81 @@ plot_mvgam_smooth(
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
-\item{trend_effects}{logical. If \code{TRUE} and a \code{trend_formula} was used in model
-fitting, terms from the trend (i.e. process) model will be plotted}
+\item{trend_effects}{logical. If \code{TRUE} and a \code{trend_formula} was used in
+model fitting, terms from the trend (i.e. process) model will be plotted}
 
-\item{series}{\code{integer} specifying which series in the set is to be plotted}
+\item{series}{\code{integer} specifying which series in the set is to be
+plotted}
 
-\item{smooth}{either a \code{character} or \code{integer} specifying which smooth term to be plotted}
+\item{smooth}{Either a \code{character} or \code{integer} specifying which
+smooth term to be plotted}
 
-\item{residuals}{\code{logical}. If \code{TRUE} then posterior quantiles of partial residuals are added
-to plots of 1-D smooths as a series of ribbon rectangles.
-Partial residuals for a smooth term are the median Dunn-Smyth residuals that would be obtained by dropping the term
-concerned from the model, while leaving all other estimates fixed (i.e. the
-estimates for the term plus the original median Dunn-Smyth residuals). Note that because \code{mvgam} works with
-Dunn-Smyth residuals and not working residuals, which are used by \code{mgcv}, the magnitudes of
-partial residuals will be different to what you would expect from \code{\link[mgcv]{plot.gam}}. Interpretation
-is similar though, as these partial residuals should be evenly scattered
-around the smooth function if the function is well estimated}
+\item{residuals}{\code{logical}. If \code{TRUE}, posterior quantiles of
+partial residuals are added to plots of 1-D smooths as a series of ribbon
+rectangles. Partial residuals for a smooth term are the median Dunn-Smyth
+residuals that would be obtained by dropping the term concerned from the
+model, while leaving all other estimates fixed (i.e. the estimates for the
+term plus the original median Dunn-Smyth residuals). Note that because
+\code{mvgam} works with Dunn-Smyth residuals and not working residuals,
+which are used by \code{mgcv}, the magnitudes of partial residuals will be
+different to what you would expect from \code{\link[mgcv]{plot.gam}}.
+Interpretation is similar though, as these partial residuals should be
+evenly scattered around the smooth function if the function is well
+estimated}
 
-\item{n_resid_bins}{\code{integer} specifying the number of bins group the covariate into when plotting partial residuals.
-Setting this argument too high can make for messy plots that are difficult to interpret, while setting it too
-low will likely mask some potentially useful patterns in the partial residuals. Default is \code{25}}
+\item{n_resid_bins}{\code{integer} specifying the number of bins to group
+the covariate into when plotting partial residuals. Setting this argument
+too high can make for messy plots that are difficult to interpret, while
+setting it too low will likely mask some potentially useful patterns in
+the partial residuals. Default is \code{25}}
 
-\item{realisations}{\code{logical}. If \code{TRUE}, posterior realisations are shown as a spaghetti plot,
-making it easier to visualise the diversity of possible functions. If \code{FALSE}, the default,
-empirical quantiles of the posterior distribution are shown}
+\item{realisations}{\code{logical}. If \code{TRUE}, posterior realisations
+are shown as a spaghetti plot, making it easier to visualise the diversity
+of possible functions. If \code{FALSE}, the default, empirical quantiles
+of the posterior distribution are shown}
 
-\item{n_realisations}{\code{integer} specifying the number of posterior realisations to plot, if
-\code{realisations = TRUE}. Ignored otherwise}
+\item{n_realisations}{\code{integer} specifying the number of posterior
+realisations to plot, if \code{realisations = TRUE}. Ignored otherwise}
 
-\item{derivatives}{\code{logical}. If \code{TRUE}, an additional plot will be returned to show the
-estimated 1st derivative for the specified smooth (Note, this only works for univariate smooths)}
+\item{derivatives}{\code{logical}. If \code{TRUE}, an additional plot will
+be returned to show the estimated 1st derivative for the specified smooth
+(Note: this only works for univariate smooths)}
 
-\item{newdata}{Optional \code{dataframe} for predicting the smooth, containing at least 'series'
-in addition to any other variables included in the linear predictor of the original model's \code{formula}.
-Note that this currently is only supported for plotting univariate smooths}
+\item{newdata}{Optional \code{dataframe} for predicting the smooth,
+containing at least 'series' in addition to any other variables included
+in the linear predictor of the original model's \code{formula}. Note that
+this currently is only supported for plotting univariate smooths}
 }
 \value{
 A base \code{R} graphics plot
 }
 \description{
-This function plots posterior empirical quantiles for a series-specific smooth term
+This function plots posterior empirical quantiles for a series-specific
+smooth term
 }
 \details{
-Smooth functions are shown as empirical quantiles (or spaghetti plots) of posterior partial expectations
-across a sequence of values between the variable's \code{min} and \code{max},
-while zeroing out effects of all other variables. At present, only univariate and bivariate smooth plots
-are allowed, though note that bivariate smooths rely on default behaviour from
-\code{\link[mgcv]{plot.gam}}. \code{plot_mvgam_smooth} generates posterior predictions from an
-object of class \code{mvgam}, calculates posterior empirical quantiles and plots them.
-If \code{realisations = FALSE}, the returned plot shows 90, 60, 40 and 20 percent posterior
-quantiles (as ribbons of increasingly darker shades or red) as well as the posterior
-median (as a dark red line). If \code{realisations = FALSE}, a set of \code{n_realisations} posterior
-draws are shown. For more nuanced visualisation, supply
-\code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model or use the more flexible \code{\link{conditional_effects.mvgam}}. Alternatively, if you prefer to use partial
-effect plots in the style of \code{gratia}, and if you have the \code{gratia} package installed, you can
-use \code{draw.mvgam}. See \code{\link{gratia_mvgam_enhancements}} for details.
+Smooth functions are shown as empirical quantiles (or spaghetti
+plots) of posterior partial expectations across a sequence of values
+between the variable's \code{min} and \code{max}, while zeroing out
+effects of all other variables. At present, only univariate and bivariate
+smooth plots are allowed, though note that bivariate smooths rely on
+default behaviour from \code{\link[mgcv]{plot.gam}}. \code{plot_mvgam_smooth}
+generates posterior predictions from an object of class \code{mvgam},
+calculates posterior empirical quantiles and plots them. If
+\code{realisations = FALSE}, the returned plot shows 90, 60, 40 and 20 percent
+posterior quantiles (as ribbons of increasingly darker shades of red) as
+well as the posterior median (as a dark red line). If
+\code{realisations = TRUE}, a set of \code{n_realisations} posterior draws are
+shown. For more nuanced visualisation, supply \code{newdata} just as you
+would when predicting from a \code{\link[mgcv]{gam}} model or use the more
+flexible \code{\link{conditional_effects.mvgam}}. Alternatively, if you
+prefer to use partial effect plots in the style of \code{gratia}, and if you
+have the \code{gratia} package installed, you can use \code{draw.mvgam}. See
+\code{\link{gratia_mvgam_enhancements}} for details.
 }
 \seealso{
-\code{\link[mgcv]{plot.gam}}, \code{\link{conditional_effects.mvgam}},
+\code{\link[mgcv]{plot.gam}},
+\code{\link{conditional_effects.mvgam}},
 \code{\link{gratia_mvgam_enhancements}}
 }
 \author{

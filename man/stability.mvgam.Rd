@@ -10,187 +10,188 @@ stability(object, ...)
 \method{stability}{mvgam}(object, ...)
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
-that used a Vector Autoregressive latent process model (either as \code{VAR(cor = FALSE)} or
-\code{VAR(cor = TRUE)})}
+\item{object}{\code{list} object of class \code{mvgam} resulting from a call
+to \code{\link[=mvgam]{mvgam()}} that used a Vector Autoregressive latent process model (either
+as \code{VAR(cor = FALSE)} or \code{VAR(cor = TRUE)})}
 
-\item{...}{ignored}
+\item{...}{Ignored}
 }
 \value{
-A \code{data.frame} containing posterior draws for each stability metric.
+A \code{data.frame} containing posterior draws for each stability
+metric.
 }
 \description{
 Compute reactivity, return rates and contributions of interactions to
-stationary forecast variance from
-\pkg{mvgam} models with Vector Autoregressive dynamics
+stationary forecast variance from \pkg{mvgam} models with Vector
+Autoregressive dynamics.
 }
 \details{
-These measures of stability can be used to assess how important inter-series
-dependencies are to the variability of a multivariate system and to ask how systems
-are expected to respond to environmental perturbations. Using the formula for a latent VAR(1) as:
+These measures of stability can be used to assess how important
+inter-series dependencies are to the variability of a multivariate system
+and to ask how systems are expected to respond to environmental
+perturbations. Using the formula for a latent VAR(1) as:
+
 \deqn{
-\mu_t \sim \text{MVNormal}(A(\mu_{t - 1}), \Sigma) \quad
-}
-this function will calculate the long-term stationary forecast distribution of the system, which
-has mean \eqn{\mu_{\infty}} and variance \eqn{\Sigma_{\infty}}, to then calculate the following quantities:
+  \mu_t \sim \text{MVNormal}(A(\mu_{t - 1}), \Sigma)
+  }
+
+this function will calculate the long-term stationary forecast distribution
+of the system, which has mean \eqn{\mu_{\infty}} and variance
+\eqn{\Sigma_{\infty}}, to then calculate the following quantities:
+
 \itemize{
-\item \code{prop_int}: Proportion of the volume of the stationary forecast distribution
-that is attributable to lagged interactions (i.e. how important are the autoregressive
-interaction coefficients in \eqn{A} for explaining the shape of the stationary forecast distribution?):
-\deqn{
-    det(A)^2 \quad
-    }
-\item \code{prop_int_adj}: Same as \code{prop_int} but scaled by the number of series \eqn{p} to facilitate
-direct comparisons among systems with different numbers of interacting variables:
-\deqn{
-    det(A)^{2/p} \quad
-    }
-\item \code{prop_int_offdiag}: Sensitivity of \code{prop_int} to inter-series
-interactions (i.e. how important are the off-diagonals of the autoregressive coefficient
-matrix \eqn{A} for shaping \code{prop_int}?), calculated as the relative magnitude of the \emph{off-diagonals} in
-the partial derivative matrix:
-\deqn{
-    [2~det(A) (A^{-1})^T] \quad
-    }
-\item \code{prop_int_diag}: Sensitivity of \code{prop_int} to intra-series
-interactions (i.e. how important are the diagonals of the autoregressive coefficient matrix \eqn{A}
-for shaping \code{prop_int}?), calculated as the relative magnitude of the \emph{diagonals} in the partial derivative
-matrix:
-\deqn{
-    [2~det(A) (A^{-1})^T] \quad
-    }
-\item \code{prop_cov_offdiag}: Sensitivity of \eqn{\Sigma_{\infty}} to inter-series error correlations
-(i.e. how important are off-diagonal covariances in \eqn{\Sigma} for shaping
-\eqn{\Sigma_{\infty}}?), calculated as the relative magnitude of the \emph{off-diagonals} in
-the partial derivative matrix:
-\deqn{
-    [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] \quad
-    }
-\item \code{prop_cov_diag}: Sensitivity of \eqn{\Sigma_{\infty}} to error variances
-(i.e. how important are diagonal variances in \eqn{\Sigma} for shaping
-\eqn{\Sigma_{\infty}}?), calculated as the relative magnitude of the \emph{diagonals} in
-the partial derivative matrix:
-\deqn{
-    [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] \quad
-    }
-\item \code{reactivity}: A measure of the degree to which the system moves
-away from a stable equilibrium following a perturbation.
-Values \verb{> 0} suggest the system is reactive, whereby a
-perturbation of the system in one period can be amplified in the next period. If
-\eqn{\sigma_{max}(A)} is the largest singular value of \eqn{A}, then reactivity is defined as:
-\deqn{
-    log\sigma_{max}(A) \quad
-    }
-\item \code{mean_return_rate}: Asymptotic (long-term) return rate of the mean of the transition distribution
-to the stationary mean, calculated using the largest eigenvalue of the matrix \eqn{A}:
-\deqn{
-   max(\lambda_{A}) \quad
-   }
-Lower values suggest greater stability
-\item \code{var_return_rate}: Asymptotic (long-term) return rate of the variance of the transition distribution
-to the stationary variance:
-\deqn{
-   max(\lambda_{A \otimes{A}}) \quad
-   }
-Again, lower values suggest greater stability
+\item \code{prop_int}: Proportion of the volume of the stationary forecast
+distribution that is attributable to lagged interactions:
+\deqn{ det(A)^2 }
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{\\item `prop_int_adj`: Same as `prop_int` but scaled by the number of
+series \eqn{p}:
+\deqn{ det(A)^{2/p} }
+
+\\item `prop_int_offdiag`: Sensitivity of `prop_int` to inter-series
+interactions (off-diagonals of \eqn{A}):
+\deqn{ [2~det(A) (A^{-1})^T] }
+
+\\item `prop_int_diag`: Sensitivity of `prop_int` to intra-series
+interactions (diagonals of \eqn{A}):
+\deqn{ [2~det(A) (A^{-1})^T] }
+
+\\item `prop_cov_offdiag`: Sensitivity of \eqn{\Sigma_{\infty}} to
+inter-series error correlations:
+\deqn{ [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] }
+
+\\item `prop_cov_diag`: Sensitivity of \eqn{\Sigma_{\infty}} to error
+variances:
+\deqn{ [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] }
+
+\\item `reactivity`: Degree to which the system moves away from a stable
+equilibrium following a perturbation. If \eqn{\sigma_{max}(A)} is the
+largest singular value of \eqn{A}:
+\deqn{ \log\sigma_{max}(A) }
+
+\\item `mean_return_rate`: Asymptotic return rate of the mean of the
+transition distribution to the stationary mean:
+\deqn{ \max(\lambda_{A}) }
+
+\\item `var_return_rate`: Asymptotic return rate of the variance of the
+transition distribution to the stationary variance:
+\deqn{ \max(\lambda_{A \otimes A}) }
+}\if{html}{\out{</div>}}
+
 }
-Major advantages of using \pkg{mvgam} to compute these metrics are that well-calibrated uncertainties are
-available and that VAR processes are forced to be stationary. These properties make it simple and
-insightful to calculate and inspect aspects of both long-term and short-term stability.
-But it is also possible to more directly inspect possible interactions among the
-time series in a latent VAR process. To do so, you can calculate
-Generalized or Orthogonalized Impulse Response Functions using the \code{\link{irf}} function,
-or you can calculate Forecast Error Variance Decompositions using the \code{\link{fevd}} function.
+
+Major advantages of using \pkg{mvgam} to compute these metrics are that
+well-calibrated uncertainties are available and that VAR processes are
+forced to be stationary. These properties make it simple and insightful to
+calculate and inspect aspects of both long-term and short-term stability.
+
+You can also inspect interactions among the time series in a latent VAR
+process using \code{\link{irf}} for impulse response functions or
+\code{\link{fevd}} for forecast error variance decompositions.
 }
 \examples{
 \donttest{
 # Simulate some time series that follow a latent VAR(1) process
-simdat <- sim_mvgam(family = gaussian(),
-                    n_series = 4,
-                    trend_model = VAR(cor = TRUE),
-                    prop_trend = 1)
+simdat <- sim_mvgam(
+  family = gaussian(),
+  n_series = 4,
+  trend_model = VAR(cor = TRUE),
+  prop_trend = 1
+)
+
 plot_mvgam_series(data = simdat$data_train, series = 'all')
 
 # Fit a model that uses a latent VAR(1)
-mod <- mvgam(y ~ -1,
-             trend_formula = ~ 1,
-             trend_model = VAR(cor = TRUE),
-             family = gaussian(),
-             data = simdat$data_train,
-             chains = 2,
-             silent = 2)
+mod <- mvgam(
+  y ~ -1,
+  trend_formula = ~ 1,
+  trend_model = VAR(cor = TRUE),
+  family = gaussian(),
+  data = simdat$data_train,
+  chains = 2,
+  silent = 2
+)
 
-# Calulate stability metrics for this system
+# Calculate stability metrics for this system
 metrics <- stability(mod)
 
-# Proportion of stationary forecast distribution
-# attributable to lagged interactions
-hist(metrics$prop_int,
-     xlim = c(0, 1),
-     xlab = 'Prop_int',
-     main = '',
-     col = '#B97C7C',
-     border = 'white')
+# Proportion of stationary forecast distribution attributable to interactions
+hist(
+  metrics$prop_int,
+  xlim = c(0, 1),
+  xlab = 'Prop_int',
+  main = '',
+  col = '#B97C7C',
+  border = 'white'
+)
 
-# Within this contribution of interactions, how important
-# are inter-series interactions (offdiagonals of the A matrix) vs
-# intra-series density dependence (diagonals of the A matrix)?
+# Inter- vs intra-series interaction contributions
 layout(matrix(1:2, nrow = 2))
-hist(metrics$prop_int_offdiag,
-     xlim = c(0, 1),
-     xlab = '',
-     main = 'Inter-series interactions',
-     col = '#B97C7C',
-     border = 'white')
+hist(
+  metrics$prop_int_offdiag,
+  xlim = c(0, 1),
+  xlab = '',
+  main = 'Inter-series interactions',
+  col = '#B97C7C',
+  border = 'white'
+)
 
-hist(metrics$prop_int_diag,
-     xlim = c(0, 1),
-     xlab = 'Contribution to interaction effect',
-     main = 'Intra-series interactions (density dependence)',
-     col = 'darkblue',
-     border = 'white')
+hist(
+  metrics$prop_int_diag,
+  xlim = c(0, 1),
+  xlab = 'Contribution to interaction effect',
+  main = 'Intra-series interactions (density dependence)',
+  col = 'darkblue',
+  border = 'white'
+)
 layout(1)
 
-# How important are inter-series error covariances
-# (offdiagonals of the Sigma matrix) vs
-# intra-series variances (diagonals of the Sigma matrix) for explaining
-# the variance of the stationary forecast distribution?
+# Inter- vs intra-series contributions to forecast variance
 layout(matrix(1:2, nrow = 2))
-hist(metrics$prop_cov_offdiag,
-     xlim = c(0, 1),
-     xlab = '',
-     main = 'Inter-series covariances',
-     col = '#B97C7C',
-     border = 'white')
+hist(
+  metrics$prop_cov_offdiag,
+  xlim = c(0, 1),
+  xlab = '',
+  main = 'Inter-series covariances',
+  col = '#B97C7C',
+  border = 'white'
+)
 
-hist(metrics$prop_cov_diag,
-     xlim = c(0, 1),
-     xlab = 'Contribution to forecast variance',
-     main = 'Intra-series variances',
-     col = 'darkblue',
-     border = 'white')
+hist(
+  metrics$prop_cov_diag,
+  xlim = c(0, 1),
+  xlab = 'Contribution to forecast variance',
+  main = 'Intra-series variances',
+  col = 'darkblue',
+  border = 'white'
+)
 layout(1)
 
-# Reactivity, i.e. degree to which the system moves
-# away from a stable equilibrium following a perturbation
-# (values > 1 suggest a more reactive, less stable system)
-hist(metrics$reactivity,
-     main = '',
-     xlab = 'Reactivity',
-     col = '#B97C7C',
-     border = 'white',
-     xlim = c(-1*max(abs(metrics$reactivity)),
-              max(abs(metrics$reactivity))))
+# Reactivity: system response to perturbation
+hist(
+  metrics$reactivity,
+  main = '',
+  xlab = 'Reactivity',
+  col = '#B97C7C',
+  border = 'white',
+  xlim = c(
+    -1 * max(abs(metrics$reactivity)),
+    max(abs(metrics$reactivity))
+  )
+)
 abline(v = 0, lwd = 2.5)
 }
+
 }
 \references{
-AR Ives, B Dennis, KL Cottingham & SR Carpenter (2003).
-Estimating community stability and ecological interactions from time-series data.
-Ecological Monographs. 73, 301-330.
+AR Ives, B Dennis, KL Cottingham & SR Carpenter (2003). Estimating
+community stability and ecological interactions from time-series data.
+\emph{Ecological Monographs}, 73, 301–330.
 }
 \seealso{
-\code{\link{VAR}}, \code{\link{irf}}, \code{\link{fevd}}
+\code{\link{VAR}},
+\code{\link{irf}},
+\code{\link{fevd}}
 }
 \author{
 Nicholas J Clark

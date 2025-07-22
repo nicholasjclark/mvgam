@@ -16,9 +16,10 @@ default, a hopefully not too large selection of variables is plotted.}
 \item{regex}{Logical; Indicates whether \code{variable} should
 be treated as regular expressions. Defaults to \code{FALSE}.}
 
-\item{use_alias}{Logical. If more informative names for parameters are available
-(i.e. for beta coefficients \code{b} or for smoothing parameters \code{rho}), replace the uninformative
-names with the more informative alias. Defaults to \code{TRUE}}
+\item{use_alias}{Logical. If more informative names for parameters are
+available (i.e. for beta coefficients \code{b} or for smoothing parameters \code{rho}),
+replace the uninformative names with the more informative alias. Defaults to
+\code{TRUE}.}
 
 \item{...}{Further arguments to be passed to
 \code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}}.}

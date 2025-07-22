@@ -10,7 +10,8 @@ ensemble(object, ...)
 \method{ensemble}{mvgam_forecast}(object, ..., ndraws = 5000)
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam_forecast}. See \code{\link[=forecast.mvgam]{forecast.mvgam()}}}
+\item{object}{\code{list} object of class \code{mvgam_forecast}.
+See \code{\link[=forecast.mvgam]{forecast.mvgam()}}}
 
 \item{...}{More \code{mvgam_forecast} objects.}
 
@@ -20,48 +21,60 @@ fewer draws than \code{ndraws}, their forecast distributions will be resampled w
 to achieve the correct number of draws}
 }
 \value{
-An object of class \code{mvgam_forecast} containing the ensemble predictions. This
-object can be readily used with the supplied S3 functions \code{plot} and \code{score}
+An object of class \code{mvgam_forecast} containing the ensemble
+predictions. This object can be readily used with the supplied S3
+functions \code{plot} and \code{score}.
 }
 \description{
-Generate evenly weighted ensemble forecast distributions from \code{mvgam_forecast} objects
+Generate evenly weighted ensemble forecast distributions from
+\code{mvgam_forecast} objects.
 }
 \details{
-It is widely recognised in the forecasting literature that combining forecasts
-from different models often results in improved forecast accuracy. The simplest way to create
-an ensemble is to use evenly weighted combinations of forecasts from the different models.
-This is straightforward to do in a Bayesian setting with \pkg{mvgam} as the posterior MCMC draws
-contained in each \code{mvgam_forecast} object will already implicitly capture correlations among
-the temporal posterior predictions.
+It is widely recognised in the forecasting literature that
+combining forecasts from different models often results in improved
+forecast accuracy. The simplest way to create an ensemble is to use
+evenly weighted combinations of forecasts from the different models.
+This is straightforward to do in a Bayesian setting with \pkg{mvgam} as
+the posterior MCMC draws contained in each \code{mvgam_forecast} object
+will already implicitly capture correlations among the temporal posterior
+predictions.
 }
 \examples{
 \donttest{
 # Simulate some series and fit a few competing dynamic models
 set.seed(1)
-simdat <- sim_mvgam(n_series = 1,
-                    prop_trend = 0.6,
-                    mu = 1)
+simdat <- sim_mvgam(
+  n_series = 1,
+  prop_trend = 0.6,
+  mu = 1
+)
 
-plot_mvgam_series(data = simdat$data_train,
-                 newdata = simdat$data_test)
+plot_mvgam_series(
+  data = simdat$data_train,
+  newdata = simdat$data_test
+)
 
-m1 <- mvgam(y ~ 1,
-            trend_formula = ~ time +
-              s(season, bs = 'cc', k = 9),
-            trend_model = AR(p = 1),
-            noncentred = TRUE,
-            data = simdat$data_train,
-            newdata = simdat$data_test,
-            chains = 2,
-            silent = 2)
+m1 <- mvgam(
+  y ~ 1,
+  trend_formula = ~ time +
+    s(season, bs = 'cc', k = 9),
+  trend_model = AR(p = 1),
+  noncentred = TRUE,
+  data = simdat$data_train,
+  newdata = simdat$data_test,
+  chains = 2,
+  silent = 2
+)
 
-m2 <- mvgam(y ~ time,
-            trend_model = RW(),
-            noncentred = TRUE,
-            data = simdat$data_train,
-            newdata = simdat$data_test,
-            chains = 2,
-            silent = 2)
+m2 <- mvgam(
+  y ~ time,
+  trend_model = RW(),
+  noncentred = TRUE,
+  data = simdat$data_train,
+  newdata = simdat$data_test,
+  chains = 2,
+  silent = 2
+)
 
 # Calculate forecast distributions for each model
 fc1 <- forecast(m1)
@@ -80,9 +93,11 @@ score(fc1)
 score(fc2)
 score(ensemble_fc)
 }
+
 }
 \seealso{
-\code{\link{plot.mvgam_forecast}}, \code{\link{score.mvgam_forecast}}
+\code{\link{plot.mvgam_forecast}},
+\code{\link{score.mvgam_forecast}}
 }
 \author{
 Nicholas J Clark

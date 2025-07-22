@@ -1,16 +1,22 @@
 #' Posterior draws of residuals from \pkg{mvgam} models
 #'
 #' This method extracts posterior draws of Dunn-Smyth (randomized quantile)
-#' residuals in the order in which the data were supplied to the model. It included
-#' additional arguments for obtaining summaries of the computed residuals
+#' residuals in the order in which the data were supplied to the model. It
+#' includes additional arguments for obtaining summaries of the computed
+#' residuals.
 #'
 #' @inheritParams brms::residuals.brmsfit
+#'
 #' @param object An object of class `mvgam`
-#' @param ... ignored
-#' @details This method gives residuals as Dunn-Smyth (randomized quantile) residuals. Any
-#' observations that were missing (i.e. `NA`) in the original data will have missing values
-#' in the residuals
+#'
+#' @param ... Ignored
+#'
+#' @details This method gives residuals as Dunn-Smyth (randomized quantile)
+#'   residuals. Any observations that were missing (i.e. `NA`) in the original
+#'   data will have missing values in the residuals.
+#'
 #' @return An \code{array} of randomized quantile residual values.
+#'
 #'   If \code{summary = FALSE} the output resembles those of
 #'   \code{\link{posterior_epred.mvgam}} and \code{\link{predict.mvgam}}.
 #'
@@ -23,18 +29,24 @@
 #'   \code{robust}). The remaining columns starting with \code{Q} contain
 #'   quantile estimates as specified via argument \code{probs}.
 #'
-#' @seealso \code{\link{augment.mvgam}}
+#' @seealso
+#'   \code{\link{augment.mvgam}}
+#'
 #' @author Nicholas J Clark
+#'
 #' @examples
 #' \donttest{
 #' # Simulate some data and fit a model
 #' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
-#' mod <- mvgam(y ~ s(season, bs = 'cc'),
-#'              trend_model = AR(),
-#'              noncentred = TRUE,
-#'              data = simdat$data_train,
-#'              chains = 2,
-#'              silent = 2)
+#'
+#' mod <- mvgam(
+#'   y ~ s(season, bs = 'cc'),
+#'   trend_model = AR(),
+#'   noncentred = TRUE,
+#'   data = simdat$data_train,
+#'   chains = 2,
+#'   silent = 2
+#' )
 #'
 #' # Extract posterior residuals
 #' resids <- residuals(mod)
@@ -42,7 +54,8 @@
 #'
 #' # Or add them directly to the observed data, along with fitted values
 #' augment(mod, robust = FALSE, probs = c(0.25, 0.75))
-#'}
+#' }
+#'
 #' @export
 residuals.mvgam <- function(
   object,

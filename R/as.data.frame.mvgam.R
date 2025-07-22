@@ -1,67 +1,95 @@
-#'@title Extract posterior draws from fitted \pkg{mvgam} objects
-#'@name mvgam_draws
-#'@description Extract posterior draws in conventional formats as data.frames, matrices, or arrays.
-#'@param x \code{list} object of class `mvgam`
-#'@param variable A character specifying which parameters to extract. Can either be one of the
-#'following options:
-#'\itemize{
-#'   \item `obs_params` (other parameters specific to the observation model, such as overdispsersions
-#'for negative binomial models or observation error SD for gaussian / student-t models)
-#'   \item `betas` (beta coefficients from the GAM observation model linear predictor; default)
+#' @title Extract posterior draws from fitted \pkg{mvgam} objects
+#'
+#' @name mvgam_draws
+#'
+#' @description
+#' Extract posterior draws in conventional formats as data.frames, matrices,
+#' or arrays.
+#'
+#' @param x \code{list} object of class `mvgam`
+#'
+#' @param variable A character specifying which parameters to extract. Can
+#' either be one of the following options:
+#' \itemize{
+#'   \item `obs_params` (other parameters specific to the observation model,
+#'   such as overdispersions for negative binomial models or observation error
+#'   SD for gaussian / student-t models)
+#'   \item `betas` (beta coefficients from the GAM observation model linear
+#'   predictor; default)
 #'   \item `smooth_params` (smoothing parameters from the GAM observation model)
-#'   \item `linpreds` (estimated linear predictors on whatever link scale was used in the model)
-#'   \item `trend_params` (parameters governing the trend dynamics, such as AR parameters,
-#'trend SD parameters or Gaussian Process parameters)
-#'   \item `trend_betas` (beta coefficients from the GAM latent process model linear predictor;
-#'   only available if a `trend_formula` was supplied in the original model)
-#'   \item `trend_smooth_params` (process model GAM smoothing parameters;
-#'   only available if a `trend_formula` was supplied in the original model)
-#'   \item `trend_linpreds` (process model linear predictors on the identity scale;
-#'   only available if a `trend_formula` was supplied in the original model)} OR can be a character vector
-#'   providing the variables to extract
-#'@param regex Logical. If not using one of the prespecified options for extractions,
-#'should `variable` be treated as a (vector of)
-#'regular expressions? Any variable in x matching at least one of the regular expressions
-#'will be selected. Defaults to `FALSE`.
-#'@param use_alias Logical. If more informative names for parameters are available
-#'(i.e. for beta coefficients `b` or for smoothing parameters `rho`), replace the uninformative
-#'names with the more informative alias. Defaults to `TRUE`
-#'@param inc_warmup Should warmup draws be included? Defaults to \code{FALSE}.
-#'@param row.names Ignored
-#'@param optional Ignored
-#'@param ... Ignored
-#'@return A `data.frame`, `matrix`, or `array` containing the posterior draws.
-#'@examples
-#'\donttest{
-#'sim <- sim_mvgam(family = Gamma())
-#'mod1 <- mvgam(y ~ s(season, bs = 'cc'),
-#'              trend_model = 'AR1',
-#'              data = sim$data_train,
-#'              family = Gamma(),
-#'              chains = 2,
-#'              silent = 2)
-#'beta_draws_df <- as.data.frame(mod1, variable = 'betas')
-#'head(beta_draws_df)
-#'str(beta_draws_df)
+#'   \item `linpreds` (estimated linear predictors on whatever link scale was
+#'   used in the model)
+#'   \item `trend_params` (parameters governing the trend dynamics, such as AR
+#'   parameters, trend SD parameters or Gaussian Process parameters)
+#'   \item `trend_betas` (beta coefficients from the GAM latent process model
+#'   linear predictor; only available if a `trend_formula` was supplied in the
+#'   original model)
+#'   \item `trend_smooth_params` (process model GAM smoothing parameters; only
+#'   available if a `trend_formula` was supplied in the original model)
+#'   \item `trend_linpreds` (process model linear predictors on the identity
+#'   scale; only available if a `trend_formula` was supplied in the original
+#'   model)
+#' }
+#' OR can be a character vector providing the variables to extract.
 #'
-#'beta_draws_mat <- as.matrix(mod1, variable = 'betas')
-#'head(beta_draws_mat)
-#'str(beta_draws_mat)
+#' @param regex Logical. If not using one of the prespecified options for
+#' extractions, should `variable` be treated as a (vector of) regular
+#' expressions? Any variable in `x` matching at least one of the regular
+#' expressions will be selected. Defaults to `FALSE`.
 #'
-#'shape_pars <- as.matrix(mod1, variable = 'shape', regex = TRUE)
-#'head(shape_pars)}
+#' @param use_alias Logical. If more informative names for parameters are
+#' available (i.e. for beta coefficients `b` or for smoothing parameters `rho`),
+#' replace the uninformative names with the more informative alias. Defaults to
+#' `TRUE`.
+#'
+#' @param inc_warmup Should warmup draws be included? Defaults to \code{FALSE}.
+#'
+#' @param row.names Ignored
+#'
+#' @param optional Ignored
+#'
+#' @param ... Ignored
+#'
+#' @return A `data.frame`, `matrix`, or `array` containing the posterior draws.
+#'
+#' @author Nicholas J Clark
+#'
+#' @examples
+#' \donttest{
+#' sim <- sim_mvgam(family = Gamma())
+#'
+#' mod1 <- mvgam(
+#'   y ~ s(season, bs = 'cc'),
+#'   trend_model = AR(),
+#'   data = sim$data_train,
+#'   family = Gamma(),
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' beta_draws_df <- as.data.frame(mod1, variable = 'betas')
+#' head(beta_draws_df)
+#' str(beta_draws_df)
+#'
+#' beta_draws_mat <- as.matrix(mod1, variable = 'betas')
+#' head(beta_draws_mat)
+#' str(beta_draws_mat)
+#'
+#' shape_pars <- as.matrix(mod1, variable = 'shape', regex = TRUE)
+#' head(shape_pars)
+#' }
 NULL
 
 #'@rdname mvgam_draws
 #'@export
 as.data.frame.mvgam = function(
-  x,
-  row.names = NULL,
-  optional = TRUE,
-  variable = 'betas',
-  use_alias = TRUE,
-  regex = FALSE,
-  ...
+    x,
+    row.names = NULL,
+    optional = TRUE,
+    variable = 'betas',
+    use_alias = TRUE,
+    regex = FALSE,
+    ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -83,11 +111,11 @@ as.data.frame.mvgam = function(
 #'@rdname mvgam_draws
 #'@export
 as.matrix.mvgam = function(
-  x,
-  variable = 'betas',
-  regex = FALSE,
-  use_alias = TRUE,
-  ...
+    x,
+    variable = 'betas',
+    regex = FALSE,
+    use_alias = TRUE,
+    ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -109,11 +137,11 @@ as.matrix.mvgam = function(
 #'@rdname mvgam_draws
 #'@export
 as.array.mvgam = function(
-  x,
-  variable = 'betas',
-  regex = FALSE,
-  use_alias = TRUE,
-  ...
+    x,
+    variable = 'betas',
+    regex = FALSE,
+    use_alias = TRUE,
+    ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -136,12 +164,12 @@ as.array.mvgam = function(
 #' @method as_draws mvgam
 #' @export
 as_draws.mvgam <- function(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  inc_warmup = FALSE,
-  use_alias = TRUE,
-  ...
+    x,
+    variable = NULL,
+    regex = FALSE,
+    inc_warmup = FALSE,
+    use_alias = TRUE,
+    ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -176,12 +204,12 @@ posterior::as_draws
 #' @method as_draws_matrix mvgam
 #' @export
 as_draws_matrix.mvgam <- function(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  inc_warmup = FALSE,
-  use_alias = TRUE,
-  ...
+    x,
+    variable = NULL,
+    regex = FALSE,
+    inc_warmup = FALSE,
+    use_alias = TRUE,
+    ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -215,12 +243,12 @@ posterior::as_draws_matrix
 #' @method as_draws_df mvgam
 #' @export
 as_draws_df.mvgam <- function(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  inc_warmup = FALSE,
-  use_alias = TRUE,
-  ...
+    x,
+    variable = NULL,
+    regex = FALSE,
+    inc_warmup = FALSE,
+    use_alias = TRUE,
+    ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -254,12 +282,12 @@ posterior::as_draws_df
 #' @method as_draws_array mvgam
 #' @export
 as_draws_array.mvgam <- function(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  inc_warmup = FALSE,
-  use_alias = TRUE,
-  ...
+    x,
+    variable = NULL,
+    regex = FALSE,
+    inc_warmup = FALSE,
+    use_alias = TRUE,
+    ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -293,12 +321,12 @@ posterior::as_draws_array
 #' @method as_draws_list mvgam
 #' @export
 as_draws_list.mvgam <- function(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  inc_warmup = FALSE,
-  use_alias = TRUE,
-  ...
+    x,
+    variable = NULL,
+    regex = FALSE,
+    inc_warmup = FALSE,
+    use_alias = TRUE,
+    ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -334,11 +362,11 @@ posterior::as_draws_list
 #' @method as_draws_rvars mvgam
 #' @export
 as_draws_rvars.mvgam <- function(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  inc_warmup = FALSE,
-  ...
+    x,
+    variable = NULL,
+    regex = FALSE,
+    inc_warmup = FALSE,
+    ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -484,16 +512,16 @@ validate_variables = function(x, variable, regex = FALSE) {
   # If not one of the standard subsets, get aliases for the chosen variable(s)
   if (
     !variable[1] %in%
-      c(
-        "obs_params",
-        "betas",
-        "smooth_params",
-        "linpreds",
-        "trend_params",
-        "trend_betas",
-        "trend_smooth_params",
-        "trend_linpreds"
-      )
+    c(
+      "obs_params",
+      "betas",
+      "smooth_params",
+      "linpreds",
+      "trend_params",
+      "trend_betas",
+      "trend_smooth_params",
+      "trend_linpreds"
+    )
   ) {
     if (regex) {
       vars_to_extract <- vector(mode = 'list')

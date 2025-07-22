@@ -53,9 +53,9 @@
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
-\item{formula}{Optional new \code{formula} object. Note, \code{mvgam} currently does not support dynamic formula
-updates such as removal of specific terms with \code{- term}. When updating, the entire formula needs
-to be supplied}
+\item{formula}{Optional new \code{formula} object. Note, \code{mvgam} currently does
+not support dynamic formula updates such as removal of specific terms with
+\code{- term}. When updating, the entire formula needs to be supplied.}
 
 \item{trend_formula}{An optional \code{formula} object specifying the GAM process
 model formula. If supplied, a linear predictor will be modelled for the
@@ -214,9 +214,11 @@ Can be set globally via \code{"brms.algorithm"} option. Limited testing suggests
 \item{lfo}{\code{logical}. Indicates whether this is part of \link{lfo_cv.mvgam} call.
 Returns lighter model version for speed. Users should leave as \code{FALSE}.}
 
-\item{...}{Other arguments to be passed to \code{\link{mvgam}} or \code{\link{jsdgam}}}
+\item{...}{Other arguments to be passed to \code{\link{mvgam}} or
+\code{\link{jsdgam}}}
 
-\item{factor_formula}{Optional new \code{formula} object for the factor linear predictors}
+\item{factor_formula}{Optional new \code{formula} object for the factor linear
+predictors}
 
 \item{factor_knots}{An optional \code{list} containing user specified knot
 values to be used for basis construction of any smooth terms in
@@ -226,50 +228,65 @@ number of knots is not always just \code{k}). Different terms can use different
 numbers of knots, unless they share a covariate}
 }
 \value{
-A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
-the mgcv model output (for easily generating simulations at
-unsampled covariate values), Dunn-Smyth residuals for each outcome variable and key information needed
-for other functions in the package. See \code{\link{mvgam-class}} for details.
-Use \code{methods(class = "mvgam")} for an overview on available methods.
+A \code{list} object of class \code{mvgam} containing model output,
+the text representation of the model file, the mgcv model output (for
+easily generating simulations at unsampled covariate values), Dunn-Smyth
+residuals for each outcome variable and key information needed for other
+functions in the package. See \code{\link{mvgam-class}} for details. Use
+\code{methods(class = "mvgam")} for an overview on available methods.
 
-A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
-the mgcv model output (for easily generating simulations at
-unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
-for other functions in the package. See \code{\link{mvgam-class}} for details.
-Use \code{methods(class = "mvgam")} for an overview on available methods.
+A \code{list} object of class \code{mvgam} containing model output,
+the text representation of the model file, the mgcv model output (for
+easily generating simulations at unsampled covariate values), Dunn-Smyth
+residuals for each series and key information needed for other functions in
+the package. See \code{\link{mvgam-class}} for details. Use
+\code{methods(class = "mvgam")} for an overview on available methods.
 }
 \description{
-This function allows a previously fitted \pkg{mvgam} model to be updated
+This function allows a previously fitted \pkg{mvgam} model to be updated.
 }
 \examples{
 \donttest{
 # Simulate some data and fit a Poisson AR1 model
 simdat <- sim_mvgam(n_series = 1, trend_model = AR())
-mod <- mvgam(y ~ s(season, bs = 'cc'),
-             trend_model = AR(),
-             noncentred = TRUE,
-             data = simdat$data_train,
-             chains = 2)
+
+mod <- mvgam(
+  y ~ s(season, bs = 'cc'),
+  trend_model = AR(),
+  noncentred = TRUE,
+  data = simdat$data_train,
+  chains = 2
+)
+
 summary(mod)
 conditional_effects(mod, type = 'link')
 
 # Update to an AR2 model
-updated_mod <- update(mod, trend_model = AR(p = 2),
-                      noncentred = TRUE)
+updated_mod <- update(
+  mod,
+  trend_model = AR(p = 2),
+  noncentred = TRUE
+)
+
 summary(updated_mod)
 conditional_effects(updated_mod, type = 'link')
 
 # Now update to a Binomial AR1 by adding information on trials
 # requires that we supply newdata that contains the 'trials' variable
 simdat$data_train$trials <- max(simdat$data_train$y) + 15
-updated_mod <- update(mod,
-                      formula = cbind(y, trials) ~ s(season, bs = 'cc'),
-                      noncentred = TRUE,
-                      data = simdat$data_train,
-                      family = binomial())
+
+updated_mod <- update(
+  mod,
+  formula = cbind(y, trials) ~ s(season, bs = 'cc'),
+  noncentred = TRUE,
+  data = simdat$data_train,
+  family = binomial()
+)
+
 summary(updated_mod)
 conditional_effects(updated_mod, type = 'link')
 }
+
 }
 \author{
 Nicholas J Clark

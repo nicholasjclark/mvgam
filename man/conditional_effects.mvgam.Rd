@@ -30,21 +30,23 @@ estimated in the model. When specifying \code{effects} manually, \emph{all}
 two-way interactions (including grouping variables) may be plotted
 even if not originally modeled.}
 
-\item{type}{\code{character} specifying the scale of predictions.
-When this has the value \code{link} the linear predictor is calculated on the link scale.
-If \code{expected} is used (the default), predictions reflect the expectation of the
-response (the mean) but ignore uncertainty in the observation process. When \code{response} is used,
-the predictions take uncertainty in the observation process into account to return
-predictions on the outcome scale. Two special cases are also allowed:
-type \code{latent_N} will return the estimated latent abundances from an N-mixture distribution,
-while type \code{detection} will return the estimated detection probability from an N-mixture distribution}
+\item{type}{\code{character} specifying the scale of predictions. When this has
+the value \code{link} the linear predictor is calculated on the link
+scale. If \code{expected} is used (the default), predictions reflect the
+expectation of the response (the mean) but ignore uncertainty in the
+observation process. When \code{response} is used, the predictions take
+uncertainty in the observation process into account to return predictions
+on the outcome scale. Two special cases are also allowed: type \code{latent_N}
+will return the estimated latent abundances from an N-mixture distribution,
+while type \code{detection} will return the estimated detection probability from
+an N-mixture distribution.}
 
-\item{points}{\code{Logical}. Indicates if the original data points should be added,
-but only if \code{type == 'response'}. Default is \code{TRUE}.}
+\item{points}{\code{Logical}. Indicates if the original data points should be
+added, but only if \code{type == 'response'}. Default is \code{TRUE}.}
 
-\item{rug}{\code{Logical}. Indicates if displays tick marks should be plotted on the
-axes to mark the distribution of raw data, but only if \code{type == 'response'}.
-Default is \code{TRUE}.}
+\item{rug}{\code{Logical}. Indicates if displays tick marks should be plotted on
+the axes to mark the distribution of raw data, but only if
+\code{type == 'response'}. Default is \code{TRUE}.}
 
 \item{...}{other arguments to pass to \code{\link[marginaleffects]{plot_predictions}}}
 
@@ -52,41 +54,46 @@ Default is \code{TRUE}.}
 plotted directly in the active graphic device.
 Defaults to \code{TRUE}.}
 
-\item{ask}{\code{Logical}. Indicates if the user is prompted before a new page is plotted.
-Only used if plot is \code{TRUE}. Default is \code{FALSE}.}
+\item{ask}{\code{Logical}. Indicates if the user is prompted before a new page is
+plotted. Only used if plot is \code{TRUE}. Default is \code{FALSE}.}
 }
 \value{
 \code{conditional_effects} returns an object of class
-\code{mvgam_conditional_effects} which is a
-named list with one slot per effect containing a \code{\link[ggplot2]{ggplot}} object,
-which can be further customized using the \pkg{ggplot2} package.
-The corresponding \code{plot} method will draw these plots in the active graphic device
+\code{mvgam_conditional_effects} which is a named list with one slot per
+effect containing a \code{\link[ggplot2]{ggplot}} object, which can be
+further customized using the \pkg{ggplot2} package. The corresponding
+\code{plot} method will draw these plots in the active graphic device.
 }
 \description{
 Display conditional effects of one or more numeric and/or categorical
-predictors in models of class \code{mvgam} and \code{jsdgam}, including two-way interaction effects.
+predictors in models of class \code{mvgam} and \code{jsdgam}, including two-way
+interaction effects.
 }
 \details{
-This function acts as a wrapper to the more
-flexible \code{\link[marginaleffects]{plot_predictions}}.
-When creating \code{conditional_effects} for a particular predictor
-(or interaction of two predictors), one has to choose the values of all
-other predictors to condition on. By default, the mean is used for
-continuous variables and the reference category is used for factors. Use
-\code{\link[marginaleffects]{plot_predictions}} to change these
-and create more bespoke conditional effects plots.
+This function acts as a wrapper to the more flexible
+\code{\link[marginaleffects]{plot_predictions}}. When creating
+\code{conditional_effects} for a particular predictor (or interaction of
+two predictors), one has to choose the values of all other predictors to
+condition on. By default, the mean is used for continuous variables and the
+reference category is used for factors. Use
+\code{\link[marginaleffects]{plot_predictions}} to change these and create
+more bespoke conditional effects plots.
 }
 \examples{
 \donttest{
 # Simulate some data
-simdat <- sim_mvgam(family = poisson(),
-                    seasonality = 'hierarchical')
+simdat <- sim_mvgam(
+  family = poisson(),
+  seasonality = 'hierarchical'
+)
 
 # Fit a model
-mod <- mvgam(y ~ s(season, by = series, k = 5) + year:series,
-             family = poisson(),
-             data = simdat$data_train,
-             chains = 2)
+mod <- mvgam(
+  y ~ s(season, by = series, k = 5) + year:series,
+  family = poisson(),
+  data = simdat$data_train,
+  chains = 2
+)
 
 # Plot all main effects on the response scale
 conditional_effects(mod)
@@ -101,10 +108,12 @@ conditional_effects(mod, type = 'link')
 # Works the same for smooth terms, including smooth interactions
 set.seed(0)
 dat <- mgcv::gamSim(1, n = 200, scale = 2)
-mod <- mvgam(y ~ te(x0, x1, k = 5) + s(x2, k = 6) + s(x3, k = 6),
-            data = dat,
-            family = gaussian(),
-            chains = 2)
+mod <- mvgam(
+  y ~ te(x0, x1, k = 5) + s(x2, k = 6) + s(x3, k = 6),
+  data = dat,
+  family = gaussian(),
+  chains = 2
+)
 conditional_effects(mod)
 conditional_effects(mod, conf_level = 0.5, type = 'link')
 
@@ -113,12 +122,13 @@ conditional_effects(mod, conf_level = 0.5, type = 'link')
 
 # Simulate some nonlinear data
 dat <- mgcv::gamSim(1, n = 200, scale = 2)
-mod <- mvgam(y ~ s(x1, bs = 'moi') +
-               te(x0, x2),
-             data = dat,
-             family = gaussian(),
-             chains = 2,
-             silent = 2)
+mod <- mvgam(
+  y ~ s(x1, bs = 'moi') + te(x0, x2),
+  data = dat,
+  family = gaussian(),
+  chains = 2,
+  silent = 2
+)
 
 # Extract the list of ggplot conditional_effect plots
 m <- plot(conditional_effects(mod), plot = FALSE)
@@ -126,12 +136,16 @@ m <- plot(conditional_effects(mod), plot = FALSE)
 # Add custom labels and arrange plots together using patchwork::wrap_plots()
 library(patchwork)
 library(ggplot2)
-wrap_plots(m[[1]] + labs(title = 's(x1, bs = "moi")'),
-           m[[2]] + labs(title = 'te(x0, x2)'))
+wrap_plots(
+  m[[1]] + labs(title = 's(x1, bs = "moi")'),
+  m[[2]] + labs(title = 'te(x0, x2)')
+)
 }
+
 }
 \seealso{
-\code{\link[marginaleffects]{plot_predictions}}, \code{\link[marginaleffects]{plot_slopes}}
+\code{\link[marginaleffects]{plot_predictions}},
+\code{\link[marginaleffects]{plot_slopes}}
 }
 \author{
 Nicholas J Clark

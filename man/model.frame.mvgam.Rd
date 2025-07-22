@@ -15,7 +15,7 @@
 
 \item{trend_effects}{\code{logical}, return the model.frame from the
 observation model (if \code{FALSE}) or from the underlying process
-model (if\code{TRUE})}
+model (if \code{TRUE})}
 
 \item{...}{Ignored}
 }

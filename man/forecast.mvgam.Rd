@@ -8,7 +8,8 @@
 \method{forecast}{mvgam}(object, newdata, data_test, n_cores = 1, type = "response", ...)
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}.
+See \code{\link[=mvgam]{mvgam()}}}
 
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data
 containing the same variables that were included in the original \code{data}
@@ -30,21 +31,21 @@ integration into \code{R} workflows}
 
 \item{n_cores}{Deprecated. Parallel processing is no longer supported}
 
-\item{type}{When this has the value \code{link} (default) the linear predictor is
-calculated on the link scale.
-If \code{expected} is used, predictions reflect the expectation of the response (the mean)
-but ignore uncertainty in the observation process. When \code{response} is used,
-the predictions take uncertainty in the observation process into account to return
-predictions on the outcome scale. When \code{variance} is used, the variance of the response
-with respect to the mean (mean-variance relationship) is returned.
-When \code{type = "terms"}, each component of the linear predictor is
-returned separately in the form of a \code{list} (possibly with standard
-errors, if \code{summary = TRUE}): this includes parametric model components,
-followed by each smooth component, but excludes any offset and any intercept.
-Two special cases are also allowed:
-type \code{latent_N} will return the estimated latent abundances from an
-N-mixture distribution, while type \code{detection} will return the estimated
-detection probability from an N-mixture distribution}
+\item{type}{When this has the value \code{link} (default) the linear
+predictor is calculated on the link scale. If \code{expected} is used,
+predictions reflect the expectation of the response (the mean) but ignore
+uncertainty in the observation process. When \code{response} is used, the
+predictions take uncertainty in the observation process into account to
+return predictions on the outcome scale. When \code{variance} is used, the
+variance of the response with respect to the mean (mean-variance
+relationship) is returned. When \code{type = "terms"}, each component of the
+linear predictor is returned separately in the form of a \code{list} (possibly
+with standard errors, if \code{summary = TRUE}): this includes parametric model
+components, followed by each smooth component, but excludes any offset and
+any intercept. Two special cases are also allowed: type \code{latent_N} will
+return the estimated latent abundances from an N-mixture distribution,
+while type \code{detection} will return the estimated detection probability from
+an N-mixture distribution}
 
 \item{...}{Ignored}
 }

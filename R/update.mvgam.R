@@ -1,51 +1,75 @@
-#'Update an existing \pkg{mvgam} model object
+#' Update an existing \pkg{mvgam} model object
 #'
-#'This function allows a previously fitted \pkg{mvgam} model to be updated
-#'@name update.mvgam
-#'@importFrom mgcv nb betar
-#'@importFrom rlang missing_arg
-#'@inheritParams mvgam
-#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
-#'@param formula Optional new `formula` object. Note, `mvgam` currently does not support dynamic formula
-#'updates such as removal of specific terms with `- term`. When updating, the entire formula needs
-#'to be supplied
-#'@param ... Other arguments to be passed to \code{\link{mvgam}} or \code{\link{jsdgam}}
-#'@return A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
-#' the mgcv model output (for easily generating simulations at
-#' unsampled covariate values), Dunn-Smyth residuals for each outcome variable and key information needed
-#' for other functions in the package. See \code{\link{mvgam-class}} for details.
-#' Use `methods(class = "mvgam")` for an overview on available methods.
+#' This function allows a previously fitted \pkg{mvgam} model to be updated.
+#'
+#' @name update.mvgam
+#'
+#' @importFrom mgcv nb betar
+#' @importFrom rlang missing_arg
+#'
+#' @inheritParams mvgam
+#'
+#' @param object \code{list} object returned from \code{mvgam}. See [mvgam()]
+#'
+#' @param formula Optional new `formula` object. Note, `mvgam` currently does
+#'   not support dynamic formula updates such as removal of specific terms with
+#'   `- term`. When updating, the entire formula needs to be supplied.
+#'
+#' @param ... Other arguments to be passed to \code{\link{mvgam}} or
+#'   \code{\link{jsdgam}}
+#'
+#' @return A \code{list} object of class \code{mvgam} containing model output,
+#'   the text representation of the model file, the mgcv model output (for
+#'   easily generating simulations at unsampled covariate values), Dunn-Smyth
+#'   residuals for each outcome variable and key information needed for other
+#'   functions in the package. See \code{\link{mvgam-class}} for details. Use
+#'   `methods(class = "mvgam")` for an overview on available methods.
+#'
 #' @author Nicholas J Clark
+#'
 #' @examples
 #' \donttest{
 #' # Simulate some data and fit a Poisson AR1 model
 #' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
-#' mod <- mvgam(y ~ s(season, bs = 'cc'),
-#'              trend_model = AR(),
-#'              noncentred = TRUE,
-#'              data = simdat$data_train,
-#'              chains = 2)
+#'
+#' mod <- mvgam(
+#'   y ~ s(season, bs = 'cc'),
+#'   trend_model = AR(),
+#'   noncentred = TRUE,
+#'   data = simdat$data_train,
+#'   chains = 2
+#' )
+#'
 #' summary(mod)
 #' conditional_effects(mod, type = 'link')
 #'
 #' # Update to an AR2 model
-#' updated_mod <- update(mod, trend_model = AR(p = 2),
-#'                       noncentred = TRUE)
+#' updated_mod <- update(
+#'   mod,
+#'   trend_model = AR(p = 2),
+#'   noncentred = TRUE
+#' )
+#'
 #' summary(updated_mod)
 #' conditional_effects(updated_mod, type = 'link')
 #'
 #' # Now update to a Binomial AR1 by adding information on trials
 #' # requires that we supply newdata that contains the 'trials' variable
 #' simdat$data_train$trials <- max(simdat$data_train$y) + 15
-#' updated_mod <- update(mod,
-#'                       formula = cbind(y, trials) ~ s(season, bs = 'cc'),
-#'                       noncentred = TRUE,
-#'                       data = simdat$data_train,
-#'                       family = binomial())
+#'
+#' updated_mod <- update(
+#'   mod,
+#'   formula = cbind(y, trials) ~ s(season, bs = 'cc'),
+#'   noncentred = TRUE,
+#'   data = simdat$data_train,
+#'   family = binomial()
+#' )
+#'
 #' summary(updated_mod)
 #' conditional_effects(updated_mod, type = 'link')
-#'}
-#'@export
+#' }
+#'
+#' @export
 update.mvgam = function(
   object,
   formula,
@@ -252,20 +276,28 @@ update.mvgam = function(
 }
 
 
-#'@rdname update.mvgam
-#'@inheritParams jsdgam
-#'@inheritParams update.mvgam
-#'@param formula Optional new `formula` object. Note, `mvgam` currently does not support dynamic formula
-#'updates such as removal of specific terms with `- term`. When updating, the entire formula needs
-#'to be supplied
-#'@param factor_formula Optional new `formula` object for the factor linear predictors
-#'@return A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
-#' the mgcv model output (for easily generating simulations at
-#' unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
-#' for other functions in the package. See \code{\link{mvgam-class}} for details.
-#' Use `methods(class = "mvgam")` for an overview on available methods.
+#' @rdname update.mvgam
+#'
+#' @inheritParams jsdgam
+#' @inheritParams update.mvgam
+#'
+#' @param formula Optional new `formula` object. Note, `mvgam` currently does
+#'   not support dynamic formula updates such as removal of specific terms with
+#'   `- term`. When updating, the entire formula needs to be supplied.
+#'
+#' @param factor_formula Optional new `formula` object for the factor linear
+#'   predictors
+#'
+#' @return A \code{list} object of class \code{mvgam} containing model output,
+#'   the text representation of the model file, the mgcv model output (for
+#'   easily generating simulations at unsampled covariate values), Dunn-Smyth
+#'   residuals for each series and key information needed for other functions in
+#'   the package. See \code{\link{mvgam-class}} for details. Use
+#'   `methods(class = "mvgam")` for an overview on available methods.
+#'
 #' @author Nicholas J Clark
-#'@export
+#'
+#' @export
 update.jsdgam = function(
   object,
   formula,

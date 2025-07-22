@@ -1,48 +1,69 @@
 #' Combine forecasts from \pkg{mvgam} models into evenly weighted ensembles
 #'
-#' Generate evenly weighted ensemble forecast distributions from \code{mvgam_forecast} objects
+#' Generate evenly weighted ensemble forecast distributions from
+#' \code{mvgam_forecast} objects.
 #'
-#'@name ensemble.mvgam_forecast
-#'@param object \code{list} object of class \code{mvgam_forecast}. See [forecast.mvgam()]
-#'@param ... More \code{mvgam_forecast} objects.
-#'@details It is widely recognised in the forecasting literature that combining forecasts
-#'from different models often results in improved forecast accuracy. The simplest way to create
-#'an ensemble is to use evenly weighted combinations of forecasts from the different models.
-#' This is straightforward to do in a Bayesian setting with \pkg{mvgam} as the posterior MCMC draws
-#' contained in each \code{mvgam_forecast} object will already implicitly capture correlations among
-#' the temporal posterior predictions.
-#'@return An object of class \code{mvgam_forecast} containing the ensemble predictions. This
-#'object can be readily used with the supplied S3 functions \code{plot} and \code{score}
-#'@author Nicholas J Clark
-#'@seealso \code{\link{plot.mvgam_forecast}}, \code{\link{score.mvgam_forecast}}
+#' @name ensemble.mvgam_forecast
+#'
+#' @param object \code{list} object of class \code{mvgam_forecast}.
+#'   See [forecast.mvgam()]
+#'
+#' @param ... More \code{mvgam_forecast} objects.
+#'
+#' @details It is widely recognised in the forecasting literature that
+#'   combining forecasts from different models often results in improved
+#'   forecast accuracy. The simplest way to create an ensemble is to use
+#'   evenly weighted combinations of forecasts from the different models.
+#'   This is straightforward to do in a Bayesian setting with \pkg{mvgam} as
+#'   the posterior MCMC draws contained in each \code{mvgam_forecast} object
+#'   will already implicitly capture correlations among the temporal posterior
+#'   predictions.
+#'
+#' @return An object of class \code{mvgam_forecast} containing the ensemble
+#'   predictions. This object can be readily used with the supplied S3
+#'   functions \code{plot} and \code{score}.
+#'
+#' @author Nicholas J Clark
+#'
+#' @seealso \code{\link{plot.mvgam_forecast}},
+#'   \code{\link{score.mvgam_forecast}}
+#'
 #' @examples
 #' \donttest{
 #' # Simulate some series and fit a few competing dynamic models
 #' set.seed(1)
-#' simdat <- sim_mvgam(n_series = 1,
-#'                     prop_trend = 0.6,
-#'                     mu = 1)
+#' simdat <- sim_mvgam(
+#'   n_series = 1,
+#'   prop_trend = 0.6,
+#'   mu = 1
+#' )
 #'
-#' plot_mvgam_series(data = simdat$data_train,
-#'                  newdata = simdat$data_test)
+#' plot_mvgam_series(
+#'   data = simdat$data_train,
+#'   newdata = simdat$data_test
+#' )
 #'
-#' m1 <- mvgam(y ~ 1,
-#'             trend_formula = ~ time +
-#'               s(season, bs = 'cc', k = 9),
-#'             trend_model = AR(p = 1),
-#'             noncentred = TRUE,
-#'             data = simdat$data_train,
-#'             newdata = simdat$data_test,
-#'             chains = 2,
-#'             silent = 2)
+#' m1 <- mvgam(
+#'   y ~ 1,
+#'   trend_formula = ~ time +
+#'     s(season, bs = 'cc', k = 9),
+#'   trend_model = AR(p = 1),
+#'   noncentred = TRUE,
+#'   data = simdat$data_train,
+#'   newdata = simdat$data_test,
+#'   chains = 2,
+#'   silent = 2
+#' )
 #'
-#' m2 <- mvgam(y ~ time,
-#'             trend_model = RW(),
-#'             noncentred = TRUE,
-#'             data = simdat$data_train,
-#'             newdata = simdat$data_test,
-#'             chains = 2,
-#'             silent = 2)
+#' m2 <- mvgam(
+#'   y ~ time,
+#'   trend_model = RW(),
+#'   noncentred = TRUE,
+#'   data = simdat$data_train,
+#'   newdata = simdat$data_test,
+#'   chains = 2,
+#'   silent = 2
+#' )
 #'
 #' # Calculate forecast distributions for each model
 #' fc1 <- forecast(m1)
@@ -61,17 +82,21 @@
 #' score(fc2)
 #' score(ensemble_fc)
 #' }
-#'@export
+#'
+#' @export
 ensemble <- function(object, ...) {
   UseMethod("ensemble", object)
 }
 
 #'@rdname ensemble.mvgam_forecast
+#'
 #'@method ensemble mvgam_forecast
+#'
 #'@param ndraws Positive integer specifying the number of draws to use from each
 #'forecast distribution for creating the ensemble. If some of the ensemble members have
 #'fewer draws than `ndraws`, their forecast distributions will be resampled with replacement
 #'to achieve the correct number of draws
+#'
 #'@export
 ensemble.mvgam_forecast <- function(object, ..., ndraws = 5000) {
   models <- split_fc_dots(object, ..., model_names = NULL)

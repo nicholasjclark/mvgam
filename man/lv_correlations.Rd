@@ -2,65 +2,68 @@
 % Please edit documentation in R/lv_correlations.R
 \name{lv_correlations}
 \alias{lv_correlations}
-\title{Calculate trend correlations based on latent factor loadings for \pkg{mvgam} models}
+\title{Calculate trend correlations based on latent factor loadings for
+\pkg{mvgam} models}
 \usage{
 lv_correlations(object)
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} that used latent factors, either
-with \code{use_lv = TRUE} or by supplying a \code{trend_map}. See \code{\link[=mvgam]{mvgam()}} for details and for
-an example}
+\item{object}{\code{list} object of class \code{mvgam} that used latent
+factors, either with \code{use_lv = TRUE} or by supplying a \code{trend_map}. See
+\code{\link[=mvgam]{mvgam()}} for details and for an example.}
 }
 \value{
-A \code{list} object containing the mean posterior correlations
-and the full array of posterior correlations
+A \code{list} object containing the mean posterior correlations and
+the full array of posterior correlations.
 }
 \description{
 This function uses factor loadings from a fitted dynamic factor
-\code{mvgam} model to calculate temporal correlations among series' trends
+\code{mvgam} model to calculate temporal correlations among series' trends.
 }
 \details{
 Although this function will still work, it is now recommended to use
-\code{\link[=residual_cor]{residual_cor()}} to obtain residual correlation information in a more user-friendly
-format that allows for a deeper investigation of relationships among the time series.
+\code{\link[=residual_cor]{residual_cor()}} to obtain residual correlation information in a more
+user-friendly format that allows for a deeper investigation of relationships
+among the time series.
 }
 \examples{
 \donttest{
+#--------------------------------------------------
 # Fit a model that uses two AR(1) dynamic factors to model
 # the temporal dynamics of the four rodent species in the portal_data
-mod <- mvgam(captures ~ series,
-            trend_model = AR(),
-            use_lv = TRUE,
-            n_lv = 2,
-            data = portal_data,
-            chains = 2,
-            silent = 2)
+#--------------------------------------------------
+mod <- mvgam(
+  captures ~ series,
+  trend_model = AR(),
+  use_lv = TRUE,
+  n_lv = 2,
+  data = portal_data,
+  chains = 2,
+  silent = 2
+)
 
 # Plot the two dynamic factors
 plot(mod, type = 'factors')
 
-# Calculate correlations among the series using lv_correlations()
+# Calculate correlations among the series
 lvcors <- lv_correlations(mod)
 names(lvcors)
 lapply(lvcors, class)
 
-# The above works, but it is now recommended to use the more
-# flexible and informative residual_cor() function to
-# calculate and work with these correlations
+# Recommended: use residual_cor() instead
 lvcors <- residual_cor(mod)
 names(lvcors)
 lvcors$cor
 
-# For those correlations whose credible intervals did not include
-# zero, plot them as a correlation matrix (all other correlations
-# are shown as zero on this plot)
+# Plot credible correlations as a matrix
 plot(lvcors, cluster = TRUE)
 
 \dontshow{
 # For R CMD check: make sure any open connections are closed afterward
- closeAllConnections()
+closeAllConnections()
 }
 }
+
 }
 \seealso{
 \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}}

@@ -1,47 +1,86 @@
-#'Plot latent trend predictions from \pkg{mvgam} models
-#'@importFrom graphics par lines polygon box abline
-#'@importFrom stats sd quantile
-#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
-#'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
-#'in addition to any other variables included in the linear predictor of the original \code{formula}.
-#'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
-#'\code{newdata} instead for more seamless integration into `R` workflows
-#'@param derivatives \code{logical}. If \code{TRUE}, an additional plot will be returned to show the
-#'estimated 1st derivative for the estimated trend
-#'@param realisations \code{logical}. If \code{TRUE}, posterior trend realisations are shown as a spaghetti plot,
-#'making it easier to visualise the diversity of possible trend paths. If \code{FALSE}, the default,
-#'empirical quantiles of the posterior distribution are shown
-#'@param n_realisations \code{integer} specifying the number of posterior realisations to plot, if
-#'\code{realisations = TRUE}. Ignored otherwise
-#'@param n_cores Deprecated. Parallel processing is no longer supported
-#'@param xlab label for x axis.
-#'@param ylab label for y axis.
-#'@return A `ggplot` object
+#' Plot latent trend predictions from \pkg{mvgam} models
+#'
+#' @importFrom graphics par lines polygon box abline
+#'
+#' @importFrom stats sd quantile
+#'
+#' @param object \code{list} object returned from \code{mvgam}. See [mvgam()]
+#'
+#' @param series \code{integer} specifying which series in the set is to be
+#'   plotted
+#'
+#' @param newdata Optional \code{dataframe} or \code{list} of test data
+#'   containing at least 'series' and 'time' in addition to any other
+#'   variables included in the linear predictor of the original \code{formula}.
+#'
+#' @param data_test Deprecated. Still works in place of \code{newdata} but
+#'   users are recommended to use \code{newdata} instead for more seamless
+#'   integration into `R` workflows
+#'
+#' @param derivatives \code{logical}. If \code{TRUE}, an additional plot will
+#'   be returned to show the estimated 1st derivative for the estimated trend
+#'
+#' @param realisations \code{logical}. If \code{TRUE}, posterior trend
+#'   realisations are shown as a spaghetti plot, making it easier to visualise
+#'   the diversity of possible trend paths. If \code{FALSE}, the default,
+#'   empirical quantiles of the posterior distribution are shown
+#'
+#' @param n_realisations \code{integer} specifying the number of posterior
+#'   realisations to plot, if \code{realisations = TRUE}. Ignored otherwise
+#'
+#' @param n_cores Deprecated. Parallel processing is no longer supported
+#'
+#' @param xlab Label for x axis
+#'
+#' @param ylab Label for y axis
+#'
+#' @return A `ggplot` object
+#'
 #' @examples
 #' \donttest{
-#' simdat <- sim_mvgam(n_series = 3, trend_model = 'AR1')
-#' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-#'             trend_model = AR(),
-#'             noncentred = TRUE,
-#'             data = simdat$data_train,
-#'             chains = 2)
+#' simdat <- sim_mvgam(
+#'   n_series = 3,
+#'   trend_model = AR()
+#' )
+#'
+#' mod <- mvgam(
+#'   y ~ s(season, bs = 'cc', k = 6),
+#'   trend_model = AR(),
+#'   noncentred = TRUE,
+#'   data = simdat$data_train,
+#'   chains = 2
+#' )
 #'
 #' # Plot estimated trends for some series
 #' plot_mvgam_trend(mod)
 #' plot_mvgam_trend(mod, series = 2)
 #'
 #' # Extrapolate trends forward in time and plot on response scale
-#' plot_mvgam_trend(mod, newdata = simdat$data_test)
-#' plot_mvgam_trend(mod, newdata = simdat$data_test, series = 2)
+#' plot_mvgam_trend(
+#'   mod,
+#'   newdata = simdat$data_test
+#' )
+#'
+#' plot_mvgam_trend(
+#'   mod,
+#'   newdata = simdat$data_test,
+#'   series = 2
+#' )
 #'
 #' # But it is recommended to compute extrapolations for all series
 #' # first and then plot
-#' trend_fc <- forecast(mod, newdata = simdat$data_test)
+#' trend_fc <- forecast(
+#'   mod,
+#'   newdata = simdat$data_test
+#' )
+#'
 #' plot(trend_fc, series = 1)
 #' plot(trend_fc, series = 2)
 #' }
-#'@export
+#'
+#' @author Nicholas J Clark
+#'
+#' @export
 plot_mvgam_trend = function(
   object,
   series = 1,

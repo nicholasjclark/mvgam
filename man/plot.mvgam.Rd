@@ -18,41 +18,40 @@
 \arguments{
 \item{x}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
-\item{type}{\code{character} specifying which type of plot to return. Options are:
-series,
-residuals,
-smooths,
-re (random effect smooths),
-pterms (parametric effects),
-forecast,
-trend,
-uncertainty,
-factors}
+\item{type}{\code{character} specifying which type of plot to return.
+Options are: \code{"series"}, \code{"residuals"}, \code{"smooths"}, \code{"re"} (random effect smooths),
+\code{"pterms"} (parametric effects), \code{"forecast"}, \code{"trend"}, \code{"uncertainty"},
+\code{"factors"}}
 
-\item{series}{\code{integer} specifying which series in the set is to be plotted. This is ignored
-if \code{type == 're'}}
+\item{series}{\code{integer} specifying which series in the set is to be
+plotted. This is ignored if \code{type == 're'}}
 
-\item{residuals}{\code{logical}. If \code{TRUE} and \code{type = 'smooths'}, posterior quantiles of partial residuals are added
-to plots of 1-D smooths as a series of ribbon rectangles.
-Partial residuals for a smooth term are the median Dunn-Smyth residuals that would be obtained by dropping the term
-concerned from the model, while leaving all other estimates fixed (i.e. the
-estimates for the term plus the original median Dunn-Smyth residuals). Note that because \code{mvgam} works with
-Dunn-Smyth residuals and not working residuals, which are used by \code{mgcv}, the magnitudes of
-partial residuals will be different to what you would expect from \code{\link[mgcv]{plot.gam}}. Interpretation
+\item{residuals}{\code{logical}. If \code{TRUE} and \code{type = 'smooths'},
+posterior quantiles of partial residuals are added to plots of 1-D
+smooths as a series of ribbon rectangles. Partial residuals for a
+smooth term are the median Dunn-Smyth residuals that would be obtained
+by dropping the term concerned from the model, while leaving all other
+estimates fixed (i.e. the estimates for the term plus the original
+median Dunn-Smyth residuals). Note that because \code{mvgam} works with
+Dunn-Smyth residuals and not working residuals, which are used by
+\code{mgcv}, the magnitudes of partial residuals will be different to
+what you would expect from \code{\link[mgcv]{plot.gam}}. Interpretation
 is similar though, as these partial residuals should be evenly scattered
 around the smooth function if the function is well estimated}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
-in addition to any other variables included in the linear predictor of the original \code{formula}.
-This argument is optional when plotting out of sample forecast period observations
-(when \code{type = forecast}) and required when plotting
-uncertainty components (\code{type = uncertainty}).}
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data
+containing at least 'series' and 'time' in addition to any other
+variables included in the linear predictor of the original
+\code{formula}. This argument is optional when plotting out of sample
+forecast period observations (when \code{type = forecast}) and required
+when plotting uncertainty components (\code{type = uncertainty}).}
 
-\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
-\code{newdata} instead for more seamless integration into \code{R} workflows}
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but
+users are recommended to use \code{newdata} instead for more seamless
+integration into \code{R} workflows}
 
-\item{trend_effects}{logical. If \code{TRUE} and a \code{trend_formula} was used in model
-fitting, terms from the trend (i.e. process) model will be plotted}
+\item{trend_effects}{logical. If \code{TRUE} and a \code{trend_formula} was used in
+model fitting, terms from the trend (i.e. process) model will be plotted}
 
 \item{...}{Additional arguments for each individual plotting function.}
 }
@@ -60,26 +59,31 @@ fitting, terms from the trend (i.e. process) model will be plotted}
 A base R plot or set of plots
 }
 \description{
-This function takes a fitted \code{mvgam} object and produces plots of smooth functions, forecasts, trends and
-uncertainty components
+This function takes a fitted \code{mvgam} object and produces plots of
+smooth functions, forecasts, trends and uncertainty components
 }
 \details{
-These plots are useful for getting an overview of the fitted model and its estimated
-random effects or smooth functions,
-but the individual plotting functions and the functions from the \code{marginaleffects} and \code{gratia} packages
-offer far more more customisation.
+These plots are useful for getting an overview of the fitted
+model and its estimated random effects or smooth functions, but the
+individual plotting functions and the functions from the \code{marginaleffects}
+and \code{gratia} packages offer far more customisation.
 }
 \examples{
 \donttest{
 # Simulate some time series
-dat <- sim_mvgam(T = 80, n_series = 3)
+dat <- sim_mvgam(
+  T = 80,
+  n_series = 3
+)
 
 # Fit a basic model
-mod <- mvgam(y ~ s(season, bs = 'cc') + s(series, bs = 're'),
-            data = dat$data_train,
-            trend_model = RW(),
-            chains = 2,
-            silent = 2)
+mod <- mvgam(
+  y ~ s(season, bs = 'cc') + s(series, bs = 're'),
+  data = dat$data_train,
+  trend_model = RW(),
+  chains = 2,
+  silent = 2
+)
 
 # Plot predictions and residuals for each series
 plot(mod, type = 'forecast', series = 1)
@@ -95,32 +99,58 @@ plot(mod, type = 're')
 
 # More flexible plots with 'marginaleffects' utilities
 library(marginaleffects)
-plot_predictions(mod, condition = 'season', type = 'link')
-plot_predictions(mod,
-                condition = c('season', 'series', 'series'),
-                type = 'link')
-plot_predictions(mod, condition = 'series', type = 'link')
+
+plot_predictions(
+  mod,
+  condition = 'season',
+  type = 'link'
+)
+
+plot_predictions(
+  mod,
+  condition = c('season', 'series', 'series'),
+  type = 'link'
+)
+
+plot_predictions(
+  mod,
+  condition = 'series',
+  type = 'link'
+)
 
 # When using a State-Space model with predictors on the process
 # model, set trend_effects = TRUE to visualise process effects
-mod <- mvgam(y ~ -1,
-            trend_formula = ~ s(season, bs = 'cc'),
-            data = dat$data_train,
-            trend_model = RW(),
-            chains = 2,
-            silent = 2)
+mod <- mvgam(
+  y ~ -1,
+  trend_formula = ~ s(season, bs = 'cc'),
+  data = dat$data_train,
+  trend_model = RW(),
+  chains = 2,
+  silent = 2
+)
+
 plot(mod, type = 'smooths', trend_effects = TRUE)
 
-# But marginaleffects functions work without any modification
-plot_predictions(mod, condition = 'season', type = 'link')
+# But 'marginaleffects' functions work without any modification
+plot_predictions(
+  mod,
+  condition = 'season',
+  type = 'link'
+)
+}
 
 }
-}
 \seealso{
-\code{\link{plot_mvgam_resids}}, \code{\link{plot_mvgam_smooth}}, \code{\link{plot_mvgam_fc}},
-\code{\link{plot_mvgam_trend}}, \code{\link{plot_mvgam_uncertainty}}, \code{\link{plot_mvgam_factors}},
-\code{\link{plot_mvgam_randomeffects}}, \code{\link{conditional_effects.mvgam}},
-\code{\link[marginaleffects]{plot_predictions}}, \code{\link[marginaleffects]{plot_slopes}},
+\code{\link{plot_mvgam_resids}},
+\code{\link{plot_mvgam_smooth}},
+\code{\link{plot_mvgam_fc}},
+\code{\link{plot_mvgam_trend}},
+\code{\link{plot_mvgam_uncertainty}},
+\code{\link{plot_mvgam_factors}},
+\code{\link{plot_mvgam_randomeffects}},
+\code{\link{conditional_effects.mvgam}},
+\code{\link[marginaleffects]{plot_predictions}},
+\code{\link[marginaleffects]{plot_slopes}},
 \code{\link{gratia_mvgam_enhancements}}
 }
 \author{

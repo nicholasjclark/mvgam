@@ -81,32 +81,39 @@
 
 \item{optional}{Ignored}
 
-\item{variable}{A character specifying which parameters to extract. Can either be one of the
-following options:
+\item{variable}{A character specifying which parameters to extract. Can
+either be one of the following options:
 \itemize{
-\item \code{obs_params} (other parameters specific to the observation model, such as overdispsersions
-for negative binomial models or observation error SD for gaussian / student-t models)
-\item \code{betas} (beta coefficients from the GAM observation model linear predictor; default)
+\item \code{obs_params} (other parameters specific to the observation model,
+such as overdispersions for negative binomial models or observation error
+SD for gaussian / student-t models)
+\item \code{betas} (beta coefficients from the GAM observation model linear
+predictor; default)
 \item \code{smooth_params} (smoothing parameters from the GAM observation model)
-\item \code{linpreds} (estimated linear predictors on whatever link scale was used in the model)
-\item \code{trend_params} (parameters governing the trend dynamics, such as AR parameters,
-trend SD parameters or Gaussian Process parameters)
-\item \code{trend_betas} (beta coefficients from the GAM latent process model linear predictor;
-only available if a \code{trend_formula} was supplied in the original model)
-\item \code{trend_smooth_params} (process model GAM smoothing parameters;
-only available if a \code{trend_formula} was supplied in the original model)
-\item \code{trend_linpreds} (process model linear predictors on the identity scale;
-only available if a \code{trend_formula} was supplied in the original model)} OR can be a character vector
-providing the variables to extract}
+\item \code{linpreds} (estimated linear predictors on whatever link scale was
+used in the model)
+\item \code{trend_params} (parameters governing the trend dynamics, such as AR
+parameters, trend SD parameters or Gaussian Process parameters)
+\item \code{trend_betas} (beta coefficients from the GAM latent process model
+linear predictor; only available if a \code{trend_formula} was supplied in the
+original model)
+\item \code{trend_smooth_params} (process model GAM smoothing parameters; only
+available if a \code{trend_formula} was supplied in the original model)
+\item \code{trend_linpreds} (process model linear predictors on the identity
+scale; only available if a \code{trend_formula} was supplied in the original
+model)
+}
+OR can be a character vector providing the variables to extract.}
 
-\item{use_alias}{Logical. If more informative names for parameters are available
-(i.e. for beta coefficients \code{b} or for smoothing parameters \code{rho}), replace the uninformative
-names with the more informative alias. Defaults to \code{TRUE}}
+\item{use_alias}{Logical. If more informative names for parameters are
+available (i.e. for beta coefficients \code{b} or for smoothing parameters \code{rho}),
+replace the uninformative names with the more informative alias. Defaults to
+\code{TRUE}.}
 
-\item{regex}{Logical. If not using one of the prespecified options for extractions,
-should \code{variable} be treated as a (vector of)
-regular expressions? Any variable in x matching at least one of the regular expressions
-will be selected. Defaults to \code{FALSE}.}
+\item{regex}{Logical. If not using one of the prespecified options for
+extractions, should \code{variable} be treated as a (vector of) regular
+expressions? Any variable in \code{x} matching at least one of the regular
+expressions will be selected. Defaults to \code{FALSE}.}
 
 \item{...}{Ignored}
 
@@ -116,17 +123,22 @@ will be selected. Defaults to \code{FALSE}.}
 A \code{data.frame}, \code{matrix}, or \code{array} containing the posterior draws.
 }
 \description{
-Extract posterior draws in conventional formats as data.frames, matrices, or arrays.
+Extract posterior draws in conventional formats as data.frames, matrices,
+or arrays.
 }
 \examples{
 \donttest{
 sim <- sim_mvgam(family = Gamma())
-mod1 <- mvgam(y ~ s(season, bs = 'cc'),
-             trend_model = 'AR1',
-             data = sim$data_train,
-             family = Gamma(),
-             chains = 2,
-             silent = 2)
+
+mod1 <- mvgam(
+  y ~ s(season, bs = 'cc'),
+  trend_model = AR(),
+  data = sim$data_train,
+  family = Gamma(),
+  chains = 2,
+  silent = 2
+)
+
 beta_draws_df <- as.data.frame(mod1, variable = 'betas')
 head(beta_draws_df)
 str(beta_draws_df)
@@ -136,5 +148,9 @@ head(beta_draws_mat)
 str(beta_draws_mat)
 
 shape_pars <- as.matrix(mod1, variable = 'shape', regex = TRUE)
-head(shape_pars)}
+head(shape_pars)
+}
+}
+\author{
+Nicholas J Clark
 }

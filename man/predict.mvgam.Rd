@@ -17,37 +17,40 @@
 )
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}.
+See \code{\link[=mvgam]{mvgam()}}}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same variables
-that were included in the original \code{data} used to fit the model. If not supplied,
-predictions are generated for the original observations used for the model fit.}
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data
+containing the same variables that were included in the original \code{data}
+used to fit the model. If not supplied, predictions are generated for the
+original observations used for the model fit.}
 
-\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
-\code{newdata} instead for more seamless integration into \code{R} workflows}
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but
+users are recommended to use \code{newdata} instead for more seamless
+integration into \code{R} workflows}
 
-\item{type}{When this has the value \code{link} (default) the linear predictor is
-calculated on the link scale.
-If \code{expected} is used, predictions reflect the expectation of the response (the mean)
-but ignore uncertainty in the observation process. When \code{response} is used,
-the predictions take uncertainty in the observation process into account to return
-predictions on the outcome scale. When \code{variance} is used, the variance of the response
-with respect to the mean (mean-variance relationship) is returned.
-When \code{type = "terms"}, each component of the linear predictor is
-returned separately in the form of a \code{list} (possibly with standard
-errors, if \code{summary = TRUE}): this includes parametric model components,
-followed by each smooth component, but excludes any offset and any intercept.
-Two special cases are also allowed:
-type \code{latent_N} will return the estimated latent abundances from an
-N-mixture distribution, while type \code{detection} will return the estimated
-detection probability from an N-mixture distribution}
+\item{type}{When this has the value \code{link} (default) the linear
+predictor is calculated on the link scale. If \code{expected} is used,
+predictions reflect the expectation of the response (the mean) but ignore
+uncertainty in the observation process. When \code{response} is used, the
+predictions take uncertainty in the observation process into account to
+return predictions on the outcome scale. When \code{variance} is used, the
+variance of the response with respect to the mean (mean-variance
+relationship) is returned. When \code{type = "terms"}, each component of the
+linear predictor is returned separately in the form of a \code{list} (possibly
+with standard errors, if \code{summary = TRUE}): this includes parametric model
+components, followed by each smooth component, but excludes any offset and
+any intercept. Two special cases are also allowed: type \code{latent_N} will
+return the estimated latent abundances from an N-mixture distribution,
+while type \code{detection} will return the estimated detection probability from
+an N-mixture distribution}
 
-\item{process_error}{Logical. If \code{TRUE} and a dynamic trend model was fit,
-expected uncertainty in the process model is accounted for by using draws
-from a stationary, zero-centred multivariate Normal distribution using any
-estimated process variance-covariance parameters.
-If \code{FALSE}, uncertainty in the latent trend
-component is ignored when calculating predictions}
+\item{process_error}{Logical. If \code{TRUE} and a dynamic trend model was
+fit, expected uncertainty in the process model is accounted for by using
+draws from a stationary, zero-centred multivariate Normal distribution
+using any estimated process variance-covariance parameters. If
+\code{FALSE}, uncertainty in the latent trend component is ignored when
+calculating predictions}
 
 \item{summary}{Should summary statistics be returned
 instead of the raw values? Default is \code{TRUE}..}
@@ -65,44 +68,46 @@ function. Only used if \code{summary} is \code{TRUE}.}
 }
 \value{
 Predicted values on the appropriate scale.
-If \code{summary = FALSE} and \code{type != "terms"},
-the output is a matrix of dimension \verb{n_draw x n_observations}
-containing predicted values for each posterior draw in \code{object}.
 
-If \code{summary = TRUE} and \code{type != "terms"}, the output is an \code{n_observations} x \code{E}
-matrix. The number of summary statistics \code{E} is equal to \code{2 +
-  length(probs)}: The \code{Estimate} column contains point estimates (either
-mean or median depending on argument \code{robust}), while the
-\code{Est.Error} column contains uncertainty estimates (either standard
-deviation or median absolute deviation depending on argument
-\code{robust}). The remaining columns starting with \code{Q} contain
-quantile estimates as specified via argument \code{probs}.
+If \code{summary = FALSE} and \code{type != "terms"}, the output is a matrix of
+dimension \verb{n_draw x n_observations} containing predicted values for each
+posterior draw in \code{object}.
+
+If \code{summary = TRUE} and \code{type != "terms"}, the output is an
+\code{n_observations} x \code{E} matrix. The number of summary statistics
+\code{E} is equal to \code{2 + length(probs)}: The \code{Estimate} column
+contains point estimates (either mean or median depending on argument
+\code{robust}), while the \code{Est.Error} column contains uncertainty
+estimates (either standard deviation or median absolute deviation depending
+on argument \code{robust}). The remaining columns starting with \code{Q}
+contain quantile estimates as specified via argument \code{probs}.
 
 If \code{type = "terms"} and \code{summary = FALSE}, the output is a named \code{list}
 containing a separate slot for each effect, with the effects returned as
-matrices of dimension \verb{n_draw x 1}. If \code{summary = TRUE}, the output resembles that
-from \code{\link[mgcv]{predict.gam}} when using the call
-\code{predict.gam(object, type = "terms", se.fit = TRUE)}, where mean contributions
-from each effect are returned in \code{matrix} form while standard errors (representing
-the interval: \code{(max(probs) - min(probs)) / 2}) are returned in a separate \code{matrix}
+matrices of dimension \verb{n_draw x 1}. If \code{summary = TRUE}, the output
+resembles that from \code{\link[mgcv]{predict.gam}} when using the call
+\code{predict.gam(object, type = "terms", se.fit = TRUE)}, where mean
+contributions from each effect are returned in \code{matrix} form while standard
+errors (representing the interval: \code{(max(probs) - min(probs)) / 2}) are
+returned in a separate \code{matrix}
 }
 \description{
 Predict from a fitted \pkg{mvgam} model
 }
 \details{
 Note that if your model included a latent temporal trend (i.e. if
-you used something other than \code{"None"} for the \code{trend_model} argument), the predictions
-returned by this function will ignore autocorrelation
-coefficients or GP length scale coefficients by \emph{assuming the process is stationary}.
-This approach is similar to how predictions are computed from other types of
-regression models that can include correlated residuals,
-\emph{ultimately treating the temporal dynamics as random effect nuisance parameters}.
-The \code{predict} function is therefore more suited to scenario-based
-posterior simulation from the GAM components
-of a \code{mvgam} model, while the hindcast / forecast functions
-\code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=forecast.mvgam]{forecast.mvgam()}} are better suited to generate predictions
-that respect the temporal dynamics of estimated latent trends at the actual
-time points supplied in \code{data} and \code{newdata}.
+you used something other than \code{"None"} for the \code{trend_model} argument), the
+predictions returned by this function will ignore autocorrelation
+coefficients or GP length scale coefficients by \emph{assuming the process is
+stationary}. This approach is similar to how predictions are computed from
+other types of regression models that can include correlated residuals,
+\emph{ultimately treating the temporal dynamics as random effect nuisance
+parameters}. The \code{predict} function is therefore more suited to
+scenario-based posterior simulation from the GAM components of a
+\code{mvgam} model, while the hindcast / forecast functions
+\code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=forecast.mvgam]{forecast.mvgam()}} are better suited to generate
+predictions that respect the temporal dynamics of estimated latent trends
+at the actual time points supplied in \code{data} and \code{newdata}.
 }
 \examples{
 \donttest{
@@ -110,36 +115,37 @@ time points supplied in \code{data} and \code{newdata}.
 # and independent AR1 dynamic processes
 set.seed(123)
 simdat <- sim_mvgam(
-seasonality = 'hierarchical',
-prop_trend = 0.75,
-trend_model = AR(),
-family = gaussian()
+  seasonality = 'hierarchical',
+  prop_trend = 0.75,
+  trend_model = AR(),
+  family = gaussian()
 )
+
 set.seed(111)
 # Fit a model with shared seasonality
 # and AR(1) dynamics
 mod1 <- mvgam(
-y ~ s(season, bs = 'cc', k = 6),
-data = simdat$data_train,
-family = gaussian(),
-trend_model = AR(),
-noncentred = TRUE,
-chains = 2,
-silent = 2
+  y ~ s(season, bs = 'cc', k = 6),
+  data = simdat$data_train,
+  family = gaussian(),
+  trend_model = AR(),
+  noncentred = TRUE,
+  chains = 2,
+  silent = 2
 )
 
 # Generate predictions against observed data
 preds <- predict(
-mod1,
-summary = TRUE
+  mod1,
+  summary = TRUE
 )
 head(preds)
 
 # Generate predictions against test data
 preds <- predict(
-mod1,
-newdata = simdat$data_test,
-summary = TRUE
+  mod1,
+  newdata = simdat$data_test,
+  summary = TRUE
 )
 head(preds)
 
@@ -147,9 +153,9 @@ head(preds)
 # to more easily see how the latent AR(1) dynamics are
 # being ignored when using predict()
 plot_predictions(
-mod1,
-by = c('time', 'series', 'series'),
-points = 0.5
+  mod1,
+  by = c('time', 'series', 'series'),
+  points = 0.5
 )
 
 # Using the hindcast() function will give a more accurate
@@ -157,12 +163,16 @@ points = 0.5
 # accurate predictions to the in-sample training data
 hc <- hindcast(mod1)
 plot(hc) +
-plot(hc, series = 2) +
-plot(hc, series = 3)
+  plot(hc, series = 2) +
+  plot(hc, series = 3)
 }
+
 }
 \seealso{
-\code{\link[=hindcast.mvgam]{hindcast.mvgam()}}, \code{\link[=forecast.mvgam]{forecast.mvgam()}}, \code{\link[=fitted.mvgam]{fitted.mvgam()}}, \code{\link[=augment.mvgam]{augment.mvgam()}}
+\code{\link[=hindcast.mvgam]{hindcast.mvgam()}},
+\code{\link[=forecast.mvgam]{forecast.mvgam()}},
+\code{\link[=fitted.mvgam]{fitted.mvgam()}},
+\code{\link[=augment.mvgam]{augment.mvgam()}}
 }
 \author{
 Nicholas J Clark

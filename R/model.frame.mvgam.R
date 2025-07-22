@@ -1,15 +1,20 @@
-#'Extract model.frame from a fitted \pkg{mvgam} object
+#' Extract model.frame from a fitted \pkg{mvgam} object
 #'
+#' @inheritParams stats::model.frame
 #'
-#'@inheritParams stats::model.frame
-#'@param trend_effects \code{logical}, return the model.frame from the
-#'observation model (if \code{FALSE}) or from the underlying process
-#'model (if\code{TRUE})
-#'@param ... Ignored
-#'@method model.frame mvgam
-#'@author Nicholas J Clark
-#'@return A \code{matrix} containing the fitted model frame
-#'@export
+#' @param trend_effects \code{logical}, return the model.frame from the
+#'   observation model (if \code{FALSE}) or from the underlying process
+#'   model (if \code{TRUE})
+#'
+#' @param ... Ignored
+#'
+#' @method model.frame mvgam
+#'
+#' @author Nicholas J Clark
+#'
+#' @return A \code{matrix} containing the fitted model frame
+#'
+#' @export
 model.frame.mvgam = function(formula, trend_effects = FALSE, ...) {
   # Check trend_effects
   if (trend_effects) {

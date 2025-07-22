@@ -1,16 +1,26 @@
-#'Plot random effect terms from \pkg{mvgam} models
+#' Plot random effect terms from \pkg{mvgam} models
 #'
-#'This function plots posterior empirical quantiles for random effect smooths (bs = re)
+#' This function plots posterior empirical quantiles for random effect
+#' smooths (bs = re)
 #'
-#'@importFrom graphics layout title
-#'@inheritParams plot.mvgam
-#'@param object \code{list} object of class \code{mvgam}. See [mvgam()]
-#'@details Posterior empirical quantiles of random effect coefficient estimates
-#'(on the link scale) are calculated and visualised as ribbon plots.
-#'Labels for coefficients are taken from the levels of the original factor variable
-#'that was used to specify the smooth in the model's formula
-#'@return A base \code{R} graphics plot
-#'@export
+#' @importFrom graphics layout title
+#'
+#' @inheritParams plot.mvgam
+#'
+#' @param object \code{list} object of class \code{mvgam}. See [mvgam()]
+#'
+#' @details Posterior empirical quantiles of random effect coefficient
+#'   estimates (on the link scale) are calculated and visualised as ribbon
+#'   plots. Labels for coefficients are taken from the levels of the original
+#'   factor variable that was used to specify the smooth in the model's
+#'   formula
+#'
+#' @return A base \code{R} graphics plot
+#'
+#' @author Nicholas J Clark
+#'
+#' @export
+#'
 plot_mvgam_randomeffects = function(object, trend_effects = FALSE) {
   # General plotting colours and empirical quantile probabilities
   c_light <- c("#DCBCBC")

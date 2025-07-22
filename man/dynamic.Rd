@@ -9,49 +9,56 @@ dynamic(variable, k, rho = 5, stationary = TRUE, scale = TRUE)
 \arguments{
 \item{variable}{The variable that the dynamic smooth will be a function of}
 
-\item{k}{Optional number of basis functions for computing approximate GPs. If missing,
-\code{k} will be set as large as possible to accurately estimate the nonlinear function}
+\item{k}{Optional number of basis functions for computing approximate GPs.
+If missing, \code{k} will be set as large as possible to accurately estimate
+the nonlinear function.}
 
-\item{rho}{Either a positive numeric stating the length scale to be used for approximating the
-squared exponential Gaussian Process smooth (see \code{\link[mgcv]{gp.smooth}} for details)
-or missing, in which case the length scale will be estimated by setting up a Hilbert space approximate
-GP}
+\item{rho}{Either a positive numeric stating the length scale to be used for
+approximating the squared exponential Gaussian Process smooth (see
+\code{\link[mgcv]{gp.smooth}} for details) or missing, in which case the
+length scale will be estimated by setting up a Hilbert space approximate GP.}
 
-\item{stationary}{Logical. If \code{TRUE} (the default) and \code{rho} is supplied,
-the latent Gaussian Process smooth will not have a linear trend component. If \code{FALSE},
-a linear trend in the covariate is added to the Gaussian Process smooth. Leave at \code{TRUE}
-if you do not believe the coefficient is evolving with much trend, as the linear component of the
-basis functions can be hard to penalize to zero. This sometimes causes divergence issues in \code{Stan}.
-See \code{\link[mgcv]{gp.smooth}} for details. Ignored if \code{rho} is missing (in which case a
-Hilbert space approximate GP is used)}
+\item{stationary}{Logical. If \code{TRUE} (the default) and \code{rho} is
+supplied, the latent Gaussian Process smooth will not have a linear trend
+component. If \code{FALSE}, a linear trend in the covariate is added to
+the Gaussian Process smooth. Leave at \code{TRUE} if you do not believe
+the coefficient is evolving with much trend, as the linear component of
+the basis functions can be hard to penalize to zero. This sometimes causes
+divergence issues in \code{Stan}. See \code{\link[mgcv]{gp.smooth}} for
+details. Ignored if \code{rho} is missing (in which case a Hilbert space
+approximate GP is used).}
 
-\item{scale}{Logical; If \code{TRUE} (the default) and \code{rho} is missing, predictors
-are scaled so that the maximum Euclidean distance between two points is \code{1}. This
-often improves sampling speed and convergence. Scaling also affects the estimated
-length-scale parameters in that they resemble those of scaled predictors
-(not of the original predictors) if scale is \code{TRUE}.}
+\item{scale}{Logical; If \code{TRUE} (the default) and \code{rho} is missing,
+predictors are scaled so that the maximum Euclidean distance between two
+points is \code{1}. This often improves sampling speed and convergence. Scaling
+also affects the estimated length-scale parameters in that they resemble
+those of scaled predictors (not of the original predictors) if scale is
+\code{TRUE}.}
 }
 \value{
 a \code{list} object for internal usage in 'mvgam'
 }
 \description{
-Set up time-varying (dynamic) coefficients for use in \pkg{mvgam} models. Currently, only
-low-rank Gaussian Process smooths are available for estimating the dynamics of the
-time-varying coefficient.
+Set up time-varying (dynamic) coefficients for use in \pkg{mvgam} models.
+Currently, only low-rank Gaussian Process smooths are available for
+estimating the dynamics of the time-varying coefficient.
 }
 \details{
 \code{mvgam} currently sets up dynamic coefficients as low-rank
-squared exponential Gaussian Process smooths via
-the call \code{s(time, by = variable, bs = "gp", m = c(2, rho, 2))}. These smooths, if specified with
-reasonable values for the length scale parameter, will give more realistic out of sample forecasts
-than standard splines such as thin plate or cubic. But the user must set the
-value for \code{rho}, as there is currently no support for estimating this value in \code{mgcv}.
-This may not be too big of a problem, as estimating latent length scales is often difficult anyway. The
-\code{rho} parameter should be thought of as a prior on the smoothness of the latent dynamic coefficient
-function (where higher values of \code{rho} lead to smoother functions with more temporal covariance structure.
-Values of \code{k} are
-set automatically to ensure enough basis functions are used to approximate the expected
-wiggliness of the underlying dynamic function (\code{k} will increase as \code{rho} decreases)
+squared exponential Gaussian Process smooths via the call
+\code{s(time, by = variable, bs = "gp", m = c(2, rho, 2))}. These smooths,
+if specified with reasonable values for the length scale parameter, will
+give more realistic out of sample forecasts than standard splines such as
+thin plate or cubic. But the user must set the value for \code{rho}, as there
+is currently no support for estimating this value in \code{mgcv}. This may
+not be too big of a problem, as estimating latent length scales is often
+difficult anyway. The \code{rho} parameter should be thought of as a prior
+on the smoothness of the latent dynamic coefficient function (where higher
+values of \code{rho} lead to smoother functions with more temporal
+covariance structure). Values of \code{k} are set automatically to ensure
+enough basis functions are used to approximate the expected wiggliness of
+the underlying dynamic function (\code{k} will increase as \code{rho}
+decreases).
 }
 \examples{
 \donttest{
@@ -61,51 +68,48 @@ set.seed(1111)
 N <- 200
 
 # A function to simulate from a squared exponential Gaussian Process
-sim_gp = function(N, c, alpha, rho){
- Sigma <- alpha ^ 2 *
-          exp(-0.5 * ((outer(1:N, 1:N, "-") / rho) ^ 2)) +
-          diag(1e-9, N)
-c + mgcv::rmvn(1,
-               mu = rep(0, N),
-               V = Sigma)
+sim_gp <- function(N, c, alpha, rho) {
+  Sigma <- alpha ^ 2 *
+    exp(-0.5 * ((outer(1:N, 1:N, "-") / rho) ^ 2)) +
+    diag(1e-9, N)
+  c + mgcv::rmvn(1, mu = rep(0, N), V = Sigma)
 }
 
-beta <- sim_gp(alpha = 0.75,
-              rho = 10,
-              c = 0.5,
-              N = N)
-plot(beta, type = 'l', lwd = 3,
-    bty = 'l', xlab = 'Time',
-    ylab = 'Coefficient',
-    col = 'darkred')
+beta <- sim_gp(alpha = 0.75, rho = 10, c = 0.5, N = N)
+plot(
+  beta, type = 'l', lwd = 3, bty = 'l',
+  xlab = 'Time', ylab = 'Coefficient', col = 'darkred'
+)
 
 # Simulate the predictor as a standard normal
 predictor <- rnorm(N, sd = 1)
 
 # Simulate a Gaussian outcome variable
-out <- rnorm(N, mean = 4 + beta * predictor,
-            sd = 0.25)
+out <- rnorm(N, mean = 4 + beta * predictor, sd = 0.25)
 time <- seq_along(predictor)
-plot(out,  type = 'l', lwd = 3,
-    bty = 'l', xlab = 'Time', ylab = 'Outcome',
-    col = 'darkred')
+plot(
+  out, type = 'l', lwd = 3, bty = 'l',
+  xlab = 'Time', ylab = 'Outcome', col = 'darkred'
+)
 
 # Gather into a data.frame and fit a dynamic coefficient model
 data <- data.frame(out, predictor, time)
 
 # Split into training and testing
-data_train <- data[1:190,]
-data_test <- data[191:200,]
+data_train <- data[1:190, ]
+data_test <- data[191:200, ]
 
 # Fit a model using the dynamic function
-mod <- mvgam(out ~
-             # mis-specify the length scale slightly as this
-             # won't be known in practice
-             dynamic(predictor, rho = 8, stationary = TRUE),
-            family = gaussian(),
-            data = data_train,
-            chains = 2,
-            silent = 2)
+mod <- mvgam(
+  out ~
+    # mis-specify the length scale slightly as this
+    # won't be known in practice
+    dynamic(predictor, rho = 8, stationary = TRUE),
+  family = gaussian(),
+  data = data_train,
+  chains = 2,
+  silent = 2
+)
 
 # Inspect the summary
 summary(mod)
@@ -121,6 +125,7 @@ abline(v = 190, lty = 'dashed', lwd = 2)
 lines(beta, lwd = 2.5, col = 'white')
 lines(beta, lwd = 2)
 }
+
 }
 \author{
 Nicholas J Clark

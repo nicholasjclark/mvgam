@@ -7,7 +7,7 @@ generics::tidy
 generics::augment
 
 
-#' Tidy an mvgam object's parameter posteriors
+#' Tidy an `mvgam` object's parameter posteriors
 #'
 #' Get parameters' posterior statistics, implementing the generic `tidy` from
 #' the package \pkg{broom}.
@@ -15,41 +15,60 @@ generics::augment
 #' The parameters are categorized by the column "type". For instance, the
 #' intercept of the observation model (i.e. the "formula" arg to `mvgam()`) has
 #' the "type" "observation_beta". The possible "type"s are:
+#'
 #'   * observation_family_extra_param: any extra parameters for your observation
 #'     model, e.g. sigma for a gaussian observation model. These parameters are
-#'     not directly derived from the latent trend components (continuing the
-#'     gaussian example, contrast to mu).
-#'   * observation_beta: betas from your observation model, excluding any smooths.
-#'     If your formula was `y ~ x1 + s(x2, bs='cr')`, then your intercept and
-#'     `x1`'s beta would be categorized as this.
+#'     not directly derived from the latent trend components (contrast to mu).
+#'
+#'   * observation_beta: betas from your observation model, excluding any
+#'     smooths. If your formula was `y ~ x1 + s(x2, bs='cr')`, then your
+#'     intercept and `x1`'s beta would be categorized as this.
+#'
 #'   * random_effect_group_level: Group-level random effects parameters, i.e.
 #'     the mean and sd of the distribution from which the specific random
 #'     intercepts/slopes are considered to be drawn from.
+#'
 #'   * random_effect_beta: betas for the individual random intercepts/slopes.
+#'
 #'   * trend_model_param: parameters from your `trend_model`.
+#'
 #'   * trend_beta: analog of "observation_beta", but for any `trend_formula`.
-#'   * trend_random_effect_group_level: analog of "random_effect_group_level",
-#'     but for any `trend_formula`.
-#'   * trend_random_effect_beta: analog of "random_effect_beta",
-#'     but for any `trend_formula`.
+#'
+#'   * trend_random_effect_group_level: analog of
+#'     "random_effect_group_level", but for any `trend_formula`.
+#'
+#'   * trend_random_effect_beta: analog of "random_effect_beta", but for any
+#'     `trend_formula`.
 #'
 #' Additionally, GP terms can be incorporated in several ways, leading to
 #' different "type"s (or absence!):
+#'
 #'   * `s(bs = "gp")`: No parameters returned.
+#'
 #'   * `gp()` in `formula`: "type" of "observation_param".
+#'
 #'   * `gp()` in `trend_formula`: "type" of "trend_formula_param".
+#'
 #'   * `GP()` in `trend_model`: "type" of "trend_model_param".
 #'
-#'
 #' @param x An object of class `mvgam`.
+#'
 #' @param probs The desired probability levels of the parameters' posteriors.
 #'   Defaults to `c(0.025, 0.5, 0.975)`, i.e. 2.5%, 50%, and 97.5%.
+#'
 #' @param ... Unused, included for generic consistency only.
+#'
 #' @returns A `tibble` containing:
+#'
 #'   * "parameter": The parameter in question.
-#'   * "type": The component of the model that the parameter belongs to (see details).
+#'
+#'   * "type": The component of the model that the parameter belongs to (see
+#'     details).
+#'
 #'   * "mean": The posterior mean.
+#'
 #'   * "sd": The posterior standard deviation.
+#'
 #'   * percentile(s): Any percentiles of interest from these posteriors.
 #'
 #' @family tidiers
@@ -57,20 +76,25 @@ generics::augment
 #' @examples
 #' \dontrun{
 #' set.seed(0)
-#' simdat <- sim_mvgam(T = 100,
-#'                     n_series = 3,
-#'                     trend_model = AR(),
-#'                     prop_trend = 0.75,
-#'                     family = gaussian())
-#' simdat$data_train$x = rnorm(nrow(simdat$data_train))
-#' simdat$data_train$year_fac = factor(simdat$data_train$year)
+#' simdat <- sim_mvgam(
+#'   T = 100,
+#'   n_series = 3,
+#'   trend_model = AR(),
+#'   prop_trend = 0.75,
+#'   family = gaussian()
+#' )
 #'
-#' mod <- mvgam(y ~ - 1 + s(time, by = series, bs = 'cr', k = 20) + x,
-#'              trend_formula = ~ s(year_fac, bs = 're') - 1,
-#'              trend_model = AR(cor = TRUE),
-#'              family = gaussian(),
-#'              data = simdat$data_train,
-#'              silent = 2)
+#' simdat$data_train$x <- rnorm(nrow(simdat$data_train))
+#' simdat$data_train$year_fac <- factor(simdat$data_train$year)
+#'
+#' mod <- mvgam(
+#'   y ~ -1 + s(time, by = series, bs = 'cr', k = 20) + x,
+#'   trend_formula = ~ s(year_fac, bs = 're') - 1,
+#'   trend_model = AR(cor = TRUE),
+#'   family = gaussian(),
+#'   data = simdat$data_train,
+#'   silent = 2
+#' )
 #'
 #' tidy(mod, probs = c(0.2, 0.5, 0.8))
 #' }
@@ -353,10 +377,13 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
 #' to align with the `gr` and `subgr` sizes from `mvgam()`'s `trend_model` argument.
 #'
 #' @param object An object of class `mvgam`.
+#'
 #' @param params `tibble` The parameters that are going to be returned by
 #'   `tidy.mvgam()`. Assumed that the columns match what `tidy.mvgam()` will return.
 #'   Specifically, that there is a "parameter" column.
+#'
 #' @returns `tibble` The `params`, but with the Sigma parameters split up by `gr`.
+#'
 #' @noRd
 split_hier_Sigma <- function(object, params) {
   params_nonSigma <- dplyr::filter(params, !grepl("^Sigma", parameter))
@@ -385,55 +412,72 @@ split_hier_Sigma <- function(object, params) {
 }
 
 
-#' Augment an \pkg{mvgam} object's data
+#' Augment an `mvgam` object's data
 #'
 #' Add fits and residuals to the data, implementing the generic `augment` from
 #' the package \pkg{broom}.
 #'
-#' A `list` is returned if `class(x$obs_data) == 'list'`, otherwise a `tibble` is
-#' returned, but the contents of either object is the same.
+#' A `list` is returned if `class(x$obs_data) == 'list'`, otherwise a `tibble`
+#' is returned, but the contents of either object is the same.
 #'
-#' The arguments `robust` and `probs` are applied to both the fit and
-#' residuals calls (see [fitted.mvgam()] and [residuals.mvgam()] for details).
+#' The arguments `robust` and `probs` are applied to both the fit and residuals
+#' calls (see [fitted.mvgam()] and [residuals.mvgam()] for details).
+#'
+#' @importFrom stats residuals
 #'
 #' @param x An object of class `mvgam`.
+#'
 #' @param robust If `FALSE` (the default) the mean is used as the measure of
-#' central tendency and the standard deviation as the measure of variability.
-#' If `TRUE`, the median and the median absolute deviation (MAD)
-#' are applied instead.
+#'   central tendency and the standard deviation as the measure of variability.
+#'   If `TRUE`, the median and the median absolute deviation (MAD) are applied
+#'   instead.
+#'
 #' @param probs The percentiles to be computed by the quantile function.
+#'
 #' @param ... Unused, included for generic consistency only.
+#'
 #' @returns A `list` or `tibble` (see details) combining:
+#'
 #'   * The data supplied to `mvgam()`.
+#'
 #'   * The outcome variable, named as `.observed`.
+#'
 #'   * The fitted backcasts, along with their variability and credible bounds.
+#'
 #'   * The residuals, along with their variability and credible bounds.
 #'
-#' @seealso \code{\link{residuals.mvgam}}, \code{\link{fitted.mvgam}}
+#' @seealso
+#'   \code{\link{residuals.mvgam}},
+#'   \code{\link{fitted.mvgam}}
+#'
 #' @family tidiers
 #'
 #' @examples
 #' \donttest{
 #' set.seed(0)
-#' dat <- sim_mvgam(T = 80,
-#'                  n_series = 3,
-#'                  mu = 2,
-#'                  trend_model = AR(p = 1),
-#'                  prop_missing = 0.1,
-#'                  prop_trend = 0.6)
+#' dat <- sim_mvgam(
+#'   T = 80,
+#'   n_series = 3,
+#'   mu = 2,
+#'   trend_model = AR(p = 1),
+#'   prop_missing = 0.1,
+#'   prop_trend = 0.6
+#' )
 #'
-#' mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
-#'               data = dat$data_train,
-#'               trend_model = AR(),
-#'               family = poisson(),
-#'               noncentred = TRUE,
-#'               chains = 2,
-#'               silent = 2)
+#' mod1 <- mvgam(
+#'   formula = y ~ s(season, bs = 'cc', k = 6),
+#'   data = dat$data_train,
+#'   trend_model = AR(),
+#'   family = poisson(),
+#'   noncentred = TRUE,
+#'   chains = 2,
+#'   silent = 2
+#' )
 #'
 #' augment(mod1, robust = TRUE, probs = c(0.25, 0.75))
 #' }
 #'
-#' @importFrom stats residuals
+#'
 #' @export
 augment.mvgam <- function(x, robust = FALSE, probs = c(0.025, 0.975), ...) {
   obs_data <- x$obs_data

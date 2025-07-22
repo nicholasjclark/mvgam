@@ -1,13 +1,19 @@
-#'Summary for a fitted \pkg{mvgam} object
+#' Print a fitted \pkg{mvgam} object
 #'
-#'This function takes a fitted \code{mvgam} or \code{jsdgam} object and prints a quick summary
+#' This function takes a fitted \code{mvgam} or \code{jsdgam} object and prints
+#' a quick summary.
 #'
-#'@param x \code{list} object returned from \code{mvgam}
-#'@param ... Ignored
-#'@author Nicholas J Clark
-#'@details A brief summary of the model's call is printed
-#'@return A \code{list} is printed on-screen
-#'@export
+#' @param x \code{list} object returned from \code{mvgam}
+#'
+#' @param ... Ignored
+#'
+#' @details A brief summary of the model's call is printed
+#'
+#' @return A \code{list} is printed on-screen
+#'
+#' @author Nicholas J Clark
+#'
+#' @export
 print.mvgam = function(x, ...) {
   object <- x
 

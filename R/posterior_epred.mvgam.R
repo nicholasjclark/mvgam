@@ -1,56 +1,78 @@
 #' Draws from the expected value of the posterior predictive distribution for \pkg{mvgam} objects
 #'
 #' Compute posterior draws of the expected value of the posterior predictive
-#' distribution (i.e. the conditional expectation).
-#' Can be performed for the data used to fit the model (posterior
-#' predictive checks) or for new data. By definition, these predictions have
-#' smaller variance than the posterior predictions performed by the
-#' \code{\link{posterior_predict.mvgam}} method. This is because only the
-#' uncertainty in the expected value of the posterior predictive distribution is
-#' incorporated in the draws computed by \code{posterior_epred} while the
-#' residual error is ignored there. However, the estimated means of both methods
-#' averaged across draws should be very similar.
+#' distribution (i.e. the conditional expectation). Can be performed for the
+#' data used to fit the model (posterior predictive checks) or for new data.
+#' By definition, these predictions have smaller variance than the posterior
+#' predictions performed by the \code{\link{posterior_predict.mvgam}} method.
+#' This is because only the uncertainty in the expected value of the posterior
+#' predictive distribution is incorporated in the draws computed by
+#' \code{posterior_epred} while the residual error is ignored there. However,
+#' the estimated means of both methods averaged across draws should be very
+#' similar.
+#'
 #' @inheritParams predict.mvgam
-#' @param ndraws Positive `integer` indicating how many posterior draws should be used.
-#' If `NULL` (the default) all draws are used.
-#' @param process_error Logical. If \code{TRUE} and \code{newdata} is supplied,
-#' expected uncertainty in the process model is accounted for by using draws
-#' from any latent trend SD parameters. If \code{FALSE}, uncertainty in the latent
-#' trend component is ignored when calculating predictions. If no \code{newdata} is
-#' supplied, draws from the fitted model's posterior predictive distribution will be used
-#' (which will always include uncertainty in any latent trend components)
+#'
+#' @param ndraws Positive \code{integer} indicating how many posterior draws
+#'   should be used. If \code{NULL} (the default) all draws are used.
+#'
+#' @param process_error \code{logical}. If \code{TRUE} and \code{newdata} is
+#'   supplied, expected uncertainty in the process model is accounted for by
+#'   using draws from any latent trend SD parameters. If \code{FALSE},
+#'   uncertainty in the latent trend component is ignored when calculating
+#'   predictions. If no \code{newdata} is supplied, draws from the fitted
+#'   model's posterior predictive distribution will be used (which will always
+#'   include uncertainty in any latent trend components)
+#'
 #' @method posterior_epred mvgam
-#' @details Note that for all types of predictions for models that did not include
-#'a `trend_formula`, uncertainty in the dynamic trend
-#'component can be ignored by setting \code{process_error = FALSE}. However,
-#'if a `trend_formula` was supplied in the model, predictions for this component cannot be
-#'ignored. If \code{process_error = TRUE}, trend predictions will ignore autocorrelation
-#'coefficients or GP length scale coefficients, ultimately assuming the process is stationary.
-#'This method is similar to the types of posterior predictions returned from `brms` models
-#'when using autocorrelated error predictions for newdata.
-#'This function is therefore more suited to posterior simulation from the GAM components
-#'of a \code{mvgam} model, while the forecasting functions
-#'\code{\link{plot_mvgam_fc}} and \code{\link{forecast.mvgam}} are better suited to generate h-step ahead forecasts
-#'that respect the temporal dynamics of estimated latent trends.
-#' @return A \code{matrix} of dimension \code{n_samples x new_obs},
-#' where \code{n_samples} is the number of posterior samples from the fitted object
-#' and \code{n_obs} is the number of observations in \code{newdata}
-#' @seealso \code{\link{hindcast.mvgam}} \code{\link{posterior_linpred.mvgam}} \code{\link{posterior_predict.mvgam}}
+#'
+#' @details Note that for all types of predictions for models that did not
+#'   include a `trend_formula`, uncertainty in the dynamic trend component can
+#'   be ignored by setting \code{process_error = FALSE}. However, if a
+#'   `trend_formula` was supplied in the model, predictions for this component
+#'   cannot be ignored. If \code{process_error = TRUE}, trend predictions will
+#'   ignore autocorrelation coefficients or GP length scale coefficients,
+#'   ultimately assuming the process is stationary. This method is similar to
+#'   the types of posterior predictions returned from `brms` models when using
+#'   autocorrelated error predictions for newdata. This function is therefore
+#'   more suited to posterior simulation from the GAM components of a
+#'   \code{mvgam} model, while the forecasting functions
+#'   \code{\link{plot_mvgam_fc}} and \code{\link{forecast.mvgam}} are better
+#'   suited to generate h-step ahead forecasts that respect the temporal
+#'   dynamics of estimated latent trends.
+#'
+#' @return A \code{matrix} of dimension \code{n_samples x n_obs}, where
+#'   \code{n_samples} is the number of posterior samples from the fitted object
+#'   and \code{n_obs} is the number of observations in \code{newdata}
+#'
+#' @seealso \code{\link{hindcast.mvgam}},
+#'   \code{\link{posterior_linpred.mvgam}},
+#'   \code{\link{posterior_predict.mvgam}}
+#'
 #' @examples
 #' \donttest{
 #' # Simulate some data and fit a model
-#' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
-#' mod <- mvgam(y ~ s(season, bs = 'cc'),
-#'             trend_model = AR(),
-#'             noncentred = TRUE,
-#'             data = simdat$data_train,
-#'             chains = 2,
-#'             silent = 2)
+#' simdat <- sim_mvgam(
+#'   n_series = 1,
+#'   trend_model = AR()
+#' )
 #'
-#'# Compute posterior expectations
-#'expectations <- posterior_epred(mod)
-#'str(expectations)
-#'}
+#' mod <- mvgam(
+#'   y ~ s(season, bs = 'cc'),
+#'   trend_model = AR(),
+#'   noncentred = TRUE,
+#'   data = simdat$data_train,
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' # Compute posterior expectations
+#' expectations <- posterior_epred(mod)
+#' str(expectations)
+#' }
+#'
+#' @author Nicholas J Clark
+#'
 #' @export
 posterior_epred.mvgam = function(
   object,
@@ -88,45 +110,63 @@ posterior_epred.mvgam = function(
 #' Compute posterior draws of the linear predictor, that is draws before
 #' applying any link functions or other transformations. Can be performed for
 #' the data used to fit the model (posterior predictive checks) or for new data.
-#' @inheritParams posterior_epred.mvgam
-#' @param transform Logical; if \code{FALSE}
-#'  (the default), draws of the linear predictor are returned.
-#'  If \code{TRUE}, draws of the transformed linear predictor,
-#'  i.e. the conditional expectation, are returned.
 #'
-#' @seealso \code{\link{posterior_epred.mvgam}} \code{\link{posterior_predict.mvgam}}
+#' @inheritParams posterior_epred.mvgam
+#'
+#' @param transform \code{logical}; if \code{FALSE} (the default), draws of
+#'   the linear predictor are returned. If \code{TRUE}, draws of the
+#'   transformed linear predictor, i.e. the conditional expectation, are
+#'   returned.
+#'
 #' @method posterior_linpred mvgam
-#' @details Note that for all types of predictions for models that did not include
-#'a `trend_formula`, uncertainty in the dynamic trend
-#'component can be ignored by setting \code{process_error = FALSE}. However,
-#'if a `trend_formula` was supplied in the model, predictions for this component cannot be
-#'ignored. If \code{process_error = TRUE}, trend predictions will ignore autocorrelation
-#'coefficients or GP length scale coefficients, ultimately assuming the process is stationary.
-#'This method is similar to the types of posterior predictions returned from `brms` models
-#'when using autocorrelated error predictions for newdata.
-#'This function is therefore more suited to posterior simulation from the GAM components
-#'of a \code{mvgam} model, while the forecasting functions
-#'\code{\link{plot_mvgam_fc}} and \code{\link{forecast.mvgam}} are better suited to generate h-step ahead forecasts
-#'that respect the temporal dynamics of estimated latent trends.
-#' @return A \code{matrix} of dimension \code{n_samples x new_obs},
-#' where \code{n_samples} is the number of posterior samples from the fitted object
-#' and \code{n_obs} is the number of observations in \code{newdata}
-#' @seealso \code{\link{hindcast.mvgam}} \code{\link{posterior_epred.mvgam}} \code{\link{posterior_predict.mvgam}}
+#'
+#' @details Note that for all types of predictions for models that did not
+#'   include a `trend_formula`, uncertainty in the dynamic trend component can
+#'   be ignored by setting \code{process_error = FALSE}. However, if a
+#'   `trend_formula` was supplied in the model, predictions for this component
+#'   cannot be ignored. If \code{process_error = TRUE}, trend predictions will
+#'   ignore autocorrelation coefficients or GP length scale coefficients,
+#'   ultimately assuming the process is stationary. This method is similar to
+#'   the types of posterior predictions returned from `brms` models when using
+#'   autocorrelated error predictions for newdata. This function is therefore
+#'   more suited to posterior simulation from the GAM components of a
+#'   \code{mvgam} model, while the forecasting functions
+#'   \code{\link{plot_mvgam_fc}} and \code{\link{forecast.mvgam}} are better
+#'   suited to generate h-step ahead forecasts that respect the temporal
+#'   dynamics of estimated latent trends.
+#'
+#' @return A \code{matrix} of dimension \code{n_samples x n_obs}, where
+#'   \code{n_samples} is the number of posterior samples from the fitted object
+#'   and \code{n_obs} is the number of observations in \code{newdata}
+#'
+#' @seealso \code{\link{hindcast.mvgam}},
+#'   \code{\link{posterior_epred.mvgam}},
+#'   \code{\link{posterior_predict.mvgam}}
+#'
 #' @examples
 #' \donttest{
 #' # Simulate some data and fit a model
-#' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
-#' mod <- mvgam(y ~ s(season, bs = 'cc'),
-#'              trend_model = AR(),
-#'              noncentred = TRUE,
-#'              data = simdat$data_train,
-#'              chains = 2,
-#'              silent = 2)
+#' simdat <- sim_mvgam(
+#'   n_series = 1,
+#'   trend_model = AR()
+#' )
 #'
-#'# Extract linear predictor values
-#'linpreds <- posterior_linpred(mod)
-#'str(linpreds)
-#'}
+#' mod <- mvgam(
+#'   y ~ s(season, bs = 'cc'),
+#'   trend_model = AR(),
+#'   noncentred = TRUE,
+#'   data = simdat$data_train,
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' # Extract linear predictor values
+#' linpreds <- posterior_linpred(mod)
+#' str(linpreds)
+#' }
+#'
+#' @author Nicholas J Clark
+#'
 #' @export
 posterior_linpred.mvgam = function(
   object,
@@ -165,51 +205,71 @@ posterior_linpred.mvgam = function(
 #' Draws from the posterior predictive distribution for \pkg{mvgam} objects
 #'
 #' Compute posterior draws of the posterior predictive distribution. Can be
-#' performed for the data used to fit the model (posterior predictive checks) or
-#' for new data. By definition, these draws have higher variance than draws
+#' performed for the data used to fit the model (posterior predictive checks)
+#' or for new data. By definition, these draws have higher variance than draws
 #' of the expected value of the posterior predictive distribution computed by
-#' \code{\link{posterior_epred.mvgam}}. This is because the residual error
-#' is incorporated in \code{posterior_predict}. However, the estimated means of
+#' \code{\link{posterior_epred.mvgam}}. This is because the residual error is
+#' incorporated in \code{posterior_predict}. However, the estimated means of
 #' both methods averaged across draws should be very similar.
+#'
 #' @inheritParams predict.mvgam
+#'
 #' @inheritParams posterior_epred.mvgam
+#'
 #' @param process_error Logical. If \code{TRUE} and \code{newdata} is supplied,
-#' expected uncertainty in the process model is accounted for by using draws
-#' from any latent trend SD parameters. If \code{FALSE}, uncertainty in the latent
-#' trend component is ignored when calculating predictions. If no \code{newdata} is
-#' supplied, draws from the fitted model's posterior predictive distribution will be used
-#' (which will always include uncertainty in any latent trend components)
+#'   expected uncertainty in the process model is accounted for by using draws
+#'   from any latent trend SD parameters. If \code{FALSE}, uncertainty in the
+#'   latent trend component is ignored when calculating predictions. If no
+#'   \code{newdata} is supplied, draws from the fitted model's posterior
+#'   predictive distribution will be used (which will always include uncertainty
+#'   in any latent trend components)
+#'
 #' @method posterior_predict mvgam
-#' @details Note that for all types of predictions for models that did not include
-#'a `trend_formula`, uncertainty in the dynamic trend
-#'component can be ignored by setting \code{process_error = FALSE}. However,
-#'if a `trend_formula` was supplied in the model, predictions for this component cannot be
-#'ignored. If \code{process_error = TRUE}, trend predictions will ignore autocorrelation
-#'coefficients or GP length scale coefficients, ultimately assuming the process is stationary.
-#'This method is similar to the types of posterior predictions returned from `brms` models
-#'when using autocorrelated error predictions for newdata.
-#'This function is therefore more suited to posterior simulation from the GAM components
-#'of a \code{mvgam} model, while the forecasting functions
-#'\code{\link{plot_mvgam_fc}} and \code{\link{forecast.mvgam}} are better suited to generate h-step ahead forecasts
-#'that respect the temporal dynamics of estimated latent trends.
-#' @return A \code{matrix} of dimension \code{n_samples x new_obs},
-#' where \code{n_samples} is the number of posterior samples from the fitted object
-#' and \code{n_obs} is the number of observations in \code{newdata}
-#' @seealso \code{\link{hindcast.mvgam}} \code{\link{posterior_linpred.mvgam}} \code{\link{posterior_epred.mvgam}}
+#'
+#' @details Note that for all types of predictions for models that did not
+#'   include a `trend_formula`, uncertainty in the dynamic trend component can
+#'   be ignored by setting \code{process_error = FALSE}. However, if a
+#'   `trend_formula` was supplied in the model, predictions for this component
+#'   cannot be ignored. If \code{process_error = TRUE}, trend predictions will
+#'   ignore autocorrelation coefficients or GP length scale coefficients,
+#'   ultimately assuming the process is stationary. This method is similar to
+#'   the types of posterior predictions returned from `brms` models when using
+#'   autocorrelated error predictions for newdata. This function is therefore
+#'   more suited to posterior simulation from the GAM components of a
+#'   \code{mvgam} model, while the forecasting functions
+#'   \code{\link{plot_mvgam_fc}} and \code{\link{forecast.mvgam}} are better
+#'   suited to generate h-step ahead forecasts that respect the temporal
+#'   dynamics of estimated latent trends.
+#'
+#' @return A \code{matrix} of dimension \code{n_samples x new_obs}, where
+#'   \code{n_samples} is the number of posterior samples from the fitted object
+#'   and \code{n_obs} is the number of observations in \code{newdata}
+#'
+#' @seealso
+#'   \code{\link{hindcast.mvgam}},
+#'   \code{\link{posterior_linpred.mvgam}},
+#'   \code{\link{posterior_epred.mvgam}}
+#'
 #' @examples
 #' \donttest{
 #' # Simulate some data and fit a model
 #' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
-#' mod <- mvgam(y ~ s(season, bs = 'cc'),
-#'             trend_model = AR(),
-#'             data = simdat$data_train,
-#'             chains = 2,
-#'             silent = 2)
 #'
-#'# Compute posterior predictions
-#'predictions <- posterior_predict(mod)
-#'str(predictions)
-#'}
+#' mod <- mvgam(
+#'   y ~ s(season, bs = 'cc'),
+#'   trend_model = AR(),
+#'   data = simdat$data_train,
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' # Compute posterior predictions
+#' predictions <- posterior_predict(mod)
+#' str(predictions)
+#' }
+#'
+#' @author Nicholas J Clark
+#'
 #' @export
 posterior_predict.mvgam = function(
   object,
@@ -253,22 +313,28 @@ rstantools::posterior_linpred
 
 #' Expected values of the posterior predictive distribution for \pkg{mvgam} objects
 #'
-#' This method extracts posterior estimates of the fitted values
-#' (i.e. the actual predictions, included estimates for any trend states,
-#' that were obtained when fitting the model). It also includes an option
-#' for obtaining summaries of the computed draws.
+#' This method extracts posterior estimates of the fitted values (i.e. the
+#' actual predictions, including estimates for any trend states, that were
+#' obtained when fitting the model). It also includes an option for obtaining
+#' summaries of the computed draws.
 #'
 #' @inheritParams brms::fitted.brmsfit
+#'
 #' @inheritParams predict.mvgam
+#'
 #' @param object An object of class `mvgam`
-#' @details This method gives the actual fitted values from the model (i.e. what you
-#' will see if you generate hindcasts from the fitted model using \code{\link{hindcast.mvgam}}
-#' with `type = 'expected'`). These
-#' predictions can be overly precise if a flexible dynamic trend component was included
-#' in the model. This is in contrast to the set of predict functions (i.e.
-#' \code{\link{posterior_epred.mvgam}} or \code{\link{predict.mvgam}}), which will assume
-#' any dynamic trend component has reached stationarity when returning hypothetical predictions
+#'
+#' @details This method gives the actual fitted values from the model (i.e. what
+#'   you will see if you generate hindcasts from the fitted model using
+#'   \code{\link{hindcast.mvgam}} with `type = 'expected'`). These predictions
+#'   can be overly precise if a flexible dynamic trend component was included in
+#'   the model. This is in contrast to the set of predict functions (i.e.
+#'   \code{\link{posterior_epred.mvgam}} or \code{\link{predict.mvgam}}), which
+#'   will assume any dynamic trend component has reached stationarity when
+#'   returning hypothetical predictions.
+#'
 #' @return An \code{array} of predicted \emph{mean} response values.
+#'
 #'   If \code{summary = FALSE} the output resembles those of
 #'   \code{\link{posterior_epred.mvgam}} and \code{\link{predict.mvgam}}.
 #'
@@ -280,21 +346,30 @@ rstantools::posterior_linpred
 #'   deviation or median absolute deviation depending on argument
 #'   \code{robust}). The remaining columns starting with \code{Q} contain
 #'   quantile estimates as specified via argument \code{probs}.
-#' @seealso \code{\link{hindcast.mvgam}}
+#'
+#' @seealso
+#'   \code{\link{hindcast.mvgam}}
+#'
 #' @examples
 #' \donttest{
 #' # Simulate some data and fit a model
 #' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
-#' mod <- mvgam(y ~ s(season, bs = 'cc'),
-#'             trend_model = AR(),
-#'             data = simdat$data_train,
-#'             chains = 2,
-#'             silent = 2)
 #'
-#'# Extract fitted values (posterior expectations)
-#'expectations <- fitted(mod)
-#'str(expectations)
-#'}
+#' mod <- mvgam(
+#'   y ~ s(season, bs = 'cc'),
+#'   trend_model = AR(),
+#'   data = simdat$data_train,
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' # Extract fitted values (posterior expectations)
+#' expectations <- fitted(mod)
+#' str(expectations)
+#' }
+#'
+#' @author Nicholas J Clark
+#'
 #' @export
 fitted.mvgam <- function(
   object,

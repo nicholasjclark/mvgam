@@ -1,17 +1,27 @@
-#'Plot parametric term partial effects for \pkg{mvgam} models
+#' Plot parametric term partial effects for \pkg{mvgam} models
 #'
-#'This function plots posterior empirical quantiles for partial effects of parametric terms
+#' This function plots posterior empirical quantiles for partial effects of
+#' parametric terms
 #'
-#'@importFrom graphics layout title rug bxp
-#'@importFrom stats coef predict
-#'@inheritParams plot.mvgam
-#'@param object \code{list} object of class \code{mvgam}. See [mvgam()]
-#'@details Posterior empirical quantiles of each parametric term's partial effect estimates
-#'(on the link scale) are calculated and visualised as ribbon plots. These effects can
-#'be interpreted as the partial effect that a parametric term contributes when all other
-#'terms in the model have been set to \code{0}
-#'@return A base \code{R} graphics plot
-#'@export
+#' @importFrom graphics layout title rug bxp
+#'
+#' @importFrom stats coef predict
+#'
+#' @inheritParams plot.mvgam
+#'
+#' @param object \code{list} object of class \code{mvgam}. See [mvgam()]
+#'
+#' @details Posterior empirical quantiles of each parametric term's partial
+#'   effect estimates (on the link scale) are calculated and visualised as
+#'   ribbon plots. These effects can be interpreted as the partial effect that
+#'   a parametric term contributes when all other terms in the model have been
+#'   set to \code{0}
+#'
+#' @return A base \code{R} graphics plot
+#'
+#' @author Nicholas J Clark
+#'
+#' @export
 plot_mvgam_pterms = function(object, trend_effects = FALSE) {
   # General plotting colours and empirical quantile probabilities
   c_light <- c("#DCBCBC")

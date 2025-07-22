@@ -2,7 +2,7 @@
 % Please edit documentation in R/tidier_methods.R
 \name{augment.mvgam}
 \alias{augment.mvgam}
-\title{Augment an \pkg{mvgam} object's data}
+\title{Augment an \code{mvgam} object's data}
 \usage{
 \method{augment}{mvgam}(x, robust = FALSE, probs = c(0.025, 0.975), ...)
 }
@@ -11,8 +11,8 @@
 
 \item{robust}{If \code{FALSE} (the default) the mean is used as the measure of
 central tendency and the standard deviation as the measure of variability.
-If \code{TRUE}, the median and the median absolute deviation (MAD)
-are applied instead.}
+If \code{TRUE}, the median and the median absolute deviation (MAD) are applied
+instead.}
 
 \item{probs}{The percentiles to be computed by the quantile function.}
 
@@ -32,36 +32,42 @@ Add fits and residuals to the data, implementing the generic \code{augment} from
 the package \pkg{broom}.
 }
 \details{
-A \code{list} is returned if \code{class(x$obs_data) == 'list'}, otherwise a \code{tibble} is
-returned, but the contents of either object is the same.
+A \code{list} is returned if \code{class(x$obs_data) == 'list'}, otherwise a \code{tibble}
+is returned, but the contents of either object is the same.
 
-The arguments \code{robust} and \code{probs} are applied to both the fit and
-residuals calls (see \code{\link[=fitted.mvgam]{fitted.mvgam()}} and \code{\link[=residuals.mvgam]{residuals.mvgam()}} for details).
+The arguments \code{robust} and \code{probs} are applied to both the fit and residuals
+calls (see \code{\link[=fitted.mvgam]{fitted.mvgam()}} and \code{\link[=residuals.mvgam]{residuals.mvgam()}} for details).
 }
 \examples{
 \donttest{
 set.seed(0)
-dat <- sim_mvgam(T = 80,
-                 n_series = 3,
-                 mu = 2,
-                 trend_model = AR(p = 1),
-                 prop_missing = 0.1,
-                 prop_trend = 0.6)
+dat <- sim_mvgam(
+  T = 80,
+  n_series = 3,
+  mu = 2,
+  trend_model = AR(p = 1),
+  prop_missing = 0.1,
+  prop_trend = 0.6
+)
 
-mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
-              data = dat$data_train,
-              trend_model = AR(),
-              family = poisson(),
-              noncentred = TRUE,
-              chains = 2,
-              silent = 2)
+mod1 <- mvgam(
+  formula = y ~ s(season, bs = 'cc', k = 6),
+  data = dat$data_train,
+  trend_model = AR(),
+  family = poisson(),
+  noncentred = TRUE,
+  chains = 2,
+  silent = 2
+)
 
 augment(mod1, robust = TRUE, probs = c(0.25, 0.75))
 }
 
+
 }
 \seealso{
-\code{\link{residuals.mvgam}}, \code{\link{fitted.mvgam}}
+\code{\link{residuals.mvgam}},
+\code{\link{fitted.mvgam}}
 
 Other tidiers: 
 \code{\link{tidy.mvgam}()}

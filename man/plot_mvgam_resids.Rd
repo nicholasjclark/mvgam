@@ -9,41 +9,54 @@ plot_mvgam_resids(object, series = 1, n_draws = 100L, n_points = 1000L)
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
-\item{series}{\code{integer} specifying which series in the set is to be plotted}
+\item{series}{\code{integer} specifying which series in the set is to be
+plotted}
 
-\item{n_draws}{\code{integer} specifying the number of posterior residual draws
-to use for calculating uncertainty in the "ACF" and "pACF" frames. Default is \code{100}}
+\item{n_draws}{\code{integer} specifying the number of posterior residual
+draws to use for calculating uncertainty in the \code{"ACF"} and \code{"pACF"} frames.
+Default is \code{100}}
 
-\item{n_points}{\code{integer} specifying the maximum number of points to show in the
-"Resids vs Fitted" and "Normal Q-Q Plot" frames. Default is \code{1000}}
+\item{n_points}{\code{integer} specifying the maximum number of points to
+show in the "Resids vs Fitted" and "Normal Q-Q Plot" frames. Default is
+\code{1000}}
 }
 \value{
-A series of facetted ggplot object
+A facetted \code{ggplot} object
 }
 \description{
-This function takes a fitted \code{mvgam} object and returns various residual diagnostic plots
+This function takes a fitted \code{mvgam} object and returns various
+residual diagnostic plots
 }
 \details{
 A total of four ggplot plots are generated to examine posterior
-Dunn-Smyth residuals for the specified series. Plots include a residuals vs fitted values plot,
-a Q-Q plot, and two plots to check for any remaining temporal autocorrelation in the residuals.
-Note, all plots only report statistics from a sample of up to 100 posterior
-draws (to save computational time), so uncertainty in these relationships may not be adequately represented.
+Dunn-Smyth residuals for the specified series. Plots include a residuals
+vs fitted values plot, a Q-Q plot, and two plots to check for any
+remaining temporal autocorrelation in the residuals. Note, all plots only
+report statistics from a sample of up to \code{100} posterior draws (to save
+computational time), so uncertainty in these relationships may not be
+adequately represented.
 }
 \examples{
 \donttest{
-simdat <- sim_mvgam(n_series = 3, trend_model = AR())
-mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-            trend_model = AR(),
-            noncentred = TRUE,
-            data = simdat$data_train,
-            chains = 2,
-            silent = 2)
+simdat <- sim_mvgam(
+  n_series = 3,
+  trend_model = AR()
+)
+
+mod <- mvgam(
+  y ~ s(season, bs = 'cc', k = 6),
+  trend_model = AR(),
+  noncentred = TRUE,
+  data = simdat$data_train,
+  chains = 2,
+  silent = 2
+)
 
 # Plot Dunn Smyth residuals for some series
 plot_mvgam_resids(mod)
 plot_mvgam_resids(mod, series = 2)
 }
+
 }
 \author{
 Nicholas J Clark

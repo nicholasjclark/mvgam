@@ -1,23 +1,30 @@
 #' Helper functions for \pkg{marginaleffects} calculations in \pkg{mvgam} models
+#'
 #' @importFrom stats coef model.frame
 #' @importFrom insight find_predictors get_data
 #' @importFrom marginaleffects get_coef set_coef get_vcov get_predict
 #' @importFrom utils getFromNamespace
+#'
 #' @inheritParams marginaleffects::get_coef
 #' @inheritParams marginaleffects::set_coef
 #' @inheritParams marginaleffects::get_vcov
 #' @inheritParams marginaleffects::get_predict
 #' @inheritParams insight::get_data
 #' @inheritParams insight::find_predictors
+#'
 #' @param trend_effects `logical`, extract from the process model component
 #' (only applicable if a `trend_formula` was specified in the model)
+#'
 #' @param process_error `logical`. If `TRUE`, uncertainty in the latent
 #' process (or trend) model is incorporated in predictions
+#'
 #' @return Objects suitable for internal 'marginaleffects' functions to proceed.
 #' See [marginaleffects::get_coef()], [marginaleffects::set_coef()],
 #' [marginaleffects::get_vcov()], [marginaleffects::get_predict()],
 #' [insight::get_data()] and [insight::find_predictors()] for details
+#'
 #' @name mvgam_marginaleffects
+#'
 #' @author Nicholas J Clark
 NULL
 

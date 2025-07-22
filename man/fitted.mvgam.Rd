@@ -17,12 +17,12 @@
 \arguments{
 \item{object}{An object of class \code{mvgam}}
 
-\item{process_error}{Logical. If \code{TRUE} and a dynamic trend model was fit,
-expected uncertainty in the process model is accounted for by using draws
-from a stationary, zero-centred multivariate Normal distribution using any
-estimated process variance-covariance parameters.
-If \code{FALSE}, uncertainty in the latent trend
-component is ignored when calculating predictions}
+\item{process_error}{Logical. If \code{TRUE} and a dynamic trend model was
+fit, expected uncertainty in the process model is accounted for by using
+draws from a stationary, zero-centred multivariate Normal distribution
+using any estimated process variance-covariance parameters. If
+\code{FALSE}, uncertainty in the latent trend component is ignored when
+calculating predictions}
 
 \item{scale}{Either \code{"response"} or \code{"linear"}.
 If \code{"response"}, results are returned on the scale
@@ -48,6 +48,7 @@ that control several aspects of data validation and prediction.}
 }
 \value{
 An \code{array} of predicted \emph{mean} response values.
+
 If \code{summary = FALSE} the output resembles those of
 \code{\link{posterior_epred.mvgam}} and \code{\link{predict.mvgam}}.
 
@@ -61,35 +62,43 @@ deviation or median absolute deviation depending on argument
 quantile estimates as specified via argument \code{probs}.
 }
 \description{
-This method extracts posterior estimates of the fitted values
-(i.e. the actual predictions, included estimates for any trend states,
-that were obtained when fitting the model). It also includes an option
-for obtaining summaries of the computed draws.
+This method extracts posterior estimates of the fitted values (i.e. the
+actual predictions, including estimates for any trend states, that were
+obtained when fitting the model). It also includes an option for obtaining
+summaries of the computed draws.
 }
 \details{
-This method gives the actual fitted values from the model (i.e. what you
-will see if you generate hindcasts from the fitted model using \code{\link{hindcast.mvgam}}
-with \code{type = 'expected'}). These
-predictions can be overly precise if a flexible dynamic trend component was included
-in the model. This is in contrast to the set of predict functions (i.e.
-\code{\link{posterior_epred.mvgam}} or \code{\link{predict.mvgam}}), which will assume
-any dynamic trend component has reached stationarity when returning hypothetical predictions
+This method gives the actual fitted values from the model (i.e. what
+you will see if you generate hindcasts from the fitted model using
+\code{\link{hindcast.mvgam}} with \code{type = 'expected'}). These predictions
+can be overly precise if a flexible dynamic trend component was included in
+the model. This is in contrast to the set of predict functions (i.e.
+\code{\link{posterior_epred.mvgam}} or \code{\link{predict.mvgam}}), which
+will assume any dynamic trend component has reached stationarity when
+returning hypothetical predictions.
 }
 \examples{
 \donttest{
 # Simulate some data and fit a model
 simdat <- sim_mvgam(n_series = 1, trend_model = AR())
-mod <- mvgam(y ~ s(season, bs = 'cc'),
-            trend_model = AR(),
-            data = simdat$data_train,
-            chains = 2,
-            silent = 2)
+
+mod <- mvgam(
+  y ~ s(season, bs = 'cc'),
+  trend_model = AR(),
+  data = simdat$data_train,
+  chains = 2,
+  silent = 2
+)
 
 # Extract fitted values (posterior expectations)
 expectations <- fitted(mod)
 str(expectations)
 }
+
 }
 \seealso{
 \code{\link{hindcast.mvgam}}
+}
+\author{
+Nicholas J Clark
 }

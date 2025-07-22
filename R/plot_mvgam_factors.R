@@ -1,34 +1,45 @@
-#'Latent factor summaries for a fitted \pkg{mvgam} object
+#' Latent factor summaries for a fitted \pkg{mvgam} object
 #'
-#'This function takes a fitted \code{mvgam} object and returns plots and summary statistics for
-#'the latent dynamic factors
+#' This function takes a fitted \code{mvgam} object and returns plots and
+#' summary statistics for the latent dynamic factors
 #'
-#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
-#'@param plot \code{logical} specifying whether factors should be plotted
-#'@author Nicholas J Clark
-#'@details If the model in \code{object} was estimated using dynamic factors, it is possible that not all factors
-#'contributed to the estimated trends. This is due to the regularisation penalty that acts independently on each
-#'factor's Gaussian precision, which will squeeze un-needed factors to a white noise process (effectively dropping
-#'that factor from the model). In this function, each factor is tested against a null hypothesis of white noise by
-#'calculating the sum of the factor's 2nd derivatives. A factor that has a larger contribution will have a larger
-#'sum due to the weaker penalty on the factor's precision. If
-#'\code{plot == TRUE}, the factors are also plotted.
-#'@return A \code{data.frame} of factor contributions and,
-#'optionally, a `ggplot` object
-#'@examples
-#'\donttest{
-#'simdat <- sim_mvgam()
-#'mod <- mvgam(y ~ s(season, bs = 'cc',
-#'                   k = 6),
-#'             trend_model = AR(),
-#'             use_lv = TRUE,
-#'             n_lv = 2,
-#'             data = simdat$data_train,
-#'             chains = 2,
-#'             silent = 2)
-#'plot_mvgam_factors(mod)
-#'}
-#'@export
+#' @param object \code{list} object returned from \code{mvgam}. See [mvgam()]
+#'
+#' @param plot \code{logical} specifying whether factors should be plotted
+#'
+#' @author Nicholas J Clark
+#'
+#' @details If the model in \code{object} was estimated using dynamic factors,
+#'   it is possible that not all factors contributed to the estimated trends.
+#'   This is due to the regularisation penalty that acts independently on each
+#'   factor's Gaussian precision, which will squeeze un-needed factors to a
+#'   white noise process (effectively dropping that factor from the model). In
+#'   this function, each factor is tested against a null hypothesis of white
+#'   noise by calculating the sum of the factor's 2nd derivatives. A factor
+#'   that has a larger contribution will have a larger sum due to the weaker
+#'   penalty on the factor's precision. If \code{plot == TRUE}, the factors
+#'   are also plotted.
+#'
+#' @return A \code{data.frame} of factor contributions
+#'
+#' @examples
+#' \donttest{
+#' simdat <- sim_mvgam()
+#'
+#' mod <- mvgam(
+#'   y ~ s(season, bs = 'cc', k = 6),
+#'   trend_model = AR(),
+#'   use_lv = TRUE,
+#'   n_lv = 2,
+#'   data = simdat$data_train,
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' plot_mvgam_factors(mod)
+#' }
+#'
+#' @export
 plot_mvgam_factors = function(object, plot = TRUE) {
   # Check arguments
   if (!(inherits(object, "mvgam"))) {

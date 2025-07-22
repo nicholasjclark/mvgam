@@ -1,127 +1,151 @@
-#'Predict from a fitted \pkg{mvgam} model
-#'@importFrom stats predict
-#'@inheritParams brms::fitted.brmsfit
-#'@param object \code{list} object of class \code{mvgam} or \code{jsdgam}. See [mvgam()]
-#'@param newdata Optional \code{dataframe} or \code{list} of test data containing the same variables
-#'that were included in the original `data` used to fit the model. If not supplied,
-#'predictions are generated for the original observations used for the model fit.
-#'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
-#'\code{newdata} instead for more seamless integration into `R` workflows
-#'@param type When this has the value \code{link} (default) the linear predictor is
-#'calculated on the link scale.
-#'If \code{expected} is used, predictions reflect the expectation of the response (the mean)
-#'but ignore uncertainty in the observation process. When \code{response} is used,
-#'the predictions take uncertainty in the observation process into account to return
-#'predictions on the outcome scale. When \code{variance} is used, the variance of the response
-#'with respect to the mean (mean-variance relationship) is returned.
-#'When `type = "terms"`, each component of the linear predictor is
-#'returned separately in the form of a `list` (possibly with standard
-#'errors, if `summary = TRUE`): this includes parametric model components,
-#'followed by each smooth component, but excludes any offset and any intercept.
-#'Two special cases are also allowed:
-#' type `latent_N` will return the estimated latent abundances from an
-#' N-mixture distribution, while type `detection` will return the estimated
-#' detection probability from an N-mixture distribution
-#'@param process_error Logical. If \code{TRUE} and a dynamic trend model was fit,
-#'expected uncertainty in the process model is accounted for by using draws
-#'from a stationary, zero-centred multivariate Normal distribution using any
-#'estimated process variance-covariance parameters.
-#'If \code{FALSE}, uncertainty in the latent trend
-#'component is ignored when calculating predictions
-#'@param ... Ignored
-#'@details Note that if your model included a latent temporal trend (i.e. if
-#'you used something other than `"None"` for the `trend_model` argument), the predictions
-#'returned by this function will ignore autocorrelation
-#'coefficients or GP length scale coefficients by *assuming the process is stationary*.
-#'This approach is similar to how predictions are computed from other types of
-#'regression models that can include correlated residuals,
-#'*ultimately treating the temporal dynamics as random effect nuisance parameters*.
-#'The `predict` function is therefore more suited to scenario-based
-#'posterior simulation from the GAM components
-#'of a \code{mvgam} model, while the hindcast / forecast functions
-#'[hindcast.mvgam()] and [forecast.mvgam()] are better suited to generate predictions
-#'that respect the temporal dynamics of estimated latent trends at the actual
-#'time points supplied in `data` and `newdata`.
-#' @return Predicted values on the appropriate scale.
-#'   If \code{summary = FALSE} and `type != "terms"`,
-#'   the output is a matrix of dimension `n_draw x n_observations`
-#'   containing predicted values for each posterior draw in `object`.
+#' Predict from a fitted \pkg{mvgam} model
 #'
-#'   If \code{summary = TRUE} and `type != "terms"`, the output is an \code{n_observations} x \code{E}
-#'   matrix. The number of summary statistics \code{E} is equal to \code{2 +
-#'   length(probs)}: The \code{Estimate} column contains point estimates (either
-#'   mean or median depending on argument \code{robust}), while the
-#'   \code{Est.Error} column contains uncertainty estimates (either standard
-#'   deviation or median absolute deviation depending on argument
-#'   \code{robust}). The remaining columns starting with \code{Q} contain
-#'   quantile estimates as specified via argument \code{probs}.
+#' @importFrom stats predict
+#'
+#' @inheritParams brms::fitted.brmsfit
+#'
+#' @param object \code{list} object of class \code{mvgam} or \code{jsdgam}.
+#'   See [mvgam()]
+#'
+#' @param newdata Optional \code{dataframe} or \code{list} of test data
+#'   containing the same variables that were included in the original `data`
+#'   used to fit the model. If not supplied, predictions are generated for the
+#'   original observations used for the model fit.
+#'
+#' @param data_test Deprecated. Still works in place of \code{newdata} but
+#'   users are recommended to use \code{newdata} instead for more seamless
+#'   integration into `R` workflows
+#'
+#' @param type When this has the value \code{link} (default) the linear
+#'   predictor is calculated on the link scale. If \code{expected} is used,
+#'   predictions reflect the expectation of the response (the mean) but ignore
+#'   uncertainty in the observation process. When \code{response} is used, the
+#'   predictions take uncertainty in the observation process into account to
+#'   return predictions on the outcome scale. When \code{variance} is used, the
+#'   variance of the response with respect to the mean (mean-variance
+#'   relationship) is returned. When `type = "terms"`, each component of the
+#'   linear predictor is returned separately in the form of a `list` (possibly
+#'   with standard errors, if `summary = TRUE`): this includes parametric model
+#'   components, followed by each smooth component, but excludes any offset and
+#'   any intercept. Two special cases are also allowed: type `latent_N` will
+#'   return the estimated latent abundances from an N-mixture distribution,
+#'   while type `detection` will return the estimated detection probability from
+#'   an N-mixture distribution
+#'
+#' @param process_error Logical. If \code{TRUE} and a dynamic trend model was
+#'   fit, expected uncertainty in the process model is accounted for by using
+#'   draws from a stationary, zero-centred multivariate Normal distribution
+#'   using any estimated process variance-covariance parameters. If
+#'   \code{FALSE}, uncertainty in the latent trend component is ignored when
+#'   calculating predictions
+#'
+#' @param ... Ignored
+#'
+#' @details Note that if your model included a latent temporal trend (i.e. if
+#'   you used something other than `"None"` for the `trend_model` argument), the
+#'   predictions returned by this function will ignore autocorrelation
+#'   coefficients or GP length scale coefficients by *assuming the process is
+#'   stationary*. This approach is similar to how predictions are computed from
+#'   other types of regression models that can include correlated residuals,
+#'   *ultimately treating the temporal dynamics as random effect nuisance
+#'   parameters*. The `predict` function is therefore more suited to
+#'   scenario-based posterior simulation from the GAM components of a
+#'   \code{mvgam} model, while the hindcast / forecast functions
+#'   [hindcast.mvgam()] and [forecast.mvgam()] are better suited to generate
+#'   predictions that respect the temporal dynamics of estimated latent trends
+#'   at the actual time points supplied in `data` and `newdata`.
+#'
+#' @return Predicted values on the appropriate scale.
+#'
+#'   If \code{summary = FALSE} and `type != "terms"`, the output is a matrix of
+#'   dimension `n_draw x n_observations` containing predicted values for each
+#'   posterior draw in `object`.
+#'
+#'   If \code{summary = TRUE} and `type != "terms"`, the output is an
+#'   \code{n_observations} x \code{E} matrix. The number of summary statistics
+#'   \code{E} is equal to \code{2 + length(probs)}: The \code{Estimate} column
+#'   contains point estimates (either mean or median depending on argument
+#'   \code{robust}), while the \code{Est.Error} column contains uncertainty
+#'   estimates (either standard deviation or median absolute deviation depending
+#'   on argument \code{robust}). The remaining columns starting with \code{Q}
+#'   contain quantile estimates as specified via argument \code{probs}.
 #'
 #'   If `type = "terms"` and `summary = FALSE`, the output is a named `list`
 #'   containing a separate slot for each effect, with the effects returned as
-#'   matrices of dimension `n_draw x 1`. If `summary = TRUE`, the output resembles that
-#'   from \code{\link[mgcv]{predict.gam}} when using the call
-#'   `predict.gam(object, type = "terms", se.fit = TRUE)`, where mean contributions
-#'   from each effect are returned in `matrix` form while standard errors (representing
-#'   the interval: `(max(probs) - min(probs)) / 2`) are returned in a separate `matrix`
+#'   matrices of dimension `n_draw x 1`. If `summary = TRUE`, the output
+#'   resembles that from \code{\link[mgcv]{predict.gam}} when using the call
+#'   `predict.gam(object, type = "terms", se.fit = TRUE)`, where mean
+#'   contributions from each effect are returned in `matrix` form while standard
+#'   errors (representing the interval: `(max(probs) - min(probs)) / 2`) are
+#'   returned in a separate `matrix`
+#'
 #' @author Nicholas J Clark
-#' @seealso [hindcast.mvgam()], [forecast.mvgam()], [fitted.mvgam()], [augment.mvgam()]
-#'@examples
-#'\donttest{
-#'# Simulate 4 time series with hierarchical seasonality
-#'# and independent AR1 dynamic processes
-#'set.seed(123)
-#'simdat <- sim_mvgam(
-#' seasonality = 'hierarchical',
-#' prop_trend = 0.75,
-#' trend_model = AR(),
-#' family = gaussian()
-#')
-#'set.seed(111)
-#'# Fit a model with shared seasonality
-#'# and AR(1) dynamics
-#'mod1 <- mvgam(
-#' y ~ s(season, bs = 'cc', k = 6),
-#' data = simdat$data_train,
-#' family = gaussian(),
-#' trend_model = AR(),
-#' noncentred = TRUE,
-#' chains = 2,
-#' silent = 2
-#')
 #'
-#'# Generate predictions against observed data
-#'preds <- predict(
-#' mod1,
-#' summary = TRUE
-#')
-#'head(preds)
+#' @seealso
+#'   [hindcast.mvgam()],
+#'   [forecast.mvgam()],
+#'   [fitted.mvgam()],
+#'   [augment.mvgam()]
 #'
-#'# Generate predictions against test data
-#'preds <- predict(
-#' mod1,
-#' newdata = simdat$data_test,
-#' summary = TRUE
-#')
-#'head(preds)
+#' @examples
+#' \donttest{
+#' # Simulate 4 time series with hierarchical seasonality
+#' # and independent AR1 dynamic processes
+#' set.seed(123)
+#' simdat <- sim_mvgam(
+#'   seasonality = 'hierarchical',
+#'   prop_trend = 0.75,
+#'   trend_model = AR(),
+#'   family = gaussian()
+#' )
 #'
-#'# Use plot_predictions(), which relies on predict()
-#'# to more easily see how the latent AR(1) dynamics are
-#'# being ignored when using predict()
-#'plot_predictions(
-#' mod1,
-#' by = c('time', 'series', 'series'),
-#' points = 0.5
-#')
+#' set.seed(111)
+#' # Fit a model with shared seasonality
+#' # and AR(1) dynamics
+#' mod1 <- mvgam(
+#'   y ~ s(season, bs = 'cc', k = 6),
+#'   data = simdat$data_train,
+#'   family = gaussian(),
+#'   trend_model = AR(),
+#'   noncentred = TRUE,
+#'   chains = 2,
+#'   silent = 2
+#' )
 #'
-#'# Using the hindcast() function will give a more accurate
-#'# representation of how the AR(1) processes were estimated to give
-#'# accurate predictions to the in-sample training data
-#'hc <- hindcast(mod1)
-#'plot(hc) +
-#' plot(hc, series = 2) +
-#' plot(hc, series = 3)
-#'}
-#'@export
+#' # Generate predictions against observed data
+#' preds <- predict(
+#'   mod1,
+#'   summary = TRUE
+#' )
+#' head(preds)
+#'
+#' # Generate predictions against test data
+#' preds <- predict(
+#'   mod1,
+#'   newdata = simdat$data_test,
+#'   summary = TRUE
+#' )
+#' head(preds)
+#'
+#' # Use plot_predictions(), which relies on predict()
+#' # to more easily see how the latent AR(1) dynamics are
+#' # being ignored when using predict()
+#' plot_predictions(
+#'   mod1,
+#'   by = c('time', 'series', 'series'),
+#'   points = 0.5
+#' )
+#'
+#' # Using the hindcast() function will give a more accurate
+#' # representation of how the AR(1) processes were estimated to give
+#' # accurate predictions to the in-sample training data
+#' hc <- hindcast(mod1)
+#' plot(hc) +
+#'   plot(hc, series = 2) +
+#'   plot(hc, series = 3)
+#' }
+#'
+#' @export
 predict.mvgam = function(
   object,
   newdata,
