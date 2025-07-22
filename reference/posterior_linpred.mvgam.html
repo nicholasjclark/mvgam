@@ -84,39 +84,43 @@ the data used to fit the model (posterior predictive checks) or for new data.</p
     <div class="section level2">
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
     <dl><dt>object</dt>
-<dd><p><code>list</code> object of class <code>mvgam</code> or <code>jsdgam</code>. See <code><a href="mvgam.html">mvgam()</a></code></p></dd>
+<dd><p><code>list</code> object of class <code>mvgam</code> or <code>jsdgam</code>.
+See <code><a href="mvgam.html">mvgam()</a></code></p></dd>
 
 
 <dt>transform</dt>
-<dd><p>Logical; if <code>FALSE</code>
-(the default), draws of the linear predictor are returned.
-If <code>TRUE</code>, draws of the transformed linear predictor,
-i.e. the conditional expectation, are returned.</p></dd>
+<dd><p><code>logical</code>; if <code>FALSE</code> (the default), draws of
+the linear predictor are returned. If <code>TRUE</code>, draws of the
+transformed linear predictor, i.e. the conditional expectation, are
+returned.</p></dd>
 
 
 <dt>newdata</dt>
-<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data containing the same variables
-that were included in the original <code>data</code> used to fit the model. If not supplied,
-predictions are generated for the original observations used for the model fit.</p></dd>
+<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data
+containing the same variables that were included in the original <code>data</code>
+used to fit the model. If not supplied, predictions are generated for the
+original observations used for the model fit.</p></dd>
 
 
 <dt>ndraws</dt>
-<dd><p>Positive <code>integer</code> indicating how many posterior draws should be used.
-If <code>NULL</code> (the default) all draws are used.</p></dd>
+<dd><p>Positive <code>integer</code> indicating how many posterior draws
+should be used. If <code>NULL</code> (the default) all draws are used.</p></dd>
 
 
 <dt>data_test</dt>
-<dd><p>Deprecated. Still works in place of <code>newdata</code> but users are recommended to use
-<code>newdata</code> instead for more seamless integration into <code>R</code> workflows</p></dd>
+<dd><p>Deprecated. Still works in place of <code>newdata</code> but
+users are recommended to use <code>newdata</code> instead for more seamless
+integration into <code>R</code> workflows</p></dd>
 
 
 <dt>process_error</dt>
-<dd><p>Logical. If <code>TRUE</code> and <code>newdata</code> is supplied,
-expected uncertainty in the process model is accounted for by using draws
-from any latent trend SD parameters. If <code>FALSE</code>, uncertainty in the latent
-trend component is ignored when calculating predictions. If no <code>newdata</code> is
-supplied, draws from the fitted model's posterior predictive distribution will be used
-(which will always include uncertainty in any latent trend components)</p></dd>
+<dd><p><code>logical</code>. If <code>TRUE</code> and <code>newdata</code> is
+supplied, expected uncertainty in the process model is accounted for by
+using draws from any latent trend SD parameters. If <code>FALSE</code>,
+uncertainty in the latent trend component is ignored when calculating
+predictions. If no <code>newdata</code> is supplied, draws from the fitted
+model's posterior predictive distribution will be used (which will always
+include uncertainty in any latent trend components)</p></dd>
 
 
 <dt>...</dt>
@@ -127,50 +131,64 @@ supplied, draws from the fitted model's posterior predictive distribution will b
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     
 
-<p>A <code>matrix</code> of dimension <code>n_samples x new_obs</code>,
-where <code>n_samples</code> is the number of posterior samples from the fitted object
+<p>A <code>matrix</code> of dimension <code>n_samples x n_obs</code>, where
+<code>n_samples</code> is the number of posterior samples from the fitted object
 and <code>n_obs</code> is the number of observations in <code>newdata</code></p>
 
 
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Note that for all types of predictions for models that did not include
-a <code>trend_formula</code>, uncertainty in the dynamic trend
-component can be ignored by setting <code>process_error = FALSE</code>. However,
-if a <code>trend_formula</code> was supplied in the model, predictions for this component cannot be
-ignored. If <code>process_error = TRUE</code>, trend predictions will ignore autocorrelation
-coefficients or GP length scale coefficients, ultimately assuming the process is stationary.
-This method is similar to the types of posterior predictions returned from <code>brms</code> models
-when using autocorrelated error predictions for newdata.
-This function is therefore more suited to posterior simulation from the GAM components
-of a <code>mvgam</code> model, while the forecasting functions
-<code><a href="plot_mvgam_forecasts.html">plot_mvgam_fc</a></code> and <code><a href="forecast.mvgam.html">forecast.mvgam</a></code> are better suited to generate h-step ahead forecasts
-that respect the temporal dynamics of estimated latent trends.</p>
+    <p>Note that for all types of predictions for models that did not
+include a <code>trend_formula</code>, uncertainty in the dynamic trend component can
+be ignored by setting <code>process_error = FALSE</code>. However, if a
+<code>trend_formula</code> was supplied in the model, predictions for this component
+cannot be ignored. If <code>process_error = TRUE</code>, trend predictions will
+ignore autocorrelation coefficients or GP length scale coefficients,
+ultimately assuming the process is stationary. This method is similar to
+the types of posterior predictions returned from <code>brms</code> models when using
+autocorrelated error predictions for newdata. This function is therefore
+more suited to posterior simulation from the GAM components of a
+<code>mvgam</code> model, while the forecasting functions
+<code><a href="plot_mvgam_forecasts.html">plot_mvgam_fc</a></code> and <code><a href="forecast.mvgam.html">forecast.mvgam</a></code> are better
+suited to generate h-step ahead forecasts that respect the temporal
+dynamics of estimated latent trends.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="posterior_epred.mvgam.html">posterior_epred.mvgam</a></code> <code><a href="posterior_predict.mvgam.html">posterior_predict.mvgam</a></code></p>
-<p><code><a href="hindcast.mvgam.html">hindcast.mvgam</a></code> <code><a href="posterior_epred.mvgam.html">posterior_epred.mvgam</a></code> <code><a href="posterior_predict.mvgam.html">posterior_predict.mvgam</a></code></p></div>
+    <div class="dont-index"><p><code><a href="hindcast.mvgam.html">hindcast.mvgam</a></code>,
+<code><a href="posterior_epred.mvgam.html">posterior_epred.mvgam</a></code>,
+<code><a href="posterior_predict.mvgam.html">posterior_predict.mvgam</a></code></p></div>
+    </div>
+    <div class="section level2">
+    <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
+    <p>Nicholas J Clark</p>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate some data and fit a model</span></span></span>
-<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">1</span>, trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>             trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>             noncentred <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
-<span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
-<span class="r-in"><span>             silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  n_series <span class="op">=</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>  trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  noncentred <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
+<span class="r-in"><span>  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Extract linear predictor values</span></span></span>
 <span class="r-in"><span><span class="va">linpreds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/rstantools/reference/posterior_linpred.html" class="external-link">posterior_linpred</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">linpreds</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  num [1:1000, 1:75] -0.139 -0.306 -1.024 -0.741 -1.049 ...</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
+<span class="r-in"><span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

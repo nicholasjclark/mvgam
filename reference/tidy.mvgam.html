@@ -54,7 +54,7 @@ the package broom."><meta property="og:image" content="https://nicholasjclark.gi
 </nav><div class="container template-reference-topic">
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.png" class="logo" alt=""><h1>Tidy an mvgam object's parameter posteriors</h1>
+      <img src="../logo.png" class="logo" alt=""><h1>Tidy an <code>mvgam</code> object's parameter posteriors</h1>
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/R/tidier_methods.R" class="external-link"><code>R/tidier_methods.R</code></a></small>
       <div class="d-none name"><code>tidy.mvgam.Rd</code></div>
     </div>
@@ -90,7 +90,8 @@ Defaults to <code>c(0.025, 0.5, 0.975)</code>, i.e. 2.5%, 50%, and 97.5%.</p></d
     
 
 <p>A <code>tibble</code> containing:</p><ul><li><p>"parameter": The parameter in question.</p></li>
-<li><p>"type": The component of the model that the parameter belongs to (see details).</p></li>
+<li><p>"type": The component of the model that the parameter belongs to (see
+details).</p></li>
 <li><p>"mean": The posterior mean.</p></li>
 <li><p>"sd": The posterior standard deviation.</p></li>
 <li><p>percentile(s): Any percentiles of interest from these posteriors.</p></li>
@@ -101,21 +102,20 @@ Defaults to <code>c(0.025, 0.5, 0.975)</code>, i.e. 2.5%, 50%, and 97.5%.</p></d
 intercept of the observation model (i.e. the "formula" arg to <code><a href="mvgam.html">mvgam()</a></code>) has
 the "type" "observation_beta". The possible "type"s are:</p><ul><li><p>observation_family_extra_param: any extra parameters for your observation
 model, e.g. sigma for a gaussian observation model. These parameters are
-not directly derived from the latent trend components (continuing the
-gaussian example, contrast to mu).</p></li>
-<li><p>observation_beta: betas from your observation model, excluding any smooths.
-If your formula was <code>y ~ x1 + s(x2, bs='cr')</code>, then your intercept and
-<code>x1</code>'s beta would be categorized as this.</p></li>
+not directly derived from the latent trend components (contrast to mu).</p></li>
+<li><p>observation_beta: betas from your observation model, excluding any
+smooths. If your formula was <code>y ~ x1 + s(x2, bs='cr')</code>, then your
+intercept and <code>x1</code>'s beta would be categorized as this.</p></li>
 <li><p>random_effect_group_level: Group-level random effects parameters, i.e.
 the mean and sd of the distribution from which the specific random
 intercepts/slopes are considered to be drawn from.</p></li>
 <li><p>random_effect_beta: betas for the individual random intercepts/slopes.</p></li>
 <li><p>trend_model_param: parameters from your <code>trend_model</code>.</p></li>
 <li><p>trend_beta: analog of "observation_beta", but for any <code>trend_formula</code>.</p></li>
-<li><p>trend_random_effect_group_level: analog of "random_effect_group_level",
-but for any <code>trend_formula</code>.</p></li>
-<li><p>trend_random_effect_beta: analog of "random_effect_beta",
-but for any <code>trend_formula</code>.</p></li>
+<li><p>trend_random_effect_group_level: analog of
+"random_effect_group_level", but for any <code>trend_formula</code>.</p></li>
+<li><p>trend_random_effect_beta: analog of "random_effect_beta", but for any
+<code>trend_formula</code>.</p></li>
 </ul><p>Additionally, GP terms can be incorporated in several ways, leading to
 different "type"s (or absence!):</p><ul><li><p><code>s(bs = "gp")</code>: No parameters returned.</p></li>
 <li><p><code><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp()</a></code> in <code>formula</code>: "type" of "observation_param".</p></li>
@@ -132,20 +132,25 @@ different "type"s (or absence!):</p><ul><li><p><code>s(bs = "gp")</code>: No par
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>T <span class="op">=</span> <span class="fl">100</span>,</span></span>
-<span class="r-in"><span>                    n_series <span class="op">=</span> <span class="fl">3</span>,</span></span>
-<span class="r-in"><span>                    trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                    prop_trend <span class="op">=</span> <span class="fl">0.75</span>,</span></span>
-<span class="r-in"><span>                    family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">x</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">year_fac</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">year</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  T <span class="op">=</span> <span class="fl">100</span>,</span></span>
+<span class="r-in"><span>  n_series <span class="op">=</span> <span class="fl">3</span>,</span></span>
+<span class="r-in"><span>  trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  prop_trend <span class="op">=</span> <span class="fl">0.75</span>,</span></span>
+<span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="op">-</span> <span class="fl">1</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">series</span>, bs <span class="op">=</span> <span class="st">'cr'</span>, k <span class="op">=</span> <span class="fl">20</span><span class="op">)</span> <span class="op">+</span> <span class="va">x</span>,</span></span>
-<span class="r-in"><span>             trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">year_fac</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
-<span class="r-in"><span>             trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span>cor <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>             silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">year_fac</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">year</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="op">-</span><span class="fl">1</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">series</span>, bs <span class="op">=</span> <span class="st">'cr'</span>, k <span class="op">=</span> <span class="fl">20</span><span class="op">)</span> <span class="op">+</span> <span class="va">x</span>,</span></span>
+<span class="r-in"><span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">year_fac</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>  trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span>cor <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy</a></span><span class="op">(</span><span class="va">mod</span>, probs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.5</span>, <span class="fl">0.8</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>

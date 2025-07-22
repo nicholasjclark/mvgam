@@ -87,80 +87,90 @@
 
 
 <dt>...</dt>
-<dd><p>further <code><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></code> graphical parameters.</p></dd>
+<dd><p>Further <code><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></code> graphical parameters</p></dd>
 
 
 <dt>newdata</dt>
-<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data containing at least 'series' and 'time'
-for the forecast horizon, in addition to any other variables included in the linear predictor of <code>formula</code>. If
-included, the observed values in the test data are compared to the model's forecast distribution for exploring
-biases in model predictions.
-Note this is only useful if the same <code>newdata</code> was also included when fitting the original model.</p></dd>
+<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data
+containing at least 'series' and 'time' for the forecast horizon, in
+addition to any other variables included in the linear predictor of
+<code>formula</code>. If included, the observed values in the test data are
+compared to the model's forecast distribution for exploring biases in
+model predictions. Note this is only useful if the same <code>newdata</code>
+was also included when fitting the original model.</p></dd>
 
 
 <dt>data_test</dt>
-<dd><p>Deprecated. Still works in place of <code>newdata</code> but users are recommended to use
-<code>newdata</code> instead for more seamless integration into <code>R</code> workflows</p></dd>
+<dd><p>Deprecated. Still works in place of <code>newdata</code> but
+users are recommended to use <code>newdata</code> instead for more seamless
+integration into <code>R</code> workflows</p></dd>
 
 
 <dt>series</dt>
-<dd><p><code>integer</code> specifying which series in the set is to be plotted</p></dd>
+<dd><p><code>integer</code> specifying which series in the set is to be
+plotted</p></dd>
 
 
 <dt>type</dt>
-<dd><p><code>character</code> specifying the type of posterior predictive check to calculate and plot.
-Valid options are: 'rootogram', 'mean', 'hist', 'density', 'prop_zero', 'pit' and 'cdf'</p></dd>
+<dd><p><code>character</code> specifying the type of posterior predictive
+check to calculate and plot. Valid options are: 'rootogram', 'mean',
+'hist', 'density', 'prop_zero', 'pit' and 'cdf'</p></dd>
 
 
 <dt>n_bins</dt>
-<dd><p><code>integer</code> specifying the number of bins to use for binning observed values when plotting
-a rootogram or histogram. Default is <code>50</code> bins for a rootogram, which means that if
-there are <code>&gt;50</code> unique observed values, bins will
-be used to prevent overplotting and facilitate interpretation. Default for a histogram is to use the
-number of bins returned by a call to <code>hist</code> in base <code>R</code></p></dd>
+<dd><p><code>integer</code> specifying the number of bins to use for
+binning observed values when plotting a rootogram or histogram. Default
+is <code>50</code> bins for a rootogram, which means that if there are &gt;50 unique
+observed values, bins will be used to prevent overplotting and facilitate
+interpretation. Default for a histogram is to use the number of bins
+returned by a call to <code>hist</code> in base <code>R</code></p></dd>
 
 
 <dt>legend_position</dt>
-<dd><p>The location may also be specified by setting x to a single keyword from the
-list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
-This places the legend on the inside of the plot frame at the given location. Or alternatively,
-use "none" to hide the legend.</p></dd>
+<dd><p>The location may also be specified by setting x to a
+single keyword from the list "bottomright", "bottom", "bottomleft",
+"left", "topleft", "top", "topright", "right" and "center". This places
+the legend on the inside of the plot frame at the given location. Or
+alternatively, use "none" to hide the legend.</p></dd>
 
 
 <dt>xlab</dt>
-<dd><p>label for x axis.</p></dd>
+<dd><p>Label for x axis</p></dd>
 
 
 <dt>ylab</dt>
-<dd><p>label for y axis.</p></dd>
+<dd><p>Label for y axis</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     
 
-<p>A base <code>R</code> graphics plot showing either a posterior rootogram (for <code>type == 'rootogram'</code>),
-the predicted vs observed mean for the
-series (for <code>type == 'mean'</code>), predicted vs observed proportion of zeroes for the
-series (for <code>type == 'prop_zero'</code>),predicted vs observed histogram for the
-series (for <code>type == 'hist'</code>), kernel density or empirical CDF estimates for
-posterior predictions (for <code>type == 'density'</code> or <code>type == 'cdf'</code>) or a Probability
+<p>A base <code>R</code> graphics plot showing either a posterior rootogram
+(for <code>type == 'rootogram'</code>), the predicted vs observed mean for the
+series (for <code>type == 'mean'</code>), predicted vs observed proportion of
+zeroes for the series (for <code>type == 'prop_zero'</code>), predicted vs
+observed histogram for the series (for <code>type == 'hist'</code>), kernel
+density or empirical CDF estimates for posterior predictions (for
+<code>type == 'density'</code> or <code>type == 'cdf'</code>) or a Probability
 Integral Transform histogram (for <code>type == 'pit'</code>).</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Conditional posterior predictions are drawn from the fitted <code>mvgam</code> and compared against
-the empirical distribution of the observed data for a specified series to help evaluate the model's
-ability to generate unbiased predictions. For all plots apart from <code>type = 'rootogram'</code>, posterior predictions
-can also be compared to out of sample observations as long as these observations were included as
-' data_test' in the original model fit and supplied here. Rootograms are currently only plotted using the
-' hanging' style.
-<br>
-Note that the predictions used for these plots are <em>conditional on the observed data</em>, i.e. they
-are those predictions that have been generated directly within
-the <code><a href="mvgam.html">mvgam()</a></code> model. They can be misleading if the model included flexible dynamic trend components. For
-a broader range of posterior checks that are created using <em>unconditional</em> "new data" predictions, see
-<code><a href="pp_check.mvgam.html">pp_check.mvgam</a></code></p>
+    <p>Conditional posterior predictions are drawn from the fitted
+<code>mvgam</code> and compared against the empirical distribution of the
+observed data for a specified series to help evaluate the model's ability
+to generate unbiased predictions. For all plots apart from
+<code>type = 'rootogram'</code>, posterior predictions can also be compared to out
+of sample observations as long as these observations were included as
+'data_test' in the original model fit and supplied here. Rootograms are
+currently only plotted using the 'hanging' style.</p>
+<p><br> Note that the predictions used for these plots are <em>conditional on
+the observed data</em>, i.e. they are those predictions that have been
+generated directly within the <code><a href="mvgam.html">mvgam()</a></code> model. They can be misleading if
+the model included flexible dynamic trend components. For a broader range
+of posterior checks that are created using <em>unconditional</em> "new data"
+predictions, see <code><a href="pp_check.mvgam.html">pp_check.mvgam</a></code></p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
@@ -176,9 +186,16 @@ a broader range of posterior checks that are created using <em>unconditional</em
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate some smooth effects and fit a model</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu">mgcv</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/gamSim.html" class="external-link">gamSim</a></span><span class="op">(</span><span class="fl">1</span>, n <span class="op">=</span> <span class="fl">200</span>, scale <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu">mgcv</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/gamSim.html" class="external-link">gamSim</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>  n <span class="op">=</span> <span class="fl">200</span>,</span></span>
+<span class="r-in"><span>  scale <span class="op">=</span> <span class="fl">2</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Gu &amp; Wahba 4 term additive model</span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x0</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x1</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x2</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x3</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x0</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x1</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x2</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x3</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  data <span class="op">=</span> <span class="va">dat</span>,</span></span>
 <span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
@@ -205,6 +222,7 @@ a broader range of posterior checks that are created using <em>unconditional</em
 <span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</span>
 <span class="r-plt img"><img src="ppc.mvgam-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
+<span class="r-in"><span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

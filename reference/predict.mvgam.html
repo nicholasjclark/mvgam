@@ -80,45 +80,48 @@
     <div class="section level2">
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
     <dl><dt>object</dt>
-<dd><p><code>list</code> object of class <code>mvgam</code> or <code>jsdgam</code>. See <code><a href="mvgam.html">mvgam()</a></code></p></dd>
+<dd><p><code>list</code> object of class <code>mvgam</code> or <code>jsdgam</code>.
+See <code><a href="mvgam.html">mvgam()</a></code></p></dd>
 
 
 <dt>newdata</dt>
-<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data containing the same variables
-that were included in the original <code>data</code> used to fit the model. If not supplied,
-predictions are generated for the original observations used for the model fit.</p></dd>
+<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data
+containing the same variables that were included in the original <code>data</code>
+used to fit the model. If not supplied, predictions are generated for the
+original observations used for the model fit.</p></dd>
 
 
 <dt>data_test</dt>
-<dd><p>Deprecated. Still works in place of <code>newdata</code> but users are recommended to use
-<code>newdata</code> instead for more seamless integration into <code>R</code> workflows</p></dd>
+<dd><p>Deprecated. Still works in place of <code>newdata</code> but
+users are recommended to use <code>newdata</code> instead for more seamless
+integration into <code>R</code> workflows</p></dd>
 
 
 <dt>type</dt>
-<dd><p>When this has the value <code>link</code> (default) the linear predictor is
-calculated on the link scale.
-If <code>expected</code> is used, predictions reflect the expectation of the response (the mean)
-but ignore uncertainty in the observation process. When <code>response</code> is used,
-the predictions take uncertainty in the observation process into account to return
-predictions on the outcome scale. When <code>variance</code> is used, the variance of the response
-with respect to the mean (mean-variance relationship) is returned.
-When <code>type = "terms"</code>, each component of the linear predictor is
-returned separately in the form of a <code>list</code> (possibly with standard
-errors, if <code>summary = TRUE</code>): this includes parametric model components,
-followed by each smooth component, but excludes any offset and any intercept.
-Two special cases are also allowed:
-type <code>latent_N</code> will return the estimated latent abundances from an
-N-mixture distribution, while type <code>detection</code> will return the estimated
-detection probability from an N-mixture distribution</p></dd>
+<dd><p>When this has the value <code>link</code> (default) the linear
+predictor is calculated on the link scale. If <code>expected</code> is used,
+predictions reflect the expectation of the response (the mean) but ignore
+uncertainty in the observation process. When <code>response</code> is used, the
+predictions take uncertainty in the observation process into account to
+return predictions on the outcome scale. When <code>variance</code> is used, the
+variance of the response with respect to the mean (mean-variance
+relationship) is returned. When <code>type = "terms"</code>, each component of the
+linear predictor is returned separately in the form of a <code>list</code> (possibly
+with standard errors, if <code>summary = TRUE</code>): this includes parametric model
+components, followed by each smooth component, but excludes any offset and
+any intercept. Two special cases are also allowed: type <code>latent_N</code> will
+return the estimated latent abundances from an N-mixture distribution,
+while type <code>detection</code> will return the estimated detection probability from
+an N-mixture distribution</p></dd>
 
 
 <dt>process_error</dt>
-<dd><p>Logical. If <code>TRUE</code> and a dynamic trend model was fit,
-expected uncertainty in the process model is accounted for by using draws
-from a stationary, zero-centred multivariate Normal distribution using any
-estimated process variance-covariance parameters.
-If <code>FALSE</code>, uncertainty in the latent trend
-component is ignored when calculating predictions</p></dd>
+<dd><p>Logical. If <code>TRUE</code> and a dynamic trend model was
+fit, expected uncertainty in the process model is accounted for by using
+draws from a stationary, zero-centred multivariate Normal distribution
+using any estimated process variance-covariance parameters. If
+<code>FALSE</code>, uncertainty in the latent trend component is ignored when
+calculating predictions</p></dd>
 
 
 <dt>summary</dt>
@@ -147,57 +150,61 @@ function. Only used if <code>summary</code> is <code>TRUE</code>.</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     
 
-<p>Predicted values on the appropriate scale.
-If <code>summary = FALSE</code> and <code>type != "terms"</code>,
-the output is a matrix of dimension <code>n_draw x n_observations</code></p>
+<p>Predicted values on the appropriate scale.</p>
 
 
-<p>containing predicted values for each posterior draw in <code>object</code>.</p>
+<p>If <code>summary = FALSE</code> and <code>type != "terms"</code>, the output is a matrix of
+dimension <code>n_draw x n_observations</code> containing predicted values for each
+posterior draw in <code>object</code>.</p>
 
 
-<p>If <code>summary = TRUE</code> and <code>type != "terms"</code>, the output is an <code>n_observations</code> x <code>E</code></p>
+<p>If <code>summary = TRUE</code> and <code>type != "terms"</code>, the output is an
+<code>n_observations</code> x <code>E</code> matrix. The number of summary statistics
+<code>E</code> is equal to <code>2 + length(probs)</code>: The <code>Estimate</code> column
+contains point estimates (either mean or median depending on argument
+<code>robust</code>), while the <code>Est.Error</code> column contains uncertainty
+estimates (either standard deviation or median absolute deviation depending
+on argument <code>robust</code>). The remaining columns starting with <code>Q</code></p>
 
 
-<p>matrix. The number of summary statistics <code>E</code> is equal to <code>2 +
-  length(probs)</code>: The <code>Estimate</code> column contains point estimates (either
-mean or median depending on argument <code>robust</code>), while the
-<code>Est.Error</code> column contains uncertainty estimates (either standard
-deviation or median absolute deviation depending on argument
-<code>robust</code>). The remaining columns starting with <code>Q</code> contain
-quantile estimates as specified via argument <code>probs</code>.</p>
+<p>contain quantile estimates as specified via argument <code>probs</code>.</p>
 
 
 <p>If <code>type = "terms"</code> and <code>summary = FALSE</code>, the output is a named <code>list</code></p>
 
 
 <p>containing a separate slot for each effect, with the effects returned as
-matrices of dimension <code>n_draw x 1</code>. If <code>summary = TRUE</code>, the output resembles that
-from <code><a href="https://rdrr.io/pkg/mgcv/man/predict.gam.html" class="external-link">predict.gam</a></code> when using the call
-<code>predict.gam(object, type = "terms", se.fit = TRUE)</code>, where mean contributions
-from each effect are returned in <code>matrix</code> form while standard errors (representing
-the interval: <code>(max(probs) - min(probs)) / 2</code>) are returned in a separate <code>matrix</code></p>
+matrices of dimension <code>n_draw x 1</code>. If <code>summary = TRUE</code>, the output
+resembles that from <code><a href="https://rdrr.io/pkg/mgcv/man/predict.gam.html" class="external-link">predict.gam</a></code> when using the call
+<code>predict.gam(object, type = "terms", se.fit = TRUE)</code>, where mean
+contributions from each effect are returned in <code>matrix</code> form while standard
+errors (representing the interval: <code>(max(probs) - min(probs)) / 2</code>) are
+returned in a separate <code>matrix</code></p>
 
 
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Note that if your model included a latent temporal trend (i.e. if
-you used something other than <code>"None"</code> for the <code>trend_model</code> argument), the predictions
-returned by this function will ignore autocorrelation
-coefficients or GP length scale coefficients by <em>assuming the process is stationary</em>.
-This approach is similar to how predictions are computed from other types of
-regression models that can include correlated residuals,
-<em>ultimately treating the temporal dynamics as random effect nuisance parameters</em>.
-The <code>predict</code> function is therefore more suited to scenario-based
-posterior simulation from the GAM components
-of a <code>mvgam</code> model, while the hindcast / forecast functions
-<code><a href="hindcast.mvgam.html">hindcast.mvgam()</a></code> and <code><a href="forecast.mvgam.html">forecast.mvgam()</a></code> are better suited to generate predictions
-that respect the temporal dynamics of estimated latent trends at the actual
-time points supplied in <code>data</code> and <code>newdata</code>.</p>
+you used something other than <code>"None"</code> for the <code>trend_model</code> argument), the
+predictions returned by this function will ignore autocorrelation
+coefficients or GP length scale coefficients by <em>assuming the process is
+stationary</em>. This approach is similar to how predictions are computed from
+other types of regression models that can include correlated residuals,
+<em>ultimately treating the temporal dynamics as random effect nuisance
+parameters</em>. The <code>predict</code> function is therefore more suited to
+scenario-based posterior simulation from the GAM components of a
+<code>mvgam</code> model, while the hindcast / forecast functions
+<code><a href="hindcast.mvgam.html">hindcast.mvgam()</a></code> and <code><a href="forecast.mvgam.html">forecast.mvgam()</a></code> are better suited to generate
+predictions that respect the temporal dynamics of estimated latent trends
+at the actual time points supplied in <code>data</code> and <code>newdata</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="hindcast.mvgam.html">hindcast.mvgam()</a></code>, <code><a href="forecast.mvgam.html">forecast.mvgam()</a></code>, <code><a href="fitted.mvgam.html">fitted.mvgam()</a></code>, <code><a href="augment.mvgam.html">augment.mvgam()</a></code></p></div>
+    <div class="dont-index"><p><code><a href="hindcast.mvgam.html">hindcast.mvgam()</a></code>,
+<code><a href="forecast.mvgam.html">forecast.mvgam()</a></code>,
+<code><a href="fitted.mvgam.html">fitted.mvgam()</a></code>,
+<code><a href="augment.mvgam.html">augment.mvgam()</a></code></p></div>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
@@ -211,28 +218,29 @@ time points supplied in <code>data</code> and <code>newdata</code>.</p>
 <span class="r-in"><span><span class="co"># and independent AR1 dynamic processes</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>seasonality <span class="op">=</span> <span class="st">'hierarchical'</span>,</span></span>
-<span class="r-in"><span>prop_trend <span class="op">=</span> <span class="fl">0.75</span>,</span></span>
-<span class="r-in"><span>trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  seasonality <span class="op">=</span> <span class="st">'hierarchical'</span>,</span></span>
+<span class="r-in"><span>  prop_trend <span class="op">=</span> <span class="fl">0.75</span>,</span></span>
+<span class="r-in"><span>  trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">111</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="co"># Fit a model with shared seasonality</span></span></span>
 <span class="r-in"><span><span class="co"># and AR(1) dynamics</span></span></span>
 <span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>noncentred <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
-<span class="r-in"><span>chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
-<span class="r-in"><span>silent <span class="op">=</span> <span class="fl">2</span></span></span>
+<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  noncentred <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
+<span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Generate predictions against observed data</span></span></span>
 <span class="r-in"><span><span class="va">preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span><span class="va">mod1</span>,</span></span>
-<span class="r-in"><span>summary <span class="op">=</span> <span class="cn">TRUE</span></span></span>
+<span class="r-in"><span>  <span class="va">mod1</span>,</span></span>
+<span class="r-in"><span>  summary <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">preds</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>        Estimate  Est.Error       Q2.5      Q97.5</span>
@@ -245,9 +253,9 @@ time points supplied in <code>data</code> and <code>newdata</code>.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Generate predictions against test data</span></span></span>
 <span class="r-in"><span><span class="va">preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span><span class="va">mod1</span>,</span></span>
-<span class="r-in"><span>newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
-<span class="r-in"><span>summary <span class="op">=</span> <span class="cn">TRUE</span></span></span>
+<span class="r-in"><span>  <span class="va">mod1</span>,</span></span>
+<span class="r-in"><span>  newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
+<span class="r-in"><span>  summary <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">preds</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>        Estimate Est.Error       Q2.5      Q97.5</span>
@@ -262,9 +270,9 @@ time points supplied in <code>data</code> and <code>newdata</code>.</p>
 <span class="r-in"><span><span class="co"># to more easily see how the latent AR(1) dynamics are</span></span></span>
 <span class="r-in"><span><span class="co"># being ignored when using predict()</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span><span class="va">mod1</span>,</span></span>
-<span class="r-in"><span>by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'time'</span>, <span class="st">'series'</span>, <span class="st">'series'</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>points <span class="op">=</span> <span class="fl">0.5</span></span></span>
+<span class="r-in"><span>  <span class="va">mod1</span>,</span></span>
+<span class="r-in"><span>  by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'time'</span>, <span class="st">'series'</span>, <span class="st">'series'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  points <span class="op">=</span> <span class="fl">0.5</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="predict.mvgam-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
@@ -273,13 +281,14 @@ time points supplied in <code>data</code> and <code>newdata</code>.</p>
 <span class="r-in"><span><span class="co"># accurate predictions to the in-sample training data</span></span></span>
 <span class="r-in"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu"><a href="hindcast.mvgam.html">hindcast</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
 <span class="r-plt img"><img src="predict.mvgam-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
+<span class="r-in"><span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
