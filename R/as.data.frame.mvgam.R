@@ -83,13 +83,13 @@ NULL
 #'@rdname mvgam_draws
 #'@export
 as.data.frame.mvgam = function(
-    x,
-    row.names = NULL,
-    optional = TRUE,
-    variable = 'betas',
-    use_alias = TRUE,
-    regex = FALSE,
-    ...
+  x,
+  row.names = NULL,
+  optional = TRUE,
+  variable = 'betas',
+  use_alias = TRUE,
+  regex = FALSE,
+  ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -111,11 +111,11 @@ as.data.frame.mvgam = function(
 #'@rdname mvgam_draws
 #'@export
 as.matrix.mvgam = function(
-    x,
-    variable = 'betas',
-    regex = FALSE,
-    use_alias = TRUE,
-    ...
+  x,
+  variable = 'betas',
+  regex = FALSE,
+  use_alias = TRUE,
+  ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -137,11 +137,11 @@ as.matrix.mvgam = function(
 #'@rdname mvgam_draws
 #'@export
 as.array.mvgam = function(
-    x,
-    variable = 'betas',
-    regex = FALSE,
-    use_alias = TRUE,
-    ...
+  x,
+  variable = 'betas',
+  regex = FALSE,
+  use_alias = TRUE,
+  ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -164,12 +164,12 @@ as.array.mvgam = function(
 #' @method as_draws mvgam
 #' @export
 as_draws.mvgam <- function(
-    x,
-    variable = NULL,
-    regex = FALSE,
-    inc_warmup = FALSE,
-    use_alias = TRUE,
-    ...
+  x,
+  variable = NULL,
+  regex = FALSE,
+  inc_warmup = FALSE,
+  use_alias = TRUE,
+  ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -204,12 +204,12 @@ posterior::as_draws
 #' @method as_draws_matrix mvgam
 #' @export
 as_draws_matrix.mvgam <- function(
-    x,
-    variable = NULL,
-    regex = FALSE,
-    inc_warmup = FALSE,
-    use_alias = TRUE,
-    ...
+  x,
+  variable = NULL,
+  regex = FALSE,
+  inc_warmup = FALSE,
+  use_alias = TRUE,
+  ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -243,12 +243,12 @@ posterior::as_draws_matrix
 #' @method as_draws_df mvgam
 #' @export
 as_draws_df.mvgam <- function(
-    x,
-    variable = NULL,
-    regex = FALSE,
-    inc_warmup = FALSE,
-    use_alias = TRUE,
-    ...
+  x,
+  variable = NULL,
+  regex = FALSE,
+  inc_warmup = FALSE,
+  use_alias = TRUE,
+  ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -282,12 +282,12 @@ posterior::as_draws_df
 #' @method as_draws_array mvgam
 #' @export
 as_draws_array.mvgam <- function(
-    x,
-    variable = NULL,
-    regex = FALSE,
-    inc_warmup = FALSE,
-    use_alias = TRUE,
-    ...
+  x,
+  variable = NULL,
+  regex = FALSE,
+  inc_warmup = FALSE,
+  use_alias = TRUE,
+  ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -321,12 +321,12 @@ posterior::as_draws_array
 #' @method as_draws_list mvgam
 #' @export
 as_draws_list.mvgam <- function(
-    x,
-    variable = NULL,
-    regex = FALSE,
-    inc_warmup = FALSE,
-    use_alias = TRUE,
-    ...
+  x,
+  variable = NULL,
+  regex = FALSE,
+  inc_warmup = FALSE,
+  use_alias = TRUE,
+  ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -362,11 +362,11 @@ posterior::as_draws_list
 #' @method as_draws_rvars mvgam
 #' @export
 as_draws_rvars.mvgam <- function(
-    x,
-    variable = NULL,
-    regex = FALSE,
-    inc_warmup = FALSE,
-    ...
+  x,
+  variable = NULL,
+  regex = FALSE,
+  inc_warmup = FALSE,
+  ...
 ) {
   # Check variable and get more informative names if applicable
   extract_pars <- validate_variables(x, variable = variable, regex = regex)
@@ -512,16 +512,16 @@ validate_variables = function(x, variable, regex = FALSE) {
   # If not one of the standard subsets, get aliases for the chosen variable(s)
   if (
     !variable[1] %in%
-    c(
-      "obs_params",
-      "betas",
-      "smooth_params",
-      "linpreds",
-      "trend_params",
-      "trend_betas",
-      "trend_smooth_params",
-      "trend_linpreds"
-    )
+      c(
+        "obs_params",
+        "betas",
+        "smooth_params",
+        "linpreds",
+        "trend_params",
+        "trend_betas",
+        "trend_smooth_params",
+        "trend_linpreds"
+      )
   ) {
     if (regex) {
       vars_to_extract <- vector(mode = 'list')
