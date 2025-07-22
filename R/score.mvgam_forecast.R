@@ -105,7 +105,6 @@
 #' str(fc_scores)
 #' }
 #'
-#'
 #' @export
 score.mvgam_forecast = function(
   object,

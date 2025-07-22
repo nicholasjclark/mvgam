@@ -10,58 +10,73 @@ how_to_cite(object, ...)
 \method{how_to_cite}{mvgam}(object, ...)
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
-or \code{\link[=jsdgam]{jsdgam()}}}
+\item{object}{\code{list} object of class \code{mvgam} resulting from a call
+to \code{\link[=mvgam]{mvgam()}} or \code{\link[=jsdgam]{jsdgam()}}}
 
 \item{...}{ignored}
 }
 \value{
-An object of class \code{how_to_cite} containing a text description of the
-methods as well as lists of both primary and additional references
+An object of class \code{how_to_cite} containing a text description
+of the methods as well as lists of both primary and additional references.
 }
 \description{
-Create a brief but fully referenced methods description, along with a useful list of references,
-for fitted \code{mvgam} and \code{jsdgam} models
+Create a brief but fully referenced methods description, along with a useful
+list of references, for fitted \code{mvgam} and \code{jsdgam} models.
 }
 \details{
-This function uses the model's structure to come up with a very basic
-but hopefully useful methods description that can help users to appropriately acknowledge
-the hard work of developers and champion open science. Please do not consider the
-text returned by this function to be a completely adequate methods section, it is only
-meant to get you started.
+This function uses the model's structure to come up with a very
+basic but hopefully useful methods description that can help users to
+appropriately acknowledge the hard work of developers and champion open
+science. Please do not consider the text returned by this function to be a
+completely adequate methods section; it is only meant to get you started.
 }
 \examples{
 \donttest{
+#--------------------------------------------------
 # Simulate 4 time series with hierarchical seasonality
 # and a VAR(1) dynamic process
+#--------------------------------------------------
 set.seed(0)
-simdat <- sim_mvgam(seasonality = 'hierarchical',
-                    trend_model = VAR(cor = TRUE),
-                    family = gaussian())
+
+simdat <- sim_mvgam(
+  seasonality = 'hierarchical',
+  trend_model = VAR(cor = TRUE),
+  family = gaussian()
+)
 
 # Fit an appropriate model
-mod1 <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-              data = simdat$data_train,
-              family = gaussian(),
-              trend_model = VAR(cor = TRUE),
-              chains = 2,
-              silent = 2)
+mod1 <- mvgam(
+  y ~ s(season, bs = 'cc', k = 6),
+  data = simdat$data_train,
+  family = gaussian(),
+  trend_model = VAR(cor = TRUE),
+  chains = 2,
+  silent = 2
+)
+
 how_to_cite(mod1)
 
+#--------------------------------------------------
 # For a GP example, simulate data using the mgcv package
+#--------------------------------------------------
 dat <- mgcv::gamSim(1, n = 30, scale = 2)
 
-# Fit a model that uses an approximate GP from the brms package
-mod2 <- mvgam(y ~ gp(x2, k = 12),
-              data = dat,
-              family = gaussian(),
-              chains = 2,
-              silent = 2)
+# Fit a model that uses an approximate GP from brms
+mod2 <- mvgam(
+  y ~ gp(x2, k = 12),
+  data = dat,
+  family = gaussian(),
+  chains = 2,
+  silent = 2
+)
+
 how_to_cite(mod2)
 }
+
 }
 \seealso{
-\code{\link[utils]{citation}}, \code{\link{mvgam}}, \code{\link{jsdgam}}
+\code{\link[utils]{citation}}, \code{\link{mvgam}},
+\code{\link{jsdgam}}
 }
 \author{
 Nicholas J Clark

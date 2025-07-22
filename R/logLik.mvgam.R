@@ -1,39 +1,58 @@
-#'@title Compute pointwise Log-Likelihoods from fitted \pkg{mvgam} objects
+#' @title Compute pointwise Log-Likelihoods from fitted \pkg{mvgam} objects
 #'
-#'@importFrom parallel setDefaultCluster stopCluster
-#'@param object \code{list} object of class \code{mvgam} or \code{jsdgam}
-#'@param linpreds Optional `matrix` of linear predictor draws to use for calculating
-#'pointwise log-likelihoods
-#'@param newdata Optional `data.frame` or `list` object specifying which series each column
-#'in `linpreds` belongs to. If `linpreds` is supplied, then `newdata` must also be supplied
-#'@param family_pars Optional `list` containing posterior draws of
-#'family-specific parameters (i.e. shape, scale or overdispersion parameters). Required if
-#'`linpreds` and `newdata` are supplied
-#'@param include_forecast Logical. If `newdata` were fed to the model to compute
-#'forecasts, should the log-likelihood draws for these observations also be returned.
-#'Defaults to `TRUE`
-#'@param ... Ignored
-#'@return A `matrix` of dimension `n_samples x n_observations` containing the pointwise
-#'log-likelihood draws for all observations in `newdata`. If no `newdata` is supplied,
-#'log-likelihood draws are returned for all observations that were originally fed to
-#'the model (training observations and, if supplied to the
-#'original model via the `newdata` argument in \code{\link{mvgam}},
-#'testing observations)
+#' @importFrom parallel setDefaultCluster stopCluster
+#'
+#' @param object \code{list} object of class \code{mvgam} or \code{jsdgam}
+#'
+#' @param linpreds Optional `matrix` of linear predictor draws to use for
+#' calculating pointwise log-likelihoods.
+#'
+#' @param newdata Optional `data.frame` or `list` object specifying which series
+#' each column in `linpreds` belongs to. If `linpreds` is supplied, then
+#' `newdata` must also be supplied.
+#'
+#' @param family_pars Optional `list` containing posterior draws of
+#' family-specific parameters (i.e. shape, scale or overdispersion parameters).
+#' Required if `linpreds` and `newdata` are supplied.
+#'
+#' @param include_forecast Logical. If `newdata` were fed to the model to
+#' compute forecasts, should the log-likelihood draws for these observations
+#' also be returned. Defaults to `TRUE`.
+#'
+#' @param ... Ignored
+#'
+#' @return A `matrix` of dimension `n_samples x n_observations` containing the
+#' pointwise log-likelihood draws for all observations in `newdata`. If no
+#' `newdata` is supplied, log-likelihood draws are returned for all observations
+#' that were originally fed to the model (training observations and, if supplied
+#' to the original model via the `newdata` argument in \code{\link{mvgam}},
+#' testing observations).
+#'
+#' @author Nicholas J Clark
+#'
 #' @examples
 #' \donttest{
 #' # Simulate some data and fit a model
-#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
-#' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-#'              trend_model = AR(),
-#'              data = simdat$data_train,
-#'              chains = 2,
-#'              silent = 2)
+#' simdat <- sim_mvgam(
+#'   n_series = 1,
+#'   trend_model = AR()
+#' )
 #'
-#'# Extract logLikelihood values
-#'lls <- logLik(mod)
-#'str(lls)
-#'}
-#'@export
+#' mod <- mvgam(
+#'   y ~ s(season, bs = 'cc', k = 6),
+#'   trend_model = AR(),
+#'   data = simdat$data_train,
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' # Extract log-likelihood values
+#' lls <- logLik(mod)
+#' str(lls)
+#' }
+#'
+#' @export
+
 logLik.mvgam = function(
   object,
   linpreds,

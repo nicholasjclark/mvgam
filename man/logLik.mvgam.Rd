@@ -9,29 +9,30 @@
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}}
 
-\item{linpreds}{Optional \code{matrix} of linear predictor draws to use for calculating
-pointwise log-likelihoods}
+\item{linpreds}{Optional \code{matrix} of linear predictor draws to use for
+calculating pointwise log-likelihoods.}
 
-\item{newdata}{Optional \code{data.frame} or \code{list} object specifying which series each column
-in \code{linpreds} belongs to. If \code{linpreds} is supplied, then \code{newdata} must also be supplied}
+\item{newdata}{Optional \code{data.frame} or \code{list} object specifying which series
+each column in \code{linpreds} belongs to. If \code{linpreds} is supplied, then
+\code{newdata} must also be supplied.}
 
 \item{family_pars}{Optional \code{list} containing posterior draws of
-family-specific parameters (i.e. shape, scale or overdispersion parameters). Required if
-\code{linpreds} and \code{newdata} are supplied}
+family-specific parameters (i.e. shape, scale or overdispersion parameters).
+Required if \code{linpreds} and \code{newdata} are supplied.}
 
-\item{include_forecast}{Logical. If \code{newdata} were fed to the model to compute
-forecasts, should the log-likelihood draws for these observations also be returned.
-Defaults to \code{TRUE}}
+\item{include_forecast}{Logical. If \code{newdata} were fed to the model to
+compute forecasts, should the log-likelihood draws for these observations
+also be returned. Defaults to \code{TRUE}.}
 
 \item{...}{Ignored}
 }
 \value{
-A \code{matrix} of dimension \verb{n_samples x n_observations} containing the pointwise
-log-likelihood draws for all observations in \code{newdata}. If no \code{newdata} is supplied,
-log-likelihood draws are returned for all observations that were originally fed to
-the model (training observations and, if supplied to the
-original model via the \code{newdata} argument in \code{\link{mvgam}},
-testing observations)
+A \code{matrix} of dimension \verb{n_samples x n_observations} containing the
+pointwise log-likelihood draws for all observations in \code{newdata}. If no
+\code{newdata} is supplied, log-likelihood draws are returned for all observations
+that were originally fed to the model (training observations and, if supplied
+to the original model via the \code{newdata} argument in \code{\link{mvgam}},
+testing observations).
 }
 \description{
 Compute pointwise Log-Likelihoods from fitted \pkg{mvgam} objects
@@ -39,15 +40,25 @@ Compute pointwise Log-Likelihoods from fitted \pkg{mvgam} objects
 \examples{
 \donttest{
 # Simulate some data and fit a model
-simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
-mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-             trend_model = AR(),
-             data = simdat$data_train,
-             chains = 2,
-             silent = 2)
+simdat <- sim_mvgam(
+  n_series = 1,
+  trend_model = AR()
+)
 
-# Extract logLikelihood values
+mod <- mvgam(
+  y ~ s(season, bs = 'cc', k = 6),
+  trend_model = AR(),
+  data = simdat$data_train,
+  chains = 2,
+  silent = 2
+)
+
+# Extract log-likelihood values
 lls <- logLik(mod)
 str(lls)
 }
+
+}
+\author{
+Nicholas J Clark
 }

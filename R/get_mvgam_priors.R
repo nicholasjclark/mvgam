@@ -1,158 +1,218 @@
-#'Extract information on default prior distributions for an \pkg{mvgam} model
+#' Extract information on default prior distributions for an \pkg{mvgam} model
 #'
-#'This function lists the parameters that can have their prior distributions
-#'changed for a given model, as well listing their default distributions
+#' This function lists the parameters that can have their prior distributions
+#' changed for a given model, as well listing their default distributions
 #'
-#'@inheritParams mvgam
-#'@inheritParams jsdgam
-#'@param ... Not currently used
-#'@param factor_formula Can be supplied instead `trend_formula` to match syntax from
-#'[jsdgam]
-#'@details Users can supply a model formula, prior to fitting the model, so that default priors can be inspected and
-#'altered. To make alterations, change the contents of the `prior` column and supplying this
-#'\code{data.frame} to the \code{\link{mvgam}} or \code{\link{jsdgam}} functions using the argument `priors`. If using `Stan` as the backend,
-#'users can also modify the parameter bounds by modifying the `new_lowerbound` and/or `new_upperbound` columns.
-#'This will be necessary if using restrictive distributions on some parameters, such as a Beta distribution
-#'for the trend sd parameters for example (Beta only has support on  \code{(0,1)}), so the upperbound cannot
-#'be above `1`. Another option is to make use of the prior modification functions in \pkg{brms}
-#'(i.e. \code{\link[brms]{prior}}) to change prior distributions and bounds (just use the name of the parameter that
-#'you'd like to change as the `class` argument; see examples below)
-#' @note Only the `prior`, `new_lowerbound` and/or `new_upperbound` columns of the output
-#' should be altered when defining the user-defined priors for the model. Use only if you are
-#' familiar with the underlying probabilistic programming language. There are no sanity checks done to
-#' ensure that the code is legal (i.e. to check that lower bounds are smaller than upper bounds, for
-#' example)
-#'@author Nicholas J Clark
-#'@seealso \code{\link{mvgam}}, \code{\link{mvgam_formulae}}, \code{\link[brms]{prior}}
-#'@return either a \code{data.frame} containing the prior definitions (if any suitable
-#'priors can be altered by the user) or \code{NULL}, indicating that no priors in the model
-#'can be modified
+#' @inheritParams mvgam
 #'
-#'@examples
-#'\donttest{
-#'# Simulate three integer-valued time series
-#'library(mvgam)
-#'dat <- sim_mvgam(trend_rel = 0.5)
+#' @inheritParams jsdgam
 #'
-#'# Get a model file that uses default mvgam priors for inspection (not always necessary,
-#'# but this can be useful for testing whether your updated priors are written correctly)
-#'mod_default <- mvgam(y ~ s(series, bs = 're') +
-#'               s(season, bs = 'cc') - 1,
-#'               family = nb(),
-#'               data = dat$data_train,
-#'               trend_model = AR(p = 2),
-#'               run_model = FALSE)
+#' @param ... Not currently used
 #'
-#'# Inspect the model file with default mvgam priors
-#'stancode(mod_default)
+#' @param factor_formula Can be supplied instead `trend_formula` to match
+#'   syntax from [jsdgam]
 #'
-#'# Look at which priors can be updated in mvgam
-#'test_priors <- get_mvgam_priors(y ~ s(series, bs = 're') +
-#'                               s(season, bs = 'cc') - 1,
-#'                               family = nb(),
-#'                               data = dat$data_train,
-#'                               trend_model = AR(p = 2))
-#'test_priors
+#' @details Users can supply a model formula, prior to fitting the model, so
+#'   that default priors can be inspected and altered. To make alterations,
+#'   change the contents of the `prior` column and supplying this
+#'   \code{data.frame} to the \code{\link{mvgam}} or \code{\link{jsdgam}}
+#'   functions using the argument `priors`. If using `Stan` as the backend,
+#'   users can also modify the parameter bounds by modifying the
+#'   `new_lowerbound` and/or `new_upperbound` columns. This will be necessary
+#'   if using restrictive distributions on some parameters, such as a Beta
+#'   distribution for the trend sd parameters for example (Beta only has
+#'   support on \code{(0,1)}), so the upperbound cannot be above `1`. Another
+#'   option is to make use of the prior modification functions in \pkg{brms}
+#'   (i.e. \code{\link[brms]{prior}}) to change prior distributions and bounds
+#'   (just use the name of the parameter that you'd like to change as the
+#'   `class` argument; see examples below)
 #'
-#'# Make a few changes; first, change the population mean for the series-level
-#'# random intercepts
-#'test_priors$prior[2] <- 'mu_raw ~ normal(0.2, 0.5);'
+#' @note Only the `prior`, `new_lowerbound` and/or `new_upperbound` columns of
+#'   the output should be altered when defining the user-defined priors for
+#'   the model. Use only if you are familiar with the underlying probabilistic
+#'   programming language. There are no sanity checks done to ensure that the
+#'   code is legal (i.e. to check that lower bounds are smaller than upper
+#'   bounds, for example)
 #'
-#'# Now use stronger regularisation for the series-level AR2 coefficients
-#'test_priors$prior[5] <- 'ar2 ~ normal(0, 0.25);'
+#' @author Nicholas J Clark
 #'
-#'# Check that the changes are made to the model file without any warnings by
-#'# setting 'run_model = FALSE'
-#'mod <- mvgam(y ~ s(series, bs = 're') +
-#'             s(season, bs = 'cc') - 1,
-#'             family = nb(),
-#'             data = dat$data_train,
-#'             trend_model = AR(p = 2),
-#'             priors = test_priors,
-#'             run_model = FALSE)
-#'stancode(mod)
+#' @seealso \code{\link{mvgam}}, \code{\link{mvgam_formulae}},
+#'   \code{\link[brms]{prior}}
 #'
-#'# No warnings, the model is ready for fitting now in the usual way with the addition
-#'# of the 'priors' argument
+#' @return either a \code{data.frame} containing the prior definitions (if any
+#'   suitable priors can be altered by the user) or \code{NULL}, indicating
+#'   that no priors in the model can be modified
 #'
-#'# The same can be done using 'brms' functions; here we will also change the ar1 prior
-#'# and put some bounds on the ar coefficients to enforce stationarity; we set the
-#'# prior using the 'class' argument in all brms prior functions
-#'brmsprior <- c(prior(normal(0.2, 0.5), class = mu_raw),
-#'               prior(normal(0, 0.25), class = ar1, lb = -1, ub = 1),
-#'               prior(normal(0, 0.25), class = ar2, lb = -1, ub = 1))
-#'brmsprior
+#' @examples
+#' \donttest{
+#' # ========================================================================
+#' # Example 1: Simulate data and inspect default priors
+#' # ========================================================================
 #'
-#'mod <- mvgam(y ~ s(series, bs = 're') +
-#'              s(season, bs = 'cc') - 1,
-#'            family = nb(),
-#'            data = dat$data_train,
-#'            trend_model = AR(p = 2),
-#'            priors = brmsprior,
-#'            run_model = FALSE)
-#'stancode(mod)
+#' dat <- sim_mvgam(trend_rel = 0.5)
 #'
-#'# Look at what is returned when an incorrect spelling is used
-#'test_priors$prior[5] <- 'ar2_bananas ~ normal(0, 0.25);'
-#'mod <- mvgam(y ~ s(series, bs = 're') +
-#'              s(season, bs = 'cc') - 1,
-#'             family = nb(),
-#'             data = dat$data_train,
-#'             trend_model = AR(p = 2),
-#'             priors = test_priors,
-#'             run_model = FALSE)
-#'stancode(mod)
+#' # Get a model file that uses default mvgam priors for inspection (not
+#' # always necessary, but this can be useful for testing whether your
+#' # updated priors are written correctly)
+#' mod_default <- mvgam(
+#'   y ~ s(series, bs = "re") + s(season, bs = "cc") - 1,
+#'   family = nb(),
+#'   data = dat$data_train,
+#'   trend_model = AR(p = 2),
+#'   run_model = FALSE
+#' )
 #'
-#'# Example of changing parametric (fixed effect) priors
-#'simdat <- sim_mvgam()
+#' # Inspect the model file with default mvgam priors
+#' stancode(mod_default)
 #'
-#'# Add a fake covariate
-#'simdat$data_train$cov <- rnorm(NROW(simdat$data_train))
+#' # Look at which priors can be updated in mvgam
+#' test_priors <- get_mvgam_priors(
+#'   y ~ s(series, bs = "re") + s(season, bs = "cc") - 1,
+#'   family = nb(),
+#'   data = dat$data_train,
+#'   trend_model = AR(p = 2)
+#' )
+#' test_priors
 #'
-#'priors <- get_mvgam_priors(y ~ cov + s(season),
-#'                           data = simdat$data_train,
-#'                           family = poisson(),
-#'                           trend_model = AR())
+#' # ========================================================================
+#' # Example 2: Modify priors manually
+#' # ========================================================================
 #'
-#'# Change priors for the intercept and fake covariate effects
-#'priors$prior[1] <- '(Intercept) ~ normal(0, 1);'
-#'priors$prior[2] <- 'cov ~ normal(0, 0.1);'
+#' # Make a few changes; first, change the population mean for the
+#' # series-level random intercepts
+#' test_priors$prior[2] <- "mu_raw ~ normal(0.2, 0.5);"
 #'
-#'mod2 <- mvgam(y ~ cov + s(season),
-#'              data = simdat$data_train,
-#'              trend_model = AR(),
-#'              family = poisson(),
-#'              priors = priors,
-#'              run_model = FALSE)
-#'stancode(mod2)
+#' # Now use stronger regularisation for the series-level AR2 coefficients
+#' test_priors$prior[5] <- "ar2 ~ normal(0, 0.25);"
 #'
-#'# Likewise using 'brms' utilities (note that you can use
-#'# Intercept rather than `(Intercept)`) to change priors on the intercept
-#'brmsprior <- c(prior(normal(0.2, 0.5), class = cov),
-#'               prior(normal(0, 0.25), class = Intercept))
-#'brmsprior
+#' # Check that the changes are made to the model file without any warnings
+#' # by setting 'run_model = FALSE'
+#' mod <- mvgam(
+#'   y ~ s(series, bs = "re") + s(season, bs = "cc") - 1,
+#'   family = nb(),
+#'   data = dat$data_train,
+#'   trend_model = AR(p = 2),
+#'   priors = test_priors,
+#'   run_model = FALSE
+#' )
+#' stancode(mod)
 #'
-#'mod2 <- mvgam(y ~ cov + s(season),
-#'              data = simdat$data_train,
-#'              trend_model = AR(),
-#'              family = poisson(),
-#'              priors = brmsprior,
-#'              run_model = FALSE)
-#'stancode(mod2)
+#' # No warnings, the model is ready for fitting now in the usual way with
+#' # the addition of the 'priors' argument
 #'
-#'# The "class = 'b'" shortcut can be used to put the same prior on all
-#'# 'fixed' effect coefficients (apart from any intercepts)
-#'set.seed(0)
-#'dat <- mgcv::gamSim(1, n = 200, scale = 2)
-#'dat$time <- 1:NROW(dat)
-#'mod <- mvgam(y ~ x0 + x1 + s(x2) + s(x3),
-#'             priors = prior(normal(0, 0.75), class = 'b'),
-#'             data = dat,
-#'             family = gaussian(),
-#'             run_model = FALSE)
-#'stancode(mod)
-#'}
-#'@export
+#' # ========================================================================
+#' # Example 3: Use brms syntax for prior modification
+#' # ========================================================================
+#'
+#' # The same can be done using 'brms' functions; here we will also change
+#' # the ar1 prior and put some bounds on the ar coefficients to enforce
+#' # stationarity; we set the prior using the 'class' argument in all brms
+#' # prior functions
+#' brmsprior <- c(
+#'   prior(normal(0.2, 0.5), class = mu_raw),
+#'   prior(normal(0, 0.25), class = ar1, lb = -1, ub = 1),
+#'   prior(normal(0, 0.25), class = ar2, lb = -1, ub = 1)
+#' )
+#' brmsprior
+#'
+#' mod <- mvgam(
+#'   y ~ s(series, bs = "re") + s(season, bs = "cc") - 1,
+#'   family = nb(),
+#'   data = dat$data_train,
+#'   trend_model = AR(p = 2),
+#'   priors = brmsprior,
+#'   run_model = FALSE
+#' )
+#' stancode(mod)
+#'
+#' # ========================================================================
+#' # Example 4: Error handling example
+#' # ========================================================================
+#'
+#' # Look at what is returned when an incorrect spelling is used
+#' test_priors$prior[5] <- "ar2_bananas ~ normal(0, 0.25);"
+#' mod <- mvgam(
+#'   y ~ s(series, bs = "re") + s(season, bs = "cc") - 1,
+#'   family = nb(),
+#'   data = dat$data_train,
+#'   trend_model = AR(p = 2),
+#'   priors = test_priors,
+#'   run_model = FALSE
+#' )
+#' stancode(mod)
+#'
+#' # ========================================================================
+#' # Example 5: Parametric (fixed effect) priors
+#' # ========================================================================
+#'
+#' simdat <- sim_mvgam()
+#'
+#' # Add a fake covariate
+#' simdat$data_train$cov <- rnorm(NROW(simdat$data_train))
+#'
+#' priors <- get_mvgam_priors(
+#'   y ~ cov + s(season),
+#'   data = simdat$data_train,
+#'   family = poisson(),
+#'   trend_model = AR()
+#' )
+#'
+#' # Change priors for the intercept and fake covariate effects
+#' priors$prior[1] <- "(Intercept) ~ normal(0, 1);"
+#' priors$prior[2] <- "cov ~ normal(0, 0.1);"
+#'
+#' mod2 <- mvgam(
+#'   y ~ cov + s(season),
+#'   data = simdat$data_train,
+#'   trend_model = AR(),
+#'   family = poisson(),
+#'   priors = priors,
+#'   run_model = FALSE
+#' )
+#' stancode(mod2)
+#'
+#' # ========================================================================
+#' # Example 6: Alternative brms syntax for fixed effects
+#' # ========================================================================
+#'
+#' # Likewise using 'brms' utilities (note that you can use Intercept rather
+#' # than `(Intercept)`) to change priors on the intercept
+#' brmsprior <- c(
+#'   prior(normal(0.2, 0.5), class = cov),
+#'   prior(normal(0, 0.25), class = Intercept)
+#' )
+#' brmsprior
+#'
+#' mod2 <- mvgam(
+#'   y ~ cov + s(season),
+#'   data = simdat$data_train,
+#'   trend_model = AR(),
+#'   family = poisson(),
+#'   priors = brmsprior,
+#'   run_model = FALSE
+#' )
+#' stancode(mod2)
+#'
+#' # ========================================================================
+#' # Example 7: Bulk prior assignment
+#' # ========================================================================
+#'
+#' # The "class = 'b'" shortcut can be used to put the same prior on all
+#' # 'fixed' effect coefficients (apart from any intercepts)
+#' set.seed(0)
+#' dat <- mgcv::gamSim(1, n = 200, scale = 2)
+#' dat$time <- 1:NROW(dat)
+#' mod <- mvgam(
+#'   y ~ x0 + x1 + s(x2) + s(x3),
+#'   priors = prior(normal(0, 0.75), class = "b"),
+#'   data = dat,
+#'   family = gaussian(),
+#'   run_model = FALSE
+#' )
+#' stancode(mod)
+#' }
+#'
+#' @export
 get_mvgam_priors = function(
   formula,
   trend_formula,

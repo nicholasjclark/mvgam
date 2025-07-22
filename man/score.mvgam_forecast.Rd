@@ -113,7 +113,6 @@ fc_scores <- score(fc, score = 'brier')
 str(fc_scores)
 }
 
-
 }
 \references{
 Gneiting, T. and Raftery, A. E. (2007). Strictly Proper

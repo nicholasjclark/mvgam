@@ -1,31 +1,50 @@
 #' Index \code{mvgam} objects
+#'
 #' @aliases variables
 #'
 #' Index variables and their `mgcv` coefficient names
 #'
 #' @param x A \code{mvgam} object or another \R object for which
 #' the methods are defined.
+#'
 #' @param ... Arguments passed to individual methods (if applicable).
 #'
 #' @name index-mvgam
 NULL
 
 #' @rdname index-mvgam
+#'
 #' @importFrom posterior variables
+#'
 #' @param x \code{list} object returned from \code{mvgam}. See [mvgam()]
+#'
 #' @method variables mvgam
+#'
 #' @return a `list` object of the variables that can be extracted, along
 #' with their aliases
+#'
+#' @author Nicholas J Clark
+#'
 #' @examples
 #' \donttest{
-#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
-#' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-#'              trend_model = AR(),
-#'              data = simdat$data_train,
-#'             chains = 2,
-#'             silent = 2)
+#' # Simulate data and fit a model
+#' simdat <- sim_mvgam(
+#'   n_series = 1,
+#'   trend_model = AR()
+#' )
+#'
+#' mod <- mvgam(
+#'   y ~ s(season, bs = 'cc', k = 6),
+#'   trend_model = AR(),
+#'   data = simdat$data_train,
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' # Extract model variables
 #' variables(mod)
 #' }
+#'
 #' @export
 #' @export variables
 variables.mvgam = function(x, ...) {

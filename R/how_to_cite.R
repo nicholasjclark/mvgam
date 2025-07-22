@@ -1,50 +1,72 @@
 #' Generate a methods description for \pkg{mvgam} models
 #'
-#' Create a brief but fully referenced methods description, along with a useful list of references,
-#' for fitted \code{mvgam} and \code{jsdgam} models
+#' Create a brief but fully referenced methods description, along with a useful
+#' list of references, for fitted \code{mvgam} and \code{jsdgam} models.
 #'
-#'@name how_to_cite.mvgam
-#'@param object \code{list} object of class \code{mvgam} resulting from a call to [mvgam()]
-#' or [jsdgam()]
-#'@param ... ignored
-#'@details This function uses the model's structure to come up with a very basic
-#'but hopefully useful methods description that can help users to appropriately acknowledge
-#'the hard work of developers and champion open science. Please do not consider the
-#'text returned by this function to be a completely adequate methods section, it is only
-#'meant to get you started.
-#'@return An object of class \code{how_to_cite} containing a text description of the
-#'methods as well as lists of both primary and additional references
-#'@author Nicholas J Clark
-#'@seealso \code{\link[utils]{citation}}, \code{\link{mvgam}}, \code{\link{jsdgam}}
+#' @name how_to_cite.mvgam
+#'
+#' @param object \code{list} object of class \code{mvgam} resulting from a call
+#' to [mvgam()] or [jsdgam()]
+#'
+#' @param ... ignored
+#'
+#' @details This function uses the model's structure to come up with a very
+#' basic but hopefully useful methods description that can help users to
+#' appropriately acknowledge the hard work of developers and champion open
+#' science. Please do not consider the text returned by this function to be a
+#' completely adequate methods section; it is only meant to get you started.
+#'
+#' @return An object of class \code{how_to_cite} containing a text description
+#' of the methods as well as lists of both primary and additional references.
+#'
+#' @author Nicholas J Clark
+#'
+#' @seealso \code{\link[utils]{citation}}, \code{\link{mvgam}},
+#' \code{\link{jsdgam}}
+#'
 #' @examples
 #' \donttest{
+#' #--------------------------------------------------
 #' # Simulate 4 time series with hierarchical seasonality
 #' # and a VAR(1) dynamic process
+#' #--------------------------------------------------
 #' set.seed(0)
-#' simdat <- sim_mvgam(seasonality = 'hierarchical',
-#'                     trend_model = VAR(cor = TRUE),
-#'                     family = gaussian())
+#'
+#' simdat <- sim_mvgam(
+#'   seasonality = 'hierarchical',
+#'   trend_model = VAR(cor = TRUE),
+#'   family = gaussian()
+#' )
 #'
 #' # Fit an appropriate model
-#' mod1 <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-#'               data = simdat$data_train,
-#'               family = gaussian(),
-#'               trend_model = VAR(cor = TRUE),
-#'               chains = 2,
-#'               silent = 2)
+#' mod1 <- mvgam(
+#'   y ~ s(season, bs = 'cc', k = 6),
+#'   data = simdat$data_train,
+#'   family = gaussian(),
+#'   trend_model = VAR(cor = TRUE),
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
 #' how_to_cite(mod1)
 #'
+#' #--------------------------------------------------
 #' # For a GP example, simulate data using the mgcv package
+#' #--------------------------------------------------
 #' dat <- mgcv::gamSim(1, n = 30, scale = 2)
 #'
-#' # Fit a model that uses an approximate GP from the brms package
-#' mod2 <- mvgam(y ~ gp(x2, k = 12),
-#'               data = dat,
-#'               family = gaussian(),
-#'               chains = 2,
-#'               silent = 2)
+#' # Fit a model that uses an approximate GP from brms
+#' mod2 <- mvgam(
+#'   y ~ gp(x2, k = 12),
+#'   data = dat,
+#'   family = gaussian(),
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
 #' how_to_cite(mod2)
 #' }
+#'
 #'@export
 how_to_cite <- function(object, ...) {
   UseMethod("how_to_cite", object)
