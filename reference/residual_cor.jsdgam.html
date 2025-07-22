@@ -93,9 +93,10 @@ or included correlated process errors directly</p>
     <div class="section level2">
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
     <dl><dt>object</dt>
-<dd><p><code>list</code> object of class <code>mvgam</code> resulting from a call to <code><a href="jsdgam.html">jsdgam()</a></code>
-or a call to <code><a href="mvgam.html">mvgam()</a></code> in which either <code>use_lv = TRUE</code> or a multivariate process was used
-with <code>cor = TRUE</code> (see <code><a href="RW.html">RW()</a></code> and <code><a href="RW.html">VAR()</a></code> for examples)</p></dd>
+<dd><p><code>list</code> object of class <code>mvgam</code> resulting from a
+call to <code><a href="jsdgam.html">jsdgam()</a></code> or a call to <code><a href="mvgam.html">mvgam()</a></code> in which either
+<code>use_lv = TRUE</code> or a multivariate process was used with <code>cor = TRUE</code>
+(see <code><a href="RW.html">RW()</a></code> and <code><a href="RW.html">VAR()</a></code> for examples)</p></dd>
 
 
 <dt>...</dt>
@@ -108,8 +109,9 @@ instead of the raw values? Default is <code>TRUE</code>..</p></dd>
 
 
 <dt>robust</dt>
-<dd><p>If <code>FALSE</code> (the default) the mean is used as a measure of central tendency.
-If <code>TRUE</code>, the median is used instead. Only used if <code>summary</code> is <code>TRUE</code></p></dd>
+<dd><p>If <code>FALSE</code> (the default) the mean is used as a measure of
+central tendency. If <code>TRUE</code>, the median is used instead. Only used if
+<code>summary</code> is <code>TRUE</code></p></dd>
 
 
 <dt>probs</dt>
@@ -121,54 +123,69 @@ function. Only used if <code>summary</code> is <code>TRUE</code>.</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     
 
-<p>If <code>summary = TRUE</code>, a <code>list</code> of  <code><a href="mvgam_residcor-class.html">mvgam_residcor-class</a></code> with the following components:</p>
+<p>If <code>summary = TRUE</code>, a <code>list</code> of
+<code><a href="mvgam_residcor-class.html">mvgam_residcor-class</a></code> with the following components:</p>
 <dl><dt>cor, cor_lower, cor_upper</dt>
-<dd><p>A set of \(p \times p\) correlation matrices,
-containing either the posterior median or mean estimate, plus lower and upper limits
-of the corresponding credible intervals supplied to <code>probs</code></p></dd>
+<dd><p>A set of \(p \times p\) correlation
+matrices, containing either the posterior median or mean estimate, plus
+lower and upper limits of the corresponding credible intervals supplied
+to <code>probs</code></p></dd>
 
 <dt>sig_cor</dt>
-<dd><p>A \(p \times p\) correlation matrix containing only those correlations whose credible
-interval does not contain zero. All other correlations are set to zero</p></dd>
+<dd><p>A \(p \times p\) correlation matrix containing only
+correlations whose credible interval does not contain zero. All other
+correlations are set to zero</p></dd>
 
 <dt>prec, prec_lower, prec_upper</dt>
-<dd><p>A set of \(p \times p\) precision matrices,
-containing either the posterior median or mean estimate, plus lower and upper limits
-of the corresponding credible intervals supplied to <code>probs</code></p></dd>
+<dd><p>A set of \(p \times p\) precision
+matrices, containing either the posterior median or mean estimate, plus
+lower and upper limits of the corresponding credible intervals supplied
+to <code>probs</code></p></dd>
 
 <dt>sig_prec</dt>
-<dd><p>A \(p \times p\) precision matrix containing only those precisions whose credible
-interval does not contain zero. All other precisions are set to zero</p></dd>
+<dd><p>A \(p \times p\) precision matrix containing only
+precisions whose credible interval does not contain zero. All other
+precisions are set to zero</p></dd>
 
 <dt>cov</dt>
-<dd><p>A \(p \times p\) posterior median or mean covariance matrix</p></dd>
+<dd><p>A \(p \times p\) posterior median or mean covariance
+matrix</p></dd>
 
 <dt>trace</dt>
-<dd><p>The median/mean point estimator of the trace (sum of the diagonal elements)
-of the residual covariance matrix <code>cov</code></p></dd>
+<dd><p>The median/mean point estimator of the trace (sum of the
+diagonal elements) of the residual covariance matrix <code>cov</code></p></dd>
 
 
-</dl><p>If <code>summary = FALSE</code>, this function returns a <code>list</code> containing the following components:</p>
+</dl><p>If <code>summary = FALSE</code>, this function returns a <code>list</code> containing the
+following components:</p>
 <dl><dt>all_cormat</dt>
-<dd><p>A \(n_{draws} \times p \times p\) <code>array</code> of posterior
-residual correlation matrix draws</p></dd>
+<dd><p>A \(n_{draws} \times p \times p\) <code>array</code> of
+posterior residual correlation matrix draws</p></dd>
 
 <dt>all_covmat</dt>
-<dd><p>A \(n_{draws} \times p \times p\) <code>array</code> of posterior
-residual covariance matrix draws</p></dd>
+<dd><p>A \(n_{draws} \times p \times p\) <code>array</code> of
+posterior residual covariance matrix draws</p></dd>
 
 <dt>all_presmat</dt>
-<dd><p>A \(n_{draws} \times p \times p\) <code>array</code> of posterior
-residual precision matrix draws</p></dd>
+<dd><p>A \(n_{draws} \times p \times p\) <code>array</code> of
+posterior residual precision matrix draws</p></dd>
 
 <dt>all_trace</dt>
-<dd><p>A \(n_{draws}\) <code>vector</code> of posterior covariance trace draws</p></dd>
+<dd><p>A \(n_{draws}\) <code>vector</code> of posterior covariance
+trace draws</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>See <code><a href="mvgam_residcor-class.html">mvgam_residcor-class</a></code> for a full description of the quantities that are
-computed and returned by this function, along with key references.</p>
+    <p>See <code><a href="mvgam_residcor-class.html">mvgam_residcor-class</a></code> for a description of the quantities
+that are computed and returned by this function, along with key references.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
+    <p>Hui, F. K. C. (2016). boral – Bayesian Ordination and
+Regression Analysis of Multivariate Abundance Data in r. <em>Methods
+in Ecology and Evolution</em>, 7(6), 744-750.
+<a href="https://doi.org/10.1111/2041-210X.12514" class="external-link">doi:10.1111/2041-210X.12514</a></p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

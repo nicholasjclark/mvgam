@@ -82,7 +82,8 @@ jsdgam models"><meta property="og:image" content="https://nicholasjclark.github.
     <div class="section level2">
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
     <dl><dt>object</dt>
-<dd><p><code>list</code> object of class <code>jsdgam</code> resulting from a call to <code><a href="jsdgam.html">jsdgam()</a></code></p></dd>
+<dd><p><code>list</code> object of class <code>jsdgam</code> resulting from a
+call to <code><a href="jsdgam.html">jsdgam()</a></code></p></dd>
 
 
 <dt>...</dt>
@@ -90,27 +91,29 @@ jsdgam models"><meta property="og:image" content="https://nicholasjclark.github.
 
 
 <dt>which_lvs</dt>
-<dd><p>A <code>vector</code> of indices indicating the two latent variables to be plotted
-(if number of the latent variables specified in the model was more than 2).
-Defaults to <code>c(1, 2)</code></p></dd>
+<dd><p>A <code>vector</code> of indices indicating the two latent variables
+to be plotted (if number of the latent variables specified in the model
+was more than 2). Defaults to <code>c(1, 2)</code></p></dd>
 
 
 <dt>biplot</dt>
-<dd><p><code>Logical</code>. If <code>TRUE</code>, both the site and the species
-scores will be plotted, with names for the taxa interpreted based on the <code>species</code>
-argument in the original call to <code><a href="jsdgam.html">jsdgam()</a></code>. If <code>FALSE</code>, only the site scores
-will be plotted</p></dd>
+<dd><p><code>Logical</code>. If <code>TRUE</code>, both the site and the species scores
+will be plotted, with names for the taxa interpreted based on the
+<code>species</code> argument in the original call to <code><a href="jsdgam.html">jsdgam()</a></code>. If <code>FALSE</code>, only
+the site scores will be plotted</p></dd>
 
 
 <dt>alpha</dt>
-<dd><p>A proportional numeric scalar between <code>0</code> and <code>1</code> that controls the relative
-scaling of the latent variables and their loading coefficients</p></dd>
+<dd><p>A proportional numeric scalar between <code>0</code> and <code>1</code> that
+controls the relative scaling of the latent variables and their loading
+coefficients</p></dd>
 
 
 <dt>label_sites</dt>
 <dd><p><code>Logical</code> flag. If <code>TRUE</code>, site scores will be
-plotted as labels using names based on the <code>unit</code> argument in the original call to <code><a href="jsdgam.html">jsdgam()</a></code>.
-If <code>FALSE</code>, site scores will be shown as points only</p></dd>
+plotted as labels using names based on the <code>unit</code> argument in the
+original call to <code><a href="jsdgam.html">jsdgam()</a></code>. If <code>FALSE</code>, site scores will be shown as
+points only</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -121,16 +124,17 @@ If <code>FALSE</code>, site scores will be shown as points only</p></dd>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>This function constructs a two-dimensional scatterplot in ordination space. The
-chosen latent variables are first re-rotated using singular value decomposition,
-so that the first plotted latent variable does not have to be the first latent variable
-that was estimated in the original model. Posterior median estimates of the variables
-and the species' loadings on these variables are then used to construct the resulting plot.
-Some attempt at de-cluttering the resulting plot is made by using <code>geom_label_repel()</code> and
-<code>geom_text_repel</code> from the <span class="pkg">ggrepel</span> package, but if there are many sites and/or species
-then some labels may be removed automatically. Note that you can typically get
-better, more readable plot layouts if you also have the <span class="pkg">ggarrow</span> and
-<span class="pkg">ggpp</span> packages installed</p>
+    <p>This function constructs a two-dimensional scatterplot in ordination space.
+The chosen latent variables are first re-rotated using singular value
+decomposition, so that the first plotted latent variable does not have to
+be the first latent variable that was estimated in the original model.
+Posterior median estimates of the variables and the species' loadings on
+these variables are then used to construct the resulting plot. Some attempt
+at de-cluttering the resulting plot is made by using <code>geom_label_repel()</code>
+and <code>geom_text_repel</code> from the <span class="pkg">ggrepel</span> package, but if there are many
+sites and/or species then some labels may be removed automatically. Note
+that you can typically get better, more readable plot layouts if you also
+have the <span class="pkg">ggarrow</span> and <span class="pkg">ggpp</span> packages installed</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

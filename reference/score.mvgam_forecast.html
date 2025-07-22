@@ -84,38 +84,44 @@
 
 
 <dt>score</dt>
-<dd><p><code>character</code> specifying the type of proper scoring rule to use for evaluation. Options are:
-<code>sis</code> (i.e. the Scaled Interval Score), <code>energy</code>, <code>variogram</code>, <code>elpd</code>
-(i.e. the Expected log pointwise Predictive Density),
-<code>drps</code> (i.e. the Discrete Rank Probability Score), <code>crps</code> (the Continuous Rank Probability Score)
-or <code>brier</code> (the latter of which is only applicable for <code>bernoulli</code> models.
-Note that when choosing <code>elpd</code>, the supplied object must have forecasts on the <code>link</code> scale so that
-expectations can be calculated prior to scoring. If choosing <code>brier</code>, the object must have forecasts
-on the <code>expected</code> scale (i.e. probability predictions). For all other scores, forecasts should be supplied
-on the <code>response</code> scale (i.e. posterior predictions)</p></dd>
+<dd><p><code>character</code> specifying the type of proper scoring rule
+to use for evaluation. Options are: <code>sis</code> (i.e. the Scaled Interval
+Score), <code>energy</code>, <code>variogram</code>, <code>elpd</code> (i.e. the Expected log pointwise
+Predictive Density), <code>drps</code> (i.e. the Discrete Rank Probability Score),
+<code>crps</code> (the Continuous Rank Probability Score) or <code>brier</code> (the latter
+of which is only applicable for <code>bernoulli</code> models. Note that when
+choosing <code>elpd</code>, the supplied object must have forecasts on the <code>link</code>
+scale so that expectations can be calculated prior to scoring. If
+choosing <code>brier</code>, the object must have forecasts on the <code>expected</code> scale
+(i.e. probability predictions). For all other scores, forecasts should
+be supplied on the <code>response</code> scale (i.e. posterior predictions)</p></dd>
 
 
 <dt>log</dt>
-<dd><p><code>logical</code>. Should the forecasts and truths be logged prior to scoring?
-This is often appropriate for comparing
-performance of models when series vary in their observation ranges. Ignored if <code>score = 'brier'</code></p></dd>
+<dd><p><code>logical</code>. Should the forecasts and truths be logged
+prior to scoring? This is often appropriate for comparing performance
+of models when series vary in their observation ranges. Ignored if
+<code>score = 'brier'</code></p></dd>
 
 
 <dt>weights</dt>
-<dd><p>optional <code>vector</code> of weights (where <code>length(weights) == n_series</code>)
-for weighting pairwise correlations when evaluating the variogram score for multivariate
-forecasts. Useful for down-weighting series that have larger magnitude observations or that
-are of less interest when forecasting. Ignored if <code>score != 'variogram'</code></p></dd>
+<dd><p>optional <code>vector</code> of weights (where
+<code>length(weights) == n_series</code>) for weighting pairwise correlations
+when evaluating the variogram score for multivariate forecasts. Useful
+for down-weighting series that have larger magnitude observations or
+that are of less interest when forecasting. Ignored if
+<code>score != 'variogram'</code></p></dd>
 
 
 <dt>interval_width</dt>
-<dd><p>proportional value on <code>[0.05,0.95]</code> defining the forecast interval
-for calculating coverage and, if <code>score = 'sis'</code>, for calculating the interval score.
-Ignored if <code>score = 'brier'</code></p></dd>
+<dd><p>proportional value on <code>[0.05,0.95]</code> defining the
+forecast interval for calculating coverage and, if <code>score = 'sis'</code>, for
+calculating the interval score. Ignored if <code>score = 'brier'</code></p></dd>
 
 
 <dt>n_cores</dt>
-<dd><p><code>integer</code> specifying number of cores for calculating scores in parallel</p></dd>
+<dd><p><code>integer</code> specifying number of cores for calculating
+scores in parallel</p></dd>
 
 
 <dt>...</dt>
@@ -126,14 +132,23 @@ Ignored if <code>score = 'brier'</code></p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     
 
-<p>a <code>list</code> containing scores and interval coverages per forecast horizon.
-If <code>score %in% c('drps', 'crps', 'elpd', 'brier')</code>,
-the list will also contain return the sum of all series-level scores per horizon. If
-<code>score %in% c('energy','variogram')</code>, no series-level scores are computed and the only score returned
-will be for all series. For all scores apart from <code>elpd</code> and <code>brier</code>, the <code>in_interval</code> column in each series-level
-slot is a binary indicator of whether or not the true value was within the forecast's corresponding
-posterior empirical quantiles. Intervals are not calculated when using <code>elpd</code> because forecasts
-will only contain the linear predictors</p>
+<p>A <code>list</code> containing scores and interval coverages per
+forecast horizon. If <code>score %in% c('drps', 'crps', 'elpd', 'brier')</code>,
+the list will also contain return the sum of all series-level scores
+per horizon. If <code>score %in% c('energy','variogram')</code>, no
+series-level scores are computed and the only score returned will be
+for all series. For all scores apart from <code>elpd</code> and <code>brier</code>, the
+<code>in_interval</code> column in each series-level slot is a binary indicator of
+whether or not the true value was within the forecast's corresponding
+posterior empirical quantiles. Intervals are not calculated when using
+<code>elpd</code> because forecasts will only contain the linear predictors</p>
+    </div>
+    <div class="section level2">
+    <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
+    <p>Gneiting, T. and Raftery, A. E. (2007). Strictly Proper
+Scoring Rules, Prediction, and Estimation. <em>Journal of the American
+Statistical Association</em>, 102(477), 359-378.
+<a href="https://doi.org/10.1198/016214506000001437" class="external-link">doi:10.1198/016214506000001437</a></p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
@@ -149,13 +164,16 @@ will only contain the linear predictors</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate observations for three count-valued time series</span></span></span>
 <span class="r-in"><span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit a dynamic model using 'newdata' to automatically produce forecasts</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fl">1</span>,</span></span>
-<span class="r-in"><span>            trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">RW</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>            data <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>            newdata <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
-<span class="r-in"><span>            chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
-<span class="r-in"><span>            silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>  trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">RW</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  data <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>  newdata <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
+<span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Extract forecasts into a 'mvgam_forecast' object</span></span></span>
 <span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
@@ -193,13 +211,16 @@ will only contain the linear predictors</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># An example using binary data</span></span></span>
 <span class="r-in"><span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="mvgam_families.html">bernoulli</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>            trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>            data <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>            newdata <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
-<span class="r-in"><span>            family <span class="op">=</span> <span class="fu"><a href="mvgam_families.html">bernoulli</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>            chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
-<span class="r-in"><span>            silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  data <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>  newdata <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
+<span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="mvgam_families.html">bernoulli</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Extract forecasts on the expectation (probability) scale</span></span></span>
 <span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'expected'</span><span class="op">)</span></span></span>
@@ -235,6 +256,8 @@ will only contain the linear predictors</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ eval_horizon: int [1:25] 1 2 3 4 5 6 7 8 9 10 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ score_type  : chr [1:25] "sum_brier" "sum_brier" "sum_brier" "sum_brier" ...</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

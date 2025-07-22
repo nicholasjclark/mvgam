@@ -125,8 +125,8 @@ of the <code>nmix()</code> family</p></li>
 </ul><p>Only <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>, <code>nb()</code>, and <code>tweedie()</code> are available if
 using <code>JAGS</code>. All families, apart from <code>tweedie()</code>, are supported if
 using <code>Stan</code>.</p>
-<p>Note that currently it is not possible to change the default link
-functions in <code>mvgam</code>, so any call to change these will be silently ignored</p>
+<p>Note that currently it is not possible to change the default link</p>
+<p>functions in <span class="pkg">mvgam</span>, so any call to change these will be silently ignored</p>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
@@ -136,77 +136,110 @@ functions in <code>mvgam</code>, so any call to change these will be silently ig
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
-<span class="r-in"><span><span class="co"># Example showing how to set up N-mixture models</span></span></span>
+<span class="r-in"><span><span class="co"># =============================================================================</span></span></span>
+<span class="r-in"><span><span class="co"># N-mixture Models</span></span></span>
+<span class="r-in"><span><span class="co"># =============================================================================</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">999</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="co"># Simulate observations for species 1, which shows a declining trend and 0.7 detection probability</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>site <span class="op">=</span> <span class="fl">1</span>,</span></span>
-<span class="r-in"><span>          <span class="co"># five replicates per year; six years</span></span></span>
-<span class="r-in"><span>          replicate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">6</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>          time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>          species <span class="op">=</span> <span class="st">'sp_1'</span>,</span></span>
-<span class="r-in"><span>          <span class="co"># true abundance declines nonlinearly</span></span></span>
-<span class="r-in"><span>          truth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">28</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">26</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">23</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">16</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">14</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">14</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>          <span class="co"># observations are taken with detection prob = 0.7</span></span></span>
-<span class="r-in"><span>          obs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">28</span>, <span class="fl">0.7</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                  <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">26</span>, <span class="fl">0.7</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                  <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">23</span>, <span class="fl">0.7</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                  <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">15</span>, <span class="fl">0.7</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                  <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">14</span>, <span class="fl">0.7</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                  <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">14</span>, <span class="fl">0.7</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
-<span class="r-in"><span> <span class="co"># add 'series' information, which is an identifier of site, replicate and species</span></span></span>
-<span class="r-in"><span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">'site_'</span>, <span class="va">site</span>,</span></span>
-<span class="r-in"><span>                               <span class="st">'_'</span>, <span class="va">species</span>,</span></span>
-<span class="r-in"><span>                               <span class="st">'_rep_'</span>, <span class="va">replicate</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>               time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">time</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>               <span class="co"># add a 'cap' variable that defines the maximum latent N to</span></span></span>
-<span class="r-in"><span>               <span class="co"># marginalize over when estimating latent abundance; in other words</span></span></span>
-<span class="r-in"><span>               <span class="co"># how large do we realistically think the true abundance could be?</span></span></span>
-<span class="r-in"><span>               cap <span class="op">=</span> <span class="fl">80</span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
-<span class="r-in"><span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span> <span class="va">replicate</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">testdat</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Now add another species that has a different temporal trend and a smaller</span></span></span>
-<span class="r-in"><span><span class="co"># detection probability (0.45 for this species)</span></span></span>
-<span class="r-in"><span><span class="va">testdat</span> <span class="op">=</span> <span class="va">testdat</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
-<span class="r-in"><span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>site <span class="op">=</span> <span class="fl">1</span>,</span></span>
-<span class="r-in"><span>                             replicate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">6</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                             time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                             species <span class="op">=</span> <span class="st">'sp_2'</span>,</span></span>
-<span class="r-in"><span>                             truth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                                       <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">7</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                                       <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">15</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                                       <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">16</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                                       <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">19</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                                       <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">18</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                             obs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">4</span>, <span class="fl">0.45</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                                     <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">7</span>, <span class="fl">0.45</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                                     <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">15</span>, <span class="fl">0.45</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                                     <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">16</span>, <span class="fl">0.45</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                                     <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">19</span>, <span class="fl">0.45</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                                     <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">18</span>, <span class="fl">0.45</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
-<span class="r-in"><span>                    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">'site_'</span>, <span class="va">site</span>,</span></span>
-<span class="r-in"><span>                                                  <span class="st">'_'</span>, <span class="va">species</span>,</span></span>
-<span class="r-in"><span>                                                  <span class="st">'_rep_'</span>, <span class="va">replicate</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                                  time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">time</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                                  cap <span class="op">=</span> <span class="fl">50</span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
-<span class="r-in"><span>                    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">replicate</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># Simulate observations for species 1, which shows a declining trend and</span></span></span>
+<span class="r-in"><span><span class="co"># 0.7 detection probability</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  site <span class="op">=</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>  <span class="co"># five replicates per year; six years</span></span></span>
+<span class="r-in"><span>  replicate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">6</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  species <span class="op">=</span> <span class="st">'sp_1'</span>,</span></span>
+<span class="r-in"><span>  <span class="co"># true abundance declines nonlinearly</span></span></span>
+<span class="r-in"><span>  truth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">28</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">26</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">23</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">16</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">14</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">14</span>, <span class="fl">5</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span>,</span></span>
+<span class="r-in"><span>  <span class="co"># observations are taken with detection prob = 0.7</span></span></span>
+<span class="r-in"><span>  obs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">28</span>, <span class="fl">0.7</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">26</span>, <span class="fl">0.7</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">23</span>, <span class="fl">0.7</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">15</span>, <span class="fl">0.7</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">14</span>, <span class="fl">0.7</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">14</span>, <span class="fl">0.7</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
+<span class="r-in"><span>  <span class="co"># add 'series' information, which is an identifier of site, replicate</span></span></span>
+<span class="r-in"><span>  <span class="co"># and species</span></span></span>
+<span class="r-in"><span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>      <span class="st">'site_'</span>, <span class="va">site</span>,</span></span>
+<span class="r-in"><span>      <span class="st">'_'</span>, <span class="va">species</span>,</span></span>
+<span class="r-in"><span>      <span class="st">'_rep_'</span>, <span class="va">replicate</span></span></span>
+<span class="r-in"><span>    <span class="op">)</span>,</span></span>
+<span class="r-in"><span>    time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">time</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    <span class="co"># add a 'cap' variable that defines the maximum latent N to</span></span></span>
+<span class="r-in"><span>    <span class="co"># marginalize over when estimating latent abundance; in other words</span></span></span>
+<span class="r-in"><span>    <span class="co"># how large do we realistically think the true abundance could be?</span></span></span>
+<span class="r-in"><span>    cap <span class="op">=</span> <span class="fl">80</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
+<span class="r-in"><span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">replicate</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">testdat</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Now add another species that has a different temporal trend and a</span></span></span>
+<span class="r-in"><span><span class="co"># smaller detection probability (0.45 for this species)</span></span></span>
+<span class="r-in"><span><span class="va">testdat</span> <span class="op">&lt;-</span> <span class="va">testdat</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
+<span class="r-in"><span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>      site <span class="op">=</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>      replicate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">6</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>      time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>      species <span class="op">=</span> <span class="st">'sp_2'</span>,</span></span>
+<span class="r-in"><span>      truth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>        <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>        <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">7</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>        <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">15</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>        <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">16</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>        <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">19</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>        <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">18</span>, <span class="fl">5</span><span class="op">)</span></span></span>
+<span class="r-in"><span>      <span class="op">)</span>,</span></span>
+<span class="r-in"><span>      obs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>        <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">4</span>, <span class="fl">0.45</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>        <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">7</span>, <span class="fl">0.45</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>        <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">15</span>, <span class="fl">0.45</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>        <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">16</span>, <span class="fl">0.45</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>        <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">19</span>, <span class="fl">0.45</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>        <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">18</span>, <span class="fl">0.45</span><span class="op">)</span></span></span>
+<span class="r-in"><span>      <span class="op">)</span></span></span>
+<span class="r-in"><span>    <span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
+<span class="r-in"><span>      <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>        series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>          <span class="st">'site_'</span>, <span class="va">site</span>,</span></span>
+<span class="r-in"><span>          <span class="st">'_'</span>, <span class="va">species</span>,</span></span>
+<span class="r-in"><span>          <span class="st">'_rep_'</span>, <span class="va">replicate</span></span></span>
+<span class="r-in"><span>        <span class="op">)</span>,</span></span>
+<span class="r-in"><span>        time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">time</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>        cap <span class="op">=</span> <span class="fl">50</span></span></span>
+<span class="r-in"><span>      <span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
+<span class="r-in"><span>      <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">replicate</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># series identifiers</span></span></span>
-<span class="r-in"><span><span class="va">testdat</span><span class="op">$</span><span class="va">species</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">species</span>,</span></span>
-<span class="r-in"><span>                          levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">species</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">testdat</span><span class="op">$</span><span class="va">series</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">series</span>,</span></span>
-<span class="r-in"><span>                         levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">testdat</span><span class="op">$</span><span class="va">species</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">testdat</span><span class="op">$</span><span class="va">species</span>,</span></span>
+<span class="r-in"><span>  levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">species</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">testdat</span><span class="op">$</span><span class="va">series</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">testdat</span><span class="op">$</span><span class="va">series</span>,</span></span>
+<span class="r-in"><span>  levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">series</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The trend_map to state how replicates are structured</span></span></span>
 <span class="r-in"><span><span class="va">testdat</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
-<span class="r-in"><span><span class="co"># each unique combination of site*species is a separate process</span></span></span>
-<span class="r-in"><span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>trend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">site</span>, <span class="va">species</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
-<span class="r-in"><span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">trend</span>, <span class="va">series</span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
-<span class="r-in"><span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/distinct.html" class="external-link">distinct</a></span><span class="op">(</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">trend_map</span></span></span>
+<span class="r-in"><span>  <span class="co"># each unique combination of site*species is a separate process</span></span></span>
+<span class="r-in"><span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    trend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">site</span>, <span class="va">species</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
+<span class="r-in"><span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">trend</span>, <span class="va">series</span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
+<span class="r-in"><span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/distinct.html" class="external-link">distinct</a></span><span class="op">(</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">trend_map</span></span></span>
 <span class="r-in"><span><span class="va">trend_map</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    trend            series</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1      1 site_1_sp_1_rep_1</span>
@@ -222,25 +255,28 @@ functions in <code>mvgam</code>, so any call to change these will be silently ig
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit a model</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>            <span class="co"># the observation formula sets up linear predictors for</span></span></span>
-<span class="r-in"><span>            <span class="co"># detection probability on the logit scale</span></span></span>
-<span class="r-in"><span>            formula <span class="op">=</span> <span class="va">obs</span> <span class="op">~</span> <span class="va">species</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>  <span class="co"># the observation formula sets up linear predictors for</span></span></span>
+<span class="r-in"><span>  <span class="co"># detection probability on the logit scale</span></span></span>
+<span class="r-in"><span>  formula <span class="op">=</span> <span class="va">obs</span> <span class="op">~</span> <span class="va">species</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span>            <span class="co"># the trend_formula sets up the linear predictors for</span></span></span>
-<span class="r-in"><span>            <span class="co"># the latent abundance processes on the log scale</span></span></span>
-<span class="r-in"><span>            trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">trend</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span> <span class="op">+</span> <span class="va">species</span>,</span></span>
+<span class="r-in"><span>  <span class="co"># the trend_formula sets up the linear predictors for</span></span></span>
+<span class="r-in"><span>  <span class="co"># the latent abundance processes on the log scale</span></span></span>
+<span class="r-in"><span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">trend</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span> <span class="op">+</span> <span class="va">species</span>,</span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span>            <span class="co"># the trend_map takes care of the mapping</span></span></span>
-<span class="r-in"><span>            trend_map <span class="op">=</span> <span class="va">trend_map</span>,</span></span>
+<span class="r-in"><span>  <span class="co"># the trend_map takes care of the mapping</span></span></span>
+<span class="r-in"><span>  trend_map <span class="op">=</span> <span class="va">trend_map</span>,</span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span>            <span class="co"># nmix() family and data</span></span></span>
-<span class="r-in"><span>            family <span class="op">=</span> <span class="fu">nmix</span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>            data <span class="op">=</span> <span class="va">testdat</span>,</span></span>
+<span class="r-in"><span>  <span class="co"># nmix() family and data</span></span></span>
+<span class="r-in"><span>  family <span class="op">=</span> <span class="fu">nmix</span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  data <span class="op">=</span> <span class="va">testdat</span>,</span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span>            <span class="co"># priors can be set in the usual way</span></span></span>
-<span class="r-in"><span>            priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">b</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                       <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">Intercept_trend</span><span class="op">)</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>            chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="co"># priors can be set in the usual way</span></span></span>
+<span class="r-in"><span>  priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">b</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">Intercept_trend</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span>,</span></span>
+<span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
@@ -268,25 +304,25 @@ functions in <code>mvgam</code>, so any call to change these will be silently ig
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 5.8 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 5.9 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 5.8 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 5.9 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 6.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 6.0 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The usual diagnostics</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM observation formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> obs ~ species - 1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x5567b241d5f0&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55ae3bd03700&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM process formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ~s(time, by = trend, k = 4) + species</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x5567b241d5f0&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55ae3bd03700&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> nmix</span>
@@ -346,39 +382,54 @@ functions in <code>mvgam</code>, so any call to change these will be silently ig
 <span class="r-out co"><span class="r-pr">#&gt;</span> Use how_to_cite() to get started describing this model</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plotting conditional effects</span></span></span>
-<span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span>; <span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://marginaleffects.com/" class="external-link">marginaleffects</a></span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">'species'</span>,</span></span>
-<span class="r-in"><span>                 type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>     <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>     <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/lims.html" class="external-link">ylim</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>     <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_classic</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>     <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">'none'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">mod</span>,</span></span>
+<span class="r-in"><span>  condition <span class="op">=</span> <span class="st">'species'</span>,</span></span>
+<span class="r-in"><span>  type <span class="op">=</span> <span class="st">'detection'</span></span></span>
+<span class="r-in"><span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/lims.html" class="external-link">ylim</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_classic</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">'none'</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="mvgam_families-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Example showcasing how cbind() is needed for Binomial observations</span></span></span>
+<span class="r-in"><span><span class="co"># =============================================================================</span></span></span>
+<span class="r-in"><span><span class="co"># Binomial Models</span></span></span>
+<span class="r-in"><span><span class="co"># =============================================================================</span></span></span>
+<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Simulate two time series of Binomial trials</span></span></span>
 <span class="r-in"><span><span class="va">trials</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">20</span><span class="op">:</span><span class="fl">25</span><span class="op">)</span>, <span class="fl">50</span>, replace <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">50</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">detprob1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="op">-</span><span class="fl">0.5</span> <span class="op">+</span> <span class="fl">0.9</span><span class="op">*</span><span class="va">x</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">detprob2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="op">-</span><span class="fl">0.1</span> <span class="op">-</span><span class="fl">0.7</span><span class="op">*</span><span class="va">x</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">50</span>, size <span class="op">=</span> <span class="va">trials</span>, prob <span class="op">=</span> <span class="va">detprob1</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                        time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">50</span>,</span></span>
-<span class="r-in"><span>                        series <span class="op">=</span> <span class="st">'series1'</span>,</span></span>
-<span class="r-in"><span>                        x <span class="op">=</span> <span class="va">x</span>,</span></span>
-<span class="r-in"><span>                        ntrials <span class="op">=</span> <span class="va">trials</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>             <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">50</span>, size <span class="op">=</span> <span class="va">trials</span>, prob <span class="op">=</span> <span class="va">detprob2</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                        time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">50</span>,</span></span>
-<span class="r-in"><span>                        series <span class="op">=</span> <span class="st">'series2'</span>,</span></span>
-<span class="r-in"><span>                        x <span class="op">=</span> <span class="va">x</span>,</span></span>
-<span class="r-in"><span>                        ntrials <span class="op">=</span> <span class="va">trials</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">detprob1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="op">-</span><span class="fl">0.5</span> <span class="op">+</span> <span class="fl">0.9</span> <span class="op">*</span> <span class="va">x</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">detprob2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="op">-</span><span class="fl">0.1</span> <span class="op">-</span> <span class="fl">0.7</span> <span class="op">*</span> <span class="va">x</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">50</span>, size <span class="op">=</span> <span class="va">trials</span>, prob <span class="op">=</span> <span class="va">detprob1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">50</span>,</span></span>
+<span class="r-in"><span>    series <span class="op">=</span> <span class="st">'series1'</span>,</span></span>
+<span class="r-in"><span>    x <span class="op">=</span> <span class="va">x</span>,</span></span>
+<span class="r-in"><span>    ntrials <span class="op">=</span> <span class="va">trials</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span>,</span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">50</span>, size <span class="op">=</span> <span class="va">trials</span>, prob <span class="op">=</span> <span class="va">detprob2</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">50</span>,</span></span>
+<span class="r-in"><span>    series <span class="op">=</span> <span class="st">'series2'</span>,</span></span>
+<span class="r-in"><span>    x <span class="op">=</span> <span class="va">x</span>,</span></span>
+<span class="r-in"><span>    ntrials <span class="op">=</span> <span class="va">trials</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span><span class="va">dat</span>, series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">as.factor</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/arrange.html" class="external-link">arrange</a></span><span class="op">(</span><span class="va">dat</span>, <span class="va">time</span>, <span class="va">series</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit a model using the binomial() family; must specify observations</span></span></span>
 <span class="r-in"><span><span class="co"># and number of trials in the cbind() wrapper</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span><span class="va">y</span>, <span class="va">ntrials</span><span class="op">)</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x</span>, by <span class="op">=</span> <span class="va">series</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>             data <span class="op">=</span> <span class="va">dat</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span><span class="va">y</span>, <span class="va">ntrials</span><span class="op">)</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x</span>, by <span class="op">=</span> <span class="va">series</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  data <span class="op">=</span> <span class="va">dat</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
@@ -402,9 +453,9 @@ functions in <code>mvgam</code>, so any call to change these will be silently ig
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
@@ -416,18 +467,18 @@ functions in <code>mvgam</code>, so any call to change these will be silently ig
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 finished in 1.9 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 finished in 1.7 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 2.2 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 2.3 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
@@ -435,16 +486,16 @@ functions in <code>mvgam</code>, so any call to change these will be silently ig
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 finished in 1.4 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 finished in 1.3 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> All 4 chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 1.7 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 3.0 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 1.6 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 2.9 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> cbind(y, ntrials) ~ series + s(x, by = series)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x5567b241d5f0&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55ae3bd03700&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> binomial</span>
@@ -509,6 +560,7 @@ functions in <code>mvgam</code>, so any call to change these will be silently ig
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Use how_to_cite() to get started describing this model</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
+<span class="r-in"><span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
