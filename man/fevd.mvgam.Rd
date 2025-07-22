@@ -70,6 +70,10 @@ plot(fevds)
 summary(fevds)
 }
 }
+\references{
+Lütkepohl, H. (2007).
+New Introduction to Multiple Time Series Analysis. 2nd ed. Springer-Verlag Berlin Heidelberg.
+}
 \seealso{
 \code{\link[=VAR]{VAR()}}, \code{\link[=irf]{irf()}}, \code{\link[=stability]{stability()}}, \code{\link{mvgam_fevd-class}}
 }

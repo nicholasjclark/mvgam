@@ -2,24 +2,31 @@
 % Please edit documentation in R/forecast.mvgam.R
 \name{forecast.mvgam}
 \alias{forecast.mvgam}
-\title{Extract or compute hindcasts and forecasts for a fitted \code{mvgam} object}
+\title{Extract or compute hindcasts and forecasts for a fitted
+\code{mvgam} object}
 \usage{
 \method{forecast}{mvgam}(object, newdata, data_test, n_cores = 1, type = "response", ...)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} or \code{jsdgam}. See \code{\link[=mvgam]{mvgam()}}}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same variables
-that were included in the original \code{data} used to fit the model. If included, the
-covariate information in \code{newdata} will be used to generate forecasts from the fitted model equations. If
-this same \code{newdata} was originally included in the call to \code{mvgam}, then forecasts have already been
-produced by the generative model and these will simply be extracted and plotted. However if no \code{newdata} was
-supplied to the original model call, an assumption is made that the \code{newdata} supplied here comes sequentially
-after the data supplied in the original model (i.e. we assume there is no time gap between the last
-observation of series 1 in the original data and the first observation for series 1 in \code{newdata})}
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data
+containing the same variables that were included in the original \code{data}
+used to fit the model. If included, the covariate information in
+\code{newdata} will be used to generate forecasts from the fitted model
+equations. If this same \code{newdata} was originally included in the call
+to \code{mvgam}, then forecasts have already been produced by the
+generative model and these will simply be extracted and plotted. However
+if no \code{newdata} was supplied to the original model call, an
+assumption is made that the \code{newdata} supplied here comes
+sequentially after the data supplied in the original model (i.e. we
+assume there is no time gap between the last observation of series 1 in
+the original data and the first observation for series 1 in
+\code{newdata})}
 
-\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
-\code{newdata} instead for more seamless integration into \code{R} workflows}
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but
+users are recommended to use \code{newdata} instead for more seamless
+integration into \code{R} workflows}
 
 \item{n_cores}{Deprecated. Parallel processing is no longer supported}
 
@@ -42,65 +49,79 @@ detection probability from an N-mixture distribution}
 \item{...}{Ignored}
 }
 \value{
-An object of class \code{mvgam_forecast} containing hindcast and forecast distributions.
-See \code{\link{mvgam_forecast-class}} for details.
+An object of class \code{mvgam_forecast} containing hindcast and
+forecast distributions. See \code{\link{mvgam_forecast-class}} for
+details.
 }
 \description{
-Extract or compute hindcasts and forecasts for a fitted \code{mvgam} object
+Extract or compute hindcasts and forecasts for a fitted
+\code{mvgam} object
 }
 \details{
-Posterior predictions are drawn from the fitted \code{mvgam} and used
-to simulate a forecast distribution
+Posterior predictions are drawn from the fitted \code{mvgam} and
+used to simulate a forecast distribution
 }
 \examples{
 \donttest{
-simdat <- sim_mvgam(n_series = 3, trend_model = AR())
-mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-             trend_model = AR(),
-             noncentred = TRUE,
-             data = simdat$data_train,
-             chains = 2,
-             silent = 2)
+  # Simulate data with 3 series and AR trend model
+  simdat <- sim_mvgam(n_series = 3, trend_model = AR())
 
-# Hindcasts on response scale
-hc <- hindcast(mod)
-str(hc)
+  # Fit mvgam model
+  mod <- mvgam(
+    y ~ s(season, bs = 'cc', k = 6),
+    trend_model = AR(),
+    noncentred = TRUE,
+    data = simdat$data_train,
+    chains = 2,
+    silent = 2
+  )
 
-# Use summary() to extract hindcasts / forecasts for custom plotting
-head(summary(hc), 12)
+  # Hindcasts on response scale
+  hc <- hindcast(mod)
+  str(hc)
 
-# Or just use the plot() function for quick plots
-plot(hc, series = 1)
-plot(hc, series = 2)
-plot(hc, series = 3)
+  # Use summary() to extract hindcasts / forecasts for custom plotting
+  head(summary(hc), 12)
 
-# Forecasts on response scale
-fc <- forecast(mod,
-               newdata = simdat$data_test)
-str(fc)
-head(summary(fc), 12)
-plot(fc, series = 1)
-plot(fc, series = 2)
-plot(fc, series = 3)
+  # Or just use the plot() function for quick plots
+  plot(hc, series = 1)
+  plot(hc, series = 2)
+  plot(hc, series = 3)
 
-# Forecasts as expectations
-fc <- forecast(mod,
-               newdata = simdat$data_test,
-               type = 'expected')
-head(summary(fc), 12)
-plot(fc, series = 1)
-plot(fc, series = 2)
-plot(fc, series = 3)
+  # Forecasts on response scale
+  fc <- forecast(
+    mod,
+    newdata = simdat$data_test
+  )
+  str(fc)
+  head(summary(fc), 12)
+  plot(fc, series = 1)
+  plot(fc, series = 2)
+  plot(fc, series = 3)
 
-# Dynamic trend extrapolations
-fc <- forecast(mod,
-               newdata = simdat$data_test,
-               type = 'trend')
-head(summary(fc), 12)
-plot(fc, series = 1)
-plot(fc, series = 2)
-plot(fc, series = 3)
+  # Forecasts as expectations
+  fc <- forecast(
+    mod,
+    newdata = simdat$data_test,
+    type = 'expected'
+  )
+  head(summary(fc), 12)
+  plot(fc, series = 1)
+  plot(fc, series = 2)
+  plot(fc, series = 3)
+
+  # Dynamic trend extrapolations
+  fc <- forecast(
+    mod,
+    newdata = simdat$data_test,
+    type = 'trend'
+  )
+  head(summary(fc), 12)
+  plot(fc, series = 1)
+  plot(fc, series = 2)
+  plot(fc, series = 3)
 }
+
 }
 \seealso{
 \code{\link[=hindcast.mvgam]{hindcast.mvgam()}}, \code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}},

@@ -4,17 +4,26 @@
 #' \code{mvgam} models with Vector Autoregressive dynamics
 #'
 #' @name fevd.mvgam
+#'
 #' @param object \code{list} object of class \code{mvgam} resulting from a call to [mvgam()]
 #' that used a Vector Autoregressive latent process model (either as `VAR(cor = FALSE)` or
 #' `VAR(cor = TRUE)`; see [VAR()] for details)
+#'
 #' @param h Positive \code{integer} specifying the forecast horizon over which to calculate
 #' the IRF
+#'
 #' @param ... ignored
-#' @return
-#' See \code{\link{mvgam_fevd-class}} for a full description of the quantities that are
+#'
+#' @return See \code{\link{mvgam_fevd-class}} for a full description of the quantities that are
 #' computed and returned by this function, along with key references.
+#'
 #' @author Nicholas J Clark
+#'
 #' @seealso [VAR()], [irf()], [stability()], \code{\link{mvgam_fevd-class}}
+#'
+#' @references Lütkepohl, H. (2007).
+#' New Introduction to Multiple Time Series Analysis. 2nd ed. Springer-Verlag Berlin Heidelberg.
+#'
 #' @examples
 #' \donttest{
 #' # Simulate some time series that follow a latent VAR(1) process
