@@ -34,7 +34,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.592</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.593</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -497,7 +497,6 @@ to interpret:</p>
 <span><span class="co">#&gt; Trend model:</span></span>
 <span><span class="co">#&gt; VAR()</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; N process models:</span></span>
 <span><span class="co">#&gt; 5 </span></span>
 <span><span class="co">#&gt; </span></span>
@@ -512,7 +511,6 @@ to interpret:</p>
 <span><span class="co">#&gt; 4 chains, each with iter = 1500; warmup = 1000; thin = 1 </span></span>
 <span><span class="co">#&gt; Total post-warmup draws = 2000</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Observation error parameter estimates:</span></span>
 <span><span class="co">#&gt;              2.5%  50% 97.5% Rhat n_eff</span></span>
 <span><span class="co">#&gt; sigma_obs[1] 0.20 0.26  0.34 1.02   309</span></span>
@@ -525,7 +523,15 @@ to interpret:</p>
 <span><span class="co">#&gt;             2.5% 50% 97.5% Rhat n_eff</span></span>
 <span><span class="co">#&gt; (Intercept)    0   0     0  NaN   NaN</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Process model VAR parameter estimates:</span></span>
+<span><span class="co">#&gt; standard deviation:</span></span>
+<span><span class="co">#&gt;          2.5%  50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; sigma[1] 0.26 0.34  0.43 1.01   517</span></span>
+<span><span class="co">#&gt; sigma[2] 0.23 0.40  0.54 1.02   147</span></span>
+<span><span class="co">#&gt; sigma[3] 0.21 0.54  0.82 1.11    35</span></span>
+<span><span class="co">#&gt; sigma[4] 0.31 0.45  0.58 1.02   374</span></span>
+<span><span class="co">#&gt; sigma[5] 0.24 0.37  0.51 1.01   230</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; var coefficient matrix:</span></span>
 <span><span class="co">#&gt;          2.5%    50% 97.5% Rhat n_eff</span></span>
 <span><span class="co">#&gt; A[1,1]  0.620  0.790 0.910 1.01   355</span></span>
 <span><span class="co">#&gt; A[1,2] -0.390 -0.130 0.041 1.01   277</span></span>
@@ -553,42 +559,14 @@ to interpret:</p>
 <span><span class="co">#&gt; A[5,4] -0.210 -0.036 0.140 1.00   413</span></span>
 <span><span class="co">#&gt; A[5,5]  0.470  0.740 0.930 1.00   507</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Process error parameter estimates:</span></span>
-<span><span class="co">#&gt;             2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; Sigma[1,1] 0.068 0.11  0.18 1.01   541</span></span>
-<span><span class="co">#&gt; Sigma[1,2] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[1,3] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[1,4] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[1,5] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[2,1] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[2,2] 0.054 0.16  0.30 1.02   168</span></span>
-<span><span class="co">#&gt; Sigma[2,3] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[2,4] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[2,5] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[3,1] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[3,2] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[3,3] 0.045 0.30  0.68 1.09    43</span></span>
-<span><span class="co">#&gt; Sigma[3,4] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[3,5] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[4,1] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[4,2] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[4,3] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[4,4] 0.098 0.21  0.34 1.01   400</span></span>
-<span><span class="co">#&gt; Sigma[4,5] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[5,1] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[5,2] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[5,3] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[5,4] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">#&gt; Sigma[5,5] 0.060 0.13  0.26 1.01   243</span></span>
-<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">#&gt;                              edf Ref.df Chi.sq p-value  </span></span>
-<span><span class="co">#&gt; te(temp,month)              4.98     15  33.02   0.038 *</span></span>
-<span><span class="co">#&gt; te(temp,month):seriestrend1 1.16     15   7.33   0.998  </span></span>
-<span><span class="co">#&gt; te(temp,month):seriestrend2 2.71     15  64.58   0.471  </span></span>
-<span><span class="co">#&gt; te(temp,month):seriestrend3 1.55     15   1.50   1.000  </span></span>
-<span><span class="co">#&gt; te(temp,month):seriestrend4 1.32     15   5.55   0.999  </span></span>
-<span><span class="co">#&gt; te(temp,month):seriestrend5 1.62     15  12.47   0.977  </span></span>
+<span><span class="co">#&gt;                               edf Ref.df Chi.sq p-value  </span></span>
+<span><span class="co">#&gt; te(temp,month)              4.981     15 33.021  0.0381 *</span></span>
+<span><span class="co">#&gt; te(temp,month):seriestrend1 1.161     15  7.330  0.9981  </span></span>
+<span><span class="co">#&gt; te(temp,month):seriestrend2 2.705     15 64.575  0.4715  </span></span>
+<span><span class="co">#&gt; te(temp,month):seriestrend3 1.550     15  1.496  1.0000  </span></span>
+<span><span class="co">#&gt; te(temp,month):seriestrend4 1.315     15  5.549  0.9993  </span></span>
+<span><span class="co">#&gt; te(temp,month):seriestrend5 1.622     15 12.466  0.9768  </span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -855,7 +833,7 @@ stationary:</p>
 <div class="sourceCode" id="cb40"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">description</span></span></code></pre></div>
 <pre><code><span><span class="co">#&gt; Methods text skeleton</span></span>
-<span><span class="co">#&gt; We used the R package mvgam (version 1.1.592; Clark &amp; Wells, 2023) to</span></span>
+<span><span class="co">#&gt; We used the R package mvgam (version 1.1.593; Clark &amp; Wells, 2023) to</span></span>
 <span><span class="co">#&gt;   construct, fit and interrogate the model. mvgam fits Bayesian</span></span>
 <span><span class="co">#&gt;   State-Space models that can include flexible predictor effects in both</span></span>
 <span><span class="co">#&gt;   the process and observation components by incorporating functionalities</span></span>

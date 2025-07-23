@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.592</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.593</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -281,13 +281,23 @@ facilitate model selection. It is essentially a wrapper for
 <span class="r-in"><span><span class="co"># Use rolling evaluation for approximate comparisons of 3-step ahead</span></span></span>
 <span class="r-in"><span><span class="co"># forecasts across the training period</span></span></span>
 <span class="r-in"><span><span class="fu">compare_mvgams</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  object1 <span class="op">=</span> <span class="va">mod_ar2</span>,</span></span>
-<span class="r-in"><span>  object2 <span class="op">=</span> <span class="va">mod_rw</span>,</span></span>
+<span class="r-in"><span>  model1 <span class="op">=</span> <span class="va">mod_ar2</span>,</span></span>
+<span class="r-in"><span>  model2 <span class="op">=</span> <span class="va">mod_rw</span>,</span></span>
 <span class="r-in"><span>  fc_horizon <span class="op">=</span> <span class="fl">3</span>,</span></span>
 <span class="r-in"><span>  n_samples <span class="op">=</span> <span class="fl">1000</span>,</span></span>
 <span class="r-in"><span>  n_evaluations <span class="op">=</span> <span class="fl">5</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in compare_mvgams(object1 = mod_ar2, object2 = mod_rw, fc_horizon = 3,     n_samples = 1000, n_evaluations = 5):</span> unused arguments (object1 = mod_ar2, object2 = mod_rw)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> RPS summaries per model (lower is better)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             Min.  1st Qu.   Median     Mean  3rd Qu.     Max.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Model 1 0.816925 1.411382 2.005840 2.367583 3.142912 4.279985</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Model 2 1.842947 2.168967 2.494988 2.523765 2.864174 3.233360</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 90% interval coverages per model (closer to 0.9 is better)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Model 1 0.9333333 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Model 2 1</span>
+<span class="r-plt img"><img src="evaluate_mvgams-1.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="evaluate_mvgams-2.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="evaluate_mvgams-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now use approximate leave-future-out CV to compare</span></span></span>
 <span class="r-in"><span><span class="co"># rolling forecasts; start at time point 40 to reduce</span></span></span>
@@ -308,9 +318,9 @@ facilitate model selection. It is essentially a wrapper for
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot Pareto-K values and ELPD estimates</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">lfo_ar2</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="evaluate_mvgams-1.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="evaluate_mvgams-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">lfo_rw</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="evaluate_mvgams-2.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="evaluate_mvgams-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Proportion of timepoints in which AR2 model gives</span></span></span>
 <span class="r-in"><span><span class="co"># better forecasts</span></span></span>
@@ -320,9 +330,9 @@ facilitate model selection. It is essentially a wrapper for
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># A higher total ELPD is preferred</span></span></span>
 <span class="r-in"><span><span class="va">lfo_ar2</span><span class="op">$</span><span class="va">sum_ELPD</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] -58.44059</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] -58.77854</span>
 <span class="r-in"><span><span class="va">lfo_rw</span><span class="op">$</span><span class="va">sum_ELPD</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] -76.5341</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] -75.98128</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>

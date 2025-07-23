@@ -34,7 +34,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.592</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.593</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -212,17 +212,16 @@ possible:</p>
 <span><span class="co">#&gt; 4 chains, each with iter = 1000; warmup = 500; thin = 1 </span></span>
 <span><span class="co">#&gt; Total post-warmup draws = 2000</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM coefficient (beta) estimates:</span></span>
 <span><span class="co">#&gt;             2.5% 50% 97.5% Rhat n_eff</span></span>
 <span><span class="co">#&gt; (Intercept)  1.9 1.9     2    1  1675</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM smooths:</span></span>
-<span><span class="co">#&gt;                         edf Ref.df Chi.sq p-value    </span></span>
-<span><span class="co">#&gt; s(season)              3.80      6   19.9 &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; s(time):seriesseries_1 8.22     19   39.1 0.47727    </span></span>
-<span><span class="co">#&gt; s(time):seriesseries_2 8.74     19   45.6 0.00092 ***</span></span>
-<span><span class="co">#&gt; s(time):seriesseries_3 6.49     19   55.6 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt;                          edf Ref.df Chi.sq p-value    </span></span>
+<span><span class="co">#&gt; s(season)              3.805      6  19.89 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; s(time):seriesseries_1 8.220     19  39.15 0.47727    </span></span>
+<span><span class="co">#&gt; s(time):seriesseries_2 8.745     19  45.62 0.00092 ***</span></span>
+<span><span class="co">#&gt; s(time):seriesseries_3 6.487     19  55.63 &lt; 2e-16 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -281,7 +280,6 @@ autoregressive and process error parameters for each time series:</p>
 <span><span class="co">#&gt; Trend model:</span></span>
 <span><span class="co">#&gt; AR(cor = TRUE)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; N process models:</span></span>
 <span><span class="co">#&gt; 3 </span></span>
 <span><span class="co">#&gt; </span></span>
@@ -296,26 +294,25 @@ autoregressive and process error parameters for each time series:</p>
 <span><span class="co">#&gt; 4 chains, each with iter = 1000; warmup = 500; thin = 1 </span></span>
 <span><span class="co">#&gt; Total post-warmup draws = 2000</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
 <span><span class="co">#&gt;             2.5% 50% 97.5% Rhat n_eff</span></span>
 <span><span class="co">#&gt; (Intercept)  1.7   2   2.4    1   706</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Process model AR parameter estimates:</span></span>
-<span><span class="co">#&gt;        2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; ar1[1] 0.74 0.89  0.99 1.00   688</span></span>
-<span><span class="co">#&gt; ar1[2] 0.66 0.82  0.95 1.01   639</span></span>
-<span><span class="co">#&gt; ar1[3] 0.87 0.96  1.00 1.00   625</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Process error parameter estimates:</span></span>
+<span><span class="co">#&gt; standard deviation:</span></span>
 <span><span class="co">#&gt;          2.5%  50% 97.5% Rhat n_eff</span></span>
 <span><span class="co">#&gt; sigma[1] 0.24 0.33  0.44 1.00   574</span></span>
 <span><span class="co">#&gt; sigma[2] 0.31 0.43  0.59 1.01   495</span></span>
 <span><span class="co">#&gt; sigma[3] 0.19 0.26  0.36 1.02   314</span></span>
 <span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; autoregressive coef 1:</span></span>
+<span><span class="co">#&gt;        2.5%  50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; ar1[1] 0.74 0.89  0.99 1.00   688</span></span>
+<span><span class="co">#&gt; ar1[2] 0.66 0.82  0.95 1.01   639</span></span>
+<span><span class="co">#&gt; ar1[3] 0.87 0.96  1.00 1.00   625</span></span>
+<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">#&gt;            edf Ref.df Chi.sq p-value    </span></span>
-<span><span class="co">#&gt; s(season) 2.29      6   20.6 3.3e-06 ***</span></span>
+<span><span class="co">#&gt;             edf Ref.df Chi.sq  p-value    </span></span>
+<span><span class="co">#&gt; s(season) 2.286      6   20.6 3.27e-06 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>

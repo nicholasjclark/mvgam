@@ -28,7 +28,7 @@ cross-validation."><meta property="og:image" content="https://nicholasjclark.git
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.592</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.593</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -757,7 +757,7 @@ PeerJ. 13:e18929 https://doi.org/10.7717/peerj.18929</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55cc49b41868&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55f1f46da0a8&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -767,7 +767,6 @@ PeerJ. 13:e18929 https://doi.org/10.7717/peerj.18929</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Trend model:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> AR()</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> N series:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 3 </span>
@@ -780,7 +779,6 @@ PeerJ. 13:e18929 https://doi.org/10.7717/peerj.18929</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2 chains, each with iter = 1000; warmup = 500; thin = 1 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Total post-warmup draws = 1000</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>               2.5%   50% 97.5% Rhat n_eff</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)  1.900  2.00  2.10 1.00   582</span>
@@ -790,19 +788,28 @@ PeerJ. 13:e18929 https://doi.org/10.7717/peerj.18929</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4 -0.650 -0.42 -0.22 1.01   594</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM smooths:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            edf Ref.df Chi.sq p-value    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 3.31      4   42.3 8.3e-07 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             edf Ref.df Chi.sq p-value    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 3.312      4  42.26 8.3e-07 ***</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Latent trend parameter AR estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           2.5%   50%   97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]    0.28  0.74  0.9800 1.00   231</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[2]   -0.95 -0.48 -0.0039 1.01   143</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[3]    0.19  0.72  0.9800 1.00   174</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.41  0.55  0.7600 1.01   364</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[2]  0.32  0.47  0.6600 1.01   274</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[3]  0.36  0.49  0.6800 1.00   339</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> standard deviation:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          2.5%  50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1] 0.41 0.55  0.76 1.01   364</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[2] 0.32 0.47  0.66 1.01   274</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[3] 0.36 0.49  0.68 1.00   339</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> precision parameter:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>        2.5% 50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> tau[1]  1.8 3.3   6.0 1.01   410</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> tau[2]  2.3 4.6   9.9 1.01   259</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> tau[3]  2.2 4.1   7.7 1.00   345</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> autoregressive coef 1:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         2.5%   50%   97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]  0.28  0.74  0.9800 1.00   231</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[2] -0.95 -0.48 -0.0039 1.01   143</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[3]  0.19  0.72  0.9800 1.00   174</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ✔ No issues with effective samples per iteration</span>
@@ -862,7 +869,7 @@ PeerJ. 13:e18929 https://doi.org/10.7717/peerj.18929</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 16</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x55cc49b41868&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x55f1f46da0a8&gt; </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family_pars       : NULL</span>
@@ -875,6 +882,9 @@ PeerJ. 13:e18929 https://doi.org/10.7717/peerj.18929</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ subgr      : chr "series"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ label      : language AR()</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "class")= chr "mvgam_trend"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "param_info")=List of 2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ param_names: chr [1:8] "trend" "tau" "sigma" "ar1" ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ labels     : chr [1:8] "trend_estimates" "precision_parameter" "standard_deviation" "autoregressive_coef_1" ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ drift             : logi FALSE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ use_lv            : logi FALSE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ fit_engine        : chr "stan"</span>
@@ -1069,7 +1079,7 @@ PeerJ. 13:e18929 https://doi.org/10.7717/peerj.18929</p>
 <span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpgvY2VY/model_fe1a9373f4bc428a5906ce7b23b30b3c.stan', line 20, column 31: Found</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpjGdEPq/model_fe1a9373f4bc428a5906ce7b23b30b3c.stan', line 20, column 31: Found</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     int division:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     Values will be rounded towards zero. If rounding is not desired you can</span>
@@ -1077,7 +1087,7 @@ PeerJ. 13:e18929 https://doi.org/10.7717/peerj.18929</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     the division as</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2.0</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     If rounding is intended please use the integer division operator %/%.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpgvY2VY/model-237b403aab39.stan', line 20, column 33: Found</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/RtmpjGdEPq/model-234a4674a0bb.stan', line 20, column 33: Found</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     int division:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     Values will be rounded towards zero. If rounding is not desired you can</span>
@@ -1231,7 +1241,7 @@ PeerJ. 13:e18929 https://doi.org/10.7717/peerj.18929</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> out ~ gp(time, by = temp, c = 5/4, k = 40, scale = FALSE)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55cc49b41868&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55f1f46da0a8&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> gaussian</span>
@@ -1252,7 +1262,6 @@ PeerJ. 13:e18929 https://doi.org/10.7717/peerj.18929</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Fitted using Stan </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2 chains, each with iter = 1000; warmup = 500; thin = 1 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Total post-warmup draws = 1000</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Observation error parameter estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>              2.5%  50% 97.5% Rhat n_eff</span>
@@ -1555,7 +1564,7 @@ PeerJ. 13:e18929 https://doi.org/10.7717/peerj.18929</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> cbind(y, ntrials) ~ series + s(x, by = series)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55cc49b41868&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55f1f46da0a8&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> binomial</span>
@@ -1576,7 +1585,6 @@ PeerJ. 13:e18929 https://doi.org/10.7717/peerj.18929</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Fitted using Stan </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2 chains, each with iter = 1000; warmup = 500; thin = 1 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Total post-warmup draws = 1000</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                        2.5%     50%  97.5% Rhat n_eff</span>
@@ -1602,9 +1610,9 @@ PeerJ. 13:e18929 https://doi.org/10.7717/peerj.18929</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.9 -0.920 -0.6900 -0.110 1.01    70</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM smooths:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                     edf Ref.df Chi.sq p-value    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1 4.20      9   59.3 0.00038 ***</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2 2.62      9   27.4 &lt; 2e-16 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                      edf Ref.df Chi.sq  p-value    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1 4.204      9  59.27 0.000378 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2 2.616      9  27.39  &lt; 2e-16 ***</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>

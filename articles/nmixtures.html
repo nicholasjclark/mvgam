@@ -34,7 +34,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.592</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.593</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -538,7 +538,6 @@ nicely</p>
 <span><span class="co">#&gt; 4 chains, each with iter = 1500; warmup = 500; thin = 1 </span></span>
 <span><span class="co">#&gt; Total post-warmup draws = 4000</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
 <span><span class="co">#&gt;              2.5%   50% 97.5% Rhat n_eff</span></span>
 <span><span class="co">#&gt; speciessp_1 -0.34 0.710  1.40    1  1454</span></span>
@@ -556,9 +555,9 @@ nicely</p>
 <span><span class="co">#&gt; s(time):trendtrend2.3_trend  0.056  0.3200  0.610    1  1587</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">#&gt;                       edf Ref.df Chi.sq p-value</span></span>
-<span><span class="co">#&gt; s(time):seriestrend1 1.03      3    2.2    0.79</span></span>
-<span><span class="co">#&gt; s(time):seriestrend2 1.14      3    1.1    0.86</span></span>
+<span><span class="co">#&gt;                        edf Ref.df Chi.sq p-value</span></span>
+<span><span class="co">#&gt; s(time):seriestrend1 1.033      3  2.195   0.793</span></span>
+<span><span class="co">#&gt; s(time):seriestrend2 1.140      3  1.101   0.860</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
 <span><span class="co">#&gt; ✔ No issues with effective samples per iteration</span></span>
@@ -898,15 +897,14 @@ model</p>
 <span><span class="co">#&gt; 1 chains, each with iter = 1000; warmup = ; thin = 1 </span></span>
 <span><span class="co">#&gt; Total post-warmup draws = 1000</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
 <span><span class="co">#&gt;             2.5%  50% 97.5% Rhat n.eff</span></span>
 <span><span class="co">#&gt; (Intercept) 0.11 0.45  0.77  NaN   NaN</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM observation smooths:</span></span>
-<span><span class="co">#&gt;              edf Ref.df Chi.sq p-value    </span></span>
-<span><span class="co">#&gt; s(det_cov)  1.01      2    172 2.4e-08 ***</span></span>
-<span><span class="co">#&gt; s(det_cov2) 1.03      2    546 6.7e-07 ***</span></span>
+<span><span class="co">#&gt;               edf Ref.df Chi.sq  p-value    </span></span>
+<span><span class="co">#&gt; s(det_cov)  1.011      2  171.9 2.45e-08 ***</span></span>
+<span><span class="co">#&gt; s(det_cov2) 1.026      2  546.0 6.67e-07 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -920,9 +918,9 @@ model</p>
 <span><span class="co">#&gt; sd(s(abund_fac))_trend    0.26  0.39  0.60  NaN   NaN</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">#&gt;               edf Ref.df Chi.sq p-value  </span></span>
-<span><span class="co">#&gt; s(abund_cov) 1.01      2   3.17   0.070 .</span></span>
-<span><span class="co">#&gt; s(abund_fac) 8.75     10  17.59   0.036 *</span></span>
+<span><span class="co">#&gt;                edf Ref.df Chi.sq p-value  </span></span>
+<span><span class="co">#&gt; s(abund_cov) 1.012      2  3.173  0.0702 .</span></span>
+<span><span class="co">#&gt; s(abund_fac) 8.749     10 17.593  0.0357 *</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>

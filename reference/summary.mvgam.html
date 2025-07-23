@@ -12,7 +12,7 @@ return various useful summaries"><meta property="og:image" content="https://nich
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.592</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.593</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -114,8 +114,12 @@ if <code>TRUE</code>. Otherwise the full posterior distribution will be returned
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     
 
-<p>For <code>summary.mvgam</code> and <code>summary.mvgam_prefit</code>, a <code>list</code> is
-printed on-screen showing the summaries for the model</p>
+<p>For <code>summary.mvgam</code>, an object of class <code>mvgam_summary</code> containing:</p><ul><li><p><code>model_spec</code>: Model specification details (formulas, family, dimensions)</p></li>
+<li><p><code>parameters</code>: Parameter estimates and significance tests</p></li>
+<li><p><code>diagnostics</code>: MCMC convergence diagnostics</p></li>
+<li><p><code>sampling_info</code>: Sampling algorithm details</p></li>
+</ul><p>For <code>summary.mvgam_prefit</code>, a <code>list</code> is printed on-screen showing
+the model specifications</p>
 
 
 <p>For <code>coef.mvgam</code>, either a <code>matrix</code> of posterior coefficient
@@ -146,6 +150,93 @@ component coefficients</p>
     <p>Nicholas J Clark</p>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>seasonality <span class="op">=</span> <span class="st">"hierarchical"</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">"cc"</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, <span class="va">series</span>, bs <span class="op">=</span> <span class="st">"fs"</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="va">mod_summary</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">mod_summary</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> y ~ series + s(season, bs = "cc", k = 6) + s(season, series, </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     bs = "fs", k = 4)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55f1e4d14c58&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Link function:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> log</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Trend model:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> None</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> N series:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> N timepoints:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 75 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Status:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Fitted using Stan </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 chains, each with iter = 1000; warmup = 500; thin = 1 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total post-warmup draws = 1000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                       2.5%     50%  97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)         -1.900 -0.3800  2.000 1.00   254</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> seriesseries_2      -2.400  0.7600  2.600 1.00   324</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> seriesseries_3      -1.700  1.0000  2.900 1.00   367</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1         -1.800 -1.3000 -0.720 1.00   282</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2          0.330  0.7700  2.000 1.01   109</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3          0.110  0.6000  1.800 1.00   121</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4          0.079  0.4600  0.920 1.00   273</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season,series).1  -0.200  0.0900  0.710 1.00   180</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season,series).2  -0.860 -0.1900  0.037 1.00   101</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season,series).3  -1.300  0.2900  2.700 1.00   263</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season,series).4  -0.210  0.0083  0.350 1.00   322</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season,series).5  -0.590 -0.0730  0.200 1.00   319</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season,series).6  -0.640 -0.0720  0.130 1.01   112</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season,series).7  -2.700 -0.0920  1.900 1.00   355</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season,series).8  -0.220 -0.0110  0.200 1.01   345</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season,series).9  -0.340  0.0082  0.410 1.00   266</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season,series).10 -0.600 -0.0037  0.210 1.01   115</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season,series).11 -2.500 -0.0070  2.300 1.00   241</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season,series).12 -0.190  0.0130  0.290 1.02   214</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM smooths:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                    edf Ref.df Chi.sq  p-value    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season)        3.708      4 62.223 1.33e-05 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season,series) 5.160     12  9.786    0.998    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ No issues with effective samples per iteration</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ Rhat looks good for all parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ No issues with divergences</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ✔ No issues with maximum tree depth</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using sampling(hmc). For each parameter, n_eff is a</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   crude measure of effective sample size, and Rhat is the potential scale</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   reduction factor on split MCMC chains (at convergence, Rhat = 1)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Use how_to_cite() to get started describing this model</span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
     </nav></aside></div>
 

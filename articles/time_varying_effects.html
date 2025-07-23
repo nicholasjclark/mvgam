@@ -34,7 +34,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.592</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.593</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -230,7 +230,6 @@ function:</p>
 <span><span class="co">#&gt; 4 chains, each with iter = 1000; warmup = 500; thin = 1 </span></span>
 <span><span class="co">#&gt; Total post-warmup draws = 2000</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Observation error parameter estimates:</span></span>
 <span><span class="co">#&gt;              2.5%  50% 97.5% Rhat n_eff</span></span>
 <span><span class="co">#&gt; sigma_obs[1] 0.23 0.25  0.28    1  2854</span></span>
@@ -240,8 +239,8 @@ function:</p>
 <span><span class="co">#&gt; (Intercept)    4   4   4.1    1  2580</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM smooths:</span></span>
-<span><span class="co">#&gt;               edf Ref.df Chi.sq p-value    </span></span>
-<span><span class="co">#&gt; s(time):temp 16.3     40    171  &lt;2e-16 ***</span></span>
+<span><span class="co">#&gt;                edf Ref.df Chi.sq p-value    </span></span>
+<span><span class="co">#&gt; s(time):temp 16.33     40    171  &lt;2e-16 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -332,7 +331,6 @@ function:</p>
 <span><span class="co">#&gt; Fitted using Stan </span></span>
 <span><span class="co">#&gt; 4 chains, each with iter = 1000; warmup = 500; thin = 1 </span></span>
 <span><span class="co">#&gt; Total post-warmup draws = 2000</span></span>
-<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Observation error parameter estimates:</span></span>
 <span><span class="co">#&gt;              2.5%  50% 97.5% Rhat n_eff</span></span>
@@ -461,7 +459,6 @@ observation model parameters:</p>
 <span><span class="co">#&gt; Trend model:</span></span>
 <span><span class="co">#&gt; AR()</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; N series:</span></span>
 <span><span class="co">#&gt; 1 </span></span>
 <span><span class="co">#&gt; </span></span>
@@ -473,7 +470,6 @@ observation model parameters:</p>
 <span><span class="co">#&gt; 4 chains, each with iter = 1000; warmup = 500; thin = 1 </span></span>
 <span><span class="co">#&gt; Total post-warmup draws = 2000</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Observation precision parameter estimates:</span></span>
 <span><span class="co">#&gt;        2.5% 50% 97.5% Rhat n_eff</span></span>
 <span><span class="co">#&gt; phi[1]   83 220   550 1.03   188</span></span>
@@ -482,10 +478,17 @@ observation model parameters:</p>
 <span><span class="co">#&gt;             2.5%  50% 97.5% Rhat n_eff</span></span>
 <span><span class="co">#&gt; (Intercept) -4.6 -4.3    -4 1.01   716</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Latent trend parameter AR estimates:</span></span>
-<span><span class="co">#&gt;           2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; ar1[1]   -0.30 0.68  0.98 1.01   525</span></span>
-<span><span class="co">#&gt; sigma[1]  0.11 0.39  0.64 1.03   181</span></span>
+<span><span class="co">#&gt; standard deviation:</span></span>
+<span><span class="co">#&gt;          2.5%  50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; sigma[1] 0.11 0.39  0.64 1.03   181</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; precision parameter:</span></span>
+<span><span class="co">#&gt;        2.5% 50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; tau[1]  2.4 6.4    77 1.01   380</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; autoregressive coef 1:</span></span>
+<span><span class="co">#&gt;        2.5%  50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; ar1[1] -0.3 0.68  0.98 1.01   525</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
 <span><span class="co">#&gt; ✔ No issues with effective samples per iteration</span></span>
@@ -545,7 +548,6 @@ time-varying GP parameters:</p>
 <span><span class="co">#&gt; Trend model:</span></span>
 <span><span class="co">#&gt; AR()</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; N process models:</span></span>
 <span><span class="co">#&gt; 1 </span></span>
 <span><span class="co">#&gt; </span></span>
@@ -560,7 +562,6 @@ time-varying GP parameters:</p>
 <span><span class="co">#&gt; 4 chains, each with iter = 1000; warmup = 500; thin = 1 </span></span>
 <span><span class="co">#&gt; Total post-warmup draws = 2000</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Observation precision parameter estimates:</span></span>
 <span><span class="co">#&gt;        2.5% 50% 97.5% Rhat n_eff</span></span>
 <span><span class="co">#&gt; phi[1]  170 350   670    1   744</span></span>
@@ -569,13 +570,13 @@ time-varying GP parameters:</p>
 <span><span class="co">#&gt;             2.5%  50% 97.5% Rhat n_eff</span></span>
 <span><span class="co">#&gt; (Intercept) -4.4 -3.7  -2.9 1.01   869</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Process model AR parameter estimates:</span></span>
-<span><span class="co">#&gt;        2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; ar1[1] 0.59 0.93     1 1.01   764</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Process error parameter estimates:</span></span>
+<span><span class="co">#&gt; standard deviation:</span></span>
 <span><span class="co">#&gt;          2.5%  50% 97.5% Rhat n_eff</span></span>
 <span><span class="co">#&gt; sigma[1] 0.18 0.32  0.52    1   753</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; autoregressive coef 1:</span></span>
+<span><span class="co">#&gt;        2.5%  50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; ar1[1] 0.59 0.93     1 1.01   764</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM process model gp term marginal deviation (alpha) and length scale (rho) estimates:</span></span>
 <span><span class="co">#&gt;                         2.5%  50% 97.5% Rhat n_eff</span></span>
