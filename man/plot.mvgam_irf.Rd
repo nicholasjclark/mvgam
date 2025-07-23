@@ -9,16 +9,18 @@
 \arguments{
 \item{x}{\code{list} object of class \code{mvgam_irf}. See \code{\link[=irf]{irf()}}}
 
-\item{series}{\code{integer} specifying which process series should be given the shock}
+\item{series}{\code{integer} specifying which process series should be
+given the shock}
 
 \item{...}{ignored}
 }
 \value{
-A ggplot object showing the expected response of each latent time series to
-a shock of the focal \code{series}
+A \code{ggplot} object showing the expected response of each latent time
+series to a shock of the focal \code{series}
 }
 \description{
-This function takes an \code{mvgam_irf} object and produces plots of Impulse Response Functions
+This function takes an \code{mvgam_irf} object and produces plots of
+Impulse Response Functions
 }
 \author{
 Nicholas J Clark

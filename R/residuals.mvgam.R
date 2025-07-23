@@ -22,7 +22,7 @@
 #'
 #'   If \code{summary = TRUE} the output is an \code{n_observations} x \code{E}
 #'   matrix. The number of summary statistics \code{E} is equal to \code{2 +
-#'   length(probs)}: The \code{Estimate} column contains point estimates (either
+#'   length(probs)}. The \code{Estimate} column contains point estimates (either
 #'   mean or median depending on argument \code{robust}), while the
 #'   \code{Est.Error} column contains uncertainty estimates (either standard
 #'   deviation or median absolute deviation depending on argument

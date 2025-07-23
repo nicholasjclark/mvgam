@@ -36,47 +36,61 @@
 #'
 #' These evaluation and plotting functions exist to allow some popular `gratia`
 #' methods to work with `mvgam` or `jsdgam` models
+#'
 #' @name gratia_mvgam_enhancements
-#' @param object a fitted mvgam, the result of a call to [mvgam()].
-#' @param model a fitted `mgcv` model of clas `gam` or `bam`.
+#'
+#' @param object a fitted mvgam, the result of a call to [mvgam()]
+#'
+#' @param model a fitted `mgcv` model of clas `gam` or `bam`
+#'
 #' @param data a data frame of covariate values at which to evaluate the
-#'   model's smooth functions.
+#'   model's smooth functions
+#'
 #' @param smooth a smooth object of class `"gp.smooth"` (returned from a model using either the
 #' `dynamic()` function or the `gp()` function) or of class `"moi.smooth"` or `"mod.smooth"`
-#' (returned from a model using the 'moi' or 'mod' basis).
+#' (returned from a model using the 'moi' or 'mod' basis)
+#'
 #' @param trend_effects logical specifying whether smooth terms from the `trend_formula` should
 #' be drawn. If `FALSE`, only terms from the observation formula are drawn. If `TRUE`, only
-#' terms from the `trend_formula` are drawn.
+#' terms from the `trend_formula` are drawn
+#'
 #' @param select character, logical, or numeric; which smooths to plot. If
 #'   `NULL`, the default, then all model smooths are drawn.
 #'   Character `select` matches the labels for smooths
 #'   as shown for example in the output from `summary(object)`. Logical
 #'   `select` operates as per numeric `select` in the order that smooths are
-#'   stored.
+#'   stored
+#'
 #' @param parametric logical; plot parametric terms also? Note that `select` is
 #'   used for selecting which smooths to plot. The `terms` argument is used to
 #'   select which parametric effects are plotted. The default, as with
-#'   [mgcv::plot.gam()], is to not draw parametric effects.
+#'   [mgcv::plot.gam()], is to not draw parametric effects
+#'
 #' @param terms character; which model parametric terms should be drawn? The
 #'   Default of `NULL` will plot all parametric terms that can be drawn.
-#' @param residuals currently ignored for `mvgam` models.
+#' @param residuals currently ignored for `mvgam` models
+#'
 #' @param scales character; should all univariate smooths be plotted with the
 #'   same y-axis scale? If `scales = "free"`, the default, each univariate
 #'   smooth has its own y-axis scale. If `scales = "fixed"`, a common y axis
 #'   scale is used for all univariate smooths.
 #'
 #'   Currently does not affect the y-axis scale of plots of the parametric
-#'   terms.
+#'   terms
+#'
 #' @param constant numeric; a constant to add to the estimated values of the
 #'   smooth. `constant`, if supplied, will be added to the estimated value
-#'   before the confidence band is computed.
+#'   before the confidence band is computed
+#'
 #' @param fun function; a function that will be applied to the estimated values
 #'   and confidence interval before plotting. Can be a function or the name of a
 #'   function. Function `fun` will be applied after adding any `constant`, if
-#'   provided.
+#'   provided
+#'
 #' @param ci_level numeric between 0 and 1; the coverage of credible interval.
 #' @param n numeric; the number of points over the range of the covariate at
-#'   which to evaluate the smooth.
+#'   which to evaluate the smooth
+#'
 #' @param n_3d,n_4d numeric; the number of points over the range of last
 #'   covariate in a 3D or 4D smooth. The default is `NULL` which achieves the
 #'   standard behaviour of using `n` points over the range of all covariate,
@@ -84,64 +98,87 @@
 #'   smooth. For `d > 2` this can result in very many evaluation points and slow
 #'   performance. For smooths of `d > 4`, the value of `n_4d` will be used for
 #'   all dimensions `> 4`, unless this is `NULL`, in which case the default
-#'   behaviour (using `n` for all dimensions) will be observed.
+#'   behaviour (using `n` for all dimensions) will be observed
+#'
 #' @param unconditional ignored for `mvgam` models as all appropriate
-#' uncertainties are already included in the posterior estimates.
+#' uncertainties are already included in the posterior estimates
+#'
 #' @param overall_uncertainty ignored for `mvgam` models as all appropriate
-#' uncertainties are already included in the posterior estimates.
+#' uncertainties are already included in the posterior estimates
+#'
 #' @param dist numeric; if greater than 0, this is used to determine when
 #'   a location is too far from data to be plotted when plotting 2-D smooths.
 #'   The data are scaled into the unit square before deciding what to exclude,
 #'   and `dist` is a distance within the unit square. See
-#'   [mgcv::exclude.too.far()] for further details.
+#'   [mgcv::exclude.too.far()] for further details
+#'
 #' @param rug logical; draw a rug plot at the bottom of each plot for 1-D
 #'   smooths or plot locations of data for higher dimensions.
 #' @param contour logical; should contours be draw on the plot using
-#'   [ggplot2::geom_contour()].
+#'   [ggplot2::geom_contour()]
+#'
 #' @param grouped_by logical; should factor by smooths be drawn as one panel
 #'   per level of the factor (`FALSE`, the default), or should the individual
 #'   smooths be combined into a single panel containing all levels (`TRUE`)?
+#'
 #' @param ci_alpha numeric; alpha transparency for confidence or simultaneous
-#'   interval.
+#'   interval
+#'
 #' @param ci_col colour specification for the confidence/credible intervals
-#'   band. Affects the fill of the interval.
-#' @param smooth_col colour specification for the smooth line.
-#' @param resid_col colour specification for residual points. Ignored.
-#' @param contour_col colour specification for contour lines.
+#'   band. Affects the fill of the interval
+#'
+#' @param smooth_col colour specification for the smooth line
+#'
+#' @param resid_col colour specification for residual points. Ignored
+#'
+#' @param contour_col colour specification for contour lines
+#'
 #' @param n_contour numeric; the number of contour bins. Will result in
-#'   `n_contour - 1` contour lines being drawn. See [ggplot2::geom_contour()].
+#'   `n_contour - 1` contour lines being drawn. See [ggplot2::geom_contour()]
+#'
 #' @param partial_match logical; should smooths be selected by partial matches
 #'   with `select`? If `TRUE`, `select` can only be a single string to match
-#'   against.
+#'   against
+#'
 #' @param discrete_colour a suitable colour scale to be used when plotting
-#'   discrete variables.
+#'   discrete variables
+#'
 #' @param discrete_fill a suitable fill scale to be used when plotting
 #'   discrete variables.
 #' @param continuous_colour a suitable colour scale to be used when plotting
-#'   continuous variables.
+#'   continuous variables
+#'
 #' @param continuous_fill a suitable fill scale to be used when plotting
-#'   continuous variables.
+#'   continuous variables
+#'
 #' @param position Position adjustment, either as a string, or the result of a
-#'   call to a position adjustment function.
+#'   call to a position adjustment function
+#'
 #' @param angle numeric; the angle at which the x axis tick labels are to be
-#'   drawn passed to the `angle` argument of [ggplot2::guide_axis()].
+#'   drawn passed to the `angle` argument of [ggplot2::guide_axis()]
+#'
 #' @param ncol,nrow numeric; the numbers of rows and columns over which to
 #'   spread the plots
+#'
 #' @param guides character; one of `"keep"` (the default), `"collect"`, or
 #'   `"auto"`. Passed to [patchwork::plot_layout()]
+#'
 #' @param widths,heights The relative widths and heights of each column and
 #'   row in the grid. Will get repeated to match the dimensions of the grid. If
 #'   there is more than 1 plot and `widths = NULL`, the value of `widths` will
 #'   be set internally to `widths = 1` to accommodate plots of smooths that
-#'   use a fixed aspect ratio.
+#'   use a fixed aspect ratio.=
+#'
 #' @param crs the coordinate reference system (CRS) to use for the plot. All
 #'   data will be projected into this CRS. See [ggplot2::coord_sf()] for
-#'   details.
+#'   details
+#'
 #' @param default_crs the coordinate reference system (CRS) to use for the
 #'   non-sf layers in the plot. If left at the default `NULL`, the CRS used is
 #'   4326 (WGS84), which is appropriate for spline-on-the-sphere smooths, which
 #'   are parameterized in terms of latitude and longitude as coordinates. See
-#'   [ggplot2::coord_sf()] for more details.
+#'   [ggplot2::coord_sf()] for more details
+#'
 #' @param lims_method character; affects how the axis limits are determined. See
 #'   [ggplot2::coord_sf()]. Be careful; in testing of some examples, changing
 #'   this to `"orthogonal"` for example with the chlorophyll-a example from
@@ -149,36 +186,45 @@
 #'   OS killed R. This could be incorrect usage on my part; right now the grid
 #'   of points at which SOS smooths are evaluated (if not supplied by the user)
 #'   can produce invalid coordinates for the corners of tiles as the grid is
-#'   generated for tile centres without respect to the spacing of those tiles.
+#'   generated for tile centres without respect to the spacing of those tiles
+#'
 #' @param wrap logical; wrap plots as a patchwork? If \code{FALSE}, a list of
-#'   ggplot objects is returned, 1 per term plotted.
-#' @param envir an environment to look up the data within.
-#' @param ... additional arguments passed to other methods.
+#'   ggplot objects is returned, 1 per term plotted
+#'
+#' @param envir an environment to look up the data within
+#'
+#' @param ... additional arguments passed to other methods
 #'
 #' @details These methods allow `mvgam` models to be *Enhanced* if users have the `gratia`
 #' package installed, making available the popular `draw()` function to plot partial effects
 #' of `mvgam` smooth functions using [ggplot2::ggplot()] utilities
+#'
 #' @author Nicholas J Clark
+#'
 #' @examples
 #' \donttest{
-#' # Fit a simple GAM and draw partial effects of smooths using gratia
+#' # Fit a simple GAM and draw partial effects of smooths using 'gratia'
 #' set.seed(0)
-#' dat <- mgcv::gamSim(1, n = 200, scale = 2)
-#' mod <- mvgam(y ~ s(x1, bs = 'moi') +
-#'               te(x0, x2),
-#'              data = dat,
-#'              family = gaussian(),
-#'              chains = 2,
-#'              silent = 2)
+#' dat <- mgcv::gamSim(
+#'   eg = 1,
+#'   n = 200,
+#'   scale = 2
+#' )
 #'
-#' if(require("gratia")){
-#'  gratia::draw(mod)
+#' mod <- mvgam(
+#'   formula = y ~ s(x1, bs = 'moi') +
+#'     te(x0, x2),
+#'   data = dat,
+#'   family = gaussian(),
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' if (require("gratia")) {
+#'   gratia::draw(mod)
 #' }
-#'
-#'}
-
+#' }
 NULL
-
 
 #' @rdname gratia_mvgam_enhancements
 #' @aliases draw.mvgam

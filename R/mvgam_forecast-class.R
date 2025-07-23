@@ -1,55 +1,90 @@
 #' `mvgam_forecast` object description
 #'
-#' A \code{mvgam_forecast} object returned by function \code{\link{hindcast}} or \code{\link{forecast}}.
-#' Run `methods(class = "mvgam_forecast")` to see an overview of available methods.
+#' A \code{mvgam_forecast} object returned by function \code{\link{hindcast}}
+#' or \code{\link{forecast}}. Run `methods(class = "mvgam_forecast")` to see
+#' an overview of available methods.
+#'
 #' @details A `mvgam_forecast` object contains the following elements:
-#'\itemize{
+#'
+#' \itemize{
 #'   \item `call` the original observation model formula
-#'   \item `trend_call` If a `trend_formula was supplied`, the original trend model formula is
-#'   returned. Otherwise `NULL`
+#'
+#'   \item `trend_call` If a `trend_formula was supplied`, the original trend
+#'     model formula is returned. Otherwise `NULL`
+#'
 #'   \item `family` \code{character} description of the observation distribution
-#'   \item `family_pars` \code{list} containing draws of family-specific parameters (i.e.
-#'   shape, scale or overdispersion parameters). Only returned if `type = link`. Otherwise `NULL`
+#'
+#'   \item `family_pars` \code{list} containing draws of family-specific
+#'     parameters (i.e. shape, scale or overdispersion parameters). Only
+#'     returned if `type = link`. Otherwise `NULL`
+#'
 #'   \item `trend_model` \code{character} description of the latent trend model
-#'   \item `drift` Logical specifying whether a drift term was used in the trend model
-#'   \item `use_lv` Logical flag indicating whether latent dynamic factors were used in the model
-#'   \item `fit_engine` `Character` describing the fit engine, either as `stan` or `jags`
-#'   \item `type` The type of predictions included (either `link`, `response` or `trend`)
-#'   \item `series_names` Names of the time series, taken from `levels(data$series)` in the original
-#'   model fit
-#'   \item `train_observations` A `list` of training observation vectors of length `n_series`
-#'   \item `train_times` A `list` of the unique training times of length `n_series`
+#'
+#'   \item `drift` Logical specifying whether a drift term was used in the
+#'     trend model
+#'
+#'   \item `use_lv` Logical flag indicating whether latent dynamic factors were
+#'     used in the model
+#'
+#'   \item `fit_engine` `Character` describing the fit engine, either as `stan`
+#'     or `jags`
+#'
+#'   \item `type` The type of predictions included (either `link`, `response`
+#'     or `trend`)
+#'
+#'   \item `series_names` Names of the time series, taken from
+#'     `levels(data$series)` in the original model fit
+#'
+#'   \item `train_observations` A `list` of training observation vectors of
+#'     length `n_series`
+#'
+#'   \item `train_times` A `list` of the unique training times of length
+#'     `n_series`
+#'
 #'   \item `test_observations` If the \code{\link{forecast}} function was used,
-#'   a `list` of test observation vectors of length `n_series`. Otherwise `NULL`
+#'     a `list` of test observation vectors of length `n_series`. Otherwise
+#'     `NULL`
+#'
 #'   \item `test_times` If the \code{\link{forecast}} function was used, a
-#'   `list` of the unique testing (validation) times of length `n_series`. Otherwise `NULL`
-#'   \item `hindcasts` A `list` of posterior hindcast distributions of length `n_series`.
-#'   \item `forecasts` If the \code{\link{forecast}} function was used,
-#'   a `list` of posterior forecast distributions of length `n_series`. Otherwise `NULL`
-#'   }
+#'     `list` of the unique testing (validation) times of length `n_series`.
+#'     Otherwise `NULL`
+#'
+#'   \item `hindcasts` A `list` of posterior hindcast distributions of length
+#'     `n_series`.
+#'
+#'   \item `forecasts` If the \code{\link{forecast}} function was used, a
+#'     `list` of posterior forecast distributions of length `n_series`.
+#'     Otherwise `NULL`
+#' }
+#'
 #' @seealso [mvgam], [hindcast.mvgam], [forecast.mvgam]
+#'
 #' @author Nicholas J Clark
+#'
 #' @name mvgam_forecast-class
 NULL
 
 #' @title Posterior summary of hindcast and forecast objects
 #'
 #' @description This function takes an \code{mvgam_forecast} object and
-#' calculates a posterior summary of the hindcast and forecast distributions of each
-#' series, along with any true values that were included in `data` and `newdata` if
-#' `type = 'response'` was used in the call to \code{hindcast()} or \code{function()}
+#'   calculates a posterior summary of the hindcast and forecast distributions
+#'   of each series, along with any true values that were included in `data`
+#'   and `newdata` if `type = 'response'` was used in the call to
+#'   \code{hindcast()} or \code{function()}
 #'
 #' @param object an object of class `mvgam_forecast` obtained using either the
-#' \code{hindcast()} or \code{function()} function. This object will contain draws
-#' from the posterior distribution of hindcasts and forecasts.
-#' @param probs The upper and lower percentiles to be computed by the `quantile` function,
-#' in addition to the median
+#'   \code{hindcast()} or \code{function()} function. This object will contain
+#'   draws from the posterior distribution of hindcasts and forecasts.
+#'
+#' @param probs The upper and lower percentiles to be computed by the
+#'   `quantile` function, in addition to the median
+#'
 #' @param ... ignored
 #'
 #' @return A long-format `tibble` / `data.frame` reporting the posterior median,
-#' upper and lower percentiles of the predictions for each series at
-#' each of the timepoints that were originally supplied in `data` and, optionally,
-#' in `newdata`.
+#'   upper and lower percentiles of the predictions for each series at each of
+#'   the timepoints that were originally supplied in `data` and, optionally,
+#'   in `newdata`.
 #'
 #' @method summary mvgam_forecast
 #'

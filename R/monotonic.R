@@ -101,7 +101,6 @@
 #'
 #' # 'by' terms that produce a different smooth for each level of the 'by'
 #' # factor are also allowed
-#' set.seed(123123)
 #'
 #' x <- runif(80) * 4 - 1
 #' x <- sort(x)

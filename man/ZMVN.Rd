@@ -7,104 +7,125 @@
 ZMVN(unit = time, gr = NA, subgr = series)
 }
 \arguments{
-\item{unit}{The unquoted name of the variable that represents the unit of analysis in \code{data} over
-which latent residuals should be correlated. This variable should be either a
-\code{numeric} or \code{integer} variable in the supplied \code{data}.
-Defaults to \code{time} to be consistent with other functionalities
-in \pkg{mvgam}, though note that the data need not be time series in this case. See examples below
-for further details and explanations}
+\item{unit}{The unquoted name of the variable that represents the unit of
+analysis in \code{data} over which latent residuals should be correlated. This
+variable should be either a \code{numeric} or \code{integer} variable in the
+supplied \code{data}. Defaults to \code{time} to be consistent with other
+functionalities in \pkg{mvgam}, though note that the data need not be time
+series in this case. See examples below for further details and
+explanations}
 
-\item{gr}{An optional grouping variable, which must be a \code{factor} in the supplied \code{data},
-for setting up hierarchical residual correlation structures. If specified,
-this will automatically set up a model where the
-residual correlations for a specific level of \code{gr} are modelled hierarchically:
+\item{gr}{An optional grouping variable, which must be a \code{factor} in the
+supplied \code{data}, for setting up hierarchical residual correlation
+structures. If specified, this will automatically set up a model where the
+residual correlations for a specific level of \code{gr} are modelled
+hierarchically:
+
 \eqn{\Omega_{group} = p\Omega_{global} + (1 - p)\Omega_{group, local}},
-where \eqn{\Omega_{global}} is a \emph{global} correlation
-matrix, \eqn{\Omega_{group, local}} is a \emph{local deviation} correlation matrix
-and \eqn{p} is a weighting parameter
-controlling how strongly the local correlation matrix \eqn{\Omega_{group}} is shrunk towards the global
-correlation matrix \eqn{\Omega_{global}}. If \code{gr} is supplied then \code{subgr} \emph{must} also be supplied}
 
-\item{subgr}{A subgrouping \code{factor} variable specifying which element in \code{data} represents the
-different observational units. Defaults to \code{series} to be consistent with other functionalities
-in \pkg{mvgam}, though note that the data need not be time series in this case.
-But note that models that use the hierarchical correlations (by supplying a value for \code{gr})
-\emph{should not} include a \code{series} element in \code{data}. Rather, this element will be created internally based
-on the supplied variables for \code{gr} and \code{subgr}. For example, if you are modelling
-counts for a group of species (labelled as \code{species} in the data) across sampling sites
-(labelled as \code{site} in the data) in three
-different geographical regions (labelled as \code{region}), and you would like the residuals to be correlated
-within regions, then you should specify
-\code{unit = site},  \code{gr = region}, and \code{subgr = species}. Internally, \code{mvgam()} will appropriately order
-the data by \code{unit} (in this case, by \code{site}) and create
-the \code{series} element for the data using something like: \code{series = as.factor(paste0(group, '_', subgroup))}}
+where \eqn{\Omega_{global}} is a \emph{global} correlation matrix,
+\eqn{\Omega_{group, local}} is a \emph{local deviation} correlation matrix, and
+\eqn{p} is a weighting parameter controlling how strongly the local
+correlation matrix \eqn{\Omega_{group}} is shrunk towards the global
+correlation matrix \eqn{\Omega_{global}}. If \code{gr} is supplied then \code{subgr}
+\emph{must} also be supplied}
+
+\item{subgr}{A subgrouping \code{factor} variable specifying which element in
+\code{data} represents the different observational units. Defaults to \code{series}
+to be consistent with other functionalities in \pkg{mvgam}, though note
+that the data need not be time series in this case
+
+Models that use the hierarchical correlations (by supplying a value for
+\code{gr}) \emph{should not} include a \code{series} element in \code{data}. Rather, this
+element will be created internally based on the supplied variables for \code{gr}
+and \code{subgr}
+
+For example, if you are modelling counts for a group of species (labelled
+as \code{species} in the data) across sampling sites (labelled as \code{site} in the
+data) in three different geographical regions (labelled as \code{region}), and
+you would like the residuals to be correlated within regions, then you
+should specify \code{unit = site}, \code{gr = region}, and \code{subgr = species}
+
+Internally, \code{mvgam()} will appropriately order the data by \code{unit} (in this
+case, by \code{site}) and create the \code{series} element for the data using
+something like:
+
+\code{series = as.factor(paste0(group, '_', subgroup))}}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of
 arguments to be interpreted by the parsing functions in \pkg{mvgam}
 }
 \description{
-Set up latent correlated multivariate Gaussian residual processes
-in \pkg{mvgam}. This function does not evaluate it's arguments –
-it exists purely to help set up a model with particular error processes.
+Set up latent correlated multivariate Gaussian residual processes in
+\pkg{mvgam}. This function does not evaluate its arguments – it exists
+purely to help set up a model with particular error processes
 }
 \examples{
 \donttest{
 # Simulate counts of four species over ten sampling locations
-site_dat <- data.frame(site = rep(1:10, 4),
-                      species = as.factor(sort(rep(letters[1:4], 10))),
-                      y = c(NA, rpois(39, 3)))
+site_dat <- data.frame(
+  site = rep(1:10, 4),
+  species = as.factor(sort(rep(letters[1:4], 10))),
+  y = c(NA, rpois(39, 3))
+)
 head(site_dat)
 
-# Set up a correlated residual (i.e. Joint Species Distribution) model,
-# where 'site' represents the unit of analysis
+# Set up a correlated residual (i.e. Joint Species Distribution) model
 trend_model <- ZMVN(unit = site, subgr = species)
-mod <- mvgam(y ~ species,
-            trend_model = ZMVN(unit = site,
-                               subgr = species),
-            data = site_dat,
-            chains = 2,
-            silent = 2)
+mod <- mvgam(
+  y ~ species,
+  trend_model = ZMVN(unit = site, subgr = species),
+  data = site_dat,
+  chains = 2,
+  silent = 2
+)
 
 # Inspect the estimated species-species residual covariances
 mcmc_plot(mod, variable = 'Sigma', regex = TRUE, type = 'hist')
 
-# A hierarchical correlation example; set up correlated counts
-# for three species across two sampling locations
-Sigma <- matrix(c(1, -0.4, 0.5,
-                 -0.4, 1, 0.3,
-                 0.5, 0.3, 1),
-               byrow = TRUE,
-               nrow = 3)
-Sigma
+# A hierarchical correlation example
+Sigma <- matrix(
+  c(1, -0.4, 0.5,
+    -0.4, 1, 0.3,
+    0.5, 0.3, 1),
+  byrow = TRUE,
+  nrow = 3
+)
 
-make_site_dat = function(...){
- errors <- mgcv::rmvn(n = 30,
-                      mu = c(0.6, 0.8, 1.8),
-                      V = Sigma)
- site_dat <- do.call(rbind, lapply(1:3, function(spec){
-   data.frame(y = rpois(30,
-                        lambda = exp(errors[, spec])),
-              species = paste0('species',
-                               spec),
-              site = 1:30)
-}))
-site_dat
+make_site_dat <- function(...) {
+  errors <- mgcv::rmvn(
+    n = 30,
+    mu = c(0.6, 0.8, 1.8),
+    V = Sigma
+  )
+  site_dat <- do.call(rbind, lapply(1:3, function(spec) {
+    data.frame(
+      y = rpois(30, lambda = exp(errors[, spec])),
+      species = paste0('species', spec),
+      site = 1:30
+    )
+  }))
+  site_dat
 }
 
-site_dat <- rbind(make_site_dat() \%>\%
-                   dplyr::mutate(group = 'group1'),
-                 make_site_dat() \%>\%
-                   dplyr::mutate(group = 'group2')) \%>\%
-   dplyr::mutate(species = as.factor(species),
-                 group = as.factor(group))
+site_dat <- rbind(
+  make_site_dat() \%>\%
+    dplyr::mutate(group = 'group1'),
+  make_site_dat() \%>\%
+    dplyr::mutate(group = 'group2')
+) \%>\%
+  dplyr::mutate(
+    species = as.factor(species),
+    group = as.factor(group)
+  )
 
 # Fit the hierarchical correlated residual model
-mod <- mvgam(y ~ species,
-            trend_model = ZMVN(unit = site,
-                               gr = group,
-                               subgr = species),
-            data = site_dat)
+mod <- mvgam(
+  y ~ species,
+  trend_model = ZMVN(unit = site, gr = group, subgr = species),
+  data = site_dat
+)
 
 # Inspect the estimated species-species residual covariances
 mcmc_plot(mod, variable = 'Sigma', regex = TRUE, type = 'hist')

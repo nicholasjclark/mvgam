@@ -121,7 +121,6 @@ simdat <- sim_mvgam(
   family = gaussian()
 )
 
-set.seed(111)
 # Fit a model with shared seasonality
 # and AR(1) dynamics
 mod1 <- mvgam(

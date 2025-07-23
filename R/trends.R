@@ -1,54 +1,85 @@
 #' Supported latent trend models in \pkg{mvgam}
+#'
 #' @importFrom utils tail
 #' @importFrom stats rnorm
-#' @details \code{mvgam} currently supports the following dynamic trend models:
-#'\itemize{
-#'   \item `None` (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-#'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
-#'   \item `ZMVN()` (zero-mean correlated errors, useful for modelling time series where no
-#'   autoregressive terms are needed or for modelling data that are not sampled as time series)
+#'
+#' @details
+#' \code{mvgam} currently supports the following dynamic trend models:
+#' \itemize{
+#'   \item `None` (no latent trend component; i.e. the GAM component is all
+#'     that contributes to the linear predictor, and the observation process is
+#'     the only source of error; similar to what is estimated by
+#'     \code{\link[mgcv]{gam}})
+#'   \item `ZMVN()` (zero-mean correlated errors, useful for modelling time
+#'     series where no autoregressive terms are needed or for modelling data
+#'     that are not sampled as time series)
 #'   \item `RW()`
 #'   \item `AR(p = 1, 2, or 3)`
-#'   \item `CAR(p = 1)`(continuous time autoregressive trends; only available in \code{Stan})
-#'   \item `VAR()`(only available in \code{Stan})
-#'   \item `PW()` (piecewise linear or logistic trends; only available in \code{Stan})
-#'   \item `GP()` (Gaussian Process with squared exponential kernel;
-#'only available in \code{Stan})}
+#'   \item `CAR(p = 1)` (continuous time autoregressive trends; only available
+#'     in \code{Stan})
+#'   \item `VAR()` (only available in \code{Stan})
+#'   \item `PW()` (piecewise linear or logistic trends; only available in
+#'     \code{Stan})
+#'   \item `GP()` (Gaussian Process with squared exponential kernel; only
+#'     available in \code{Stan})
+#' }
 #'
-#'For most dynamic trend types available in `mvgam` (see argument `trend_model`), time should be
-#'measured in discrete, regularly spaced intervals (i.e. `c(1, 2, 3, ...)`). However you can
-#'use irregularly spaced intervals if using `trend_model = CAR(1)`, though note that any
-#'temporal intervals that are exactly `0` will be adjusted to a very small number
-#'(`1e-12`) to prevent sampling errors. For all autoregressive trend types
-#'apart from `CAR()`, moving average and/or correlated
-#'process error terms can also be estimated (for example, `RW(cor = TRUE)` will set up a
-#'multivariate Random Walk if `data` contains `>1` series). Hierarchical process error correlations
-#'can also be handled if the data contain relevant observation units that are nested into
-#'relevant grouping and subgrouping levels (i.e. using `AR(gr = region, subgr = species)`)
+#' For most dynamic trend types available in `mvgam` (see argument
+#' `trend_model`), time should be measured in discrete, regularly spaced
+#' intervals (i.e. `c(1, 2, 3, ...)`). However, you can use irregularly spaced
+#' intervals if using `trend_model = CAR(1)`, though note that any temporal
+#' intervals that are exactly `0` will be adjusted to a very small number
+#' (`1e-12`) to prevent sampling errors.
 #'
-#'Note that only `RW`, `AR1`, `AR2` and `AR3` are available if
-#'using `JAGS`. All trend models are supported if using `Stan`.
-#'Dynamic factor models can be used in which the latent factors evolve as either
-#'`RW`, `AR1-3`, `VAR` or `GP`. For `VAR` models
-#'(i.e. `VAR` and `VARcor` models), users can either fix the trend error covariances to be `0`
-#'(using `VAR`) or estimate them and potentially allow for contemporaneously correlated errors using
-#'`VARcor`. For all `VAR` models, stationarity of
-#'the latent process is enforced through the prior using the parameterisation given by
-#'Heaps (2022). Stationarity is not enforced when using `AR1`, `AR2` or `AR3` models,
-#'though this can be changed by the user by specifying lower and upper bounds on autoregressive
-#'parameters using functionality in [get_mvgam_priors] and the `priors` argument in
-#'[mvgam]. Piecewise trends follow the formulation in the popular `prophet` package produced
-#'by `Facebook`, where users can allow for changepoints to control the potential flexibility
-#'of the trend. See Taylor and Letham (2018) for details
-#'@seealso \code{\link{RW}}, \code{\link{AR}}, \code{\link{CAR}},
-#'\code{\link{VAR}}, \code{\link{PW}}, \code{\link{GP}}, \code{\link{ZMVN}}
-#' @references Sarah E. Heaps (2022) Enforcing stationarity through the prior in Vector Autoregressions.
-#' Journal of Computational and Graphical Statistics. 32:1, 1-10.
+#' For all autoregressive trend types apart from `CAR()`, moving average and/or
+#' correlated process error terms can also be estimated (for example,
+#' `RW(cor = TRUE)` will set up a multivariate Random Walk if `data` contains
+#' `>1` series). Hierarchical process error correlations can also be handled if
+#' the data contain relevant observation units that are nested into relevant
+#' grouping and subgrouping levels (i.e. using
+#' `AR(gr = region, subgr = species)`).
 #'
-#' Sean J. Taylor and Benjamin Letham (2018) Forecasting at scale.
-#' The American Statistician 72.1, 37-45.
+#' Note that only `RW`, `AR1`, `AR2` and `AR3` are available if using `JAGS`.
+#' All trend models are supported if using `Stan`.
+#'
+#' Dynamic factor models can be used in which the latent factors evolve as
+#' either `RW`, `AR1-3`, `VAR` or `GP`. For `VAR` models (i.e. `VAR` and
+#' `VARcor` models), users can either fix the trend error covariances to be `0`
+#' (using `VAR`) or estimate them and potentially allow for contemporaneously
+#' correlated errors using `VARcor`.
+#'
+#' For all `VAR` models, stationarity of the latent process is enforced through
+#' the prior using the parameterisation given by Heaps (2022). Stationarity is
+#' not enforced when using `AR1`, `AR2` or `AR3` models, though this can be
+#' changed by the user by specifying lower and upper bounds on autoregressive
+#' parameters using functionality in [get_mvgam_priors] and the `priors`
+#' argument in [mvgam].
+#'
+#' Piecewise trends follow the formulation in the popular `prophet` package
+#' produced by `Facebook`, where users can allow for changepoints to control
+#' the potential flexibility of the trend. See Taylor and Letham (2018) for
+#' details.
+#'
+#' @seealso
+#' \code{\link{RW}},
+#' \code{\link{AR}},
+#' \code{\link{CAR}},
+#' \code{\link{VAR}},
+#' \code{\link{PW}},
+#' \code{\link{GP}},
+#' \code{\link{ZMVN}}
+#'
+#' @references
+#' Sarah E. Heaps (2022) Enforcing stationarity through the prior in Vector
+#' Autoregressions. Journal of Computational and Graphical Statistics. 32:1,
+#' 1–10.
+#'
+#' Sean J. Taylor and Benjamin Letham (2018) Forecasting at scale. The American
+#' Statistician 72.1, 37–45.
+#'
 #' @name mvgam_trends
 NULL
+
 
 #### Generic trend information ####
 #' @noRd
@@ -171,13 +202,18 @@ ma_cor_additions = function(trend_model) {
 #' This code is borrowed from the {prophet} R package
 #' All credit goes directly to the prophet development team
 #' https://github.com/facebook/prophet/blob/main/R/R/prophet.R
-#' @param t Vector of times on which the function is evaluated.
-#' @param deltas Vector of rate changes at each changepoint.
-#' @param k Float initial rate.
-#' @param m Float initial offset.
-#' @param changepoint_ts Vector of changepoint times.
 #'
-#' @return Vector y(t).
+#' @param t Vector of times on which the function is evaluated
+#'
+#' @param deltas Vector of rate changes at each changepoint
+#'
+#' @param k Float initial rate
+#'
+#' @param m Float initial offset
+#'
+#' @param changepoint_ts Vector of changepoint times
+#'
+#' @return Vector y(t)
 #'
 #' @noRd
 piecewise_linear <- function(t, deltas, k, m = 0, changepoint_ts) {

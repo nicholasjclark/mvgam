@@ -14,10 +14,10 @@
 
 \item{incl_dynamics}{Deprecated and currently ignored}
 
-\item{...}{More \code{mvgam} objects.}
+\item{...}{More \code{mvgam} objects}
 
 \item{model_names}{If \code{NULL} (the default) will use model names derived
-from deparsing the call. Otherwise will use the passed values as model names.}
+from deparsing the call. Otherwise will use the passed values as model names}
 }
 \value{
 For \code{loo.mvgam}, an object of class \code{psis_loo} (see \code{\link[loo:loo]{loo::loo()}}

@@ -99,31 +99,31 @@ eval_smoothDotmoiDotsmooth(
 )
 }
 \arguments{
-\item{object}{a fitted mvgam, the result of a call to \code{\link[=mvgam]{mvgam()}}.}
+\item{object}{a fitted mvgam, the result of a call to \code{\link[=mvgam]{mvgam()}}}
 
 \item{trend_effects}{logical specifying whether smooth terms from the \code{trend_formula} should
 be drawn. If \code{FALSE}, only terms from the observation formula are drawn. If \code{TRUE}, only
-terms from the \code{trend_formula} are drawn.}
+terms from the \code{trend_formula} are drawn}
 
 \item{data}{a data frame of covariate values at which to evaluate the
-model's smooth functions.}
+model's smooth functions}
 
 \item{select}{character, logical, or numeric; which smooths to plot. If
 \code{NULL}, the default, then all model smooths are drawn.
 Character \code{select} matches the labels for smooths
 as shown for example in the output from \code{summary(object)}. Logical
 \code{select} operates as per numeric \code{select} in the order that smooths are
-stored.}
+stored}
 
 \item{parametric}{logical; plot parametric terms also? Note that \code{select} is
 used for selecting which smooths to plot. The \code{terms} argument is used to
 select which parametric effects are plotted. The default, as with
-\code{\link[mgcv:plot.gam]{mgcv::plot.gam()}}, is to not draw parametric effects.}
+\code{\link[mgcv:plot.gam]{mgcv::plot.gam()}}, is to not draw parametric effects}
 
 \item{terms}{character; which model parametric terms should be drawn? The
 Default of \code{NULL} will plot all parametric terms that can be drawn.}
 
-\item{residuals}{currently ignored for \code{mvgam} models.}
+\item{residuals}{currently ignored for \code{mvgam} models}
 
 \item{scales}{character; should all univariate smooths be plotted with the
 same y-axis scale? If \code{scales = "free"}, the default, each univariate
@@ -131,12 +131,12 @@ smooth has its own y-axis scale. If \code{scales = "fixed"}, a common y axis
 scale is used for all univariate smooths.
 
 Currently does not affect the y-axis scale of plots of the parametric
-terms.}
+terms}
 
 \item{ci_level}{numeric between 0 and 1; the coverage of credible interval.}
 
 \item{n}{numeric; the number of points over the range of the covariate at
-which to evaluate the smooth.}
+which to evaluate the smooth}
 
 \item{n_3d, n_4d}{numeric; the number of points over the range of last
 covariate in a 3D or 4D smooth. The default is \code{NULL} which achieves the
@@ -145,75 +145,75 @@ resulting in \code{n^d} evaluation points, where \code{d} is the dimension of th
 smooth. For \code{d > 2} this can result in very many evaluation points and slow
 performance. For smooths of \code{d > 4}, the value of \code{n_4d} will be used for
 all dimensions \verb{> 4}, unless this is \code{NULL}, in which case the default
-behaviour (using \code{n} for all dimensions) will be observed.}
+behaviour (using \code{n} for all dimensions) will be observed}
 
 \item{unconditional}{ignored for \code{mvgam} models as all appropriate
-uncertainties are already included in the posterior estimates.}
+uncertainties are already included in the posterior estimates}
 
 \item{overall_uncertainty}{ignored for \code{mvgam} models as all appropriate
-uncertainties are already included in the posterior estimates.}
+uncertainties are already included in the posterior estimates}
 
 \item{constant}{numeric; a constant to add to the estimated values of the
 smooth. \code{constant}, if supplied, will be added to the estimated value
-before the confidence band is computed.}
+before the confidence band is computed}
 
 \item{fun}{function; a function that will be applied to the estimated values
 and confidence interval before plotting. Can be a function or the name of a
 function. Function \code{fun} will be applied after adding any \code{constant}, if
-provided.}
+provided}
 
 \item{dist}{numeric; if greater than 0, this is used to determine when
 a location is too far from data to be plotted when plotting 2-D smooths.
 The data are scaled into the unit square before deciding what to exclude,
 and \code{dist} is a distance within the unit square. See
-\code{\link[mgcv:exclude.too.far]{mgcv::exclude.too.far()}} for further details.}
+\code{\link[mgcv:exclude.too.far]{mgcv::exclude.too.far()}} for further details}
 
 \item{rug}{logical; draw a rug plot at the bottom of each plot for 1-D
 smooths or plot locations of data for higher dimensions.}
 
 \item{contour}{logical; should contours be draw on the plot using
-\code{\link[ggplot2:geom_contour]{ggplot2::geom_contour()}}.}
+\code{\link[ggplot2:geom_contour]{ggplot2::geom_contour()}}}
 
 \item{grouped_by}{logical; should factor by smooths be drawn as one panel
 per level of the factor (\code{FALSE}, the default), or should the individual
 smooths be combined into a single panel containing all levels (\code{TRUE})?}
 
 \item{ci_alpha}{numeric; alpha transparency for confidence or simultaneous
-interval.}
+interval}
 
 \item{ci_col}{colour specification for the confidence/credible intervals
-band. Affects the fill of the interval.}
+band. Affects the fill of the interval}
 
-\item{smooth_col}{colour specification for the smooth line.}
+\item{smooth_col}{colour specification for the smooth line}
 
-\item{resid_col}{colour specification for residual points. Ignored.}
+\item{resid_col}{colour specification for residual points. Ignored}
 
-\item{contour_col}{colour specification for contour lines.}
+\item{contour_col}{colour specification for contour lines}
 
 \item{n_contour}{numeric; the number of contour bins. Will result in
-\code{n_contour - 1} contour lines being drawn. See \code{\link[ggplot2:geom_contour]{ggplot2::geom_contour()}}.}
+\code{n_contour - 1} contour lines being drawn. See \code{\link[ggplot2:geom_contour]{ggplot2::geom_contour()}}}
 
 \item{partial_match}{logical; should smooths be selected by partial matches
 with \code{select}? If \code{TRUE}, \code{select} can only be a single string to match
-against.}
+against}
 
 \item{discrete_colour}{a suitable colour scale to be used when plotting
-discrete variables.}
+discrete variables}
 
 \item{discrete_fill}{a suitable fill scale to be used when plotting
 discrete variables.}
 
 \item{continuous_colour}{a suitable colour scale to be used when plotting
-continuous variables.}
+continuous variables}
 
 \item{continuous_fill}{a suitable fill scale to be used when plotting
-continuous variables.}
+continuous variables}
 
 \item{position}{Position adjustment, either as a string, or the result of a
-call to a position adjustment function.}
+call to a position adjustment function}
 
 \item{angle}{numeric; the angle at which the x axis tick labels are to be
-drawn passed to the \code{angle} argument of \code{\link[ggplot2:guide_axis]{ggplot2::guide_axis()}}.}
+drawn passed to the \code{angle} argument of \code{\link[ggplot2:guide_axis]{ggplot2::guide_axis()}}}
 
 \item{ncol, nrow}{numeric; the numbers of rows and columns over which to
 spread the plots}
@@ -225,17 +225,17 @@ spread the plots}
 row in the grid. Will get repeated to match the dimensions of the grid. If
 there is more than 1 plot and \code{widths = NULL}, the value of \code{widths} will
 be set internally to \code{widths = 1} to accommodate plots of smooths that
-use a fixed aspect ratio.}
+use a fixed aspect ratio.=}
 
 \item{crs}{the coordinate reference system (CRS) to use for the plot. All
 data will be projected into this CRS. See \code{\link[ggplot2:ggsf]{ggplot2::coord_sf()}} for
-details.}
+details}
 
 \item{default_crs}{the coordinate reference system (CRS) to use for the
 non-sf layers in the plot. If left at the default \code{NULL}, the CRS used is
 4326 (WGS84), which is appropriate for spline-on-the-sphere smooths, which
 are parameterized in terms of latitude and longitude as coordinates. See
-\code{\link[ggplot2:ggsf]{ggplot2::coord_sf()}} for more details.}
+\code{\link[ggplot2:ggsf]{ggplot2::coord_sf()}} for more details}
 
 \item{lims_method}{character; affects how the axis limits are determined. See
 \code{\link[ggplot2:ggsf]{ggplot2::coord_sf()}}. Be careful; in testing of some examples, changing
@@ -244,20 +244,20 @@ Simon Wood's GAM book quickly used up all the RAM in my test system and the
 OS killed R. This could be incorrect usage on my part; right now the grid
 of points at which SOS smooths are evaluated (if not supplied by the user)
 can produce invalid coordinates for the corners of tiles as the grid is
-generated for tile centres without respect to the spacing of those tiles.}
+generated for tile centres without respect to the spacing of those tiles}
 
 \item{wrap}{logical; wrap plots as a patchwork? If \code{FALSE}, a list of
-ggplot objects is returned, 1 per term plotted.}
+ggplot objects is returned, 1 per term plotted}
 
-\item{envir}{an environment to look up the data within.}
+\item{envir}{an environment to look up the data within}
 
-\item{...}{additional arguments passed to other methods.}
+\item{...}{additional arguments passed to other methods}
 
 \item{smooth}{a smooth object of class \code{"gp.smooth"} (returned from a model using either the
 \code{dynamic()} function or the \code{gp()} function) or of class \code{"moi.smooth"} or \code{"mod.smooth"}
-(returned from a model using the 'moi' or 'mod' basis).}
+(returned from a model using the 'moi' or 'mod' basis)}
 
-\item{model}{a fitted \code{mgcv} model of clas \code{gam} or \code{bam}.}
+\item{model}{a fitted \code{mgcv} model of clas \code{gam} or \code{bam}}
 }
 \description{
 These evaluation and plotting functions exist to allow some popular \code{gratia}
@@ -270,20 +270,26 @@ of \code{mvgam} smooth functions using \code{\link[ggplot2:ggplot]{ggplot2::ggpl
 }
 \examples{
 \donttest{
-# Fit a simple GAM and draw partial effects of smooths using gratia
+# Fit a simple GAM and draw partial effects of smooths using 'gratia'
 set.seed(0)
-dat <- mgcv::gamSim(1, n = 200, scale = 2)
-mod <- mvgam(y ~ s(x1, bs = 'moi') +
-              te(x0, x2),
-             data = dat,
-             family = gaussian(),
-             chains = 2,
-             silent = 2)
+dat <- mgcv::gamSim(
+  eg = 1,
+  n = 200,
+  scale = 2
+)
 
-if(require("gratia")){
- gratia::draw(mod)
+mod <- mvgam(
+  formula = y ~ s(x1, bs = 'moi') +
+    te(x0, x2),
+  data = dat,
+  family = gaussian(),
+  chains = 2,
+  silent = 2
+)
+
+if (require("gratia")) {
+  gratia::draw(mod)
 }
-
 }
 }
 \author{

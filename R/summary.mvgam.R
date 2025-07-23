@@ -1,39 +1,55 @@
-#'Summary for a fitted \pkg{mvgam} models
+#' Summary for a fitted \pkg{mvgam} models
 #'
-#'These functions take a fitted \code{mvgam} or \code{jsdgam} object and
-#'return various useful summaries
-#'@importFrom stats printCoefmat
-#'@param object \code{list} object of class `mvgam`
-#'@param include_betas Logical. Print a summary that includes posterior summaries
-#'of all linear predictor beta coefficients (including spline coefficients)?
-#'Defaults to \code{TRUE} but use \code{FALSE} for a more concise summary
-#'@param smooth_test Logical. Compute estimated degrees of freedom and approximate
-#'p-values for smooth terms? Defaults to \code{TRUE}, but users may wish to set
-#'to \code{FALSE} for complex models with many smooth or random effect terms
-#'@param digits The number of significant digits for printing out the summary;
-#'  defaults to \code{2}.
-#'@param ... Ignored
-#'@author Nicholas J Clark
-#'@details `summary.mvgam` and `summary.mvgam_prefit` return brief summaries of the model's call, along with posterior intervals for
-#'some of the key parameters in the model. Note that some smooths have extra penalties on the null space,
-#'so summaries for the \code{rho} parameters may include more penalty terms than the number of smooths in
-#'the original model formula. Approximate p-values for smooth terms are also returned,
-#'with methods used for their
-#'calculation following those used for `mgcv` equivalents (see \code{\link[mgcv]{summary.gam}} for details).
-#'The Estimated Degrees of Freedom (edf) for smooth terms is computed using
-#'either `edf.type = 1` for models with no trend component, or `edf.type = 0` for models with
-#'trend components. These are described in the documentation for \code{\link[mgcv]{jagam}}. Experiments suggest
-#'these p-values tend to be more conservative than those that might be returned from an equivalent
-#'model fit with \code{\link[mgcv]{summary.gam}} using `method = 'REML'`
+#' These functions take a fitted \code{mvgam} or \code{jsdgam} object and
+#' return various useful summaries
 #'
-#'`coef.mvgam` returns either summaries or full posterior estimates for `GAM` component
-#'coefficients
-#'@return For `summary.mvgam` and `summary.mvgam_prefit`, a \code{list} is printed
-#'on-screen showing the summaries for the model
+#' @importFrom stats printCoefmat
 #'
-#'For `coef.mvgam`, either a \code{matrix} of posterior coefficient distributions
-#'(if \code{summarise == FALSE} or \code{data.frame} of coefficient summaries)
-#'@export
+#' @param object \code{list} object of class `mvgam`
+#'
+#' @param include_betas Logical. Print a summary that includes posterior
+#'   summaries of all linear predictor beta coefficients (including spline
+#'   coefficients)? Defaults to \code{TRUE} but use \code{FALSE} for a more
+#'   concise summary
+#'
+#' @param smooth_test Logical. Compute estimated degrees of freedom and
+#'   approximate p-values for smooth terms? Defaults to \code{TRUE}, but users
+#'   may wish to set to \code{FALSE} for complex models with many smooth or
+#'   random effect terms
+#'
+#' @param digits The number of significant digits for printing out the summary;
+#'   defaults to \code{2}.
+#'
+#' @param ... Ignored
+#'
+#' @author Nicholas J Clark
+#'
+#' @details `summary.mvgam` and `summary.mvgam_prefit` return brief summaries of
+#'   the model's call, along with posterior intervals for some of the key
+#'   parameters in the model. Note that some smooths have extra penalties on the
+#'   null space, so summaries for the \code{rho} parameters may include more
+#'   penalty terms than the number of smooths in the original model formula.
+#'   Approximate p-values for smooth terms are also returned, with methods used
+#'   for their calculation following those used for `mgcv` equivalents (see
+#'   \code{\link[mgcv]{summary.gam}} for details). The Estimated Degrees of
+#'   Freedom (edf) for smooth terms is computed using either `edf.type = 1` for
+#'   models with no trend component, or `edf.type = 0` for models with trend
+#'   components. These are described in the documentation for
+#'   \code{\link[mgcv]{jagam}}. Experiments suggest these p-values tend to be
+#'   more conservative than those that might be returned from an equivalent model
+#'   fit with \code{\link[mgcv]{summary.gam}} using `method = 'REML'`
+#'
+#'   `coef.mvgam` returns either summaries or full posterior estimates for `GAM`
+#'   component coefficients
+#'
+#' @return For `summary.mvgam` and `summary.mvgam_prefit`, a \code{list} is
+#'   printed on-screen showing the summaries for the model
+#'
+#'   For `coef.mvgam`, either a \code{matrix} of posterior coefficient
+#'   distributions (if \code{summarise == FALSE} or \code{data.frame} of
+#'   coefficient summaries)
+#'
+#' @export
 summary.mvgam = function(
   object,
   include_betas = TRUE,
@@ -1054,6 +1070,7 @@ summary.mvgam = function(
 }
 
 #' @rdname summary.mvgam
+#'
 #' @export
 summary.mvgam_prefit = function(object, ...) {
   if (!is.null(object$trend_call)) {
@@ -1114,14 +1131,19 @@ summary.mvgam_prefit = function(object, ...) {
 }
 
 #' @rdname summary.mvgam
-#' @export
-#'@title Extract mvgam beta coefficients from the GAM component
-#'@param object \code{list} object returned from \code{mvgam}
-#'@param summarise \code{logical}. Summaries of coefficients will be returned
-#'if \code{TRUE}. Otherwise the full posterior distribution will be returned
 #'
-#'@method coef mvgam
-#'@export
+#' @export
+#'
+#' @title Extract mvgam beta coefficients from the GAM component
+#'
+#' @param object \code{list} object returned from \code{mvgam}
+#'
+#' @param summarise \code{logical}. Summaries of coefficients will be returned
+#'  if \code{TRUE}. Otherwise the full posterior distribution will be returned
+#'
+#' @method coef mvgam
+#'
+#' @export
 coef.mvgam = function(object, summarise = TRUE, ...) {
   coef_names <- names(object$mgcv_model$coefficients)
 

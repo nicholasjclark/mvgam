@@ -166,12 +166,18 @@ loo.mvgam <- function(x, incl_dynamics = FALSE, ...) {
 }
 
 #' @importFrom loo loo_compare
+#'
 #' @param x Object of class `mvgam`
-#' @param ... More \code{mvgam} objects.
+#'
+#' @param ... More \code{mvgam} objects
+#'
 #' @param model_names If `NULL` (the default) will use model names derived
-#' from deparsing the call. Otherwise will use the passed values as model names.
+#' from deparsing the call. Otherwise will use the passed values as model names
+#'
 #' @param incl_dynamics Deprecated and currently ignored
+#'
 #' @rdname loo.mvgam
+#'
 #' @export
 loo_compare.mvgam <- function(
   x,

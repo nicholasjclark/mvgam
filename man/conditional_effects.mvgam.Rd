@@ -92,7 +92,8 @@ mod <- mvgam(
   y ~ s(season, by = series, k = 5) + year:series,
   family = poisson(),
   data = simdat$data_train,
-  chains = 2
+  chains = 2,
+  silent = 2
 )
 
 # Plot all main effects on the response scale
@@ -112,7 +113,8 @@ mod <- mvgam(
   y ~ te(x0, x1, k = 5) + s(x2, k = 6) + s(x3, k = 6),
   data = dat,
   family = gaussian(),
-  chains = 2
+  chains = 2,
+  silent = 2
 )
 conditional_effects(mod)
 conditional_effects(mod, conf_level = 0.5, type = 'link')

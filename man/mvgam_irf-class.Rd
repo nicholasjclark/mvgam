@@ -8,14 +8,16 @@ A \code{mvgam_irf} object returned by function \code{\link{irf}}.
 Run \code{methods(class = "mvgam_irf")} to see an overview of available methods.
 }
 \details{
-Generalized or Orthogonalized Impulse Response Functions can be computed
-using the posterior estimates of Vector Autoregressive parameters. This function
-generates a positive "shock" for a target process at time \code{t = 0} and then
-calculates how  each of the remaining processes in the latent VAR are expected
-to respond over the forecast horizon \code{h}. The function computes IRFs for all
-processes in the object and returns them in an array that can be plotted using
-the S3 \code{plot} function. To inspect community-level metrics of stability using latent
-VAR processes, you can use the related \code{\link[=stability]{stability()}} function.
+Generalized or Orthogonalized Impulse Response Functions can be
+computed using the posterior estimates of Vector Autoregressive parameters.
+This function generates a positive "shock" for a target process at time
+\code{t = 0} and then calculates how each of the remaining processes in the
+latent VAR are expected to respond over the forecast horizon \code{h}. The
+function computes IRFs for all processes in the object and returns them in
+an array that can be plotted using the S3 \code{plot} function. To inspect
+community-level metrics of stability using latent VAR processes, you can
+use the related \code{\link[=stability]{stability()}} function.
+
 A \code{mvgam_irf} object contains a \code{list} of posterior impulse response
 functions, each stored as its own \code{list}
 }

@@ -86,12 +86,13 @@ bind the discrete observations and the discrete number of trials
 \item\code{beta_binomial()} as for \code{binomial()} but allows for overdispersion}
 Default is \code{poisson()}. See \code{\link{mvgam_families}} for more details}
 
-\item{unit}{The unquoted name of the variable that represents the unit of analysis in \code{data} over
-which latent residuals should be correlated. This variable should be either a
-\code{numeric} or \code{integer} variable in the supplied \code{data}.
-Defaults to \code{time} to be consistent with other functionalities
-in \pkg{mvgam}, though note that the data need not be time series in this case. See examples below
-for further details and explanations}
+\item{unit}{The unquoted name of the variable that represents the unit of
+analysis in \code{data} over which latent residuals should be correlated. This
+variable should be either a \code{numeric} or \code{integer} variable in the
+supplied \code{data}. Defaults to \code{time} to be consistent with other
+functionalities in \pkg{mvgam}, though note that the data need not be time
+series in this case. See examples below for further details and
+explanations}
 
 \item{species}{The unquoted name of the \code{factor} variable that indexes the
 different response units in \code{data} (usually \code{'species'} in a JSDM).

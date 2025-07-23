@@ -2,41 +2,49 @@
 #'
 #' A \code{mvgam_irf} object returned by function \code{\link{irf}}.
 #' Run `methods(class = "mvgam_irf")` to see an overview of available methods.
-#' @details
-#' Generalized or Orthogonalized Impulse Response Functions can be computed
-#' using the posterior estimates of Vector Autoregressive parameters. This function
-#' generates a positive "shock" for a target process at time `t = 0` and then
-#' calculates how  each of the remaining processes in the latent VAR are expected
-#' to respond over the forecast horizon `h`. The function computes IRFs for all
-#' processes in the object and returns them in an array that can be plotted using
-#' the S3 `plot` function. To inspect community-level metrics of stability using latent
-#' VAR processes, you can use the related [stability()] function.
-#' A `mvgam_irf` object contains a `list` of posterior impulse response
-#' functions, each stored as its own `list`
+#'
+#' @details Generalized or Orthogonalized Impulse Response Functions can be
+#'   computed using the posterior estimates of Vector Autoregressive parameters.
+#'   This function generates a positive "shock" for a target process at time
+#'   `t = 0` and then calculates how each of the remaining processes in the
+#'   latent VAR are expected to respond over the forecast horizon `h`. The
+#'   function computes IRFs for all processes in the object and returns them in
+#'   an array that can be plotted using the S3 `plot` function. To inspect
+#'   community-level metrics of stability using latent VAR processes, you can
+#'   use the related [stability()] function.
+#'
+#'   A `mvgam_irf` object contains a `list` of posterior impulse response
+#'   functions, each stored as its own `list`
+#'
 #' @seealso [mvgam], [VAR]
+#'
 #' @references PH Pesaran & Shin Yongcheol (1998).
-#' Generalized impulse response analysis in linear multivariate models.
-#' Economics Letters 58: 17–29.
+#'   Generalized impulse response analysis in linear multivariate models.
+#'   Economics Letters 58: 17–29.
+#'
 #' @author Nicholas J Clark
+#'
 #' @name mvgam_irf-class
 NULL
 
 #' @title Posterior summary of impulse responses
 #'
 #' @description This function takes an \code{mvgam_irf} object and
-#' calculates a posterior summary of the impulse responses of each
-#' series to shocks from each of the other series, at all horizons
+#'   calculates a posterior summary of the impulse responses of each
+#'   series to shocks from each of the other series, at all horizons
 #'
 #' @param object an object of class `mvgam_irf` obtained using the
-#' \code{irf()} function. This object will contain draws from the posterior
-#' distribution of the impulse responses.
-#' @param probs The upper and lower percentiles to be computed by the `quantile` function,
-#' in addition to the median
+#'   \code{irf()} function. This object will contain draws from the posterior
+#'   distribution of the impulse responses.
+#'
+#' @param probs The upper and lower percentiles to be computed by the
+#'   `quantile` function, in addition to the median
+#'
 #' @param ... ignored
 #'
 #' @return A long-format `tibble` / `data.frame` reporting the posterior median,
-#' upper and lower percentiles of the impulse responses of each series to shocks
-#' from each of the other series at all horizons.
+#'   upper and lower percentiles of the impulse responses of each series to
+#'   shocks from each of the other series at all horizons.
 #'
 #' @method summary mvgam_irf
 #'
@@ -105,17 +113,24 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
   return(out)
 }
 
-#'Plot impulse responses from an `mvgam_irf` object
+#' Plot impulse responses from an `mvgam_irf` object
 #'
-#'This function takes an \code{mvgam_irf} object and produces plots of Impulse Response Functions
+#' This function takes an \code{mvgam_irf} object and produces plots of
+#' Impulse Response Functions
 #'
-#'@param x \code{list} object of class \code{mvgam_irf}. See [irf()]
-#'@param series \code{integer} specifying which process series should be given the shock
-#'@param ... ignored
-#'@return A ggplot object showing the expected response of each latent time series to
-#'a shock of the focal `series`
-#'@author Nicholas J Clark
-#'@export
+#' @param x \code{list} object of class \code{mvgam_irf}. See [irf()]
+#'
+#' @param series \code{integer} specifying which process series should be
+#'   given the shock
+#'
+#' @param ... ignored
+#'
+#' @return A `ggplot` object showing the expected response of each latent time
+#'   series to a shock of the focal `series`
+#'
+#' @author Nicholas J Clark
+#'
+#' @export
 plot.mvgam_irf = function(x, series = 1, ...) {
   all_irfs <- x
   validate_pos_integer(series)

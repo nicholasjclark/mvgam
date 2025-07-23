@@ -16,20 +16,25 @@ plot_mvgam_uncertainty(
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
-\item{series}{\code{integer} specifying which series in the set is to be plotted}
+\item{series}{\code{integer} specifying which series in the set is to be
+plotted}
 
-\item{newdata}{A \code{dataframe} or \code{list} containing at least 'series' and 'time' for the forecast horizon, in
-addition to any other variables included in the linear predictor of \code{formula}}
+\item{newdata}{A \code{dataframe} or \code{list} containing at least 'series'
+and 'time' for the forecast horizon, in addition to any other variables
+included in the linear predictor of \code{formula}}
 
-\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
-\code{newdata} instead for more seamless integration into \code{R} workflows}
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but users
+are recommended to use \code{newdata} instead for more seamless integration
+into \code{R} workflows}
 
-\item{legend_position}{The location may also be specified by setting x to a single keyword from the
-list: "none", "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
-This places the legend on the inside of the plot frame at the given location (if it is not "none").}
+\item{legend_position}{The location may also be specified by setting x to a
+single keyword from the list: "none", "bottomright", "bottom", "bottomleft",
+"left", "topleft", "top", "topright", "right" and "center". This places the
+legend on the inside of the plot frame at the given location (if it is not
+"none").}
 
-\item{hide_xlabels}{\code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
-\code{axis} from base \code{R}}
+\item{hide_xlabels}{\code{logical}. If \code{TRUE}, no xlabels are printed to
+allow the user to add custom labels using \code{axis} from base \code{R}}
 }
 \value{
 A base \code{R} graphics plot
@@ -38,13 +43,14 @@ A base \code{R} graphics plot
 Plot forecast uncertainty contributions from \pkg{mvgam} models
 }
 \details{
-The basic idea of this function is to compute forecasts by ignoring one of the
-two primary components in a correlated residual model (i.e. by either ignoring the
-linear predictor effects or by ignoring the residual dynamics). Some caution is required
-however, as this function was designed early in the \pkg{mvgam} development cycle and
-there are now many types of models that it cannot handle very well. For example,
-models with shared latent states, or any type of State-Space models that include terms
-in the \code{trend_formula}, will either fail or give nonsensical results. Improvements are
-in the works to provide a more general way to decompose forecast uncertainties, so
-please check back at a later date.
+The basic idea of this function is to compute forecasts by ignoring
+one of the two primary components in a correlated residual model (i.e. by
+either ignoring the linear predictor effects or by ignoring the residual
+dynamics). Some caution is required however, as this function was designed
+early in the \pkg{mvgam} development cycle and there are now many types of
+models that it cannot handle very well. For example, models with shared
+latent states, or any type of State-Space models that include terms in the
+\code{trend_formula}, will either fail or give nonsensical results. Improvements
+are in the works to provide a more general way to decompose forecast
+uncertainties, so please check back at a later date.
 }

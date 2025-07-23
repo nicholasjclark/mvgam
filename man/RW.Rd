@@ -16,125 +16,145 @@ CAR(p = 1)
 VAR(ma = FALSE, cor = FALSE, gr = NA, subgr = NA)
 }
 \arguments{
-\item{ma}{\code{Logical} Include moving average terms of order \code{1}?
+\item{ma}{\code{Logical}. Include moving average terms of order \code{1}?
 Default is \code{FALSE}.}
 
-\item{cor}{\code{Logical} Include correlated process errors as part of a
-multivariate normal process model? If \code{TRUE} and if \code{n_series > 1}
-in the supplied data, a fully structured covariance matrix will be estimated
-for the process errors. Default is \code{FALSE}.}
+\item{cor}{\code{Logical}. Include correlated process errors as part of a
+multivariate normal process model? If \code{TRUE} and if
+\code{n_series > 1} in the supplied data, a fully structured covariance
+matrix will be estimated for the process errors. Default is \code{FALSE}.}
 
-\item{gr}{An optional grouping variable, which must be a \code{factor} in the supplied \code{data},
-for setting up hierarchical residual correlation structures. If specified,
-this will automatically set \code{cor = TRUE} and set up a model where the
-residual correlations for a specific level of \code{gr} are modelled hierarchically:
-\eqn{\Omega_{group} = \alpha_{cor}\Omega_{global} + (1 - \alpha_{cor})\Omega_{group, local}},
-where \eqn{\Omega_{global}} is a \emph{global} correlation
-matrix, \eqn{\Omega_{group, local}} is a \emph{local deviation} correlation matrix
-and \eqn{\alpha_{cor}} is a weighting parameter
-controlling how strongly the local correlation matrix \eqn{\Omega_{group}}
-is shrunk towards the global
-correlation matrix \eqn{\Omega_{global}} (larger values of \eqn{\alpha_{cor}} indicate
-a greater degree of shrinkage, i.e. a greater degree of partial pooling). When used
-within a \code{VAR()} model, this essentially sets up a hierarchical panel vector autoregression
-where both the autoregressive and correlation matrices are learned hierarchically.
-If \code{gr} is supplied then \code{subgr} \emph{must} also be supplied}
+\item{gr}{An optional grouping variable, which must be a \code{factor} in the
+supplied \code{data}, for setting up hierarchical residual correlation
+structures. If specified, this will automatically set \code{cor = TRUE} and set
+up a model where the residual correlations for a specific level of \code{gr}
+are modelled hierarchically:
 
-\item{subgr}{A subgrouping \code{factor} variable specifying which element in \code{data} represents the
-different time series. Defaults to \code{series}, but note that
-models that use the hierarchical correlations, where the \code{subgr} time series are measured in each level of \code{gr},
-\emph{should not} include a \code{series} element in \code{data}. Rather, this element will be created internally based
-on the supplied variables for \code{gr} and \code{subgr}. For example, if you are modelling
-temporal counts for a group of species (labelled as \code{species} in \code{data}) across three
-different geographical regions (labelled as \code{region}),
-and you would like the residuals to be correlated within regions,
-then you should specify \code{gr = region} and \code{subgr = species}. Internally, \code{mvgam()} will create
-the \code{series} element for the data using: \verb{series = interaction(group, subgroup, drop = TRUE))}}
+\eqn{\Omega_{group} = \alpha_{cor}\Omega_{global} +
+  (1 - \alpha_{cor})\Omega_{group, local}},
+
+where \eqn{\Omega_{global}} is a \emph{global} correlation matrix,
+\eqn{\Omega_{group, local}} is a \emph{local deviation} correlation matrix and
+\eqn{\alpha_{cor}} is a weighting parameter controlling how strongly the
+local correlation matrix \eqn{\Omega_{group}} is shrunk towards the global
+correlation matrix \eqn{\Omega_{global}} (larger values of
+\eqn{\alpha_{cor}} indicate a greater degree of shrinkage, i.e. a greater
+degree of partial pooling).
+
+When used within a \code{VAR()} model, this essentially sets up a hierarchical
+panel vector autoregression where both the autoregressive and correlation
+matrices are learned hierarchically. If \code{gr} is supplied then \code{subgr}
+\emph{must} also be supplied.}
+
+\item{subgr}{A subgrouping \code{factor} variable specifying which element in
+\code{data} represents the different time series. Defaults to \code{series}, but
+note that models that use the hierarchical correlations, where the
+\code{subgr} time series are measured in each level of \code{gr}, \emph{should not}
+include a \code{series} element in \code{data}. Rather, this element will be created
+internally based on the supplied variables for \code{gr} and \code{subgr}.
+
+For example, if you are modelling temporal counts for a group of species
+(labelled as \code{species} in \code{data}) across three different geographical
+regions (labelled as \code{region}), and you would like the residuals to be
+correlated within regions, then you should specify \code{gr = region} and
+\code{subgr = species}. Internally, \code{mvgam()} will create the \code{series} element
+for the data using:
+
+\code{series = interaction(group, subgroup, drop = TRUE)}}
 
 \item{p}{A non-negative integer specifying the autoregressive (AR) order.
-Default is \code{1}. Cannot currently be larger than \code{3} for \code{AR} terms,
-and cannot be anything other than \code{1} for continuous time AR (\code{CAR}) terms}
+Default is \code{1}. Cannot currently be larger than \code{3} for \code{AR}
+terms, and cannot be anything other than \code{1} for continuous time AR
+(\code{CAR}) terms.}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of
-arguments to be interpreted by the parsing functions in \pkg{mvgam}
+arguments to be interpreted by the parsing functions in \pkg{mvgam}.
 }
 \description{
-Set up autoregressive or autoregressive moving average trend models
-in \pkg{mvgam}. These functions do not evaluate their arguments –
-they exist purely to help set up a model with particular autoregressive
-trend models.
+Set up autoregressive or autoregressive moving average trend models in
+\pkg{mvgam}. These functions do not evaluate their arguments – they exist
+purely to help set up a model with particular autoregressive trend models.
 }
 \details{
-Use \code{vignette("mvgam_overview")} to see the full details of available
-stochastic trend types in \pkg{mvgam}, or view the rendered version on the package
-website at: https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html
+Use \code{vignette("mvgam_overview")} to see the full details of
+available stochastic trend types in \pkg{mvgam}, or view the rendered
+version on the package website at:
+https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html
 }
 \examples{
 \donttest{
 # A short example to illustrate CAR(1) models
 # Function to simulate CAR1 data with seasonality
 sim_corcar1 = function(n = 125,
-                      phi = 0.5,
-                      sigma = 2,
-                      sigma_obs = 0.75){
-# Sample irregularly spaced time intervals
-time_dis <- c(1, runif(n - 1, 0, 5))
+                       phi = 0.5,
+                       sigma = 2,
+                       sigma_obs = 0.75) {
+  # Sample irregularly spaced time intervals
+  time_dis <- c(1, runif(n - 1, 0, 5))
 
-# Set up the latent dynamic process
-x <- vector(length = n); x[1] <- -0.3
-for(i in 2:n){
- # zero-distances will cause problems in sampling, so mvgam uses a
- # minimum threshold; this simulation function emulates that process
- if(time_dis[i] == 0){
-   x[i] <- rnorm(
-     1, mean = (phi^1e-3) * x[i - 1],
-     sd = sigma * (1 - phi^(2*1e-3)) / (1 - phi^2)
-   )
-  } else {
-   x[i] <- rnorm(
-     1,
-     mean = (phi^time_dis[i]) * x[i - 1],
-     sd = sigma * (1 - phi^(2*time_dis[i])) / (1 - phi^2)
-   )
+  # Set up the latent dynamic process
+  x <- vector(length = n); x[1] <- -0.3
+  for (i in 2:n) {
+    # zero-distances will cause problems in sampling, so mvgam uses a
+    # minimum threshold; this simulation function emulates that process
+    if (time_dis[i] == 0) {
+      x[i] <- rnorm(
+        1,
+        mean = (phi^1e-3) * x[i - 1],
+        sd = sigma * (1 - phi^(2 * 1e-3)) / (1 - phi^2)
+      )
+    } else {
+      x[i] <- rnorm(
+        1,
+        mean = (phi^time_dis[i]) * x[i - 1],
+        sd = sigma * (1 - phi^(2 * time_dis[i])) / (1 - phi^2)
+      )
+    }
   }
-}
 
-# Add 12-month seasonality
-cov1 <- sin(2 * pi * (1 : n) / 12); cov2 <- cos(2 * pi * (1 : n) / 12)
-beta1 <- runif(1, 0.3, 0.7); beta2 <- runif(1, 0.2, 0.5)
-seasonality <- beta1 * cov1 + beta2 * cov2
+  # Add 12-month seasonality
+  cov1 <- sin(2 * pi * (1:n) / 12)
+  cov2 <- cos(2 * pi * (1:n) / 12)
+  beta1 <- runif(1, 0.3, 0.7)
+  beta2 <- runif(1, 0.2, 0.5)
+  seasonality <- beta1 * cov1 + beta2 * cov2
 
-# Take Gaussian observations with error and return
-data.frame(y = rnorm(n, mean = x + seasonality, sd = sigma_obs),
-           season = rep(1:12, 20)[1:n],
-           time = cumsum(time_dis))
+  # Take Gaussian observations with error and return
+  data.frame(
+    y = rnorm(n, mean = x + seasonality, sd = sigma_obs),
+    season = rep(1:12, 20)[1:n],
+    time = cumsum(time_dis)
+  )
 }
 
 # Sample two time series
-dat <- rbind(dplyr::bind_cols(sim_corcar1(phi = 0.65,
-                                         sigma_obs = 0.55),
-                             data.frame(series = 'series1')),
-            dplyr::bind_cols(sim_corcar1(phi = 0.8,
-                             sigma_obs = 0.35),
-                             data.frame(series = 'series2'))) \%>\%
-      dplyr::mutate(series = as.factor(series))
+dat <- rbind(
+  dplyr::bind_cols(
+    sim_corcar1(phi = 0.65, sigma_obs = 0.55),
+    data.frame(series = 'series1')
+  ),
+  dplyr::bind_cols(
+    sim_corcar1(phi = 0.8, sigma_obs = 0.35),
+    data.frame(series = 'series2')
+  )
+) \%>\%
+  dplyr::mutate(series = as.factor(series))
 
-# mvgam with CAR(1) trends and series-level seasonal smooths; the
-# State-Space representation (using trend_formula) will be more efficient;
-# using informative priors on the sigmas often helps with convergence
-mod <- mvgam(formula = y ~ -1,
-            trend_formula = ~ s(season, bs = 'cc',
-                                k = 5, by = trend),
-            trend_model = CAR(),
-            priors = c(prior(exponential(3),
-                           class = sigma),
-                       prior(beta(4, 4),
-                           class = sigma_obs)),
-            data = dat,
-            family = gaussian(),
-            chains = 2,
-            silent = 2)
+# mvgam with CAR(1) trends and series-level seasonal smooths
+mod <- mvgam(
+  formula = y ~ -1,
+  trend_formula = ~ s(season, bs = 'cc', k = 5, by = trend),
+  trend_model = CAR(),
+  priors = c(
+    prior(exponential(3), class = sigma),
+    prior(beta(4, 4), class = sigma_obs)
+  ),
+  data = dat,
+  family = gaussian(),
+  chains = 2,
+  silent = 2
+)
 
 # View usual summaries and plots
 summary(mod)
@@ -143,52 +163,68 @@ plot(mod, type = 'trend', series = 1)
 plot(mod, type = 'trend', series = 2)
 plot(mod, type = 'residuals', series = 1)
 plot(mod, type = 'residuals', series = 2)
-mcmc_plot(mod,
-         variable = 'ar1',
-         regex = TRUE,
-         type = 'hist')
+mcmc_plot(
+  mod,
+  variable = 'ar1',
+  regex = TRUE,
+  type = 'hist'
+)
 
 # Now an example illustrating hierarchical dynamics
 set.seed(123)
-# Simulate three species monitored in three different
-# regions, where dynamics can potentially vary across regions
-simdat1 <- sim_mvgam(trend_model = VAR(cor = TRUE),
-                    prop_trend = 0.95,
-                    n_series = 3,
-                    mu = c(1, 2, 3))
-simdat2 <- sim_mvgam(trend_model = VAR(cor = TRUE),
-                    prop_trend = 0.95,
-                    n_series = 3,
-                    mu = c(1, 2, 3))
-simdat3 <- sim_mvgam(trend_model = VAR(cor = TRUE),
-                    prop_trend = 0.95,
-                    n_series = 3,
-                    mu = c(1, 2, 3))
+
+# Simulate three species monitored in three different regions
+simdat1 <- sim_mvgam(
+  trend_model = VAR(cor = TRUE),
+  prop_trend = 0.95,
+  n_series = 3,
+  mu = c(1, 2, 3)
+)
+simdat2 <- sim_mvgam(
+  trend_model = VAR(cor = TRUE),
+  prop_trend = 0.95,
+  n_series = 3,
+  mu = c(1, 2, 3)
+)
+simdat3 <- sim_mvgam(
+  trend_model = VAR(cor = TRUE),
+  prop_trend = 0.95,
+  n_series = 3,
+  mu = c(1, 2, 3)
+)
 
 # Set up the data but DO NOT include 'series'
-all_dat <- rbind(simdat1$data_train \%>\%
-                  dplyr::mutate(region = 'qld'),
-                simdat2$data_train \%>\%
-                  dplyr::mutate(region = 'nsw'),
-                simdat3$data_train \%>\%
-                  dplyr::mutate(region = 'vic')) \%>\%
-dplyr::mutate(species = gsub('series', 'species', series),
-              species = as.factor(species),
-              region = as.factor(region)) \%>\%
-dplyr::arrange(series, time) \%>\%
-dplyr::select(-series)
+all_dat <- rbind(
+  simdat1$data_train \%>\%
+    dplyr::mutate(region = 'qld'),
+  simdat2$data_train \%>\%
+    dplyr::mutate(region = 'nsw'),
+  simdat3$data_train \%>\%
+    dplyr::mutate(region = 'vic')
+) \%>\%
+  dplyr::mutate(
+    species = gsub('series', 'species', series),
+    species = as.factor(species),
+    region = as.factor(region)
+  ) \%>\%
+  dplyr::arrange(series, time) \%>\%
+  dplyr::select(-series)
 
 # Check priors for a hierarchical AR1 model
-get_mvgam_priors(formula = y ~ species,
-                trend_model = AR(gr = region, subgr = species),
-                data = all_dat)
+get_mvgam_priors(
+  formula = y ~ species,
+  trend_model = AR(gr = region, subgr = species),
+  data = all_dat
+)
 
 # Fit the model
-mod <- mvgam(formula = y ~ species,
-            trend_model = AR(gr = region, subgr = species),
-            data = all_dat,
-            chains = 2,
-            silent = 2)
+mod <- mvgam(
+  formula = y ~ species,
+  trend_model = AR(gr = region, subgr = species),
+  data = all_dat,
+  chains = 2,
+  silent = 2
+)
 
 # Check standard outputs
 summary(mod)

@@ -11,15 +11,15 @@
 \code{irf()} function. This object will contain draws from the posterior
 distribution of the impulse responses.}
 
-\item{probs}{The upper and lower percentiles to be computed by the \code{quantile} function,
-in addition to the median}
+\item{probs}{The upper and lower percentiles to be computed by the
+\code{quantile} function, in addition to the median}
 
 \item{...}{ignored}
 }
 \value{
 A long-format \code{tibble} / \code{data.frame} reporting the posterior median,
-upper and lower percentiles of the impulse responses of each series to shocks
-from each of the other series at all horizons.
+upper and lower percentiles of the impulse responses of each series to
+shocks from each of the other series at all horizons.
 }
 \description{
 This function takes an \code{mvgam_irf} object and
