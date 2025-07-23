@@ -982,17 +982,23 @@ ppc.mvgam <- function(
 #' of the \pkg{bayesplot} package.
 #'
 #' @aliases pp_check
+#'
 #' @inheritParams brms::pp_check
+#' @inheritParams brms::prepare_predictions.brmsfit
+#'
 #' @importFrom insight get_predictors
 #' @importFrom brms do_call
-#' @param object An object of class \code{mvgam}.
+#' @importFrom bayesplot pp_check
+#'
+#' @param object An object of class \code{mvgam}
+#'
 #' @param newdata Optional \code{dataframe} or \code{list} of test data containing the
 #' variables included in the linear predictor of \code{formula}. If not supplied,
 #' predictions are generated for the original observations used for the model fit.
 #' Ignored if using one of the residual plots (i.e. 'resid_hist')
+#'
 #' @param ... Further arguments passed to \code{\link{predict.mvgam}}
-#'   as well as to the PPC function specified in \code{type}.
-#' @inheritParams brms::prepare_predictions.brmsfit
+#'   as well as to the PPC function specified in \code{type}
 #'
 #' @return A ggplot object that can be further
 #'  customized using the \pkg{ggplot2} package.
@@ -1004,8 +1010,9 @@ ppc.mvgam <- function(
 #' see the \code{\link[bayesplot:PPC-overview]{PPC}}
 #' documentation of the \pkg{\link[bayesplot:bayesplot-package]{bayesplot}}
 #' package.
+#'
 #' @seealso \code{\link{ppc}}, \code{\link{predict.mvgam}}
-#' @author Nicholas J Clark
+#'
 #' @examples
 #' \donttest{
 #' simdat <- sim_mvgam(seasonality = "hierarchical")
@@ -1080,9 +1087,10 @@ ppc.mvgam <- function(
 #' pp_check(mod, prefix = "ppd")
 #' }
 #'
-#' @importFrom bayesplot pp_check
 #' @export pp_check
+#'
 #' @author Nicholas J Clark
+#'
 #' @export
 pp_check.mvgam <- function(
   object,

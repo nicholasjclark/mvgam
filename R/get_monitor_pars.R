@@ -40,7 +40,7 @@ get_monitor_pars = function(
   }
 
   # Family-specific parameters to monitor
-  param <- c(param, family_par_names(family))
+  param <- c(param, family_param_info(family)$param_names)
 
   # Trend-specific parameters
   param <- c(

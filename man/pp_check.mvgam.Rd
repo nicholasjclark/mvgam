@@ -17,7 +17,7 @@
 )
 }
 \arguments{
-\item{object}{An object of class \code{mvgam}.}
+\item{object}{An object of class \code{mvgam}}
 
 \item{type}{Type of the ppc plot as given by a character string.
 See \code{\link[bayesplot:PPC-overview]{PPC}} for an overview
@@ -50,7 +50,7 @@ predictions are generated for the original observations used for the model fit.
 Ignored if using one of the residual plots (i.e. 'resid_hist')}
 
 \item{...}{Further arguments passed to \code{\link{predict.mvgam}}
-as well as to the PPC function specified in \code{type}.}
+as well as to the PPC function specified in \code{type}}
 }
 \value{
 A ggplot object that can be further

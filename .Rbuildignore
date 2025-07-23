@@ -5,6 +5,8 @@
 ^LICENSE\.md$
 ^_pkgdown\.yml$
 ^docs$
+^.claude$
+^Claude\.md$
 ^index_files$
 ^doc$
 ^misc$
@@ -25,3 +27,6 @@
 ^memcheck\.R$
 ^build_vignettes_CRAN\.R$
 ^src\.gcda$
+^.*-requirements\.md$
+^.*-design\.md$
+^.*-implementation\.md$

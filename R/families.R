@@ -1085,40 +1085,88 @@ family_invlinks = function(family) {
 }
 
 #' Parameters to monitor / extract depending on the observation family
+#' @param family Character string of family name
+#' @return Named list with parameter names and descriptive labels
+#' @noRd
+family_param_info = function(family) {
+  # Define family parameter specifications
+  family_specs <- list(
+    gaussian = list(
+      param_names = "sigma_obs",
+      labels = "observation_error"
+    ),
+    lognormal = list(
+      param_names = "sigma_obs",
+      labels = "log_observation_error"
+    ),
+    student = list(
+      param_names = c("sigma_obs", "nu"),
+      labels = c("observation_error", "observation_df")
+    ),
+    Gamma = list(
+      param_names = "shape",
+      labels = "observation_shape"
+    ),
+    beta = list(
+      param_names = "phi",
+      labels = "observation_precision"
+    ),
+    beta_binomial = list(
+      param_names = "phi",
+      labels = "observation_dispersion"
+    ),
+    "negative binomial" = list(
+      param_names = "phi",
+      labels = "observation_dispersion"
+    ),
+    tweedie = list(
+      param_names = "phi",
+      labels = "observation_dispersion"
+    ),
+    nmix = list(
+      param_names = "detprob",
+      labels = "detection_probability"
+    ),
+    poisson = list(
+      param_names = character(0),
+      labels = character(0)
+    ),
+    binomial = list(
+      param_names = character(0),
+      labels = character(0)
+    ),
+    bernoulli = list(
+      param_names = character(0),
+      labels = character(0)
+    )
+  )
+
+  # Return specification for the given family
+  spec <- family_specs[[family]]
+  if (is.null(spec)) {
+    # Default for unknown families
+    spec <- list(
+      param_names = character(0),
+      labels = character(0)
+    )
+  }
+
+  return(spec)
+}
+
+#' Parameters to monitor / extract depending on the observation family
+#' (deprecated Use family_param_info() instead)
 #' @noRd
 family_par_names = function(family) {
-  if (family %in% c('gaussian', 'lognormal')) {
-    out <- c('sigma_obs')
-  }
-
-  if (family == 'student') {
-    out <- c('sigma_obs', 'nu')
-  }
-
-  if (family == 'Gamma') {
-    out <- c('shape')
-  }
-
-  if (family %in% c('beta', 'beta_binomial', 'negative binomial', 'tweedie')) {
-    out <- c('phi')
-  }
-
-  if (family %in% c('poisson', 'binomial', 'bernoulli')) {
-    out <- c()
-  }
-
-  if (family == 'nmix') {
-    out <- c('detprob')
-  }
-
-  return(out)
+  # Maintain backward compatibility by extracting param_names from new function
+  family_param_info(family)$param_names
 }
 
 #' Define which parameters to monitor / extract
 #' @noRd
 extract_family_pars = function(object, newdata = NULL) {
   # Get names of parameters to extract
-  pars_to_extract <- family_par_names(object$family)
+  pars_to_extract <- family_param_info(object$family)$param_names
 
   # Extract into a named list
   if (length(pars_to_extract) > 0) {

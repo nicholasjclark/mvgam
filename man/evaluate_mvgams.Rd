@@ -190,8 +190,8 @@ sum(score_rw$series_1$score)
 # Use rolling evaluation for approximate comparisons of 3-step ahead
 # forecasts across the training period
 compare_mvgams(
-  object1 = mod_ar2,
-  object2 = mod_rw,
+  model1 = mod_ar2,
+  model2 = mod_rw,
   fc_horizon = 3,
   n_samples = 1000,
   n_evaluations = 5

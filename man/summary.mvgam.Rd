@@ -34,8 +34,16 @@ defaults to \code{2}.}
 if \code{TRUE}. Otherwise the full posterior distribution will be returned}
 }
 \value{
-For \code{summary.mvgam} and \code{summary.mvgam_prefit}, a \code{list} is
-printed on-screen showing the summaries for the model
+For \code{summary.mvgam}, an object of class \code{mvgam_summary} containing:
+\itemize{
+\item \code{model_spec}: Model specification details (formulas, family, dimensions)
+\item \code{parameters}: Parameter estimates and significance tests
+\item \code{diagnostics}: MCMC convergence diagnostics
+\item \code{sampling_info}: Sampling algorithm details
+}
+
+For \code{summary.mvgam_prefit}, a \code{list} is printed on-screen showing
+the model specifications
 
 For \code{coef.mvgam}, either a \code{matrix} of posterior coefficient
 distributions (if \code{summarise == FALSE} or \code{data.frame} of
@@ -63,6 +71,23 @@ fit with \code{\link[mgcv]{summary.gam}} using \code{method = 'REML'}
 
 \code{coef.mvgam} returns either summaries or full posterior estimates for \code{GAM}
 component coefficients
+}
+\examples{
+\donttest{
+simdat <- sim_mvgam(seasonality = "hierarchical")
+
+mod <- mvgam(
+  y ~ series +
+    s(season, bs = "cc", k = 6) +
+    s(season, series, bs = "fs", k = 4),
+  data = simdat$data_train,
+  chains = 2,
+  silent = 2
+)
+
+mod_summary <- summary(mod)
+mod_summary
+}
 }
 \author{
 Nicholas J Clark
