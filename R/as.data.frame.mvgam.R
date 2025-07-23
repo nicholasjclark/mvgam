@@ -414,7 +414,7 @@ validate_variables = function(x, variable, regex = FALSE) {
   )
 
   if (variable[1] == 'obs_params') {
-    to_extract <- family_par_names(x$family)
+    to_extract <- family_param_info(x$family)$param_names
     newnames <- NULL
   }
 

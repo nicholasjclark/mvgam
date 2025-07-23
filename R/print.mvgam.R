@@ -16,84 +16,74 @@
 #' @export
 print.mvgam = function(x, ...) {
   object <- x
+  
+  # Use shared extractor functions to eliminate code duplication
+  model_spec <- extract_model_spec(object)
+  sampling_info <- extract_sampling_info(object)
+  
+  # Print model specification with simplified logic for print.mvgam
+  print_model_specification_simple(model_spec)
+  
+  # Print sampling information using shared helper  
+  print_sampling_information(sampling_info)
+}
 
-  if (!is.null(object$trend_call)) {
+#' Print model specification section for print.mvgam (simplified version)
+#' @param model_spec Model specification from extract_model_spec
+#' @noRd
+print_model_specification_simple <- function(model_spec) {
+  # Print formulas
+  if (!is.null(model_spec$formulas$process)) {
     cat("GAM observation formula:\n")
-    print(object$call)
-
-    cat("\nGAM process formula:\n")
-    print(object$trend_call)
+    print(model_spec$formulas$observation)
+    cat("\nGAM process formula:\n") 
+    print(model_spec$formulas$process)
   } else {
     cat("GAM formula:\n")
-    print(object$call)
+    print(model_spec$formulas$observation)
   }
-
+  
+  # Print family and link
   cat("\nFamily:\n")
-  cat(paste0(object$family, '\n'))
-
+  cat(paste0(model_spec$family, '\n'))
+  
   cat("\nLink function:\n")
-  cat(paste0(family_links(object$family), '\n'))
-
-  if (!inherits(object, 'jsdgam')) {
+  cat(paste0(model_spec$link, '\n'))
+  
+  # Print trend model
+  if (!model_spec$is_jsdgam) {
     cat("\nTrend model:\n")
-    if (inherits(object$trend_model, 'mvgam_trend')) {
-      print(object$trend_model$label)
+    if (is.call(model_spec$trend_model)) {
+      print(model_spec$trend_model)
       cat('\n')
     } else {
-      cat(paste0(object$trend_model, '\n'))
+      cat(paste0(model_spec$trend_model, '\n'))
     }
   }
-
-  if (object$use_lv) {
+  
+  # Print latent variable info (simplified - always "latent factors" for print.mvgam)
+  if (!is.null(model_spec$latent_variables)) {
     cat("\nN latent factors:\n")
-    cat(object$n_lv, '\n')
+    cat(model_spec$latent_variables$count, '\n')
   }
-
-  if (inherits(object, 'jsdgam')) {
+  
+  # Print dimensions
+  if (model_spec$is_jsdgam) {
     cat('\nN species:\n')
-    cat(NCOL(object$ytimes), '\n')
+    cat(model_spec$dimensions$n_species, '\n')
+    cat('\nN sites:\n')
+    cat(model_spec$dimensions$n_sites, '\n')
   } else {
     cat('\nN series:\n')
-    cat(NCOL(object$ytimes), '\n')
-  }
-
-  if (!is.null(object$upper_bounds)) {
-    cat('\nUpper bounds:\n')
-    cat(object$upper_bounds, '\n')
-  }
-
-  if (inherits(object, 'jsdgam')) {
-    cat('\nN sites:\n')
-    cat(NROW(object$ytimes), '\n')
-  } else {
+    cat(model_spec$dimensions$n_series, '\n')
     cat('\nN timepoints:\n')
-    cat(NROW(object$ytimes), '\n')
+    cat(model_spec$dimensions$n_timepoints, '\n')
   }
-
-  if (object$fit_engine == 'jags') {
-    cat('\nStatus:\n')
-    cat('Fitted using JAGS', '\n')
-  }
-
-  if (object$fit_engine == 'stan') {
-    cat('\nStatus:\n')
-    cat('Fitted using Stan', '\n')
-
-    n_kept <- object$model_output@sim$n_save - object$model_output@sim$warmup2
-    cat(
-      object$model_output@sim$chains,
-      " chains, each with iter = ",
-      object$model_output@sim$iter,
-      "; warmup = ",
-      object$model_output@sim$warmup,
-      "; thin = ",
-      object$model_output@sim$thin,
-      " \n",
-      "Total post-warmup draws = ",
-      sum(n_kept),
-      "\n\n",
-      sep = ''
-    )
+  
+  # Print upper bounds if present
+  if (!is.null(model_spec$upper_bounds)) {
+    cat('\nUpper bounds:\n')
+    cat(model_spec$upper_bounds, '\n')
   }
 }
 
@@ -101,42 +91,14 @@ print.mvgam = function(x, ...) {
 #'@export
 print.mvgam_prefit = function(x, ...) {
   object <- x
-
-  if (!is.null(object$trend_call)) {
-    cat("GAM observation formula:\n")
-    print(object$call)
-
-    cat("\nGAM process formula:\n")
-    print(object$trend_call)
-  } else {
-    cat("GAM formula:\n")
-    print(object$call)
-  }
-
-  cat("\nFamily:\n")
-  cat(paste0(object$family, '\n'))
-
-  cat("\nLink function:\n")
-  cat(paste0(family_links(object$family), '\n'))
-
-  cat("\nTrend model:\n")
-  if (inherits(object$trend_model, 'mvgam_trend')) {
-    print(object$trend_model$label)
-  } else {
-    cat(paste0(object$trend_model, '\n'))
-  }
-
-  if (object$use_lv) {
-    cat("\nN latent factors:\n")
-    cat(object$n_lv, '\n')
-  }
-
-  cat('\nN series:\n')
-  cat(NCOL(object$ytimes), '\n')
-
-  cat('\nN timepoints:\n')
-  cat(NROW(object$ytimes), '\n')
-
+  
+  # Use shared extractor function for model specification
+  model_spec <- extract_model_spec(object)
+  
+  # Print model specification using shared helper
+  print_model_specification(model_spec)
+  
+  # Add prefit-specific status message
   cat('\nStatus:\n')
   cat('Not fitted', '\n')
 }
