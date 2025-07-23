@@ -72,6 +72,23 @@ fit with \code{\link[mgcv]{summary.gam}} using \code{method = 'REML'}
 \code{coef.mvgam} returns either summaries or full posterior estimates for \code{GAM}
 component coefficients
 }
+\examples{
+\donttest{
+simdat <- sim_mvgam(seasonality = "hierarchical")
+
+mod <- mvgam(
+  y ~ series +
+    s(season, bs = "cc", k = 6) +
+    s(season, series, bs = "fs", k = 4),
+  data = simdat$data_train,
+  chains = 2,
+  silent = 2
+)
+
+mod_summary <- summary(mod)
+mod_summary
+}
+}
 \author{
 Nicholas J Clark
 }

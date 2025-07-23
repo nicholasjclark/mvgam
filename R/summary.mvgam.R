@@ -56,7 +56,22 @@
 #'   For `coef.mvgam`, either a \code{matrix} of posterior coefficient
 #'   distributions (if \code{summarise == FALSE} or \code{data.frame} of
 #'   coefficient summaries)
+#' @examples
+#' \donttest{
+#' simdat <- sim_mvgam(seasonality = "hierarchical")
 #'
+#' mod <- mvgam(
+#'   y ~ series +
+#'     s(season, bs = "cc", k = 6) +
+#'     s(season, series, bs = "fs", k = 4),
+#'   data = simdat$data_train,
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' mod_summary <- summary(mod)
+#' mod_summary
+#' }
 #' @export
 summary.mvgam = function(
   object,
@@ -217,7 +232,7 @@ print_sampling_information <- function(sampling_info) {
         " \n",
         "Total post-warmup draws = ",
         sampling_info$total_draws,
-        "\n\n",
+        "\n",
         sep = ''
       )
     }
