@@ -9,7 +9,10 @@ test_that("summary.mvgam returns structured object", {
   expect_s3_class(summary_obj, "list")
 
   # Check structure
-  expect_named(summary_obj, c("model_spec", "parameters", "diagnostics", "sampling_info"))
+  expect_named(
+    summary_obj,
+    c("model_spec", "parameters", "diagnostics", "sampling_info")
+  )
 
   # Check that each component is a list
   expect_type(summary_obj$model_spec, "list")
@@ -18,9 +21,19 @@ test_that("summary.mvgam returns structured object", {
   expect_type(summary_obj$sampling_info, "list")
 
   # Check that model_spec has expected components
-  expect_named(summary_obj$model_spec,
-               c("formulas", "family", "link", "trend_model", "upper_bounds",
-                 "latent_variables", "dimensions", "is_jsdgam"))
+  expect_named(
+    summary_obj$model_spec,
+    c(
+      "formulas",
+      "family",
+      "link",
+      "trend_model",
+      "upper_bounds",
+      "latent_variables",
+      "dimensions",
+      "is_jsdgam"
+    )
+  )
 })
 
 test_that("print.mvgam_summary works", {

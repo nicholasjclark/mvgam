@@ -256,8 +256,24 @@ RW = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA) {
     ),
     class = 'mvgam_trend',
     param_info = list(
-      param_names = c('trend', 'tau', 'sigma', 'theta', 'Sigma', 'error', 'drift'),
-      labels = c('trend_estimates', 'precision_parameter', 'standard_deviation', 'moving_average_coef', 'covariance_matrix', 'process_errors', 'drift_parameter')
+      param_names = c(
+        'trend',
+        'tau',
+        'sigma',
+        'theta',
+        'Sigma',
+        'error',
+        'drift'
+      ),
+      labels = c(
+        'trend_estimates',
+        'precision_parameter',
+        'standard_deviation',
+        'moving_average_coef',
+        'covariance_matrix',
+        'process_errors',
+        'drift_parameter'
+      )
     )
   )
 }
@@ -296,11 +312,27 @@ AR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA) {
 
   # Determine parameter names based on AR order
   ar_params <- paste0('ar', 1:p)
-  param_names <- c('trend', 'tau', 'sigma', ar_params, 'theta', 'Sigma', 'error', 'drift')
-  param_labels <- c('trend_estimates', 'precision_parameter', 'standard_deviation', 
-                   paste0('autoregressive_coef_', 1:p), 'moving_average_coef', 
-                   'covariance_matrix', 'process_errors', 'drift_parameter')
-  
+  param_names <- c(
+    'trend',
+    'tau',
+    'sigma',
+    ar_params,
+    'theta',
+    'Sigma',
+    'error',
+    'drift'
+  )
+  param_labels <- c(
+    'trend_estimates',
+    'precision_parameter',
+    'standard_deviation',
+    paste0('autoregressive_coef_', 1:p),
+    'moving_average_coef',
+    'covariance_matrix',
+    'process_errors',
+    'drift_parameter'
+  )
+
   out <- structure(
     list(
       trend_model = paste0('AR', p),
@@ -339,7 +371,13 @@ CAR = function(p = 1) {
     class = 'mvgam_trend',
     param_info = list(
       param_names = c('trend', 'tau', 'sigma', 'ar1', 'Sigma'),
-      labels = c('trend_estimates', 'precision_parameter', 'standard_deviation', 'autoregressive_coef', 'covariance_matrix')
+      labels = c(
+        'trend_estimates',
+        'precision_parameter',
+        'standard_deviation',
+        'autoregressive_coef',
+        'covariance_matrix'
+      )
     )
   )
 }
@@ -383,8 +421,26 @@ VAR = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA) {
     ),
     class = 'mvgam_trend',
     param_info = list(
-      param_names = c('trend', 'A', 'Sigma', 'P_real', 'sigma', 'theta', 'error', 'drift'),
-      labels = c('trend_estimates', 'var_coefficient_matrix', 'covariance_matrix', 'stationary_precision', 'standard_deviation', 'moving_average_matrix', 'process_errors', 'drift_parameter')
+      param_names = c(
+        'trend',
+        'A',
+        'Sigma',
+        'P_real',
+        'sigma',
+        'theta',
+        'error',
+        'drift'
+      ),
+      labels = c(
+        'trend_estimates',
+        'var_coefficient_matrix',
+        'covariance_matrix',
+        'stationary_precision',
+        'standard_deviation',
+        'moving_average_matrix',
+        'process_errors',
+        'drift_parameter'
+      )
     )
   )
 }
@@ -434,7 +490,12 @@ GP = function(...) {
     class = 'mvgam_trend',
     param_info = list(
       param_names = c('trend', 'alpha_gp', 'rho_gp', 'b_gp'),
-      labels = c('trend_estimates', 'marginal_deviation', 'length_scale', 'basis_coefficients')
+      labels = c(
+        'trend_estimates',
+        'marginal_deviation',
+        'length_scale',
+        'basis_coefficients'
+      )
     )
   )
 }
@@ -597,7 +658,12 @@ PW = function(
     class = 'mvgam_trend',
     param_info = list(
       param_names = c('trend', 'delta_trend', 'k_trend', 'm_trend'),
-      labels = c('trend_estimates', 'rate_changes', 'growth_rate', 'offset_parameter')
+      labels = c(
+        'trend_estimates',
+        'rate_changes',
+        'growth_rate',
+        'offset_parameter'
+      )
     )
   )
 }
@@ -753,7 +819,14 @@ ZMVN = function(unit = time, gr = NA, subgr = series) {
     class = 'mvgam_trend',
     param_info = list(
       param_names = c('trend', 'tau', 'sigma', 'theta', 'Sigma', 'error'),
-      labels = c('trend_estimates', 'precision_parameter', 'standard_deviation', 'correlation_parameter', 'covariance_matrix', 'process_errors')
+      labels = c(
+        'trend_estimates',
+        'precision_parameter',
+        'standard_deviation',
+        'correlation_parameter',
+        'covariance_matrix',
+        'process_errors'
+      )
     )
   )
 }

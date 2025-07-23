@@ -120,7 +120,13 @@ summary.mvgam = function(
   summary_obj <- structure(
     list(
       model_spec = extract_model_spec(object),
-      parameters = extract_parameters(object, include_betas, smooth_test, digits, variational),
+      parameters = extract_parameters(
+        object,
+        include_betas,
+        smooth_test,
+        digits,
+        variational
+      ),
       diagnostics = extract_diagnostics(object, digits, variational),
       sampling_info = extract_sampling_info(object)
     ),
@@ -245,8 +251,12 @@ print_sampling_information <- function(sampling_info) {
 print_parameters <- function(parameters) {
   # Print family parameters
   family_param_labels <- c(
-    "observation_error", "log_observation_error", "observation_df",
-    "observation_shape", "observation_precision", "observation_dispersion"
+    "observation_error",
+    "log_observation_error",
+    "observation_df",
+    "observation_shape",
+    "observation_precision",
+    "observation_dispersion"
   )
 
   for (label in family_param_labels) {
@@ -280,12 +290,16 @@ print_parameters <- function(parameters) {
 
   # Print GP parameters
   if (!is.null(parameters$gam_gp_parameters)) {
-    cat("\nGAM gp term marginal deviation (alpha) and length scale (rho) estimates:\n")
+    cat(
+      "\nGAM gp term marginal deviation (alpha) and length scale (rho) estimates:\n"
+    )
     print(parameters$gam_gp_parameters)
   }
 
   if (!is.null(parameters$gam_obs_gp_parameters)) {
-    cat("\nGAM observation model gp term marginal deviation (alpha) and length scale (rho) estimates:\n")
+    cat(
+      "\nGAM observation model gp term marginal deviation (alpha) and length scale (rho) estimates:\n"
+    )
     print(parameters$gam_obs_gp_parameters)
   }
 
@@ -316,9 +330,15 @@ print_parameters <- function(parameters) {
 
   # Print trend parameters (using labels from param_info)
   trend_param_patterns <- c(
-    "drift_parameter", "standard_deviation", "precision_parameter",
-    "autoregressive_coef", "var_coefficient", "marginal_deviation",
-    "length_scale", "growth_rate", "offset_parameter"
+    "drift_parameter",
+    "standard_deviation",
+    "precision_parameter",
+    "autoregressive_coef",
+    "var_coefficient",
+    "marginal_deviation",
+    "length_scale",
+    "growth_rate",
+    "offset_parameter"
   )
 
   for (pattern in trend_param_patterns) {
@@ -333,7 +353,9 @@ print_parameters <- function(parameters) {
 
   # Print hierarchical correlation
   if (!is.null(parameters$hierarchical_correlation)) {
-    cat("\nHierarchical correlation weighting parameter (alpha_cor) estimates:\n")
+    cat(
+      "\nHierarchical correlation weighting parameter (alpha_cor) estimates:\n"
+    )
     print(parameters$hierarchical_correlation)
   }
 
@@ -349,7 +371,9 @@ print_parameters <- function(parameters) {
   }
 
   if (!is.null(parameters$gam_process_gp_parameters)) {
-    cat("\nGAM process model gp term marginal deviation (alpha) and length scale (rho) estimates:\n")
+    cat(
+      "\nGAM process model gp term marginal deviation (alpha) and length scale (rho) estimates:\n"
+    )
     print(parameters$gam_process_gp_parameters)
   }
 
@@ -375,8 +399,7 @@ print_diagnostics <- function(diagnostics) {
       cat('\nStan MCMC diagnostics:\n')
 
       if (!is.null(diagnostics$sampler_message)) {
-        cat(insight::format_message(diagnostics$sampler_message,
-                                    indent = ""))
+        cat(insight::format_message(diagnostics$sampler_message, indent = ""))
         cat('\n')
       }
     }
@@ -405,7 +428,8 @@ print_diagnostics <- function(diagnostics) {
 #' @return Formatted header string
 #' @noRd
 format_param_header <- function(label) {
-  switch(label,
+  switch(
+    label,
     "observation_error" = "Observation error parameter estimates",
     "log_observation_error" = "log(observation error) parameter estimates",
     "observation_df" = "Observation df parameter estimates",
@@ -793,11 +817,13 @@ extract_diagnostics <- function(object, digits = 2, variational = FALSE) {
 #' @param ISB Logical for ISB parameter (used for group-level effects)
 #' @return Parameter summary matrix
 #' @noRd
-extract_param_summary <- function(model_output,
-                                  param_name,
-                                  digits = 2,
-                                  variational = FALSE,
-                                  ISB = TRUE) {
+extract_param_summary <- function(
+  model_output,
+  param_name,
+  digits = 2,
+  variational = FALSE,
+  ISB = TRUE
+) {
   mcmc_summary(
     model_output,
     param_name,
@@ -823,7 +849,10 @@ extract_family_parameters <- function(object, digits = 2, variational = FALSE) {
       param_label <- family_info$labels[i]
 
       family_params[[param_label]] <- extract_param_summary(
-        object$model_output, param_name, digits, variational
+        object$model_output,
+        param_name,
+        digits,
+        variational
       )
     }
   }
@@ -838,26 +867,44 @@ extract_family_parameters <- function(object, digits = 2, variational = FALSE) {
 #' @param variational Logical for variational approximation
 #' @return List of coefficient summaries
 #' @noRd
-extract_gam_coefficients <- function(object, include_betas = TRUE, digits = 2, variational = FALSE) {
+extract_gam_coefficients <- function(
+  object,
+  include_betas = TRUE,
+  digits = 2,
+  variational = FALSE
+) {
   gam_params <- list()
 
   # Determine coefficient subset
   if (include_betas) {
     coef_indices <- seq_along(object$mgcv_model$coefficients)
   } else {
-    coef_indices <- if (object$mgcv_model$nsdf > 0) 1:object$mgcv_model$nsdf else integer(0)
+    coef_indices <- if (object$mgcv_model$nsdf > 0) {
+      1:object$mgcv_model$nsdf
+    } else {
+      integer(0)
+    }
   }
 
   if (length(coef_indices) > 0) {
     coef_names <- names(object$mgcv_model$coefficients)[coef_indices]
-    mvgam_coefs <- extract_param_summary(object$model_output, 'b', digits, variational)
+    mvgam_coefs <- extract_param_summary(
+      object$model_output,
+      'b',
+      digits,
+      variational
+    )
 
     if (nrow(mvgam_coefs) >= max(coef_indices)) {
       mvgam_coefs <- mvgam_coefs[coef_indices, , drop = FALSE]
       rownames(mvgam_coefs) <- coef_names
 
       # Choose appropriate label based on model structure
-      coef_label <- if (!is.null(object$trend_call)) "gam_obs_coefficients" else "gam_coefficients"
+      coef_label <- if (!is.null(object$trend_call)) {
+        "gam_obs_coefficients"
+      } else {
+        "gam_coefficients"
+      }
       gam_params[[coef_label]] <- mvgam_coefs
     }
   }
@@ -873,22 +920,47 @@ extract_gam_coefficients <- function(object, include_betas = TRUE, digits = 2, v
 #' @param variational Logical indicating if variational approximation was used
 #' @return List containing all parameter estimates
 #' @noRd
-extract_parameters <- function(object, include_betas = TRUE, smooth_test = TRUE,
-                               digits = 2, variational = FALSE) {
-
+extract_parameters <- function(
+  object,
+  include_betas = TRUE,
+  smooth_test = TRUE,
+  digits = 2,
+  variational = FALSE
+) {
   parameters <- list()
 
   # Extract family-specific parameters
-  parameters <- c(parameters, extract_family_parameters(object, digits, variational))
+  parameters <- c(
+    parameters,
+    extract_family_parameters(object, digits, variational)
+  )
 
   # Extract GAM coefficients
-  parameters <- c(parameters, extract_gam_coefficients(object, include_betas, digits, variational))
+  parameters <- c(
+    parameters,
+    extract_gam_coefficients(object, include_betas, digits, variational)
+  )
 
   # Extract remaining parameter types
-  parameters <- c(parameters, extract_group_level_parameters(object, digits, variational))
-  parameters <- c(parameters, extract_gp_parameters(object, digits, variational))
+  parameters <- c(
+    parameters,
+    extract_group_level_parameters(object, digits, variational)
+  )
+  parameters <- c(
+    parameters,
+    extract_gp_parameters(object, digits, variational)
+  )
   parameters <- c(parameters, extract_smooth_tests(object, smooth_test, digits))
-  parameters <- c(parameters, extract_trend_parameters(object, include_betas, smooth_test, digits, variational))
+  parameters <- c(
+    parameters,
+    extract_trend_parameters(
+      object,
+      include_betas,
+      smooth_test,
+      digits,
+      variational
+    )
+  )
 
   return(parameters)
 }
@@ -899,7 +971,11 @@ extract_parameters <- function(object, include_betas = TRUE, smooth_test = TRUE,
 #' @param variational Logical for variational approximation
 #' @return List of group-level parameter summaries
 #' @noRd
-extract_group_level_parameters <- function(object, digits = 2, variational = FALSE) {
+extract_group_level_parameters <- function(
+  object,
+  digits = 2,
+  variational = FALSE
+) {
   group_params <- list()
 
   if (!all(is.na(object$sp_names))) {
@@ -914,7 +990,11 @@ extract_group_level_parameters <- function(object, digits = 2, variational = FAL
         purrr::map(object$mgcv_model$smooth, 'label'),
         paste,
         collapse = ','
-      ))[unlist(purrr::map(object$mgcv_model$smooth, inherits, 'random.effect'))]
+      ))[unlist(purrr::map(
+        object$mgcv_model$smooth,
+        inherits,
+        'random.effect'
+      ))]
 
       re_sds <- extract_param_summary(
         object$model_output,
@@ -935,7 +1015,11 @@ extract_group_level_parameters <- function(object, digits = 2, variational = FAL
       rownames(re_sds) <- paste0('sd(', re_labs, ')')
       rownames(re_mus) <- paste0('mean(', re_labs, ')')
 
-      param_label <- if (!is.null(object$trend_call)) "gam_obs_group_level" else "gam_group_level"
+      param_label <- if (!is.null(object$trend_call)) {
+        "gam_obs_group_level"
+      } else {
+        "gam_group_level"
+      }
       group_params[[param_label]] <- rbind(re_mus, re_sds)
     }
   }
@@ -960,8 +1044,15 @@ extract_gp_parameters <- function(object, digits = 2, variational = FALSE) {
       variational = variational
     )
 
-    param_label <- if (!is.null(object$trend_call)) "gam_obs_gp_parameters" else "gam_gp_parameters"
-    gp_params[[param_label]] <- rbind(gp_summaries$alpha_summary, gp_summaries$rho_summary)
+    param_label <- if (!is.null(object$trend_call)) {
+      "gam_obs_gp_parameters"
+    } else {
+      "gam_gp_parameters"
+    }
+    gp_params[[param_label]] <- rbind(
+      gp_summaries$alpha_summary,
+      gp_summaries$rho_summary
+    )
   }
 
   return(gp_params)
@@ -978,22 +1069,40 @@ extract_smooth_tests <- function(object, smooth_test = TRUE, digits = 2) {
 
   if (any(!is.na(object$sp_names)) & smooth_test) {
     gam_sig_table <- try(
-      suppressWarnings(summary(object$mgcv_model)$s.table[, c(1, 2, 3, 4), drop = FALSE]),
+      suppressWarnings(summary(object$mgcv_model)$s.table[,
+        c(1, 2, 3, 4),
+        drop = FALSE
+      ]),
       silent = TRUE
     )
 
     if (inherits(gam_sig_table, 'try-error')) {
       object$mgcv_model$R <- NULL
-      gam_sig_table <- suppressWarnings(summary(object$mgcv_model)$s.table[, c(1, 2, 3, 4), drop = FALSE])
-      gam_sig_table[, 2] <- unlist(purrr::map(object$mgcv_model$smooth, 'df'), use.names = FALSE)
+      gam_sig_table <- suppressWarnings(summary(object$mgcv_model)$s.table[,
+        c(1, 2, 3, 4),
+        drop = FALSE
+      ])
+      gam_sig_table[, 2] <- unlist(
+        purrr::map(object$mgcv_model$smooth, 'df'),
+        use.names = FALSE
+      )
     }
 
     # Handle GP terms
     if (!is.null(attr(object$mgcv_model, 'gp_att_table'))) {
-      gp_names <- unlist(purrr::map(attr(object$mgcv_model, 'gp_att_table'), 'name'))
-      if (!all(rownames(gam_sig_table) %in% gsub('gp(', 's(', gp_names, fixed = TRUE))) {
+      gp_names <- unlist(purrr::map(
+        attr(object$mgcv_model, 'gp_att_table'),
+        'name'
+      ))
+      if (
+        !all(
+          rownames(gam_sig_table) %in% gsub('gp(', 's(', gp_names, fixed = TRUE)
+        )
+      ) {
         gam_sig_table <- gam_sig_table[
-          !rownames(gam_sig_table) %in% gsub('gp(', 's(', gp_names, fixed = TRUE), ,
+          !rownames(gam_sig_table) %in%
+            gsub('gp(', 's(', gp_names, fixed = TRUE),
+          ,
           drop = FALSE
         ]
       } else {
@@ -1002,7 +1111,11 @@ extract_smooth_tests <- function(object, smooth_test = TRUE, digits = 2) {
     }
 
     if (!is.null(gam_sig_table) && nrow(gam_sig_table) > 0) {
-      param_label <- if (!is.null(object$trend_call)) "gam_obs_smooth_tests" else "gam_smooth_tests"
+      param_label <- if (!is.null(object$trend_call)) {
+        "gam_obs_smooth_tests"
+      } else {
+        "gam_smooth_tests"
+      }
       smooth_params[[param_label]] <- gam_sig_table
     }
   }
@@ -1018,7 +1131,13 @@ extract_smooth_tests <- function(object, smooth_test = TRUE, digits = 2) {
 #' @param variational Logical for variational approximation
 #' @return List of trend parameter summaries
 #' @noRd
-extract_trend_parameters <- function(object, include_betas = TRUE, smooth_test = TRUE, digits = 2, variational = FALSE) {
+extract_trend_parameters <- function(
+  object,
+  include_betas = TRUE,
+  smooth_test = TRUE,
+  digits = 2,
+  variational = FALSE
+) {
   trend_params <- list()
 
   # Get trend model information
@@ -1026,26 +1145,40 @@ extract_trend_parameters <- function(object, include_betas = TRUE, smooth_test =
     trend_info <- attr(object$trend_model, 'param_info')
     if (!is.null(trend_info)) {
       # Extract parameters that are available in the model
-      available_params <- get_available_trend_params(object, trend_info$param_names)
+      available_params <- get_available_trend_params(
+        object,
+        trend_info$param_names
+      )
 
       if (length(available_params) > 0) {
         for (i in seq_along(available_params)) {
           param_name <- available_params[i]
-          param_label <- trend_info$labels[match(param_name, trend_info$param_names)]
+          param_label <- trend_info$labels[match(
+            param_name,
+            trend_info$param_names
+          )]
 
           # Skip trend estimates as they're not summary statistics
-          if (param_name == 'trend') next
+          if (param_name == 'trend') {
+            next
+          }
 
-          tryCatch({
-            param_summary <- extract_param_summary(
-              object$model_output, param_name, digits, variational
-            )
-            if (!is.null(param_summary) && nrow(param_summary) > 0) {
-              trend_params[[param_label]] <- param_summary
+          tryCatch(
+            {
+              param_summary <- extract_param_summary(
+                object$model_output,
+                param_name,
+                digits,
+                variational
+              )
+              if (!is.null(param_summary) && nrow(param_summary) > 0) {
+                trend_params[[param_label]] <- param_summary
+              }
+            },
+            error = function(e) {
+              # Parameter not available in this model, skip silently
             }
-          }, error = function(e) {
-            # Parameter not available in this model, skip silently
-          })
+          )
         }
       }
     }
@@ -1053,18 +1186,33 @@ extract_trend_parameters <- function(object, include_betas = TRUE, smooth_test =
 
   # Handle hierarchical correlation parameters
   if (grepl('hiercor', validate_trend_model(object$trend_model))) {
-    tryCatch({
-      trend_params[["hierarchical_correlation"]] <- extract_param_summary(
-        object$model_output, 'alpha_cor', digits, variational
-      )
-    }, error = function(e) {
-      # Parameter not available, skip
-    })
+    tryCatch(
+      {
+        trend_params[["hierarchical_correlation"]] <- extract_param_summary(
+          object$model_output,
+          'alpha_cor',
+          digits,
+          variational
+        )
+      },
+      error = function(e) {
+        # Parameter not available, skip
+      }
+    )
   }
 
   # Process model coefficients (trend_call section)
   if (!is.null(object$trend_call) && !inherits(object, 'jsdgam')) {
-    trend_params <- c(trend_params, extract_trend_gam_parameters(object, include_betas, smooth_test, digits, variational))
+    trend_params <- c(
+      trend_params,
+      extract_trend_gam_parameters(
+        object,
+        include_betas,
+        smooth_test,
+        digits,
+        variational
+      )
+    )
   }
 
   return(trend_params)
@@ -1098,13 +1246,18 @@ get_available_trend_params <- function(object, param_names) {
     }
 
     # GP parameters
-    if (param %in% c('alpha_gp', 'rho_gp', 'b_gp') && trend_model_attr == 'GP') {
+    if (
+      param %in% c('alpha_gp', 'rho_gp', 'b_gp') && trend_model_attr == 'GP'
+    ) {
       available <- c(available, param)
     }
 
     # Piecewise parameters
-    if (param %in% c('k_trend', 'm_trend', 'delta_trend') &&
-        trend_model_attr %in% c('PWlinear', 'PWlogistic')) {
+    if (
+      param %in%
+        c('k_trend', 'm_trend', 'delta_trend') &&
+        trend_model_attr %in% c('PWlinear', 'PWlogistic')
+    ) {
       available <- c(available, param)
     }
 
@@ -1122,20 +1275,39 @@ get_available_trend_params <- function(object, param_names) {
 #' @param variational Logical for variational approximation
 #' @return List of trend GAM parameter summaries
 #' @noRd
-extract_trend_gam_parameters <- function(object, include_betas = TRUE, smooth_test = TRUE, digits = 2, variational = FALSE) {
+extract_trend_gam_parameters <- function(
+  object,
+  include_betas = TRUE,
+  smooth_test = TRUE,
+  digits = 2,
+  variational = FALSE
+) {
   trend_gam_params <- list()
 
   # Extract trend GAM coefficients
   if (include_betas) {
     coef_names <- paste0(names(object$trend_mgcv_model$coefficients), '_trend')
-    mvgam_coefs <- extract_param_summary(object$model_output, 'b_trend', digits, variational)
+    mvgam_coefs <- extract_param_summary(
+      object$model_output,
+      'b_trend',
+      digits,
+      variational
+    )
     rownames(mvgam_coefs) <- gsub('series', 'trend', coef_names, fixed = TRUE)
     trend_gam_params[["gam_process_coefficients"]] <- mvgam_coefs
   } else {
     if (object$trend_mgcv_model$nsdf > 0) {
       coefs_include <- 1:object$trend_mgcv_model$nsdf
-      coef_names <- paste0(names(object$trend_mgcv_model$coefficients), '_trend')[coefs_include]
-      mvgam_coefs <- extract_param_summary(object$model_output, 'b_trend', digits, variational)[coefs_include, , drop = FALSE]
+      coef_names <- paste0(
+        names(object$trend_mgcv_model$coefficients),
+        '_trend'
+      )[coefs_include]
+      mvgam_coefs <- extract_param_summary(
+        object$model_output,
+        'b_trend',
+        digits,
+        variational
+      )[coefs_include, , drop = FALSE]
       rownames(mvgam_coefs) <- gsub('series', 'trend', coef_names, fixed = TRUE)
       trend_gam_params[["gam_process_coefficients"]] <- mvgam_coefs
     }
@@ -1144,24 +1316,37 @@ extract_trend_gam_parameters <- function(object, include_betas = TRUE, smooth_te
   # Extract trend group-level parameters
   if (!all(is.na(object$trend_sp_names))) {
     has_random_effects <- any(unlist(purrr::map(
-      object$trend_mgcv_model$smooth, inherits, 'random.effect'
+      object$trend_mgcv_model$smooth,
+      inherits,
+      'random.effect'
     )))
 
     if (has_random_effects) {
       re_labs <- unlist(lapply(
         purrr::map(object$trend_mgcv_model$smooth, 'label'),
-        paste, collapse = ','
-      ))[unlist(purrr::map(object$trend_mgcv_model$smooth, inherits, 'random.effect'))]
+        paste,
+        collapse = ','
+      ))[unlist(purrr::map(
+        object$trend_mgcv_model$smooth,
+        inherits,
+        'random.effect'
+      ))]
 
       re_labs <- gsub('series', 'trend', re_labs)
 
       re_sds <- extract_param_summary(
-        object$model_output, 'sigma_raw_trend', digits = digits,
-        variational = variational, ISB = TRUE
+        object$model_output,
+        'sigma_raw_trend',
+        digits = digits,
+        variational = variational,
+        ISB = TRUE
       )
       re_mus <- extract_param_summary(
-        object$model_output, 'mu_raw_trend', digits = digits,
-        variational = variational, ISB = TRUE
+        object$model_output,
+        'mu_raw_trend',
+        digits = digits,
+        variational = variational,
+        ISB = TRUE
       )
 
       rownames(re_sds) <- paste0('sd(', re_labs, ')_trend')
@@ -1182,29 +1367,47 @@ extract_trend_gam_parameters <- function(object, include_betas = TRUE, smooth_te
     )
 
     trend_gam_params[["gam_process_gp_parameters"]] <- rbind(
-      gp_summaries$alpha_summary, gp_summaries$rho_summary
+      gp_summaries$alpha_summary,
+      gp_summaries$rho_summary
     )
   }
 
   # Extract trend smooth tests
   if (any(!is.na(object$trend_sp_names)) && smooth_test) {
     gam_sig_table <- try(
-      suppressWarnings(summary(object$trend_mgcv_model)$s.table[, c(1, 2, 3, 4), drop = FALSE]),
+      suppressWarnings(summary(object$trend_mgcv_model)$s.table[,
+        c(1, 2, 3, 4),
+        drop = FALSE
+      ]),
       silent = TRUE
     )
 
     if (inherits(gam_sig_table, 'try-error')) {
       object$trend_mgcv_model$R <- NULL
-      gam_sig_table <- suppressWarnings(summary(object$trend_mgcv_model)$s.table[, c(1, 2, 3, 4), drop = FALSE])
-      gam_sig_table[, 2] <- unlist(purrr::map(object$trend_mgcv_model$smooth, 'df'), use.names = FALSE)
+      gam_sig_table <- suppressWarnings(summary(
+        object$trend_mgcv_model
+      )$s.table[, c(1, 2, 3, 4), drop = FALSE])
+      gam_sig_table[, 2] <- unlist(
+        purrr::map(object$trend_mgcv_model$smooth, 'df'),
+        use.names = FALSE
+      )
     }
 
     # Handle trend GP terms
     if (!is.null(attr(object$trend_mgcv_model, 'gp_att_table'))) {
-      gp_names <- unlist(purrr::map(attr(object$trend_mgcv_model, 'gp_att_table'), 'name'))
-      if (!all(rownames(gam_sig_table) %in% gsub('gp(', 's(', gp_names, fixed = TRUE))) {
+      gp_names <- unlist(purrr::map(
+        attr(object$trend_mgcv_model, 'gp_att_table'),
+        'name'
+      ))
+      if (
+        !all(
+          rownames(gam_sig_table) %in% gsub('gp(', 's(', gp_names, fixed = TRUE)
+        )
+      ) {
         gam_sig_table <- gam_sig_table[
-          !rownames(gam_sig_table) %in% gsub('gp(', 's(', gp_names, fixed = TRUE), ,
+          !rownames(gam_sig_table) %in%
+            gsub('gp(', 's(', gp_names, fixed = TRUE),
+          ,
           drop = FALSE
         ]
       } else {
