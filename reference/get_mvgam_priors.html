@@ -183,12 +183,13 @@ don't require a <code>time</code> variable</p></li>
 
 
 <dt>unit</dt>
-<dd><p>The unquoted name of the variable that represents the unit of analysis in <code>data</code> over
-which latent residuals should be correlated. This variable should be either a
-<code>numeric</code> or <code>integer</code> variable in the supplied <code>data</code>.
-Defaults to <code>time</code> to be consistent with other functionalities
-in <span class="pkg">mvgam</span>, though note that the data need not be time series in this case. See examples below
-for further details and explanations</p></dd>
+<dd><p>The unquoted name of the variable that represents the unit of
+analysis in <code>data</code> over which latent residuals should be correlated. This
+variable should be either a <code>numeric</code> or <code>integer</code> variable in the
+supplied <code>data</code>. Defaults to <code>time</code> to be consistent with other
+functionalities in <span class="pkg">mvgam</span>, though note that the data need not be time
+series in this case. See examples below for further details and
+explanations</p></dd>
 
 
 <dt>species</dt>
@@ -453,13 +454,13 @@ bounds, for example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion      phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1     lambda ~ exponential(0.6);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  mu_raw ~ normal(-0.07, 0.61);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.22);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4     ar1 ~ normal(-0.92, 0.66);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5         ar2 ~ normal(0, 0.23);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.47);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(-0.24, 0.4);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.86);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  mu_raw ~ normal(-0.51, 0.95);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.66);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4     ar1 ~ normal(-0.05, 0.29);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5      ar2 ~ normal(0.78, 0.57);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.27);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.27, 0.66);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># ========================================================================</span></span></span>
 <span class="r-in"><span><span class="co"># Example 2: Modify priors manually</span></span></span>

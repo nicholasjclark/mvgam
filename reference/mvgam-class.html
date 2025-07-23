@@ -68,60 +68,72 @@ Run <code>methods(class = "mvgam")</code> to see an overview of available method
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>A <code>mvgam</code> object contains the following elements:</p><ul><li><p><code>call</code> the original observation model formula</p></li>
-<li><p><code>trend_call</code> If a <code>trend_formula was supplied</code>, the original trend model formula is
-returned. Otherwise <code>NULL</code></p></li>
+<li><p><code>trend_call</code> If a <code>trend_formula was supplied</code>, the original trend model
+formula is returned. Otherwise <code>NULL</code></p></li>
 <li><p><code>family</code> <code>character</code> description of the observation distribution</p></li>
 <li><p><code>trend_model</code> <code>character</code> description of the latent trend model</p></li>
 <li><p><code>trend_map</code> <code>data.frame</code> describing the mapping of trend states to
 observations, if supplied in the original model. Otherwise <code>NULL</code></p></li>
-<li><p><code>drift</code> Logical specifying whether a drift term was used in the trend model</p></li>
-<li><p><code>priors</code> If the model priors were updated from their defaults, the prior <code>dataframe</code>
-will be returned. Otherwise <code>NULL</code></p></li>
-<li><p><code>model_output</code> The <code>MCMC</code> object returned by the fitting engine. If the model was fitted
-using <code>Stan</code>, this will be an object of class <code>stanfit</code> (see <code><a href="https://mc-stan.org/rstan/reference/stanfit-class.html" class="external-link">stanfit-class</a></code> for details).
-If <code>JAGS</code> was used as the backend, this will be an object of class <code>runjags</code>
-(see <code><a href="https://rdrr.io/pkg/runjags/man/runjags-class.html" class="external-link">runjags-class</a></code> for details)</p></li>
-<li><p><code>model_file</code> The <code>character</code> string model file used to describe the model in either
-<code>Stan</code> or <code>JAGS</code> syntax</p></li>
-<li><p><code>model_data</code> If <code>return_model_data</code> was set to <code>TRUE</code> when fitting the model, the <code>list</code> object
-containing all data objects needed to condition the model is returned. Each item in the <code>list</code> is described
-in detail at the top of the <code>model_file</code>. Otherwise <code>NULL</code></p></li>
-<li><p><code>inits</code> If <code>return_model_data</code> was set to <code>TRUE</code> when fitting the model, the initial value
-functions used to initialise the MCMC chains will be returned. Otherwise <code>NULL</code></p></li>
-<li><p><code>monitor_pars</code> The parameters
-that were monitored during MCMC sampling are returned as a <code>character vector</code></p></li>
-<li><p><code>sp_names</code> A <code>character vector</code> specifying the names for each smoothing parameter</p></li>
-<li><p><code>mgcv_model</code> An object of class <code>gam</code> containing the <code>mgcv</code> version of the observation model.
-This object is used for generating the linear predictor matrix when making predictions for new data. The
-coefficients in this model object will contain the posterior median coefficients from the GAM linear predictor,
-but these are only used if generating plots of smooth functions that <code>mvgam</code> currently cannot handle
-(such as plots for three-dimensional smooths). This model therefore should not be used for inference.
-See <code><a href="https://rdrr.io/pkg/mgcv/man/gamObject.html" class="external-link">gamObject</a></code> for details</p></li>
-<li><p><code>trend_mgcv_model</code> If a <code>trend_formula was supplied</code>, an object of class <code>gam</code> containing
-the <code>mgcv</code> version of the trend model. Otherwise <code>NULL</code></p></li>
-<li><p><code>ytimes</code> The <code>matrix</code> object used in model fitting for indexing which series and timepoints
-were observed in each row of the supplied data. Used internally by some downstream plotting
-and prediction functions</p></li>
+<li><p><code>drift</code> Logical specifying whether a drift term was used in the trend
+model</p></li>
+<li><p><code>priors</code> If the model priors were updated from their defaults, the prior
+<code>dataframe</code> will be returned. Otherwise <code>NULL</code></p></li>
+<li><p><code>model_output</code> The <code>MCMC</code> object returned by the fitting engine. If the
+model was fitted using <code>Stan</code>, this will be an object of class <code>stanfit</code>
+(see <code><a href="https://mc-stan.org/rstan/reference/stanfit-class.html" class="external-link">stanfit-class</a></code> for details). If <code>JAGS</code> was used
+as the backend, this will be an object of class <code>runjags</code> (see
+<code><a href="https://rdrr.io/pkg/runjags/man/runjags-class.html" class="external-link">runjags-class</a></code> for details)</p></li>
+<li><p><code>model_file</code> The <code>character</code> string model file used to describe the model
+in either <code>Stan</code> or <code>JAGS</code> syntax</p></li>
+<li><p><code>model_data</code> If <code>return_model_data</code> was set to <code>TRUE</code> when fitting the
+model, the <code>list</code> object containing all data objects needed to condition
+the model is returned. Each item in the <code>list</code> is described in detail at
+the top of the <code>model_file</code>. Otherwise <code>NULL</code></p></li>
+<li><p><code>inits</code> If <code>return_model_data</code> was set to <code>TRUE</code> when fitting the model,
+the initial value functions used to initialise the MCMC chains will be
+returned. Otherwise <code>NULL</code></p></li>
+<li><p><code>monitor_pars</code> The parameters that were monitored during MCMC sampling
+are returned as a <code>character vector</code></p></li>
+<li><p><code>sp_names</code> A <code>character vector</code> specifying the names for each smoothing
+parameter</p></li>
+<li><p><code>mgcv_model</code> An object of class <code>gam</code> containing the <code>mgcv</code> version of
+the observation model. This object is used for generating the linear
+predictor matrix when making predictions for new data. The coefficients
+in this model object will contain the posterior median coefficients from
+the GAM linear predictor, but these are only used if generating plots of
+smooth functions that <code>mvgam</code> currently cannot handle (such as plots for
+three-dimensional smooths). This model therefore should not be used for
+inference. See <code><a href="https://rdrr.io/pkg/mgcv/man/gamObject.html" class="external-link">gamObject</a></code> for details</p></li>
+<li><p><code>trend_mgcv_model</code> If a <code>trend_formula was supplied</code>, an object of class
+<code>gam</code> containing the <code>mgcv</code> version of the trend model. Otherwise <code>NULL</code></p></li>
+<li><p><code>ytimes</code> The <code>matrix</code> object used in model fitting for indexing which
+series and timepoints were observed in each row of the supplied data.
+Used internally by some downstream plotting and prediction functions</p></li>
 <li><p><code>resids</code> A named <code>list</code> object containing posterior draws of Dunn-Smyth
 randomized quantile residuals</p></li>
-<li><p><code>use_lv</code> Logical flag indicating whether latent dynamic factors were used in the model</p></li>
-<li><p><code>n_lv</code> If <code>use_lv == TRUE</code>, the number of latent dynamic factors used in the model</p></li>
-<li><p><code>upper_bounds</code> If bounds were supplied in the original model fit, they will be returned.
-Otherwise <code>NULL</code></p></li>
-<li><p><code>obs_data</code> The original data object (either a <code>list</code> or <code>dataframe</code>) supplied in model
-fitting.</p></li>
-<li><p><code>test_data</code> If test data were supplied (as argument <code>newdata</code> in the original model), it
-will be returned. Othwerise <code>NULL</code></p></li>
-<li><p><code>fit_engine</code> <code>Character</code> describing the fit engine, either as <code>stan</code> or <code>jags</code></p></li>
-<li><p><code>backend</code> <code>Character</code> describing the backend used for modelling, either as <code>rstan</code>, <code>cmdstanr</code> or <code>rjags</code></p></li>
-<li><p><code>algorithm</code> <code>Character</code> describing the algorithm used for finding the posterior,
-either as <code>sampling</code>, <code>laplace</code>, <code>pathfinder</code>, <code>meanfield</code> or <code>fullrank</code></p></li>
-<li><p><code>max_treedepth</code> If the model was fitted using <code>Stan</code>, the value supplied for the maximum
-treedepth tuning parameter is returned (see <code><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></code> for details).
-Otherwise <code>NULL</code></p></li>
-<li><p><code>adapt_delta</code> If the model was fitted using <code>Stan</code>, the value supplied for the adapt_delta
-tuning parameter is returned (see <code><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></code> for details).
-Otherwise <code>NULL</code></p></li>
+<li><p><code>use_lv</code> Logical flag indicating whether latent dynamic factors were used
+in the model</p></li>
+<li><p><code>n_lv</code> If <code>use_lv == TRUE</code>, the number of latent dynamic factors used in
+the model</p></li>
+<li><p><code>upper_bounds</code> If bounds were supplied in the original model fit, they
+will be returned. Otherwise <code>NULL</code></p></li>
+<li><p><code>obs_data</code> The original data object (either a <code>list</code> or <code>dataframe</code>)
+supplied in model fitting.</p></li>
+<li><p><code>test_data</code> If test data were supplied (as argument <code>newdata</code> in the
+original model), it will be returned. Othwerise <code>NULL</code></p></li>
+<li><p><code>fit_engine</code> <code>Character</code> describing the fit engine, either as <code>stan</code> or
+<code>jags</code></p></li>
+<li><p><code>backend</code> <code>Character</code> describing the backend used for modelling, either
+as <code>rstan</code>, <code>cmdstanr</code> or <code>rjags</code></p></li>
+<li><p><code>algorithm</code> <code>Character</code> describing the algorithm used for finding the
+posterior, either as <code>sampling</code>, <code>laplace</code>, <code>pathfinder</code>, <code>meanfield</code> or
+<code>fullrank</code></p></li>
+<li><p><code>max_treedepth</code> If the model was fitted using <code>Stan</code>, the value supplied
+for the maximum treedepth tuning parameter is returned (see
+<code><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></code> for details). Otherwise <code>NULL</code></p></li>
+<li><p><code>adapt_delta</code> If the model was fitted using <code>Stan</code>, the value supplied
+for the adapt_delta tuning parameter is returned (see
+<code><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></code> for details). Otherwise <code>NULL</code></p></li>
 </ul></div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

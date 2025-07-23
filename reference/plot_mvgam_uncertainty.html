@@ -80,28 +80,33 @@
 
 
 <dt>series</dt>
-<dd><p><code>integer</code> specifying which series in the set is to be plotted</p></dd>
+<dd><p><code>integer</code> specifying which series in the set is to be
+plotted</p></dd>
 
 
 <dt>newdata</dt>
-<dd><p>A <code>dataframe</code> or <code>list</code> containing at least 'series' and 'time' for the forecast horizon, in
-addition to any other variables included in the linear predictor of <code>formula</code></p></dd>
+<dd><p>A <code>dataframe</code> or <code>list</code> containing at least 'series'
+and 'time' for the forecast horizon, in addition to any other variables
+included in the linear predictor of <code>formula</code></p></dd>
 
 
 <dt>data_test</dt>
-<dd><p>Deprecated. Still works in place of <code>newdata</code> but users are recommended to use
-<code>newdata</code> instead for more seamless integration into <code>R</code> workflows</p></dd>
+<dd><p>Deprecated. Still works in place of <code>newdata</code> but users
+are recommended to use <code>newdata</code> instead for more seamless integration
+into <code>R</code> workflows</p></dd>
 
 
 <dt>legend_position</dt>
-<dd><p>The location may also be specified by setting x to a single keyword from the
-list: "none", "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
-This places the legend on the inside of the plot frame at the given location (if it is not "none").</p></dd>
+<dd><p>The location may also be specified by setting x to a
+single keyword from the list: "none", "bottomright", "bottom", "bottomleft",
+"left", "topleft", "top", "topright", "right" and "center". This places the
+legend on the inside of the plot frame at the given location (if it is not
+"none").</p></dd>
 
 
 <dt>hide_xlabels</dt>
-<dd><p><code>logical</code>. If <code>TRUE</code>, no xlabels are printed to allow the user to add custom labels using
-<code>axis</code> from base <code>R</code></p></dd>
+<dd><p><code>logical</code>. If <code>TRUE</code>, no xlabels are printed to
+allow the user to add custom labels using <code>axis</code> from base <code>R</code></p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -112,15 +117,16 @@ This places the legend on the inside of the plot frame at the given location (if
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>The basic idea of this function is to compute forecasts by ignoring one of the
-two primary components in a correlated residual model (i.e. by either ignoring the
-linear predictor effects or by ignoring the residual dynamics). Some caution is required
-however, as this function was designed early in the <span class="pkg">mvgam</span> development cycle and
-there are now many types of models that it cannot handle very well. For example,
-models with shared latent states, or any type of State-Space models that include terms
-in the <code>trend_formula</code>, will either fail or give nonsensical results. Improvements are
-in the works to provide a more general way to decompose forecast uncertainties, so
-please check back at a later date.</p>
+    <p>The basic idea of this function is to compute forecasts by ignoring
+one of the two primary components in a correlated residual model (i.e. by
+either ignoring the linear predictor effects or by ignoring the residual
+dynamics). Some caution is required however, as this function was designed
+early in the <span class="pkg">mvgam</span> development cycle and there are now many types of
+models that it cannot handle very well. For example, models with shared
+latent states, or any type of State-Space models that include terms in the
+<code>trend_formula</code>, will either fail or give nonsensical results. Improvements
+are in the works to provide a more general way to decompose forecast
+uncertainties, so please check back at a later date.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
