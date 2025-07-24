@@ -31,3 +31,4 @@
 ^.*-design\.md$
 ^.*-implementation\.md$
 ^mvgam-brms-refactoring-plan\.md$
+^CURRENT_STATUS\.md$
