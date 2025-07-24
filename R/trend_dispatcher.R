@@ -616,10 +616,26 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
   validate_trend_components(trend_components)
   
   # Create base formula without trend constructors (brms pattern)
+  # Handle offset terms like in interpret_mvgam()
+  offset_attr <- attr(tf_safe, 'offset')
+  
   base_formula <- if (length(regular_terms) > 0) {
-    try(reformulate(regular_terms, response = NULL), silent = TRUE)
+    if (!is.null(offset_attr)) {
+      # Include offset in formula reconstruction
+      offset_terms <- rownames(attr(tf_safe, 'factors'))[offset_attr]
+      all_terms <- c(regular_terms, offset_terms)
+      try(reformulate(all_terms, response = NULL), silent = TRUE)
+    } else {
+      try(reformulate(regular_terms, response = NULL), silent = TRUE)
+    }
   } else {
-    ~ 1  # Intercept only
+    if (!is.null(offset_attr)) {
+      # Offset only formula
+      offset_terms <- rownames(attr(tf_safe, 'factors'))[offset_attr]
+      try(reformulate(offset_terms, response = NULL), silent = TRUE)
+    } else {
+      ~ 1  # Intercept only
+    }
   }
   
   # Ensure formula reconstruction succeeded
@@ -644,6 +660,7 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
     trend_model = trend_model,
     trend_terms = trend_terms,
     regular_terms = regular_terms,
+    offset_terms = if (!is.null(offset_attr)) rownames(attr(tf_safe, 'factors'))[offset_attr] else character(0),
     original_formula = trend_formula
   ))
 }
@@ -681,6 +698,39 @@ eval_trend_constructor <- function(trend_call) {
       "Check the syntax and parameters of your trend constructor call."
     )
   })
+}
+
+#' Validate trend components for conflicts
+#'
+#' Checks for conflicting trend specifications like multiple dynamic factor models
+#' or incompatible correlation structures using brms-inspired validation patterns.
+#'
+#' @param trend_components List of trend components to validate
+#'
+#' @noRd
+validate_trend_components <- function(trend_components) {
+  
+  # Check for multiple dynamic factor models
+  n_lv_models <- sum(sapply(trend_components, function(x) !is.null(x$n_lv) && x$n_lv > 0))
+  if (n_lv_models > 1) {
+    insight::format_error(
+      "Multiple dynamic factor models specified.",
+      "Only one trend component can have {.field n_lv > 0}.",
+      "Consider combining factor structures or removing one factor model."
+    )
+  }
+  
+  # Check for conflicting correlation structures
+  cor_settings <- sapply(trend_components, function(x) x$cor %||% FALSE)
+  if (any(cor_settings) && !all(cor_settings)) {
+    insight::format_warning(
+      "Mixed correlation settings detected.",
+      "Some trend components have correlation enabled while others don't.",
+      "This may lead to unexpected interactions."
+    )
+  }
+  
+  invisible(NULL)
 }
 
 #' Print method for mvgam trend objects

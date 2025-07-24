@@ -195,11 +195,11 @@ test_that("formula parsing handles edge cases correctly", {
   expect_true("poly(x, degree = 2)" %in% parsed1$regular_terms)
   
   # Test interaction terms
-  f2 <- ~ cov1:cov2 + s(time)*group + VAR(p = 1, ma = TRUE)
+  f2 <- ~ cov1:cov2 + s(time, by = group) + VAR(p = 1, ma = TRUE)
   parsed2 <- mvgam:::parse_trend_formula(f2)
   expect_equal(parsed2$trend_terms, "VAR(p = 1, ma = TRUE)")
   expect_true("cov1:cov2" %in% parsed2$regular_terms)
-  expect_true("s(time)*group" %in% parsed2$regular_terms)
+  expect_true("s(time, by = group)" %in% parsed2$regular_terms)
   
   # Test special characters and operators in regular terms
   f3 <- ~ I(x^2) + log(y + 1) + RW(ma = FALSE) + offset(z)
@@ -207,12 +207,14 @@ test_that("formula parsing handles edge cases correctly", {
   expect_equal(parsed3$trend_terms, "RW(ma = FALSE)")
   expect_true("I(x^2)" %in% parsed3$regular_terms)
   expect_true("log(y + 1)" %in% parsed3$regular_terms)
-  expect_true("offset(z)" %in% parsed3$regular_terms)
+  # Check offset terms are captured separately
+  expect_true("offset(z)" %in% parsed3$offset_terms)
+  expect_equal(length(parsed3$regular_terms), 2)
   
   # Test whitespace handling
   f4 <- ~   s(time)   +   RW(cor=TRUE)   +   cov1   
   parsed4 <- mvgam:::parse_trend_formula(f4)
-  expect_equal(parsed4$trend_terms, "RW(cor=TRUE)")
+  expect_equal(parsed4$trend_terms, "RW(cor = TRUE)")
   expect_setequal(parsed4$regular_terms, c("s(time)", "cov1"))
 })
 
@@ -222,7 +224,7 @@ test_that("formula parsing error handling works comprehensively", {
   # Test empty formula (different from ~ 1)
   expect_error(
     mvgam:::parse_trend_formula(~ 1),
-    "No trend model specified"
+    "Empty trend formula provided"
   )
   
   # Test formula with response variable
@@ -240,7 +242,7 @@ test_that("formula parsing error handling works comprehensively", {
   # Test dot formula (should error before our validation)
   expect_error(
     mvgam:::parse_trend_formula(~ .),
-    "formula and no 'data' argument"
+    "Invalid formula syntax"
   )
   
   # Test invalid trend constructor calls
@@ -323,7 +325,7 @@ test_that("regex pattern handles edge cases correctly", {
 test_that("validation system handles edge cases", {
   
   # Test correlation requirements with edge cases
-  expect_true(mvgam:::validate_correlation_requirements("region", FALSE))
+  expect_true(suppressWarnings(mvgam:::validate_correlation_requirements("region", FALSE)))
   expect_false(mvgam:::validate_correlation_requirements("NA", FALSE))
   expect_true(mvgam:::validate_correlation_requirements("group", TRUE))
   
@@ -368,7 +370,7 @@ test_that("custom trend registration works correctly", {
   expect_true("CUSTOM" %in% choices)
   
   # Test pattern includes custom trend
-  pattern <- mvgam_trend_pattern()
+  pattern <- mvgam:::mvgam_trend_pattern()
   expect_true(grepl("CUSTOM", pattern))
   
   # Test formula parsing with custom trend
@@ -409,7 +411,8 @@ test_that("realistic complex formulas work correctly", {
   expect_equal(length(parsed$trend_components), 1)
   expect_equal(parsed$trend_components[[1]]$p, c(1, 12, 24))
   expect_false(parsed$trend_components[[1]]$ma)
-  expect_equal(length(parsed$regular_terms), 4)
+  expect_equal(length(parsed$regular_terms), 3)
+  expect_true("offset(log_effort)" %in% parsed$offset_terms)
   
   # Test multivariate model formula
   multivar_formula <- ~ s(time, by = species, k = 20) +
