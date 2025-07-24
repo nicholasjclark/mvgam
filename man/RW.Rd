@@ -7,13 +7,13 @@
 \alias{VAR}
 \title{Specify autoregressive dynamic processes in \pkg{mvgam}}
 \usage{
-RW(ma = FALSE, cor = FALSE, gr = NA, subgr = NA)
+RW(ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL)
 
-AR(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA)
+AR(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL)
 
 CAR(p = 1)
 
-VAR(ma = FALSE, cor = FALSE, gr = NA, subgr = NA)
+VAR(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL)
 }
 \arguments{
 \item{ma}{\code{Logical}. Include moving average terms of order \code{1}?

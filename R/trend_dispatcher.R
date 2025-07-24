@@ -151,7 +151,7 @@ mvgam_trend_registry <- function() {
 #' Returns a character vector of available trend types from the registry.
 #'
 #' @return Character vector of trend type names
-#' @noRd
+#' @export
 mvgam_trend_choices <- function() {
   mvgam_trend_registry()
 }
@@ -200,7 +200,7 @@ register_custom_trend <- function(trend_name, constructor_fun) {
 #'
 #' @param x Object to test
 #' @return Logical indicating if x is a mvgam trend
-#' @noRd
+#' @export
 is.mvgam_trend <- function(x) {
   inherits(x, "mvgam_trend")
 }

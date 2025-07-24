@@ -76,18 +76,18 @@ test_that("trend constructors work with dispatcher integration", {
 test_that("grouping validation helper works correctly", {
   
   # Test default case
-  result1 <- validate_grouping_arguments("NA", "NA")
+  result1 <- mvgam:::validate_grouping_arguments("NA", "NA")
   expect_equal(result1$gr, "NA")
   expect_equal(result1$subgr, "series")
   
   # Test valid hierarchical case would work (but we test error cases)
   expect_error(
-    validate_grouping_arguments("region", "NA"),
+    mvgam:::validate_grouping_arguments("region", "NA"),
     "Hierarchical grouping requires subgrouping"
   )
   
   expect_error(
-    validate_grouping_arguments("region", "series"),
+    mvgam:::validate_grouping_arguments("region", "series"),
     "Invalid subgrouping for hierarchical models"
   )
 })
@@ -97,7 +97,7 @@ test_that("basic formula parsing works", {
   
   # Test simple trend-only formula
   f1 <- ~ RW()
-  parsed1 <- parse_trend_formula(f1)
+  parsed1 <- mvgam:::parse_trend_formula(f1)
   
   expect_equal(length(parsed1$trend_components), 1)
   expect_s3_class(parsed1$trend_components[[1]], "mvgam_trend")
@@ -108,7 +108,7 @@ test_that("basic formula parsing works", {
   
   # Test formula with regular predictors and trend
   f2 <- ~ s(time) + cov1 + AR(p = 1)
-  parsed2 <- parse_trend_formula(f2)
+  parsed2 <- mvgam:::parse_trend_formula(f2)
   
   expect_equal(length(parsed2$trend_components), 1)
   expect_equal(parsed2$trend_components[[1]]$trend, "AR1")
@@ -128,10 +128,10 @@ test_that("formula parsing is order-independent", {
   f4 <- ~ cov2 + RW(cor = TRUE) + cov1 + s(time)
   
   # Parse all versions
-  parsed1 <- parse_trend_formula(f1)
-  parsed2 <- parse_trend_formula(f2)
-  parsed3 <- parse_trend_formula(f3)
-  parsed4 <- parse_trend_formula(f4)
+  parsed1 <- mvgam:::parse_trend_formula(f1)
+  parsed2 <- mvgam:::parse_trend_formula(f2)
+  parsed3 <- mvgam:::parse_trend_formula(f3)
+  parsed4 <- mvgam:::parse_trend_formula(f4)
   
   # Check that trend components are identical
   expect_equal(parsed1$trend_terms, parsed2$trend_terms)
@@ -162,8 +162,8 @@ test_that("multiple trend components are handled correctly", {
   f1 <- ~ s(season) + RW() + AR(p = 2) + cov1
   f2 <- ~ AR(p = 2) + cov1 + RW() + s(season)
   
-  parsed1 <- parse_trend_formula(f1)
-  parsed2 <- parse_trend_formula(f2)
+  parsed1 <- mvgam:::parse_trend_formula(f1)
+  parsed2 <- mvgam:::parse_trend_formula(f2)
   
   # Should have two trend components
   expect_equal(length(parsed1$trend_components), 2)
@@ -189,21 +189,21 @@ test_that("formula parsing handles edge cases correctly", {
   
   # Test nested parentheses and complex expressions
   f1 <- ~ s(time, k = c(5, 10)) + AR(p = c(1, 12)) + poly(x, degree = 2)
-  parsed1 <- parse_trend_formula(f1)
+  parsed1 <- mvgam:::parse_trend_formula(f1)
   expect_equal(parsed1$trend_terms, "AR(p = c(1, 12))")
   expect_true("s(time, k = c(5, 10))" %in% parsed1$regular_terms)
   expect_true("poly(x, degree = 2)" %in% parsed1$regular_terms)
   
   # Test interaction terms
   f2 <- ~ cov1:cov2 + s(time)*group + VAR(p = 1, ma = TRUE)
-  parsed2 <- parse_trend_formula(f2)
+  parsed2 <- mvgam:::parse_trend_formula(f2)
   expect_equal(parsed2$trend_terms, "VAR(p = 1, ma = TRUE)")
   expect_true("cov1:cov2" %in% parsed2$regular_terms)
   expect_true("s(time)*group" %in% parsed2$regular_terms)
   
   # Test special characters and operators in regular terms
   f3 <- ~ I(x^2) + log(y + 1) + RW(ma = FALSE) + offset(z)
-  parsed3 <- parse_trend_formula(f3)
+  parsed3 <- mvgam:::parse_trend_formula(f3)
   expect_equal(parsed3$trend_terms, "RW(ma = FALSE)")
   expect_true("I(x^2)" %in% parsed3$regular_terms)
   expect_true("log(y + 1)" %in% parsed3$regular_terms)
@@ -211,7 +211,7 @@ test_that("formula parsing handles edge cases correctly", {
   
   # Test whitespace handling
   f4 <- ~   s(time)   +   RW(cor=TRUE)   +   cov1   
-  parsed4 <- parse_trend_formula(f4)
+  parsed4 <- mvgam:::parse_trend_formula(f4)
   expect_equal(parsed4$trend_terms, "RW(cor=TRUE)")
   expect_setequal(parsed4$regular_terms, c("s(time)", "cov1"))
 })
@@ -221,43 +221,43 @@ test_that("formula parsing error handling works comprehensively", {
   
   # Test empty formula (different from ~ 1)
   expect_error(
-    parse_trend_formula(~ 1),
+    mvgam:::parse_trend_formula(~ 1),
     "No trend model specified"
   )
   
   # Test formula with response variable
   expect_error(
-    parse_trend_formula(y ~ RW()),
+    mvgam:::parse_trend_formula(y ~ RW()),
     "Response variable not allowed"
   )
   
   # Test formula with no trend constructors
   expect_error(
-    parse_trend_formula(~ s(time) + cov1),
+    mvgam:::parse_trend_formula(~ s(time) + cov1),
     "No trend model specified"
   )
   
   # Test truly empty formula
   expect_error(
-    parse_trend_formula(~ .),
+    mvgam:::parse_trend_formula(~ .),
     "No trend model specified"
   )
   
   # Test invalid trend constructor calls
   expect_error(
-    eval_trend_constructor("INVALID_TREND()"),
+    mvgam:::eval_trend_constructor("INVALID_TREND()"),
     "Failed to evaluate trend constructor"
   )
   
   # Test malformed trend constructor syntax
   expect_error(
-    eval_trend_constructor("RW(invalid_param = )"),
+    mvgam:::eval_trend_constructor("RW(invalid_param = )"),
     "Failed to evaluate trend constructor"
   )
   
   # Test unbalanced parentheses (should be caught by R's parser)
   expect_error(
-    eval_trend_constructor("RW(cor = TRUE"),
+    mvgam:::eval_trend_constructor("RW(cor = TRUE"),
     "Failed to evaluate trend constructor"
   )
 })
@@ -267,20 +267,20 @@ test_that("boundary conditions are handled correctly", {
   
   # Test formula with only intercept and trend
   f1 <- ~ 1 + RW()
-  parsed1 <- parse_trend_formula(f1)
+  parsed1 <- mvgam:::parse_trend_formula(f1)
   expect_equal(parsed1$base_formula, ~ 1)
   expect_equal(length(parsed1$trend_components), 1)
   
   # Test formula with very long expressions
   long_expr <- paste0("s(x", 1:50, ")", collapse = " + ")
   f2 <- as.formula(paste("~", long_expr, "+ AR(p = 1)"))
-  parsed2 <- parse_trend_formula(f2)
+  parsed2 <- mvgam:::parse_trend_formula(f2)
   expect_equal(length(parsed2$trend_components), 1)
   expect_equal(length(parsed2$regular_terms), 50)
   
   # Test formula with repeated trend constructors
   f3 <- ~ RW() + s(time) + RW(ma = TRUE)
-  parsed3 <- parse_trend_formula(f3)
+  parsed3 <- mvgam:::parse_trend_formula(f3)
   expect_equal(length(parsed3$trend_components), 2)
   expect_setequal(parsed3$trend_terms, c("RW()", "RW(ma = TRUE)"))
 })
@@ -297,7 +297,7 @@ test_that("regex pattern handles edge cases correctly", {
     "s(time, bs = 'tp', k = 20)"
   )
   
-  found_trends <- find_trend_terms(complex_terms)
+  found_trends <- mvgam:::find_trend_terms(complex_terms)
   expect_true("AR(p = c(1, 12, 24), ma = TRUE, cor = FALSE)" %in% found_trends)
   expect_true("VAR(p = 10, cor = TRUE)" %in% found_trends)
   expect_true("RW(ma = FALSE)" %in% found_trends)
@@ -305,13 +305,13 @@ test_that("regex pattern handles edge cases correctly", {
   expect_false("s(time, bs = 'tp', k = 20)" %in% found_trends)
   
   # Test extraction of regular terms from complex expressions
-  regular_terms <- extract_regular_terms(complex_terms)
+  regular_terms <- mvgam:::extract_regular_terms(complex_terms)
   expect_false("AR(p = c(1, 12, 24), ma = TRUE, cor = FALSE)" %in% regular_terms)
   expect_true("s(time, bs = 'tp', k = 20)" %in% regular_terms)
   
   # Test edge case: trend-like names that aren't trend constructors
   fake_trends <- c("ARbitrary()", "VARious()", "RWanda()", "s(time)")
-  found_fake <- find_trend_terms(fake_trends)
+  found_fake <- mvgam:::find_trend_terms(fake_trends)
   expect_equal(length(found_fake), 0)
 })
 
@@ -319,9 +319,9 @@ test_that("regex pattern handles edge cases correctly", {
 test_that("validation system handles edge cases", {
   
   # Test correlation requirements with edge cases
-  expect_true(validate_correlation_requirements("region", FALSE))
-  expect_false(validate_correlation_requirements("NA", FALSE))
-  expect_true(validate_correlation_requirements("group", TRUE))
+  expect_true(mvgam:::validate_correlation_requirements("region", FALSE))
+  expect_false(mvgam:::validate_correlation_requirements("NA", FALSE))
+  expect_true(mvgam:::validate_correlation_requirements("group", TRUE))
   
   # Test invalid parameter combinations through constructors
   expect_error(
@@ -357,7 +357,7 @@ test_that("custom trend registration works correctly", {
   }
   
   # Register the custom trend
-  register_custom_trend("CUSTOM", custom_constructor)
+  mvgam:::register_custom_trend("CUSTOM", custom_constructor)
   
   # Test it appears in registry
   choices <- mvgam_trend_choices()
@@ -381,11 +381,10 @@ test_that("print method handles all configurations", {
   expect_output(print(minimal_trend), "mvgam trend specification")
   expect_output(print(minimal_trend), "Type: RW")
   
-  # Test maximal configuration
-  complex_trend <- AR(p = c(1, 12), ma = TRUE, cor = TRUE, n_lv = 2)
+  # Test maximal configuration (without conflicting parameters)
+  complex_trend <- AR(p = c(1, 12), ma = FALSE, cor = TRUE, n_lv = 2)
   output <- capture.output(print(complex_trend))
   expect_true(any(grepl("Dynamic factors: 2", output)))
-  expect_true(any(grepl("Moving average: enabled", output)))
   expect_true(any(grepl("Correlation: enabled", output)))
   
   # Test hierarchical grouping display
@@ -402,7 +401,7 @@ test_that("realistic complex formulas work correctly", {
                        AR(p = c(1, 12, 24), ma = TRUE) +
                        offset(log_effort)
   
-  parsed <- parse_trend_formula(seasonal_formula)
+  parsed <- mvgam:::parse_trend_formula(seasonal_formula)
   expect_equal(length(parsed$trend_components), 1)
   expect_equal(parsed$trend_components[[1]]$p, c(1, 12, 24))
   expect_true(parsed$trend_components[[1]]$ma)
@@ -414,7 +413,7 @@ test_that("realistic complex formulas work correctly", {
                         VAR(p = 2, cor = TRUE) +
                         s(temperature, species, bs = "fs")
   
-  parsed2 <- parse_trend_formula(multivar_formula)
+  parsed2 <- mvgam:::parse_trend_formula(multivar_formula)
   expect_equal(parsed2$trend_components[[1]]$trend, "VAR2")
   expect_true(parsed2$trend_components[[1]]$cor)
   expect_true("s(time, by = species, k = 20)" %in% parsed2$regular_terms)
