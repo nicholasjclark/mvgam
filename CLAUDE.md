@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Package Overview
 
-mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Models.The package enables Bayesian forecasting and analysis of multivariate time series data using flexible GAM frameworks. It can handle various data types (counts, proportions, continuous values) with complex temporal dynamics, missing data, and seasonality, building custom Stan models that provide robust Bayesian inference.
+mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Models.The package enables Bayesian analysis of multivariate data using flexible GAM frameworks. It can handle various data types (counts, proportions, continuous values) with complex temporal or spatial dynamics, missing data, and seasonality, building custom Stan models that provide robust Bayesian inference.
 
 ## Development Commands
 
@@ -95,6 +95,7 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 - `tests/testthat/` - Test suite
 - `vignettes/` - Documentation and examples
 - `.github/workflows/` - CI/CD with R CMD check, pkgdown building and valgrind check
+- Use `gh` client for all Github interactions
 
 ## Development Notes
 
@@ -114,7 +115,153 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 
 ### Documentation
 - Roxygen2 comments for all exported functions
-- tidyverse styling (https://style.tidyverse.org/) for all R and roxygen code
+- Apply tidyverse styling (https://style.tidyverse.org/) for all R and roxygen code
 - Vignettes demonstrate in-depth use cases
 - pkgdown site provides comprehensive documentation
 - Examples demonstrate simpler use cases
+
+## Package-Specific Development Standards
+
+### Code Style and Formatting
+- **Line Length**: Maximum 80 characters per line for readability
+- **Roxygen Documentation**: Use 2-space indentation for continuation lines
+- **Comment Style**: Use sentence case, avoid ALL CAPS in comments
+- **Function Names**: Use snake_case following tidyverse conventions
+- **Consistency**: Follow existing package conventions where established
+
+### Validation and Error Handling
+All mvgam functions must follow these validation patterns:
+
+#### Required Packages for Validation
+- `checkmate`: Parameter validation and type checking
+- `insight`: Error and warning message formatting  
+- `rlang`: Session-wide warnings and advanced error handling
+
+#### Validation Patterns
+1. **Input Validation**: Use `checkmate::assert_*()` for all function parameters
+2. **Error Messages**: Use `insight::format_error()` for user-friendly error formatting
+3. **Warnings**: Use `insight::format_warning()` for informative warnings
+4. **Session Warnings**: Use `rlang::warn(..., .frequency = "once")` for one-time warnings
+
+#### Message Formatting Standards
+- Use `{.field parameter_name}` for parameter highlighting
+- Include suggested solutions in error messages
+- Provide context about why constraints exist
+- Use consistent terminology across the package
+
+#### Dynamic Factor Model Constraints
+Special validation for identifiability constraints:
+- `n_lv > 0` cannot be combined with `gr != 'NA'` or `subgr != 'series'`
+- `n_lv > 0` cannot be combined with `ma = TRUE`
+- Only certain trend types support `n_lv > 0` (checked via `characteristics$supports_factors`)
+- Variance parameters fixed for dynamic factor models (one-time warning)
+
+### Export Guidelines
+- Only export functions that users directly need (trend constructors, methods)
+- Keep validation and utility functions internal (`@noRd`)
+- Export extension points for users (e.g., `custom_trend()`)
+- Use clear, simple descriptions without excessive technical references
+
+## Project Management Integration
+
+### TodoWrite Usage for Multi-Phase Projects
+Use TodoWrite tool proactively for:
+
+#### When to Use TodoWrite
+- Complex multi-step tasks requiring 3+ distinct steps
+- Major refactoring projects with multiple phases
+- When user provides multiple tasks or requirements
+- Before starting work on complex implementations
+- After completing tasks to track progress
+
+#### TodoWrite Best Practices
+- Create specific, actionable todo items
+- Break complex tasks into manageable steps
+- Use clear, descriptive task names
+- Update status in real-time during work
+- Mark tasks complete immediately after finishing
+- Only have ONE task in_progress at any time
+
+#### Task States and Management
+- `pending`: Task not yet started
+- `in_progress`: Currently working on (limit to ONE task at a time)
+- `completed`: Task finished successfully
+
+## Advanced Git Workflow
+
+### Branch Management
+- Use descriptive feature branch names: `feature/brms-integration`
+- Create branches from master before starting major work
+- Keep feature branches focused on specific functionality
+- Push branches to remote for backup and collaboration
+
+### Commit Message Standards
+Follow this pattern for all commits:
+```
+Brief description of changes (50 chars max)
+
+- Detailed explanation of what was changed
+- Why the change was necessary  
+- Any important implementation notes
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+### .Rbuildignore Management
+- Automatically add specification documents to `.Rbuildignore`:
+  - `*-requirements.md`, `*-design.md`, `*-implementation.md`
+  - `*-plan.md` files
+  - Any temporary development documentation
+- Update `.Rbuildignore` immediately when creating new spec files
+
+### Pre-commit Workflow
+1. Check git status to understand current changes
+2. Stage appropriate files with clear understanding of what's being committed
+3. Write descriptive commit messages explaining the changes
+4. Push to remote branch for backup
+
+## R Package Refactoring Best Practices
+
+### Managing Complex Architectural Migrations
+When performing major refactoring like the brms integration:
+
+#### Backwards Compatibility Strategy
+- Maintain parallel implementations during transition
+- Use feature flags to enable new vs. old implementations
+- Deprecate old functionality with clear migration path
+- Provide detailed upgrade documentation
+
+#### Dual Architecture Management
+- Create clear interfaces between old and new systems
+- Use wrapper functions to maintain existing user interfaces
+- Implement systematic testing to ensure equivalent functionality
+- Plan staged rollout with alpha/beta testing phases
+
+#### Systematic Feature Implementation
+- Follow established implementation timeline (e.g., 16-week plan)
+- Implement foundational components before dependent features
+- Validate each component before proceeding to next phase
+- Maintain comprehensive testing throughout migration
+
+#### Risk Mitigation
+- Create rollback plans for each phase
+- Maintain working implementations at each milestone
+- Use extensive testing to catch regressions early
+- Document all architectural decisions and constraints
+
+### Complex Project Context Management
+For extended development projects:
+
+#### Documentation Standards
+- Maintain comprehensive project plans (e.g., `mvgam-brms-refactoring-plan.md`)
+- Document architectural decisions and constraints
+- Keep implementation notes and design rationale
+- Update progress and status regularly
+
+#### Code Organization During Refactoring
+- Group related functionality in logical file structures
+- Use consistent naming conventions for new components
+- Maintain clear separation between old and new implementations
+- Document integration points and dependencies
