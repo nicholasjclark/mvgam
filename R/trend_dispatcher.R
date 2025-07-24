@@ -165,7 +165,8 @@ mvgam_trend_choices <- function() {
 #' @noRd
 mvgam_trend_pattern <- function() {
   trend_types <- mvgam_trend_registry()
-  paste0("\\b(", paste(trend_types, collapse = "|"), ")\\s*\\([^)]*\\)")
+  # Updated pattern to handle nested parentheses
+  paste0("\\b(", paste(trend_types, collapse = "|"), ")\\s*\\([^)]*(?:\\([^)]*\\)[^)]*)*\\)")
 }
 
 #' Environment to store custom trend types
@@ -433,15 +434,41 @@ find_trend_terms <- function(x) {
     terms_char <- attr(terms(x), "term.labels")
   }
   
-  # Use centralized pattern from registry
-  trend_pattern <- mvgam_trend_pattern()
+  # Get trend types
+  trend_types <- mvgam_trend_registry()
   
-  # Find all matching terms
+  # Find all matching terms using a more robust approach
   trend_matches <- character(0)
   for (term in terms_char) {
-    matches <- regmatches(term, gregexpr(trend_pattern, term))[[1]]
-    if (length(matches) > 0) {
-      trend_matches <- c(trend_matches, matches)
+    for (trend_type in trend_types) {
+      # Look for trend_type followed by opening parenthesis
+      pattern <- paste0("\\b", trend_type, "\\s*\\(")
+      if (grepl(pattern, term)) {
+        # Extract the full function call
+        # Find the position of the trend function
+        start_pos <- regexpr(pattern, term)
+        if (start_pos > 0) {
+          # Count parentheses to find the end
+          text_after <- substr(term, start_pos, nchar(term))
+          paren_count <- 0
+          end_pos <- start_pos - 1
+          
+          for (i in seq_len(nchar(text_after))) {
+            char <- substr(text_after, i, i)
+            if (char == "(") paren_count <- paren_count + 1
+            if (char == ")") paren_count <- paren_count - 1
+            if (paren_count == 0) {
+              end_pos <- start_pos + i - 1
+              break
+            }
+          }
+          
+          if (end_pos > start_pos) {
+            match <- substr(term, start_pos, end_pos)
+            trend_matches <- c(trend_matches, match)
+          }
+        }
+      }
     }
   }
   
