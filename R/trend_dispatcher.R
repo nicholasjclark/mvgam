@@ -429,20 +429,55 @@ custom_trend <- function(trend, tpars, forecast_fun, stancode_fun,
 #' @noRd
 find_trend_terms <- function(x) {
   if (is.character(x)) {
+    # If character input, search directly
     terms_char <- x
   } else {
+    # If formula input, extract term labels
     terms_char <- attr(terms(x), "term.labels")
   }
   
-  # Simple approach: use regex to match trend constructors
+  # Use mvgam-style approach: grep for each trend type
   trend_types <- mvgam_trend_registry()
-  pattern <- paste0("\\b(", paste(trend_types, collapse = "|"), ")\\s*\\([^)]*\\)")
-  
   trend_matches <- character(0)
-  for (term in terms_char) {
-    matches <- regmatches(term, gregexpr(pattern, term))[[1]]
-    if (length(matches) > 0) {
-      trend_matches <- c(trend_matches, matches)
+  
+  for (trend_type in trend_types) {
+    # Look for trend_type followed by opening parenthesis (like mvgam's dynamic() detection)
+    pattern <- paste0(trend_type, '\\s*\\(')
+    which_trends <- grep(pattern, terms_char, fixed = FALSE)
+    
+    if (length(which_trends) > 0) {
+      # Extract the full function calls
+      for (idx in which_trends) {
+        term <- terms_char[idx]
+        # Find all instances of this trend type in this term
+        matches <- gregexpr(pattern, term)[[1]]
+        for (match_start in matches) {
+          if (match_start > 0) {
+            # Extract from match start to end of term (simple approach)
+            # Find the function call - count parentheses
+            remaining_text <- substr(term, match_start, nchar(term))
+            paren_count <- 0
+            end_pos <- 0
+            
+            for (i in seq_len(nchar(remaining_text))) {
+              char <- substr(remaining_text, i, i)
+              if (char == "(") paren_count <- paren_count + 1
+              if (char == ")") {
+                paren_count <- paren_count - 1
+                if (paren_count == 0) {
+                  end_pos <- i
+                  break
+                }
+              }
+            }
+            
+            if (end_pos > 0) {
+              full_call <- substr(remaining_text, 1, end_pos)
+              trend_matches <- c(trend_matches, full_call)
+            }
+          }
+        }
+      }
     }
   }
   
@@ -484,10 +519,10 @@ extract_regular_terms <- function(formula_terms) {
   return(unique(regular_terms))
 }
 
-#' Parse trend formula
+#' Parse trend formula using mvgam-style approach
 #'
-#' Extracts trend model specifications from a formula and separates them
-#'   from regular predictors.
+#' Extracts trend model specifications from a formula using similar patterns
+#'   to interpret_mvgam()'s dynamic() and gp() detection.
 #'
 #' @param trend_formula A formula object containing trend specifications
 #' @param data The data frame for validation (optional)
@@ -507,10 +542,10 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
     )
   }
   
-  # Get formula terms
-  formula_terms <- attr(terms(trend_formula), "term.labels")
+  # Use mvgam's approach: get term labels directly
+  tf <- attr(terms(trend_formula, keep.order = TRUE), 'term.labels')
   
-  if (length(formula_terms) == 0) {
+  if (length(tf) == 0) {
     insight::format_error(
       "Empty trend formula provided.",
       "The {.field trend_formula} must contain at least one term.",
@@ -518,9 +553,27 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
     )
   }
   
-  # Extract trend constructor terms using registry
-  trend_terms <- find_trend_terms(formula_terms)
-  regular_terms <- extract_regular_terms(formula_terms)
+  # Find trend terms using mvgam-style grep approach
+  trend_types <- mvgam_trend_registry()
+  trend_indices <- integer(0)
+  trend_terms <- character(0)
+  
+  for (trend_type in trend_types) {
+    # Use mvgam's approach: grep with fixed=TRUE for exact matching
+    which_trends <- grep(paste0(trend_type, '('), tf, fixed = TRUE)
+    if (length(which_trends) > 0) {
+      trend_indices <- c(trend_indices, which_trends)
+      trend_terms <- c(trend_terms, tf[which_trends])
+    }
+  }
+  
+  # Remove duplicates and sort to maintain order
+  trend_indices <- unique(trend_indices)
+  trend_terms <- tf[trend_indices]
+  
+  # Regular terms are everything else
+  regular_indices <- setdiff(seq_along(tf), trend_indices)
+  regular_terms <- if (length(regular_indices) > 0) tf[regular_indices] else character(0)
   
   # Validate we have at least one trend model
   if (length(trend_terms) == 0) {
@@ -532,7 +585,7 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
     )
   }
   
-  # Parse trend constructor calls
+  # Parse trend constructor calls (like mvgam's eval(parse()) approach)
   trend_components <- vector("list", length(trend_terms))
   names(trend_components) <- paste0("trend", seq_along(trend_terms))
   
