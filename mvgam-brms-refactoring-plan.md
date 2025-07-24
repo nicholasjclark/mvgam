@@ -59,6 +59,22 @@ Special validation for identifiability constraints:
 - **Week 9-12**: Apply to prediction/forecasting functions
 - **Week 13-16**: Comprehensive validation testing
 
+### Code Style Standards
+
+#### R Code Formatting
+- **Line length**: Maximum 80 characters per line
+- **Roxygen indentation**: Use indents for continuation lines in documentation
+- **Comment style**: Use sentence case, avoid ALL CAPS in comments
+- **Function names**: Use snake_case following tidyverse conventions
+- **Consistency**: Follow existing package conventions where established
+
+#### Documentation Standards
+- Keep roxygen2 lines under 80 characters
+- Indent continuation lines with 2 spaces
+- Use descriptive parameter descriptions
+- Include examples for exported functions
+- Apply tidyverse styling throughout
+
 ## Implementation Timeline
 
 ### Phase 1: Foundation and Dispatching System (Weeks 1-4)
