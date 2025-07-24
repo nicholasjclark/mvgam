@@ -22,6 +22,43 @@ Transform mvgam from an mgcv-based standalone package into a specialized brms ex
 3. **Formula-centric**: Trend models specified in trend_formula (e.g., `~ s(time) + RW(cor = TRUE)`)
 4. **Single learning curve**: Users only need to know `brms::prior()` and `brms::set_prior()` to change priors
 
+## Development Standards and Validation
+
+### Validation and Error Handling Standards
+
+All mvgam functions must follow these validation patterns:
+
+#### Required Packages
+- `checkmate`: Parameter validation and type checking
+- `insight`: Error and warning message formatting  
+- `rlang`: Session-wide warnings and advanced error handling
+
+#### Validation Patterns
+1. **Input Validation**: Use `checkmate::assert_*()` for all function parameters
+2. **Error Messages**: Use `insight::format_error()` for user-friendly error formatting
+3. **Warnings**: Use `insight::format_warning()` for informative warnings
+4. **Session Warnings**: Use `rlang::warn(..., .frequency = "once")` for one-time warnings
+
+#### Message Formatting Standards
+- Use `{.field parameter_name}` for parameter highlighting
+- Include suggested solutions in error messages
+- Provide context about why constraints exist
+- Use consistent terminology across the package
+
+#### Dynamic Factor Model Constraints
+Special validation for identifiability constraints:
+- `n_lv > 0` cannot be combined with `gr != 'NA'` or `subgr != 'series'`
+- `n_lv > 0` cannot be combined with `ma = TRUE`
+- Only certain trend types support `n_lv > 0` (checked via `characteristics$supports_factors`)
+- Variance parameters fixed for dynamic factor models (one-time warning)
+
+#### Implementation Throughout Features
+- **Week 1-2**: Implement in trend constructors and validation
+- **Week 3-4**: Apply to brms setup functions  
+- **Week 5-8**: Use in Stan code generation and prior system
+- **Week 9-12**: Apply to prediction/forecasting functions
+- **Week 13-16**: Comprehensive validation testing
+
 ## Implementation Timeline
 
 ### Phase 1: Foundation and Dispatching System (Weeks 1-4)
