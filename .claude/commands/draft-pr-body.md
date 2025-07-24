@@ -1,10 +1,10 @@
 # PR Body Generator Template
 
-You are helping create a PR body for the posit-dev/positron repository. Follow these guidelines:
+You are helping create a PR body for the nicholasjclark/mvgam repository. Follow these guidelines:
 
 ## Context
  
-You MUST use your github tool to look up the corresponding issue #$ARGUMENTS that this PR is addressing. Ask questions to clarify any unknowns.
+You MUST use your github tool(preferably the gh client) to look up the corresponding issue #$ARGUMENTS that this PR is addressing. Ask questions to clarify any unknowns.
 
 ## Structure
 
@@ -16,17 +16,15 @@ You MUST use your github tool to look up the corresponding issue #$ARGUMENTS tha
    - Mention if this PR is paired with other PRs in related repos
    - Include any important technical context
 
-3. **Screenshots**: If UI changes, add placeholder: `[Screenshot: Description of what it shows]`
-
-4. **Release Notes**:
+3. **Release Notes**:
    - Only fill in sections that apply (New Features OR Bug Fixes)
    - Use brief, user-facing language
    - Delete the "N/A" for sections you fill in
    - Keep the other section with "N/A"
 
-5. **QA Notes**:
+4. **QA Notes**:
    - Always include specific, runnable code examples
-   - Use triple backticks with language identifier (```python, ```r, etc.)
+   - Use triple backticks with R language identifier (```r)
    - Describe expected behavior after running the code
    - Include any special setup steps if needed
 
@@ -63,7 +61,6 @@ Addresses #[issue].
 "What issue number does this PR address, and what's the main problem it's solving?"
 
 Then follow up with:
-- "Are there any UI changes that need screenshots?"
 - "Is this paired with PRs in other repos?"
 - "What's the best way to test this change?"
 
