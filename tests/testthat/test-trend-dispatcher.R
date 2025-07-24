@@ -3,6 +3,11 @@
 #' Comprehensive tests for the trend type registry, validation, and formula
 #' parsing functionality. Includes edge cases based on brms testing patterns.
 
+# Setup - ensure we have access to required functions
+library(checkmate)
+library(insight)
+library(rlang)
+
 # Test trend registry functionality
 test_that("trend registry works correctly", {
   

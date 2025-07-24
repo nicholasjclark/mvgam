@@ -252,11 +252,11 @@ RW = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
       forecast_fun = 'forecast_rw_rcpp',
       stancode_fun = 'rw_stan_code',
       standata_fun = 'rw_stan_data',
-      bounds = list(
+      bounds = Filter(Negate(is.null), list(
         sigma = c(0, Inf),
         theta = if(ma) c(-1, 1) else NULL,
         Sigma = if(cor || gr != 'NA') c(-1, 1) else NULL
-      ),
+      )),
       characteristics = list(
         supports_predictors = TRUE,
         supports_correlation = TRUE,
@@ -273,7 +273,7 @@ RW = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
   )
   
   # Validate using dispatcher system
-  validate(out)
+  validate_trend(out)
   
   return(out)
 }
@@ -361,7 +361,7 @@ AR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) 
   )
   
   # Validate using dispatcher system
-  validate(out)
+  validate_trend(out)
   
   return(out)
 }
@@ -439,12 +439,12 @@ VAR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL)
       forecast_fun = 'forecast_var_rcpp',
       stancode_fun = 'var_stan_code',
       standata_fun = 'var_stan_data',
-      bounds = list(
+      bounds = Filter(Negate(is.null), list(
         sigma = c(0, Inf),
         A1 = c(-1, 1),
         Sigma = c(-1, 1),
         theta = if(ma) c(-1, 1) else NULL
-      ),
+      )),
       characteristics = list(
         supports_predictors = TRUE,
         supports_correlation = TRUE,
@@ -461,7 +461,7 @@ VAR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL)
   )
   
   # Validate using dispatcher system
-  validate(out)
+  validate_trend(out)
   
   return(out)
 }

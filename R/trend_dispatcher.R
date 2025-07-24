@@ -15,28 +15,37 @@
 #'
 #' @return The validated trend object
 #' @noRd
-validate.mvgam_trend <- function(trend_obj, ...) {
+validate_trend <- function(trend_obj, ...) {
   
-  # Checkmate parameter validation
+  # Basic validation
   checkmate::assert_class(trend_obj, "mvgam_trend")
   checkmate::assert_string(trend_obj$trend, min.chars = 1)
-  checkmate::assert_character(trend_obj$tpars, min.len = 1)
-  checkmate::assert_string(trend_obj$forecast_fun, min.chars = 1)
-  checkmate::assert_string(trend_obj$stancode_fun, min.chars = 1)
-  checkmate::assert_list(trend_obj$bounds, min.len = 1)
-  checkmate::assert_list(trend_obj$characteristics, min.len = 1)
   
-  # Check function references exist (will be implemented during Week 9-12)
-  # For now, just validate the names are provided
-  if (is.null(trend_obj$forecast_fun) || trend_obj$forecast_fun == "") {
-    insight::format_error(
-      "Forecast function name missing.",
-      "Trend objects must specify a {.field forecast_fun}."
-    )
+  # Optional components validation (only if present)
+  if (!is.null(trend_obj$tpars)) {
+    checkmate::assert_character(trend_obj$tpars, min.len = 1)
   }
   
-  # Dynamic factor model constraints
-  validate_dynamic_factor_constraints(trend_obj)
+  if (!is.null(trend_obj$forecast_fun)) {
+    checkmate::assert_string(trend_obj$forecast_fun, min.chars = 1)
+  }
+  
+  if (!is.null(trend_obj$stancode_fun)) {
+    checkmate::assert_string(trend_obj$stancode_fun, min.chars = 1)  
+  }
+  
+  if (!is.null(trend_obj$bounds)) {
+    checkmate::assert_list(trend_obj$bounds)
+  }
+  
+  if (!is.null(trend_obj$characteristics)) {
+    checkmate::assert_list(trend_obj$characteristics)
+  }
+  
+  # Dynamic factor model constraints (only if n_lv is present)
+  if (!is.null(trend_obj$n_lv)) {
+    validate_dynamic_factor_constraints(trend_obj)
+  }
   
   return(trend_obj)
 }
@@ -403,7 +412,7 @@ custom_trend <- function(trend, tpars, forecast_fun, stancode_fun,
   ), class = c("mvgam_trend", "custom"))
   
   # Validate the custom trend
-  validate(trend_obj)
+  validate_trend(trend_obj)
   
   return(trend_obj)
 }
