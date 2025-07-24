@@ -219,40 +219,51 @@
 #' mcmc_plot(mod, variable = 'alpha_cor', type = 'hist')
 #' }
 #' @export
-RW = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA) {
-  # Validate the supplied groupings and correlation argument
+RW = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
+  # Input validation using checkmate
+  checkmate::assert_logical(ma, len = 1)
+  checkmate::assert_logical(cor, len = 1)
+  
+  # Process and validate grouping arguments
   gr <- deparse0(substitute(gr))
   subgr <- deparse0(substitute(subgr))
+  groupings <- validate_grouping_arguments(gr, subgr)
+  gr <- groupings$gr
+  subgr <- groupings$subgr
 
-  if (gr == 'NA') {
-    subgr <- 'series'
-  }
+  # Validate and adjust correlation requirements
+  cor <- validate_correlation_requirements(gr, cor)
 
-  if (gr != 'NA') {
-    if (subgr == 'NA') {
-      stop(
-        'argument "subgr" must be supplied if "gr" is also supplied',
-        call. = FALSE
-      )
-    } else if (subgr == 'series') {
-      stop(
-        'argument "subgr" cannot be set to "series" if "gr" is also supplied',
-        call. = FALSE
-      )
-    } else {
-      cor <- TRUE
-    }
-  }
-
+  # Create trend object with dispatcher integration
   out <- structure(
     list(
-      trend_model = 'RW',
+      trend = 'RW',
+      trend_model = 'RW',  # Backwards compatibility
       ma = ma,
       cor = cor,
       unit = 'time',
       gr = gr,
       subgr = subgr,
-      label = match.call()
+      n_lv = n_lv,
+      label = build_trend_label('RW', cor = cor, ma = ma, gr = gr, n_lv = n_lv),
+      tpars = c('sigma', if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
+      monitor_pars = c('trend', 'sigma', if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
+      extract_pars = c('sigma', if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
+      forecast_fun = 'forecast_rw_rcpp',
+      stancode_fun = 'rw_stan_code',
+      standata_fun = 'rw_stan_data',
+      bounds = list(
+        sigma = c(0, Inf),
+        theta = if(ma) c(-1, 1) else NULL,
+        Sigma = if(cor || gr != 'NA') c(-1, 1) else NULL
+      ),
+      characteristics = list(
+        supports_predictors = TRUE,
+        supports_correlation = TRUE,
+        supports_factors = TRUE,
+        max_order = 1,
+        requires_sorting = TRUE
+      )
     ),
     class = 'mvgam_trend',
     param_info = list(
@@ -260,56 +271,87 @@ RW = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA) {
       labels = c('trend_estimates', 'precision_parameter', 'standard_deviation', 'moving_average_coef', 'covariance_matrix', 'process_errors', 'drift_parameter')
     )
   )
+  
+  # Validate using dispatcher system
+  validate(out)
+  
+  return(out)
 }
 
 #' @rdname RW
 #' @export
-AR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA) {
-  validate_pos_integer(p)
-  if (p > 3) {
-    stop("Argument 'p' must be <= 3", call. = FALSE)
+AR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
+  # Validate AR order parameter - can be integer or vector of integers
+  if (length(p) == 1) {
+    checkmate::assert_int(p, lower = 1)
+    ar_lags <- 1:p
+    max_lag <- p
+  } else {
+    checkmate::assert_integerish(p, lower = 1, unique = TRUE, sorted = TRUE)
+    ar_lags <- p
+    max_lag <- max(p)
   }
+  
+  # Input validation using checkmate
+  checkmate::assert_logical(ma, len = 1)
+  checkmate::assert_logical(cor, len = 1)
 
-  # Validate the supplied groupings and correlation argument
+  # Process and validate grouping arguments
   gr <- deparse0(substitute(gr))
   subgr <- deparse0(substitute(subgr))
+  groupings <- validate_grouping_arguments(gr, subgr)
+  gr <- groupings$gr
+  subgr <- groupings$subgr
 
-  if (gr == 'NA') {
-    subgr <- 'series'
-  }
+  # Validate and adjust correlation requirements
+  cor <- validate_correlation_requirements(gr, cor)
 
-  if (gr != 'NA') {
-    if (subgr == 'NA') {
-      stop(
-        'argument "subgr" must be supplied if "gr" is also supplied',
-        call. = FALSE
-      )
-    } else if (subgr == 'series') {
-      stop(
-        'argument "subgr" cannot be set to "series" if "gr" is also supplied',
-        call. = FALSE
-      )
-    } else {
-      cor <- TRUE
-    }
-  }
-
-  # Determine parameter names based on AR order
-  ar_params <- paste0('ar', 1:p)
-  param_names <- c('trend', 'tau', 'sigma', ar_params, 'theta', 'Sigma', 'error', 'drift')
+  # Determine parameter names based on AR lags
+  ar_params <- paste0('ar', ar_lags)
+  param_names <- c('trend', 'tau', 'sigma', ar_params, if(ma) 'theta', if(cor || gr != 'NA') 'Sigma', 'error', 'drift')
   param_labels <- c('trend_estimates', 'precision_parameter', 'standard_deviation', 
-                   paste0('autoregressive_coef_', 1:p), 'moving_average_coef', 
-                   'covariance_matrix', 'process_errors', 'drift_parameter')
+                   paste0('autoregressive_coef_lag_', ar_lags), 
+                   if(ma) 'moving_average_coef' else NULL,
+                   if(cor || gr != 'NA') 'covariance_matrix' else NULL,
+                   'process_errors', 'drift_parameter')
   
+  # Create AR bounds list
+  ar_bounds <- setNames(rep(list(c(-1, 1)), length(ar_params)), ar_params)
+  
+  # Create trend object with dispatcher integration
   out <- structure(
     list(
-      trend_model = paste0('AR', p),
+      trend = if(length(p) == 1) paste0('AR', p) else paste0('AR(', paste(p, collapse = ','), ')'),
+      trend_model = if(length(p) == 1) paste0('AR', p) else paste0('AR(', paste(p, collapse = ','), ')'),  # Backwards compatibility
+      p = p,
+      ar_lags = ar_lags,
+      max_lag = max_lag,
       ma = ma,
       cor = cor,
       unit = 'time',
       gr = gr,
       subgr = subgr,
-      label = match.call()
+      n_lv = n_lv,
+      label = build_trend_label('AR', cor = cor, ma = ma, gr = gr, n_lv = n_lv, p = max_lag),
+      tpars = c('sigma', ar_params, if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
+      monitor_pars = c('trend', 'sigma', ar_params, if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
+      extract_pars = c('sigma', ar_params, if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
+      forecast_fun = 'forecast_ar_rcpp',
+      stancode_fun = 'ar_stan_code',
+      standata_fun = 'ar_stan_data',
+      bounds = c(
+        list(sigma = c(0, Inf)),
+        ar_bounds,
+        if(ma) list(theta = c(-1, 1)) else list(),
+        if(cor || gr != 'NA') list(Sigma = c(-1, 1)) else list()
+      ),
+      characteristics = list(
+        supports_predictors = TRUE,
+        supports_correlation = TRUE,
+        supports_factors = TRUE,
+        max_order = max_lag,
+        requires_sorting = TRUE
+      )
     ),
     class = 'mvgam_trend',
     param_info = list(
@@ -317,6 +359,11 @@ AR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA) {
       labels = param_labels
     )
   )
+  
+  # Validate using dispatcher system
+  validate(out)
+  
+  return(out)
 }
 
 #' @rdname RW
@@ -346,47 +393,77 @@ CAR = function(p = 1) {
 
 #' @rdname RW
 #' @export
-VAR = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA) {
-  # Validate the supplied groupings and correlation argument
+VAR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
+  # Validate VAR order parameter - any positive integer
+  checkmate::assert_int(p, lower = 1)
+  
+  # Input validation using checkmate
+  checkmate::assert_logical(ma, len = 1)
+  checkmate::assert_logical(cor, len = 1)
+
+  # Process and validate grouping arguments
   gr <- deparse0(substitute(gr))
   subgr <- deparse0(substitute(subgr))
+  groupings <- validate_grouping_arguments(gr, subgr)
+  gr <- groupings$gr
+  subgr <- groupings$subgr
 
-  if (gr == 'NA') {
-    subgr <- 'series'
-  }
+  # Validate and adjust correlation requirements
+  cor <- validate_correlation_requirements(gr, cor)
 
-  if (gr != 'NA') {
-    if (subgr == 'NA') {
-      stop(
-        'argument "subgr" must be supplied if "gr" is also supplied',
-        call. = FALSE
-      )
-    } else if (subgr == 'series') {
-      stop(
-        'argument "subgr" cannot be set to "series" if "gr" is also supplied',
-        call. = FALSE
-      )
-    } else {
-      cor <- TRUE
-    }
-  }
+  # Create parameter names for VAR(p)
+  param_names <- c('trend', paste0('A', 1:p), 'Sigma', 'P_real', 'sigma', 
+                   if(ma) 'theta', 'error', 'drift')
+  param_labels <- c('trend_estimates', 
+                   paste0('var_coefficient_matrix_lag_', 1:p),
+                   'covariance_matrix', 'stationary_precision', 'standard_deviation', 
+                   if(ma) 'moving_average_matrix' else NULL,
+                   'process_errors', 'drift_parameter')
 
+  # Create trend object with dispatcher integration
   out <- structure(
     list(
-      trend_model = 'VAR',
+      trend = paste0('VAR', p),
+      trend_model = paste0('VAR', p),  # Backwards compatibility
+      p = p,
       ma = ma,
       cor = cor,
       unit = 'time',
       gr = gr,
       subgr = subgr,
-      label = match.call()
+      n_lv = n_lv,
+      label = build_trend_label('VAR', cor = cor, ma = ma, gr = gr, n_lv = n_lv, p = p),
+      tpars = c('sigma', paste0('A', 1:p), 'Sigma', if(ma) 'theta'),
+      monitor_pars = c('trend', 'sigma', paste0('A', 1:p), 'Sigma', if(ma) 'theta'),
+      extract_pars = c('sigma', paste0('A', 1:p), 'Sigma', if(ma) 'theta'),
+      forecast_fun = 'forecast_var_rcpp',
+      stancode_fun = 'var_stan_code',
+      standata_fun = 'var_stan_data',
+      bounds = list(
+        sigma = c(0, Inf),
+        A1 = c(-1, 1),
+        Sigma = c(-1, 1),
+        theta = if(ma) c(-1, 1) else NULL
+      ),
+      characteristics = list(
+        supports_predictors = TRUE,
+        supports_correlation = TRUE,
+        supports_factors = TRUE,
+        max_order = p,
+        requires_sorting = TRUE
+      )
     ),
     class = 'mvgam_trend',
     param_info = list(
-      param_names = c('trend', 'A', 'Sigma', 'P_real', 'sigma', 'theta', 'error', 'drift'),
-      labels = c('trend_estimates', 'var_coefficient_matrix', 'covariance_matrix', 'stationary_precision', 'standard_deviation', 'moving_average_matrix', 'process_errors', 'drift_parameter')
+      param_names = param_names,
+      labels = param_labels
     )
   )
+  
+  # Validate using dispatcher system
+  validate(out)
+  
+  return(out)
 }
 
 #' Specify dynamic Gaussian process trends in \pkg{mvgam} models
