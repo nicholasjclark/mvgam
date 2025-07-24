@@ -519,10 +519,10 @@ extract_regular_terms <- function(formula_terms) {
   return(unique(regular_terms))
 }
 
-#' Parse trend formula using mvgam-style approach
+#' Parse trend formula with brms-inspired validation
 #'
-#' Extracts trend model specifications from a formula using similar patterns
-#'   to interpret_mvgam()'s dynamic() and gp() detection.
+#' Extracts trend model specifications from a formula using robust validation
+#'   patterns inspired by brms' validate_formula and mvgam's interpret_mvgam.
 #'
 #' @param trend_formula A formula object containing trend specifications
 #' @param data The data frame for validation (optional)
@@ -531,10 +531,21 @@ extract_regular_terms <- function(formula_terms) {
 #' @noRd
 parse_trend_formula <- function(trend_formula, data = NULL) {
   
-  # Input validation
+  # Input validation with brms-inspired error handling
   checkmate::assert_class(trend_formula, "formula")
   
-  if (attr(terms(trend_formula), "response") > 0) {
+  # Safe formula parsing with try() like brms
+  tf_safe <- try(terms(trend_formula, keep.order = TRUE), silent = TRUE)
+  if (inherits(tf_safe, "try-error")) {
+    insight::format_error(
+      "Invalid formula syntax.",
+      "The {.field trend_formula} could not be parsed.",
+      "Check for balanced parentheses and valid R syntax."
+    )
+  }
+  
+  # Check for response variable (brms pattern)
+  if (attr(tf_safe, "response") > 0) {
     insight::format_error(
       "Response variable not allowed in trend formula.",
       "Trend formulas should only contain predictors.",
@@ -542,9 +553,19 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
     )
   }
   
-  # Use mvgam's approach: get term labels directly
-  tf <- attr(terms(trend_formula, keep.order = TRUE), 'term.labels')
+  # Handle dot expansion if data provided (brms pattern)
+  if (!is.null(data)) {
+    # Expand dots in formula using stats::terms with data
+    tf_expanded <- try(terms(trend_formula, data = data, keep.order = TRUE), silent = TRUE)
+    if (!inherits(tf_expanded, "try-error")) {
+      tf_safe <- tf_expanded
+    }
+  }
   
+  # Extract term labels (mvgam pattern)
+  tf <- attr(tf_safe, 'term.labels')
+  
+  # Validate non-empty formula (brms pattern)
   if (length(tf) == 0) {
     insight::format_error(
       "Empty trend formula provided.",
@@ -553,39 +574,37 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
     )
   }
   
-  # Find trend terms using mvgam-style grep approach
+  # Find trend terms using mvgam-style detection with brms-inspired robustness
   trend_types <- mvgam_trend_registry()
   trend_indices <- integer(0)
-  trend_terms <- character(0)
   
   for (trend_type in trend_types) {
-    # Use mvgam's approach: grep with fixed=TRUE for exact matching
+    # Use mvgam's approach: grep with fixed=TRUE (like dynamic() detection)
     which_trends <- grep(paste0(trend_type, '('), tf, fixed = TRUE)
     if (length(which_trends) > 0) {
       trend_indices <- c(trend_indices, which_trends)
-      trend_terms <- c(trend_terms, tf[which_trends])
     }
   }
   
-  # Remove duplicates and sort to maintain order
-  trend_indices <- unique(trend_indices)
+  # Remove duplicates and maintain order
+  trend_indices <- unique(sort(trend_indices))
   trend_terms <- tf[trend_indices]
   
   # Regular terms are everything else
   regular_indices <- setdiff(seq_along(tf), trend_indices)
   regular_terms <- if (length(regular_indices) > 0) tf[regular_indices] else character(0)
   
-  # Validate we have at least one trend model
+  # Validate we have at least one trend model (brms-style error)
   if (length(trend_terms) == 0) {
     available_trends <- paste(mvgam_trend_choices(), collapse = "(), ")
     insight::format_error(
       "No trend model specified in trend_formula.",
       "At least one trend constructor is required.",
-      "Available: {.field {available_trends}()}."
+      "Available constructors: {.field {available_trends}()}."
     )
   }
   
-  # Parse trend constructor calls (like mvgam's eval(parse()) approach)
+  # Parse trend constructor calls with error handling (brms pattern)
   trend_components <- vector("list", length(trend_terms))
   names(trend_components) <- paste0("trend", seq_along(trend_terms))
   
@@ -593,11 +612,23 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
     trend_components[[i]] <- eval_trend_constructor(trend_terms[i])
   }
   
-  # Create base formula without trend constructors
+  # Validate trend components don't conflict (brms pattern)
+  validate_trend_components(trend_components)
+  
+  # Create base formula without trend constructors (brms pattern)
   base_formula <- if (length(regular_terms) > 0) {
-    reformulate(regular_terms, response = NULL)
+    try(reformulate(regular_terms, response = NULL), silent = TRUE)
   } else {
     ~ 1  # Intercept only
+  }
+  
+  # Ensure formula reconstruction succeeded
+  if (inherits(base_formula, "try-error")) {
+    insight::format_error(
+      "Failed to reconstruct base formula.",
+      "Regular terms could not be combined into a valid formula.",
+      "Check for invalid predictor syntax in {.field trend_formula}."
+    )
   }
   
   # Determine primary trend model
