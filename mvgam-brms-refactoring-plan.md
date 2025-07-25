@@ -190,29 +190,27 @@ mvgam <- function(formula, trend_formula = NULL, data, data2 = NULL,
 #### Week 5: glue-Based Stan Code Generation
 **Files**: `R/stan_glue_templates.R` (new), `R/mvgam_stancode.R` (new)
 
-#### Core brms Integration Strategy
+#### brms stanvar Extension Strategy
 
-**Public API Approach**: Use only public brms functions to avoid dependency on internal APIs:
-- Generate complete Stan code using `brms::stancode()` for both observation and trend components
-- Extract Stan code blocks using robust regex patterns that target stable Stan syntax
-- Apply systematic parameter renaming to trend components  
-- Combine components using glue templates for clean assembly
+**Two-Phase Approach**: Use `brms::stanvar` for trend components, then modify observation linear predictor:
 
-**Key Integration Pattern**:
 ```r
-# Generate complete brms Stan code for both components
-obs_stancode <- brms::stancode(obs_formula, obs_data, obs_family, obs_priors)
-trend_stancode <- brms::stancode(trend_formula, trend_data, trend_family, trend_priors)
+# Phase 1: Generate base brms model with trend stanvars
+base_stancode <- brms::stancode(
+  formula = obs_formula,
+  data = combined_data,
+  stanvars = trend_stanvars
+)
 
-# Extract components, rename trend parameters, combine with State-Space dynamics
-combined_stancode <- merge_stan_components(obs_stancode, trend_stancode, statespace_dynamics)
+# Phase 2: Modify observation linear predictor to include trends
+final_stancode <- inject_trend_into_linear_predictor(base_stancode, trend_spec)
 ```
 
-**Function Deduplication**: Ensure `combine_functions_safely()` prevents duplicate function definitions:
-- Parse and deduplicate `#include` statements
-- Extract individual function definitions and check for name conflicts
-- Merge identical functions, warn about conflicting implementations
-- Reassemble with proper Stan formatting
+**Key Benefits**:
+- Leverages brms's designed extension mechanism for trend components
+- No manual Stan code parsing or complex merging required
+- Targeted modification only for observation linear predictor integration
+- Maintains full brms compatibility and threading support
 
 ```r
 # Generate Stan code using brms-style named list returns
@@ -326,6 +324,19 @@ Apply `_trend` suffix to all trend parameters using stable brms patterns:
 - Validate renaming success to ensure no conflicts remain
 - Handle both parameter declarations and usage consistently
 
+### Observation Linear Predictor Modification
+
+**Target Patterns**: Identify and modify observation equations in brms-generated Stan code:
+- **Vectorized assignments**: `mu = ...` patterns  
+- **Loop-based assignments**: `mu[n] = ...` patterns
+- **Pre-likelihood insertion**: Before `target += ... _lpdf()` calls
+- **Fallback strategy**: Explicit integration section if automatic detection fails
+
+**Integration Code**: Use glue templates to generate appropriate trend addition:
+- Vectorized: `mu += to_vector(trend[time, series])`
+- Loop-based: `mu[n] += trend[time[n], series[n]]`
+- Comprehensive testing across various brms model structures
+
 #### Week 7: data2 Integration for Factor Loadings
 **Files**: `R/mvgam_factor_loadings.R` (new), `R/jsdgam.R` (refactor)
 
@@ -379,15 +390,16 @@ process_factor_data2 <- function(data2, lv, data) {
 #### Week 8: Higher-Order VAR/AR Extensions
 **Files**: `R/mvgam_trend_types.R` (extend), `R/stan_trend_higher_order.R` (new)
 
-#### Stan Block Merging Strategy
+#### Two-Stage Assembly Strategy
 
-**Block Extraction**: Parse Stan code into standard blocks (functions, data, parameters, model, etc.) using robust regex patterns that target Stan syntax structure rather than brms internals.
+**Stage 1**: Generate trend stanvars using glue templates for parameters, dynamics, and functions
+**Stage 2**: Modify observation linear predictor using targeted pattern matching
 
-**Component Integration**: 
-- **Functions**: Deduplicate includes and custom functions
-- **Data/Parameters**: Simple concatenation with clear commenting
-- **Model**: Combine priors, insert State-Space dynamics, integrate trends into observation linear predictor
-- **Assembly**: Use glue templates for clean, readable Stan program construction
+```r
+# Complete mvgam workflow
+mvgam_stancode <- brms::stancode(obs_formula, data = combined_data, stanvars = trend_stanvars)
+final_stancode <- modify_observation_linear_predictor(mvgam_stancode, trend_spec)
+```
 
 ```r
 # Extended constructors supporting higher orders
@@ -631,6 +643,7 @@ benchmark_performance <- function() {
 5. Update CLAUDE.md with new architecture patterns
 6. Document new capabilities enabled by brms integration
 7. **brms Compatibility Maintenance**: Document stable brms patterns, compatibility testing procedures, and version monitoring requirements
+8. **Linear Predictor Integration Guide**: Document automatic detection patterns and manual fallback procedures
 
 ## Migration/Deployment Plan
 
@@ -680,11 +693,12 @@ benchmark_performance <- function() {
 4. **Single source of truth**: Leverages brms development rather than reimplementing
 
 ### Stan Code Generation Benefits
-1. **brms Compatibility**: Follows exact brms code generation patterns for seamless integration
-2. **Modular Assembly**: Uses brms's `collapse_lists()` pattern for combining code blocks  
-3. **Systematic Naming**: Leverages brms parameter naming conventions with `_trend` suffix
-4. **Prior Integration**: Reuses brms prior handling infrastructure with automatic parameter renaming
-5. **Extensibility**: New trend types follow established brms generator patterns
+1. **brms Compatibility**: Uses brms's designed extension mechanism (`stanvar`)
+2. **Targeted Modification**: Only modifies observation linear predictor, not entire Stan program
+3. **Threading Support**: Automatically inherits brms threading compatibility
+4. **Robust Assembly**: brms handles Stan code injection and validation
+5. **Future-Proof**: Uses public brms API with minimal text manipulation
+6. **Flexible Extension**: Easy to add new trend types through stanvar templates
 
 ## Risk Mitigation
 
@@ -695,6 +709,7 @@ benchmark_performance <- function() {
 4. **User Interface Changes**: Breaking changes disrupting workflows
 5. **brms API Changes**: Public Stan code structure or parameter naming changes
 6. **Function Conflicts**: Same function names with different implementations in observation vs trend
+7. **Linear Predictor Detection**: Automatic detection of observation linear predictor patterns may fail
 
 ### Contingency Plans
 1. **Stan Issues**: Extensive testing, fallback to current generation
@@ -703,6 +718,7 @@ benchmark_performance <- function() {
 4. **Interface**: Backward compatibility layer, migration tools
 5. **API Monitoring**: Compatibility testing, graceful degradation, version-specific adaptations
 6. **Function Resolution**: Clear conflict detection, user warnings, precedence rules
+7. **Detection Strategies**: Multiple pattern matching approaches, explicit integration fallback, comprehensive testing with various brms model types
 
 ## Success Metrics
 
