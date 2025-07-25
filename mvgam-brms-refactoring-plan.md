@@ -436,7 +436,8 @@ mvgam_multiple <- function(formula, trend_formula, data_list, backend, file_refi
 
 #### Week 8: Higher-Order Models & Three-Level JSDGAM
 - Extended AR/VAR: `AR(p = c(1, 12, 24))`, `VAR(p = 3)`
-- Custom families: `nmix()`, `tweedie()`, `occ()` with three-level hierarchy
+- Custom family: `tweedie()` (https://discourse.mc-stan.org/t/tweedie-likelihood-compound-poisson-gamma-in-stan/14636/9)
+- Custom families: `nmix()` and `occ()` with three-level hierarchy
 - JSDGAM specialized validation for multi-species factor models
 
 ### Phase 3: Optimization & Methods (Weeks 9-12)
