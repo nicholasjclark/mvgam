@@ -280,8 +280,10 @@ pool_mvgam_fits <- function(fits) {
 }
 ```
 
-#### Week 12: Method System Integration
+#### Week 12: Method System Integration & Residual Functions
 Critical methods: `log_lik()`, `update()`, `print()`, `loo()` with multiple imputation support
+
+**Residual Functions**: Implement Dunn-Smyth randomized quantile residuals for all brms families or develop general solution using inverse CDF transformations. Essential for model diagnostics across the full range of brms observation families.
 
 ### Phase 4: Testing & Launch (Weeks 13-16)
 
@@ -324,6 +326,7 @@ Critical methods: `log_lik()`, `update()`, `print()`, `loo()` with multiple impu
 - [ ] Multiple imputation: Native support with Rubin's rules pooling
 - [ ] Enhanced LFO-CV: Time series evaluation with comprehensive metrics
 - [ ] Seamless brms ecosystem integration: loo/waic/pp_check/diagnostics
+- [ ] Dunn-Smyth residuals: For all brms families or general randomized quantile solution
 - [ ] >90% test coverage
 - [ ] Multivariate models with response-specific trends
 - [ ] Intelligent autocorrelation validation
