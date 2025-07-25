@@ -78,13 +78,25 @@ RW <- function(cor = FALSE, ma = FALSE, gr = 'NA', subgr = 'series', n_lv = NULL
 #### Week 2: Formula Integration
 ```r
 mvgam(
-  formula = y ~ s(x1) + (1|group),
-  trend_formula = ~ s(time) + cov1 + RW(cor = TRUE),
+  formula = y ~ s(x1) + (1|group),  # Standard linear formula
+  # OR
+  formula = bf(y ~ alpha * exp(beta * x), alpha ~ s(x1), beta ~ 1, nl = TRUE),  # Nonlinear bf()
+  
+  trend_formula = ~ s(time) + cov1 + RW(cor = TRUE),  # Standard trend formula  
+  # OR  
+  trend_formula = bf(~ gamma * exp(delta * time) + AR(p = 2), gamma ~ 1, delta ~ 1, nl = TRUE),  # Nonlinear trend
+  
   priors = c(...),          # Standard brms (unchanged)
   trend_priors = c(...),    # Auto-renamed with _trend suffix
   data = data, data2 = data2, ...
 )
 ```
+
+**Formula Complexity Handling**: Support bf() calls in both formula and trend_formula:
+- **Standard formulas**: Direct brms processing, straightforward trend integration
+- **Nonlinear bf() formulas**: Complex Stan code parsing, multiple linear predictor identification
+- **Mixed scenarios**: Linear observation + nonlinear trend, or vice versa
+- **Full mvgam compatibility**: All trend types (RW, AR, VAR, GP, etc.) and factor models work with any formula type
 
 #### Week 3: brms Setup Optimization
 Benchmark and implement fastest brms setup method (`backend = "mock"` vs `chains = 0`).
@@ -132,21 +144,36 @@ base_stancode <- brms::stancode(obs_formula, data, stanvars = trend_stanvars)
 final_stancode <- inject_trend_into_linear_predictor(base_stancode, trend_spec)
 ```
 
+**Nonlinear Model Complexity**: brms nonlinear models (`bf(nl = TRUE)`) introduce significant Stan code complexity:
+- Custom functions and parameter declarations beyond standard linear predictors
+- Nonlinear parameters as placeholders for linear predictors: `alpha ~ 1 + (1|group)`
+- Complex prediction pathways requiring specialized trend integration
+- **Critical requirement**: Must ensure trend injection works with any bf() complexity while preserving all mvgam trend types (RW, AR, VAR, GP, CAR, etc.) and factor model capabilities
+
 **Benefits**: Uses brms's designed extension mechanism (`stanvars`), targeted modification only.
 
-#### Week 7: Dynamic Prior System & Missing Data Handling
+#### Week 7: Dynamic Prior System & Complex Formula Handling
 ```r
 # Extract trend components from brms-generated Stan code
 extract_trend_stanvars_from_setup <- function(trend_setup, trend_spec) {
   # Apply systematic _trend suffix: b → b_trend, Intercept → Intercept_trend
+  # Handle nonlinear parameters: nlpar renaming for complex bf() formulas
   # Create stanvars for injection: parameters, transformed parameters, model blocks
   # Monitor trend matrix only - no predictions in generated_quantities for efficiency
+}
+
+# Parse and validate complex formula combinations
+parse_formula_complexity <- function(formula, trend_formula) {
+  # Detect bf() calls in either formula or trend_formula
+  # Extract nonlinear parameters and their linear predictors
+  # Validate mvgam trend compatibility with nonlinear specifications
+  # Plan integration strategy based on formula complexity
 }
 
 # Handle missing data following current mvgam pattern
 prepare_missing_data_for_brms <- function(data, formula, trend_formula) {
   # Replace NAs with imputed values, create obs_ind tracking non-missing
-  # Ensure brms computes mu/mu_trend for full time grid
+  # Ensure brms computes mu/mu_trend for full time grid (works with bf() formulas)
   # Pass obs_ind to Stan for selective likelihood computation
 }
 ```
@@ -232,9 +259,14 @@ Full brms method support using dual brmsfit-like objects: `summary()`, `plot()`,
 ### Phase 4: Testing & Launch (Weeks 13-16)
 
 #### Week 13-14: Comprehensive Testing
-- All trend types, formula parsing, higher-order models, three-level JSDGAM
-- Missing data handling, Rcpp optimization, prior system
-- Performance benchmarking vs current implementation
+- **Formula complexity matrix**: Test all combinations of linear/nonlinear observation and trend formulas
+  - Linear obs + Linear trend: Standard mvgam functionality
+  - Linear obs + Nonlinear trend: `bf(~ gamma * exp(delta * time) + RW(), gamma ~ 1, delta ~ 1, nl = TRUE)`
+  - Nonlinear obs + Linear trend: `bf(y ~ alpha * exp(beta * x), alpha ~ s(x), beta ~ 1, nl = TRUE)` + standard trends
+  - Nonlinear obs + Nonlinear trend: Complex bf() in both formulas
+- **All mvgam features preserved**: RW, AR, VAR, GP, CAR, factor models, three-level JSDGAM
+- **Missing data + complexity**: obs_ind tracking with bf() formulas
+- **Performance benchmarking** across complexity combinations
 
 #### Week 15: Performance Optimization
 Object footprint reduction, memory usage optimization, final performance validation.
@@ -269,6 +301,7 @@ Complete documentation updates, migration guide from v1.x to v2.0, community fee
 2. **Performance Regression** → Profile bottlenecks, parallel implementation
 3. **Missing Data Handling** → Preserve proven mvgam approach with obs_ind tracking
 4. **brms API Changes** → Version detection, compatibility testing when 3.0 approaches
+5. **Nonlinear Model Integration** → Complex Stan code modification, specialized testing for `bf(nl = TRUE)` models
 
 ### Contingency Plans
 - Maintain parallel old/new implementations during transition
