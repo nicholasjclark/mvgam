@@ -179,6 +179,21 @@ validate_distributional_trends <- function(formula, trend_formula) {
       ))
     }
   }
+  
+  # Check hurdle model restrictions
+  if (is_hurdle_family(formula) && is.list(trend_formula)) {
+    param_names <- names(trend_formula)
+    hurdle_params <- param_names[grepl("^hu", param_names)]
+    
+    if (length(hurdle_params) > 0) {
+      stop(insight::format_error(
+        "State-Space trends not allowed for hurdle parameters.",
+        "x" = paste("Found trends for hurdle parameters:", paste(hurdle_params, collapse = ", ")),
+        "i" = "trends can only be applied to the main response parameter (mu)",
+        "i" = "The hurdle process should use fixed/smooth effects: hu ~ s(time)"
+      ))
+    }
+  }
 }
 
 validate_multiple_imputation_data <- function(data_list) {
@@ -211,6 +226,7 @@ validate_multiple_imputation_data <- function(data_list) {
 - **Distributional model restriction**: Trends only allowed for main response parameter
 - **Response helper validation**: Compatibility with `mi()`, `weights()`, `cens()`, `trunc()`, `trials()`, etc.
 - **Multiple imputation validation**: Dataset structure consistency, pooling compatibility
+- **Hurdle model validation**: Trends restricted to main (`mu`) parameter, proper `hu` parameter handling (similar strategy for zero_inflated_* or zero_one_inflated_* families)
 
 ## Multivariate Model Integration
 
@@ -262,7 +278,44 @@ parse_multivariate_trends <- function(formula, trend_formula) {
   # Validate distributional models: trends only for main parameter
   validate_distributional_trends(formula, trend_formula)
   
+  # Validate hurdle models: trends only for main parameter  
+  validate_hurdle_trends(formula, trend_formula)
+  
   return(list(responses = response_names, trends = trend_formula))
+}
+
+# Helper functions for hurdle model support
+is_hurdle_family <- function(formula) {
+  family_info <- extract_family_info(formula)
+  return(grepl("hurdle", family_info$family, ignore.case = TRUE))
+}
+
+extract_parameters <- function(fit) {
+  # Extract parameter names handling hurdle conventions
+  draws <- as_draws_df(fit)
+  param_names <- names(draws)
+  
+  # Separate main and hurdle parameters
+  main_params <- param_names[!grepl("^b_hu_", param_names)]
+  hurdle_params <- param_names[grepl("^b_hu_", param_names)]
+  
+  return(list(main = main_params, hurdle = hurdle_params))
+}
+
+validate_hurdle_trends <- function(formula, trend_formula) {
+  if (is_hurdle_family(formula) && is.list(trend_formula)) {
+    param_names <- names(trend_formula)
+    hurdle_params <- param_names[grepl("^hu", param_names)]
+    
+    if (length(hurdle_params) > 0) {
+      stop(insight::format_error(
+        "State-Space trends not allowed for hurdle parameters.",
+        "x" = paste("Found trends for:", paste(hurdle_params, collapse = ", ")),
+        "i" = "trends can only be applied to the main response parameter",
+        "i" = "The hurdle process should use fixed/smooth effects: hu ~ s(time)"
+      ))
+    }
+  }
 }
 ```
 
@@ -372,11 +425,14 @@ mvgam_multiple <- function(formula, trend_formula, data_list, backend, file_refi
 - Handle nonlinear model complexity (`bf(nl = TRUE)`)
 - Ensure compatibility with all mvgam trend types (RW, AR, VAR, GP, CAR)
 
-#### Week 7: Dynamic Prior System & Context-Aware Validation
+#### Week 7: Dynamic Prior System & Context-Aware Validation + Hurdle Model Support
 - Intelligent autocorrelation validation based on formula context
 - Extract trend components from brms-generated Stan code
 - Apply systematic `_trend` suffix handling
 - Handle multivariate response-specific parameters
+- **Hurdle model validation**: Ensure trends only applied to main (`mu`) parameter, not hurdle (`hu`) parameter
+- **Parameter name recognition**: Properly handle `b_hu_*` vs `b_*` parameter naming conventions
+- **Stan code integration**: Ensure hurdle and trend processes don't interfere
 
 #### Week 8: Higher-Order Models & Three-Level JSDGAM
 - Extended AR/VAR: `AR(p = c(1, 12, 24))`, `VAR(p = 3)`
