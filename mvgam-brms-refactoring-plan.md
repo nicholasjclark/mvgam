@@ -1,165 +1,63 @@
 # mvgam → brms Extension Refactoring Plan
 
-**Version**: 1.2 (Final)  
-**Date**: 2025-01-24  
+**Version**: 1.5 (Balanced Implementation Guide)  
+**Date**: 2025-01-25  
 **Status**: Ready for Implementation
 
 ## Executive Summary
 
-Transform mvgam from mgcv-based standalone package into specialized brms extension adding State-Space modeling, N-mixture/occupancy models, and JSDMs. Architecture: brms generates linear predictors (`mu`, `mu_trend`), single combined Stan model, dual brmsfit-like objects for post-processing. **JSDGAM function** follows identical architecture with specialized validation for multi-species factor models.
+Transform mvgam from mgcv-based standalone package into specialized brms extension adding State-Space modeling, N-mixture/occupancy models, and JSDMs. **Core Innovation**: brms generates linear predictors (`mu`, `mu_trend`), single combined Stan model, dual brmsfit-like objects for post-processing. Full multivariate model support preserving brms cross-response correlations while adding State-Space dynamics.
 
-## Core Architecture
+## Critical Design Principles
 
-### Single-Fit Dual-Object Strategy
-- **brms for**: Linear predictor generation (`mu` + `mu_trend`), Stan code setup, internal object creation (no fitting)
+### 1. **Single-Fit Dual-Object Architecture**
+- **brms role**: Linear predictor generation (`mu` + `mu_trend`), Stan code setup, internal object creation (no fitting)
 - **Single fit**: Combined Stan model with observation + trend components  
 - **Dual objects**: Internal brmsfit-like objects for post-processing
 - **State-Space link**: Observation and trend layers connected in Stan
+- **Multivariate support**: Response-specific trends with preserved cross-response correlations
 
-### Design Principles
-1. **Observation layer**: Uses brms exactly as-is (no parameter renaming)
-2. **Trend layer**: brms functionality with `_trend` suffixed parameters
-3. **Formula-centric**: `trend_formula = ~ s(time) + RW(cor = TRUE)`
-4. **Single learning curve**: Only need `brms::prior()` and `brms::set_prior()`
-5. **Efficiency-first**: No predictions in Stan `generated_quantities`, on-demand computation like brms
-
-## Development Standards
-
-### brms 3.0 Compatibility
-**Timeline Reality**: brms 3.0 is "still a long way to go" with no set release date. Our 16-week timeline likely precedes brms 3.0 release.
-
-**Strategy**: Target brms 2.x stable API as primary, add 3.0 compatibility as future enhancement when needed.
-
-### Validation Framework
-- **checkmate**: Parameter validation (`assert_*()`)
-- **insight**: Error/warning formatting (`format_error()`, `format_warning()`)
-- **rlang**: Session warnings (`warn(..., .frequency = "once")`)
-
-### Key Validation Differences: mvgam() vs jsdgam()
-
-**mvgam() validation**:
-- Single or multiple series allowed
-- Optional trend components
-- Standard State-Space constraints
-
-**jsdgam() validation**:
-- Requires multiple series (`n_series > 1`)
-- Requires `lv > 0` (latent factors)
-- Factor model identifiability constraints
-- Specialized data2 processing for factor loadings
-- **Three-level hierarchy** for `occ()` and `nmix()` families:
-  - Level 1: Environmental factors → Species latent abundance/occupancy
-  - Level 2: Species trends/dynamics  
-  - Level 3: Observation process (detection/counting)
-
-### Code Standards
-- **80 char lines**, snake_case, tidyverse conventions
-- Comprehensive roxygen2 documentation with examples
-- Unit tests with >90% coverage
-
-## Implementation Timeline (16 Weeks)
-
-### Phase 1: Foundation (Weeks 1-4)
-
-#### Week 1: Trend Dispatcher
+### 2. **Formula-Centric Interface**
 ```r
-# Registry-based trend constructor system
-trend <- function(type = "RW", ...) {
-  get_trend_constructor(type)(...)
-}
+# Standard State-Space
+mvgam(y ~ s(x), trend_formula = ~ RW(cor = TRUE), data = data)
 
-RW <- function(cor = FALSE, ma = FALSE, gr = 'NA', subgr = 'series', n_lv = NULL, ...) {
-  structure(list(trend_type = "RW", cor = cor, ma = ma, gr = gr, 
-                 subgr = subgr, n_lv = n_lv, formula_term = TRUE),
-           class = c("mvgam_trend_term", "RW"))
-}
-```
-
-#### Week 2: Formula Integration
-```r
+# Multivariate with response-specific trends
 mvgam(
-  formula = y ~ s(x1) + (1|group),  # Standard linear formula
-  # OR
-  formula = bf(y ~ alpha * exp(beta * x), alpha ~ s(x1), beta ~ 1, nl = TRUE),  # Nonlinear bf()
-  
-  trend_formula = ~ s(time) + cov1 + RW(cor = TRUE),  # Standard trend formula  
-  # OR  
-  trend_formula = bf(~ gamma * exp(delta * time) + AR(p = 2), gamma ~ 1, delta ~ 1, nl = TRUE),  # Nonlinear trend
-  
-  priors = c(...),          # Standard brms (unchanged)
-  trend_priors = c(...),    # Auto-renamed with _trend suffix
-  data = data, data2 = data2, ...
+  mvbf(count ~ temp, biomass ~ precip),
+  trend_formula = list(
+    count = ~ AR(p = 1),        # Population dynamics
+    biomass = ~ RW(cor = TRUE), # Correlated biomass trends
+    presence = NULL             # No trend (static occupancy)
+  ),
+  family = c(poisson(), gaussian(), bernoulli()),
+  data = data
+)
+
+# Intelligent autocorrelation separation
+mvgam(
+  count ~ Trt + unstr(visit, patient),  # ✅ Observation-level correlation
+  trend_formula = ~ AR(p = 1),          # ✅ State-Space dynamics
+  data = data
+)
+
+mvgam(
+  y ~ x + ar(time, group),        # ✅ Residual AR at obs level
+  trend_formula = ~ RW(cor = TRUE), # ✅ Latent trends
+  data = data
+)
+
+# FORBIDDEN: Trend-level brms autocor
+mvgam(
+  y ~ s(x1),
+  trend_formula = ~ s(time) + ar(p = 1),  # ❌ Conflicts with mvgam AR()
+  data = data
 )
 ```
 
-**Formula Complexity Handling**: Support bf() calls in both formula and trend_formula:
-- **Standard formulas**: Direct brms processing, straightforward trend integration
-- **Nonlinear bf() formulas**: Complex Stan code parsing, multiple linear predictor identification
-- **Mixed scenarios**: Linear observation + nonlinear trend, or vice versa
-- **Full mvgam compatibility**: All trend types (RW, AR, VAR, GP, etc.) and factor models work with any formula type
+### 3. **Stan Code Strategy: Two-Stage Assembly**
 
-#### Week 3: brms Setup Optimization
-Benchmark and implement fastest brms setup method (`backend = "mock"` vs `chains = 0`).
-
-#### Week 4: Single-Fit Architecture & Backend Strategy
-```r
-mvgam <- function(formula, trend_formula = NULL, backend = NULL, ...) {
-  # 1. Setup obs/trend models (no fitting)
-  obs_setup <- setup_brms_lightweight(formula, data, ...)
-  trend_setup <- setup_brms_lightweight(trend_spec$base_formula, ...)
-  
-  # 2. Extract trend stanvars from trend_setup's generated Stan code
-  trend_stanvars <- extract_trend_stanvars_from_setup(trend_setup, trend_spec)
-  
-  # 3. Generate combined Stan code using trend stanvars
-  combined_stancode <- generate_combined_stancode(obs_setup, trend_stanvars)
-  
-  # 4. Use enhanced mvgam backend system (adapted from brms)
-  combined_fit <- fit_mvgam_model(combined_stancode, combined_standata, 
-                                  backend = backend, silent = silent, ...)
-  return(create_mvgam_from_combined_fit(combined_fit, obs_setup, trend_setup))
-}
-
-# Current approach: Enhance existing mvgam backend system
-fit_mvgam_model <- function(stancode, standata, backend = NULL, algorithm = "sampling",
-                           iter = 2000, warmup = 1000, chains = 4, cores = 1,
-                           threads = NULL, silent = 1, control = list(), ...) {
-  
-  # Use existing mvgam backend approach (adapted from brms internals)
-  # This preserves important features like:
-  # - Message silencing (silent parameter)
-  # - Progress control and user feedback
-  # - Error handling and diagnostics
-  # - Threading and parallelization options
-  # - Algorithm flexibility (sampling, vb, fixed_param)
-  
-  backend <- backend %||% getOption("brms.backend", "rstan")
-  
-  if (backend == "rstan") {
-    fitted_model <- mvgam_fit_rstan(stancode, standata, algorithm, iter, warmup,
-                                   chains, cores, silent, control, ...)
-  } else if (backend == "cmdstanr") {
-    fitted_model <- mvgam_fit_cmdstanr(stancode, standata, algorithm, iter, warmup,
-                                      chains, cores, threads, silent, control, ...)
-  }
-  
-  return(fitted_model)
-}
-```
-
-**Backend Strategy**: Maintain and enhance current mvgam approach:
-- **Keep copied brms internals**: Provides essential user experience features
-- **Message silencing**: `silent` parameter for clean output control
-- **Progress feedback**: User-friendly progress messages and warnings
-- **Error handling**: Robust diagnostics and helpful error messages  
-- **Full feature parity**: All brms backend capabilities preserved
-- **Update synchronization**: Periodically sync with latest brms backend improvements
-
-### Phase 2: Stan Generation (Weeks 5-8)
-
-#### Week 5-6: Two-Stage Stan Assembly
-
-**Stage 1**: Extract trend stanvars from trend_setup and generate base model
+**Stage 1**: Extract trend stanvars from brms setup
 ```r
 # Extract Stan code blocks from trend brms setup
 trend_stanvars <- extract_trend_stanvars_from_setup(trend_setup, trend_spec)
@@ -174,44 +72,16 @@ base_stancode <- brms::stancode(obs_formula, data, stanvars = trend_stanvars)
 final_stancode <- inject_trend_into_linear_predictor(base_stancode, trend_spec)
 ```
 
-**Nonlinear Model Complexity**: brms nonlinear models (`bf(nl = TRUE)`) introduce significant Stan code complexity:
-- Custom functions and parameter declarations beyond standard linear predictors
-- Nonlinear parameters as placeholders for linear predictors: `alpha ~ 1 + (1|group)`
-- Complex prediction pathways requiring specialized trend integration
-- **Critical requirement**: Must ensure trend injection works with any bf() complexity while preserving all mvgam trend types (RW, AR, VAR, GP, CAR, etc.) and factor model capabilities
-
-**Benefits**: Uses brms's designed extension mechanism (`stanvars`), targeted modification only.
-
-#### Week 7: Dynamic Prior System & Complex Formula Handling
-```r
-# Extract trend components from brms-generated Stan code
-extract_trend_stanvars_from_setup <- function(trend_setup, trend_spec) {
-  # Apply systematic _trend suffix: b → b_trend, Intercept → Intercept_trend
-  # Handle nonlinear parameters: nlpar renaming for complex bf() formulas
-  # Create stanvars for injection: parameters, transformed parameters, model blocks
-  # Monitor trend matrix only - no predictions in generated_quantities for efficiency
-}
-
-# Parse and validate complex formula combinations
-parse_formula_complexity <- function(formula, trend_formula) {
-  # Detect bf() calls in either formula or trend_formula
-  # Extract nonlinear parameters and their linear predictors
-  # Validate mvgam trend compatibility with nonlinear specifications
-  # Plan integration strategy based on formula complexity
-}
-
-# Handle missing data following current mvgam pattern
-prepare_missing_data_for_brms <- function(data, formula, trend_formula) {
-  # Replace NAs with imputed values, create obs_ind tracking non-missing
-  # Ensure brms computes mu/mu_trend for full time grid (works with bf() formulas)
-  # Pass obs_ind to Stan for selective likelihood computation
-}
-```
-
-**Stan Integration Pattern**:
+**Critical Stan Pattern**:
 ```stan
 // brms produces mu and mu_trend for full time grid
 mu_combined = mu + mu_trend;
+
+// Multivariate case: per-response handling
+if (is_multivariate) {
+  mu1_combined = mu1 + mu1_trend;
+  mu2_combined = mu2 + mu2_trend;
+}
 
 // Likelihood only for non-missing observations (using obs_ind tracking)
 {
@@ -223,229 +93,378 @@ mu_combined = mu + mu_trend;
 trend[2:T] ~ normal(trend[1:(T-1)], sigma_trend);
 ```
 
-#### Week 8: Higher-Order Models & Three-Level JSDGAM
-```r
-# Extended AR/VAR: AR(p = c(1, 12, 24)), VAR(p = 3)
-# Custom families: nmix(), tweedie(), occ() with three-level hierarchical structure
+**Stan Modification Requirements**:
+- Uses brms's designed extension mechanism (`stanvars`)
+- Preserves parameter constraints and transformations
+- Handles nonlinear formula complexity (`bf(nl = TRUE)`)
+- Maintains brms correlation structures
+- Supports multivariate response-specific trends
 
-jsdgam <- function(formula, data, data2 = NULL, lv = 0, family = gaussian(), 
-                   trend_formula = NULL, latent_formula = NULL, ...) {
-  # Three-level hierarchy for occ()/nmix() families
-  if (family$family %in% c("occ", "nmix")) {
-    # Level 1: Environmental factors → Species abundance/occupancy
-    latent_setup <- setup_brms_lightweight(latent_formula, data, data2, ...)
-    # Level 2: Species trends + Level 3: Observation process
-    # Generate three-level stancode
-  } else {
-    # Standard two-level jsdgam (same as mvgam pattern)
+### 4. **Validation Framework**
+
+**Context-Aware Autocorrelation**:
+```r
+validate_autocor_usage <- function(formula, trend_formula) {
+  # Observation-level autocor: ALLOWED (residual correlation structures)
+  obs_autocor <- extract_autocor_terms(formula)
+  if (length(obs_autocor) > 0) {
+    insight::format_warning(
+      "Using brms autocorrelation for observation-level residual structure.",
+      "This models residual correlation and complements State-Space trends.",
+      .frequency = "once"
+    )
+  }
+  
+  # Trend-level autocor: FORBIDDEN (conflicts with State-Space dynamics)
+  trend_autocor <- extract_autocor_terms(trend_formula)
+  if (length(trend_autocor) > 0) {
+    stop(insight::format_error(
+      "brms autocorrelation terms not allowed in trend_formula.",
+      "Use mvgam trend types: ar(p = 1) → AR(p = 1)"
+    ))
   }
 }
 ```
 
-### Phase 3: Optimization (Weeks 9-12)
+**Multivariate Validation**:
+- Response-trend mapping consistency
+- Family compatibility with trend types  
+- Missing data consistency across responses
+- Cross-response correlation preservation
 
-#### Week 9-10: Rcpp Functions Following Carpenter's Efficiency Guidelines
+## Multivariate Model Integration
+
+### Architecture Extension
+Each response variable can have its own State-Space trend component while preserving brms cross-response correlations.
+
+### Stan Code Architecture
+```stan
+// Multiple trend parameters: b_trend_y1, b_trend_y2, etc.
+// Response-specific missing data: obs_ind_1, obs_ind_2 tracking
+// Conditional trend evolution: Only for responses with trends
+// Preserve brms correlations: Don't interfere with cross-response structures
+
+vector[N] mu1 = mu1_base + mu1_trend;  // Response 1: base + trend
+vector[N] mu2 = mu2_base + mu2_trend;  // Response 2: base + trend  
+vector[N] mu3 = mu3_base;              // Response 3: base only (no trend)
+
+// Preserve brms multivariate correlation structure while adding State-Space dynamics
+{
+  vector[n_nonmissing_1] selected_mu1 = mu1[obs_ind_1];
+  vector[n_nonmissing_2] selected_mu2 = mu2[obs_ind_2];
+  vector[n_nonmissing_3] selected_mu3 = mu3[obs_ind_3];
+  
+  flat_y1s ~ poisson_log(selected_mu1);
+  flat_y2s ~ normal(selected_mu2, sigma_y2);
+  flat_y3s ~ bernoulli_logit(selected_mu3);
+}
+
+// State-Space evolution for each trend component
+if (has_trend_y1) trend_y1[2:T] ~ normal(trend_y1[1:(T-1)], sigma_trend_y1);
+if (has_trend_y2) trend_y2[2:T] ~ normal(trend_y2[1:(T-1)], sigma_trend_y2);
+```
+
+### Implementation Requirements
+```r
+parse_multivariate_trends <- function(formula, trend_formula) {
+  if (is.mvbrmsformula(formula)) {
+    response_names <- extract_response_names(formula)
+    
+    if (is.list(trend_formula)) {
+      validate_trend_response_mapping(response_names, trend_formula)
+    } else if (!is.null(trend_formula)) {
+      # Single trend applied to all responses
+      trend_formula <- rep(list(trend_formula), length(response_names))
+      names(trend_formula) <- response_names
+    }
+  }
+  return(list(responses = response_names, trends = trend_formula))
+}
+```
+
+## Development Standards
+
+### brms Compatibility Strategy
+**Target**: brms 2.x stable API as primary, add 3.0 compatibility when released
+**Monitoring**: Automated compatibility testing across brms versions
+**Fallback**: Graceful degradation strategies for API changes
+
+### Validation Tools
+- **checkmate**: Parameter validation (`assert_*()`)
+- **insight**: Error/warning formatting (`format_error()`, `format_warning()`)
+- **rlang**: Session warnings (`warn(..., .frequency = "once")`)
+
+### Code Standards
+- **80 char lines**, snake_case, tidyverse conventions
+- Comprehensive roxygen2 documentation with examples
+- Unit tests with >90% coverage
+
+## Implementation Timeline (16 Weeks)
+
+### Phase 1: Foundation (Weeks 1-4)
+
+#### Week 1: Trend Dispatcher System
+```r
+# Registry-based trend constructor system
+trend <- function(type = "RW", ...) {
+  get_trend_constructor(type)(...)
+}
+
+RW <- function(cor = FALSE, ma = FALSE, gr = 'NA', subgr = 'series', n_lv = NULL, ...) {
+  structure(list(trend_type = "RW", cor = cor, ma = ma, gr = gr, 
+                 subgr = subgr, n_lv = n_lv, formula_term = TRUE),
+           class = c("mvgam_trend_term", "RW"))
+}
+```
+
+#### Week 2: Formula Integration & Intelligent Autocor Validation
+- Multivariate formula parsing with `mvbf()` support
+- Context-aware autocorrelation validation
+- Educational error messages for trend vs observation level conflicts
+
+#### Week 3: brms Setup Optimization
+- Benchmark fastest brms setup method (`backend = "mock"` vs `chains = 0`)
+- Optimize for 10-50x setup speed improvement
+
+#### Week 4: Single-Fit Architecture & Backend Strategy
+```r
+mvgam <- function(formula, trend_formula = NULL, backend = NULL, ...) {
+  # 1. Parse multivariate formulas if needed
+  mv_spec <- parse_multivariate_trends(formula, trend_formula)
+  
+  # 2. Setup obs/trend models (no fitting)
+  obs_setup <- setup_brms_lightweight(formula, data, ...)
+  trend_setup <- setup_brms_lightweight(trend_spec$base_formula, ...)
+  
+  # 3. Extract trend stanvars and generate combined Stan code
+  trend_stanvars <- extract_trend_stanvars_from_setup(trend_setup, trend_spec)
+  combined_stancode <- generate_combined_stancode(obs_setup, trend_stanvars)
+  
+  # 4. Use enhanced mvgam backend system
+  combined_fit <- fit_mvgam_model(combined_stancode, combined_standata, 
+                                  backend = backend, ...)
+  return(create_mvgam_from_combined_fit(combined_fit, obs_setup, trend_setup))
+}
+```
+
+**Backend Strategy**: Enhance existing mvgam approach maintaining message silencing, progress feedback, error handling, and threading options.
+
+### Phase 2: Stan Integration (Weeks 5-8)
+
+#### Week 5-6: Two-Stage Stan Assembly
+- Extract trend stanvars from trend_setup and generate base model
+- Modify observation linear predictor with missing data preservation
+- Handle nonlinear model complexity (`bf(nl = TRUE)`)
+- Ensure compatibility with all mvgam trend types (RW, AR, VAR, GP, CAR)
+
+#### Week 7: Dynamic Prior System & Context-Aware Validation
+- Intelligent autocorrelation validation based on formula context
+- Extract trend components from brms-generated Stan code
+- Apply systematic `_trend` suffix handling
+- Handle multivariate response-specific parameters
+
+#### Week 8: Higher-Order Models & Three-Level JSDGAM
+- Extended AR/VAR: `AR(p = c(1, 12, 24))`, `VAR(p = 3)`
+- Custom families: `nmix()`, `tweedie()`, `occ()` with three-level hierarchy
+- JSDGAM specialized validation for multi-species factor models
+
+### Phase 3: Optimization & Methods (Weeks 9-12)
+
+#### Week 9-10: Rcpp Functions
 ```cpp
-// Vectorized operations, minimal indexing, pre-compute repeated calculations
 // Higher-order AR/VAR with embedded predictors
 // [[Rcpp::export]]
 Rcpp::NumericVector ar_p_recursC(Rcpp::NumericVector phi_coeffs, ...);
 
-// Matrix-based JSDGAM prediction (replace R loops for 10-100x speedup)
+// Matrix-based JSDGAM prediction (10-100x speedup)
 // [[Rcpp::export]]
 arma::mat fast_jsdgam_predict(const arma::mat& design_matrices, ...);
 
-// Forecasting from monitored trend states (no Stan generated_quantities)
+// Multivariate-aware prediction functions
 // [[Rcpp::export]]
-arma::mat forecast_from_final_states(const arma::mat& final_states, int h, ...);
+arma::cube fast_multivariate_predict(const arma::cube& design_arrays, ...);
 ```
 
 #### Week 11: brms Prediction Integration
 ```r
-posterior_predict.mvgam <- function(object, newdata = NULL, ...) {
+posterior_predict.mvgam <- function(object, newdata = NULL, resp = NULL, ...) {
+  if (is_multivariate(object)) {
+    if (!is.null(resp)) {
+      return(predict_single_response(object, resp, newdata, ...))
+    } else {
+      return(predict_all_responses(object, newdata, ...))
+    }
+  }
+  
   # Use brms::prepare_predictions() for full pipeline
   prep <- brms::prepare_predictions(object$obs_fit, newdata = newdata, ...)
-  
-  # Add trend effects to linear predictor
   base_linpred <- brms::posterior_linpred_draws(prep)
   trend_effects <- predict_trend_effects(object, prep)
   prep <- update_brmsprep_linpred(prep, base_linpred + trend_effects)
   
-  # Let brms handle family transformations
   return(brms::posterior_predict_draws(prep))
-}
-
-# Forecasting extends from monitored trend states
-forecast.mvgam <- function(object, h = NULL, ...) {
-  final_states <- extract_final_trend_states(object)
-  forecast_trends <- forecast_trend_from_states_rcpp(final_states, h, ...)
-  return(combine_trend_obs_forecasts(object, forecast_trends, ...))
 }
 ```
 
 #### Week 12: Method System Integration
 ```r
-# Full brms method support using dual brmsfit-like objects
-summary.mvgam <- function(object, ...) {
-  # Use dual objects for comprehensive summaries
-}
-
 # Critical: log_lik integration following brms patterns
-log_lik.mvgam <- function(object, newdata = NULL, re_formula = NULL, 
-                          resp = NULL, ndraws = NULL, draw_ids = NULL,
-                          pointwise = FALSE, combine = TRUE, cores = NULL, ...) {
-  # Step 1: Use brms::prepare_predictions() for base setup
-  prep <- brms::prepare_predictions(object$obs_fit, newdata = newdata, 
-                                   re_formula = re_formula, resp = resp,
-                                   ndraws = ndraws, draw_ids = draw_ids, ...)
-  
-  # Step 2: Add trend effects to linear predictor
-  prep <- add_trend_effects_to_prep(object, prep)
-  
-  # Step 3: Compute log-likelihood using family-specific functions
-  if (pointwise) {
-    # Return function for loo/waic compatibility
-    return(create_pointwise_log_lik_function(prep, object))
-  } else {
-    # Return S x N matrix of log-likelihood draws
-    return(compute_log_lik_matrix(prep, object, combine, cores))
-  }
-}
-
-# Seamless loo integration 
-loo.mvgam <- function(x, ..., compare = TRUE, resp = NULL, pointwise = FALSE,
-                      moment_match = FALSE, reloo = FALSE, save_psis = FALSE) {
-  # Leverage brms loo method with mvgam log_lik
-  log_lik_matrix <- log_lik(x, pointwise = pointwise, ...)
-  
-  if (pointwise) {
-    # Use function method for efficiency
-    return(loo::loo(log_lik_matrix, ...))
-  } else {
-    # Use matrix method 
-    return(loo::loo(log_lik_matrix, save_psis = save_psis, ...))
-  }
-}
-
-# Additional model evaluation methods
-waic.mvgam <- function(x, ...) {
-  log_lik_matrix <- log_lik(x, ...)
-  return(loo::waic(log_lik_matrix, ...))
-}
-
-# Posterior predictive checks using bayesplot
-pp_check.mvgam <- function(object, type = "dens_overlay", ndraws = NULL,
-                           prefix = c("ppc", "ppd"), group = NULL, x = NULL,
-                           newdata = NULL, resp = NULL, draw_ids = NULL, ...) {
-  # Validate plot type (leverages bayesplot error messages for invalid types)
-  valid_types <- bayesplot::available_ppc(pattern = "")
-  type <- match.arg(type, valid_types)
-  prefix <- match.arg(prefix)
-  
-  # Get observed data from fitted object
-  y <- get_y(object, resp = resp)
-  
-  # Generate posterior predictive draws using mvgam prediction methods
-  yrep <- posterior_predict(object, newdata = newdata, resp = resp, 
-                           ndraws = ndraws, draw_ids = draw_ids, ...)
-  
-  # Get bayesplot ppc function
-  ppc_fun <- get(paste0(prefix, "_", type), asNamespace("bayesplot"))
-  
-  # Handle grouped plots
-  if ("group" %in% names(formals(ppc_fun))) {
-    if (is.null(group)) {
-      stop2("Argument 'group' is required for ppc type '", type, "'.")
+log_lik.mvgam <- function(object, resp = NULL, ...) {
+  if (is_multivariate(object)) {
+    if (!is.null(resp)) {
+      return(compute_response_log_lik(object, resp, ...))
+    } else {
+      return(compute_multivariate_log_lik(object, ...))
     }
-    group_var <- get_data(object)[[group]]
-    return(ppc_fun(y, yrep, group = group_var, ...))
   }
   
-  # Handle plots with x variable
-  if ("x" %in% names(formals(ppc_fun)) && !is.null(x)) {
-    x_var <- get_data(object)[[x]]
-    return(ppc_fun(y, yrep, x = x_var, ...))
-  }
-  
-  # Standard ppc plot
-  return(ppc_fun(y, yrep, ...))
+  # Standard univariate approach with brms integration
+  prep <- brms::prepare_predictions(object$obs_fit, ...)
+  prep <- add_trend_effects_to_prep(object, prep)
+  return(compute_log_lik_matrix(prep, object))
 }
+
+# Seamless loo/waic/pp_check integration with bayesplot ecosystem
 ```
 
 ### Phase 4: Testing & Launch (Weeks 13-16)
 
-#### Week 13-14: Comprehensive Testing
-- **Formula complexity matrix**: Test all combinations of linear/nonlinear observation and trend formulas
-  - Linear obs + Linear trend: Standard mvgam functionality
-  - Linear obs + Nonlinear trend: `bf(~ gamma * exp(delta * time) + RW(), gamma ~ 1, delta ~ 1, nl = TRUE)`
-  - Nonlinear obs + Linear trend: `bf(y ~ alpha * exp(beta * x), alpha ~ s(x), beta ~ 1, nl = TRUE)` + standard trends
-  - Nonlinear obs + Nonlinear trend: Complex bf() in both formulas
-- **All mvgam features preserved**: RW, AR, VAR, GP, CAR, factor models, three-level JSDGAM
-- **Missing data + complexity**: obs_ind tracking with bf() formulas
-- **Model evaluation integration**: log_lik, loo, waic, pp_check methods work seamlessly with brms/bayesplot ecosystem
-- **Performance benchmarking** across complexity combinations
+#### Week 13-14: Comprehensive Testing Matrix
 
-#### Week 15: Performance Optimization
-Object footprint reduction, memory usage optimization, final performance validation.
+**Stan Code Injection Safety**:
+```r
+test_that("Stan modification preserves brms parameter constraints", {
+  # Parameter transformation preservation
+  fit_constrained <- mvgam(mvbf(y ~ x, family = Gamma(link = "log")), 
+                          trend_formula = ~ AR(p = 1), data = data)
+  draws <- as_draws_df(fit_constrained)
+  expect_true(all(draws$shape > 0))
+  
+  # Nonlinear parameter constraints preserved
+  fit_nl <- mvgam(bf(y ~ a * exp(-b * x), a ~ 1, b ~ 1, nl = TRUE),
+                  trend_formula = ~ RW(), data = nldata)
+  expect_parameter_bounds_preserved(fit_nl)
+})
+```
 
-#### Week 16: Documentation & Release
-Complete documentation updates, migration guide from v1.x to v2.0, community feedback integration.
+**Multivariate Missing Data**:
+```r
+test_that("complex missing data patterns work correctly", {
+  mvdata_missing$y1[c(5:10, 25:30)] <- NA  # Block missing
+  mvdata_missing$y2[c(1:3, 15:20)] <- NA   # Different pattern
+  
+  fit_missing <- mvgam(mvbf(y1 ~ x1, y2 ~ x2),
+                      trend_formula = list(y1 = ~ AR(p = 1), y2 = ~ RW()),
+                      data = mvdata_missing)
+  
+  # Trends evolve over ALL time points, likelihood only for non-missing
+  expect_equal(get_trend_length(fit_missing), nrow(mvdata_missing))
+  expect_different_obs_indices(fit_missing, "y1", "y2")
+})
+```
 
-## Key Benefits
+**Cross-Response Correlation Preservation**:
+```r
+test_that("complex correlation structures preserved", {
+  fit_multiple_corr <- mvgam(
+    mvbf(y1 ~ x, y2 ~ x, y3 ~ x) + set_rescor(TRUE) +
+      autocor(ar(p = 1, formula = ~ time | group)),
+    trend_formula = list(y1 = ~ AR(p = 1), y2 = ~ RW(cor = TRUE), y3 = ~ VAR(p = 1)),
+    data = complex_corr_data
+  )
+  
+  # Should have: brms residual + observation AR + mvgam State-Space correlations
+  expect_correlation_separation(fit_multiple_corr)
+})
+```
 
-### Performance Targets
-- **brms Setup**: 10-50x faster initialization
-- **JSDGAM Prediction**: 10-100x speedup (Rcpp vs R loops)
-- **Memory Usage**: 30-50% reduction
-- **Stan Efficiency**: No generated_quantities predictions, on-demand computation
+**Performance Validation**:
+- Setup speed: 10x improvement target
+- JSDGAM prediction: 100x speedup with Rcpp
+- Memory usage: 30% reduction target
+- Formula complexity matrix: all combinations working
 
-### User Experience
-- **Formula-centric**: Everything in formulas
-- **Single learning curve**: Only brms prior syntax needed
-- **Full compatibility**: All current brms functionality preserved
-- **Better errors**: Smart validation with suggestions
+#### Week 15: Performance Optimization & Object Footprint
+- Memory usage optimization and object compression
+- Final performance validation against targets
+- Automated benchmarking integration
 
-### Architecture
-- **Modular**: Clear observation/State-Space separation
-- **Extensible**: Easy new trend types via dispatcher
-- **Future-proof**: Leverages brms development
-- **Maintainable**: Single source of truth
+#### Week 16: Documentation & Release Preparation
+- Updated function documentation with roxygen2
+- Key vignettes: multivariate models, autocorrelation integration, migration guide
+- Performance benchmarks documentation
+- Community feedback integration
+
+## Key Innovation Points
+
+### 1. **Autocorrelation Intelligence**
+First package to properly distinguish observation-level residual correlation from State-Space dynamics, enabling sophisticated multi-level temporal structures.
+
+### 2. **Multivariate State-Space**
+Native support for response-specific trends while preserving brms cross-response correlations - unprecedented capability in the ecosystem.
+
+### 3. **Stan Extension Pattern**
+Using brms `stanvars` mechanism for State-Space injection - provides scalable approach for other time series extensions.
+
+### 4. **Method System Integration**
+Dual brmsfit-like objects enabling seamless bayesplot/loo/waic compatibility while maintaining mvgam-specific functionality.
 
 ## Risk Mitigation
 
-### Primary Risks & Solutions
-1. **Stan Integration Complexity** → Extensive testing, fallback patterns
-2. **Performance Regression** → Profile bottlenecks, parallel implementation
-3. **Missing Data Handling** → Preserve proven mvgam approach with obs_ind tracking
-4. **brms API Changes** → Version detection, compatibility testing when 3.0 approaches
-5. **Nonlinear Model Integration** → Complex Stan code modification, specialized testing for `bf(nl = TRUE)` models
-6. **Backend Maintenance** → Periodic synchronization with brms backend updates, maintain feature parity
+### Primary Implementation Risks & Solutions
 
-### Contingency Plans
-- Maintain parallel old/new implementations during transition
-- **Backend synchronization**: Establish process for updating mvgam backends when brms internals evolve
-- Comprehensive test suite covering edge cases
-- Performance monitoring and automated benchmarks
+1. **Stan Code Injection Complexity**
+   - **Risk**: Breaking brms parameter transformations in complex models
+   - **Mitigation**: AST-based modification with extensive validation, fallback to limited modification approach
 
-## Success Metrics
+2. **Multivariate Missing Data Complexity**
+   - **Risk**: Cross-response missing patterns breaking trend evolution
+   - **Mitigation**: Preserve proven `obs_ind` tracking approach, comprehensive testing matrix
 
-- [ ] All existing functionality preserved
-- [ ] Performance targets achieved  
-- [ ] Memory usage reduced by 30-50%
-- [ ] Simplified user interface working
-- [ ] Full brms compatibility maintained
+3. **Backend Maintenance Burden**
+   - **Risk**: brms internal changes breaking mvgam compatibility
+   - **Mitigation**: Automated monitoring system, version compatibility matrix, graceful degradation
+
+4. **Performance Regression**
+   - **Risk**: New architecture slower than current mvgam
+   - **Mitigation**: Automated benchmarking throughout development, Rcpp optimization, profiling
+
+### Fallback Strategies
+- **Limited Stan modification**: If AST parsing proves too complex, target simple linear predictors first
+- **Legacy method fallback**: Graceful degradation to v1.x methods for brms incompatibilities
+- **Parallel implementation**: Maintain old/new implementations during transition
+
+## Success Criteria
+
+### Performance Targets
+- [ ] brms setup: 10-50x faster initialization
+- [ ] JSDGAM prediction: 10-100x speedup (Rcpp vs R loops)
+- [ ] Memory usage: 30-50% reduction
+- [ ] Multivariate scaling: Linear with number of responses
+
+### Functionality Preservation & Enhancement
+- [ ] All existing mvgam features preserved
+- [ ] Full brms compatibility maintained (all formula types, families, priors)
+- [ ] Seamless bayesplot/loo/waic integration
 - [ ] >90% test coverage achieved
-- [ ] **Model evaluation methods** (log_lik, loo, waic, pp_check) work seamlessly with brms/bayesplot ecosystem
+- [ ] Multivariate models with response-specific trends working
+- [ ] Cross-response correlations preserved in multivariate State-Space models
+- [ ] Intelligent autocorrelation validation preventing conflicts
 
-## Migration Strategy
+## Dependencies & Migration
 
-**Primary Development (Weeks 1-16)**: Target brms 2.x stable API  
-**Future Enhancement**: Add brms 3.0 compatibility when released  
-**Quality Assurance**: All PRs require maintainer review, unit tests with >90% coverage
+**Core Dependencies**: brms (≥2.19.0), Stan (≥2.30.0), Rcpp, checkmate, insight, bayesplot
 
-**Dependencies**: brms (≥2.19.0), Stan (≥2.30.0), Rcpp, checkmate, insight
+**Quality Assurance**: All PRs require maintainer review, comprehensive unit tests, automated performance benchmarking
+
+**Migration Strategy**: 
+- Target brms 2.x stable API as primary
+- Add brms 3.0 compatibility when released
+- Maintain backward compatibility where possible
+- Clear migration guide for breaking changes
 
 ---
 
 **Next Step**: Begin Week 1 - Trend Type Dispatcher System  
-**Key Innovation**: Leverage brms linear predictor generation + mvgam State-Space expertise
+**Critical Success Factor**: Stan code modification that preserves all brms functionality while seamlessly adding State-Space dynamics  
+**Key Innovation**: Leverage brms linear predictor generation + mvgam State-Space expertise + native multivariate support
