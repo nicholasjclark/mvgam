@@ -102,9 +102,70 @@ mvgam <- function(formula, trend_formula = NULL, ...) {
 }
 ```
 
-### Phase 2: Stan Generation (Weeks 5-8)
+**Critical Missing Data Handling**: State-Space models require latent states to evolve over ALL timesteps, including when observations are missing. Implementation must ensure:
+- brms doesn't drop missing observations from likelihood computation
+- Latent states continue evolving: `trend[t] ~ normal(trend[t-1], sigma)` for all t
+- brms produces `mu` (observation linear predictor) and `mu_trend` (trend linear predictor)
+- Final integration: `mu_combined = mu + mu_trend` preserving missing data patterns
 
-#### Week 5-6: Two-Stage Stan Assembly
+### Stan Code Generation Efficiency Guidelines
+
+**Bob Carpenter's Optimization Principles**:
+
+#### 1. Vectorization Over Loops
+Stan performs much better with vectorized operations than nested loops. For trend components:
+```stan
+// Efficient: Vectorized State-Space dynamics
+target += normal_lpdf(trend[2:T] | trend[1:(T-1)] + X_trend[2:T] * b_trend, sigma_trend);
+
+// Inefficient: Loop-based approach
+for (t in 2:T) {
+  target += normal_lpdf(trend[t] | trend[t-1] + X_trend[t] * b_trend, sigma_trend);
+}
+```
+
+#### 2. Matrix Operations for Linear Predictors
+Matrix operations are "much much faster than indexing". Apply to trend integration:
+```stan
+// Efficient: Matrix-based trend addition
+mu += to_vector(trend[time, series]);
+
+// Inefficient: Index-based approach  
+for (n in 1:N) {
+  mu[n] += trend[time[n], series[n]];
+}
+```
+
+#### 3. State-Space Vectorization Patterns
+For autoregressive processes, use slice notation for vectorized priors:
+```stan
+// AR(1) vectorized correctly
+trend[1] ~ normal(X_trend[1] * b_trend, sigma_trend);
+trend[2:T] ~ normal(trend[1:(T-1)] + X_trend[2:T] * b_trend, sigma_trend);
+```
+
+#### 4. Avoid Redundant Computations
+Factor out terms to avoid redundant computations in AD stack:
+```stan
+// Efficient: Pre-compute linear predictor
+vector[T] trend_mu = X_trend * b_trend;
+trend[2:T] ~ normal(trend[1:(T-1)] + trend_mu[2:T], sigma_trend);
+
+// Inefficient: Recompute X_trend * b_trend each time
+trend[2:T] ~ normal(trend[1:(T-1)] + X_trend[2:T] * b_trend, sigma_trend);
+```
+
+#### 5. Use target += for Complex Models
+For complex State-Space models, target += syntax provides more control and is required for certain post-processing:
+```stan
+// Complex trend dynamics with embedded predictors
+target += normal_lpdf(trend_raw[1] | X_trend[1] * b_trend, sigma_trend);
+for (t in 2:T) {
+  target += normal_lpdf(trend_raw[t] | trend_raw[t-1] + X_trend[t] * b_trend, sigma_trend);
+}
+```
+
+### Week 5-6: Two-Stage Stan Assembly
 **Stage 1**: Extract trend stanvars from trend_setup and generate base model
 ```r
 # Extract Stan code blocks from trend brms setup
@@ -115,20 +176,38 @@ trend_stanvars <- extract_trend_stanvars_from_setup(trend_setup, trend_spec)
 base_stancode <- brms::stancode(obs_formula, data, stanvars = trend_stanvars)
 ```
 
-**Stage 2**: Modify observation linear predictor
+**Stage 2**: Modify observation linear predictor with missing data preservation
 ```r
 final_stancode <- inject_trend_into_linear_predictor(base_stancode, trend_spec)
 ```
 
 **Trend Stanvar Extraction**: Parse trend_setup$stancode to extract:
 - Parameter declarations (`vector<lower=0>[n_series] sigma_trend;`)
-- Transformed parameters (`matrix[T,n_series] trend;`)  
-- Model dynamics (`trend[t] ~ normal(trend[t-1], sigma_trend);`)
+- Transformed parameters (`matrix[T,n_series] mu_trend;`) - brms generates this
+- Model dynamics (`trend[t] ~ normal(trend[t-1], sigma_trend);`) - ALL timesteps
 - Generated quantities for predictions
+
+**Missing Data Architecture**: Critical adaptation from current mvgam approach:
+- **Current pattern**: Replace NAs with imputed values, track via `obs_ind` and use `flat_ys` for likelihood
+- **brms handles**: `mu` (observation linear predictor) and `mu_trend` (trend linear predictor)
+- **Key requirement**: Preserve mvgam's missing data tracking while letting brms generate linear predictors
+- **Integration pattern**: `mu_final = mu + mu_trend` with missing data awareness
+
+**Missing Data Strategy**:
+```r
+# Adapt current mvgam approach for brms compatibility
+prepare_missing_data_for_brms <- function(data, formula, trend_formula) {
+  # 1. Replace NAs with imputed values (following current mvgam pattern)
+  # 2. Create obs_ind tracking which observations are non-missing
+  # 3. Ensure brms can compute mu/mu_trend for full time grid
+  # 4. Pass obs_ind to Stan for likelihood computation on non-missing only
+  # 5. Preserve State-Space evolution over ALL timesteps
+}
+```
 
 **Benefits**: Uses brms's designed extension mechanism, targeted modification only.
 
-#### Week 7: Dynamic Prior System & Stanvar Generation
+#### Week 7: Dynamic Prior System & Missing Data Handling
 ```r
 # Dual prior arguments with systematic _trend renaming
 rename_trend_priors_dynamic <- function(trend_priors) {
@@ -154,6 +233,31 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_spec) {
   
   return(stanvars)
 }
+
+# Handle missing data following current mvgam pattern
+prepare_missing_data_for_brms <- function(data, formula, trend_formula) {
+  # 1. Replace NAs with imputed values (preserve current mvgam approach)
+  # 2. Create obs_ind tracking non-missing observations  
+  # 3. Ensure brms computes mu/mu_trend for full time grid
+  # 4. Pass obs_ind to Stan for selective likelihood computation
+  # 5. Preserve State-Space evolution over ALL timesteps
+}
+```
+
+**Stan Integration Pattern Following Current mvgam**:
+```stan
+// brms produces mu and mu_trend for full time grid
+mu_combined = mu + mu_trend;
+
+// Likelihood only for non-missing observations (current mvgam pattern)
+{
+  vector[n_nonmissing] flat_trends;
+  flat_trends = to_vector(mu_combined)[obs_ind];  // Use obs_ind tracking
+  flat_ys ~ family_distribution(flat_trends, ...);
+}
+
+// But trends evolve over ALL timesteps
+trend[2:T] ~ normal(trend[1:(T-1)], sigma_trend);
 ```
 
 #### Week 8: Higher-Order Models & data2 Integration
