@@ -101,9 +101,9 @@ mvgam(
 #### Week 3: brms Setup Optimization
 Benchmark and implement fastest brms setup method (`backend = "mock"` vs `chains = 0`).
 
-#### Week 4: Single-Fit Architecture
+#### Week 4: Single-Fit Architecture & Backend Strategy
 ```r
-mvgam <- function(formula, trend_formula = NULL, ...) {
+mvgam <- function(formula, trend_formula = NULL, backend = NULL, ...) {
   # 1. Setup obs/trend models (no fitting)
   obs_setup <- setup_brms_lightweight(formula, data, ...)
   trend_setup <- setup_brms_lightweight(trend_spec$base_formula, ...)
@@ -114,16 +114,46 @@ mvgam <- function(formula, trend_formula = NULL, ...) {
   # 3. Generate combined Stan code using trend stanvars
   combined_stancode <- generate_combined_stancode(obs_setup, trend_stanvars)
   
-  # 4. Fit single model & create dual objects
-  combined_fit <- fit_combined_stan_model(combined_stancode)
+  # 4. Use enhanced mvgam backend system (adapted from brms)
+  combined_fit <- fit_mvgam_model(combined_stancode, combined_standata, 
+                                  backend = backend, silent = silent, ...)
   return(create_mvgam_from_combined_fit(combined_fit, obs_setup, trend_setup))
+}
+
+# Current approach: Enhance existing mvgam backend system
+fit_mvgam_model <- function(stancode, standata, backend = NULL, algorithm = "sampling",
+                           iter = 2000, warmup = 1000, chains = 4, cores = 1,
+                           threads = NULL, silent = 1, control = list(), ...) {
+  
+  # Use existing mvgam backend approach (adapted from brms internals)
+  # This preserves important features like:
+  # - Message silencing (silent parameter)
+  # - Progress control and user feedback
+  # - Error handling and diagnostics
+  # - Threading and parallelization options
+  # - Algorithm flexibility (sampling, vb, fixed_param)
+  
+  backend <- backend %||% getOption("brms.backend", "rstan")
+  
+  if (backend == "rstan") {
+    fitted_model <- mvgam_fit_rstan(stancode, standata, algorithm, iter, warmup,
+                                   chains, cores, silent, control, ...)
+  } else if (backend == "cmdstanr") {
+    fitted_model <- mvgam_fit_cmdstanr(stancode, standata, algorithm, iter, warmup,
+                                      chains, cores, threads, silent, control, ...)
+  }
+  
+  return(fitted_model)
 }
 ```
 
-**Critical Missing Data Handling**: Preserve mvgam's proven approach:
-- Replace NAs with imputed values, track via `obs_ind` for selective likelihood computation
-- brms generates `mu`/`mu_trend` for full time grid, likelihood computed only for non-missing
-- Latent states evolve over ALL timesteps: `trend[t] ~ normal(trend[t-1], sigma)`
+**Backend Strategy**: Maintain and enhance current mvgam approach:
+- **Keep copied brms internals**: Provides essential user experience features
+- **Message silencing**: `silent` parameter for clean output control
+- **Progress feedback**: User-friendly progress messages and warnings
+- **Error handling**: Robust diagnostics and helpful error messages  
+- **Full feature parity**: All brms backend capabilities preserved
+- **Update synchronization**: Periodically sync with latest brms backend improvements
 
 ### Phase 2: Stan Generation (Weeks 5-8)
 
@@ -254,7 +284,93 @@ forecast.mvgam <- function(object, h = NULL, ...) {
 ```
 
 #### Week 12: Method System Integration
-Full brms method support using dual brmsfit-like objects: `summary()`, `plot()`, `conditional_effects()`, etc.
+```r
+# Full brms method support using dual brmsfit-like objects
+summary.mvgam <- function(object, ...) {
+  # Use dual objects for comprehensive summaries
+}
+
+# Critical: log_lik integration following brms patterns
+log_lik.mvgam <- function(object, newdata = NULL, re_formula = NULL, 
+                          resp = NULL, ndraws = NULL, draw_ids = NULL,
+                          pointwise = FALSE, combine = TRUE, cores = NULL, ...) {
+  # Step 1: Use brms::prepare_predictions() for base setup
+  prep <- brms::prepare_predictions(object$obs_fit, newdata = newdata, 
+                                   re_formula = re_formula, resp = resp,
+                                   ndraws = ndraws, draw_ids = draw_ids, ...)
+  
+  # Step 2: Add trend effects to linear predictor
+  prep <- add_trend_effects_to_prep(object, prep)
+  
+  # Step 3: Compute log-likelihood using family-specific functions
+  if (pointwise) {
+    # Return function for loo/waic compatibility
+    return(create_pointwise_log_lik_function(prep, object))
+  } else {
+    # Return S x N matrix of log-likelihood draws
+    return(compute_log_lik_matrix(prep, object, combine, cores))
+  }
+}
+
+# Seamless loo integration 
+loo.mvgam <- function(x, ..., compare = TRUE, resp = NULL, pointwise = FALSE,
+                      moment_match = FALSE, reloo = FALSE, save_psis = FALSE) {
+  # Leverage brms loo method with mvgam log_lik
+  log_lik_matrix <- log_lik(x, pointwise = pointwise, ...)
+  
+  if (pointwise) {
+    # Use function method for efficiency
+    return(loo::loo(log_lik_matrix, ...))
+  } else {
+    # Use matrix method 
+    return(loo::loo(log_lik_matrix, save_psis = save_psis, ...))
+  }
+}
+
+# Additional model evaluation methods
+waic.mvgam <- function(x, ...) {
+  log_lik_matrix <- log_lik(x, ...)
+  return(loo::waic(log_lik_matrix, ...))
+}
+
+# Posterior predictive checks using bayesplot
+pp_check.mvgam <- function(object, type = "dens_overlay", ndraws = NULL,
+                           prefix = c("ppc", "ppd"), group = NULL, x = NULL,
+                           newdata = NULL, resp = NULL, draw_ids = NULL, ...) {
+  # Validate plot type (leverages bayesplot error messages for invalid types)
+  valid_types <- bayesplot::available_ppc(pattern = "")
+  type <- match.arg(type, valid_types)
+  prefix <- match.arg(prefix)
+  
+  # Get observed data from fitted object
+  y <- get_y(object, resp = resp)
+  
+  # Generate posterior predictive draws using mvgam prediction methods
+  yrep <- posterior_predict(object, newdata = newdata, resp = resp, 
+                           ndraws = ndraws, draw_ids = draw_ids, ...)
+  
+  # Get bayesplot ppc function
+  ppc_fun <- get(paste0(prefix, "_", type), asNamespace("bayesplot"))
+  
+  # Handle grouped plots
+  if ("group" %in% names(formals(ppc_fun))) {
+    if (is.null(group)) {
+      stop2("Argument 'group' is required for ppc type '", type, "'.")
+    }
+    group_var <- get_data(object)[[group]]
+    return(ppc_fun(y, yrep, group = group_var, ...))
+  }
+  
+  # Handle plots with x variable
+  if ("x" %in% names(formals(ppc_fun)) && !is.null(x)) {
+    x_var <- get_data(object)[[x]]
+    return(ppc_fun(y, yrep, x = x_var, ...))
+  }
+  
+  # Standard ppc plot
+  return(ppc_fun(y, yrep, ...))
+}
+```
 
 ### Phase 4: Testing & Launch (Weeks 13-16)
 
@@ -266,6 +382,7 @@ Full brms method support using dual brmsfit-like objects: `summary()`, `plot()`,
   - Nonlinear obs + Nonlinear trend: Complex bf() in both formulas
 - **All mvgam features preserved**: RW, AR, VAR, GP, CAR, factor models, three-level JSDGAM
 - **Missing data + complexity**: obs_ind tracking with bf() formulas
+- **Model evaluation integration**: log_lik, loo, waic, pp_check methods work seamlessly with brms/bayesplot ecosystem
 - **Performance benchmarking** across complexity combinations
 
 #### Week 15: Performance Optimization
@@ -302,9 +419,11 @@ Complete documentation updates, migration guide from v1.x to v2.0, community fee
 3. **Missing Data Handling** → Preserve proven mvgam approach with obs_ind tracking
 4. **brms API Changes** → Version detection, compatibility testing when 3.0 approaches
 5. **Nonlinear Model Integration** → Complex Stan code modification, specialized testing for `bf(nl = TRUE)` models
+6. **Backend Maintenance** → Periodic synchronization with brms backend updates, maintain feature parity
 
 ### Contingency Plans
 - Maintain parallel old/new implementations during transition
+- **Backend synchronization**: Establish process for updating mvgam backends when brms internals evolve
 - Comprehensive test suite covering edge cases
 - Performance monitoring and automated benchmarks
 
@@ -316,6 +435,7 @@ Complete documentation updates, migration guide from v1.x to v2.0, community fee
 - [ ] Simplified user interface working
 - [ ] Full brms compatibility maintained
 - [ ] >90% test coverage achieved
+- [ ] **Model evaluation methods** (log_lik, loo, waic, pp_check) work seamlessly with brms/bayesplot ecosystem
 
 ## Migration Strategy
 
