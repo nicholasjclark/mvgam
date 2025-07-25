@@ -22,6 +22,34 @@ Transform mvgam from mgcv-based standalone package into specialized brms extensi
 # Standard State-Space
 mvgam(y ~ s(x), trend_formula = ~ RW(cor = TRUE), data = data)
 
+# Distributional models: trends ONLY apply to main response parameter
+mvgam(
+  bf(y ~ s(x), sigma ~ s(z)),           # Distributional regression
+  trend_formula = ~ AR(p = 1),          # Applied ONLY to mu (main parameter)
+  family = gaussian(),
+  data = data
+)
+
+# NOT ALLOWED: Trends in non-main distributional parameters
+# mvgam(
+#   bf(y ~ s(x), sigma ~ s(z)),
+#   trend_formula = list(mu = ~ AR(p = 1), sigma = ~ RW()),  # ❌ FORBIDDEN
+#   data = data
+# )
+
+# Response helpers with State-Space trends (applied to main parameter only)
+mvgam(
+  bf(y | mi() ~ s(x), sigma ~ s(z)),    # Missing value imputation
+  trend_formula = ~ AR(p = 1),          # Applied to mu only
+  data = data
+)
+
+mvgam(
+  bf(y | weights(w) ~ s(x)),            # Weighted observations
+  trend_formula = ~ RW(cor = TRUE),     # Applied to main parameter
+  data = data
+)
+
 # Multivariate with response-specific trends
 mvgam(
   mvbf(count ~ temp, biomass ~ precip),
@@ -96,9 +124,12 @@ trend[2:T] ~ normal(trend[1:(T-1)], sigma_trend);
 **Stan Modification Requirements**:
 - Uses brms's designed extension mechanism (`stanvars`)
 - Preserves parameter constraints and transformations
+- Handles distributional regression (trends apply ONLY to main response parameter)
 - Handles nonlinear formula complexity (`bf(nl = TRUE)`)
+- Supports response helpers (`mi()`, `weights()`, `cens()`, `trunc()`, `trials()`, etc.)
 - Maintains brms correlation structures
 - Supports multivariate response-specific trends
+- **Restriction**: No latent state trends for distributional parameters (sigma, nu, tau)
 
 ### 4. **Validation Framework**
 
@@ -124,6 +155,23 @@ validate_autocor_usage <- function(formula, trend_formula) {
     ))
   }
 }
+
+validate_distributional_trends <- function(formula, trend_formula) {
+  # Check if formula has distributional components
+  if (is_distributional(formula) && is.list(trend_formula)) {
+    param_names <- names(trend_formula)
+    non_main_params <- setdiff(param_names, c("mu", get_main_parameter(formula)))
+    
+    if (length(non_main_params) > 0) {
+      stop(insight::format_error(
+        "State-Space trends not allowed for distributional parameters.",
+        "x" = paste("Found trends for:", paste(non_main_params, collapse = ", ")),
+        "i" = "trends can only be applied to the main response parameter",
+        "i" = "Use brms smooths for distributional parameters: sigma ~ s(time)"
+      ))
+    }
+  }
+}
 ```
 
 **Multivariate Validation**:
@@ -131,6 +179,8 @@ validate_autocor_usage <- function(formula, trend_formula) {
 - Family compatibility with trend types  
 - Missing data consistency across responses
 - Cross-response correlation preservation
+- **Distributional model restriction**: Trends only allowed for main response parameter
+- **Response helper validation**: Compatibility with `mi()`, `weights()`, `cens()`, `trunc()`, `trials()`, etc.
 
 ## Multivariate Model Integration
 
@@ -178,6 +228,10 @@ parse_multivariate_trends <- function(formula, trend_formula) {
       names(trend_formula) <- response_names
     }
   }
+  
+  # Validate distributional models: trends only for main parameter
+  validate_distributional_trends(formula, trend_formula)
+  
   return(list(responses = response_names, trends = trend_formula))
 }
 ```
@@ -348,6 +402,64 @@ test_that("Stan modification preserves brms parameter constraints", {
                   trend_formula = ~ RW(), data = nldata)
   expect_parameter_bounds_preserved(fit_nl)
 })
+
+test_that("distributional models: trends only for main parameter", {
+  # Valid: trend only for main parameter
+  fit_distr_valid <- mvgam(
+    bf(y ~ s(x), sigma ~ s(z)),
+    trend_formula = ~ AR(p = 1),  # Applied to mu only
+    family = gaussian(),
+    data = data
+  )
+  expect_no_error(fit_distr_valid)
+  
+  # Invalid: attempting trends for distributional parameters
+  expect_error(
+    mvgam(
+      bf(y ~ s(x), sigma ~ s(z)),
+      trend_formula = list(mu = ~ AR(p = 1), sigma = ~ RW()),  # sigma trend forbidden
+      family = gaussian(),
+      data = data
+    ),
+    "State-Space trends not allowed for distributional parameters"
+  )
+  
+  # Complex distributional families: trends only for main parameter
+  fit_beta <- mvgam(
+    bf(prop ~ s(x), phi ~ s(z)),
+    trend_formula = ~ AR(p = 1),  # Applied to mu (main) only
+    family = Beta(),
+    data = beta_data
+  )
+  expect_distributional_constraints_preserved(fit_beta)
+  expect_no_sigma_trends(fit_beta)
+})
+
+test_that("response helpers work with State-Space trends", {
+  # Missing value imputation with trends
+  fit_mi <- mvgam(
+    bf(y | mi() ~ s(x)),
+    trend_formula = ~ AR(p = 1),
+    data = data_with_missing
+  )
+  expect_missing_imputation_correct(fit_mi)
+  
+  # Weighted observations
+  fit_weights <- mvgam(
+    bf(y | weights(w) ~ s(x)),
+    trend_formula = ~ RW(),
+    data = weighted_data
+  )
+  expect_weights_handled_correctly(fit_weights)
+  
+  # Censored/truncated data
+  fit_cens <- mvgam(
+    bf(y | cens(censor) ~ s(x)),
+    trend_formula = ~ AR(p = 1),
+    data = censored_data
+  )
+  expect_censoring_correct(fit_cens)
+})
 ```
 
 **Multivariate Missing Data**:
@@ -385,8 +497,11 @@ test_that("complex correlation structures preserved", {
 - Setup speed: 10x improvement target
 - JSDGAM prediction: 100x speedup with Rcpp
 - Memory usage: 30% reduction target
-- Formula complexity matrix: all combinations working
-
+- **Formula complexity matrix**: all combinations working
+  - Linear/smooth/nonlinear × RW/AR/VAR/GP trends
+  - Distributional models: mu/sigma/nu/tau parameter trends
+  - Response helpers: mi()/weights()/cens()/trunc()/trials() compatibility
+  - Multivariate: shared vs response-specific trends
 #### Week 15: Performance Optimization & Object Footprint
 - Memory usage optimization and object compression
 - Final performance validation against targets
@@ -451,7 +566,12 @@ Dual brmsfit-like objects enabling seamless brms ecosystem compatibility:
 
 ### Functionality Preservation & Enhancement
 - [ ] All existing mvgam features preserved
-- [ ] Full brms compatibility maintained (all formula types, families, priors)
+- [ ] Full brms compatibility maintained:
+  - [ ] All formula types: linear/smooth/nonlinear/multivariate
+  - [ ] All families and link functions
+  - [ ] Distributional regression: main parameter trends only (others via brms smooths)
+  - [ ] Response helpers: mi()/weights()/cens()/trunc()/trials()/rate() etc.
+  - [ ] Prior specification syntax
 - [ ] Seamless brms ecosystem integration:
   - [ ] Model evaluation: loo/waic/pp_check with bayesplot
   - [ ] Diagnostics: rhat/neff_ratio/mcmc_plot/nuts_params via brms methods
