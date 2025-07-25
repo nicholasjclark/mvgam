@@ -42,8 +42,8 @@ Transform mvgam from mgcv-based standalone package into specialized brms extensi
 - Factor model identifiability constraints
 - Specialized data2 processing for factor loadings
 - **Three-level hierarchy** for `occ()` and `nmix()` families:
-  - Level 1: Environmental factors
-  - Level 2: Species latent abundance/occupancy which loads on Level 1  
+  - Level 1: Environmental factors → Species latent abundance/occupancy
+  - Level 2: Species trends/dynamics  
   - Level 3: Observation process (detection/counting)
 
 ### Code Standards
@@ -161,8 +161,8 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_spec) {
 - Factor loading constraints via data2
 - Custom families: `nmix()`, `tweedie()`, `occ()` with three-level hierarchical structure
 - **Three-Level JSDGAM**: For `occ()`/`nmix()` families only, supporting:
-  - Environmental factors 
-  - Species factor-mediated states → Species latent abundance/occupancy  
+  - Environmental factors → Species latent abundance/occupancy
+  - Species factor-mediated trends  
   - Observation process (detection/counting)
 
 **JSDGAM Function**: Closely mimics `mvgam()` architecture but with specialized validation:
@@ -197,9 +197,10 @@ jsdgam <- function(formula, data, data2 = NULL, lv = 0, family = gaussian(),
 }
 ```
 
-**Two-Level Prediction Strategy**: 
+**Three-Level Prediction Strategy**: 
 - **Level 1 predictions**: `type = 'latent_abundance'` or `type = 'latent_occupancy'`
-- **Level 2 predictions**: `type = 'response'` (observed detections/counts)
+- **Level 2 predictions**: `type = 'trend'` (factor-mediated trends)
+- **Level 3 predictions**: `type = 'response'` (observed detections/counts)
 
 ### Phase 3: Optimization (Weeks 9-12)
 
@@ -236,6 +237,9 @@ posterior_predict.jsdgam <- function(object, newdata = NULL, type = "response", 
   if (object$family$family %in% c("occ", "nmix") && type %in% c("latent_abundance", "latent_occupancy")) {
     # Level 1: Environmental factors → Species abundance/occupancy
     return(predict_latent_abundance_jsdgam(object, newdata, type, ...))
+  } else if (type == "trend") {
+    # Level 2: Factor-mediated species trends
+    return(predict_factor_trends_jsdgam(object, newdata, ...))
   } else {
     # Level 3: Standard observation process (use mvgam method)
     NextMethod()
@@ -283,7 +287,56 @@ Full brms method support using dual brmsfit-like objects.
 - **Future-proof**: Leverages brms development
 - **Maintainable**: Single source of truth
 
-## Risk Mitigation
+## Risk Mitigation & brms 3.0 Compatibility
+
+### brms 3.0 Breaking Changes Impact
+
+**API Changes**:
+- `make_stancode`/`make_standata` transformed into generic S3 methods with aliases for backward compatibility
+- `get_prior` becomes alias of new generic `default_prior` method
+- brmsfit object cleanup: removal of `family`, `autocor`, `ranef` elements; data restructuring
+
+**Stan Code Generation Changes**:
+- No automatic Stan code canonicalization with cmdstanr backend
+- Switch to new Stan array syntax (requires Stan ≥2.26)
+- Parameter class name improvements affecting our `_trend` renaming strategy
+
+**Mitigation Strategies**:
+1. **Generic Method Compatibility**: Use new S3 methods directly rather than deprecated functions
+```r
+# Future-proof approach
+stancode_obs <- brms::stancode.default(obs_formula, data, ...)
+stancode_trend <- brms::stancode.default(trend_formula, trend_data, ...)
+```
+
+2. **Object Structure Monitoring**: Implement compatibility layer for brmsfit object changes
+```r
+# Defensive extraction accounting for 3.0 changes
+extract_brmsfit_elements <- function(brms_object) {
+  # Handle removal of family/autocor from brmsfit in 3.0
+  if ("family" %in% names(brms_object)) {
+    family <- brms_object$family  # Pre-3.0
+  } else {
+    family <- brms_object$formula$family  # Post-3.0
+  }
+  return(list(family = family, ...))
+}
+```
+
+3. **Version-Specific Code Paths**: Implement brms version detection
+```r
+check_brms_version_compatibility <- function() {
+  brms_version <- packageVersion("brms")
+  if (brms_version >= "3.0.0") {
+    # Use 3.0+ compatible methods
+    use_new_api <- TRUE
+  } else {
+    # Use legacy compatibility
+    use_new_api <- FALSE
+  }
+  return(use_new_api)
+}
+```
 
 ### Primary Risks & Solutions
 1. **Stan Integration Complexity** → Extensive testing, fallback patterns
@@ -331,4 +384,10 @@ Full brms method support using dual brmsfit-like objects.
 ---
 
 **Next Step**: Begin Week 1 - Trend Type Dispatcher System  
-**Dependencies**: brms (≥2.19.0), Stan (≥2.30.0), Rcpp, checkmate, insight
+**Dependencies**: brms (≥2.19.0, <3.0.0 OR ≥3.0.0), Stan (≥2.30.0), Rcpp, checkmate, insight
+
+### brms 3.0 Transition Plan
+
+**Phase 1 (Weeks 1-8)**: Build with brms 2.x compatibility  
+**Phase 2 (Weeks 9-12)**: Add brms 3.0 compatibility layer  
+**Phase 3 (Weeks 13-16)**: Test across both versions, implement version detection
