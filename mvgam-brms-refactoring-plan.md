@@ -1,6 +1,6 @@
 # mvgam → brms Extension Refactoring Plan
 
-**Version**: 1.6 (Multiple Imputation Integration)  
+**Version**: 1.7  
 **Date**: 2025-01-25  
 **Status**: Ready for Implementation
 
@@ -430,9 +430,9 @@ mvgam_multiple <- function(formula, trend_formula, data_list, backend, file_refi
 - Extract trend components from brms-generated Stan code
 - Apply systematic `_trend` suffix handling
 - Handle multivariate response-specific parameters
-- **Hurdle model validation**: Ensure trends only applied to main (`mu`) parameter, not hurdle (`hu`) parameter
-- **Parameter name recognition**: Properly handle `b_hu_*` vs `b_*` parameter naming conventions
-- **Stan code integration**: Ensure hurdle and trend processes don't interfere
+- Hurdle model validation: Ensure trends only applied to main (`mu`) parameter, not hurdle (`hu`) parameter
+- Parameter name recognition: Properly handle `b_hu_*` vs `b_*` parameter naming conventions
+- Stan code integration: Ensure hurdle and trend processes don't interfere
 
 #### Week 8: Higher-Order Models & Three-Level JSDGAM
 - Extended AR/VAR: `AR(p = c(1, 12, 24))`, `VAR(p = 3)`
@@ -705,12 +705,11 @@ test_that("enhanced update() method works correctly", {
 - Setup speed: 10x improvement target
 - JSDGAM prediction: 100x speedup with Rcpp
 - Memory usage: 30% reduction target
-- **Formula complexity matrix**: all combinations working
-  - Linear/smooth/nonlinear × RW/AR/VAR/GP trends
-  - Distributional models: mu/sigma/nu/tau parameter trends
+- Formula complexity matrix: all combinations working
+  - Linear/smooth/nonlinear/distributional × RW/AR/VAR/GP/CAR trends
   - Response helpers: mi()/weights()/cens()/trunc()/trials() compatibility
   - Multivariate: shared vs response-specific trends
-  - **Multiple imputation**: Rubin's rules accuracy, pooling diagnostics
+  - Multiple imputation: Rubin's rules accuracy, pooling diagnostics
   
 #### Week 15: Performance Optimization & Object Footprint
 - Memory usage optimization and object compression
@@ -792,18 +791,18 @@ Dual brmsfit-like objects enabling seamless brms ecosystem compatibility:
   - [ ] Distributional regression: main parameter trends only (others via brms smooths)
   - [ ] Response helpers: mi()/weights()/cens()/trunc()/trials()/rate() etc.
   - [ ] Prior specification syntax
-  - [ ] **Multiple imputation**: Native support with Rubin's rules pooling
+  - [ ] Multiple imputation: Native support with Rubin's rules pooling
 - [ ] Seamless brms ecosystem integration:
   - [ ] Model evaluation: loo/waic/pp_check with bayesplot
   - [ ] Diagnostics: rhat/neff_ratio/mcmc_plot/nuts_params via brms methods
   - [ ] Prediction: posterior_predict/fitted/residuals following brms patterns
   - [ ] Model updating: enhanced update() method with comprehensive validation
-  - [ ] **MI-enhanced methods**: All methods work with pooled multiple imputation objects
+  - [ ] MI-enhanced methods: All methods work with pooled multiple imputation objects
 - [ ] >90% test coverage achieved
 - [ ] Multivariate models with response-specific trends working
 - [ ] Cross-response correlations preserved in multivariate State-Space models
 - [ ] Intelligent autocorrelation validation preventing conflicts
-- [ ] **Multiple imputation validation**: Dataset consistency, pooling diagnostics
+- [ ] Multiple imputation validation: Dataset consistency, pooling diagnostics
 
 ## Dependencies & Migration
 
