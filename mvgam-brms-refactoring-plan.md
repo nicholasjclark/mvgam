@@ -529,38 +529,54 @@ predict_jsdgam_optimized <- function(object, newdata, type = "response", ...) {
 #### Week 11: Coordinated Prediction/Forecasting
 **Files**: `R/predict.mvgam.R` (major refactor), `R/forecast.mvgam.R` (refactor)
 
+### brms brmsprep Integration Strategy
+
+**Core Approach**: Use brms's public `prepare_predictions()` function to leverage complete brms prediction infrastructure:
+
 ```r
-# Updated predict.mvgam with Rcpp optimization
-predict.mvgam <- function(object, newdata = NULL, type = "response", ...) {
+posterior_predict.mvgam <- function(object, newdata = NULL, summary = FALSE, ...) {
+  # Step 1: Create brmsprep object using public brms function
+  prep <- brms::prepare_predictions(object$obs_fit, newdata = newdata, ...)
   
-  if (inherits(object, 'jsdgam')) {
-    # Use optimized Rcpp prediction for JSDGAM (replaces lines 309-365)
-    return(predict_jsdgam_optimized(object, newdata, type, ...))
-    
-  } else if (object$dual_object) {
-    # Standard dual object prediction with trend models
-    obs_pred <- brms::predict(object$brms_fit, newdata = newdata, ...)
-    trend_pred <- predict_trend_optimized(object$trend_fit, newdata, ...)
-    return(coordinate_predictions(obs_pred, trend_pred, object))
-    
+  # Step 2: Get base linear predictor and add trend effects  
+  base_linpred <- brms::posterior_linpred_draws(prep)
+  trend_effects <- predict_trend_effects(object, prep)
+  combined_linpred <- base_linpred + trend_effects
+  
+  # Step 3: Update brmsprep with combined linear predictor
+  prep <- update_brmsprep_linpred(prep, combined_linpred)
+  
+  # Step 4: Use brms functions for final predictions
+  if (summary) {
+    epred <- brms::posterior_epred_draws(prep)
+    return(posterior_summary(epred, ...))
   } else {
-    # Single object prediction
-    return(brms::predict(object$brms_fit, newdata = newdata, ...))
+    return(brms::posterior_predict_draws(prep))
   }
 }
+```
 
-# Forecasting with Rcpp optimization
-forecast.mvgam <- function(object, newdata = NULL, h = NULL, ...) {
-  if (object$dual_object && !is.null(object$trend_fit)) {
-    # Use optimized Rcpp functions for trend forecasting
-    trend_forecast <- forecast_trend_rcpp(
-      trend_model = object$trend_model,
-      trend_pars = extract_forecast_parameters(object$trend_fit),
-      linpreds = extract_trend_linpreds(newdata, object),
-      h = h
-    )
-    # Continue with observation forecasting...
-  }
+**Key Benefits**:
+- Leverages brms's complete prediction pipeline (family transformations, error handling, validation)
+- Uses only public brms APIs (`prepare_predictions`, `posterior_*_draws`)
+- Automatic support for all brms families and their specific requirements
+- "Hijacks" prediction at linear predictor stage, lets brms handle response transformations
+
+### Trend Effect Integration
+
+**Linear Predictor Modification**: Add trend effects to observation linear predictor before brms applies family transformations:
+
+```r
+predict_trend_effects <- function(mvgam_object, prep) {
+  # Extract context from brmsprep object
+  newdata <- prep$data
+  draw_ids <- prep$draw_ids
+  
+  # Generate trend predictions using extracted parameters
+  trend_pars <- extract_trend_parameters(mvgam_object, draw_ids)
+  trend_effects <- forecast_trend_from_parameters(trend_pars, newdata)
+  
+  return(ensure_proper_dimensions(trend_effects, prep))
 }
 ```
 
@@ -588,6 +604,27 @@ plot.mvgam <- function(x, type = 'residuals', ...) {
     'trend' = plot_mvgam_trends(x, ...),
     'series' = plot_mvgam_series(x, ...)
   )
+}
+```
+
+### Complete brms Method Support
+
+**Prediction Method Family**: Implement full brms prediction API using brmsprep approach:
+
+```r
+# Support all standard brms prediction methods
+posterior_epred.mvgam <- function(object, ...) {
+  prep <- brms::prepare_predictions(object$obs_fit, ...)
+  # Add trends and use brms::posterior_epred_draws(prep)
+}
+
+posterior_linpred.mvgam <- function(object, ...) {
+  prep <- brms::prepare_predictions(object$obs_fit, ...)
+  # Return combined linear predictor with trends
+}
+
+fitted.mvgam <- function(object, ...) {
+  # Alias for posterior_epred for consistency
 }
 ```
 
@@ -699,6 +736,9 @@ benchmark_performance <- function() {
 4. **Robust Assembly**: brms handles Stan code injection and validation
 5. **Future-Proof**: Uses public brms API with minimal text manipulation
 6. **Flexible Extension**: Easy to add new trend types through stanvar templates
+7. **Complete brms Prediction Pipeline**: Leverages brms's family-specific transformations, error handling, and validation
+8. **Public API Stability**: Uses only stable public brms functions (`prepare_predictions`, `posterior_*_draws`)
+9. **Family Universality**: Automatic support for all current and future brms families without additional coding
 
 ## Risk Mitigation
 
