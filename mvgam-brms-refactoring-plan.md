@@ -324,7 +324,10 @@ log_lik.mvgam <- function(object, resp = NULL, ...) {
   return(compute_log_lik_matrix(prep, object))
 }
 
-# Seamless loo/waic/pp_check integration with bayesplot ecosystem
+# Seamless integration with brms ecosystem methods
+# - Model evaluation: loo/waic/pp_check with bayesplot
+# - Diagnostics: rhat/neff_ratio/mcmc_plot/nuts_params via brms methods
+# - Dual object structure enables direct brms diagnostic access
 ```
 
 ### Phase 4: Testing & Launch (Weeks 13-16)
@@ -407,7 +410,11 @@ Native support for response-specific trends while preserving brms cross-response
 Using brms `stanvars` mechanism for State-Space injection - provides scalable approach for other time series extensions.
 
 ### 4. **Method System Integration**
-Dual brmsfit-like objects enabling seamless bayesplot/loo/waic compatibility while maintaining mvgam-specific functionality.
+Dual brmsfit-like objects enabling seamless brms ecosystem compatibility:
+- **Model evaluation**: loo/waic/pp_check with bayesplot integration
+- **Diagnostics**: rhat/neff_ratio/mcmc_plot/nuts_params via brms methods  
+- **Prediction**: posterior_predict/fitted/residuals following brms patterns
+- **State-Space extensions**: mvgam-specific functionality (forecasting, trend extraction) built on top
 
 ## Risk Mitigation
 
@@ -445,7 +452,10 @@ Dual brmsfit-like objects enabling seamless bayesplot/loo/waic compatibility whi
 ### Functionality Preservation & Enhancement
 - [ ] All existing mvgam features preserved
 - [ ] Full brms compatibility maintained (all formula types, families, priors)
-- [ ] Seamless bayesplot/loo/waic integration
+- [ ] Seamless brms ecosystem integration:
+  - [ ] Model evaluation: loo/waic/pp_check with bayesplot
+  - [ ] Diagnostics: rhat/neff_ratio/mcmc_plot/nuts_params via brms methods
+  - [ ] Prediction: posterior_predict/fitted/residuals following brms patterns
 - [ ] >90% test coverage achieved
 - [ ] Multivariate models with response-specific trends working
 - [ ] Cross-response correlations preserved in multivariate State-Space models
