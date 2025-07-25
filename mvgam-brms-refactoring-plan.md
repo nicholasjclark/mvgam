@@ -190,25 +190,57 @@ mvgam <- function(formula, trend_formula = NULL, data, data2 = NULL,
 #### Week 5: glue-Based Stan Code Generation
 **Files**: `R/stan_glue_templates.R` (new), `R/mvgam_stancode.R` (new)
 
+#### Core brms Integration Strategy
+
+**Public API Approach**: Use only public brms functions to avoid dependency on internal APIs:
+- Generate complete Stan code using `brms::stancode()` for both observation and trend components
+- Extract Stan code blocks using robust regex patterns that target stable Stan syntax
+- Apply systematic parameter renaming to trend components  
+- Combine components using glue templates for clean assembly
+
+**Key Integration Pattern**:
 ```r
-# Generate Stan code using glue templates (following issue #117 and using add_MACor.R to help with design)
-# n_lv will come from the constructors to flag whether a dynamic factor model is needed
+# Generate complete brms Stan code for both components
+obs_stancode <- brms::stancode(obs_formula, obs_data, obs_family, obs_priors)
+trend_stancode <- brms::stancode(trend_formula, trend_data, trend_family, trend_priors)
+
+# Extract components, rename trend parameters, combine with State-Space dynamics
+combined_stancode <- merge_stan_components(obs_stancode, trend_stancode, statespace_dynamics)
+```
+
+**Function Deduplication**: Ensure `combine_functions_safely()` prevents duplicate function definitions:
+- Parse and deduplicate `#include` statements
+- Extract individual function definitions and check for name conflicts
+- Merge identical functions, warn about conflicting implementations
+- Reassemble with proper Stan formatting
+
+```r
+# Generate Stan code using brms-style named list returns
+# Following stan_prior() patterns: return $par, $tpar_def, $model_prior blocks
 generate_trend_parameters <- function(trend_model, n_series, n_lv, max_lag = 1, ...) {
+  # Return named list with Stan code blocks (following brms convention)
   switch(trend_model,
-    "RW" = glue::glue("
-      vector<lower=0>[{n_series}] sigma_trend;
-      matrix[T,{n_series}] trend_raw;
-    "),
-    "AR" = glue::glue("
-      vector<lower=-1,upper=1>[{n_series}] phi_ar;
-      vector<lower=0>[{n_series}] sigma_trend;
-      matrix[T,{n_series}] trend_raw;
-    "),
-    "VAR" = glue::glue("
-      matrix<lower=-1,upper=1>[{n_series},{n_series * max_lag}] phi_var;
-      vector<lower=0>[{n_series}] sigma_trend;
-      matrix[T,{n_series}] trend_raw;
-    ")
+    "RW" = list(
+      par = glue::glue("vector<lower=0>[{n_series}] sigma_trend;"),
+      tpar_def = glue::glue("matrix[T,{n_series}] trend_raw;"),
+      model_prior = "" # Will be populated by stan_trend_prior()
+    ),
+    "AR" = list(
+      par = glue::glue("
+        vector<lower=-1,upper=1>[{n_series}] phi_ar;
+        vector<lower=0>[{n_series}] sigma_trend;
+      "),
+      tpar_def = glue::glue("matrix[T,{n_series}] trend_raw;"),
+      model_prior = ""
+    ),
+    "VAR" = list(
+      par = glue::glue("
+        matrix<lower=-1,upper=1>[{n_series},{n_series * max_lag}] phi_var;
+        vector<lower=0>[{n_series}] sigma_trend;
+      "),
+      tpar_def = glue::glue("matrix[T,{n_series}] trend_raw;"),
+      model_prior = ""
+    )
   )
 }
 
@@ -264,8 +296,55 @@ rename_trend_parameters_in_stan_dynamic <- function(stan_code) {
 }
 ```
 
+#### Following brms Prior Architecture
+
+The trend prior system should mirror brms's `stan_prior()` patterns:
+
+```r
+# Following brms stan_prior() signature for trend parameters
+stan_trend_prior <- function(prior, class, coef = NULL, group = NULL,
+                           type = "real", suffix = "_trend", px = list(), ...) {
+  # Apply systematic _trend suffix to all parameter names
+  # Use brms's bound handling: stan_type_add_bounds()
+  # Generate both parameter declarations and prior statements
+  # Handle vectorized vs individual coefficient priors
+}
+
+# Integration with existing brms prior objects
+rename_trend_priors_dynamic <- function(trend_priors) {
+  # Extract class/coef/group from brms prior objects
+  # Apply _trend suffix while preserving brms structure
+  # Return modified prior objects for stan_trend_prior()
+}
+```
+
+### Systematic Parameter Renaming
+
+Apply `_trend` suffix to all trend parameters using stable brms patterns:
+- Target fundamental brms parameter names: `b`, `Intercept`, `sigma`, `sd_`, `z_`, `r_`
+- Use word boundary regex patterns to avoid partial matches
+- Validate renaming success to ensure no conflicts remain
+- Handle both parameter declarations and usage consistently
+
 #### Week 7: data2 Integration for Factor Loadings
 **Files**: `R/mvgam_factor_loadings.R` (new), `R/jsdgam.R` (refactor)
+
+#### brms Parameter Naming Conventions
+
+Following brms systematic naming (from `stan_predictor.R` patterns):
+- **Base parameters**: `b`, `Intercept`, `sd`, `sigma`
+- **Suffixed parameters**: `b_1`, `Intercept_mu2`, `sd_3` 
+- **Group parameters**: Parameters get group identifiers: `sd_group_1`
+- **Prefixed parameters**: Special terms get prefixes: `bs` (splines), `ar` (autocorr)
+
+For mvgam trend parameters, apply systematic `_trend` suffix:
+```r
+# Original brms parameter → Trend equivalent
+"b" → "b_trend"
+"Intercept" → "Intercept_trend"  
+"sd" → "sd_trend"
+"sigma" → "sigma_trend"
+```
 
 ```r
 jsdgam <- function(formula, data, data2 = NULL, lv = 0, family = gaussian(), ...) {
@@ -299,6 +378,16 @@ process_factor_data2 <- function(data2, lv, data) {
 
 #### Week 8: Higher-Order VAR/AR Extensions
 **Files**: `R/mvgam_trend_types.R` (extend), `R/stan_trend_higher_order.R` (new)
+
+#### Stan Block Merging Strategy
+
+**Block Extraction**: Parse Stan code into standard blocks (functions, data, parameters, model, etc.) using robust regex patterns that target Stan syntax structure rather than brms internals.
+
+**Component Integration**: 
+- **Functions**: Deduplicate includes and custom functions
+- **Data/Parameters**: Simple concatenation with clear commenting
+- **Model**: Combine priors, insert State-Space dynamics, integrate trends into observation linear predictor
+- **Assembly**: Use glue templates for clean, readable Stan program construction
 
 ```r
 # Extended constructors supporting higher orders
@@ -541,6 +630,7 @@ benchmark_performance <- function() {
 4. Create migration guide from mvgam v1.x to v2.0
 5. Update CLAUDE.md with new architecture patterns
 6. Document new capabilities enabled by brms integration
+7. **brms Compatibility Maintenance**: Document stable brms patterns, compatibility testing procedures, and version monitoring requirements
 
 ## Migration/Deployment Plan
 
@@ -589,6 +679,13 @@ benchmark_performance <- function() {
 3. **Future-proof priors**: Dynamic parameter discovery keeps up with brms evolution
 4. **Single source of truth**: Leverages brms development rather than reimplementing
 
+### Stan Code Generation Benefits
+1. **brms Compatibility**: Follows exact brms code generation patterns for seamless integration
+2. **Modular Assembly**: Uses brms's `collapse_lists()` pattern for combining code blocks  
+3. **Systematic Naming**: Leverages brms parameter naming conventions with `_trend` suffix
+4. **Prior Integration**: Reuses brms prior handling infrastructure with automatic parameter renaming
+5. **Extensibility**: New trend types follow established brms generator patterns
+
 ## Risk Mitigation
 
 ### Potential Failure Points
@@ -596,12 +693,16 @@ benchmark_performance <- function() {
 2. **Performance Regression**: Single fit slower than current approach
 3. **Object Coordination**: brmsfit-like objects coordination issues
 4. **User Interface Changes**: Breaking changes disrupting workflows
+5. **brms API Changes**: Public Stan code structure or parameter naming changes
+6. **Function Conflicts**: Same function names with different implementations in observation vs trend
 
 ### Contingency Plans
 1. **Stan Issues**: Extensive testing, fallback to current generation
 2. **Performance**: Profile bottlenecks, maintain parallel implementation
 3. **Coordination**: Robust testing, error handling, fallback modes
 4. **Interface**: Backward compatibility layer, migration tools
+5. **API Monitoring**: Compatibility testing, graceful degradation, version-specific adaptations
+6. **Function Resolution**: Clear conflict detection, user warnings, precedence rules
 
 ## Success Metrics
 
@@ -623,8 +724,91 @@ benchmark_performance <- function() {
 - [ ] Clear documentation and examples
 - [ ] Community feedback incorporated
 
+## Quality Assurance
+
+### Code Review Standards
+- All pull requests require review from at least one maintainer
+- New features require unit tests with >90% coverage
+- Documentation updates required for all user-facing changes
+- Performance benchmarks required for optimization claims
+
+### Testing Strategy
+1. **Unit Tests**: Individual function validation
+2. **Integration Tests**: End-to-end workflow validation
+3. **Performance Tests**: Speed and memory benchmarks
+4. **Regression Tests**: Ensure backward compatibility
+5. **Edge Case Tests**: Boundary conditions and error handling
+
+### Documentation Requirements
+- All exported functions must have complete roxygen2 documentation
+- Examples must be runnable and demonstrate key functionality
+- Vignettes updated to reflect new capabilities
+- Migration guide with before/after code comparisons
+
+## Communication Plan
+
+### Developer Communication
+- Weekly progress updates during implementation phases
+- Bi-weekly architecture review meetings
+- Monthly stakeholder briefings
+- Real-time communication via dedicated Slack channel
+
+### Community Engagement
+- Alpha release announcement with call for testing
+- Beta release with detailed changelog and migration guide
+- Webinar demonstrating new capabilities
+- Conference presentations at relevant R/Stan events
+
+### Documentation Timeline
+- **Week 4**: Initial architecture documentation complete
+- **Week 8**: Stan code generation patterns documented
+- **Week 12**: Method integration patterns documented
+- **Week 16**: Complete user documentation and migration guide
+
+## Post-Release Maintenance
+
+### Version Support Strategy
+- mvgam v1.x: Security patches only after v2.0 release
+- mvgam v2.0: Full feature support and bug fixes
+- Deprecation notices for removed functionality with alternatives
+
+### Performance Monitoring
+- Automated benchmarking suite for key workflows
+- Memory usage tracking for large datasets
+- User feedback collection on performance improvements
+- Regular profiling to identify optimization opportunities
+
+### Feature Roadmap
+- **v2.1**: Additional trend types based on user requests
+- **v2.2**: Enhanced factor model capabilities
+- **v2.3**: Advanced forecasting methods
+- **v3.0**: Next-generation State-Space modeling features
+
 ---
 
 **Plan Status**: Design Complete - Ready for Implementation  
 **Next Step**: Begin Phase 1, Week 1 - Trend Type Dispatcher System  
-**Document Location**: `mvgam-brms-refactoring-plan.md`
+**Document Location**: `mvgam-brms-refactoring-plan.md`  
+**Plan Approval**: Pending stakeholder review and technical validation
+
+## Appendix: Technical Dependencies
+
+### R Package Dependencies
+- **Core**: brms (>= 2.19.0), Stan (>= 2.30.0)
+- **Optimization**: Rcpp (>= 1.0.10), RcppArmadillo (>= 0.12.0)
+- **Validation**: checkmate (>= 2.1.0), insight (>= 0.18.0)
+- **Utilities**: rlang (>= 1.1.0), glue (>= 1.6.0)
+
+### System Requirements
+- **Minimum R Version**: 4.1.0
+- **Stan Version**: 2.30.0 or higher
+- **Memory**: 8GB RAM recommended for large models
+- **Disk Space**: 2GB for package compilation
+
+### Development Environment
+- **IDE**: RStudio (>= 2022.07.0) recommended
+- **Version Control**: Git with conventional commit messages
+- **CI/CD**: GitHub Actions for automated testing
+- **Documentation**: pkgdown for website generation
+
+This comprehensive refactoring plan provides a clear roadmap for transforming mvgam into a brms-based extension while maintaining all current functionality and significantly improving performance and user experience.
