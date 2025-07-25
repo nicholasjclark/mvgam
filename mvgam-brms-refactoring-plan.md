@@ -291,6 +291,8 @@ Full brms method support using dual brmsfit-like objects.
 
 ### brms 3.0 Breaking Changes Impact
 
+**Timeline Reality**: As of July 2018, Paul Bürkner stated brms 3.0 is "still a long way to go". Current milestone shows 24 open issues with no set release date. **Our 16-week refactoring timeline likely precedes brms 3.0 release.**
+
 **API Changes**:
 - `make_stancode`/`make_standata` transformed into generic S3 methods with aliases for backward compatibility
 - `get_prior` becomes alias of new generic `default_prior` method
@@ -301,40 +303,42 @@ Full brms method support using dual brmsfit-like objects.
 - Switch to new Stan array syntax (requires Stan ≥2.26)
 - Parameter class name improvements affecting our `_trend` renaming strategy
 
+**Reduced Risk Assessment**: Given brms 3.0's extended timeline, we can:
+1. **Implement with brms 2.x as primary target** (current stable API)
+2. **Add 3.0 compatibility as future enhancement** rather than core requirement
+3. **Monitor milestone progress** and adjust strategy if 3.0 release accelerates
+
 **Mitigation Strategies**:
-1. **Generic Method Compatibility**: Use new S3 methods directly rather than deprecated functions
+1. **Conservative API Usage**: Use established brms 2.x patterns that are less likely to change
 ```r
-# Future-proof approach
-stancode_obs <- brms::stancode.default(obs_formula, data, ...)
-stancode_trend <- brms::stancode.default(trend_formula, trend_data, ...)
+# Robust approach - use current stable API
+stancode_obs <- brms::stancode(obs_formula, data, ...)
+stancode_trend <- brms::stancode(trend_formula, trend_data, ...)
 ```
 
-2. **Object Structure Monitoring**: Implement compatibility layer for brmsfit object changes
+2. **Defensive Programming**: Plan for object structure evolution
 ```r
-# Defensive extraction accounting for 3.0 changes
-extract_brmsfit_elements <- function(brms_object) {
-  # Handle removal of family/autocor from brmsfit in 3.0
+# Future-proof extraction
+extract_family_safe <- function(brms_object) {
   if ("family" %in% names(brms_object)) {
-    family <- brms_object$family  # Pre-3.0
-  } else {
-    family <- brms_object$formula$family  # Post-3.0
+    return(brms_object$family)  # Current structure
+  } else if (!is.null(brms_object$formula$family)) {
+    return(brms_object$formula$family)  # Potential 3.0 structure
   }
-  return(list(family = family, ...))
+  stop("Cannot extract family from brmsfit object")
 }
 ```
 
-3. **Version-Specific Code Paths**: Implement brms version detection
+3. **Version Detection Layer**: Implement when 3.0 approaches
 ```r
-check_brms_version_compatibility <- function() {
-  brms_version <- packageVersion("brms")
-  if (brms_version >= "3.0.0") {
-    # Use 3.0+ compatible methods
-    use_new_api <- TRUE
-  } else {
-    # Use legacy compatibility
-    use_new_api <- FALSE
-  }
-  return(use_new_api)
+# Future enhancement - not required for initial implementation
+brms_version_compat <- function() {
+  version <- packageVersion("brms")
+  list(
+    major = version$major,
+    supports_new_api = version >= "3.0.0",
+    requires_compatibility_layer = version >= "3.0.0"
+  )
 }
 ```
 
@@ -384,10 +388,10 @@ check_brms_version_compatibility <- function() {
 ---
 
 **Next Step**: Begin Week 1 - Trend Type Dispatcher System  
-**Dependencies**: brms (≥2.19.0, <3.0.0 OR ≥3.0.0), Stan (≥2.30.0), Rcpp, checkmate, insight
+**Dependencies**: brms (≥2.19.0), Stan (≥2.30.0), Rcpp, checkmate, insight
 
-### brms 3.0 Transition Plan
+### brms 3.0 Transition Strategy
 
-**Phase 1 (Weeks 1-8)**: Build with brms 2.x compatibility  
-**Phase 2 (Weeks 9-12)**: Add brms 3.0 compatibility layer  
-**Phase 3 (Weeks 13-16)**: Test across both versions, implement version detection
+**Primary Development (Weeks 1-16)**: Target brms 2.x stable API  
+**Future Enhancement**: Add brms 3.0 compatibility when released  
+**Monitoring**: Track brms 3.0 milestone progress for timeline adjustments
