@@ -1,12 +1,12 @@
 # mvgam → brms Extension Refactoring Plan
 
-**Version**: 1.5 (Balanced Implementation Guide)  
+**Version**: 1.6 (Multiple Imputation Integration)  
 **Date**: 2025-01-25  
 **Status**: Ready for Implementation
 
 ## Executive Summary
 
-Transform mvgam from mgcv-based standalone package into specialized brms extension adding State-Space modeling, N-mixture/occupancy models, and JSDMs. **Core Innovation**: brms generates linear predictors (`mu`, `mu_trend`), single combined Stan model, dual brmsfit-like objects for post-processing. Full multivariate model support preserving brms cross-response correlations while adding State-Space dynamics.
+Transform mvgam from mgcv-based standalone package into specialized brms extension adding State-Space modeling, N-mixture/occupancy models, and JSDMs. **Core Innovation**: brms generates linear predictors (`mu`, `mu_trend`), single combined Stan model, dual brmsfit-like objects for post-processing. Full multivariate model support preserving brms cross-response correlations while adding State-Space dynamics. **New**: Native multiple imputation support following brms patterns with Rubin's rules pooling.
 
 ## Critical Design Principles
 
@@ -42,6 +42,14 @@ mvgam(
   bf(y | mi() ~ s(x), sigma ~ s(z)),    # Missing value imputation
   trend_formula = ~ AR(p = 1),          # Applied to mu only
   data = data
+)
+
+# Multiple imputation with State-Space trends
+mvgam(
+  y ~ s(x), 
+  trend_formula = ~ AR(p = 1),
+  data = imputed_data_list,             # List of multiply imputed datasets
+  combine = TRUE                        # Pool results using Rubin's rules
 )
 
 mvgam(
@@ -172,6 +180,27 @@ validate_distributional_trends <- function(formula, trend_formula) {
     }
   }
 }
+
+validate_multiple_imputation_data <- function(data_list) {
+  if (!is.list(data_list) || length(data_list) < 2) {
+    stop(insight::format_error(
+      "Multiple imputation requires list of 2+ datasets.",
+      "i" = "Use mice::complete(mice_object, 'all') or similar"
+    ))
+  }
+  
+  # Validate structure consistency across imputations
+  ref_structure <- sapply(data_list[[1]], class)
+  for (i in seq_along(data_list)[-1]) {
+    curr_structure <- sapply(data_list[[i]], class)
+    if (!identical(ref_structure, curr_structure)) {
+      stop(insight::format_error(
+        "Inconsistent data structure across imputations.",
+        "x" = paste("Imputation", i, "differs from first dataset")
+      ))
+    }
+  }
+}
 ```
 
 **Multivariate Validation**:
@@ -181,6 +210,7 @@ validate_distributional_trends <- function(formula, trend_formula) {
 - Cross-response correlation preservation
 - **Distributional model restriction**: Trends only allowed for main response parameter
 - **Response helper validation**: Compatibility with `mi()`, `weights()`, `cens()`, `trunc()`, `trials()`, etc.
+- **Multiple imputation validation**: Dataset structure consistency, pooling compatibility
 
 ## Multivariate Model Integration
 
@@ -280,24 +310,55 @@ RW <- function(cor = FALSE, ma = FALSE, gr = 'NA', subgr = 'series', n_lv = NULL
 - Benchmark fastest brms setup method (`backend = "mock"` vs `chains = 0`)
 - Optimize for 10-50x setup speed improvement
 
-#### Week 4: Single-Fit Architecture & Backend Strategy
+#### Week 4: Single-Fit Architecture & Backend Strategy + Multiple Imputation
 ```r
-mvgam <- function(formula, trend_formula = NULL, backend = NULL, ...) {
-  # 1. Parse multivariate formulas if needed
+mvgam <- function(formula, trend_formula = NULL, data = NULL, backend = NULL, 
+                  combine = TRUE, file_refit = getOption("mvgam.file_refit", "never"), 
+                  ...) {
+  
+  # 1. Handle multiple imputation input
+  if (is.list(data) && !is.data.frame(data)) {
+    if (combine) {
+      return(mvgam_multiple(formula, trend_formula, data, backend, file_refit, ...))
+    } else {
+      # Return list of individual fits (useful for diagnostics)
+      return(map(data, ~ mvgam(formula, trend_formula, .x, backend, ...)))
+    }
+  }
+  
+  # 2. Parse multivariate formulas if needed
   mv_spec <- parse_multivariate_trends(formula, trend_formula)
   
-  # 2. Setup obs/trend models (no fitting)
+  # 3. Setup obs/trend models (no fitting)
   obs_setup <- setup_brms_lightweight(formula, data, ...)
   trend_setup <- setup_brms_lightweight(trend_spec$base_formula, ...)
   
-  # 3. Extract trend stanvars and generate combined Stan code
+  # 4. Extract trend stanvars and generate combined Stan code
   trend_stanvars <- extract_trend_stanvars_from_setup(trend_setup, trend_spec)
   combined_stancode <- generate_combined_stancode(obs_setup, trend_stanvars)
   
-  # 4. Use enhanced mvgam backend system
+  # 5. Use enhanced mvgam backend system
   combined_fit <- fit_mvgam_model(combined_stancode, combined_standata, 
                                   backend = backend, ...)
   return(create_mvgam_from_combined_fit(combined_fit, obs_setup, trend_setup))
+}
+
+# Multiple imputation implementation following brms patterns
+mvgam_multiple <- function(formula, trend_formula, data_list, backend, file_refit, ...) {
+  validate_multiple_imputation_data(data_list)
+  
+  # Fit models to each imputed dataset with file caching
+  fits <- map(seq_along(data_list), function(i) {
+    fit_file <- if (!is.null(file_refit) && file_refit != "never") {
+      paste0(tools::file_path_sans_ext(file_refit), "_imp", i, ".rds")
+    } else NULL
+    
+    mvgam(formula = formula, trend_formula = trend_formula,
+          data = data_list[[i]], backend = backend, file = fit_file, ...)
+  })
+  
+  # Pool results using Rubin's rules
+  return(pool_mvgam_fits(fits))
 }
 ```
 
@@ -339,9 +400,15 @@ arma::mat fast_jsdgam_predict(const arma::mat& design_matrices, ...);
 arma::cube fast_multivariate_predict(const arma::cube& design_arrays, ...);
 ```
 
-#### Week 11: brms Prediction Integration
+#### Week 11: brms Prediction Integration + Multiple Imputation Pooling
 ```r
-posterior_predict.mvgam <- function(object, newdata = NULL, resp = NULL, ...) {
+# Prediction methods with multiple imputation support
+posterior_predict.mvgam <- function(object, newdata = NULL, resp = NULL, 
+                                   allow_new_levels = FALSE, ...) {
+  if (inherits(object, "mvgam_pooled")) {
+    return(posterior_predict_multiple(object, newdata, resp, ...))
+  }
+  
   if (is_multivariate(object)) {
     if (!is.null(resp)) {
       return(predict_single_response(object, resp, newdata, ...))
@@ -351,19 +418,43 @@ posterior_predict.mvgam <- function(object, newdata = NULL, resp = NULL, ...) {
   }
   
   # Use brms::prepare_predictions() for full pipeline
-  prep <- brms::prepare_predictions(object$obs_fit, newdata = newdata, ...)
+  prep <- brms::prepare_predictions(object$obs_fit, newdata = newdata, 
+                                   allow_new_levels = allow_new_levels, ...)
   base_linpred <- brms::posterior_linpred_draws(prep)
   trend_effects <- predict_trend_effects(object, prep)
   prep <- update_brmsprep_linpred(prep, base_linpred + trend_effects)
   
   return(brms::posterior_predict_draws(prep))
 }
+
+# Rubin's rules pooling for parameter estimates
+pool_mvgam_fits <- function(fits) {
+  validate_compatible_fits(fits)
+  estimates_list <- map(fits, extract_fit_estimates)
+  pooled_estimates <- apply_rubins_rules(estimates_list)
+  
+  # Create pooled mvgam object with individual fits stored
+  pooled_fit <- create_pooled_mvgam(fits[[1]], pooled_estimates)
+  attr(pooled_fit, "individual_fits") <- fits
+  attr(pooled_fit, "n_imputations") <- length(fits)
+  class(pooled_fit) <- c("mvgam_pooled", class(fits[[1]]))
+  
+  return(pooled_fit)
+}
 ```
 
-#### Week 12: Method System Integration
+#### Week 12: Method System Integration + Multiple Imputation Methods
 ```r
 # Critical: log_lik integration following brms patterns
 log_lik.mvgam <- function(object, resp = NULL, ...) {
+  if (inherits(object, "mvgam_pooled")) {
+    # Pool log-likelihood across imputations (average)
+    ll_list <- map(attr(object, "individual_fits"), ~ log_lik(.x, resp = resp, ...))
+    pooled_ll <- Reduce("+", ll_list) / length(ll_list)
+    attr(pooled_ll, "n_imputations") <- length(ll_list)
+    return(pooled_ll)
+  }
+  
   if (is_multivariate(object)) {
     if (!is.null(resp)) {
       return(compute_response_log_lik(object, resp, ...))
@@ -378,13 +469,21 @@ log_lik.mvgam <- function(object, resp = NULL, ...) {
   return(compute_log_lik_matrix(prep, object))
 }
 
-# Enhanced update() method with comprehensive brms-style validation
+# Enhanced update() method with multiple imputation support
 update.mvgam <- function(object, formula. = NULL, trend_formula. = NULL, 
-                        newdata = NULL, recompile = NULL, ...) {
-  # Comprehensive argument validation following brms patterns
+                        newdata = NULL, recompile = NULL, combine = TRUE, ...) {
+  
+  # Handle multiple imputation objects
+  if (inherits(object, "mvgam_pooled")) {
+    individual_fits <- attr(object, "individual_fits")
+    updated_fits <- map(individual_fits, ~ update(.x, formula. = formula., 
+      trend_formula. = trend_formula., newdata = newdata, recompile = recompile, ...))
+    return(if (combine) pool_mvgam_fits(updated_fits) else updated_fits)
+  }
+  
+  # Standard update validation and processing
   validate_update_arguments(object, formula., trend_formula., newdata, ...)
   
-  # Handle formula updates with State-Space trend considerations
   if (!is.null(formula.)) {
     new_formula <- update_formula_safely(object$formula, formula.)
     validate_formula_change_compatibility(object, new_formula)
@@ -395,21 +494,30 @@ update.mvgam <- function(object, formula. = NULL, trend_formula. = NULL,
     validate_trend_change_compatibility(object, new_trend_formula)
   }
   
-  # Intelligent recompilation decisions
   needs_recompile <- determine_recompilation_need(object, formula., trend_formula., ...)
   if (is.null(recompile)) recompile <- needs_recompile
   
-  # Preserve State-Space specific components during update
   updated_args <- prepare_update_args(object, formula., trend_formula., ...)
-  
-  # Call mvgam with updated arguments
   do.call(mvgam, updated_args)
 }
 
-# Seamless integration with brms ecosystem methods
-# - Model evaluation: loo/waic/pp_check with bayesplot
-# - Diagnostics: rhat/neff_ratio/mcmc_plot/nuts_params via brms methods
-# - Dual object structure enables direct brms diagnostic access
+# Additional multiple imputation methods
+print.mvgam_pooled <- function(x, ...) {
+  cat("Multiple Imputation mvgam Model\n")
+  cat("Number of imputations:", attr(x, "n_imputations"), "\n")
+  cat("Pooling method: Rubin's rules\n\n")
+  NextMethod("print")
+  cat("\nNote: Estimates pooled across", attr(x, "n_imputations"), "imputations\n")
+}
+
+# Model comparison with MI pooling following Vehtari et al.
+loo.mvgam_pooled <- function(x, ...) {
+  individual_fits <- attr(x, "individual_fits")
+  loo_list <- map(individual_fits, brms::loo)
+  pooled_loo <- pool_loo_estimates(loo_list)
+  attr(pooled_loo, "n_imputations") <- length(individual_fits)
+  return(pooled_loo)
+}
 ```
 
 ### Phase 4: Testing & Launch (Weeks 13-16)
@@ -451,16 +559,6 @@ test_that("distributional models: trends only for main parameter", {
     ),
     "State-Space trends not allowed for distributional parameters"
   )
-  
-  # Complex distributional families: trends only for main parameter
-  fit_beta <- mvgam(
-    bf(prop ~ s(x), phi ~ s(z)),
-    trend_formula = ~ AR(p = 1),  # Applied to mu (main) only
-    family = Beta(),
-    data = beta_data
-  )
-  expect_distributional_constraints_preserved(fit_beta)
-  expect_no_sigma_trends(fit_beta)
 })
 
 test_that("response helpers work with State-Space trends", {
@@ -479,79 +577,70 @@ test_that("response helpers work with State-Space trends", {
     data = weighted_data
   )
   expect_weights_handled_correctly(fit_weights)
+})
+```
+
+**Multiple Imputation Testing**:
+```r
+test_that("multiple imputation with State-Space trends works", {
+  # Basic MI workflow
+  mice_data <- mice::mice(data_with_missing, m = 5, printFlag = FALSE)
+  imputed_datasets <- mice::complete(mice_data, "all")
   
-  # Censored/truncated data
-  fit_cens <- mvgam(
-    bf(y | cens(censor) ~ s(x)),
-    trend_formula = ~ AR(p = 1),
-    data = censored_data
-  )
-  expect_censoring_correct(fit_cens)
+  fit_mi <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1), 
+                  data = imputed_datasets, combine = TRUE)
+  
+  expect_s3_class(fit_mi, "mvgam_pooled")
+  expect_equal(attr(fit_mi, "n_imputations"), 5)
+  
+  # Pooled estimates follow Rubin's rules
+  pooled_coefs <- coef(fit_mi)
+  individual_fits <- attr(fit_mi, "individual_fits")
+  expect_length(individual_fits, 5)
+  
+  # Predictions pool appropriately
+  pred_pooled <- posterior_predict(fit_mi, newdata = test_data)
+  expect_true(attr(pred_pooled, "n_imputations") == 5)
+  
+  # Model comparison works
+  loo_pooled <- loo(fit_mi)
+  expect_s3_class(loo_pooled, "loo_pooled")
 })
 
+test_that("multivariate MI with response-specific trends", {
+  fit_mv_mi <- mvgam(
+    mvbf(y1 ~ x, y2 ~ z),
+    trend_formula = list(y1 = ~ AR(p = 1), y2 = ~ RW()),
+    data = imputed_datasets_mv,
+    combine = TRUE
+  )
+  
+  expect_s3_class(fit_mv_mi, c("mvgam_pooled", "mvgam"))
+  expect_true(is_multivariate(fit_mv_mi))
+  
+  # Response-specific predictions work
+  pred_y1 <- posterior_predict(fit_mv_mi, resp = "y1")
+  pred_y2 <- posterior_predict(fit_mv_mi, resp = "y2")
+  expect_different_dimensions(pred_y1, pred_y2)
+})
+```
+
+**Enhanced update() method testing**:
+```r
 test_that("enhanced update() method works correctly", {
   # Basic formula updates
   fit_base <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1), data = data)
   fit_updated <- update(fit_base, formula. = . ~ . + z)
   expect_formula_updated_correctly(fit_updated)
   
-  # Trend formula updates
-  fit_trend_updated <- update(fit_base, trend_formula. = ~ RW(cor = TRUE))
-  expect_trend_updated_correctly(fit_trend_updated)
-  
-  # Combined updates with validation
-  expect_error(
-    update(fit_base, 
-           formula. = . ~ . + ar(time, group),  # brms autocor
-           trend_formula. = ~ AR(p = 2)),       # mvgam trend
-    "Conflicting autocorrelation specifications"
-  )
-  
-  # Multivariate model updates
-  fit_mv <- mvgam(mvbf(y1 ~ x, y2 ~ z), 
-                  trend_formula = list(y1 = ~ AR(p = 1), y2 = ~ RW()),
-                  data = mvdata)
-  fit_mv_updated <- update(fit_mv, 
-                          trend_formula. = list(y1 = ~ VAR(p = 1), y2 = ~ RW()))
-  expect_multivariate_update_correct(fit_mv_updated)
+  # Multiple imputation updates
+  fit_mi_updated <- update(fit_mi, trend_formula. = ~ RW())
+  expect_s3_class(fit_mi_updated, "mvgam_pooled")
+  expect_equal(attr(fit_mi_updated, "n_imputations"), 5)
   
   # Recompilation intelligence
   fit_no_recompile <- update(fit_base, iter = 4000)  # Should not recompile
   expect_false(attr(fit_no_recompile, "recompiled"))
-  
-  fit_recompile <- update(fit_base, formula. = . ~ . + s(z))  # Should recompile
-  expect_true(attr(fit_recompile, "recompiled"))
-})
-```
-
-**Multivariate Missing Data**:
-```r
-test_that("complex missing data patterns work correctly", {
-  mvdata_missing$y1[c(5:10, 25:30)] <- NA  # Block missing
-  mvdata_missing$y2[c(1:3, 15:20)] <- NA   # Different pattern
-  
-  fit_missing <- mvgam(mvbf(y1 ~ x1, y2 ~ x2),
-                      trend_formula = list(y1 = ~ AR(p = 1), y2 = ~ RW()),
-                      data = mvdata_missing)
-  
-  # Trends evolve over ALL time points, likelihood only for non-missing
-  expect_equal(get_trend_length(fit_missing), nrow(mvdata_missing))
-  expect_different_obs_indices(fit_missing, "y1", "y2")
-})
-```
-
-**Cross-Response Correlation Preservation**:
-```r
-test_that("complex correlation structures preserved", {
-  fit_multiple_corr <- mvgam(
-    mvbf(y1 ~ x, y2 ~ x, y3 ~ x) + set_rescor(TRUE) +
-      autocor(ar(p = 1, formula = ~ time | group)),
-    trend_formula = list(y1 = ~ AR(p = 1), y2 = ~ RW(cor = TRUE), y3 = ~ VAR(p = 1)),
-    data = complex_corr_data
-  )
-  
-  # Should have: brms residual + observation AR + mvgam State-Space correlations
-  expect_correlation_separation(fit_multiple_corr)
 })
 ```
 
@@ -564,6 +653,7 @@ test_that("complex correlation structures preserved", {
   - Distributional models: mu/sigma/nu/tau parameter trends
   - Response helpers: mi()/weights()/cens()/trunc()/trials() compatibility
   - Multivariate: shared vs response-specific trends
+  - **Multiple imputation**: Rubin's rules accuracy, pooling diagnostics
   
 #### Week 15: Performance Optimization & Object Footprint
 - Memory usage optimization and object compression
@@ -572,9 +662,10 @@ test_that("complex correlation structures preserved", {
 
 #### Week 16: Documentation & Release Preparation
 - Updated function documentation with roxygen2
-- Key vignettes: multivariate models, autocorrelation integration, migration guide
+- Key vignettes: multivariate models, autocorrelation integration, multiple imputation workflow, migration guide
 - Performance benchmarks documentation
 - **Enhanced update() method documentation**: Examples showing formula updates, trend changes, recompilation logic
+- **Multiple imputation documentation**: Workflow examples, pooling diagnostics, comparison with brms patterns
 - Community feedback integration
 
 ## Key Innovation Points
@@ -585,14 +676,18 @@ First package to properly distinguish observation-level residual correlation fro
 ### 2. **Multivariate State-Space**
 Native support for response-specific trends while preserving brms cross-response correlations - unprecedented capability in the ecosystem.
 
-### 3. **Stan Extension Pattern**
+### 3. **Multiple Imputation Integration**
+Seamless multiple imputation support with Rubin's rules pooling, extending brms patterns to State-Space models - first implementation in time series modeling ecosystem.
+
+### 4. **Stan Extension Pattern**
 Using brms `stanvars` mechanism for State-Space injection - provides scalable approach for other time series extensions.
 
-### 4. **Method System Integration**
+### 5. **Method System Integration**
 Dual brmsfit-like objects enabling seamless brms ecosystem compatibility:
 - **Model evaluation**: loo/waic/pp_check with bayesplot integration
 - **Diagnostics**: rhat/neff_ratio/mcmc_plot/nuts_params via brms methods  
 - **Prediction**: posterior_predict/fitted/residuals following brms patterns
+- **Multiple imputation**: Rubin's rules pooling for all inference methods
 - **State-Space extensions**: mvgam-specific functionality (forecasting, trend extraction) built on top
 
 ## Risk Mitigation
@@ -607,11 +702,15 @@ Dual brmsfit-like objects enabling seamless brms ecosystem compatibility:
    - **Risk**: Cross-response missing patterns breaking trend evolution
    - **Mitigation**: Preserve proven `obs_ind` tracking approach, comprehensive testing matrix
 
-3. **Backend Maintenance Burden**
+3. **Multiple Imputation Pooling Accuracy**
+   - **Risk**: Incorrect Rubin's rules implementation affecting inference
+   - **Mitigation**: Extensive validation against known MI results, comparison with mice/brms patterns
+
+4. **Backend Maintenance Burden**
    - **Risk**: brms internal changes breaking mvgam compatibility
    - **Mitigation**: Automated monitoring system, version compatibility matrix, graceful degradation
 
-4. **Performance Regression**
+5. **Performance Regression**
    - **Risk**: New architecture slower than current mvgam
    - **Mitigation**: Automated benchmarking throughout development, Rcpp optimization, profiling
 
@@ -636,15 +735,18 @@ Dual brmsfit-like objects enabling seamless brms ecosystem compatibility:
   - [ ] Distributional regression: main parameter trends only (others via brms smooths)
   - [ ] Response helpers: mi()/weights()/cens()/trunc()/trials()/rate() etc.
   - [ ] Prior specification syntax
+  - [ ] **Multiple imputation**: Native support with Rubin's rules pooling
 - [ ] Seamless brms ecosystem integration:
   - [ ] Model evaluation: loo/waic/pp_check with bayesplot
   - [ ] Diagnostics: rhat/neff_ratio/mcmc_plot/nuts_params via brms methods
   - [ ] Prediction: posterior_predict/fitted/residuals following brms patterns
   - [ ] Model updating: enhanced update() method with comprehensive validation
+  - [ ] **MI-enhanced methods**: All methods work with pooled multiple imputation objects
 - [ ] >90% test coverage achieved
 - [ ] Multivariate models with response-specific trends working
 - [ ] Cross-response correlations preserved in multivariate State-Space models
 - [ ] Intelligent autocorrelation validation preventing conflicts
+- [ ] **Multiple imputation validation**: Dataset consistency, pooling diagnostics
 
 ## Dependencies & Migration
 
@@ -661,5 +763,5 @@ Dual brmsfit-like objects enabling seamless brms ecosystem compatibility:
 ---
 
 **Next Step**: Begin Week 1 - Trend Type Dispatcher System  
-**Critical Success Factor**: Stan code modification that preserves all brms functionality while seamlessly adding State-Space dynamics  
-**Key Innovation**: Leverage brms linear predictor generation + mvgam State-Space expertise + native multivariate support
+**Critical Success Factor**: Stan code modification that preserves all brms functionality while seamlessly adding State-Space dynamics and multiple imputation support  
+**Key Innovation**: Leverage brms linear predictor generation + mvgam State-Space expertise + native multivariate support + Rubin's rules pooling
