@@ -502,6 +502,7 @@ test_that("complex correlation structures preserved", {
   - Distributional models: mu/sigma/nu/tau parameter trends
   - Response helpers: mi()/weights()/cens()/trunc()/trials() compatibility
   - Multivariate: shared vs response-specific trends
+  
 #### Week 15: Performance Optimization & Object Footprint
 - Memory usage optimization and object compression
 - Final performance validation against targets
