@@ -378,6 +378,34 @@ log_lik.mvgam <- function(object, resp = NULL, ...) {
   return(compute_log_lik_matrix(prep, object))
 }
 
+# Enhanced update() method with comprehensive brms-style validation
+update.mvgam <- function(object, formula. = NULL, trend_formula. = NULL, 
+                        newdata = NULL, recompile = NULL, ...) {
+  # Comprehensive argument validation following brms patterns
+  validate_update_arguments(object, formula., trend_formula., newdata, ...)
+  
+  # Handle formula updates with State-Space trend considerations
+  if (!is.null(formula.)) {
+    new_formula <- update_formula_safely(object$formula, formula.)
+    validate_formula_change_compatibility(object, new_formula)
+  }
+  
+  if (!is.null(trend_formula.)) {
+    new_trend_formula <- update_trend_formula_safely(object$trend_formula, trend_formula.)
+    validate_trend_change_compatibility(object, new_trend_formula)
+  }
+  
+  # Intelligent recompilation decisions
+  needs_recompile <- determine_recompilation_need(object, formula., trend_formula., ...)
+  if (is.null(recompile)) recompile <- needs_recompile
+  
+  # Preserve State-Space specific components during update
+  updated_args <- prepare_update_args(object, formula., trend_formula., ...)
+  
+  # Call mvgam with updated arguments
+  do.call(mvgam, updated_args)
+}
+
 # Seamless integration with brms ecosystem methods
 # - Model evaluation: loo/waic/pp_check with bayesplot
 # - Diagnostics: rhat/neff_ratio/mcmc_plot/nuts_params via brms methods
@@ -460,6 +488,40 @@ test_that("response helpers work with State-Space trends", {
   )
   expect_censoring_correct(fit_cens)
 })
+
+test_that("enhanced update() method works correctly", {
+  # Basic formula updates
+  fit_base <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1), data = data)
+  fit_updated <- update(fit_base, formula. = . ~ . + z)
+  expect_formula_updated_correctly(fit_updated)
+  
+  # Trend formula updates
+  fit_trend_updated <- update(fit_base, trend_formula. = ~ RW(cor = TRUE))
+  expect_trend_updated_correctly(fit_trend_updated)
+  
+  # Combined updates with validation
+  expect_error(
+    update(fit_base, 
+           formula. = . ~ . + ar(time, group),  # brms autocor
+           trend_formula. = ~ AR(p = 2)),       # mvgam trend
+    "Conflicting autocorrelation specifications"
+  )
+  
+  # Multivariate model updates
+  fit_mv <- mvgam(mvbf(y1 ~ x, y2 ~ z), 
+                  trend_formula = list(y1 = ~ AR(p = 1), y2 = ~ RW()),
+                  data = mvdata)
+  fit_mv_updated <- update(fit_mv, 
+                          trend_formula. = list(y1 = ~ VAR(p = 1), y2 = ~ RW()))
+  expect_multivariate_update_correct(fit_mv_updated)
+  
+  # Recompilation intelligence
+  fit_no_recompile <- update(fit_base, iter = 4000)  # Should not recompile
+  expect_false(attr(fit_no_recompile, "recompiled"))
+  
+  fit_recompile <- update(fit_base, formula. = . ~ . + s(z))  # Should recompile
+  expect_true(attr(fit_recompile, "recompiled"))
+})
 ```
 
 **Multivariate Missing Data**:
@@ -512,6 +574,7 @@ test_that("complex correlation structures preserved", {
 - Updated function documentation with roxygen2
 - Key vignettes: multivariate models, autocorrelation integration, migration guide
 - Performance benchmarks documentation
+- **Enhanced update() method documentation**: Examples showing formula updates, trend changes, recompilation logic
 - Community feedback integration
 
 ## Key Innovation Points
@@ -577,6 +640,7 @@ Dual brmsfit-like objects enabling seamless brms ecosystem compatibility:
   - [ ] Model evaluation: loo/waic/pp_check with bayesplot
   - [ ] Diagnostics: rhat/neff_ratio/mcmc_plot/nuts_params via brms methods
   - [ ] Prediction: posterior_predict/fitted/residuals following brms patterns
+  - [ ] Model updating: enhanced update() method with comprehensive validation
 - [ ] >90% test coverage achieved
 - [ ] Multivariate models with response-specific trends working
 - [ ] Cross-response correlations preserved in multivariate State-Space models
