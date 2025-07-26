@@ -4,14 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Package Overview
 
-mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Models.The package enables Bayesian analysis of multivariate data using flexible GAM frameworks. It can handle various data types (counts, proportions, continuous values) with complex temporal or spatial dynamics, missing data, and seasonality, building custom Stan models that provide robust Bayesian inference.
+mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Models.The package enables Bayesian analysis of multivariate data using flexible GAM frameworks by enhancing the brms package. It can handle various data types (counts, proportions, continuous values) with complex temporal or spatial dynamics, missing data, and seasonality, building custom Stan models that provide robust Bayesian inference.
 
 ## Development Commands
 
 ### Testing
 - `R CMD check` - Full package check (used in CI)
-- `testthat::test_check("mvgam")` - Run all tests via testthat
-- `devtools::test()` - Run tests interactively during development
+- `testthat::test_check("mvgam")` - Run all tests via testthat or use `testthat::test_file()` to run specific tests during development
 
 ### Building and Documentation
 - `devtools::document()` - Generate documentation from roxygen2 comments
@@ -20,9 +19,9 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 - `devtools::install()` - Install package locally for development
 
 ### Package Structure
-- Uses standard R package structure with DESCRIPTION, NAMESPACE, and man/ directories
+- Uses standard R package structure with `DESCRIPTION`, `NAMESPACE`, `inst/` and `man/` directories
 - Source code organized in `R/` directory with provider-specific files
-- Vignettes in vignettes/ directory demonstrate key features
+- Vignettes in `vignettes/` directory demonstrate key features
 - Tests in `tests/testthat/`
 
 ## Architecture
@@ -34,16 +33,16 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 - Supports method inheritance and specialization
 
 **Layered Architecture Pattern**: Uses clear separation of concerns across multiple layers:
-- Interface Layer: User-facing functions (mvgam(), forecast(), plot()) provide clean APIs
-- Model Specification Layer: Formula processing, trend model constructors (RW(), VAR(), GP()), family definitions
-- Code Generation Layer: Translates R specifications into Stan/JAGS model code
-- Computational Backend Layer: Interfaces with Stan/JAGS for MCMC sampling
-- Post-processing Layer: Methods for analysis, diagnostics, and visualization
+- Interface Layer: User-facing functions (`mvgam()`, `forecast()`, `predict()`, `plot()`) provide clean APIs
+- Model Specification Layer: Formula processing with special trend model constructors (`RW()`, `VAR()`, `GP()`), family definitions
+- Code Generation Layer: Translates R specifications into brms code to build Stan models and data
+- Computational Backend Layer: Interfaces with Stan for MCMC sampling
+- Post-processing Layer: S3 methods for analysis, diagnostics, and visualization
 
 **Modular Component System**: Modular design where different components can be mixed and matched:
 - Trend Modules: Independent implementations of different temporal dynamics (Random Walk, AR, VAR, Gaussian Process, CAR)
 - Family Modules: Separate observation model implementations for different distributions
-- Backend Modules: Pluggable computational backends (Stan via rstan/cmdstanr, JAGS)
+- Backend Modules: Pluggable computational backends (Stan via rstan or cmdstanr)
 - Visualization Modules: Modular plotting system with specialized functions for different aspects
 
 **Bayesian Workflow Integration Pattern**: Designed around the complete Bayesian modeling workflow:
@@ -59,12 +58,12 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 ### Core Model Functions
 - `R/mvgam.R` - Main model fitting function that:
   - Validates and processes GAM formulas for observation and trend processes
-  - Sets up Stan/JAGS model code generation
+  - Sets up Stan model code generation
   - Runs MCMC sampling and returns fitted model objects
 
 - Trend model constructors in `R/mvgam_trend_types.R` (`RW()`, `AR()`, `VAR()`, `GP()`, `CAR()`):
-  - Define temporal dynamics specifications
-  - Configure stationarity constraints and correlation structures
+  - Define temporal dynamics specifications and point to forecasting cpp functions
+  - Provide user support to easily add new trend types with higher dispatch
 
 ### Prediction & Forecasting
 - `R/forecast.mvgam.R` - Generates in-sample and out-of-sample forecasts:
@@ -84,12 +83,6 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 - `R/ppc.mvgam.R` - Posterior predictive checks using bayesplot
 - `R/residuals.mvgam.R` - Dunn-Smyth residuals for model checking
 - `R/loo.mvgam.R` - Approximate leave-one-out cross-validation
-
-### Family Support
-- Extensive distribution families in `R/families.R`:
-  - Standard: gaussian, poisson, binomial, Gamma
-  - Extended: negative binomial, beta, Student-t, Tweedie
-  - Special: N-mixture models for imperfect detection
   
 ### Testing and Quality
 - `tests/testthat/` - Test suite
@@ -148,13 +141,6 @@ All mvgam functions must follow these validation patterns:
 - Include suggested solutions in error messages
 - Provide context about why constraints exist
 - Use consistent terminology across the package
-
-#### Dynamic Factor Model Constraints
-Special validation for identifiability constraints:
-- `n_lv > 0` cannot be combined with `gr != 'NA'` or `subgr != 'series'`
-- `n_lv > 0` cannot be combined with `ma = TRUE`
-- Only certain trend types support `n_lv > 0` (checked via `characteristics$supports_factors`)
-- Variance parameters fixed for dynamic factor models (one-time warning)
 
 ### Export Guidelines
 - Only export functions that users directly need (trend constructors, methods)
