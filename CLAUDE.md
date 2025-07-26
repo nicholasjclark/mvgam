@@ -97,9 +97,7 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 - Prioritize internal mvgam objects (i.e. `mvgam:::mvgam_example1`) for testing
 
 ### File Management
-- Specification documents (`*-requirements.md`, `*-design.md`, `*-implementation.md`) should be automatically added to `.Rbuildignore`
-- Any temporary development files should be excluded from package builds
-- When creating new specification files, always update `.Rbuildignore` to prevent inclusion in built package
+- Specification documents (`*-requirements.md`, `*-design.md`, `*-implementation.md`) and temporary development files should be automatically added to `.Rbuildignore`
 
 ### Code Organization
 - Provider files should follow consistent naming pattern
@@ -145,7 +143,6 @@ All mvgam functions must follow these validation patterns:
 ### Export Guidelines
 - Only export functions that users directly need (trend constructors, methods)
 - Keep validation and utility functions internal (`@noRd`)
-- Export extension points for users (e.g., `custom_trend()`)
 - Use clear, simple descriptions without excessive technical references
 
 ## Project Management Integration
@@ -189,10 +186,6 @@ Brief description of changes (50 chars max)
 - Detailed explanation of what was changed
 - Why the change was necessary  
 - Any important implementation notes
-
-🤖 Generated with [Claude Code](https://claude.ai/code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 ### .Rbuildignore Management
