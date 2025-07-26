@@ -6,10 +6,6 @@
 \alias{student_t}
 \alias{betar}
 \alias{nb}
-\alias{lognormal}
-\alias{student}
-\alias{bernoulli}
-\alias{beta_binomial}
 \alias{nmix}
 \title{Supported \pkg{mvgam} families}
 \usage{
@@ -20,14 +16,6 @@ student_t(link = "identity")
 betar(...)
 
 nb(...)
-
-lognormal(...)
-
-student(...)
-
-bernoulli(...)
-
-beta_binomial(...)
 
 nmix(link = "log")
 }

@@ -39,8 +39,8 @@ mvgam(
 
 # Multivariate with response-specific trends
 mvgam(
-  mvbf(count ~ temp, biomass ~ precip),
-  trend_formula = list(
+  bf(count ~ temp, biomass ~ precip) + set_rescor(FALSE),
+  trend_formula = bf(
     count = ~ AR(p = 1),        # Population dynamics
     biomass = ~ RW(cor = TRUE), # Correlated biomass trends
     presence = NULL             # No trend (static occupancy)
@@ -221,6 +221,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL, backend = NULL,
 #### Week 5-6: Two-Stage Stan Assembly
 - Extract trend stanvars from trend_setup
 - Modify observation linear predictor with missing data preservation
+- Ensure time series data are validated by modifying relevant functions in `validations.R`
 - Handle nonlinear model complexity (`bf(nl = TRUE)`)
 
 #### Week 7: Validation & Hurdle Model Support

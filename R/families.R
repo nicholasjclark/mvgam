@@ -103,30 +103,6 @@ nb = function(...) {
 }
 
 #' @rdname mvgam_families
-#' @export
-lognormal = function(...) {
-  brms::lognormal(...)
-}
-
-#' @rdname mvgam_families
-#' @export
-student = function(...) {
-  brms::student(...)
-}
-
-#' @rdname mvgam_families
-#' @export
-bernoulli = function(...) {
-  brms::bernoulli(...)
-}
-
-#' @rdname mvgam_families
-#' @export
-beta_binomial = function(...) {
-  brms::beta_binomial(...)
-}
-
-#' @rdname mvgam_families
 #'
 #' @examples
 #' \donttest{

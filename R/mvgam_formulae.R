@@ -43,23 +43,3 @@
 #' @author Nicholas J Clark
 #' @name mvgam_formulae
 NULL
-
-#' @export
-#' @importFrom brms gp
-brms::gp
-
-#' @export
-#' @importFrom mgcv s
-mgcv::s
-
-#' @export
-#' @importFrom mgcv te
-mgcv::te
-
-#' @export
-#' @importFrom mgcv ti
-mgcv::ti
-
-#' @export
-#' @importFrom mgcv t2
-mgcv::t2

@@ -1,6 +1,6 @@
 Package: mvgam
 Title: Multivariate (Dynamic) Generalized Additive Models
-Version: 1.1.593
+Version: 2.0.0
 Date: 2025-07-23
 Authors@R: c(person("Nicholas J", "Clark", email = "nicholas.j.clark1214@gmail.com", 
                     role = c("aut", "cre"), comment = c(ORCID = "0000-0001-7131-3301")),
@@ -17,9 +17,9 @@ URL: https://github.com/nicholasjclark/mvgam, https://nicholasjclark.github.io/m
 BugReports: https://github.com/nicholasjclark/mvgam/issues
 License: MIT + file LICENSE
 Depends: 
-    R (>= 3.6.0)
-Imports: 
-    brms (>= 2.21.0),
+    R (>= 3.6.0),
+    brms (>= 2.21.0)
+Imports:
     methods,
     mgcv (>= 1.8-13),
     insight (>= 0.19.1),
