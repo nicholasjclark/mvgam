@@ -9,7 +9,8 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 ## Development Commands
 
 ### Testing
-- `R CMD check` - Full package check (used in CI)
+- `Rscript -e "devtools::document()"` - Update package documentation
+- `Rscript -e "devtools::install()"` - Install package locally
 - `testthat::test_check("mvgam")` - Run all tests via testthat
 - `devtools::test()` - Run tests interactively during development
 
