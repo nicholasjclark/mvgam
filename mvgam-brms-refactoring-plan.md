@@ -346,3 +346,47 @@ Critical methods: `log_lik()`, `update()`, `print()`, `loo()` with multiple impu
 
 **Next Step**: Begin Week 1 - Trend Type Dispatcher System  
 **Critical Success Factor**: Stan code modification preserving all brms functionality while seamlessly adding State-Space dynamics, multiple imputation support, and enhanced LFO-CV
+
+## R Package Refactoring Best Practices
+
+### Managing Complex Architectural Migrations
+When performing major refactoring:
+
+#### Backwards Compatibility Strategy
+- Maintain parallel implementations during transition
+- Use feature flags to enable new vs. old implementations
+- Deprecate old functionality with clear migration path
+- Provide detailed upgrade documentation
+
+#### Dual Architecture Management
+- Create clear interfaces between old and new systems
+- Use wrapper functions to maintain existing user interfaces
+- Implement systematic testing to ensure equivalent functionality
+- Plan staged rollout with alpha/beta testing phases
+
+#### Systematic Feature Implementation
+- Follow established implementation timeline (e.g., 16-week plan)
+- Implement foundational components before dependent features
+- Validate each component before proceeding to next phase
+- Maintain comprehensive testing throughout migration
+
+#### Risk Mitigation
+- Create rollback plans for each phase
+- Maintain working implementations at each milestone
+- Use extensive testing to catch regressions early
+- Document all architectural decisions and constraints
+
+### Complex Project Context Management
+For extended development projects:
+
+#### Documentation Standards
+- Maintain comprehensive project plans (e.g., `mvgam-brms-refactoring-plan.md`)
+- Document architectural decisions and constraints
+- Keep implementation notes and design rationale
+- Update progress and status regularly
+
+#### Code Organization During Refactoring
+- Group related functionality in logical file structures
+- Use consistent naming conventions for new components
+- Maintain clear separation between old and new implementations
+- Document integration points and dependencies

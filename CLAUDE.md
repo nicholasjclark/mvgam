@@ -10,25 +10,24 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 
 ### Testing
 - `Rscript -e "devtools::document()"` - Update package documentation
-- `Rscript -e "devtools::install()"` - Install package locally
-- `testthat::test_check("mvgam")` - Run all tests via testthat
-- `devtools::test()` - Run tests interactively during development
-- `R CMD check` - Full package check (used in CI)
-- `testthat::test_check("mvgam")` - Run all tests via testthat or use `testthat::test_file()` to run specific tests during development
+- `Rscript -e "devtools::build(vignettes = FALSE)"` - Build package tarball
+- `Rscript -e "devtools::install(dependencies = FALSE)"` - Install package locally
+- `Rscript -e "testthat::test_check("mvgam")"` - Run all tests via testthat or use `Rscript -e "testthat::test_file(path/to/test)"` to run specific tests during development
 
 ### Building and Documentation
-- `devtools::document()` - Generate documentation from roxygen2 comments
-- `pkgdown::build_site()` - Build package website
-- `devtools::build()` - Build package tarball
-- `devtools::install()` - Install package locally for development
-
-### Package Structure
-- Uses standard R package structure with `DESCRIPTION`, `NAMESPACE`, `inst/` and `man/` directories
-- Source code organized in `R/` directory with provider-specific files
-- Vignettes in `vignettes/` directory demonstrate key features
-- Tests in `tests/testthat/`
+- `Rscript -e "devtools::document()"` - Generate documentation from roxygen2 comments
+- `Rscript -e "pkgdown::build_site()"` - Build package website
+- `Rscript -e "devtools::build(vignettes = FALSE)"` - Build package tarball
+- `Rscript -e "devtools::install(dependencies = FALSE)"` - Install package locally
 
 ## Architecture
+
+### Package Structure
+- Uses standard R package structure with `DESCRIPTION`, `NAMESPACE`, `src/` and `man/` directories
+- R source code organized in `R/` directory
+- Exported Rcpp source code organized in `src/` directory
+- Vignettes in `vignettes/` directory demonstrate key features
+- Tests in `tests/testthat/`
 
 ### Key Design Patterns
 
@@ -39,7 +38,7 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 **Layered Architecture Pattern**: Uses clear separation of concerns across multiple layers:
 - Interface Layer: User-facing functions (`mvgam()`, `forecast()`, `predict()`, `plot()`) provide clean APIs
 - Model Specification Layer: Formula processing with special trend model constructors (`RW()`, `VAR()`, `GP()`), family definitions
-- Code Generation Layer: Translates R specifications into brms code to build Stan models and data
+- Code Generation Layer: Translates R specifications into brms code to build initial Stan models and data, then extends these with custom additions
 - Computational Backend Layer: Interfaces with Stan for MCMC sampling
 - Post-processing Layer: S3 methods for analysis, diagnostics, and visualization
 
@@ -76,6 +75,8 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
   - Returns structured forecast objects with uncertainty quantification
 
 - `R/predict.mvgam.R` - General prediction treating trends as random effects
+
+- `src/trend_funs.cpp` - Rcpp source code for trend forecasting
   
 ### Visualization Suite
 - `R/plot.mvgam.R` - Main plotting method with multiple types:
@@ -92,16 +93,12 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 - `tests/testthat/` - Test suite
 - `vignettes/` - Documentation and examples
 - `.github/workflows/` - CI/CD with R CMD check, pkgdown building and valgrind check
-- Use `gh` client for all Github interactions
 
 ## Development Notes
 
 ### Testing Strategy
 - Separate test files for each major component
 - Prioritize internal mvgam objects (i.e. `mvgam:::mvgam_example1`) for testing
-
-### File Management
-- Specification documents (`*-requirements.md`, `*-design.md`, `*-implementation.md`) and temporary development files should be automatically added to `.Rbuildignore`
 
 ### Code Organization
 - Provider files should follow consistent naming pattern
@@ -110,14 +107,12 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 
 ### Documentation
 - Roxygen2 comments for all exported functions
-- Apply tidyverse styling (https://style.tidyverse.org/) for all R and roxygen code
 - Vignettes demonstrate in-depth use cases
 - pkgdown site provides comprehensive documentation
 - Examples demonstrate simpler use cases
 
-## Package-Specific Development Standards
-
 ### Code Style and Formatting
+- Apply tidyverse styling (https://style.tidyverse.org/) for all R and roxygen code
 - **Line Length**: Maximum 80 characters per line for readability
 - **Roxygen Documentation**: Use 2-space indentation for continuation lines
 - **Comment Style**: Use sentence case, avoid ALL CAPS in comments
@@ -125,7 +120,7 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 - **Consistency**: Follow existing package conventions where established
 
 ### Validation and Error Handling
-All mvgam functions must follow these validation patterns:
+- All mvgam functions must follow these validation patterns:
 
 #### Required Packages for Validation
 - `checkmate`: Parameter validation and type checking
@@ -149,38 +144,14 @@ All mvgam functions must follow these validation patterns:
 - Keep validation and utility functions internal (`@noRd`)
 - Use clear, simple descriptions without excessive technical references
 
-## Project Management Integration
-
-### TodoWrite Usage for Multi-Phase Projects
-Use TodoWrite tool proactively for:
-
-#### When to Use TodoWrite
-- Complex multi-step tasks requiring 3+ distinct steps
-- Major refactoring projects with multiple phases
-- When user provides multiple tasks or requirements
-- Before starting work on complex implementations
-- After completing tasks to track progress
-
-#### TodoWrite Best Practices
-- Create specific, actionable todo items
-- Break complex tasks into manageable steps
-- Use clear, descriptive task names
-- Update status in real-time during work
-- Mark tasks complete immediately after finishing
-- Only have ONE task in_progress at any time
-
-#### Task States and Management
-- `pending`: Task not yet started
-- `in_progress`: Currently working on (limit to ONE task at a time)
-- `completed`: Task finished successfully
-
-## Advanced Git Workflow
+## Git Workflow
 
 ### Branch Management
 - Use descriptive feature branch names: `feature/brms-integration`
 - Create branches from master before starting major work
 - Keep feature branches focused on specific functionality
 - Push branches to remote for backup and collaboration
+- Use `gh` client for all Github interactions
 
 ### Commit Message Standards
 Follow this pattern for all commits:
@@ -193,58 +164,14 @@ Brief description of changes (50 chars max)
 ```
 
 ### .Rbuildignore Management
+- Update `.Rbuildignore` immediately when creating new spec files
 - Automatically add specification documents to `.Rbuildignore`:
   - `*-requirements.md`, `*-design.md`, `*-implementation.md`
   - `*-plan.md` files
-  - Any temporary development documentation
-- Update `.Rbuildignore` immediately when creating new spec files
+  - Any temporary development documentation files
 
 ### Pre-commit Workflow
 1. Check git status to understand current changes
 2. Stage appropriate files with clear understanding of what's being committed
 3. Write descriptive commit messages explaining the changes
 4. Push to remote branch for backup
-
-## R Package Refactoring Best Practices
-
-### Managing Complex Architectural Migrations
-When performing major refactoring like the brms integration:
-
-#### Backwards Compatibility Strategy
-- Maintain parallel implementations during transition
-- Use feature flags to enable new vs. old implementations
-- Deprecate old functionality with clear migration path
-- Provide detailed upgrade documentation
-
-#### Dual Architecture Management
-- Create clear interfaces between old and new systems
-- Use wrapper functions to maintain existing user interfaces
-- Implement systematic testing to ensure equivalent functionality
-- Plan staged rollout with alpha/beta testing phases
-
-#### Systematic Feature Implementation
-- Follow established implementation timeline (e.g., 16-week plan)
-- Implement foundational components before dependent features
-- Validate each component before proceeding to next phase
-- Maintain comprehensive testing throughout migration
-
-#### Risk Mitigation
-- Create rollback plans for each phase
-- Maintain working implementations at each milestone
-- Use extensive testing to catch regressions early
-- Document all architectural decisions and constraints
-
-### Complex Project Context Management
-For extended development projects:
-
-#### Documentation Standards
-- Maintain comprehensive project plans (e.g., `mvgam-brms-refactoring-plan.md`)
-- Document architectural decisions and constraints
-- Keep implementation notes and design rationale
-- Update progress and status regularly
-
-#### Code Organization During Refactoring
-- Group related functionality in logical file structures
-- Use consistent naming conventions for new components
-- Maintain clear separation between old and new implementations
-- Document integration points and dependencies
