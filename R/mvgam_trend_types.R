@@ -17,6 +17,27 @@
 #'   terms, and cannot be anything other than `1` for continuous time AR
 #'   (`CAR`) terms.
 #'
+#' @param time The unquoted name of the variable that represents time in the
+#'   supplied `data`. This variable should be either a `numeric` or `integer`
+#'   variable. Defaults to `time` to align with brms conventions, allowing
+#'   flexible time variable naming without requiring explicit "time" columns.
+#'   When using the default, a one-time warning will be issued.
+#'
+#' @param series The unquoted name of the variable that represents the series
+#'   identifier in the supplied `data`. This variable should be either a 
+#'   `character` or `factor` variable. Defaults to `series` following mvgam
+#'   conventions, allowing flexible series variable naming. When using the 
+#'   default, a one-time warning will be issued.
+#'   
+#' @details
+#' **Important**: Only ONE trend constructor is allowed per `trend_formula`. 
+#' For complex temporal dynamics, use flexible parameters within a single trend type:
+#' \itemize{
+#'   \item For seasonal patterns: `AR(p = c(1, 12))` instead of `RW() + AR(p = 12)`
+#'   \item For multiple time scales: `AR(p = c(1, 7, 30))` for daily, weekly, monthly
+#'   \item For multivariate dynamics: `VAR(p = 2)` captures cross-series relationships
+#' }
+#'
 #' @param gr An optional grouping variable, which must be a `factor` in the
 #'   supplied `data`, for setting up hierarchical residual correlation
 #'   structures. If specified, this will automatically set `cor = TRUE` and set
@@ -69,6 +90,38 @@
 #'
 #' @examples
 #' \donttest{
+#' # Basic trend model usage with defaults (will issue warnings)
+#' mod1 <- mvgam(y ~ s(x), trend_formula = ~ RW(), data = data)
+#' 
+#' # Using custom time and series variable names
+#' mod2 <- mvgam(y ~ temp, 
+#'               trend_formula = ~ AR(time = week, series = species, p = 1), 
+#'               data = weekly_data)
+#' mod3 <- mvgam(count ~ habitat, 
+#'               trend_formula = ~ VAR(time = month, series = location, p = 2), 
+#'               data = monthly_data)
+#' 
+#' # Seasonal AR model with multiple lags (Note: only ONE trend constructor per formula)
+#' mod4 <- mvgam(
+#'   biomass ~ precipitation,
+#'   trend_formula = ~ AR(time = daily, series = plot_id, p = c(1, 12)),  # Daily + seasonal lags
+#'   data = ecosystem_data
+#' )
+#' 
+#' # Hierarchical models with custom time and series variables
+#' mod5 <- mvgam(
+#'   abundance ~ temperature,
+#'   trend_formula = ~ VAR(time = timestep, series = unit_id, gr = region, subgr = species),
+#'   data = multisite_data
+#' )
+#' 
+#' # Multiple species across sites - explicit variable naming avoids warnings
+#' mod6 <- mvgam(
+#'   count ~ habitat + temperature,
+#'   trend_formula = ~ RW(time = survey_date, series = species_site),
+#'   data = biodiversity_data
+#' )
+#' 
 #' # A short example to illustrate CAR(1) models
 #' # Function to simulate CAR1 data with seasonality
 #' sim_corcar1 = function(n = 125,
@@ -219,7 +272,21 @@
 #' mcmc_plot(mod, variable = 'alpha_cor', type = 'hist')
 #' }
 #' @export
-RW = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
+RW = function(time = NA, series = NA, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
+  # Process time argument like brms
+  time <- deparse0(substitute(time))
+  time_was_default <- (time == "NA")
+  if (time == "NA") time <- "time"  # Default to 'time' when NA
+  
+  # Process series argument like brms
+  series <- deparse0(substitute(series))
+  series_was_default <- (series == "NA")
+  if (series == "NA") series <- "series"  # Default to 'series' when NA
+  
+  # Issue warnings for default usage using modular functions
+  if (time_was_default) warn_default_time_variable()
+  if (series_was_default) warn_default_series_variable()
+  
   # Input validation using checkmate
   checkmate::assert_logical(ma, len = 1)
   checkmate::assert_logical(cor, len = 1)
@@ -241,7 +308,8 @@ RW = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
       trend_model = 'RW',  # Backwards compatibility
       ma = ma,
       cor = cor,
-      unit = 'time',
+      time = time,
+      series = series,
       gr = gr,
       subgr = subgr,
       n_lv = n_lv,
@@ -280,7 +348,21 @@ RW = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
 
 #' @rdname RW
 #' @export
-AR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
+AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
+  # Process time argument like brms
+  time <- deparse0(substitute(time))
+  time_was_default <- (time == "NA")
+  if (time == "NA") time <- "time"  # Default to 'time' when NA
+  
+  # Process series argument like brms
+  series <- deparse0(substitute(series))
+  series_was_default <- (series == "NA")
+  if (series == "NA") series <- "series"  # Default to 'series' when NA
+  
+  # Issue warnings for default usage using modular functions
+  if (time_was_default) warn_default_time_variable()
+  if (series_was_default) warn_default_series_variable()
+  
   # Validate AR order parameter - can be integer or vector of integers
   if (length(p) == 1) {
     checkmate::assert_int(p, lower = 1)
@@ -328,7 +410,8 @@ AR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) 
       max_lag = max_lag,
       ma = ma,
       cor = cor,
-      unit = 'time',
+      time = time,
+      series = series,
       gr = gr,
       subgr = subgr,
       n_lv = n_lv,
@@ -368,7 +451,21 @@ AR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) 
 
 #' @rdname RW
 #' @export
-CAR = function(p = 1) {
+CAR = function(time = NA, series = NA, p = 1) {
+  # Process time argument like brms
+  time <- deparse0(substitute(time))
+  time_was_default <- (time == "NA")
+  if (time == "NA") time <- "time"  # Default to 'time' when NA
+  
+  # Process series argument like brms
+  series <- deparse0(substitute(series))
+  series_was_default <- (series == "NA")
+  if (series == "NA") series <- "series"  # Default to 'series' when NA
+  
+  # Issue warnings for default usage using modular functions
+  if (time_was_default) warn_default_time_variable()
+  if (series_was_default) warn_default_series_variable()
+  
   validate_pos_integer(p)
   if (p > 1) {
     stop("Argument 'p' must be = 1", call. = FALSE)
@@ -378,6 +475,8 @@ CAR = function(p = 1) {
       trend_model = paste0('CAR', p),
       ma = FALSE,
       cor = FALSE,
+      time = time,
+      series = series,
       unit = 'time',
       gr = 'NA',
       subgr = 'series',
@@ -393,7 +492,21 @@ CAR = function(p = 1) {
 
 #' @rdname RW
 #' @export
-VAR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
+VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
+  # Process time argument like brms
+  time <- deparse0(substitute(time))
+  time_was_default <- (time == "NA")
+  if (time == "NA") time <- "time"  # Default to 'time' when NA
+  
+  # Process series argument like brms
+  series <- deparse0(substitute(series))
+  series_was_default <- (series == "NA")
+  if (series == "NA") series <- "series"  # Default to 'series' when NA
+  
+  # Issue warnings for default usage using modular functions
+  if (time_was_default) warn_default_time_variable()
+  if (series_was_default) warn_default_series_variable()
+  
   # Validate VAR order parameter - any positive integer
   checkmate::assert_int(p, lower = 1)
   
@@ -428,7 +541,8 @@ VAR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL)
       p = p,
       ma = ma,
       cor = cor,
-      unit = 'time',
+      time = time,
+      series = series,
       gr = gr,
       subgr = subgr,
       n_lv = n_lv,
@@ -497,12 +611,28 @@ VAR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL)
 #' @seealso \code{\link[brms]{gp}}
 #'
 #' @export
-GP = function(...) {
+GP = function(time = NA, series = NA, ...) {
+  # Process time argument like brms
+  time <- deparse0(substitute(time))
+  time_was_default <- (time == "NA")
+  if (time == "NA") time <- "time"  # Default to 'time' when NA
+  
+  # Process series argument like brms
+  series <- deparse0(substitute(series))
+  series_was_default <- (series == "NA")
+  if (series == "NA") series <- "series"  # Default to 'series' when NA
+  
+  # Issue warnings for default usage using modular functions
+  if (time_was_default) warn_default_time_variable()
+  if (series_was_default) warn_default_series_variable()
+  
   out <- structure(
     list(
       trend_model = 'GP',
       ma = FALSE,
       cor = FALSE,
+      time = time,
+      series = series,
       unit = 'time',
       gr = 'NA',
       subgr = 'series',

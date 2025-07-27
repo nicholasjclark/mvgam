@@ -290,6 +290,114 @@ validate_trend_order <- function(p, max_order, trend_type) {
 #'
 #' @return List with validated gr and subgr values
 #' @noRd
+validate_time_variable <- function(time, data = NULL) {
+  # Default to 'time' if NA specified (like brms)
+  if (time == 'NA') {
+    time <- 'time'
+  }
+  
+  # If data is provided, validate that time variable exists and is appropriate
+  if (!is.null(data)) {
+    checkmate::assert_data_frame(data)
+    
+    if (!time %in% names(data)) {
+      stop(insight::format_error(
+        "Time variable {.field {time}} not found in data.",
+        "Available variables: {.field {paste(names(data), collapse = ', ')}}.",
+        "Please specify a valid time variable or ensure your data contains a 'time' column."
+      ), call. = FALSE)
+    }
+    
+    time_var <- data[[time]]
+    if (!is.numeric(time_var) && !is.integer(time_var)) {
+      stop(insight::format_error(
+        "Time variable {.field {time}} must be numeric or integer.",
+        "Found type: {.field {class(time_var)[1]}}.",
+        "Time series models require ordered numeric time indices."
+      ), call. = FALSE)
+    }
+    
+    # Warning for non-standard time variable names
+    if (time != 'time') {
+      rlang::warn(
+        insight::format_warning(
+          "Using {.field {time}} as time variable instead of 'time'.",
+          "This follows brms conventions for flexible time variable naming."
+        ),
+        .frequency = "once",
+        .frequency_id = paste0("mvgam_custom_time_var_", time)
+      )
+    }
+  }
+  
+  return(time)
+}
+
+warn_default_time_variable <- function() {
+  rlang::warn(
+    insight::format_warning(
+      "Using default time variable 'time'.",
+      "Specify {.field time = your_time_var} if your time variable has a different name."
+    ),
+    .frequency = "once",
+    .frequency_id = "mvgam_default_time_var"
+  )
+}
+
+warn_default_series_variable <- function() {
+  rlang::warn(
+    insight::format_warning(
+      "Using default series variable 'series'.",
+      "Specify {.field series = your_series_var} if your series variable has a different name."
+    ),
+    .frequency = "once",
+    .frequency_id = "mvgam_default_series_var"
+  )
+}
+
+validate_series_variable <- function(series, data = NULL) {
+  # Default to 'series' if NA specified (like mvgam convention)
+  if (series == 'NA') {
+    series <- 'series'
+  }
+  
+  # If data is provided, validate that series variable exists and is appropriate
+  if (!is.null(data)) {
+    checkmate::assert_data_frame(data)
+    
+    if (!series %in% names(data)) {
+      stop(insight::format_error(
+        "Series variable {.field {series}} not found in data.",
+        "Available variables: {.field {paste(names(data), collapse = ', ')}}.",
+        "Please specify a valid series variable or ensure your data contains a 'series' column."
+      ), call. = FALSE)
+    }
+    
+    series_var <- data[[series]]
+    if (!is.character(series_var) && !is.factor(series_var)) {
+      stop(insight::format_error(
+        "Series variable {.field {series}} must be character or factor.",
+        "Found type: {.field {class(series_var)[1]}}.",
+        "Series identifiers should be categorical variables."
+      ), call. = FALSE)
+    }
+    
+    # Warning for non-standard series variable names
+    if (series != 'series') {
+      rlang::warn(
+        insight::format_warning(
+          "Using {.field {series}} as series variable instead of 'series'.",
+          "This follows mvgam conventions for flexible series variable naming."
+        ),
+        .frequency = "once",
+        .frequency_id = paste0("mvgam_custom_series_var_", series)
+      )
+    }
+  }
+  
+  return(series)
+}
+
 validate_grouping_arguments <- function(gr, subgr) {
   
   # Set default subgr if no grouping specified

@@ -179,12 +179,23 @@ validate_autocor_usage <- function(formula, trend_formula) {
 
 ### Phase 1: Foundation (Weeks 1-4)
 
-#### Week 1: Trend Dispatcher System
+#### Week 1: Trend Dispatcher System ✅ **COMPLETE**
 Registry-based trend constructor system enabling `RW()`, `AR()`, `VAR()`, `GP()`, `CAR()`
 
-#### Week 2: Formula Integration & Autocorrelation Validation
+#### Week 2: Formula Integration & Autocorrelation Validation ✅ **COMPLETE**
 - Multivariate formula parsing with `mvbf()` support
 - Context-aware autocorrelation validation preventing conflicts
+
+**Post-Week 2 Enhancement**: Enhanced trend constructors with `time` and `series` parameters following brms conventions:
+```r
+# Flexible variable naming with unquoted syntax
+AR(time = week, series = species, p = 1)
+VAR(time = timepoint, series = location, p = 2, cor = TRUE)
+RW(time = day, series = site)
+
+# Defaults with informative warnings
+RW()  # Uses 'time' and 'series' with one-time session warnings
+```
 
 #### Week 3: brms Setup Optimization
 - Benchmark fastest brms setup method (`backend = "mock"` vs `chains = 0`)
