@@ -10,15 +10,13 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 
 ### Testing
 - `Rscript -e "devtools::document()"` - Update package documentation
-- `Rscript -e "devtools::build(vignettes = FALSE)"` - Build package tarball
-- `Rscript -e "devtools::install(dependencies = FALSE)"` - Install package locally
+- `R CMD INSTALL --preclean --no-multiarch` - Install package locally
 - `Rscript -e "testthat::test_check("mvgam")"` - Run all tests via testthat or use `Rscript -e "testthat::test_file(path/to/test)"` to run specific tests during development
 
 ### Building and Documentation
 - `Rscript -e "devtools::document()"` - Generate documentation from roxygen2 comments
 - `Rscript -e "pkgdown::build_site()"` - Build package website
-- `Rscript -e "devtools::build(vignettes = FALSE)"` - Build package tarball
-- `Rscript -e "devtools::install(dependencies = FALSE)"` - Install package locally
+- `R CMD INSTALL --preclean --no-multiarch` - Install package locally
 
 ## Architecture
 

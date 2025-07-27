@@ -7,15 +7,53 @@
 \alias{VAR}
 \title{Specify autoregressive dynamic processes in \pkg{mvgam}}
 \usage{
-RW(ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL)
+RW(
+  time = NA,
+  series = NA,
+  ma = FALSE,
+  cor = FALSE,
+  gr = NA,
+  subgr = NA,
+  n_lv = NULL
+)
 
-AR(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL)
+AR(
+  time = NA,
+  series = NA,
+  p = 1,
+  ma = FALSE,
+  cor = FALSE,
+  gr = NA,
+  subgr = NA,
+  n_lv = NULL
+)
 
-CAR(p = 1)
+CAR(time = NA, series = NA, p = 1)
 
-VAR(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL)
+VAR(
+  time = NA,
+  series = NA,
+  p = 1,
+  ma = FALSE,
+  cor = FALSE,
+  gr = NA,
+  subgr = NA,
+  n_lv = NULL
+)
 }
 \arguments{
+\item{time}{The unquoted name of the variable that represents time in the
+supplied \code{data}. This variable should be either a \code{numeric} or \code{integer}
+variable. Defaults to \code{time} to align with brms conventions, allowing
+flexible time variable naming without requiring explicit "time" columns.
+When using the default, a one-time warning will be issued.}
+
+\item{series}{The unquoted name of the variable that represents the series
+identifier in the supplied \code{data}. This variable should be either a
+\code{character} or \code{factor} variable. Defaults to \code{series} following mvgam
+conventions, allowing flexible series variable naming. When using the
+default, a one-time warning will be issued.}
+
 \item{ma}{\code{Logical}. Include moving average terms of order \code{1}?
 Default is \code{FALSE}.}
 
@@ -77,6 +115,14 @@ Set up autoregressive or autoregressive moving average trend models in
 purely to help set up a model with particular autoregressive trend models.
 }
 \details{
+\strong{Important}: Only ONE trend constructor is allowed per \code{trend_formula}.
+For complex temporal dynamics, use flexible parameters within a single trend type:
+\itemize{
+\item For seasonal patterns: \code{AR(p = c(1, 12))} instead of \code{RW() + AR(p = 12)}
+\item For multiple time scales: \code{AR(p = c(1, 7, 30))} for daily, weekly, monthly
+\item For multivariate dynamics: \code{VAR(p = 2)} captures cross-series relationships
+}
+
 Use \code{vignette("mvgam_overview")} to see the full details of
 available stochastic trend types in \pkg{mvgam}, or view the rendered
 version on the package website at:
@@ -84,6 +130,38 @@ https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html
 }
 \examples{
 \donttest{
+# Basic trend model usage with defaults (will issue warnings)
+mod1 <- mvgam(y ~ s(x), trend_formula = ~ RW(), data = data)
+
+# Using custom time and series variable names
+mod2 <- mvgam(y ~ temp, 
+              trend_formula = ~ AR(time = week, series = species, p = 1), 
+              data = weekly_data)
+mod3 <- mvgam(count ~ habitat, 
+              trend_formula = ~ VAR(time = month, series = location, p = 2), 
+              data = monthly_data)
+
+# Seasonal AR model with multiple lags (Note: only ONE trend constructor per formula)
+mod4 <- mvgam(
+  biomass ~ precipitation,
+  trend_formula = ~ AR(time = daily, series = plot_id, p = c(1, 12)),  # Daily + seasonal lags
+  data = ecosystem_data
+)
+
+# Hierarchical models with custom time and series variables
+mod5 <- mvgam(
+  abundance ~ temperature,
+  trend_formula = ~ VAR(time = timestep, series = unit_id, gr = region, subgr = species),
+  data = multisite_data
+)
+
+# Multiple species across sites - explicit variable naming avoids warnings
+mod6 <- mvgam(
+  count ~ habitat + temperature,
+  trend_formula = ~ RW(time = survey_date, series = species_site),
+  data = biodiversity_data
+)
+
 # A short example to illustrate CAR(1) models
 # Function to simulate CAR1 data with seasonality
 sim_corcar1 = function(n = 125,

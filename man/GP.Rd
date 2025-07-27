@@ -4,7 +4,7 @@
 \alias{GP}
 \title{Specify dynamic Gaussian process trends in \pkg{mvgam} models}
 \usage{
-GP(...)
+GP(time = NA, series = NA, ...)
 }
 \arguments{
 \item{...}{unused}
