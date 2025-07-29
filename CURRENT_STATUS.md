@@ -233,14 +233,41 @@ Created 6 comprehensive test files with **350+ test cases** covering all archite
 - **Real-world validation** shows architecture functions work correctly
 - **Testing strategy refined** for Phase 2 focus on Stan integration
 
+## Phase 2 Preparation: Stan Code Enhancement ✅
+
+**Date**: 2025-01-29  
+**Update**: Non-centered parameterization integration for enhanced architecture
+
+### **Stan Code Enhancements Complete**
+1. **Non-centered parameterization**: Updated refactoring plan for RW(), AR(), and CAR() models
+   - Innovations sampled in `model` block: `to_vector(LV_raw) ~ std_normal()`
+   - Transformations computed in `transformed parameters` block
+   - Follows current mvgam patterns for efficient MCMC sampling
+
+2. **Enhanced trend integration**: Aligned Stan code generation with dispatcher system
+   - Uses enhanced trend object metadata (`stancode_fun`, `forecast_fun`)
+   - Supports non-continuous AR lags: `AR(p = c(1, 12, 24))`
+   - Integrated with `time` and `series` parameter flexibility
+
+3. **CAR model support**: Added continuous-time AR with proper time distance handling
+   - Uses `time_dis` matrix for irregular time intervals
+   - Power decay: `pow(ar1[j], time_dis[i, j])` for continuous-time evolution
+   - Maintains compatibility with current CAR implementation patterns
+
+### **Refactoring Plan Alignment**
+- **Current architecture**: Plan now reflects enhanced trend constructors with dispatcher system
+- **Stan code generators**: Modular functions (`rw_stan_code()`, `ar_stan_code()`, `car_stan_code()`)
+- **Implementation ready**: Phase 2 Stan integration prepared with detailed specifications
+
 ## Next Steps 🎯
 
 **Proceeding to Phase 2**: Stan Integration (Weeks 5-8)
 **Strategic Decision**: Move forward with proven architecture, focus testing efforts on Stan code integration where real validation matters most.
 
 **Phase 2 Priorities:**
-- Two-stage Stan assembly with trend stanvar extraction
+- Two-stage Stan assembly with trend stanvar extraction using enhanced architecture
 - Linear predictor modification with missing data preservation  
+- Non-centered parameterization implementation for all trend types
 - Real Stan code compilation testing (not mocked)
 - End-to-end model fitting validation
 

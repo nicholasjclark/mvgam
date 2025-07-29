@@ -254,11 +254,242 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL, backend = NULL,
 
 ### Phase 2: Stan Integration (Weeks 5-8)
 
-#### Week 5-6: Two-Stage Stan Assembly
-- Extract trend stanvars from trend_setup
+#### Week 5-6: Two-Stage Stan Assembly with Enhanced Trend Architecture
+**Files**: `R/trend_injection_generators.R` (new), `R/stan_assembly.R` (new)
+
+**Key Innovation**: Generate **stanvars that inject temporal components** into brms Stan code using the enhanced trend constructor architecture with dispatcher system.
+
+```r
+# Generate trend injection stanvars using dispatcher system
+generate_trend_injection_stanvars <- function(trend_obj, data_info) {
+  # Use the enhanced trend object's metadata for Stan code generation
+  stancode_fun <- get(trend_obj$stancode_fun, mode = "function")
+  
+  # Call the trend-specific Stan code generator with non-centered parameterization
+  return(stancode_fun(trend_obj, data_info))
+}
+
+# AR Stan code generator - supports non-continuous lags with non-centered parameterization
+ar_stan_code <- function(trend_obj, data_info) {
+  # Extract AR parameters from enhanced trend object
+  ar_lags <- trend_obj$ar_lags
+  max_lag <- trend_obj$max_lag
+  n_lags <- length(ar_lags)
+  lags_str <- paste(ar_lags, collapse = ", ")
+  
+  # Handle single lag (AR1) vs multiple lags
+  if (n_lags == 1 && ar_lags[1] == 1) {
+    # Optimized AR(1) non-centered implementation
+    return(list(
+      ar1_params = stanvar(NULL, "ar1_params", scode = glue::glue("
+        parameters {{
+          vector[{data_info$n_lv}] ar1;
+          vector<lower=0>[{data_info$n_lv}] sigma;
+          matrix[n, {data_info$n_lv}] LV_raw;
+        }}
+      ")),
+      ar1_transform = stanvar(NULL, "ar1_transform", block = "tparameters", scode = glue::glue("
+        // Non-centered AR(1) transformation
+        matrix[n, {data_info$n_lv}] LV;
+        trend_mus = X_trend * b_trend;
+        LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
+        for (j in 1:{data_info$n_lv}) {{
+          LV[1, j] += trend_mus[ytimes_trend[1, j]];
+          for (i in 2:n) {{
+            LV[i, j] += trend_mus[ytimes_trend[i, j]]
+                        + ar1[j] * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]);
+          }}
+        }}
+        
+        // derived latent states
+        for (i in 1:n) {{
+          for (s in 1:n_series) {{
+            trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+          }}
+        }}
+      ")),
+      ar1_model = stanvar(NULL, "ar1_model_block", scode = "
+        // Non-centered AR(1) priors - only sample innovations
+        ar1 ~ normal(0, 0.5);
+        sigma ~ inv_gamma(1.418, 0.452);
+        to_vector(LV_raw) ~ std_normal();
+      ")
+    ))
+  } else {
+    # General AR(p) with non-continuous lags like p = c(1, 12, 24)
+    return(list(
+      ar_functions = stanvar(NULL, "ar_functions", block = "functions", scode = glue::glue("
+        // Efficient AR with non-continuous lags function
+        matrix ar_evolution_sparse(matrix LV_raw, vector[] ar_coeffs, matrix trend_mus, 
+                                  matrix ytimes_trend, vector sigma, int[] lags, 
+                                  int max_lag, int n, int n_lv) {{
+          matrix[n, n_lv] LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
+          int n_lags = size(lags);
+          
+          // Initialize first max_lag time points with available lags
+          for (j in 1:n_lv) {{
+            for (i in 1:min(max_lag, n)) {{
+              LV[i, j] += trend_mus[ytimes_trend[i, j]];
+              for (k in 1:n_lags) {{
+                int lag = lags[k];
+                if (i > lag) {{
+                  LV[i, j] += ar_coeffs[j][k] * (LV[i - lag, j] - trend_mus[ytimes_trend[i - lag, j]]);
+                }}
+              }}
+            }}
+          }}
+          
+          // Efficient computation for remaining time points
+          if (n > max_lag) {{
+            for (i in (max_lag+1):n) {{
+              for (j in 1:n_lv) {{
+                real ar_contribution = 0;
+                for (k in 1:n_lags) {{
+                  int lag = lags[k];
+                  ar_contribution += ar_coeffs[j][k] * (LV[i - lag, j] - trend_mus[ytimes_trend[i - lag, j]]);
+                }}
+                LV[i, j] += trend_mus[ytimes_trend[i, j]] + ar_contribution;
+              }}
+            }}
+          }}
+          
+          return LV;
+        }}
+      ")),
+      ar_data = stanvar(as.array(ar_lags), "ar_lags", scode = glue::glue("
+        data {{
+          int ar_lags[{n_lags}] = {{{lags_str}}};
+          int max_lag = {max_lag};
+          int n_lags = {n_lags};
+        }}
+      ")),
+      ar_params = stanvar(NULL, "ar_params", scode = glue::glue("
+        parameters {{
+          vector[{n_lags}] ar_coeffs[{data_info$n_lv}];
+          vector<lower=0>[{data_info$n_lv}] sigma;
+          matrix[n, {data_info$n_lv}] LV_raw;
+        }}
+      ")),
+      ar_transform = stanvar(NULL, "ar_transform", block = "tparameters", scode = glue::glue("
+        // Non-centered AR with sparse lags transformation
+        matrix[n, {data_info$n_lv}] LV;
+        trend_mus = X_trend * b_trend;
+        LV = ar_evolution_sparse(LV_raw, ar_coeffs, trend_mus, ytimes_trend, sigma, 
+                                ar_lags, max_lag, n, {data_info$n_lv});
+        
+        // derived latent states
+        for (i in 1:n) {{
+          for (s in 1:n_series) {{
+            trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+          }}
+        }}
+      ")),
+      ar_model = stanvar(NULL, "ar_model_block", scode = "
+        // Non-centered AR priors - only sample innovations
+        for (j in 1:n_lv) {
+          ar_coeffs[j] ~ normal(0, 0.5);
+        }
+        sigma ~ inv_gamma(1.418, 0.452);
+        to_vector(LV_raw) ~ std_normal();
+      ")
+    ))
+  }
+}
+
+# RW Stan code generator - non-centered parameterization
+rw_stan_code <- function(trend_obj, data_info) {
+  return(list(
+    rw_params = stanvar(NULL, "rw_params", scode = glue::glue("
+      parameters {{
+        vector<lower=0>[{data_info$n_lv}] sigma;
+        matrix[n, {data_info$n_lv}] LV_raw;
+      }}
+    ")),
+    rw_transform = stanvar(NULL, "rw_transform", block = "tparameters", scode = glue::glue("
+      // Non-centered RW transformation
+      matrix[n, {data_info$n_lv}] LV;
+      trend_mus = X_trend * b_trend;
+      LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
+      for (j in 1:{data_info$n_lv}) {{
+        LV[1, j] += trend_mus[ytimes_trend[1, j]];
+        for (i in 2:n) {{
+          LV[i, j] += trend_mus[ytimes_trend[i, j]] + LV[i - 1, j];
+        }}
+      }}
+      
+      // derived latent states
+      for (i in 1:n) {{
+        for (s in 1:n_series) {{
+          trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+        }}
+      }}
+    ")),
+    rw_model = stanvar(NULL, "rw_model_block", scode = "
+      // Non-centered RW priors - only sample innovations
+      sigma ~ inv_gamma(1.418, 0.452);
+      to_vector(LV_raw) ~ std_normal();
+    ")
+  ))
+}
+
+# CAR Stan code generator - non-centered parameterization for continuous-time AR
+car_stan_code <- function(trend_obj, data_info) {
+  return(list(
+    car_params = stanvar(NULL, "car_params", scode = glue::glue("
+      parameters {{
+        vector[{data_info$n_lv}] ar1;
+        vector<lower=0>[{data_info$n_lv}] sigma;
+        matrix[n, {data_info$n_lv}] LV_raw;
+      }}
+    ")),
+    car_data = stanvar(NULL, "car_data", scode = glue::glue("
+      data {{
+        matrix[n, {data_info$n_lv}] time_dis;  // Time distances for CAR process
+      }}
+    ")),
+    car_transform = stanvar(NULL, "car_transform", block = "tparameters", scode = glue::glue("
+      // Non-centered CAR(1) transformation with continuous-time distances
+      matrix[n, {data_info$n_lv}] LV;
+      trend_mus = X_trend * b_trend;
+      LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
+      for (j in 1:{data_info$n_lv}) {{
+        LV[1, j] += trend_mus[ytimes_trend[1, j]];
+        for (i in 2:n) {{
+          LV[i, j] += trend_mus[ytimes_trend[i, j]]
+                      + pow(ar1[j], time_dis[i, j])
+                        * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]);
+        }}
+      }}
+      
+      // derived latent states
+      for (i in 1:n) {{
+        for (s in 1:n_series) {{
+          trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+        }}
+      }}
+    ")),
+    car_model = stanvar(NULL, "car_model_block", scode = "
+      // Non-centered CAR(1) priors - only sample innovations
+      ar1 ~ normal(0, 0.5);
+      sigma ~ inv_gamma(1.418, 0.452);
+      to_vector(LV_raw) ~ std_normal();
+    ")
+  ))
+}
+```
+
+**Implementation Tasks**:
+- Extract trend stanvars from trend_setup using enhanced trend objects
 - Modify observation linear predictor with missing data preservation
-- Ensure time series data are validated by modifying relevant functions in `validations.R`
+- Integrate with existing `time` and `series` parameter system
 - Handle nonlinear model complexity (`bf(nl = TRUE)`)
+
+**Special CAR Implementation Notes**:
+- CAR models require `time_dis` matrix in Stan data containing time distances between observations
+- Time distances are computed from irregular time intervals: `time_dis[i, j] = time[i] - time[i-1]` 
+- CAR autoregressive decay uses `pow(ar1[j], time_dis[i, j])` for continuous-time evolution
+- Minimum time distance threshold (e.g., 1e-3) prevents numerical issues with zero distances
+- CAR constructor currently needs enhancement to match full dispatcher architecture with `stancode_fun = 'car_stan_code'`
 
 #### Week 7: Validation & Hurdle Model Support
 - Intelligent autocorrelation validation based on formula context
