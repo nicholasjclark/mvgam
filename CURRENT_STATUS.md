@@ -311,4 +311,4 @@ git status
 
 ## Next Session Pickup Point
 
-**Ready for Week 3**: brms Setup Optimization - Focus on integrating the validation system with existing mvgam workflow, optimizing brms posterior processing, and implementing dual-architecture compatibility patterns as outlined in the refactoring plan.
+**Ready for Week 3**: Add PW() and ZMVN() trend stancode generators - modify AR() and RW() stancode generators to handle grouping and correlated errors - Deprecate GP() trend type - brms Setup Optimization - Focus on integrating the validation system with existing mvgam workflow, optimizing brms posterior processing, and implementing dual-architecture compatibility patterns as outlined in the refactoring plan.
