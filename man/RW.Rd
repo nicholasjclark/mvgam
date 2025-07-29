@@ -131,62 +131,126 @@ https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html
 \examples{
 \donttest{
 # Basic trend model usage with defaults (will issue warnings)
-mod1 <- mvgam(y ~ s(x), trend_formula = ~ RW(), data = data)
+set.seed(0)
+simdat <- sim_mvgam(
+  T = 50,
+  n_series = 3,
+  prop_trend = 0.6
+)
+mod1 <- mvgam(
+  y ~ s(season, bs = "cc"),
+  trend_formula = ~ RW(),
+  data = simdat$data_train,
+  chains = 2,
+  silent = 2
+)
 
-# Using custom time and series variable names
-mod2 <- mvgam(y ~ temp, 
-              trend_formula = ~ AR(time = week, series = species, p = 1), 
-              data = weekly_data)
-mod3 <- mvgam(count ~ habitat, 
-              trend_formula = ~ VAR(time = month, series = location, p = 2), 
-              data = monthly_data)
+# Using custom time and series variable names with simulated data
+set.seed(123)
+weekly_data <- sim_mvgam(
+  T = 52,
+  n_series = 2,
+  prop_trend = 0.5
+)$data_train
 
-# Seasonal AR model with multiple lags (Note: only ONE trend constructor per formula)
-mod4 <- mvgam(
-  biomass ~ precipitation,
-  trend_formula = ~ AR(time = daily, series = plot_id, p = c(1, 12)),  # Daily + seasonal lags
-  data = ecosystem_data
+# Rename variables to demonstrate custom naming
+weekly_data$week <- weekly_data$time
+weekly_data$species <- weekly_data$series
+weekly_data$temp <- rnorm(nrow(weekly_data))
+
+mod2 <- mvgam(
+  y ~ temp,
+  trend_formula = ~ AR(time = week, series = species, p = 1),
+  data = weekly_data,
+  chains = 2,
+  silent = 2
+)
+
+# Seasonal AR model with multiple lags using portal_data
+data(portal_data)
+mod3 <- mvgam(
+  captures ~ s(ndvi_ma12) + s(mintemp),
+  trend_formula = ~ AR(p = c(1, 12)),  # Annual seasonality
+  data = portal_data,
+  family = nb(),
+  chains = 2,
+  silent = 2
 )
 
 # Hierarchical models with custom time and series variables
-mod5 <- mvgam(
-  abundance ~ temperature,
-  trend_formula = ~ VAR(time = timestep, series = unit_id, gr = region, subgr = species),
-  data = multisite_data
+set.seed(456)
+multisite_data <- rbind(
+  sim_mvgam(T = 30, n_series = 3, prop_trend = 0.7)$data_train \%>\%
+    dplyr::mutate(region = "north"),
+  sim_mvgam(T = 30, n_series = 3, prop_trend = 0.7)$data_train \%>\%
+    dplyr::mutate(region = "south")
+) \%>\%
+  dplyr::mutate(
+    region = as.factor(region),
+    unit_id = paste0(region, "_", series),
+    timestep = time,
+    temperature = rnorm(n())
+  ) \%>\%
+  dplyr::select(-series)  # Remove series for hierarchical structure
+
+mod4 <- mvgam(
+  y ~ temperature,
+  trend_formula = ~ VAR(
+    time = timestep,
+    gr = region,
+    subgr = unit_id,
+    p = 2
+  ),
+  data = multisite_data,
+  chains = 2,
+  silent = 2
 )
 
-# Multiple species across sites - explicit variable naming avoids warnings
-mod6 <- mvgam(
+# Multiple species across sites using portal_data
+portal_subset <- portal_data \%>\%
+  dplyr::mutate(
+    survey_date = time,
+    species_site = series,
+    count = captures,
+    habitat = "grassland",
+    temperature = mintemp
+  )
+
+mod5 <- mvgam(
   count ~ habitat + temperature,
   trend_formula = ~ RW(time = survey_date, series = species_site),
-  data = biodiversity_data
+  data = portal_subset,
+  family = nb(),
+  chains = 2,
+  silent = 2
 )
 
 # A short example to illustrate CAR(1) models
 # Function to simulate CAR1 data with seasonality
-sim_corcar1 = function(n = 125,
-                       phi = 0.5,
-                       sigma = 2,
-                       sigma_obs = 0.75) {
+sim_corcar1 <- function(n = 125,
+                        phi = 0.5,
+                        sigma = 2,
+                        sigma_obs = 0.75) {
   # Sample irregularly spaced time intervals
   time_dis <- c(1, runif(n - 1, 0, 5))
 
   # Set up the latent dynamic process
-  x <- vector(length = n); x[1] <- -0.3
+  x <- vector(length = n)
+  x[1] <- -0.3
   for (i in 2:n) {
-    # zero-distances will cause problems in sampling, so mvgam uses a
+    # Zero-distances will cause problems in sampling, so mvgam uses a
     # minimum threshold; this simulation function emulates that process
     if (time_dis[i] == 0) {
       x[i] <- rnorm(
         1,
         mean = (phi^1e-3) * x[i - 1],
-        sd = sigma * (1 - phi^(2 * 1e-3)) / (1 - phi^2)
+        sd = sigma * sqrt((1 - phi^(2 * 1e-3)) / (1 - phi^2))
       )
     } else {
       x[i] <- rnorm(
         1,
         mean = (phi^time_dis[i]) * x[i - 1],
-        sd = sigma * (1 - phi^(2 * time_dis[i])) / (1 - phi^2)
+        sd = sigma * sqrt((1 - phi^(2 * time_dis[i])) / (1 - phi^2))
       )
     }
   }
@@ -207,14 +271,15 @@ sim_corcar1 = function(n = 125,
 }
 
 # Sample two time series
+set.seed(99)
 dat <- rbind(
   dplyr::bind_cols(
     sim_corcar1(phi = 0.65, sigma_obs = 0.55),
-    data.frame(series = 'series1')
+    data.frame(series = "series1")
   ),
   dplyr::bind_cols(
     sim_corcar1(phi = 0.8, sigma_obs = 0.35),
-    data.frame(series = 'series2')
+    data.frame(series = "series2")
   )
 ) \%>\%
   dplyr::mutate(series = as.factor(series))
@@ -243,9 +308,9 @@ plot(mod, type = 'residuals', series = 1)
 plot(mod, type = 'residuals', series = 2)
 mcmc_plot(
   mod,
-  variable = 'ar1',
+  variable = "ar1",
   regex = TRUE,
-  type = 'hist'
+  type = "hist"
 )
 
 # Now an example illustrating hierarchical dynamics
@@ -274,14 +339,14 @@ simdat3 <- sim_mvgam(
 # Set up the data but DO NOT include 'series'
 all_dat <- rbind(
   simdat1$data_train \%>\%
-    dplyr::mutate(region = 'qld'),
+    dplyr::mutate(region = "qld"),
   simdat2$data_train \%>\%
-    dplyr::mutate(region = 'nsw'),
+    dplyr::mutate(region = "nsw"),
   simdat3$data_train \%>\%
-    dplyr::mutate(region = 'vic')
+    dplyr::mutate(region = "vic")
 ) \%>\%
   dplyr::mutate(
-    species = gsub('series', 'species', series),
+    species = gsub("series", "species", series),
     species = as.factor(species),
     region = as.factor(region)
   ) \%>\%
@@ -306,10 +371,10 @@ mod <- mvgam(
 
 # Check standard outputs
 summary(mod)
-conditional_effects(mod, type = 'link')
+conditional_effects(mod, type = "link")
 
 # Inspect posterior estimates for the correlation weighting parameter
-mcmc_plot(mod, variable = 'alpha_cor', type = 'hist')
+mcmc_plot(mod, variable = "alpha_cor", type = "hist")
 }
 }
 \author{

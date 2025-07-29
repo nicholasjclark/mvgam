@@ -24,13 +24,13 @@
 #'   When using the default, a one-time warning will be issued.
 #'
 #' @param series The unquoted name of the variable that represents the series
-#'   identifier in the supplied `data`. This variable should be either a 
+#'   identifier in the supplied `data`. This variable should be either a
 #'   `character` or `factor` variable. Defaults to `series` following mvgam
-#'   conventions, allowing flexible series variable naming. When using the 
+#'   conventions, allowing flexible series variable naming. When using the
 #'   default, a one-time warning will be issued.
-#'   
+#'
 #' @details
-#' **Important**: Only ONE trend constructor is allowed per `trend_formula`. 
+#' **Important**: Only ONE trend constructor is allowed per `trend_formula`.
 #' For complex temporal dynamics, use flexible parameters within a single trend type:
 #' \itemize{
 #'   \item For seasonal patterns: `AR(p = c(1, 12))` instead of `RW() + AR(p = 12)`
@@ -104,7 +104,7 @@
 #'   chains = 2,
 #'   silent = 2
 #' )
-#' 
+#'
 #' # Using custom time and series variable names with simulated data
 #' set.seed(123)
 #' weekly_data <- sim_mvgam(
@@ -112,12 +112,12 @@
 #'   n_series = 2,
 #'   prop_trend = 0.5
 #' )$data_train
-#' 
+#'
 #' # Rename variables to demonstrate custom naming
 #' weekly_data$week <- weekly_data$time
 #' weekly_data$species <- weekly_data$series
 #' weekly_data$temp <- rnorm(nrow(weekly_data))
-#' 
+#'
 #' mod2 <- mvgam(
 #'   y ~ temp,
 #'   trend_formula = ~ AR(time = week, series = species, p = 1),
@@ -125,7 +125,7 @@
 #'   chains = 2,
 #'   silent = 2
 #' )
-#' 
+#'
 #' # Seasonal AR model with multiple lags using portal_data
 #' data(portal_data)
 #' mod3 <- mvgam(
@@ -136,7 +136,7 @@
 #'   chains = 2,
 #'   silent = 2
 #' )
-#' 
+#'
 #' # Hierarchical models with custom time and series variables
 #' set.seed(456)
 #' multisite_data <- rbind(
@@ -152,7 +152,7 @@
 #'     temperature = rnorm(n())
 #'   ) %>%
 #'   dplyr::select(-series)  # Remove series for hierarchical structure
-#' 
+#'
 #' mod4 <- mvgam(
 #'   y ~ temperature,
 #'   trend_formula = ~ VAR(
@@ -165,7 +165,7 @@
 #'   chains = 2,
 #'   silent = 2
 #' )
-#' 
+#'
 #' # Multiple species across sites using portal_data
 #' portal_subset <- portal_data %>%
 #'   dplyr::mutate(
@@ -175,7 +175,7 @@
 #'     habitat = "grassland",
 #'     temperature = mintemp
 #'   )
-#' 
+#'
 #' mod5 <- mvgam(
 #'   count ~ habitat + temperature,
 #'   trend_formula = ~ RW(time = survey_date, series = species_site),
@@ -184,7 +184,7 @@
 #'   chains = 2,
 #'   silent = 2
 #' )
-#' 
+#'
 #' # A short example to illustrate CAR(1) models
 #' # Function to simulate CAR1 data with seasonality
 #' sim_corcar1 <- function(n = 125,
@@ -337,25 +337,32 @@
 #' mcmc_plot(mod, variable = "alpha_cor", type = "hist")
 #' }
 #' @export
-RW = function(time = NA, series = NA, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
-  # Process time argument like brms
+RW = function(
+    time = NA,
+    series = NA,
+    ma = FALSE,
+    cor = FALSE,
+    gr = NA,
+    subgr = NA,
+    n_lv = NULL) {
+  # Process time argument
   time <- deparse0(substitute(time))
   time_was_default <- (time == "NA")
   if (time == "NA") time <- "time"  # Default to 'time' when NA
-  
-  # Process series argument like brms
+
+  # Process series argument
   series <- deparse0(substitute(series))
   series_was_default <- (series == "NA")
   if (series == "NA") series <- "series"  # Default to 'series' when NA
-  
+
   # Issue warnings for default usage using modular functions
   if (time_was_default) warn_default_time_variable()
   if (series_was_default) warn_default_series_variable()
-  
+
   # Input validation using checkmate
   checkmate::assert_logical(ma, len = 1)
   checkmate::assert_logical(cor, len = 1)
-  
+
   # Process and validate grouping arguments
   gr <- deparse0(substitute(gr))
   subgr <- deparse0(substitute(subgr))
@@ -404,30 +411,30 @@ RW = function(time = NA, series = NA, ma = FALSE, cor = FALSE, gr = NA, subgr = 
       labels = c('trend_estimates', 'precision_parameter', 'standard_deviation', 'moving_average_coef', 'covariance_matrix', 'process_errors', 'drift_parameter')
     )
   )
-  
+
   # Validate using dispatcher system
   validate_trend(out)
-  
+
   return(out)
 }
 
 #' @rdname RW
 #' @export
 AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
-  # Process time argument like brms
+  # Process time argument
   time <- deparse0(substitute(time))
   time_was_default <- (time == "NA")
   if (time == "NA") time <- "time"  # Default to 'time' when NA
-  
-  # Process series argument like brms
+
+  # Process series argument
   series <- deparse0(substitute(series))
   series_was_default <- (series == "NA")
   if (series == "NA") series <- "series"  # Default to 'series' when NA
-  
+
   # Issue warnings for default usage using modular functions
   if (time_was_default) warn_default_time_variable()
   if (series_was_default) warn_default_series_variable()
-  
+
   # Validate AR order parameter - can be integer or vector of integers
   if (length(p) == 1) {
     checkmate::assert_int(p, lower = 1)
@@ -438,7 +445,7 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
     ar_lags <- p
     max_lag <- max(p)
   }
-  
+
   # Input validation using checkmate
   checkmate::assert_logical(ma, len = 1)
   checkmate::assert_logical(cor, len = 1)
@@ -455,16 +462,17 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
 
   # Determine parameter names based on AR lags
   ar_params <- paste0('ar', ar_lags)
+  ar_params_bracketed <- paste0('ar[', ar_lags, ']')
   param_names <- c('trend', 'tau', 'sigma', ar_params, if(ma) 'theta', if(cor || gr != 'NA') 'Sigma', 'error', 'drift')
-  param_labels <- c('trend_estimates', 'precision_parameter', 'standard_deviation', 
-                   paste0('autoregressive_coef_lag_', ar_lags), 
+  param_labels <- c('trend_estimates', 'precision_parameter', 'standard_deviation',
+                   paste0('autoregressive_coef_lag_', ar_lags),
                    if(ma) 'moving_average_coef' else NULL,
                    if(cor || gr != 'NA') 'covariance_matrix' else NULL,
                    'process_errors', 'drift_parameter')
-  
+
   # Create AR bounds list
   ar_bounds <- setNames(rep(list(c(-1, 1)), length(ar_params)), ar_params)
-  
+
   # Create trend object with dispatcher integration
   out <- structure(
     list(
@@ -482,8 +490,8 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
       n_lv = n_lv,
       label = build_trend_label('AR', cor = cor, ma = ma, gr = gr, n_lv = n_lv, p = max_lag),
       tpars = c('sigma', ar_params, if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
-      monitor_pars = c('trend', 'sigma', ar_params, if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
-      extract_pars = c('sigma', ar_params, if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
+      monitor_pars = c('trend', 'sigma', ar_params_bracketed, if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
+      extract_pars = c('sigma', ar_params_bracketed, if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
       forecast_fun = 'forecast_ar_rcpp',
       stancode_fun = 'ar_stan_code',
       standata_fun = 'ar_stan_data',
@@ -507,30 +515,30 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
       labels = param_labels
     )
   )
-  
+
   # Validate using dispatcher system
   validate_trend(out)
-  
+
   return(out)
 }
 
 #' @rdname RW
 #' @export
 CAR = function(time = NA, series = NA, p = 1) {
-  # Process time argument like brms
+  # Process time argument
   time <- deparse0(substitute(time))
   time_was_default <- (time == "NA")
   if (time == "NA") time <- "time"  # Default to 'time' when NA
-  
-  # Process series argument like brms
+
+  # Process series argument
   series <- deparse0(substitute(series))
   series_was_default <- (series == "NA")
   if (series == "NA") series <- "series"  # Default to 'series' when NA
-  
+
   # Issue warnings for default usage using modular functions
   if (time_was_default) warn_default_time_variable()
   if (series_was_default) warn_default_series_variable()
-  
+
   validate_pos_integer(p)
   if (p > 1) {
     stop("Argument 'p' must be = 1", call. = FALSE)
@@ -558,23 +566,23 @@ CAR = function(time = NA, series = NA, p = 1) {
 #' @rdname RW
 #' @export
 VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
-  # Process time argument like brms
+  # Process time argument
   time <- deparse0(substitute(time))
   time_was_default <- (time == "NA")
   if (time == "NA") time <- "time"  # Default to 'time' when NA
-  
-  # Process series argument like brms
+
+  # Process series argument
   series <- deparse0(substitute(series))
   series_was_default <- (series == "NA")
   if (series == "NA") series <- "series"  # Default to 'series' when NA
-  
+
   # Issue warnings for default usage using modular functions
   if (time_was_default) warn_default_time_variable()
   if (series_was_default) warn_default_series_variable()
-  
+
   # Validate VAR order parameter - any positive integer
   checkmate::assert_int(p, lower = 1)
-  
+
   # Input validation using checkmate
   checkmate::assert_logical(ma, len = 1)
   checkmate::assert_logical(cor, len = 1)
@@ -590,11 +598,13 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, 
   cor <- validate_correlation_requirements(gr, cor)
 
   # Create parameter names for VAR(p)
-  param_names <- c('trend', paste0('A', 1:p), 'Sigma', 'P_real', 'sigma', 
+  A_params <- paste0('A', 1:p)
+  A_params_bracketed <- paste0('A[', 1:p, ']')
+  param_names <- c('trend', A_params, 'Sigma', 'P_real', 'sigma',
                    if(ma) 'theta', 'error', 'drift')
-  param_labels <- c('trend_estimates', 
+  param_labels <- c('trend_estimates',
                    paste0('var_coefficient_matrix_lag_', 1:p),
-                   'covariance_matrix', 'stationary_precision', 'standard_deviation', 
+                   'covariance_matrix', 'stationary_precision', 'standard_deviation',
                    if(ma) 'moving_average_matrix' else NULL,
                    'process_errors', 'drift_parameter')
 
@@ -612,9 +622,9 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, 
       subgr = subgr,
       n_lv = n_lv,
       label = build_trend_label('VAR', cor = cor, ma = ma, gr = gr, n_lv = n_lv, p = p),
-      tpars = c('sigma', paste0('A', 1:p), 'Sigma', if(ma) 'theta'),
-      monitor_pars = c('trend', 'sigma', paste0('A', 1:p), 'Sigma', if(ma) 'theta'),
-      extract_pars = c('sigma', paste0('A', 1:p), 'Sigma', if(ma) 'theta'),
+      tpars = c('sigma', A_params, 'Sigma', if(ma) 'theta'),
+      monitor_pars = c('trend', 'sigma', A_params_bracketed, 'Sigma', if(ma) 'theta'),
+      extract_pars = c('sigma', A_params_bracketed, 'Sigma', if(ma) 'theta'),
       forecast_fun = 'forecast_var_rcpp',
       stancode_fun = 'var_stan_code',
       standata_fun = 'var_stan_data',
@@ -638,10 +648,10 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, 
       labels = param_labels
     )
   )
-  
+
   # Validate using dispatcher system
   validate_trend(out)
-  
+
   return(out)
 }
 
@@ -677,20 +687,20 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, 
 #'
 #' @export
 GP = function(time = NA, series = NA, ...) {
-  # Process time argument like brms
+  # Process time argument
   time <- deparse0(substitute(time))
   time_was_default <- (time == "NA")
   if (time == "NA") time <- "time"  # Default to 'time' when NA
-  
-  # Process series argument like brms
+
+  # Process series argument
   series <- deparse0(substitute(series))
   series_was_default <- (series == "NA")
   if (series == "NA") series <- "series"  # Default to 'series' when NA
-  
+
   # Issue warnings for default usage using modular functions
   if (time_was_default) warn_default_time_variable()
   if (series_was_default) warn_default_series_variable()
-  
+
   out <- structure(
     list(
       trend_model = 'GP',

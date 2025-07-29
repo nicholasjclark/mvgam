@@ -64,6 +64,7 @@ purely to help set up a model with particular error processes
 \examples{
 \donttest{
 # Simulate counts of four species over ten sampling locations
+set.seed(42)
 site_dat <- data.frame(
   site = rep(1:10, 4),
   species = as.factor(sort(rep(letters[1:4], 10))),
@@ -82,9 +83,10 @@ mod <- mvgam(
 )
 
 # Inspect the estimated species-species residual covariances
-mcmc_plot(mod, variable = 'Sigma', regex = TRUE, type = 'hist')
+mcmc_plot(mod, variable = "Sigma", regex = TRUE, type = "hist")
 
 # A hierarchical correlation example
+set.seed(789)
 Sigma <- matrix(
   c(1, -0.4, 0.5,
     -0.4, 1, 0.3,
@@ -102,7 +104,7 @@ make_site_dat <- function(...) {
   site_dat <- do.call(rbind, lapply(1:3, function(spec) {
     data.frame(
       y = rpois(30, lambda = exp(errors[, spec])),
-      species = paste0('species', spec),
+      species = paste0("species", spec),
       site = 1:30
     )
   }))
@@ -111,9 +113,9 @@ make_site_dat <- function(...) {
 
 site_dat <- rbind(
   make_site_dat() \%>\%
-    dplyr::mutate(group = 'group1'),
+    dplyr::mutate(group = "group1"),
   make_site_dat() \%>\%
-    dplyr::mutate(group = 'group2')
+    dplyr::mutate(group = "group2")
 ) \%>\%
   dplyr::mutate(
     species = as.factor(species),
@@ -128,7 +130,7 @@ mod <- mvgam(
 )
 
 # Inspect the estimated species-species residual covariances
-mcmc_plot(mod, variable = 'Sigma', regex = TRUE, type = 'hist')
+mcmc_plot(mod, variable = "Sigma", regex = TRUE, type = "hist")
 }
 
 }

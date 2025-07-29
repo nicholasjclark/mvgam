@@ -74,11 +74,11 @@ scale of your outcome. Note also that no missing values are allowed in
 \examples{
 \donttest{
 # Example of logistic growth with possible changepoints
-dNt = function(r, N, k) {
+dNt <- function(r, N, k) {
   r * N * (k - N)
 }
 
-Nt = function(r, N, t, k) {
+Nt <- function(r, N, t, k) {
   for (i in 1:(t - 1)) {
     if (i \%in\% c(5, 15, 25, 41, 45, 60, 80)) {
       N[i + 1] <- max(
@@ -94,22 +94,22 @@ Nt = function(r, N, t, k) {
 
 set.seed(11)
 expected <- Nt(0.004, 2, 100, 30)
-plot(expected, xlab = 'Time')
+plot(expected, xlab = "Time")
 
 y <- rpois(100, expected)
-plot(y, xlab = 'Time')
+plot(y, xlab = "Time")
 
 mod_data <- data.frame(
   y = y,
   time = 1:100,
   cap = 35,
-  series = as.factor('series_1')
+  series = as.factor("series_1")
 )
 plot_mvgam_series(data = mod_data)
 
 mod <- mvgam(
   y ~ 0,
-  trend_model = PW(growth = 'logistic'),
+  trend_model = PW(growth = "logistic"),
   family = poisson(),
   data = mod_data,
   chains = 2,
@@ -121,11 +121,11 @@ hc <- hindcast(mod)
 plot(hc)
 
 library(ggplot2)
-mcmc_plot(mod, variable = 'delta_trend', regex = TRUE) +
+mcmc_plot(mod, variable = "delta_trend", regex = TRUE) +
   scale_y_discrete(labels = mod$trend_model$changepoints) +
   labs(
-    y = 'Potential changepoint',
-    x = 'Rate change'
+    y = "Potential changepoint",
+    x = "Rate change"
   )
 
 how_to_cite(mod)
