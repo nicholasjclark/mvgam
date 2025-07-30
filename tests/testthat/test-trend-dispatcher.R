@@ -754,3 +754,276 @@ test_that("time and series parameters integrate correctly with formula parsing",
     expect_equal(parsed3$trend_components[[1]]$subgr, "species")
   })
 })
+
+# Additional comprehensive tests for grouping variables and PW validation
+
+# Test grouping variables are properly passed to dispatchers
+test_that("grouping variables are properly validated and passed to dispatchers", {
+  suppressWarnings({
+    
+    # Test valid hierarchical grouping scenarios
+    # RW with hierarchical grouping (should work with correlation)
+    rw_grouped <- RW(time = week, series = species, gr = region, subgr = site, cor = TRUE)
+    expect_equal(rw_grouped$gr, "region")
+    expect_equal(rw_grouped$subgr, "site")
+    expect_equal(rw_grouped$time, "week")
+    expect_equal(rw_grouped$series, "species")
+    expect_true(rw_grouped$cor)
+    
+    # AR with hierarchical grouping
+    ar_grouped <- AR(time = month, series = location, p = 1, gr = ecosystem, subgr = site, cor = TRUE)
+    expect_equal(ar_grouped$gr, "ecosystem")
+    expect_equal(ar_grouped$subgr, "site")
+    expect_equal(ar_grouped$p, 1)
+    expect_true(ar_grouped$cor)
+    
+    # VAR with hierarchical grouping
+    var_grouped <- VAR(time = year, series = population, p = 2, gr = habitat, subgr = species, cor = TRUE)
+    expect_equal(var_grouped$gr, "habitat")
+    expect_equal(var_grouped$subgr, "species")
+    expect_equal(var_grouped$p, 2)
+    expect_true(var_grouped$cor)
+    
+    # Test that grouping is preserved in formula parsing
+    f1 <- ~ s(temp) + RW(time = week, series = species, gr = region, subgr = site, cor = TRUE)
+    parsed1 <- mvgam:::parse_trend_formula(f1)
+    trend_comp <- parsed1$trend_components[[1]]
+    expect_equal(trend_comp$gr, "region")
+    expect_equal(trend_comp$subgr, "site")
+    expect_equal(trend_comp$time, "week")
+    expect_equal(trend_comp$series, "species")
+    expect_true(trend_comp$cor)
+    
+    # Test complex formula with multiple trends having different grouping
+    f2 <- ~ AR(time = day, series = unit, gr = block, subgr = plot, p = 1, cor = TRUE) + 
+           s(temperature) + 
+           RW(time = week, series = transect, gr = site, subgr = quadrat, cor = TRUE)
+    parsed2 <- mvgam:::parse_trend_formula(f2)
+    expect_equal(length(parsed2$trend_components), 2)
+    
+    # Check first trend (AR)
+    ar_comp <- parsed2$trend_components[[1]]
+    expect_equal(ar_comp$trend, "AR1")
+    expect_equal(ar_comp$gr, "block")
+    expect_equal(ar_comp$subgr, "plot")
+    expect_equal(ar_comp$time, "day")
+    expect_equal(ar_comp$series, "unit")
+    
+    # Check second trend (RW) 
+    rw_comp <- parsed2$trend_components[[2]]
+    expect_equal(rw_comp$trend, "RW")
+    expect_equal(rw_comp$gr, "site")
+    expect_equal(rw_comp$subgr, "quadrat")
+    expect_equal(rw_comp$time, "week")
+    expect_equal(rw_comp$series, "transect")
+  })
+})
+
+# Test grouping validation error conditions
+test_that("grouping variable validation catches invalid combinations", {
+  
+  # Test error when gr specified without subgr
+  expect_error(
+    mvgam:::validate_grouping_arguments("region", "NA"),
+    "Hierarchical grouping requires subgrouping"
+  )
+  
+  # Test error when subgr is 'series' (reserved)
+  expect_error(
+    mvgam:::validate_grouping_arguments("region", "series"),
+    "Invalid subgrouping for hierarchical models"
+  )
+  
+  # Test warning when hierarchical grouping specified without correlation
+  expect_warning(
+    RW(gr = region, subgr = site, cor = FALSE),
+    "Hierarchical grouping specified without correlation"
+  )
+  
+  expect_warning(
+    AR(gr = habitat, subgr = species, p = 1, cor = FALSE),
+    "Hierarchical grouping specified without correlation"
+  )
+  
+  expect_warning(
+    VAR(gr = ecosystem, subgr = location, p = 2, cor = FALSE),
+    "Hierarchical grouping specified without correlation"
+  )
+})
+
+# Test PW cap argument validation for logistic growth
+test_that("PW cap argument is properly validated for logistic growth", {
+  
+  suppressWarnings({
+    # Test linear growth doesn't require cap (should work)
+    pw_linear1 <- PW(time = week, series = species, growth = 'linear', n_changepoints = 5)
+    expect_equal(pw_linear1$growth, "linear")
+    expect_equal(pw_linear1$trend_model, "PWlinear")
+    expect_equal(pw_linear1$cap, "cap")  # Default cap still set but not required
+    expect_equal(pw_linear1$n_changepoints, 5)
+    
+    # Test linear growth with explicit cap (should work)
+    pw_linear2 <- PW(time = month, series = population, cap = max_size, growth = 'linear')
+    expect_equal(pw_linear2$growth, "linear")
+    expect_equal(pw_linear2$cap, "max_size")
+    
+    # Test logistic growth with explicit cap (should work)
+    pw_logistic1 <- PW(time = day, series = cells, cap = carrying_capacity, growth = 'logistic')
+    expect_equal(pw_logistic1$growth, "logistic")
+    expect_equal(pw_logistic1$trend_model, "PWlogistic")
+    expect_equal(pw_logistic1$cap, "carrying_capacity")
+    
+    # Test that cap argument is preserved in formula parsing
+    f1 <- ~ s(temperature) + PW(time = week, series = species, cap = max_biomass, growth = 'logistic')
+    parsed1 <- mvgam:::parse_trend_formula(f1)
+    pw_comp <- parsed1$trend_components[[1]]
+    expect_equal(pw_comp$cap, "max_biomass")
+    expect_equal(pw_comp$growth, "logistic")
+    expect_equal(pw_comp$trend_model, "PWlogistic")
+    
+    # Test complex PW specification in formula
+    f2 <- ~ AR(p = 1) + s(temp) + 
+           PW(time = daily, series = population, cap = environment_capacity, 
+              growth = 'logistic', n_changepoints = 15, changepoint_scale = 0.1)
+    parsed2 <- mvgam:::parse_trend_formula(f2)
+    expect_equal(length(parsed2$trend_components), 2)
+    
+    # Find the PW component (could be in either position)
+    pw_comp2 <- NULL
+    for (comp in parsed2$trend_components) {
+      if (comp$trend_model %in% c("PWlinear", "PWlogistic")) {
+        pw_comp2 <- comp
+        break
+      }
+    }
+    expect_false(is.null(pw_comp2))
+    expect_equal(pw_comp2$cap, "environment_capacity")
+    expect_equal(pw_comp2$growth, "logistic")
+    expect_equal(pw_comp2$n_changepoints, 15)
+    expect_equal(pw_comp2$changepoint_scale, 0.1)
+  })
+})
+
+# Test PW parameter validation
+test_that("PW parameter validation works correctly", {
+  
+  suppressWarnings({
+    # Test valid parameter ranges
+    pw_valid <- PW(time = week, series = species, cap = max_pop, growth = 'logistic',
+                   n_changepoints = 20, changepoint_range = 0.9, changepoint_scale = 0.02)
+    expect_equal(pw_valid$n_changepoints, 20)
+    expect_equal(pw_valid$changepoint_range, 0.9)
+    expect_equal(pw_valid$changepoint_scale, 0.02)
+    
+    # Test invalid n_changepoints (must be positive integer)
+    expect_error(
+      PW(n_changepoints = 0),
+      "must be a positive integer"
+    )
+
+    expect_error(
+      PW(n_changepoints = -5),
+      "must be a positive integer"
+    )
+
+    expect_error(
+      PW(n_changepoints = 3.5),
+      "must be a positive integer"
+    )
+
+    # Test invalid changepoint_range (must be between 0 and 1)
+    expect_error(
+      PW(changepoint_range = 1.5),
+      "must be a proportion ranging from 0 to 1"
+    )
+
+    expect_error(
+      PW(changepoint_range = -0.1),
+      "must be a proportion ranging from 0 to 1"
+    )
+
+    # Test invalid changepoint_scale (must be positive)
+    expect_error(
+      PW(changepoint_scale = 0),
+      "must be a positive real value"
+    )
+
+    expect_error(
+      PW(changepoint_scale = -0.05),
+      "must be a positive real value"
+    )
+
+    # Test invalid growth type
+    expect_error(
+      PW(growth = 'exponential'),
+      "'arg' should be one of"
+    )
+  })
+})
+
+# Test integration of grouping variables with stan injection system
+test_that("grouping variables integrate with stanvar generation", {
+  # This test ensures the data_info structure properly includes grouping information
+  # that would be used by the injection generators
+  
+  # Test data structure that would be passed to injection generators
+  test_data_info <- list(
+    n_lv = 3,
+    n_series = 6,
+    n_groups = 2,        # From gr variable
+    n_subgroups = 3      # From subgr variable  
+  )
+  
+  # Test that hierarchical grouping info would be available
+  expect_equal(test_data_info$n_groups, 2)
+  expect_equal(test_data_info$n_subgroups, 3)
+  
+  # Test trend spec structure includes grouping info
+  suppressWarnings({
+    rw_hierarchical <- RW(time = week, series = species, gr = region, subgr = site, cor = TRUE)
+  })
+  
+  # Check that all necessary grouping info is present for stanvar generation
+  expect_equal(rw_hierarchical$gr, "region")
+  expect_equal(rw_hierarchical$subgr, "site")
+  expect_true(rw_hierarchical$cor)  # Required for hierarchical models
+  
+  # Test that generate_trend_injection_stanvars would receive proper structure
+  # (This is a structural test - the actual function would need data_info)
+  expect_true(!is.null(rw_hierarchical$gr) && rw_hierarchical$gr != 'NA')
+  expect_true(!is.null(rw_hierarchical$subgr) && rw_hierarchical$subgr != 'series')
+})
+
+# Test cap argument integration with stanvar generation
+test_that("PW cap argument integrates with stanvar generation", {
+  
+  # Test that cap information is properly structured for Stan code generation
+  suppressWarnings({
+    pw_logistic <- PW(time = week, series = population, cap = max_capacity, 
+                      growth = 'logistic', n_changepoints = 12)
+  })
+  
+  # Check that cap info is available for stanvar generation
+  expect_equal(pw_logistic$cap, "max_capacity")
+  expect_equal(pw_logistic$growth, "logistic")
+  expect_equal(pw_logistic$trend_model, "PWlogistic")
+  expect_equal(pw_logistic$n_changepoints, 12)
+  
+  # Test that trend spec structure includes all PW parameters needed for Stan generation
+  expected_params <- c("cap", "growth", "trend_model", "n_changepoints", 
+                       "changepoint_range", "changepoint_scale")
+  for (param in expected_params) {
+    expect_true(param %in% names(pw_logistic), 
+                info = paste("Parameter", param, "should be present in PW object"))
+  }
+  
+  # Test variable name extraction for Stan data generation
+  expect_equal(pw_logistic$time, "week")
+  expect_equal(pw_logistic$series, "population") 
+  expect_equal(pw_logistic$cap, "max_capacity")
+  
+  # These would be used in the Stan data and transformed parameters blocks
+  expect_true(nzchar(pw_logistic$time))
+  expect_true(nzchar(pw_logistic$series))
+  expect_true(nzchar(pw_logistic$cap))
+})

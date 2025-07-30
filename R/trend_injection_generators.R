@@ -1195,31 +1195,18 @@ generate_seasonal_ar_injection_stanvars <- function(p_lags, n_lv, data_info) {
     ")
   )
   
-  # Generate evolution code following mvgam pattern but with dynamic lags
-  stanvars$ar_transform <- stanvar(
-    x = NULL,
-    name = "seasonal_ar_transform",
-    scode = glue::glue("
-    transformed parameters {{
-      // latent states with non-centered parameterization
-      matrix[n, {n_lv}] LV;
-      
-      // Apply non-centered transformation for seasonal AR
-      LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
-      for (j in 1:{n_lv}) {{
-        // Initialize first max_lag timepoints with available lags
-        for (i in 1:min(max_lag, n)) {{
-          LV[i, j] += trend_mus[ytimes_trend[i, j]];
-          // Add AR contributions for available lags
-          if (i > ar_lags[1]) {{
-            LV[i, j] += ar{p_lags[1]}[j] * (LV[i - ar_lags[1], j] - trend_mus[ytimes_trend[i - ar_lags[1], j]]);
-          }}") # Continue building this based on the pattern
-  
-  # Build the lag contributions dynamically
+  # Build the lag contributions dynamically for initialization phase
   lag_contributions <- character(n_lags)
   for (k in 1:n_lags) {
     lag <- p_lags[k]
     lag_contributions[k] <- glue::glue("          if (i > ar_lags[{k}]) {{\n            LV[i, j] += ar{lag}[j] * (LV[i - ar_lags[{k}], j] - trend_mus[ytimes_trend[i - ar_lags[{k}], j]]);\n          }}")
+  }
+  
+  # Build AR contributions for the main loop
+  main_ar_contributions <- character(n_lags)
+  for (k in 1:n_lags) {
+    lag <- p_lags[k]
+    main_ar_contributions[k] <- glue::glue("            ar_contribution += ar{lag}[j] * (LV[i - ar_lags[{k}], j] - trend_mus[ytimes_trend[i - ar_lags[{k}], j]]);")
   }
   
   # Complete the transformation code
@@ -1244,7 +1231,7 @@ generate_seasonal_ar_injection_stanvars <- function(p_lags, n_lv, data_info) {
         if (n > max_lag) {{
           for (i in (max_lag+1):n) {{
             real ar_contribution = 0;
-{paste(paste0("            ar_contribution += ar", p_lags, "[j] * (LV[i - ar_lags[", 1:n_lags, "], j] - trend_mus[ytimes_trend[i - ar_lags[", 1:n_lags, "], j]]);"), collapse = '\n')}
+{paste(main_ar_contributions, collapse = '\n')}
             LV[i, j] += trend_mus[ytimes_trend[i, j]] + ar_contribution;
           }}
         }}
