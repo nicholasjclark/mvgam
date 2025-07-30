@@ -68,7 +68,7 @@ mvgam(
 
 ### 3. Stan Code Strategy: Two-Stage Assembly
 
-**Philosophy**: Leverage brms's modular Stan code generation system (detailed in `brms-stan-integration-patterns.md` Section 1-3) to inject State-Space components without modifying core brms functionality.
+**Philosophy**: Leverage brms's modular Stan code generation system (detailed in `brms-stan-integration-patterns.md` Section 1-3) to inject State-Space components without modifying core brms functionality. Use the REF MCP server to explore documentation on the Stan modelling language when designing or reviewing Stan code
 
 **Stage 1**: Generate complete trend stanvars and let brms handle data integration
 ```r

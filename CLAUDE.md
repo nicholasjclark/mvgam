@@ -16,6 +16,10 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 - `Rscript -e "pkgdown::build_site()"` - Build package website
 - `R CMD INSTALL --preclean --no-multiarch` - Install package locally
 
+### Validating and Optimising Stan code
+- Use the `Ref` MCP server if searching for documentation on the Stan modelling language
+- Use the `context7` MCP server if searching for up-to-date Stan code examples
+
 ## Architecture
 
 ### Package Structure
