@@ -4,14 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Package Overview
 
-mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Models.The package enables Bayesian analysis of multivariate data using flexible GAM frameworks by enhancing the brms package. It can handle various data types (counts, proportions, continuous values) with complex temporal or spatial dynamics, missing data, and seasonality, building custom Stan models that provide robust Bayesian inference.
+mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Models. The package enables Bayesian analysis of multivariate data using flexible State-Space models by enhancing the brms package. It can handle various data types (counts, proportions, continuous values) with complex temporal or spatial dynamics, missing data, and seasonality, building custom Stan models that provide robust Bayesian inference.
 
 ## Development Commands
 
 ### Testing
-- `Rscript -e "devtools::document()"` - Update package documentation
-- `R CMD INSTALL --preclean --no-multiarch` - Install package locally
-- `Rscript -e "devtools::load_all();testthat::test_check("mvgam")"` - Run all tests via testthat or use `Rscript -e "devtools::load_all();testthat::test_file(path/to/test)"` to run specific tests during development
+- Use `Rscript -e "devtools::load_all();testthat::test_file(path/to/test)"` to run specific tests during development
 
 ### Building and Documentation
 - `Rscript -e "devtools::document()"` - Generate documentation from roxygen2 comments
@@ -35,14 +33,14 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 
 **Layered Architecture Pattern**: Uses clear separation of concerns across multiple layers:
 - Interface Layer: User-facing functions (`mvgam()`, `forecast()`, `predict()`, `plot()`) provide clean APIs
-- Model Specification Layer: Formula processing with special trend model constructors (`RW()`, `VAR()`, `GP()`), family definitions
-- Code Generation Layer: Translates R specifications into brms code to build initial Stan models and data, then extends these with custom additions
+- Model Specification Layer: Formula processing with special trend model constructors (`RW()`, `VAR()`, `CAR()`), family definitions
+- Code Generation Layer: Translates R specifications into brms code to build initial Stan models and data, then extends these with custom trend and factor additions
 - Computational Backend Layer: Interfaces with Stan for MCMC sampling
 - Post-processing Layer: S3 methods for analysis, diagnostics, and visualization
 
 **Modular Component System**: Modular design where different components can be mixed and matched:
-- Trend Modules: Independent implementations of different temporal dynamics (Random Walk, AR, VAR, Gaussian Process, CAR)
-- Family Modules: Separate observation model implementations for different distributions
+- Trend Modules: Independent implementations of different temporal dynamics (Random Walk, AR, VAR, Gaussian Process, CAR) that can include brms-generated predictor effects
+- Family Modules: Separate observation model implementations for different distributions, maintaining full brms flexibility
 - Backend Modules: Pluggable computational backends (Stan via rstan or cmdstanr)
 - Visualization Modules: Modular plotting system with specialized functions for different aspects
 
@@ -58,13 +56,19 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 
 ### Core Model Functions
 - `R/mvgam.R` - Main model fitting function that:
-  - Validates and processes GAM formulas for observation and trend processes
+  - Validates and processes brms-compatible formulas for observation and trend processes
   - Sets up Stan model code generation
   - Runs MCMC sampling and returns fitted model objects
 
 - Trend model constructors in `R/mvgam_trend_types.R` (`RW()`, `AR()`, `VAR()`, `GP()`, `CAR()`):
   - Define temporal dynamics specifications and point to forecasting cpp functions
   - Provide user support to easily add new trend types with higher dispatch
+  
+- Trend Stan code injection generators in `R/trend_injection_generators.R` and `R/trend_stan_generators.R`:
+  - Dispatch functions that generate complete Stan code for specified trend types
+  
+- Full Stan code generation in `R/stan_assembly.R` and `R/stan_code_generation.R`:
+  - Two-stage Stan code assembly system with validation
 
 ### Prediction & Forecasting
 - `R/forecast.mvgam.R` - Generates in-sample and out-of-sample forecasts:
