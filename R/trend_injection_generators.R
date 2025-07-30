@@ -148,8 +148,9 @@ generate_rw_injection_stanvars <- function(trend_spec, data_info) {
 #' Generate AR Injection Stanvars
 #'
 #' @description
-#' AR models: LV[i,j] ~ normal(trend_mus[...] + ar1[j] * (LV[i-1,j] - trend_mus[...]), sigma[j])
-#' Supports both simple correlation (cor = TRUE) and hierarchical grouping (gr != 'NA').
+#' AR models: Supports AR(1), higher-order AR(p), and seasonal AR with discontinuous lags.
+#' Follows current mvgam Stan patterns with non-centered parameterization.
+#' Supports hierarchical grouping (gr != 'NA') and correlation (cor = TRUE).
 #'
 #' @param trend_spec Trend specification
 #' @param data_info Data information
@@ -163,11 +164,10 @@ generate_ar_injection_stanvars <- function(trend_spec, data_info) {
 
   stanvars <- list()
 
+  # Handle different AR specifications
   if (length(p_order) == 1 && p_order == 1) {
-    # AR(1) model
-
+    # AR(1) model - original implementation
     if (use_grouping) {
-      # Hierarchical grouping case: AR(gr = region, subgr = species)
       n_groups <- data_info$n_groups %||% 1
       n_subgroups <- data_info$n_subgroups %||% n_lv
 
@@ -177,7 +177,6 @@ generate_ar_injection_stanvars <- function(trend_spec, data_info) {
       stanvars$ar_hierarchical_model <- generate_hierarchical_model_stanvar(n_groups, add_ar_priors = TRUE)
 
     } else {
-      # Simple AR(1) case - matches the original exactly
       stanvars$ar_params <- stanvar(
         x = NULL,
         name = "ar1_params",
@@ -187,6 +186,36 @@ generate_ar_injection_stanvars <- function(trend_spec, data_info) {
           vector[{n_lv}] ar1;
           // latent state SD parameters
           vector<lower=0>[{n_lv}] sigma;
+          // raw latent states for non-centered parameterization
+          matrix[n, {n_lv}] LV_raw;
+        }}
+        ")
+      )
+
+      stanvars$ar_transform <- stanvar(
+        x = NULL,
+        name = "ar1_transform",
+        scode = glue::glue("
+        transformed parameters {{
+          // latent states with non-centered parameterization
+          matrix[n, {n_lv}] LV;
+          
+          // Apply non-centered transformation following mvgam pattern
+          LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
+          for (j in 1:{n_lv}) {{
+            LV[1, j] += trend_mus[ytimes_trend[1, j]];
+            for (i in 2:n) {{
+              LV[i, j] += trend_mus[ytimes_trend[i, j]]
+                          + ar1[j] * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]);
+            }}
+          }}
+          
+          // derived latent states
+          for (i in 1:n) {{
+            for (s in 1:n_series) {{
+              trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+            }}
+          }}
         }}
         ")
       )
@@ -194,36 +223,29 @@ generate_ar_injection_stanvars <- function(trend_spec, data_info) {
       stanvars$ar_model <- stanvar(
         x = NULL,
         name = "ar1_model_block",
-        scode = glue::glue("
-        // AR(1) latent state evolution - matches mvgam pattern exactly
-        for (j in 1:{n_lv}) {{
-          LV[1, j] ~ normal(mu_trend[ytimes_trend[1, j]], sigma[j]);
-          for (i in 2:n) {{
-            LV[i, j] ~ normal(mu_trend[ytimes_trend[i, j]]
-                              + ar1[j] * (LV[i - 1, j] - mu_trend[ytimes_trend[i - 1, j]]),
-                              sigma[j]);
-          }}
-        }}
-        ")
-      )
-
-      stanvars$ar_priors <- stanvar(
-        x = NULL,
-        name = "ar1_priors",
         scode = "
-        // priors for AR parameters - matches mvgam exactly
+        // priors for AR parameters
         ar1 ~ std_normal();
         // priors for latent state SD parameters
         sigma ~ inv_gamma(1.418, 0.452);
+        // non-centered innovations
+        to_vector(LV_raw) ~ std_normal();
         "
       )
     }
 
+  } else if (length(p_order) == 1 && p_order > 1) {
+    # Higher-order AR(p) - continuous lags like AR(3)
+    stanvars <- generate_ar_p_injection_stanvars(p_order, n_lv, data_info)
+    
+  } else if (length(p_order) > 1) {
+    # Seasonal AR with discontinuous lags like AR(p = c(1, 12, 24))
+    stanvars <- generate_seasonal_ar_injection_stanvars(p_order, n_lv, data_info)
+    
   } else {
-    # Higher order or seasonal AR - more complex implementation needed
     stop(insight::format_error(
-      "Higher-order AR models not yet implemented.",
-      "Currently only AR(1) is supported. Requested: AR(p = {paste(p_order, collapse = ', ')})"
+      "Invalid AR specification: {paste(p_order, collapse = ', ')}",
+      "Use: AR(p = 1), AR(p = 3), or AR(p = c(1, 12, 24))"
     ))
   }
 
@@ -1014,6 +1036,244 @@ generate_simple_corr_params_stanvar <- function(n_lv, add_ar_params = FALSE) {
     }}
     ")
   )
+}
+
+#' Generate Higher-Order AR(p) Injection Stanvars
+#'
+#' @description
+#' Generates stanvars for AR(p) models with continuous lags (e.g., AR(3)).
+#' Follows current mvgam pattern with individual parameters (ar1, ar2, ar3, ...).
+#'
+#' @param p_order Integer AR order
+#' @param n_lv Number of latent variables
+#' @param data_info Data information
+#' @return List of stanvars
+#' @noRd
+generate_ar_p_injection_stanvars <- function(p_order, n_lv, data_info) {
+  
+  # Generate individual AR parameter names: ar1, ar2, ar3, etc.
+  ar_param_names <- paste0("ar", 1:p_order)
+  ar_param_decl <- paste0("  vector<lower=-1, upper=1>[", n_lv, "] ", ar_param_names, ";", collapse = "\n")
+  ar_param_priors <- paste0("  ", ar_param_names, " ~ std_normal();", collapse = "\n")
+  
+  stanvars <- list()
+  
+  # Parameters with individual AR terms following mvgam pattern
+  stanvars$ar_params <- stanvar(
+    x = NULL,
+    name = "ar_p_params",
+    scode = glue::glue("
+    parameters {{
+      // individual AR parameters for AR({p_order})
+{ar_param_decl}
+      
+      // latent state SD parameters
+      vector<lower=0>[{n_lv}] sigma;
+      
+      // raw latent states for non-centered parameterization
+      matrix[n, {n_lv}] LV_raw;
+    }}
+    ")
+  )
+  
+  # Generate the evolution code following the mvgam AR(3) pattern
+  # Handle initial timepoints (1, 2, ..., p) separately, then general loop
+  initial_cases <- character(p_order)
+  for (i in 1:p_order) {
+    if (i == 1) {
+      initial_cases[i] <- glue::glue("    LV[1, j] += trend_mus[ytimes_trend[1, j]];")
+    } else {
+      ar_terms <- character(i-1)
+      for (lag in 1:(i-1)) {
+        ar_terms[lag] <- glue::glue("ar{lag}[j] * (LV[{i - lag}, j] - trend_mus[ytimes_trend[{i - lag}, j]])")
+      }
+      ar_sum <- paste(ar_terms, collapse = "\n                  + ")
+      initial_cases[i] <- glue::glue("    LV[{i}, j] += trend_mus[ytimes_trend[{i}, j]]\n                  + {ar_sum};")
+    }
+  }
+  
+  # Generate AR terms for the general loop (timepoints > p)
+  general_ar_terms <- character(p_order)
+  for (lag in 1:p_order) {
+    general_ar_terms[lag] <- glue::glue("ar{lag}[j] * (LV[i - {lag}, j] - trend_mus[ytimes_trend[i - {lag}, j]])")
+  }
+  general_ar_sum <- paste(general_ar_terms, collapse = "\n                  + ")
+  
+  stanvars$ar_transform <- stanvar(
+    x = NULL,
+    name = "ar_p_transform",
+    scode = glue::glue("
+    transformed parameters {{
+      // latent states with non-centered parameterization
+      matrix[n, {n_lv}] LV;
+      
+      // Apply non-centered transformation following mvgam AR({p_order}) pattern
+      LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
+      for (j in 1:{n_lv}) {{
+{paste(initial_cases, collapse = '\n')}
+        for (i in {p_order + 1}:n) {{
+          LV[i, j] += trend_mus[ytimes_trend[i, j]]
+                      + {general_ar_sum};
+        }}
+      }}
+      
+      // derived latent states
+      for (i in 1:n) {{
+        for (s in 1:n_series) {{
+          trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+        }}
+      }}
+    }}
+    ")
+  )
+  
+  stanvars$ar_model <- stanvar(
+    x = NULL,
+    name = "ar_p_model_block",
+    scode = glue::glue("
+    // priors for AR parameters
+{ar_param_priors}
+    // priors for latent state SD parameters
+    sigma ~ inv_gamma(1.418, 0.452);
+    // non-centered innovations
+    to_vector(LV_raw) ~ std_normal();
+    ")
+  )
+  
+  return(stanvars)
+}
+
+#' Generate Seasonal AR Injection Stanvars
+#'
+#' @description
+#' Generates stanvars for seasonal AR models with discontinuous lags (e.g., AR(p = c(1, 12, 24))).
+#' Creates individual parameters for each lag and handles the evolution efficiently.
+#'
+#' @param p_lags Vector of AR lags
+#' @param n_lv Number of latent variables
+#' @param data_info Data information
+#' @return List of stanvars
+#' @noRd
+generate_seasonal_ar_injection_stanvars <- function(p_lags, n_lv, data_info) {
+  n_lags <- length(p_lags)
+  max_lag <- max(p_lags)
+  
+  # Generate individual AR parameter names for each lag
+  ar_param_names <- paste0("ar", p_lags)
+  ar_param_decl <- paste0("  vector<lower=-1, upper=1>[", n_lv, "] ", ar_param_names, ";", collapse = "\n")
+  ar_param_priors <- paste0("  ", ar_param_names, " ~ std_normal();", collapse = "\n")
+  
+  stanvars <- list()
+  
+  # Add lag data to Stan
+  stanvars$ar_data <- stanvar(
+    x = as.array(p_lags),
+    name = "ar_lags",
+    scode = glue::glue("
+    data {{
+      int ar_lags[{n_lags}] = {{{paste(p_lags, collapse = ', ')}}};
+      int max_lag = {max_lag};
+      int n_lags = {n_lags};
+    }}
+    ")
+  )
+  
+  stanvars$ar_params <- stanvar(
+    x = NULL,
+    name = "seasonal_ar_params",
+    scode = glue::glue("
+    parameters {{
+      // individual AR parameters for lags: {paste(p_lags, collapse = ', ')}
+{ar_param_decl}
+      
+      // latent state SD parameters
+      vector<lower=0>[{n_lv}] sigma;
+      
+      // raw latent states for non-centered parameterization
+      matrix[n, {n_lv}] LV_raw;
+    }}
+    ")
+  )
+  
+  # Generate evolution code following mvgam pattern but with dynamic lags
+  stanvars$ar_transform <- stanvar(
+    x = NULL,
+    name = "seasonal_ar_transform",
+    scode = glue::glue("
+    transformed parameters {{
+      // latent states with non-centered parameterization
+      matrix[n, {n_lv}] LV;
+      
+      // Apply non-centered transformation for seasonal AR
+      LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
+      for (j in 1:{n_lv}) {{
+        // Initialize first max_lag timepoints with available lags
+        for (i in 1:min(max_lag, n)) {{
+          LV[i, j] += trend_mus[ytimes_trend[i, j]];
+          // Add AR contributions for available lags
+          if (i > ar_lags[1]) {{
+            LV[i, j] += ar{p_lags[1]}[j] * (LV[i - ar_lags[1], j] - trend_mus[ytimes_trend[i - ar_lags[1], j]]);
+          }}") # Continue building this based on the pattern
+  
+  # Build the lag contributions dynamically
+  lag_contributions <- character(n_lags)
+  for (k in 1:n_lags) {
+    lag <- p_lags[k]
+    lag_contributions[k] <- glue::glue("          if (i > ar_lags[{k}]) {{\n            LV[i, j] += ar{lag}[j] * (LV[i - ar_lags[{k}], j] - trend_mus[ytimes_trend[i - ar_lags[{k}], j]]);\n          }}")
+  }
+  
+  # Complete the transformation code
+  stanvars$ar_transform <- stanvar(
+    x = NULL,
+    name = "seasonal_ar_transform",
+    scode = glue::glue("
+    transformed parameters {{
+      // latent states with non-centered parameterization
+      matrix[n, {n_lv}] LV;
+      
+      // Apply non-centered transformation for seasonal AR
+      LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
+      for (j in 1:{n_lv}) {{
+        // Initialize first max_lag timepoints with available lags
+        for (i in 1:min(max_lag, n)) {{
+          LV[i, j] += trend_mus[ytimes_trend[i, j]];
+{paste(lag_contributions, collapse = '\n')}
+        }}
+        
+        // Efficient computation for remaining timepoints
+        if (n > max_lag) {{
+          for (i in (max_lag+1):n) {{
+            real ar_contribution = 0;
+{paste(paste0("            ar_contribution += ar", p_lags, "[j] * (LV[i - ar_lags[", 1:n_lags, "], j] - trend_mus[ytimes_trend[i - ar_lags[", 1:n_lags, "], j]]);"), collapse = '\n')}
+            LV[i, j] += trend_mus[ytimes_trend[i, j]] + ar_contribution;
+          }}
+        }}
+      }}
+      
+      // derived latent states
+      for (i in 1:n) {{
+        for (s in 1:n_series) {{
+          trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+        }}
+      }}
+    }}
+    ")
+  )
+  
+  stanvars$ar_model <- stanvar(
+    x = NULL,
+    name = "seasonal_ar_model_block",
+    scode = glue::glue("
+    // priors for seasonal AR parameters
+{ar_param_priors}
+    // priors for latent state SD parameters
+    sigma ~ inv_gamma(1.418, 0.452);
+    // non-centered innovations
+    to_vector(LV_raw) ~ std_normal();
+    ")
+  )
+  
+  return(stanvars)
 }
 
 #' Create Stanvar Helper
