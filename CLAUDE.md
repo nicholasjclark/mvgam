@@ -60,12 +60,12 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
   - Sets up Stan model code generation
   - Runs MCMC sampling and returns fitted model objects
 
-- Trend model constructors in `R/mvgam_trend_types.R` (`RW()`, `AR()`, `VAR()`, `GP()`, `CAR()`):
+- Trend model constructors in `R/mvgam_trend_types.R` (`RW()`, `AR()`, `VAR()`, `CAR()`):
   - Define temporal dynamics specifications and point to forecasting cpp functions
   - Provide user support to easily add new trend types with higher dispatch
   
-- Trend Stan code injection generators in `R/trend_injection_generators.R` and `R/trend_stan_generators.R`:
-  - Dispatch functions that generate complete Stan code for specified trend types
+- Trend Stan code injection generators in `R/trend_injection_generators.R`:
+  - Dispatch functions that generate Stan code for specified trend types
   
 - Full Stan code generation in `R/stan_assembly.R` and `R/stan_code_generation.R`:
   - Two-stage Stan code assembly system with validation
@@ -99,7 +99,7 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 ## Development Notes
 
 ### Testing Strategy
-- Separate test files for each major component
+- Separate test files for major components
 - Prioritize internal mvgam objects (i.e. `mvgam:::mvgam_example1`) for testing
 
 ### Code Organization

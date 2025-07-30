@@ -379,4 +379,4 @@ git status
 - ✅ GP() deprecation with comprehensive migration guidance
 - ✅ Enhanced PW() constructor with `time`, `series`, and `cap` parameter support
 
-**Ready for Phase 2**: Stan Integration (Weeks 5-8) with proven enhanced architecture foundation
+**Ready for Phase 2**: Update PW() injection generators so that they create `LV` instead of `trend` and incorporate `trend_mus` to be consistent with other trend generators. Update CAR generator to use the noncentred parameterisation. Make sure all trend generators calculate the `trend` variable as `trend[i, s] = dot_product(Z[s, :], LV[i, :]);` as in the current `generate_ar_injection_stanvars`. If `n_lv < n_series`, need to then move `trend_mus` so that it is only considered after estimating the `LV`, such as: `trend[i, s] = dot_product(Z[s, :], LV[i, :]) + trend_mus[ytimes_trend[i, s]];`. Then proceed to Stan Integration (Weeks 5-8) with proven enhanced architecture foundation
