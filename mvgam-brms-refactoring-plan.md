@@ -8,6 +8,8 @@
 
 Transform mvgam from mgcv-based package into specialized brms extension adding State-Space modeling, N-mixture/occupancy models, and JSDMs. **Core Innovation**: brms generates linear predictors (`mu`, `mu_trend`), single combined Stan model, dual brmsfit-like objects for post-processing. **New Features**: Native multiple imputation with Rubin's rules pooling and enhanced leave-future-out cross-validation.
 
+**Key Architecture Reference**: See `brms-stan-integration-patterns.md` for comprehensive analysis of brms design patterns, modular Stan code generation, and implementation strategies that guide this refactoring.
+
 ## Critical Design Principles
 
 ### 1. Single-Fit Dual-Object Architecture
@@ -66,18 +68,25 @@ mvgam(
 
 ### 3. Stan Code Strategy: Two-Stage Assembly
 
-**Stage 1**: Extract trend stanvars from brms setup
+**Philosophy**: Leverage brms's modular Stan code generation system (detailed in `brms-stan-integration-patterns.md` Section 1-3) to inject State-Space components without modifying core brms functionality.
+
+**Stage 1**: Generate complete trend stanvars and let brms handle data integration
 ```r
-trend_stanvars <- extract_trend_stanvars_from_setup(trend_setup, trend_spec)
+# Generate both data and code stanvars (following brms-stan-integration-patterns.md Section 3.1)
+trend_stanvars <- generate_trend_stanvars_complete(trend_obj, data_info)
+
+# brms generates both code and data with trend integration
 base_stancode <- brms::stancode(obs_formula, data, stanvars = trend_stanvars)
+base_standata <- brms::standata(obs_formula, data, stanvars = trend_stanvars)
 ```
 
 **Stage 2**: Modify observation linear predictor with missing data preservation
 ```r
 final_stancode <- inject_trend_into_linear_predictor(base_stancode, trend_spec)
+# final_standata already contains trend data via stanvars - no modification needed
 ```
 
-**Critical Stan Pattern**:
+**Critical Stan Pattern** (following brms non-vectorized likelihood patterns from `brms-stan-integration-patterns.md` Section 4):
 ```stan
 // brms produces mu and mu_trend for full time grid
 mu_combined = mu + mu_trend;
@@ -144,7 +153,7 @@ lfo_cv <- function(object, K = NULL, fc_horizon = 1,
 
 ### 5. Validation Framework
 
-**Context-Aware Autocorrelation**:
+**Context-Aware Autocorrelation** (implements intelligent separation described in `brms-stan-integration-patterns.md` Key Innovation #1):
 ```r
 validate_autocor_usage <- function(formula, trend_formula) {
   # Observation-level autocor: ALLOWED (residual correlation structures)
@@ -168,11 +177,11 @@ validate_autocor_usage <- function(formula, trend_formula) {
 }
 ```
 
-**Key Validation Areas**:
-- Distributional model restriction: Trends only for main response parameter
-- Response helper compatibility: `mi()`, `weights()`, `cens()`, `trunc()`, `trials()`
+**Key Validation Areas** (following brms validation patterns from `brms-stan-integration-patterns.md` Section 8):
+- Distributional model restriction: Trends only for main response parameter (Section 6 of patterns doc)
+- Response helper compatibility: `mi()`, `weights()`, `cens()`, `trunc()`, `trials()` 
 - Multiple imputation: Dataset structure consistency, pooling compatibility
-- Hurdle/zero-inflated models: Trends restricted to main (`mu`) parameter
+- Hurdle/zero-inflated models: Trends restricted to main (`mu`) parameter (Section 6)
 - LFO-CV: Time series structure, forecast horizon limits, evaluation timepoint validity
 
 ## Implementation Timeline (16 Weeks)
@@ -257,7 +266,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL, backend = NULL,
 #### Week 5-6: Two-Stage Stan Assembly with Enhanced Trend Architecture
 **Files**: `R/trend_injection_generators.R` (new), `R/stan_assembly.R` (new)
 
-**Key Innovation**: Generate **stanvars that inject temporal components** into brms Stan code using the enhanced trend constructor architecture with dispatcher system.
+**Key Innovation**: Generate **stanvars that inject temporal components** into brms Stan code using the enhanced trend constructor architecture with dispatcher system. **Implementation follows brms stanvars patterns** detailed in `brms-stan-integration-patterns.md` Section 3.
 
 ```r
 # Generate trend injection stanvars using dispatcher system
@@ -479,10 +488,19 @@ car_stan_code <- function(trend_obj, data_info) {
 ```
 
 **Implementation Tasks**:
-- Extract trend stanvars from trend_setup using enhanced trend objects
-- Modify observation linear predictor with missing data preservation
+- Generate complete trend stanvars (data + code) using enhanced trend objects
+- **Critical Reference**: Follow `brms-stan-integration-patterns.md` comprehensive data integration patterns:
+  - Modular code generation (Section 1) and stanvars injection (Section 3)
+  - **Data integration architecture** (Section 3.1) - use brms's modular data system
+  - Non-centered parameterization (Section 2) and dynamic parameter naming (Section 2)
+  - **Data validation and threading** (Section 5) - ensure compatibility
+- Apply brms data generation patterns: leverage `data_response()`, `data_predictor()` flow
+- **Name conflict prevention**: Validate stanvars don't overwrite brms data variables
+- Refer to `Stan specs/Stan-reference-manual-2_36.pdf` if needed to clarify Stan language requirements
+- Modify observation linear predictor with missing data preservation (Section 4 patterns)
 - Integrate with existing `time` and `series` parameter system
-- Handle nonlinear model complexity (`bf(nl = TRUE)`)
+- Handle nonlinear model complexity (`bf(nl = TRUE)`) following brms patterns
+- **Threading compatibility**: Include `pll_args` in stanvars for parallelization support
 
 **Special CAR Implementation Notes**:
 - CAR models require `time_dis` matrix in Stan data containing time distances between observations
@@ -492,13 +510,18 @@ car_stan_code <- function(trend_obj, data_info) {
 - CAR constructor currently needs enhancement to match full dispatcher architecture with `stancode_fun = 'car_stan_code'`
 
 #### Week 7: Validation & Hurdle Model Support
-- Intelligent autocorrelation validation based on formula context
-- Hurdle model validation: Trends only for main (`mu`) parameter
-- Parameter name recognition: `b_hu_*` vs `b_*` handling
+- Intelligent autocorrelation validation based on formula context (following `brms-stan-integration-patterns.md` validation framework Section 3)
+- **Data validation integration**: Implement comprehensive validation following Section 5 patterns
+  - Validate trend data compatibility with brms structure
+  - Check for name conflicts between trend stanvars and brms data variables
+  - Validate time series structure and threading compatibility
+- Hurdle model validation: Trends only for main (`mu`) parameter (brms distributional parameter patterns Section 6)
+- Parameter name recognition: `b_hu_*` vs `b_*` handling using brms family integration patterns (Section 7)
 
 #### Week 8: Higher-Order Models & Custom Families
 - Extended AR/VAR: `AR(p = c(1, 12, 24))`, `VAR(p = 3)`
-- Custom families: `tweedie()`, `nmix()`, `occ()` with three-level hierarchy
+- Custom families: `tweedie()`, `nmix()`, `occ()` with three-level hierarchy (following brms family extension patterns from `brms-stan-integration-patterns.md` Section 6)
+- **Data integration for custom families**: Ensure custom family data requirements integrate with brms standata system
 
 ### Phase 3: Optimization & Methods (Weeks 9-12)
 
@@ -520,6 +543,9 @@ arma::mat fast_lfo_metrics(const arma::cube& forecasts, const arma::mat& observa
 Core LFO-CV implementation with parallel support, multiple imputation pooling, and comprehensive metrics.
 
 #### Week 11: brms Prediction Integration & Multiple Imputation Pooling
+
+**Implementation Strategy**: Follow brms ecosystem integration patterns from `brms-stan-integration-patterns.md` Section 4 to ensure seamless compatibility with all brms methods.
+
 ```r
 # Prediction methods with multiple imputation support
 posterior_predict.mvgam <- function(object, newdata = NULL, resp = NULL, ...) {
@@ -553,6 +579,8 @@ Critical methods: `log_lik()`, `update()`, `print()`, `loo()` with multiple impu
 
 **Residual Functions**: Implement Dunn-Smyth randomized quantile residuals for all brms families or develop general solution using inverse CDF transformations. Essential for model diagnostics across the full range of brms observation families.
 
+**Method Integration**: Follow brms method compatibility patterns from `brms-stan-integration-patterns.md` conclusion to ensure all brms ecosystem methods work seamlessly with mvgam objects.
+
 ### Phase 4: Testing & Launch (Weeks 13-16)
 
 #### Week 13-14: Comprehensive Testing
@@ -573,12 +601,12 @@ Critical methods: `log_lik()`, `update()`, `print()`, `loo()` with multiple impu
 
 ## Key Innovation Points
 
-1. **Autocorrelation Intelligence**: First package to properly distinguish observation-level residual correlation from State-Space dynamics
-2. **Multivariate State-Space**: Response-specific trends while preserving brms cross-response correlations
+1. **Autocorrelation Intelligence**: First package to properly distinguish observation-level residual correlation from State-Space dynamics (detailed in `brms-stan-integration-patterns.md` Critical Success Factor #2)
+2. **Multivariate State-Space**: Response-specific trends while preserving brms cross-response correlations (Section 5 multivariate patterns)
 3. **Multiple Imputation Integration**: Seamless support with Rubin's rules pooling
 4. **Enhanced Time Series Cross-Validation**: Comprehensive LFO-CV with distributional evaluation
-5. **Stan Extension Pattern**: Using brms `stanvars` for State-Space injection
-6. **Method System Integration**: Dual brmsfit-like objects enabling seamless brms ecosystem compatibility
+5. **Stan Extension Pattern**: Using brms `stanvars` for State-Space injection (Section 3 stanvars system)
+6. **Method System Integration**: Dual brmsfit-like objects enabling seamless brms ecosystem compatibility (Section 4 ecosystem integration)
 
 ## Success Criteria
 
@@ -591,6 +619,9 @@ Critical methods: `log_lik()`, `update()`, `print()`, `loo()` with multiple impu
 ### Functionality Requirements
 - [ ] All existing mvgam features preserved
 - [ ] Full brms compatibility: formulas/families/priors/response helpers
+- [ ] **Complete data integration**: Trend data seamlessly integrated via brms standata system
+- [ ] **Threading compatibility**: Support brms within-chain parallelization
+- [ ] **Name conflict prevention**: No stanvars conflicts with brms data variables
 - [ ] Multiple imputation: Native support with Rubin's rules pooling
 - [ ] Enhanced LFO-CV: Time series evaluation with comprehensive metrics
 - [ ] Seamless brms ecosystem integration: loo/waic/pp_check/diagnostics
@@ -613,6 +644,8 @@ Critical methods: `log_lik()`, `update()`, `print()`, `loo()` with multiple impu
 
 **Next Step**: Begin Week 1 - Trend Type Dispatcher System  
 **Critical Success Factor**: Stan code modification preserving all brms functionality while seamlessly adding State-Space dynamics, multiple imputation support, and enhanced LFO-CV
+
+**Implementation Guide**: The comprehensive brms design patterns documented in `brms-stan-integration-patterns.md` provide the architectural foundation for this refactoring, ensuring compatibility and leveraging brms's sophisticated code generation system.
 
 ## R Package Refactoring Best Practices
 

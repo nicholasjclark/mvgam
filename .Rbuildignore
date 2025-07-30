@@ -32,3 +32,5 @@
 ^.*-implementation\.md$
 ^mvgam-brms-refactoring-plan\.md$
 ^CURRENT_STATUS\.md$
+^brms-stan-integration-patterns\.md$
+^Stan specs$
