@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Package Overview
 
-mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Models. The package enables Bayesian analysis of multivariate data using flexible State-Space models by enhancing the brms package. It can handle various data types (counts, proportions, continuous values) with complex temporal or spatial dynamics, missing data, and seasonality, building custom Stan models that provide robust Bayesian inference.
+mvgam is an R package for fitting, plotting and interpreting Bayesian Multivariate State-Space Models. It can handle various data types (counts, proportions, continuous values) with complex temporal or spatial dynamics, missing data, and seasonality, building custom Stan models by enhancing models from the brms R package.
 
 ## Development Commands
 
@@ -12,44 +12,41 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 - Use `Rscript -e "devtools::load_all();testthat::test_file(path/to/test)"` to run specific tests during development
 
 ### Building and Documentation
-- `Rscript -e "devtools::document()"` - Generate documentation from roxygen2 comments
+- `Rscript -e "devtools::document()"` - Generate roxygen2 documentation
 - `Rscript -e "pkgdown::build_site()"` - Build package website
 - `R CMD INSTALL --preclean --no-multiarch` - Install package locally
 
 ### Validating and Optimising Stan code
-- Use the `Ref` MCP server if searching for documentation on the Stan modelling language
-- Use the `context7` MCP server if searching for up-to-date Stan code examples
+- Use `Ref` and `context7` MCP servers to search for documentation on the Stan language and to up-to-date Stan code examples
 
 ## Architecture
 
 ### Package Structure
-- Uses standard R package structure with `DESCRIPTION`, `NAMESPACE`, `src/` and `man/` directories
-- R source code organized in `R/` directory
-- Exported Rcpp source code organized in `src/` directory
+- Standard R package structure with `DESCRIPTION`, `NAMESPACE`, `src/` and `man/` directories
+- R source code in `R/` directory
+- Rcpp source code in `src/` directory
 - Vignettes in `vignettes/` directory demonstrate key features
 - Tests in `tests/testthat/`
 
 ### Key Design Patterns
 
-**S3 Type System**: Uses S3 for structured objects
-- Maintains compatibility with R's statistical modeling ecosystem
-- Supports method inheritance and specialization
+**S3 Type System**: Uses S3 for structured objects to support method inheritance and specialization
 
 **Layered Architecture Pattern**: Uses clear separation of concerns across multiple layers:
 - Interface Layer: User-facing functions (`mvgam()`, `forecast()`, `predict()`, `plot()`) provide clean APIs
 - Model Specification Layer: Formula processing with special trend model constructors (`RW()`, `VAR()`, `CAR()`), family definitions
 - Code Generation Layer: Translates R specifications into brms code to build initial Stan models and data, then extends these with custom trend and factor additions
-- Computational Backend Layer: Interfaces with Stan for MCMC sampling
+- Computational Backend Layer: Interfaces with Stan for sampling
 - Post-processing Layer: S3 methods for analysis, diagnostics, and visualization
 
 **Modular Component System**: Modular design where different components can be mixed and matched:
-- Trend Modules: Independent implementations of different temporal dynamics (Random Walk, AR, VAR, Gaussian Process, CAR) that can include brms-generated predictor effects
-- Family Modules: Separate observation model implementations for different distributions, maintaining full brms flexibility
+- Trend Modules: Independent implementations of state models with possible temporal dynamics (RW, AR, VAR, CAR) and brms-generated predictor effects
+- Family Modules: Separate observation model maintaining full brms flexibility
 - Backend Modules: Pluggable computational backends (Stan via rstan or cmdstanr)
-- Visualization Modules: Modular plotting system with specialized functions for different aspects
+- Visualization Modules: Modular plotting system
 
-**Bayesian Workflow Integration Pattern**: Designed around the complete Bayesian modeling workflow:
-- Model Building: Formula specification, prior setup, trend model selection
+**Bayesian Workflow Integration Pattern**: Supports complete Bayesian modeling workflow:
+- Model Building: Formula specification, prior setup, trend model selection, observation family
 - Fitting: MCMC sampling with convergence monitoring
 - Checking: Posterior predictive checks, residual analysis, diagnostic plots
 - Inference: Parameter summarization, uncertainty quantification
@@ -65,7 +62,7 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
   - Runs MCMC sampling and returns fitted model objects
 
 - Trend model constructors in `R/mvgam_trend_types.R` (`RW()`, `AR()`, `VAR()`, `CAR()`):
-  - Define temporal dynamics specifications and point to forecasting cpp functions
+  - Define temporal dynamics and point to forecasting cpp functions
   - Provide user support to easily add new trend types with higher dispatch
   
 - Trend Stan code injection generators in `R/trend_injection_generators.R`:
@@ -122,16 +119,11 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 - **Line Length**: Maximum 80 characters per line for readability
 - **Roxygen Documentation**: Use 2-space indentation for continuation lines
 - **Comment Style**: Use sentence case, avoid ALL CAPS in comments
-- **Function Names**: Use snake_case following tidyverse conventions
+- **Function Names**: Use snake_case
 - **Consistency**: Follow existing package conventions where established
 
 ### Validation and Error Handling
 - All mvgam functions must follow these validation patterns:
-
-#### Required Packages for Validation
-- `checkmate`: Parameter validation and type checking
-- `insight`: Error and warning message formatting  
-- `rlang`: Session-wide warnings and advanced error handling
 
 #### Validation Patterns
 1. **Input Validation**: Use `checkmate::assert_*()` for all function parameters
@@ -149,6 +141,12 @@ mvgam is an R package for fitting Multivariate Dynamic Generalized Additive Mode
 - Only export functions that users directly need (trend constructors, methods)
 - Keep validation and utility functions internal (`@noRd`)
 - Use clear, simple descriptions without excessive technical references
+
+### .Rbuildignore Management
+- Update `.Rbuildignore` immediately when creating new spec files:
+  - `*-requirements.md`, `*-design.md`, `*-implementation.md`
+  - `*-plan.md` files
+  - Any temporary development documentation files
 
 ## Git Workflow
 
@@ -169,15 +167,8 @@ Brief description of changes (50 chars max)
 - Any important implementation notes
 ```
 
-### .Rbuildignore Management
-- Update `.Rbuildignore` immediately when creating new spec files
-- Automatically add specification documents to `.Rbuildignore`:
-  - `*-requirements.md`, `*-design.md`, `*-implementation.md`
-  - `*-plan.md` files
-  - Any temporary development documentation files
-
 ### Pre-commit Workflow
 1. Check git status to understand current changes
 2. Stage appropriate files with clear understanding of what's being committed
-3. Write descriptive commit messages explaining the changes
+3. Write descriptive commit messages explaining changes
 4. Push to remote branch for backup
