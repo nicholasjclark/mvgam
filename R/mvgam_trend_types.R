@@ -687,6 +687,17 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, 
 #'
 #' @export
 GP = function(time = NA, series = NA, ...) {
+  # Issue deprecation warning
+  rlang::warn(
+    paste0(
+      "GP() trend models are deprecated and will be removed in a future version.\n",
+      "Use Gaussian Process terms in trend_formula instead: ~ gp(time, k = 10)\n",
+      "Combined with other trend models: trend_model = AR() or RW()"
+    ),
+    class = "mvgam_deprecation_warning",
+    .frequency = "once"
+  )
+  
   # Process time argument
   time <- deparse0(substitute(time))
   time_was_default <- (time == "NA")
@@ -727,6 +738,23 @@ GP = function(time = NA, series = NA, ...) {
 #' functions do not evaluate their arguments – they exist purely to help set up
 #' a model with particular piecewise trend models.
 #'
+#' @param time The unquoted name of the variable that represents time in the
+#'   supplied `data`. This variable should be either a `numeric` or `integer`
+#'   variable. Defaults to `time` to align with brms conventions, allowing
+#'   flexible time variable naming without requiring explicit "time" columns.
+#'   When using the default, a one-time warning will be issued.
+#'
+#' @param series The unquoted name of the variable that represents the series
+#'   identifier in the supplied `data`. This variable should be either a
+#'   `character` or `factor` variable. Defaults to `series` following mvgam
+#'   conventions, allowing flexible series variable naming. When using the
+#'   default, a one-time warning will be issued.
+#'
+#' @param cap The unquoted name of the variable in `data` that specifies the
+#'   carrying capacity for logistic growth models. Required when `growth = 'logistic'`.
+#'   This variable should be numeric and can vary by time and series if necessary.
+#'   Defaults to `cap` when not specified, with a warning for logistic models.
+#'
 #' @param n_changepoints A non-negative integer specifying the number of
 #'   potential changepoints. Potential changepoints are selected uniformly from
 #'   the first `changepoint_range` proportion of timepoints in \code{data}.
@@ -743,8 +771,8 @@ GP = function(time = NA, series = NA, ...) {
 #'   changepoints. Default is `0.05`.
 #'
 #' @param growth Character string specifying either `'linear'` or `'logistic'`
-#'   growth of the trend. If `'logistic'`, a variable labelled `cap` MUST be in
-#'   \code{data} to specify the maximum saturation point for the trend (see
+#'   growth of the trend. If `'logistic'`, the `cap` argument must specify the
+#'   variable containing maximum saturation points for the trend (see
 #'   details and examples in \code{\link{mvgam}} for more information). Default
 #'   is `'linear'`.
 #'
@@ -789,6 +817,45 @@ GP = function(time = NA, series = NA, ...) {
 #'
 #' @examples
 #' \donttest{
+#' # Basic linear piecewise trend with defaults (will issue warnings)
+#' set.seed(101)
+#' linear_data <- data.frame(
+#'   y = rnorm(50, mean = 1:50, sd = 2),
+#'   time = 1:50,
+#'   series = factor("series_1")
+#' )
+#'
+#' mod1 <- mvgam(
+#'   y ~ 0,
+#'   trend_model = PW(growth = "linear"),
+#'   data = linear_data,
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' # Custom variable names for time and series
+#' growth_data <- data.frame(
+#'   count = rpois(60, exp(seq(0, 2, length.out = 60))),
+#'   week = 1:60,
+#'   population = factor("pop_A"),
+#'   carrying_capacity = 100
+#' )
+#'
+#' mod2 <- mvgam(
+#'   count ~ 0,
+#'   trend_model = PW(
+#'     time = week,
+#'     series = population,
+#'     cap = carrying_capacity,
+#'     growth = "logistic",
+#'     n_changepoints = 5
+#'   ),
+#'   family = poisson(),
+#'   data = growth_data,
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
 #' # Example of logistic growth with possible changepoints
 #' dNt <- function(r, N, k) {
 #'   r * N * (k - N)
@@ -823,41 +890,83 @@ GP = function(time = NA, series = NA, ...) {
 #' )
 #' plot_mvgam_series(data = mod_data)
 #'
-#' mod <- mvgam(
+#' mod3 <- mvgam(
 #'   y ~ 0,
-#'   trend_model = PW(growth = "logistic"),
+#'   trend_model = PW(growth = "logistic"),  # Uses default 'cap' variable
 #'   family = poisson(),
 #'   data = mod_data,
 #'   chains = 2,
 #'   silent = 2
 #' )
-#' summary(mod)
+#' summary(mod3)
 #'
-#' hc <- hindcast(mod)
+#' hc <- hindcast(mod3)
 #' plot(hc)
 #'
 #' library(ggplot2)
-#' mcmc_plot(mod, variable = "delta_trend", regex = TRUE) +
-#'   scale_y_discrete(labels = mod$trend_model$changepoints) +
+#' mcmc_plot(mod3, variable = "delta_trend", regex = TRUE) +
+#'   scale_y_discrete(labels = mod3$trend_model$changepoints) +
 #'   labs(
 #'     y = "Potential changepoint",
 #'     x = "Rate change"
 #'   )
 #'
-#' how_to_cite(mod)
+#' how_to_cite(mod3)
 #' }
 #'
 #' @export
 PW = function(
+  time = NA,
+  series = NA,
+  cap = NA,
   n_changepoints = 10,
   changepoint_range = 0.8,
   changepoint_scale = 0.05,
   growth = 'linear'
 ) {
+  # Process time argument
+  time <- deparse0(substitute(time))
+  time_was_default <- (time == "NA")
+  if (time == "NA") time <- "time"  # Default to 'time' when NA
+
+  # Process series argument
+  series <- deparse0(substitute(series))
+  series_was_default <- (series == "NA")
+  if (series == "NA") series <- "series"  # Default to 'series' when NA
+
+  # Process cap argument
+  cap <- deparse0(substitute(cap))
+  cap_was_default <- (cap == "NA")
+  if (cap == "NA") cap <- "cap"  # Default to 'cap' when NA
+
+  # Issue warnings for default usage using modular functions
+  if (time_was_default) warn_default_time_variable()
+  if (series_was_default) warn_default_series_variable()
+  if (cap_was_default && growth == 'logistic') {
+    rlang::warn(
+      paste0(
+        "Using default variable name 'cap' for logistic growth carrying capacity.\n",
+        "Specify explicitly with: PW(cap = your_cap_variable, growth = 'logistic')"
+      ),
+      class = "mvgam_default_variable_warning",
+      .frequency = "once"
+    )
+  }
+
+  # Validate arguments
   growth <- match.arg(growth, choices = c('linear', 'logistic'))
   validate_proportional(changepoint_range)
   validate_pos_integer(n_changepoints)
   validate_pos_real(changepoint_scale)
+
+  # Check for required cap variable in logistic models
+  if (growth == 'logistic' && cap == "NA") {
+    stop(insight::format_error(
+      "Logistic growth models require a {.field cap} variable.",
+      "Either provide {.field cap} argument or ensure 'cap' column exists in data.",
+      "Example: PW(cap = carrying_capacity, growth = 'logistic')"
+    ))
+  }
 
   trend_model <- 'PWlinear'
   if (growth == 'logistic') {
@@ -869,6 +978,10 @@ PW = function(
       n_changepoints = n_changepoints,
       changepoint_range = changepoint_range,
       changepoint_scale = changepoint_scale,
+      growth = growth,
+      time = time,
+      series = series,
+      cap = cap,
       ma = FALSE,
       cor = FALSE,
       unit = 'time',

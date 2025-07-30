@@ -5,11 +5,11 @@
 #' These inject parameters, functions, and model components rather than complete programs.
 
 #' Generate Trend Injection Stanvars
-#' 
+#'
 #' @description
 #' Main dispatcher that generates stanvars to inject temporal dynamics into brms Stan code.
 #' The brms code provides trend_mus = X_trend * b_trend, we add temporal evolution.
-#' 
+#'
 #' @param trend_spec List containing trend specification (type, parameters, etc.)
 #' @param data_info List containing data structure information
 #' @return List of stanvars for injection
@@ -17,9 +17,9 @@
 generate_trend_injection_stanvars <- function(trend_spec, data_info) {
   checkmate::assert_list(trend_spec, names = "named")
   checkmate::assert_list(data_info, names = "named")
-  
+
   trend_type <- trend_spec$type
-  
+
   # Dispatch to appropriate trend stanvar generator
   stanvars <- switch(trend_type,
     "RW" = generate_rw_injection_stanvars(trend_spec, data_info),
@@ -27,128 +27,198 @@ generate_trend_injection_stanvars <- function(trend_spec, data_info) {
     "VAR" = generate_var_injection_stanvars(trend_spec, data_info),
     "GP" = generate_gp_injection_stanvars(trend_spec, data_info),
     "CAR" = generate_car_injection_stanvars(trend_spec, data_info),
+    "PW" = generate_pw_injection_stanvars(trend_spec, data_info),
+    "PWlinear" = generate_pw_injection_stanvars(trend_spec, data_info),
+    "PWlogistic" = generate_pw_injection_stanvars(trend_spec, data_info),
+    "ZMVN" = generate_zmvn_injection_stanvars(trend_spec, data_info),
     stop(insight::format_error(
       "Unknown trend type: {trend_type}",
-      "Supported types: RW, AR, VAR, GP, CAR"
+      "Supported types: RW, AR, VAR, GP, CAR, PW, ZMVN"
     ))
   )
-  
+
   return(stanvars)
 }
 
 #' Generate Random Walk Injection Stanvars
-#' 
+#'
 #' @description
 #' RW models: LV[i,j] ~ normal(trend_mus[...], sigma[j])
-#' No temporal dependence, just independent evolution around trend_mus.
-#' 
+#' Supports both simple correlation (cor = TRUE) and hierarchical grouping (gr != 'NA').
+#'
 #' @param trend_spec Trend specification
 #' @param data_info Data information
 #' @return List of stanvars
 #' @noRd
 generate_rw_injection_stanvars <- function(trend_spec, data_info) {
   n_lv <- data_info$n_lv %||% data_info$n_series %||% 1
-  
-  # RW models don't need temporal parameters - they're just independent normals
-  # The "random walk" behavior comes from the trend_mus evolution via brms
+  use_cor <- trend_spec$cor %||% FALSE
+  use_grouping <- !is.null(trend_spec$gr) && trend_spec$gr != 'NA'
+
   stanvars <- list()
-  
-  # Add latent state variance parameters
-  stanvars$sigma_params <- stanvar(
-    x = NULL,
-    name = "rw_sigma_params",
-    scode = glue::glue("
-    parameters {{
-      // latent state SD parameters for RW
-      vector<lower=0>[{n_lv}] sigma;
-    }}
-    ")
-  )
-  
-  # Add RW model dynamics (no temporal dependence)
-  stanvars$rw_model <- stanvar(
-    x = NULL,
-    name = "rw_model_block",
-    scode = glue::glue("
-    // RW latent state evolution (independent around mu_trend)
-    for (j in 1:{n_lv}) {{
-      for (i in 1:n) {{
-        LV[i, j] ~ normal(mu_trend[ytimes_trend[i, j]], sigma[j]);
+
+  if (use_grouping) {
+    # Hierarchical grouping case: RW(gr = region, subgr = species)
+    n_groups <- data_info$n_groups %||% 1
+    n_subgroups <- data_info$n_subgroups %||% n_lv
+
+    stanvars$hierarchical_functions <- generate_hierarchical_functions_stanvar()
+    stanvars$rw_hierarchical_params <- generate_hierarchical_params_stanvar(n_groups, n_subgroups, add_ar_params = FALSE)
+    stanvars$rw_hierarchical_transformed <- generate_hierarchical_transformed_stanvar(n_groups, n_subgroups, dynamics_type = "rw")
+    stanvars$rw_hierarchical_model <- generate_hierarchical_model_stanvar(n_groups, add_ar_priors = FALSE)
+
+  } else if (use_cor) {
+    # Simple correlation case: RW(cor = TRUE)
+    stanvars$rw_correlated_params <- generate_simple_corr_params_stanvar(n_lv, add_ar_params = FALSE)
+
+    stanvars$rw_correlated_transformed <- stanvar(
+      x = NULL,
+      name = "rw_correlated_transformed",
+      scode = glue::glue("
+      transformed parameters {{
+        array[n] vector[{n_lv}] trend_raw;
+
+        // LKJ form of covariance matrix
+        matrix[{n_lv}, {n_lv}] L_Sigma;
+
+        // computed error covariance matrix
+        cov_matrix[{n_lv}] Sigma;
+
+        // derived RW latent states (cumulative sum of errors)
+        trend_raw[1] = error[1];
+        for (i in 2 : n) {{
+          // RW: trend[i] = trend[i-1] + error[i]
+          trend_raw[i] = trend_raw[i - 1] + error[i];
+        }}
+
+        L_Sigma = diag_pre_multiply(sigma, L_Omega);
+        Sigma = multiply_lower_tri_self_transpose(L_Sigma);
       }}
-    }}
-    ")
-  )
-  
-  # Add priors
-  stanvars$rw_priors <- stanvar(
-    x = NULL,
-    name = "rw_priors",
-    scode = "
-    // priors for RW latent state SD parameters
-    sigma ~ inv_gamma(1.418, 0.452);
-    "
-  )
-  
+      ")
+    )
+
+    stanvars$rw_correlated_model <- stanvar(
+      x = NULL,
+      name = "rw_correlated_model",
+      scode = "
+      // priors for latent trend variance parameters
+      sigma ~ inv_gamma(1.418, 0.452);
+
+      // contemporaneous errors
+      L_Omega ~ lkj_corr_cholesky(2);
+      for (i in 1 : n) {
+        error[i] ~ multi_normal_cholesky(trend_zeros, L_Sigma);
+      }
+      "
+    )
+
+  } else {
+    # Simple uncorrelated case: RW()
+    stanvars$rw_simple_params <- stanvar(
+      x = NULL,
+      name = "rw_simple_params",
+      scode = glue::glue("
+      parameters {{
+        // latent state SD parameters for RW
+        vector<lower=0>[{n_lv}] sigma;
+      }}
+      ")
+    )
+
+    stanvars$rw_simple_model <- stanvar(
+      x = NULL,
+      name = "rw_simple_model",
+      scode = glue::glue("
+      // RW latent state evolution (independent around mu_trend)
+      for (j in 1:{n_lv}) {{
+        for (i in 1:n) {{
+          LV[i, j] ~ normal(mu_trend[ytimes_trend[i, j]], sigma[j]);
+        }}
+      }}
+
+      // priors for RW latent state SD parameters
+      sigma ~ inv_gamma(1.418, 0.452);
+      ")
+    )
+  }
+
   return(stanvars)
 }
 
 #' Generate AR Injection Stanvars
-#' 
+#'
 #' @description
 #' AR models: LV[i,j] ~ normal(trend_mus[...] + ar1[j] * (LV[i-1,j] - trend_mus[...]), sigma[j])
-#' 
-#' @param trend_spec Trend specification  
+#' Supports both simple correlation (cor = TRUE) and hierarchical grouping (gr != 'NA').
+#'
+#' @param trend_spec Trend specification
 #' @param data_info Data information
 #' @return List of stanvars
 #' @noRd
 generate_ar_injection_stanvars <- function(trend_spec, data_info) {
   n_lv <- data_info$n_lv %||% data_info$n_series %||% 1
   p_order <- trend_spec$p %||% 1
-  
+  use_cor <- trend_spec$cor %||% FALSE
+  use_grouping <- !is.null(trend_spec$gr) && trend_spec$gr != 'NA'
+
   stanvars <- list()
-  
+
   if (length(p_order) == 1 && p_order == 1) {
-    # AR(1) model - matches the example exactly
-    stanvars$ar_params <- stanvar(
-      x = NULL,
-      name = "ar1_params",
-      scode = glue::glue("
-      parameters {{
-        // AR parameters
-        vector[{n_lv}] ar1;
-        // latent state SD parameters  
-        vector<lower=0>[{n_lv}] sigma;
-      }}
-      ")
-    )
-    
-    stanvars$ar_model <- stanvar(
-      x = NULL,
-      name = "ar1_model_block", 
-      scode = glue::glue("
-      // AR(1) latent state evolution - matches mvgam pattern exactly
-      for (j in 1:{n_lv}) {{
-        LV[1, j] ~ normal(mu_trend[ytimes_trend[1, j]], sigma[j]);
-        for (i in 2:n) {{
-          LV[i, j] ~ normal(mu_trend[ytimes_trend[i, j]]
-                            + ar1[j] * (LV[i - 1, j] - mu_trend[ytimes_trend[i - 1, j]]),
-                            sigma[j]);
+    # AR(1) model
+
+    if (use_grouping) {
+      # Hierarchical grouping case: AR(gr = region, subgr = species)
+      n_groups <- data_info$n_groups %||% 1
+      n_subgroups <- data_info$n_subgroups %||% n_lv
+
+      stanvars$hierarchical_functions <- generate_hierarchical_functions_stanvar()
+      stanvars$ar_hierarchical_params <- generate_hierarchical_params_stanvar(n_groups, n_subgroups, add_ar_params = TRUE)
+      stanvars$ar_hierarchical_transformed <- generate_hierarchical_transformed_stanvar(n_groups, n_subgroups, dynamics_type = "ar")
+      stanvars$ar_hierarchical_model <- generate_hierarchical_model_stanvar(n_groups, add_ar_priors = TRUE)
+
+    } else {
+      # Simple AR(1) case - matches the original exactly
+      stanvars$ar_params <- stanvar(
+        x = NULL,
+        name = "ar1_params",
+        scode = glue::glue("
+        parameters {{
+          // AR parameters
+          vector[{n_lv}] ar1;
+          // latent state SD parameters
+          vector<lower=0>[{n_lv}] sigma;
         }}
-      }}
-      ")
-    )
-    
-    stanvars$ar_priors <- stanvar(
-      x = NULL,
-      name = "ar1_priors",
-      scode = "
-      // priors for AR parameters - matches mvgam exactly
-      ar1 ~ std_normal();
-      // priors for latent state SD parameters
-      sigma ~ inv_gamma(1.418, 0.452);
-      "
-    )
-    
+        ")
+      )
+
+      stanvars$ar_model <- stanvar(
+        x = NULL,
+        name = "ar1_model_block",
+        scode = glue::glue("
+        // AR(1) latent state evolution - matches mvgam pattern exactly
+        for (j in 1:{n_lv}) {{
+          LV[1, j] ~ normal(mu_trend[ytimes_trend[1, j]], sigma[j]);
+          for (i in 2:n) {{
+            LV[i, j] ~ normal(mu_trend[ytimes_trend[i, j]]
+                              + ar1[j] * (LV[i - 1, j] - mu_trend[ytimes_trend[i - 1, j]]),
+                              sigma[j]);
+          }}
+        }}
+        ")
+      )
+
+      stanvars$ar_priors <- stanvar(
+        x = NULL,
+        name = "ar1_priors",
+        scode = "
+        // priors for AR parameters - matches mvgam exactly
+        ar1 ~ std_normal();
+        // priors for latent state SD parameters
+        sigma ~ inv_gamma(1.418, 0.452);
+        "
+      )
+    }
+
   } else {
     # Higher order or seasonal AR - more complex implementation needed
     stop(insight::format_error(
@@ -156,40 +226,40 @@ generate_ar_injection_stanvars <- function(trend_spec, data_info) {
       "Currently only AR(1) is supported. Requested: AR(p = {paste(p_order, collapse = ', ')})"
     ))
   }
-  
+
   return(stanvars)
 }
 
 #' Generate VAR Injection Stanvars
-#' 
+#'
 #' @description
 #' VAR models: Complex multivariate dynamics with stationarity constraints.
 #' Matches the extensive VAR(1) example provided.
-#' 
+#'
 #' @param trend_spec Trend specification
-#' @param data_info Data information  
+#' @param data_info Data information
 #' @return List of stanvars
 #' @noRd
 generate_var_injection_stanvars <- function(trend_spec, data_info) {
   n_lv <- data_info$n_lv %||% data_info$n_series %||% 2
   p_order <- trend_spec$p %||% 1
-  
+
   if (n_lv < 2) {
     stop(insight::format_error(
       "VAR models require at least 2 latent factors.",
       "Current n_lv: {n_lv}"
-    ))  
+    ))
   }
-  
+
   if (p_order != 1) {
     stop(insight::format_error(
       "Only VAR(1) currently supported.",
       "Requested: VAR(p = {p_order})"
     ))
   }
-  
+
   stanvars <- list()
-  
+
   # Add the complex VAR functions - copied exactly from the example
   stanvars$var_functions <- stanvar(
     x = NULL,
@@ -205,7 +275,7 @@ generate_var_injection_stanvars <- function(trend_spec, data_info) {
         matrix[m, m] eprod = diag_post_multiply(evecs, root_root_evals);
         return tcrossprod(eprod);
       }
-      
+
       /* Function to transform P_real to P */
       /* see Heaps 2022 for details (https://doi.org/10.1080/10618600.2022.2079648)*/
       matrix P_realtoP(matrix P_real) {
@@ -216,7 +286,7 @@ generate_var_injection_stanvars <- function(trend_spec, data_info) {
         }
         return mdivide_left_spd(sqrtm(B), P_real);
       }
-      
+
       /* Function to perform the reverse mapping*/
       /* see Heaps 2022 for details (https://doi.org/10.1080/10618600.2022.2079648)*/
       array[,] matrix rev_mapping(array[] matrix P, matrix Sigma) {
@@ -231,7 +301,7 @@ generate_var_injection_stanvars <- function(trend_spec, data_info) {
         array[p + 1] matrix[m, m] S_for_list;
         array[p + 1] matrix[m, m] Gamma_trans;
         array[2, p] matrix[m, m] phiGamma;
-        
+
         // Step 1:
         Sigma_for[p + 1] = Sigma;
         S_for_list[p + 1] = sqrtm(Sigma);
@@ -251,7 +321,7 @@ generate_var_injection_stanvars <- function(trend_spec, data_info) {
                                                     S_rev);
           Sigma_for[p - s + 1] = tcrossprod(S_for_list[p - s + 1]);
         }
-        
+
         // Step 2:
         Sigma_rev[1] = Sigma_for[1];
         Gamma_trans[1] = Sigma_for[1];
@@ -288,7 +358,7 @@ generate_var_injection_stanvars <- function(trend_spec, data_info) {
     }
     "
   )
-  
+
   # Add transformed data for VAR hyperparameters - from example
   stanvars$var_transformed_data <- stanvar(
     x = NULL,
@@ -312,7 +382,7 @@ generate_var_injection_stanvars <- function(trend_spec, data_info) {
     }}
     ")
   )
-  
+
   # Add VAR parameters - matches example exactly
   stanvars$var_params <- stanvar(
     x = NULL,
@@ -322,17 +392,17 @@ generate_var_injection_stanvars <- function(trend_spec, data_info) {
       // latent state variance parameters
       cholesky_factor_corr[{n_lv}] L_Omega;
       vector<lower=0>[{n_lv}] sigma;
-      
+
       // unconstrained VAR1 partial autocorrelations
       matrix[{n_lv}, {n_lv}] P_real;
-      
+
       // partial autocorrelation hyperparameters
       vector[2] Pmu;
       vector<lower=0>[2] Pomega;
     }}
     ")
   )
-  
+
   # Add VAR transformed parameters - matches example exactly
   stanvars$var_transformed <- stanvar(
     x = NULL,
@@ -341,19 +411,19 @@ generate_var_injection_stanvars <- function(trend_spec, data_info) {
     transformed parameters {{
       // latent state VAR1 autoregressive terms
       matrix[{n_lv}, {n_lv}] A;
-      
+
       // LKJ form of covariance matrix
       matrix[{n_lv}, {n_lv}] L_Sigma;
-      
+
       // computed error covariance matrix
       cov_matrix[{n_lv}] Sigma;
-      
+
       // initial trend covariance
       cov_matrix[{n_lv}] Gamma;
-      
+
       L_Sigma = diag_pre_multiply(sigma, L_Omega);
       Sigma = multiply_lower_tri_self_transpose(L_Sigma);
-      
+
       // stationary VAR reparameterisation
       {{
         array[1] matrix[{n_lv}, {n_lv}] P;
@@ -366,7 +436,7 @@ generate_var_injection_stanvars <- function(trend_spec, data_info) {
     }}
     ")
   )
-  
+
   # Add VAR model block - matches example exactly
   stanvars$var_model <- stanvar(
     x = NULL,
@@ -376,17 +446,17 @@ generate_var_injection_stanvars <- function(trend_spec, data_info) {
     {{
       // latent state mean parameters
       array[n] vector[{n_lv}] mu;
-      
+
       // priors for latent state variance parameters
       sigma ~ inv_gamma(1.418, 0.452);
-      
+
       // LKJ error correlation prior
       L_Omega ~ lkj_corr_cholesky(2);
-      
+
       // partial autocorrelation hyperpriors
       Pmu ~ normal(es, fs);
       Pomega ~ gamma(gs, hs);
-      
+
       // unconstrained partial autocorrelations
       diagonal(P_real) ~ normal(Pmu[1], 1 / sqrt(Pomega[1]));
       for (i in 1:{n_lv}) {{
@@ -396,13 +466,13 @@ generate_var_injection_stanvars <- function(trend_spec, data_info) {
           }}
         }}
       }}
-      
+
       // latent state means
       for (i in 2:n) {{
         mu[i] = A * (LV[i - 1] - mu_trend[ytimes_trend[i - 1, 1:{n_lv}]]);
       }}
-      
-      // VAR latent state evolution - matches example exactly  
+
+      // VAR latent state evolution - matches example exactly
       LV[1] ~ multi_normal(mu_trend[ytimes_trend[1, 1:{n_lv}]], Gamma);
       for (i in 2:n) {{
         LV[i] ~ multi_normal_cholesky(mu_trend[ytimes_trend[i, 1:{n_lv}]] + mu[i], L_Sigma);
@@ -410,24 +480,24 @@ generate_var_injection_stanvars <- function(trend_spec, data_info) {
     }}
     ")
   )
-  
+
   return(stanvars)
 }
 
 #' Generate CAR Injection Stanvars
-#' 
+#'
 #' @description
 #' CAR models: LV[i,j] ~ normal(trend_mus[...] + pow(ar1[j], time_dis[i,j]) * (...), sigma[j])
-#' 
+#'
 #' @param trend_spec Trend specification
 #' @param data_info Data information
 #' @return List of stanvars
 #' @noRd
 generate_car_injection_stanvars <- function(trend_spec, data_info) {
   n_lv <- data_info$n_lv %||% data_info$n_series %||% 1
-  
+
   stanvars <- list()
-  
+
   # CAR parameters - matches example
   stanvars$car_params <- stanvar(
     x = NULL,
@@ -441,7 +511,7 @@ generate_car_injection_stanvars <- function(trend_spec, data_info) {
     }}
     ")
   )
-  
+
   # CAR model - matches example exactly
   stanvars$car_model <- stanvar(
     x = NULL,
@@ -459,11 +529,11 @@ generate_car_injection_stanvars <- function(trend_spec, data_info) {
     }}
     ")
   )
-  
+
   # CAR priors
   stanvars$car_priors <- stanvar(
     x = NULL,
-    name = "car_priors", 
+    name = "car_priors",
     scode = "
     // priors for AR parameters
     ar1 ~ std_normal();
@@ -471,16 +541,16 @@ generate_car_injection_stanvars <- function(trend_spec, data_info) {
     sigma ~ inv_gamma(1.418, 0.452);
     "
   )
-  
+
   return(stanvars)
 }
 
 #' Generate GP Injection Stanvars
-#' 
+#'
 #' @description
 #' GP models: Currently not implemented as examples show GP applied to trend_formula,
 #' not as temporal dynamics on LV.
-#' 
+#'
 #' @param trend_spec Trend specification
 #' @param data_info Data information
 #' @return List of stanvars
@@ -488,15 +558,469 @@ generate_car_injection_stanvars <- function(trend_spec, data_info) {
 generate_gp_injection_stanvars <- function(trend_spec, data_info) {
   stop(insight::format_error(
     "GP trends are handled via trend_formula, not as temporal dynamics.",
-    "Use: trend_formula = ~ gp(time, k = 10) with trend_model = AR() or RW()"
+    "Use: trend_formula = ~ gp(time, k = 10)..."
   ))
 }
 
+#' Generate Piecewise (PW) Injection Stanvars
+#'
+#' @description
+#' PW models: Piecewise linear or logistic trends with changepoints.
+#' Based on Prophet-style piecewise regression with automatic changepoint detection.
+#'
+#' @param trend_spec Trend specification containing n_changepoints, growth type, etc.
+#' @param data_info Data information
+#' @return List of stanvars
+#' @noRd
+generate_pw_injection_stanvars <- function(trend_spec, data_info) {
+  n_lv <- data_info$n_lv %||% data_info$n_series %||% 1
+  n_changepoints <- trend_spec$n_changepoints %||% 10
+  growth_type <- trend_spec$growth %||% "linear"
+  is_logistic <- (trend_spec$trend_model == "PWlogistic" || growth_type == "logistic")
+
+  # Extract variable names from trend specification
+  time_var <- trend_spec$time %||% "time"
+  series_var <- trend_spec$series %||% "series"
+  cap_var <- trend_spec$cap %||% "cap"
+
+  stanvars <- list()
+
+  # Add PW functions - based on the current mvgam implementation
+  stanvars$pw_functions <- stanvar(
+    x = NULL,
+    name = "pw_functions",
+    scode = "
+    functions {
+      matrix get_changepoint_matrix(vector t, vector t_change, int T, int S) {
+        /* Function to sort changepoints */
+        /* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/
+        matrix[T, S] A;
+        row_vector[S] a_row;
+        int cp_idx;
+        A = rep_matrix(0, T, S);
+        a_row = rep_row_vector(0, S);
+        cp_idx = 1;
+        for (i in 1 : T) {
+          while ((cp_idx <= S) && (t[i] >= t_change[cp_idx])) {
+            a_row[cp_idx] = 1;
+            cp_idx = cp_idx + 1;
+          }
+          A[i] = a_row;
+        }
+        return A;
+      }
+
+      // logistic trend functions
+      vector logistic_gamma(real k, real m, vector delta, vector t_change, int S) {
+        /* Function to compute a logistic trend with changepoints */
+        /* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/
+        vector[S] gamma; // adjusted offsets, for piecewise continuity
+        vector[S + 1] k_s; // actual rate in each segment
+        real m_pr;
+        k_s = append_row(k, k + cumulative_sum(delta));
+        m_pr = m; // The offset in the previous segment
+        for (i in 1 : S) {
+          gamma[i] = (t_change[i] - m_pr) * (1 - k_s[i] / k_s[i + 1]);
+          m_pr = m_pr + gamma[i]; // update for the next segment
+        }
+        return gamma;
+      }
+
+      vector logistic_trend(real k, real m, vector delta, vector t, vector cap,
+                            matrix A, vector t_change, int S) {
+        /* Function to adjust a logistic trend using a carrying capacity */
+        /* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/
+        vector[S] gamma;
+        gamma = logistic_gamma(k, m, delta, t_change, S);
+        return cap .* inv_logit((k + A * delta) .* (t - (m + A * gamma)));
+      }
+
+      // linear trend function
+      /* Function to compute a linear trend with changepoints */
+      /* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/
+      vector linear_trend(real k, real m, vector delta, vector t, matrix A,
+                          vector t_change) {
+        return (k + A * delta) .* t + (m + A * (-t_change .* delta));
+      }
+    }
+    "
+  )
+
+  # PW parameters - matches current mvgam implementation
+  stanvars$pw_params <- stanvar(
+    x = NULL,
+    name = "pw_params",
+    scode = glue::glue("
+    parameters {{
+      // base trend growth rates
+      vector[n_series] k_trend;
+
+      // trend offset parameters
+      vector[n_series] m_trend;
+
+      // trend rate adjustments per series
+      matrix[n_changepoints, n_series] delta_trend;
+    }}
+    ")
+  )
+
+  # PW transformed parameters - matches current implementation structure
+  if (is_logistic) {
+    stanvars$pw_transformed <- stanvar(
+      x = NULL,
+      name = "pw_transformed",
+      scode = glue::glue("
+      transformed parameters {{
+        // latent trends
+        matrix[n, n_series] trend;
+
+        // trend estimates using logistic growth
+        for (s in 1 : n_series) {{
+          trend[1 : n, s] = logistic_trend(k_trend[s], m_trend[s],
+                                           to_vector(delta_trend[ : , s]), {time_var},
+                                           to_vector({cap_var}[ : , s]), A, t_change,
+                                           n_changepoints);
+        }}
+      }}
+      ")
+    )
+  } else {
+    stanvars$pw_transformed <- stanvar(
+      x = NULL,
+      name = "pw_transformed",
+      scode = glue::glue("
+      transformed parameters {{
+        // latent trends
+        matrix[n, n_series] trend;
+
+        // trend estimates using linear growth
+        for (s in 1 : n_series) {{
+          trend[1 : n, s] = linear_trend(k_trend[s], m_trend[s],
+                                         to_vector(delta_trend[ : , s]), {time_var},
+                                         A, t_change);
+        }}
+      }}
+      ")
+    )
+  }
+
+  # PW priors - matches current implementation
+  stanvars$pw_priors <- stanvar(
+    x = NULL,
+    name = "pw_priors",
+    scode = glue::glue("
+    // trend parameter priors
+    m_trend ~ student_t(3, 0, 2.5);
+    k_trend ~ std_normal();
+    to_vector(delta_trend) ~ double_exponential(0, changepoint_scale);
+    ")
+  )
+
+  return(stanvars)
+}
+
+#' Generate Zero-Mean Multivariate Normal (ZMVN) Injection Stanvars
+#'
+#' @description
+#' ZMVN models: Correlated residual processes for Joint Species Distribution Models.
+#' Models correlation structure without temporal dynamics.
+#'
+#' @param trend_spec Trend specification
+#' @param data_info Data information
+#' @return List of stanvars
+#' @noRd
+generate_zmvn_injection_stanvars <- function(trend_spec, data_info) {
+  n_lv <- data_info$n_lv %||% data_info$n_series %||% 1
+  use_grouping <- !is.null(trend_spec$gr) && trend_spec$gr != 'NA'
+  unit_var <- trend_spec$unit %||% "time"
+
+  stanvars <- list()
+
+  if (use_grouping) {
+    # Hierarchical ZMVN case: ZMVN(unit = site, gr = group, subgr = species)
+    n_groups <- data_info$n_groups %||% 1
+    n_subgroups <- data_info$n_subgroups %||% n_lv
+
+    # Add hierarchical correlation functions (reuse if not already added)
+    stanvars$hierarchical_functions <- stanvar(
+      x = NULL,
+      name = "hierarchical_functions",
+      scode = "
+      functions {
+        /* Function to compute a partially pooled correlation matrix */
+        matrix combine_cholesky(matrix global_chol_cor, matrix local_chol_cor,
+                                real alpha) {
+          int dim = rows(local_chol_cor);
+          matrix[dim, dim] global_cor = multiply_lower_tri_self_transpose(global_chol_cor);
+          matrix[dim, dim] local_cor = multiply_lower_tri_self_transpose(local_chol_cor);
+          matrix[dim, dim] combined_chol_cor;
+          combined_chol_cor = cholesky_decompose(alpha * global_cor
+                                                 + (1 - alpha) * local_cor);
+          return combined_chol_cor;
+        }
+      }
+      "
+    )
+
+    # Hierarchical ZMVN parameters
+    stanvars$zmvn_hierarchical_params <- stanvar(
+      x = NULL,
+      name = "zmvn_hierarchical_params",
+      scode = glue::glue("
+      parameters {{
+        // correlation params for hierarchical ZMVN
+        cholesky_factor_corr[{n_subgroups}] L_Omega_global;
+        array[{n_groups}] cholesky_factor_corr[{n_subgroups}] L_deviation_group;
+        real<lower=0, upper=1> alpha_cor;
+      }}
+      ")
+    )
+
+    # Hierarchical ZMVN model
+    stanvars$zmvn_hierarchical_model <- stanvar(
+      x = NULL,
+      name = "zmvn_hierarchical_model",
+      scode = glue::glue("
+      {{
+        // derived hierarchical correlation matrices
+        array[{n_groups}] cholesky_factor_corr[{n_subgroups}] L_Omega_group;
+        for (g in 1 : {n_groups}) {{
+          L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g],
+                                              alpha_cor);
+        }}
+
+        // hierarchical ZMVN process
+        alpha_cor ~ beta(3, 2);
+        L_Omega_global ~ lkj_corr_cholesky(1);
+        for (g in 1 : {n_groups}) {{
+          L_deviation_group[g] ~ lkj_corr_cholesky(6);
+        }}
+
+        // ZMVN residual correlation by {unit_var}
+        for (i in 1:n_{unit_var}) {{
+          for (g in 1:{n_groups}) {{
+            to_vector(LV[group_unit_indices[i, g]]) ~ multi_normal_cholesky(rep_vector(0, {n_subgroups}),
+                                                                             L_Omega_group[g]);
+          }}
+        }}
+      }}
+      ")
+    )
+
+  } else {
+    # Simple ZMVN case: ZMVN(unit = site, subgr = species)
+    stanvars$zmvn_simple_params <- stanvar(
+      x = NULL,
+      name = "zmvn_simple_params",
+      scode = glue::glue("
+      parameters {{
+        // correlation matrix for ZMVN
+        cholesky_factor_corr[{n_lv}] L_Omega;
+      }}
+      ")
+    )
+
+    stanvars$zmvn_simple_model <- stanvar(
+      x = NULL,
+      name = "zmvn_simple_model",
+      scode = glue::glue("
+      // Simple ZMVN residual correlation by {unit_var}
+      L_Omega ~ lkj_corr_cholesky(2);
+      for (i in 1:n_{unit_var}) {{
+        to_vector(LV[{unit_var}_indices[i]]) ~ multi_normal_cholesky(rep_vector(0, {n_lv}), L_Omega);
+      }}
+      ")
+    )
+  }
+
+  return(stanvars)
+}
+
+# Helper Functions for Trend Stancode Generation
+# ======================================================
+
+#' Generate Hierarchical Correlation Functions
+#' @description Common functions block for hierarchical correlation models
+#' @noRd
+generate_hierarchical_functions_stanvar <- function() {
+  stanvar(
+    x = NULL,
+    name = "hierarchical_functions",
+    scode = "
+    functions {
+      /* Function to compute a partially pooled correlation matrix */
+      /* https://discourse.mc-stan.org/t/hierarchical-prior-for-partial-pooling-on-correlation-matrices*/
+      matrix combine_cholesky(matrix global_chol_cor, matrix local_chol_cor,
+                              real alpha) {
+        int dim = rows(local_chol_cor);
+        matrix[dim, dim] global_cor = multiply_lower_tri_self_transpose(global_chol_cor);
+        matrix[dim, dim] local_cor = multiply_lower_tri_self_transpose(local_chol_cor);
+        matrix[dim, dim] combined_chol_cor;
+        combined_chol_cor = cholesky_decompose(alpha * global_cor
+                                               + (1 - alpha) * local_cor);
+        return combined_chol_cor;
+      }
+    }
+    "
+  )
+}
+
+#' Generate Hierarchical Correlation Parameters
+#' @description Common parameters block for hierarchical models
+#' @param n_groups Number of groups
+#' @param n_subgroups Number of subgroups
+#' @param add_ar_params Whether to include AR parameters
+#' @noRd
+generate_hierarchical_params_stanvar <- function(n_groups, n_subgroups, add_ar_params = FALSE) {
+  ar_params_code <- if (add_ar_params) {
+    "\n        // latent trend AR1 terms\n        vector<lower=-1, upper=1>[n_series] ar1;\n"
+  } else {
+    ""
+  }
+
+  stanvar(
+    x = NULL,
+    name = "hierarchical_params",
+    scode = glue::glue("
+    parameters {{
+      // latent trend variance parameters
+      vector<lower=0>[n_series] sigma;{ar_params_code}
+
+      // correlation params and dynamic error parameters per group
+      cholesky_factor_corr[{n_subgroups}] L_Omega_global;
+      array[{n_groups}] cholesky_factor_corr[{n_subgroups}] L_deviation_group;
+      real<lower=0, upper=1> alpha_cor;
+      array[n] matrix[{n_groups}, {n_subgroups}] sub_error;
+    }}
+    ")
+  )
+}
+
+#' Generate Hierarchical Correlation Model Block
+#' @description Common model block for hierarchical correlation priors
+#' @param n_groups Number of groups
+#' @param add_ar_priors Whether to include AR parameter priors
+#' @noRd
+generate_hierarchical_model_stanvar <- function(n_groups, add_ar_priors = FALSE) {
+  ar_priors_code <- if (add_ar_priors) {
+    "\n      // priors for AR parameters\n      ar1 ~ std_normal();\n"
+  } else {
+    ""
+  }
+
+  stanvar(
+    x = NULL,
+    name = "hierarchical_model",
+    scode = glue::glue("{ar_priors_code}
+    // priors for latent trend variance parameters
+    sigma ~ inv_gamma(1.418, 0.452);
+
+    // hierarchical process error correlations
+    alpha_cor ~ beta(3, 2);
+    L_Omega_global ~ lkj_corr_cholesky(1);
+    for (g in 1 : {n_groups}) {{
+      L_deviation_group[g] ~ lkj_corr_cholesky(6);
+    }}
+
+    // contemporaneous errors
+    for (i in 1 : n) {{
+      for (g in 1 : {n_groups}) {{
+        to_vector(sub_error[i, g]) ~ multi_normal_cholesky(trend_zeros,
+                                                           L_Sigma_group[g]);
+      }}
+    }}
+    ")
+  )
+}
+
+#' Generate Hierarchical Transformed Parameters
+#' @description Common transformed parameters for hierarchical models
+#' @param n_groups Number of groups
+#' @param n_subgroups Number of subgroups
+#' @param dynamics_type Either "rw" or "ar"
+#' @noRd
+generate_hierarchical_transformed_stanvar <- function(n_groups, n_subgroups, dynamics_type = "rw") {
+  dynamics_code <- switch(dynamics_type,
+    "rw" = "
+        // derived RW latent states (cumulative sum of errors)
+        trend_raw[1] = error[1];
+        for (i in 2 : n) {
+          // RW: trend[i] = trend[i-1] + error[i]
+          trend_raw[i] = trend_raw[i - 1] + error[i];
+        }",
+    "ar" = "
+        // derived AR(1) latent states
+        trend_raw[1] = error[1];
+        for (i in 2 : n) {
+          // full AR process: trend[i] = ar1 * trend[i-1] + error[i]
+          trend_raw[i] = ar1 .* trend_raw[i - 1] + error[i];
+        }"
+  )
+
+  stanvar(
+    x = NULL,
+    name = "hierarchical_transformed",
+    scode = glue::glue("
+    transformed parameters {{
+      array[n] vector[n_series] trend_raw;
+
+      // reconstructed correlated errors
+      array[n] vector[n_series] error;
+      array[{n_groups}] cholesky_factor_corr[{n_subgroups}] L_Omega_group;
+
+      // LKJ forms of covariance matrices
+      array[{n_groups}] matrix[{n_subgroups}, {n_subgroups}] L_Sigma_group;
+
+      // derived error correlation and covariance matrices
+      for (g in 1 : {n_groups}) {{
+        L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g],
+                                            alpha_cor);
+        L_Sigma_group[g] = diag_pre_multiply(sigma[group_inds[g]],
+                                             L_Omega_group[g]);
+      }}
+
+      // derived correlated errors
+      for (i in 1 : n) {{
+        error[i] = to_vector(sub_error[i]');
+      }}{dynamics_code}
+    }}
+    ")
+  )
+}
+
+#' Generate Simple Correlation Parameters
+#' @description Common parameters for simple correlation models (cor = TRUE)
+#' @param n_lv Number of latent variables
+#' @param add_ar_params Whether to include AR parameters
+#' @noRd
+generate_simple_corr_params_stanvar <- function(n_lv, add_ar_params = FALSE) {
+  ar_params_code <- if (add_ar_params) {
+    "\n        // AR parameters\n        vector[{n_lv}] ar1;\n"
+  } else {
+    ""
+  }
+
+  stanvar(
+    x = NULL,
+    name = "correlated_params",
+    scode = glue::glue("
+    parameters {{
+      // latent trend variance parameters
+      vector<lower=0>[{n_lv}] sigma;
+      cholesky_factor_corr[{n_lv}] L_Omega;{ar_params_code}
+
+      // dynamic error parameters
+      array[n] vector[{n_lv}] error;
+    }}
+    ")
+  )
+}
+
 #' Create Stanvar Helper
-#' 
+#'
 #' @description
 #' Helper to create brms stanvar objects with proper structure.
-#' 
+#'
 #' @param x Data object (can be NULL for code-only stanvars)
 #' @param name Character string name
 #' @param scode Character string Stan code or block type
@@ -506,7 +1030,7 @@ stanvar <- function(x, name, scode) {
   if (!requireNamespace("brms", quietly = TRUE)) {
     stop(insight::format_error("Package {.pkg brms} required for stanvar creation"))
   }
-  
+
   # Use brms stanvar function
   brms::stanvar(x = x, name = name, scode = scode)
 }
