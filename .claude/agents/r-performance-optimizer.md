@@ -28,6 +28,9 @@ When analyzing performance issues, you will:
 
 6. **Document Trade-offs**: Clearly explain any trade-offs between performance, memory usage, code complexity, and maintainability.
 
+**MCP Integration**:
+- **Context7**: Research R packages, functions, frameworks, best practices
+
 For R code optimization, you consider:
 - Vectorization opportunities and efficient use of apply functions
 - Data structure choices (data.table vs data.frame vs matrix)

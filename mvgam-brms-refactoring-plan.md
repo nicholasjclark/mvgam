@@ -8,7 +8,7 @@
 
 Transform mvgam from mgcv-based package into specialized brms extension adding State-Space modeling, N-mixture/occupancy models, and JSDMs. **Core Innovation**: brms generates linear predictors (`mu`, `mu_trend`), single combined Stan model, dual brmsfit-like objects for post-processing. **New Features**: Native multiple imputation with Rubin's rules pooling and enhanced leave-future-out cross-validation.
 
-**Key Architecture Reference**: See `brms-stan-integration-patterns.md` for comprehensive analysis of brms design patterns, modular Stan code generation, and implementation strategies that guide this refactoring.
+**Key Architecture Reference**: See `brms-stan-integration-patterns.md` for comprehensive analysis of brms design patterns, modular Stan code generation, and implementation strategies to guide this refactoring.
 
 ## Critical Design Principles
 
@@ -105,45 +105,6 @@ trend[2:T] ~ normal(trend[1:(T-1)], sigma_trend);
 
 Enhanced time series cross-validation with brms ecosystem integration:
 
-```r
-lfo_cv <- function(object, K = NULL, fc_horizon = 1, 
-                   eval_timepoints = NULL, compare_null = TRUE,
-                   n_cores = 1, silent = TRUE, ...) {
-  
-  # Support multiple imputation and multivariate objects
-  if (inherits(object, "mvgam_pooled")) {
-    return(lfo_cv_multiple(object, K, fc_horizon, eval_timepoints, ...))
-  }
-  
-  if (is_multivariate(object)) {
-    return(lfo_cv_multivariate(object, K, fc_horizon, eval_timepoints, ...))
-  }
-  
-  # Core implementation with parallel support
-  timepoints <- extract_timepoints(object)
-  eval_points <- determine_eval_timepoints(timepoints, K, eval_timepoints)
-  splits <- create_lfo_splits(object, eval_points, fc_horizon)
-  
-  lfo_results <- if (n_cores > 1) {
-    parallel_lfo_evaluation(splits, n_cores, silent, ...)
-  } else {
-    sequential_lfo_evaluation(splits, silent, ...)
-  }
-  
-  metrics <- compute_lfo_metrics(lfo_results, compare_null)
-  
-  return(structure(list(
-    forecasts = lfo_results$forecasts,
-    observations = lfo_results$observations,
-    elpd_estimates = metrics$elpd,
-    forecast_metrics = metrics$forecasts,
-    timepoints = eval_points,
-    fc_horizon = fc_horizon,
-    model_call = object$call
-  ), class = c("mvgam_lfo", "lfo")))
-}
-```
-
 **Key Features**:
 - Time-aware evaluation preserving temporal ordering
 - Distributional forecast assessment (ELPD, RMSE, MAE, coverage, CRPS, energy scores)
@@ -153,30 +114,7 @@ lfo_cv <- function(object, K = NULL, fc_horizon = 1,
 
 ### 5. Validation Framework
 
-**Context-Aware Autocorrelation** (implements intelligent separation described in `brms-stan-integration-patterns.md` Key Innovation #1):
-```r
-validate_autocor_usage <- function(formula, trend_formula) {
-  # Observation-level autocor: ALLOWED (residual correlation structures)
-  obs_autocor <- extract_autocor_terms(formula)
-  if (length(obs_autocor) > 0) {
-    insight::format_warning(
-      "Using brms autocorrelation for observation-level residual structure.",
-      "This models residual correlation and complements State-Space trends.",
-      .frequency = "once"
-    )
-  }
-  
-  # Trend-level autocor: FORBIDDEN (conflicts with State-Space dynamics)
-  trend_autocor <- extract_autocor_terms(trend_formula)
-  if (length(trend_autocor) > 0) {
-    stop(insight::format_error(
-      "brms autocorrelation terms not allowed in trend_formula.",
-      "Use mvgam trend types: ar(p = 1) → AR(p = 1)"
-    ))
-  }
-}
-```
-
+**Context-Aware Autocorrelation** (implements intelligent separation described in `brms-stan-integration-patterns.md` Key Innovation #1)
 **Key Validation Areas** (following brms validation patterns from `brms-stan-integration-patterns.md` Section 8):
 - Distributional model restriction: Trends only for main response parameter (Section 6 of patterns doc)
 - Response helper compatibility: `mi()`, `weights()`, `cens()`, `trunc()`, `trials()` 
@@ -189,27 +127,15 @@ validate_autocor_usage <- function(formula, trend_formula) {
 ### Phase 1: Foundation (Weeks 1-4)
 
 #### Week 1: Trend Dispatcher System ✅ **COMPLETE**
-Registry-based trend constructor system enabling `RW()`, `AR()`, `VAR()`, `GP()`, `CAR()`
+Registry-based trend constructor system enabling `RW()`, `AR()`, `VAR()`, `CAR()`
 
 #### Week 2: Formula Integration & Autocorrelation Validation ✅ **COMPLETE**
 - Multivariate formula parsing with `mvbf()` support
 - Context-aware autocorrelation validation preventing conflicts
 
-**Post-Week 2 Enhancement**: Enhanced trend constructors with `time` and `series` parameters following brms conventions:
-```r
-# Flexible variable naming with unquoted syntax
-AR(time = week, series = species, p = 1)
-VAR(time = timepoint, series = location, p = 2, cor = TRUE)
-RW(time = day, series = site)
-
-# Defaults with informative warnings
-RW()  # Uses 'time' and 'series' with one-time session warnings
-```
-
 #### Week 3: brms Setup Optimization ✅ **CONFIRMED**
 - **Confirmed**: `backend = "mock"` is superior to `chains = 0` for setup speed
 - **Locked Design**: Use `backend = "mock"` for all brms lightweight setup operations
-- Target 10-50x setup speed improvement achieved through mock backend
 
 #### Week 4: Single-Fit Architecture & Multiple Imputation ✅ **COMPLETE**
 **Status**: Fully implemented and validated
@@ -235,293 +161,35 @@ RW()  # Uses 'time' and 'series' with one-time session warnings
 - Lightweight brms setup with 10-50x performance improvement
 - Future-compatible parameter extraction with brms 3.0 considerations
 
-#### Week 4 Post-Implementation
-```r
-mvgam <- function(formula, trend_formula = NULL, data = NULL, backend = NULL, 
-                  combine = TRUE, ...) {
-  
-  # Handle multiple imputation input
-  if (is.list(data) && !is.data.frame(data)) {
-    if (combine) {
-      return(mvgam_multiple(formula, trend_formula, data, backend, ...))
-    } else {
-      return(map(data, ~ mvgam(formula, trend_formula, .x, backend, ...)))
-    }
-  }
-  
-  # Parse multivariate formulas, setup models, extract stanvars, fit
-  mv_spec <- parse_multivariate_trends(formula, trend_formula)
-  obs_setup <- setup_brms_lightweight(formula, data, ...)
-  trend_setup <- setup_brms_lightweight(trend_spec$base_formula, ...)
-  trend_stanvars <- extract_trend_stanvars_from_setup(trend_setup, trend_spec)
-  combined_stancode <- generate_combined_stancode(obs_setup, trend_stanvars)
-  combined_fit <- fit_mvgam_model(combined_stancode, combined_standata, 
-                                  backend = backend, ...)
-  return(create_mvgam_from_combined_fit(combined_fit, obs_setup, trend_setup))
-}
-```
-
 ### Phase 2: Stan Integration (Weeks 5-8)
 
-#### Week 5-6: Two-Stage Stan Assembly with Enhanced Trend Architecture
-**Files**: `R/trend_injection_generators.R` (new), `R/stan_assembly.R` (new)
+#### Week 5-6: Registry-Based Stan Assembly with Simplified Architecture
+**Files**: `R/trend_registry.R` (new), `R/trend_injection_generators.R` (updated), `R/stan_assembly.R` (new)
 
-**Key Innovation**: Generate **stanvars that inject temporal components** into brms Stan code using the enhanced trend constructor architecture with dispatcher system. **Implementation follows brms stanvars patterns** detailed in `brms-stan-integration-patterns.md` Section 3.
-
-```r
-# Generate trend injection stanvars using dispatcher system
-generate_trend_injection_stanvars <- function(trend_obj, data_info) {
-  # Use the enhanced trend object's metadata for Stan code generation
-  stancode_fun <- get(trend_obj$stancode_fun, mode = "function")
-  
-  # Call the trend-specific Stan code generator with non-centered parameterization
-  return(stancode_fun(trend_obj, data_info))
-}
-
-# AR Stan code generator - supports non-continuous lags with non-centered parameterization
-ar_stan_code <- function(trend_obj, data_info) {
-  # Extract AR parameters from enhanced trend object
-  ar_lags <- trend_obj$ar_lags
-  max_lag <- trend_obj$max_lag
-  n_lags <- length(ar_lags)
-  lags_str <- paste(ar_lags, collapse = ", ")
-  
-  # Handle single lag (AR1) vs multiple lags
-  if (n_lags == 1 && ar_lags[1] == 1) {
-    # Optimized AR(1) non-centered implementation
-    return(list(
-      ar1_params = stanvar(NULL, "ar1_params", scode = glue::glue("
-        parameters {{
-          vector[{data_info$n_lv}] ar1;
-          vector<lower=0>[{data_info$n_lv}] sigma;
-          matrix[n, {data_info$n_lv}] LV_raw;
-        }}
-      ")),
-      ar1_transform = stanvar(NULL, "ar1_transform", block = "tparameters", scode = glue::glue("
-        // Non-centered AR(1) transformation
-        matrix[n, {data_info$n_lv}] LV;
-        trend_mus = X_trend * b_trend;
-        LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
-        for (j in 1:{data_info$n_lv}) {{
-          LV[1, j] += trend_mus[ytimes_trend[1, j]];
-          for (i in 2:n) {{
-            LV[i, j] += trend_mus[ytimes_trend[i, j]]
-                        + ar1[j] * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]);
-          }}
-        }}
-        
-        // derived latent states
-        for (i in 1:n) {{
-          for (s in 1:n_series) {{
-            trend[i, s] = dot_product(Z[s, :], LV[i, :]);
-          }}
-        }}
-      ")),
-      ar1_model = stanvar(NULL, "ar1_model_block", scode = "
-        // Non-centered AR(1) priors - only sample innovations
-        ar1 ~ normal(0, 0.5);
-        sigma ~ inv_gamma(1.418, 0.452);
-        to_vector(LV_raw) ~ std_normal();
-      ")
-    ))
-  } else {
-    # General AR(p) with non-continuous lags like p = c(1, 12, 24)
-    return(list(
-      ar_functions = stanvar(NULL, "ar_functions", block = "functions", scode = glue::glue("
-        // Efficient AR with non-continuous lags function
-        matrix ar_evolution_sparse(matrix LV_raw, vector[] ar_coeffs, matrix trend_mus, 
-                                  matrix ytimes_trend, vector sigma, int[] lags, 
-                                  int max_lag, int n, int n_lv) {{
-          matrix[n, n_lv] LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
-          int n_lags = size(lags);
-          
-          // Initialize first max_lag time points with available lags
-          for (j in 1:n_lv) {{
-            for (i in 1:min(max_lag, n)) {{
-              LV[i, j] += trend_mus[ytimes_trend[i, j]];
-              for (k in 1:n_lags) {{
-                int lag = lags[k];
-                if (i > lag) {{
-                  LV[i, j] += ar_coeffs[j][k] * (LV[i - lag, j] - trend_mus[ytimes_trend[i - lag, j]]);
-                }}
-              }}
-            }}
-          }}
-          
-          // Efficient computation for remaining time points
-          if (n > max_lag) {{
-            for (i in (max_lag+1):n) {{
-              for (j in 1:n_lv) {{
-                real ar_contribution = 0;
-                for (k in 1:n_lags) {{
-                  int lag = lags[k];
-                  ar_contribution += ar_coeffs[j][k] * (LV[i - lag, j] - trend_mus[ytimes_trend[i - lag, j]]);
-                }}
-                LV[i, j] += trend_mus[ytimes_trend[i, j]] + ar_contribution;
-              }}
-            }}
-          }}
-          
-          return LV;
-        }}
-      ")),
-      ar_data = stanvar(as.array(ar_lags), "ar_lags", scode = glue::glue("
-        data {{
-          int ar_lags[{n_lags}] = {{{lags_str}}};
-          int max_lag = {max_lag};
-          int n_lags = {n_lags};
-        }}
-      ")),
-      ar_params = stanvar(NULL, "ar_params", scode = glue::glue("
-        parameters {{
-          vector[{n_lags}] ar_coeffs[{data_info$n_lv}];
-          vector<lower=0>[{data_info$n_lv}] sigma;
-          matrix[n, {data_info$n_lv}] LV_raw;
-        }}
-      ")),
-      ar_transform = stanvar(NULL, "ar_transform", block = "tparameters", scode = glue::glue("
-        // Non-centered AR with sparse lags transformation
-        matrix[n, {data_info$n_lv}] LV;
-        trend_mus = X_trend * b_trend;
-        LV = ar_evolution_sparse(LV_raw, ar_coeffs, trend_mus, ytimes_trend, sigma, 
-                                ar_lags, max_lag, n, {data_info$n_lv});
-        
-        // derived latent states
-        for (i in 1:n) {{
-          for (s in 1:n_series) {{
-            trend[i, s] = dot_product(Z[s, :], LV[i, :]);
-          }}
-        }}
-      ")),
-      ar_model = stanvar(NULL, "ar_model_block", scode = "
-        // Non-centered AR priors - only sample innovations
-        for (j in 1:n_lv) {
-          ar_coeffs[j] ~ normal(0, 0.5);
-        }
-        sigma ~ inv_gamma(1.418, 0.452);
-        to_vector(LV_raw) ~ std_normal();
-      ")
-    ))
-  }
-}
-
-# RW Stan code generator - non-centered parameterization
-rw_stan_code <- function(trend_obj, data_info) {
-  return(list(
-    rw_params = stanvar(NULL, "rw_params", scode = glue::glue("
-      parameters {{
-        vector<lower=0>[{data_info$n_lv}] sigma;
-        matrix[n, {data_info$n_lv}] LV_raw;
-      }}
-    ")),
-    rw_transform = stanvar(NULL, "rw_transform", block = "tparameters", scode = glue::glue("
-      // Non-centered RW transformation
-      matrix[n, {data_info$n_lv}] LV;
-      trend_mus = X_trend * b_trend;
-      LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
-      for (j in 1:{data_info$n_lv}) {{
-        LV[1, j] += trend_mus[ytimes_trend[1, j]];
-        for (i in 2:n) {{
-          LV[i, j] += trend_mus[ytimes_trend[i, j]] + LV[i - 1, j];
-        }}
-      }}
-      
-      // derived latent states
-      for (i in 1:n) {{
-        for (s in 1:n_series) {{
-          trend[i, s] = dot_product(Z[s, :], LV[i, :]);
-        }}
-      }}
-    ")),
-    rw_model = stanvar(NULL, "rw_model_block", scode = "
-      // Non-centered RW priors - only sample innovations
-      sigma ~ inv_gamma(1.418, 0.452);
-      to_vector(LV_raw) ~ std_normal();
-    ")
-  ))
-}
-
-# CAR Stan code generator - non-centered parameterization for continuous-time AR
-car_stan_code <- function(trend_obj, data_info) {
-  return(list(
-    car_params = stanvar(NULL, "car_params", scode = glue::glue("
-      parameters {{
-        vector[{data_info$n_lv}] ar1;
-        vector<lower=0>[{data_info$n_lv}] sigma;
-        matrix[n, {data_info$n_lv}] LV_raw;
-      }}
-    ")),
-    car_data = stanvar(NULL, "car_data", scode = glue::glue("
-      data {{
-        matrix[n, {data_info$n_lv}] time_dis;  // Time distances for CAR process
-      }}
-    ")),
-    car_transform = stanvar(NULL, "car_transform", block = "tparameters", scode = glue::glue("
-      // Non-centered CAR(1) transformation with continuous-time distances
-      matrix[n, {data_info$n_lv}] LV;
-      trend_mus = X_trend * b_trend;
-      LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
-      for (j in 1:{data_info$n_lv}) {{
-        LV[1, j] += trend_mus[ytimes_trend[1, j]];
-        for (i in 2:n) {{
-          LV[i, j] += trend_mus[ytimes_trend[i, j]]
-                      + pow(ar1[j], time_dis[i, j])
-                        * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]);
-        }}
-      }}
-      
-      // derived latent states
-      for (i in 1:n) {{
-        for (s in 1:n_series) {{
-          trend[i, s] = dot_product(Z[s, :], LV[i, :]);
-        }}
-      }}
-    ")),
-    car_model = stanvar(NULL, "car_model_block", scode = "
-      // Non-centered CAR(1) priors - only sample innovations
-      ar1 ~ normal(0, 0.5);
-      sigma ~ inv_gamma(1.418, 0.452);
-      to_vector(LV_raw) ~ std_normal();
-    ")
-  ))
-}
-```
-
-**Implementation Tasks**:
-- Generate complete trend stanvars (data + code) using enhanced trend objects
-- **Critical Reference**: Follow `brms-stan-integration-patterns.md` comprehensive data integration patterns:
-  - Modular code generation (Section 1) and stanvars injection (Section 3)
-  - **Data integration architecture** (Section 3.1) - use brms's modular data system
-  - Non-centered parameterization (Section 2) and dynamic parameter naming (Section 2)
-  - **Data validation and threading** (Section 5) - ensure compatibility
-- Apply brms data generation patterns: leverage `data_response()`, `data_predictor()` flow
-- **Name conflict prevention**: Validate stanvars don't overwrite brms data variables
-- Refer to `Stan specs/Stan-reference-manual-2_36.pdf` if needed to clarify Stan language requirements
-- Modify observation linear predictor with missing data preservation (Section 4 patterns)
+**Key Innovation**: Replace complex conditional logic with **centralized registry system** that automatically handles factor model compatibility and validation: 
+- Public API for custom trend registration: `register_custom_trend()`
+- Generate stanvars that inject temporal components into brms Stan code
+- Generators handle factor vs full models internally
+- Maintain non-centered parameterization and consistent LV → trend patterns
 - Integrate with existing `time` and `series` parameter system
-- Handle nonlinear model complexity (`bf(nl = TRUE)`) following brms patterns
-- **Threading compatibility**: Include `pll_args` in stanvars for parallelization support
+- Follow brms stanvars patterns for data integration and threading compatibility
 
-**Special CAR Implementation Notes**:
-- CAR models require `time_dis` matrix in Stan data containing time distances between observations
-- Time distances are computed from irregular time intervals: `time_dis[i, j] = time[i] - time[i-1]` 
-- CAR autoregressive decay uses `pow(ar1[j], time_dis[i, j])` for continuous-time evolution
-- Minimum time distance threshold (e.g., 1e-3) prevents numerical issues with zero distances
-- CAR constructor currently needs enhancement to match full dispatcher architecture with `stancode_fun = 'car_stan_code'`
+**Factor Model Support**:
+- **Compatible**: AR, RW, VAR, ZMVN (stationary dynamics work with factor structure)
+- **Incompatible**: PW (series-specific changepoints), CAR (irregular time spacing)
+- **Pattern**: `n_lv < n_series` creates dynamic factor model with estimated loading matrix Z
 
-#### Week 7: Validation & Hurdle Model Support
-- Intelligent autocorrelation validation based on formula context (following `brms-stan-integration-patterns.md` validation framework Section 3)
-- **Data validation integration**: Implement comprehensive validation following Section 5 patterns
-  - Validate trend data compatibility with brms structure
-  - Check for name conflicts between trend stanvars and brms data variables
-  - Validate time series structure and threading compatibility
-- Hurdle model validation: Trends only for main (`mu`) parameter (brms distributional parameter patterns Section 6)
-- Parameter name recognition: `b_hu_*` vs `b_*` handling using brms family integration patterns (Section 7)
+#### Week 7: Enhanced Validation & User Extension System
+- Registry-based validation framework with centralized error messages
+- Intelligent autocorrelation validation using registry information
+- Multivariate model validation: trends allowed for each response (`mu_*`) parameter
+- Hurdle and distributional model validation: trends only for main (`mu`) parameter
 
-#### Week 8: Higher-Order Models & Custom Families
-- Extended AR/VAR: `AR(p = c(1, 12, 24))`, `VAR(p = 3)`
-- Custom families: `tweedie()`, `nmix()`, `occ()` with three-level hierarchy (following brms family extension patterns from `brms-stan-integration-patterns.md` Section 6)
-- **Data integration for custom families**: Ensure custom family data requirements integrate with brms standata system
+#### Week 8: Factor Model Implementation & Testing
+- Complete factor vs full model Stan code for compatible trends
+- Loading matrix estimation with identification constraints
+- Integration testing with registry dispatch system
+- Performance validation (registry lookup should add <1ms overhead)
 
 ### Phase 3: Optimization & Methods (Weeks 9-12)
 
@@ -534,13 +202,9 @@ Rcpp::NumericVector ar_p_recursC(Rcpp::NumericVector phi_coeffs, ...);
 // Matrix-based JSDGAM prediction (10-100x speedup)
 // [[Rcpp::export]]
 arma::mat fast_jsdgam_predict(const arma::mat& design_matrices, ...);
-
-// LFO-CV optimization functions
-// [[Rcpp::export]]
-arma::mat fast_lfo_metrics(const arma::cube& forecasts, const arma::mat& observations);
 ```
 
-Core LFO-CV implementation with parallel support, multiple imputation pooling, and comprehensive metrics.
+Core LFO-CV implementation with multiple imputation pooling and comprehensive metrics.
 
 #### Week 11: brms Prediction Integration & Multiple Imputation Pooling
 
@@ -640,12 +304,10 @@ Critical methods: `log_lik()`, `update()`, `print()`, `loo()` with multiple impu
 - Maintain backward compatibility where possible
 - Clear migration guide for breaking changes
 
----
-
 **Next Step**: Begin Week 1 - Trend Type Dispatcher System  
 **Critical Success Factor**: Stan code modification preserving all brms functionality while seamlessly adding State-Space dynamics, multiple imputation support, and enhanced LFO-CV
 
-**Implementation Guide**: The comprehensive brms design patterns documented in `brms-stan-integration-patterns.md` provide the architectural foundation for this refactoring, ensuring compatibility and leveraging brms's sophisticated code generation system.
+**Implementation Guide**: The brms design patterns documented in `brms-stan-integration-patterns.md` provide the architectural foundation for this refactoring, ensuring compatibility and leveraging brms's sophisticated code generation system.
 
 ## R Package Refactoring Best Practices
 

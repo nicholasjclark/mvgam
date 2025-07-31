@@ -7,36 +7,30 @@
 #' Generate Trend Injection Stanvars
 #'
 #' @description
-#' Main dispatcher that generates stanvars to inject temporal dynamics into brms Stan code.
-#' The brms code provides trend_mus = X_trend * b_trend, we add temporal evolution.
+#' Registry-based dispatcher that generates stanvars to inject temporal dynamics into brms Stan code.
+#' Automatically handles factor model compatibility validation and trend type dispatch.
 #'
-#' @param trend_spec List containing trend specification (type, parameters, etc.)
+#' @param trend_spec List containing trend specification (trend_model, parameters, etc.)
 #' @param data_info List containing data structure information
 #' @return List of stanvars for injection
 #' @noRd
 generate_trend_injection_stanvars <- function(trend_spec, data_info) {
   checkmate::assert_list(trend_spec, names = "named")
   checkmate::assert_list(data_info, names = "named")
+  checkmate::assert_string(trend_spec$trend_model, min.chars = 1)
 
-  trend_type <- trend_spec$type
-
-  # Dispatch to appropriate trend stanvar generator
-  stanvars <- switch(trend_type,
-    "RW" = generate_rw_injection_stanvars(trend_spec, data_info),
-    "AR" = generate_ar_injection_stanvars(trend_spec, data_info),
-    "VAR" = generate_var_injection_stanvars(trend_spec, data_info),
-    "GP" = generate_gp_injection_stanvars(trend_spec, data_info),
-    "CAR" = generate_car_injection_stanvars(trend_spec, data_info),
-    "PW" = generate_pw_injection_stanvars(trend_spec, data_info),
-    "PWlinear" = generate_pw_injection_stanvars(trend_spec, data_info),
-    "PWlogistic" = generate_pw_injection_stanvars(trend_spec, data_info),
-    "ZMVN" = generate_zmvn_injection_stanvars(trend_spec, data_info),
-    stop(insight::format_error(
-      "Unknown trend type: {trend_type}",
-      "Supported types: RW, AR, VAR, GP, CAR, PW, ZMVN"
-    ))
-  )
-
+  # Ensure registry is initialized
+  ensure_registry_initialized()
+  
+  # Get trend information from registry
+  trend_info <- get_trend_info(trend_spec$trend_model)
+  
+  # Automatic factor compatibility validation
+  validate_factor_compatibility(trend_spec)
+  
+  # Call registered generator (handles factor vs full internally)
+  stanvars <- trend_info$generator(trend_spec, data_info)
+  
   return(stanvars)
 }
 
@@ -76,7 +70,8 @@ generate_rw_injection_stanvars <- function(trend_spec, data_info) {
       name = "rw_correlated_transformed",
       scode = glue::glue("
       transformed parameters {{
-        array[n] vector[{n_lv}] trend_raw;
+        // latent states matrix
+        matrix[n, {n_lv}] LV;
 
         // LKJ form of covariance matrix
         matrix[{n_lv}, {n_lv}] L_Sigma;
@@ -85,14 +80,23 @@ generate_rw_injection_stanvars <- function(trend_spec, data_info) {
         cov_matrix[{n_lv}] Sigma;
 
         // derived RW latent states (cumulative sum of errors)
-        trend_raw[1] = error[1];
-        for (i in 2 : n) {{
-          // RW: trend[i] = trend[i-1] + error[i]
-          trend_raw[i] = trend_raw[i - 1] + error[i];
+        for (j in 1:{n_lv}) {{
+          LV[1, j] = trend_mus[ytimes_trend[1, j]] + error[1][j];
+          for (i in 2 : n) {{
+            // RW: LV[i] = trend_mus + LV[i-1] + error[i]
+            LV[i, j] = trend_mus[ytimes_trend[i, j]] + LV[i - 1, j] + error[i][j];
+          }}
         }}
 
         L_Sigma = diag_pre_multiply(sigma, L_Omega);
         Sigma = multiply_lower_tri_self_transpose(L_Sigma);
+        
+        // derived latent states
+        for (i in 1:n) {{
+          for (s in 1:n_series) {{
+            trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+          }}
+        }}
       }}
       ")
     )
@@ -113,7 +117,7 @@ generate_rw_injection_stanvars <- function(trend_spec, data_info) {
     )
 
   } else {
-    # Simple uncorrelated case: RW()
+    # Simple uncorrelated case: RW() - non-centered parameterization
     stanvars$rw_simple_params <- stanvar(
       x = NULL,
       name = "rw_simple_params",
@@ -121,6 +125,35 @@ generate_rw_injection_stanvars <- function(trend_spec, data_info) {
       parameters {{
         // latent state SD parameters for RW
         vector<lower=0>[{n_lv}] sigma;
+        // raw latent states for non-centered parameterization
+        matrix[n, {n_lv}] LV_raw;
+      }}
+      ")
+    )
+
+    stanvars$rw_simple_transformed <- stanvar(
+      x = NULL,
+      name = "rw_simple_transformed",
+      scode = glue::glue("
+      transformed parameters {{
+        // latent states with non-centered parameterization
+        matrix[n, {n_lv}] LV;
+        
+        // Apply non-centered RW transformation
+        LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
+        for (j in 1:{n_lv}) {{
+          LV[1, j] += trend_mus[ytimes_trend[1, j]];
+          for (i in 2:n) {{
+            LV[i, j] += trend_mus[ytimes_trend[i, j]] + LV[i - 1, j];
+          }}
+        }}
+        
+        // derived latent states
+        for (i in 1:n) {{
+          for (s in 1:n_series) {{
+            trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+          }}
+        }}
       }}
       ")
     )
@@ -128,17 +161,11 @@ generate_rw_injection_stanvars <- function(trend_spec, data_info) {
     stanvars$rw_simple_model <- stanvar(
       x = NULL,
       name = "rw_simple_model",
-      scode = glue::glue("
-      // RW latent state evolution (independent around mu_trend)
-      for (j in 1:{n_lv}) {{
-        for (i in 1:n) {{
-          LV[i, j] ~ normal(mu_trend[ytimes_trend[i, j]], sigma[j]);
-        }}
-      }}
-
-      // priors for RW latent state SD parameters
+      scode = "
+      // Non-centered RW priors - only sample innovations
       sigma ~ inv_gamma(1.418, 0.452);
-      ")
+      to_vector(LV_raw) ~ std_normal();
+      "
     )
   }
 
@@ -455,6 +482,13 @@ generate_var_injection_stanvars <- function(trend_spec, data_info) {
         A = phiGamma[1, 1];
         Gamma = phiGamma[2, 1];
       }}
+      
+      // derived latent states - VAR uses direct LV matrix
+      for (i in 1:n) {{
+        for (s in 1:n_series) {{
+          trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+        }}
+      }}
     }}
     ")
   )
@@ -509,7 +543,8 @@ generate_var_injection_stanvars <- function(trend_spec, data_info) {
 #' Generate CAR Injection Stanvars
 #'
 #' @description
-#' CAR models: LV[i,j] ~ normal(trend_mus[...] + pow(ar1[j], time_dis[i,j]) * (...), sigma[j])
+#' CAR models: Non-centered parameterization with continuous-time AR evolution
+#' using time distances and consistent LV -> trend pattern
 #'
 #' @param trend_spec Trend specification
 #' @param data_info Data information
@@ -520,7 +555,7 @@ generate_car_injection_stanvars <- function(trend_spec, data_info) {
 
   stanvars <- list()
 
-  # CAR parameters - matches example
+  # CAR parameters - non-centered parameterization
   stanvars$car_params <- stanvar(
     x = NULL,
     name = "car_params",
@@ -530,37 +565,62 @@ generate_car_injection_stanvars <- function(trend_spec, data_info) {
       vector[{n_lv}] ar1;
       // latent state SD parameters
       vector<lower=0>[{n_lv}] sigma;
+      // raw latent states for non-centered parameterization
+      matrix[n, {n_lv}] LV_raw;
     }}
     ")
   )
 
-  # CAR model - matches example exactly
-  stanvars$car_model <- stanvar(
+  # CAR data for time distances
+  stanvars$car_data <- stanvar(
     x = NULL,
-    name = "car_model_block",
+    name = "car_data",
     scode = glue::glue("
-    // CAR latent state evolution - matches mvgam pattern exactly
-    for (j in 1:{n_lv}) {{
-      LV[1, j] ~ normal(mu_trend[ytimes_trend[1, j]], sigma[j]);
-      for (i in 2:n) {{
-        LV[i, j] ~ normal(mu_trend[ytimes_trend[i, j]]
-                          + pow(ar1[j], time_dis[i, j])
-                            * (LV[i - 1, j] - mu_trend[ytimes_trend[i - 1, j]]),
-                          sigma[j]);
+    data {{
+      matrix[n, {n_lv}] time_dis;  // Time distances for CAR process
+    }}
+    ")
+  )
+
+  # CAR transformed parameters - non-centered with consistent pattern
+  stanvars$car_transform <- stanvar(
+    x = NULL,
+    name = "car_transform",
+    scode = glue::glue("
+    transformed parameters {{
+      // latent states with non-centered parameterization
+      matrix[n, {n_lv}] LV;
+      
+      // Apply non-centered CAR transformation
+      LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
+      for (j in 1:{n_lv}) {{
+        LV[1, j] += trend_mus[ytimes_trend[1, j]];
+        for (i in 2:n) {{
+          LV[i, j] += trend_mus[ytimes_trend[i, j]]
+                      + pow(ar1[j], time_dis[i, j])
+                        * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]);
+        }}
+      }}
+      
+      // derived latent states
+      for (i in 1:n) {{
+        for (s in 1:n_series) {{
+          trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+        }}
       }}
     }}
     ")
   )
 
-  # CAR priors
-  stanvars$car_priors <- stanvar(
+  # CAR model block - non-centered priors
+  stanvars$car_model <- stanvar(
     x = NULL,
-    name = "car_priors",
+    name = "car_model_block",
     scode = "
-    // priors for AR parameters
-    ar1 ~ std_normal();
-    // priors for latent state SD parameters
+    // Non-centered CAR(1) priors - only sample innovations
+    ar1 ~ normal(0, 0.5);
     sigma ~ inv_gamma(1.418, 0.452);
+    to_vector(LV_raw) ~ std_normal();
     "
   )
 
@@ -686,22 +746,42 @@ generate_pw_injection_stanvars <- function(trend_spec, data_info) {
     ")
   )
 
-  # PW transformed parameters - matches current implementation structure
+  # PW transformed parameters - consistent LV -> trend pattern
   if (is_logistic) {
     stanvars$pw_transformed <- stanvar(
       x = NULL,
       name = "pw_transformed",
       scode = glue::glue("
       transformed parameters {{
-        // latent trends
-        matrix[n, n_series] trend;
+        // latent variables matrix
+        matrix[n, {n_lv}] LV;
 
-        // trend estimates using logistic growth
-        for (s in 1 : n_series) {{
-          trend[1 : n, s] = logistic_trend(k_trend[s], m_trend[s],
-                                           to_vector(delta_trend[ : , s]), {time_var},
-                                           to_vector({cap_var}[ : , s]), A, t_change,
-                                           n_changepoints);
+        // PW estimates using logistic growth
+        for (j in 1:{n_lv}) {{
+          LV[1 : n, j] = logistic_trend(k_trend[j], m_trend[j],
+                                        to_vector(delta_trend[ : , j]), {time_var},
+                                        to_vector({cap_var}[ : , j]), A, t_change,
+                                        n_changepoints);
+        }}
+        
+        // Add trend_mus to LV if n_lv < n_series
+        if ({n_lv} < n_series) {{
+          for (i in 1:n) {{
+            for (j in 1:{n_lv}) {{
+              LV[i, j] += trend_mus[ytimes_trend[i, j]];
+            }}
+          }}
+        }}
+        
+        // derived latent states
+        for (i in 1:n) {{
+          for (s in 1:n_series) {{
+            if ({n_lv} < n_series) {{
+              trend[i, s] = dot_product(Z[s, :], LV[i, :]) + trend_mus[ytimes_trend[i, s]];
+            }} else {{
+              trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+            }}
+          }}
         }}
       }}
       ")
@@ -712,14 +792,34 @@ generate_pw_injection_stanvars <- function(trend_spec, data_info) {
       name = "pw_transformed",
       scode = glue::glue("
       transformed parameters {{
-        // latent trends
-        matrix[n, n_series] trend;
+        // latent variables matrix
+        matrix[n, {n_lv}] LV;
 
-        // trend estimates using linear growth
-        for (s in 1 : n_series) {{
-          trend[1 : n, s] = linear_trend(k_trend[s], m_trend[s],
-                                         to_vector(delta_trend[ : , s]), {time_var},
-                                         A, t_change);
+        // PW estimates using linear growth
+        for (j in 1:{n_lv}) {{
+          LV[1 : n, j] = linear_trend(k_trend[j], m_trend[j],
+                                      to_vector(delta_trend[ : , j]), {time_var},
+                                      A, t_change);
+        }}
+        
+        // Add trend_mus to LV if n_lv < n_series
+        if ({n_lv} < n_series) {{
+          for (i in 1:n) {{
+            for (j in 1:{n_lv}) {{
+              LV[i, j] += trend_mus[ytimes_trend[i, j]];
+            }}
+          }}
+        }}
+        
+        // derived latent states
+        for (i in 1:n) {{
+          for (s in 1:n_series) {{
+            if ({n_lv} < n_series) {{
+              trend[i, s] = dot_product(Z[s, :], LV[i, :]) + trend_mus[ytimes_trend[i, s]];
+            }} else {{
+              trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+            }}
+          }}
         }}
       }}
       ")

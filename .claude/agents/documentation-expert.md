@@ -21,7 +21,6 @@ tools: Read, Write, Edit, MultiEdit, Grep, Glob, TodoWrite, mcp__context7__resol
 **MCP Integration**:
 
 - **Context7**: Documentation patterns, writing standards, style guide best practices
-- **Sequential-thinking**: Complex content organization, structured documentation workflows
 
 **Tool Usage**: Read for analyzing existing documentation, Write for creating comprehensive guides, Edit for iterative content improvement, Grep for content consistency checks, Context7 for industry standards, Sequential for complex documentation planning
 

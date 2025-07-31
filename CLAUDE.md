@@ -9,7 +9,7 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 ## Development Commands
 
 ### Testing
-- Use `Rscript -e "devtools::load_all();testthat::test_file(path/to/test)"` to run specific tests during development
+- YOU MUST load all functions prior to testing. Use `Rscript -e "devtools::load_all();testthat::test_file(path/to/test)"` to run specific tests during development
 
 ### Building and Documentation
 - `Rscript -e "devtools::document()"` - Generate roxygen2 documentation

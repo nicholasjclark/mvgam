@@ -524,7 +524,16 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
 
 #' @rdname RW
 #' @export
-CAR = function(time = NA, series = NA, p = 1) {
+CAR = function(time = NA, series = NA, p = 1, n_lv = NULL) {
+  # Factor model validation - CAR trends don't support factor models
+  if (!is.null(n_lv)) {
+    stop(insight::format_error(
+      "Factor models ({.field n_lv}) not supported for CAR trends.",
+      "Continuous-time AR requires series-specific irregular time intervals.",
+      "Remove {.field n_lv} parameter or use factor-compatible trends: AR, RW, VAR, ZMVN"
+    ), call. = FALSE)
+  }
+  
   # Process time argument
   time <- deparse0(substitute(time))
   time_was_default <- (time == "NA")
@@ -545,7 +554,7 @@ CAR = function(time = NA, series = NA, p = 1) {
   }
   out <- structure(
     list(
-      trend_model = paste0('CAR', p),
+      trend_model = 'CAR',
       ma = FALSE,
       cor = FALSE,
       time = time,
@@ -695,7 +704,8 @@ GP = function(time = NA, series = NA, ...) {
       "Combined with other trend models: trend_model = AR() or RW()"
     ),
     class = "mvgam_deprecation_warning",
-    .frequency = "once"
+    .frequency = "once",
+    .frequency_id = "gp_deprecation"
   )
   
   # Process time argument
@@ -922,8 +932,17 @@ PW = function(
   n_changepoints = 10,
   changepoint_range = 0.8,
   changepoint_scale = 0.05,
-  growth = 'linear'
+  growth = 'linear',
+  n_lv = NULL
 ) {
+  # Factor model validation - PW trends don't support factor models
+  if (!is.null(n_lv)) {
+    stop(insight::format_error(
+      "Factor models ({.field n_lv}) not supported for PW trends.",
+      "Piecewise trends require series-specific changepoint modeling.",
+      "Remove {.field n_lv} parameter or use factor-compatible trends: AR, RW, VAR, ZMVN"
+    ), call. = FALSE)
+  }
   # Process time argument
   time <- deparse0(substitute(time))
   time_was_default <- (time == "NA")
@@ -949,7 +968,8 @@ PW = function(
         "Specify explicitly with: PW(cap = your_cap_variable, growth = 'logistic')"
       ),
       class = "mvgam_default_variable_warning",
-      .frequency = "once"
+      .frequency = "once",
+      .frequency_id = "pw_cap_default"
     )
   }
 
