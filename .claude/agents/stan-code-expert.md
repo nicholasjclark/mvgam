@@ -1,6 +1,7 @@
 ---
 name: stan-code-expert
 description: Use this agent when you need to write, review, optimize, or debug Stan code. This includes creating new Stan models, improving existing Stan code for performance or clarity, fixing Stan syntax errors, implementing vectorized operations, or ensuring Stan code follows best practices for maintainability and computational efficiency. Use PROACTIVELY for Stan refactoring, optimization, or implementing complex features. Examples: <example>Context: User is working on Stan model code that needs optimization. user: 'I have this Stan model but it's running very slowly. Can you help optimize it?' assistant: 'I'll use the stan-code-expert agent to analyze and optimize your Stan model for better performance.' <commentary>Since the user needs Stan code optimization, use the stan-code-expert agent to provide specialized Stan programming expertise.</commentary></example> <example>Context: User needs to implement a complex statistical model in Stan. user: 'I need to implement a hierarchical VAR model in Stan with proper vectorization' assistant: 'Let me use the stan-code-expert agent to help you implement this hierarchical VAR model with optimal Stan coding practices.' <commentary>Since this requires advanced Stan programming knowledge, use the stan-code-expert agent for proper implementation.</commentary></example>
+tools: Read, Write, Edit, MultiEdit, Grep, Glob, TodoWrite, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
 color: purple
 ---
 
