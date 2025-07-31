@@ -532,6 +532,6 @@ posterior_predict.mvgam <- function(object, ...) {
 
 ## Conclusion
 
-The brms architecture provides an excellent foundation for mvgam's State-Space extensions. By leveraging brms's modular code generation, stanvars system, and comprehensive family support, mvgam can focus on its core innovation: adding temporal dynamics to any brms model while preserving full ecosystem compatibility.
+brms architecture provides the foundation for mvgam's State-Space extensions. By leveraging brms's modular code generation, stanvars system, and comprehensive family support, mvgam can focus on its core innovation: adding temporal dynamics to any brms model while preserving full ecosystem compatibility.
 
 The key insight is that **brms handles the observation model complexity** (families, links, priors, multivariate structures) while **mvgam adds the temporal evolution layer** through carefully designed Stan code injection. This division of responsibilities allows both packages to excel in their domains while providing users with unprecedented modeling flexibility.
