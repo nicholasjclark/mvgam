@@ -1,10 +1,10 @@
-# MVGam-BRMS Quick Reference
+# mvgam-brms Quick Reference
 
 ## Core Formula Patterns
 
 ### Standard State-Space
 ```r
-mvgam(y ~ s(x), trend_formula = ~ RW(cor = TRUE), data = data)
+mvgam(y ~ s(x), trend_formula = ~ s(habitat) + RW(series = series, time = time, cor = TRUE, n_lv = 3, ...), data = data)
 ```
 
 ### Distributional Models (trends ONLY on mu)
@@ -156,10 +156,10 @@ trend_formula = ~ AR(p = 1)
 ### Factor Model Incompatibility
 ```r
 # ❌ Wrong: Incompatible trend with factor model
-mvgam(..., trend_formula = ~ PW(), n_lv = 2, n_series = 5)
+mvgam(..., trend_formula = ~ PW(n_lv = 2))
 
 # ✅ Correct: Compatible trend
-mvgam(..., trend_formula = ~ AR(p = 1), n_lv = 2, n_series = 5)
+mvgam(..., trend_formula = ~ AR(p = 1, n_lv = 2))
 ```
 
 ### Distributional Trend Misplacement
@@ -170,3 +170,8 @@ bf(y ~ s(x), sigma ~ s(z) + AR(p = 1))
 # ✅ Correct: Trend only on main parameter
 bf(y ~ s(x) + AR(p = 1), sigma ~ s(z))
 ```
+
+## Context Loading Guide
+- Validation work: `reference/validation-rules.md`
+- brms integration strategies: `reference/integration-patterns.md`  
+- Complete timeline: `planning/full-timeline.md`
