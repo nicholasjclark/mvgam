@@ -1,4 +1,4 @@
-# brms Integration Patterns for MVGam
+# brms Integration Patterns for mvgam
 
 **Purpose**: Essential brms design patterns extracted for mvgam implementation
 
