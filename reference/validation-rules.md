@@ -126,31 +126,9 @@ validate_time_series_structure <- function(data, time_var, series_var = NULL) {
   if (!is.null(series_var)) {
     validate_series_structure(data, time_var, series_var)
   }
-
-validate_series_structure <- function(data, time_var, series_var) {
-  # Check each series has sufficient observations
-  series_counts <- table(data[[series_var]])
-  insufficient_series <- names(series_counts)[series_counts < 3]
-  
-  if (length(insufficient_series) > 0) {
-    stop(insight::format_error(
-      sprintf("Series with <3 observations: %s", 
-              paste(insufficient_series, collapse = ", ")),
-      "Each series requires minimum 3 time points"
-    ))
-  }
   
   # Check for regular time spacing within series
-  for (series_id in unique(data[[series_var]])) {
-    series_data <- data[data[[series_var]] == series_id, ]
-    time_diffs <- diff(sort(series_data[[time_var]]))
-    
-    if (any(time_diffs <= 0)) {
-      stop(insight::format_error(
-        sprintf("Series '%s' has non-increasing time values", series_id)
-      ))
-    }
-  }
+  # if useing AR, VAR, RW, PW; not relevant for CAR models
 }
 ```
 
@@ -254,15 +232,8 @@ validate_factor_model_compatibility <- function(trend_type, n_lv, n_series) {
 ### 2. Trend Parameter Validation
 ```r
 validate_trend_parameters <- function(trend_spec) {
-  trend_type <- extract_trend_type(trend_spec)
-  
-  switch(trend_type,
-    "AR" = validate_ar_parameters(trend_spec),
-    "VAR" = validate_var_parameters(trend_spec),
-    "RW" = validate_rw_parameters(trend_spec),
-    "CAR" = validate_car_parameters(trend_spec),
-    validate_custom_trend_parameters(trend_spec)
-  )
+  # Ensure trend parameters are valid using appropriate
+  # lower level functions
 }
 
 validate_ar_parameters <- function(trend_spec) {
@@ -273,13 +244,6 @@ validate_ar_parameters <- function(trend_spec) {
       sprintf("AR order 'p' must be positive integer, got: %s", p)
     ))
   }
-  
-  if (p > 5) {
-    insight::format_warning(
-      sprintf("High AR order (p = %d) may cause convergence issues", p),
-      "Consider using p ≤ 3 for most applications"
-    )
-  }
 }
 
 validate_var_parameters <- function(trend_spec) {
@@ -289,13 +253,6 @@ validate_var_parameters <- function(trend_spec) {
     stop(insight::format_error(
       sprintf("VAR order 'p' must be positive integer, got: %s", p)
     ))
-  }
-  
-  if (p > 3) {
-    insight::format_warning(
-      sprintf("High VAR order (p = %d) requires many parameters", p),
-      "Consider lower order or factor model approach"
-    )
   }
 }
 ```
@@ -407,7 +364,7 @@ validate_stan_blocks <- function(stan_code) {
 
 ### 1. Time Series Cross-Validation Setup
 ```r
-validate_lfo_setup <- function(data, time_var, L_future, n_cores = 1) {
+validate_lfo_setup <- function(data, time_var, L_future, ...) {
   # Validate time structure
   validate_time_series_structure(data, time_var)
   
@@ -436,19 +393,10 @@ validate_lfo_setup <- function(data, time_var, L_future, n_cores = 1) {
     ))
   }
   
-  # Validate parallel setup
-  if (n_cores > 1 && !requireNamespace("future", quietly = TRUE)) {
-    insight::format_warning(
-      "Package 'future' required for parallel LFO-CV",
-      "Falling back to sequential computation"
-    )
-    n_cores <- 1
-  }
-  
   return(list(
     n_timepoints = n_timepoints,
     min_train = min_train,
-    n_cores = n_cores
+    ...
   ))
 }
 ```
