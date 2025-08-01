@@ -84,26 +84,26 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - `R/residuals.mvgam.R` - Dunn-Smyth residuals for model checking
 - `R/loo.mvgam.R` - Approximate leave-one-out cross-validation
   
-### Testing and Quality
-- `tests/testthat/` - Test suite
-- `vignettes/` - Documentation and examples
-- `.github/workflows/` - CI/CD with R CMD check, pkgdown building and valgrind check
+### Continuous Integration
+- `.github/workflows/` - CI/CD with R CMD check, pkgdown building and valgrind memory check
 
 ## Development Notes
 
 ### Testing Strategy
+- Please prioritize test-driven development
 - Separate test files for major components
 - Prioritize internal objects (i.e. `mvgam:::mvgam_example1`) for testing, where appropriate
 
 ### Code Organization
-- Provider files should follow consistent naming pattern
+- Provider files should follow consistent naming patterns
 - Utility functions should be grouped by purpose (`utils-*.R`)
 
 ### Documentation
 - Roxygen2 comments for all functions
 - Vignettes demonstrate in-depth use cases
 - pkgdown site provides comprehensive documentation
-- Examples demonstrate simpler use cases
+- README provides a high level overview of package goals and major functions
+- roxygen2 examples demonstrate simpler use cases
 
 ### Code Style and Formatting
 - Apply tidyverse styling (https://style.tidyverse.org/) for all R and roxygen code
