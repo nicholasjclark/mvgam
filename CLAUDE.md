@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Package Overview
 
-mvgam is an R package for fitting, plotting and interpreting Bayesian Multivariate State-Space Models. It can handle various data types (counts, proportions, continuous values) with complex temporal or spatial dynamics, missing data, and seasonality, building custom Stan models by enhancing models from the brms R package.
+mvgam is an R package for fitting, plotting and interpreting Bayesian Multivariate State-Space Models.
 
 ## Development Commands
 
@@ -16,8 +16,8 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - `Rscript -e "pkgdown::build_site()"` - Build package website
 - `R CMD INSTALL --preclean --no-multiarch` - Install package locally
 
-### Validating and Optimising Stan code
-- Use `Ref` and `context7` MCP servers to search for documentation on the Stan language and to up-to-date Stan code examples
+### Documentation Memory
+- Use `Ref` and `context7` MCP servers to find relevant, up-to-date documentation when working with 3rd party libraries, as needed
 
 ## Architecture
 
@@ -32,20 +32,14 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 
 **S3 Type System**: Uses S3 for structured objects to support method inheritance and specialization
 
-**Layered Architecture Pattern**: Uses clear separation of concerns across multiple layers:
+**Layered Architecture Pattern**:
 - Interface Layer: User-facing functions (`mvgam()`, `forecast()`, `predict()`, `plot()`) provide clean APIs
 - Model Specification Layer: Formula processing with special trend model constructors (`RW()`, `VAR()`, `CAR()`), family definitions
 - Code Generation Layer: Translates R specifications into brms code to build initial Stan models and data, then extends these with custom trend and factor additions
 - Computational Backend Layer: Interfaces with Stan for sampling
 - Post-processing Layer: S3 methods for analysis, diagnostics, and visualization
 
-**Modular Component System**: Modular design where different components can be mixed and matched:
-- Trend Modules: Independent implementations of state models with possible temporal dynamics (RW, AR, VAR, CAR) and brms-generated predictor effects
-- Family Modules: Separate observation model maintaining full brms flexibility
-- Backend Modules: Pluggable computational backends (Stan via rstan or cmdstanr)
-- Visualization Modules: Modular plotting system
-
-**Bayesian Workflow Integration Pattern**: Supports complete Bayesian modeling workflow:
+**Bayesian Workflow Integration**:
 - Model Building: Formula specification, prior setup, trend model selection, observation family
 - Fitting: MCMC sampling with convergence monitoring
 - Checking: Posterior predictive checks, residual analysis, diagnostic plots
@@ -56,25 +50,23 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 ## Key Files
 
 ### Core Model Functions
-- `R/mvgam.R` - Main model fitting function that:
+- `R/mvgam.R` - Main model fitting function:
   - Validates and processes brms-compatible formulas for observation and trend processes
   - Sets up Stan model code generation
   - Runs MCMC sampling and returns fitted model objects
 
-- Trend model constructors in `R/mvgam_trend_types.R` (`RW()`, `AR()`, `VAR()`, `CAR()`):
+- Trend model constructors in `R/mvgam_trend_types.R`:
   - Define temporal dynamics and point to forecasting cpp functions
-  - Provide user support to easily add new trend types with higher dispatch
+  - Provide user support to add new trend types with higher dispatch
   
 - Trend Stan code injection generators in `R/trend_injection_generators.R`:
   - Dispatch functions that generate Stan code for specified trend types
   
-- Full Stan code generation in `R/stan_assembly.R` and `R/stan_code_generation.R`:
+- Full Stan code generation in `R/stan_assembly.R`:
   - Two-stage Stan code assembly system with validation
 
 ### Prediction & Forecasting
-- `R/forecast.mvgam.R` - Generates in-sample and out-of-sample forecasts:
-  - Respects temporal dynamics for proper time series forecasting
-  - Supports multiple prediction types (response, trend, link)
+- `R/forecast.mvgam.R` - Generates in-sample and out-of-sample forecasts
   - Returns structured forecast objects with uncertainty quantification
 
 - `R/predict.mvgam.R` - General prediction treating trends as random effects
@@ -84,7 +76,7 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 ### Visualization Suite
 - `R/plot.mvgam.R` - Main plotting method with multiple types:
   - Series plots, residual diagnostics, smooth functions, forecasts
-  - Calls specialized functions: `plot_mvgam_forecasts()`, `plot_mvgam_series()`, `plot_mvgam_trend()`
+  - Calls specialized plotting functions
 
 ### Model Analysis
 - `R/summary.mvgam.R` - Parameter estimates and convergence diagnostics
@@ -101,15 +93,14 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 
 ### Testing Strategy
 - Separate test files for major components
-- Prioritize internal mvgam objects (i.e. `mvgam:::mvgam_example1`) for testing
+- Prioritize internal objects (i.e. `mvgam:::mvgam_example1`) for testing, where appropriate
 
 ### Code Organization
 - Provider files should follow consistent naming pattern
 - Utility functions should be grouped by purpose (`utils-*.R`)
-- Standalone imports should minimize external dependencies
 
 ### Documentation
-- Roxygen2 comments for all exported functions
+- Roxygen2 comments for all functions
 - Vignettes demonstrate in-depth use cases
 - pkgdown site provides comprehensive documentation
 - Examples demonstrate simpler use cases
@@ -120,10 +111,9 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - **Roxygen Documentation**: Use 2-space indentation for continuation lines
 - **Comment Style**: Use sentence case, avoid ALL CAPS in comments
 - **Function Names**: Use snake_case
-- **Consistency**: Follow existing package conventions where established
 
 ### Validation and Error Handling
-- All mvgam functions must follow these validation patterns:
+- All R functions must follow these validation patterns:
 
 #### Validation Patterns
 1. **Input Validation**: Use `checkmate::assert_*()` for all function parameters
@@ -135,10 +125,10 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - Use `{.field parameter_name}` for parameter highlighting
 - Include suggested solutions in error messages
 - Provide context about why constraints exist
-- Use consistent terminology across the package
+- Use consistent terminology
 
 ### Export Guidelines
-- Only export functions that users directly need (trend constructors, methods)
+- Only export functions that users directly need
 - Keep validation and utility functions internal (`@noRd`)
 - Use clear, simple descriptions without excessive technical references
 
@@ -158,7 +148,7 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - Use `gh` client for all Github interactions
 
 ### Commit Message Standards
-Follow this pattern for all commits:
+- Follow this pattern for all commits:
 ```
 Brief description of changes (50 chars max)
 
@@ -166,9 +156,9 @@ Brief description of changes (50 chars max)
 - Why the change was necessary  
 - Any important implementation notes
 ```
+- Please do not mention Claude as a co-author or include links to Claude Code in messages
 
 ### Pre-commit Workflow
 1. Check git status to understand current changes
 2. Stage appropriate files with clear understanding of what's being committed
-3. Write descriptive commit messages explaining changes
-4. Push to remote branch for backup
+3. Write commit messages explaining changes
