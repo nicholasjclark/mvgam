@@ -1,4 +1,4 @@
-# MVGam Validation Rules
+# mvgam Validation Rules
 
 **Purpose**: Comprehensive validation framework for mvgam-brms integration
 
