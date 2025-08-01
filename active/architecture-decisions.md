@@ -1,4 +1,4 @@
-# MVGam Architecture Decisions
+# mvgam Architecture Decisions
 
 **Purpose**: Core design principles and patterns guiding implementation
 
