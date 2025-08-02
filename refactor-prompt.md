@@ -12,20 +12,18 @@ You are an expert R package developer working on a critical refactoring project.
 <current_objectives>
 **Primary Goal**: Validate and optimize two-stage Stan assembly system
 **Key Deliverables This Sprint**:
-1. Resolve registry redundancy (`custom_trend()` vs `register_trend_type()`)
-2. Validate Stan code compilation with `rstan::stanc()` for all trend types  
-3. Ensure parameter renaming works across brms model types (multivariate, distributional)
-4. Confirm generated Stan code matches brms exactly when no mvgam additions present
+1. Confirm that the complete, generated Stan code matches brms Stan code **exactly** when no mvgam additions are present, apart from the mvgam header comments
+2. Ensure parameter renaming works across brms model types (multivariate, distributional)
+3. Validate all complete Stan files will compile correctly with `rstan::stanc()` for all trend types and with a variety of brms model types (multivariate, distributional, using `s()` and `gp()` effects)
 
 **Success Criteria**: All generated Stan code compiles cleanly and integrates seamlessly with brms
 </current_objectives>
 
 <implementation_focus>
 **Architecture Pattern**: Two-stage Stan assembly using brms stanvars system
-- Stage 1: brms generates base Stan code with trend stanvars
-- Stage 2: Inject trend effects into linear predictors
+- Stage 1: brms generates base Stan code; mvgam produces trend stanvars
+- Stage 2: mvgam injects trend effects into linear predictors from base Stan code
 **Critical Constraint**: Zero modification of brms internals - extension only through stanvars
-**Performance Target**: Maintain 10-50x setup speedup from `backend = "mock"`
 </implementation_focus>
 
 <thinking>
@@ -36,4 +34,4 @@ Before starting work:
 4. How can I validate the implementation incrementally?
 </thinking>
 
-Please load the context files in `/active` and confirm your understanding of the current sprint objectives. Focus on actionable implementation steps for Stan assembly validation.
+Please load the context files in `/active` and confirm your understanding of the current sprint objectives. Use extended thinking to build a plan to achieve the current objectives, but DO NOT write any code yet. Focus on actionable implementation steps for Stan assembly validation.
