@@ -5,12 +5,12 @@
 ## Foundation Decisions
 
 ### 1. Single-Fit Dual-Object Architecture
-**Decision**: One Stan fit produces two brmsfit-like objects for post-processing  
+**Decision**: One mvgam object containing two brmsfit-like objects for post-processing  
 **Rationale**: Enables seamless brms ecosystem integration while preserving multivariate correlations  
 **Implementation**: 
-- brms generates linear predictors (`mu`, `mu_trend`)
-- Single combined Stan model with observation + trend components
-- Dual objects created from same fit for different aspects
+- brms generates linear predictors (`mu`, `mu_trend`) from two formulae
+- Stan models from both are combined to contain with observation + trend components
+- Combined Stan model fit by mvgam for joint estimation
 
 ### 2. Formula-Centric Interface Design
 **Decision**: Extend brms formula syntax with `trend_formula` parameter  
@@ -25,8 +25,8 @@ mvgam(
 
 ### 3. Stan Integration Strategy: Two-Stage Assembly
 **Decision**: Leverage brms stanvars system rather than modifying brms internals  
-**Stage 1**: Generate trend stanvars and let brms handle data integration  
-**Stage 2**: Post-process Stan code to inject trend effects into linear predictors
+**Stage 1**: Generate trend stanvars and trend Stan data  
+**Stage 2**: Post-process observation model Stan code to inject trend effects and create the combined model
 
 ### 4. Autocorrelation Separation Principle
 **Critical Innovation**: Distinguish observation-level correlation from State-Space dynamics
@@ -104,8 +104,8 @@ transformed parameters {
 - **Trigger**: Presence of `n_lv` parameter in trend specification
 - **Validation**: Only factor-compatible trend types can accept `n_lv` parameter
 - **Requirement**: `n_lv < n_series` (fewer latent variables than observed series)
-- **Compatible Trends**: AR, RW, VAR (including correlated variants)
-- **Incompatible Trends**: CAR (spatial structure), None (no dynamics)
+- **Compatible Trends**: AR, RW, VAR, ZMVN (including correlated and grouped variants)
+- **Incompatible Trends**: CAR (continuous time), PW (piecewise), None (no dynamics)
 
 **Non-Factor Model Pattern** (no `n_lv` specified or `n_lv >= n_series`):
 ```stan
@@ -178,7 +178,7 @@ model {
 
 ### 5. Code Deduplication for User Extensibility
 
-**Design Principle**: Eliminate redundant code patterns to simplify custom trend development
+**Design Principle**: Eliminate redundant code to simplify custom trend development
 
 **Shared Utility Functions** (`R/trend_injection_generators.R`):
 ```r
@@ -191,7 +191,7 @@ generate_trend_computation_code(n_lv, n_series)
 # Factor model priors with variance constraints
 generate_factor_model_priors(is_factor_model, n_lv)
 
-# Hierarchical correlation support (NEW)
+# Hierarchical correlation support
 generate_hierarchical_functions()
 generate_hierarchical_correlation_params(n_groups, n_subgroups)
 generate_hierarchical_correlation_priors(n_groups)
@@ -199,7 +199,7 @@ generate_hierarchical_correlation_priors(n_groups)
 
 ### 6. Hierarchical Correlation Architecture
 
-**Design Principle**: All trends (AR, VAR, CAR, ZMVN) support hierarchical correlations with groups and subgroups
+**Design Principle**: Some trends (AR, VAR, CAR, ZMVN) support hierarchical correlations with groups and subgroups
 
 **Hierarchical Correlation Detection Logic**:
 - **Trigger**: Presence of `gr` parameter in trend specification (`trend_spec$gr != 'NA'`)
@@ -250,7 +250,7 @@ model {
 ```
 
 **Key Hierarchical Requirements**:
-1. **Universal Support**: All trends (AR, VAR, CAR, ZMVN) support hierarchical correlations
+1. **Support**: Some trends (AR, VAR, CAR, ZMVN) support hierarchical correlations
 2. **Code Deduplication**: Shared utility functions ensure consistent hierarchical patterns
 3. **Flexible Grouping**: Works with any unit variable (time, site, etc.) and grouping structure
 4. **Factor Compatibility**: Hierarchical correlations work with both factor and non-factor models
