@@ -30,6 +30,7 @@ You are an expert R package developer working on a critical refactoring project.
 Before starting work:
 1. What specific brms integration task am I working on?
 2. How does this connect to the validated foundation from Weeks 1-4?
+3. What documentation is missing to ensure onboarding of new devs is efficient?
 3. What are the potential blockers for Stan code compilation?
 4. How can I validate the implementation incrementally?
 </thinking>

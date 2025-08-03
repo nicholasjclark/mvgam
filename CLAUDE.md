@@ -95,7 +95,8 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - When proposing new tests, first check existing test file names and add to the most appropriate existing file
 - Prioritize internal objects (i.e. `mvgam:::mvgam_example1`) for testing, where appropriate
 - DO NOT write replacement functions just so that tests can pass. Please update existing functions appropriately in light of any test warnings or failures
-- DO NOT use `try()` or `tryCatch()` and `skip()` important tests to make them pass
+- DO NOT use `try()` or `tryCatch()` and `skip()` within tests
+- DO NOT insert placeholder functions to ensure tests pass
 
 ### Code Organization
 - Provider files should follow consistent naming patterns

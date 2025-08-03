@@ -165,16 +165,16 @@ get_default_incompatibility_reason <- function(name) {
 #' @noRd
 register_core_trends <- function() {
   # Factor-compatible trends (stationary dynamics work with factor structure)
-  register_trend_type("AR", supports_factors = TRUE, generate_ar_injection_stanvars)
-  register_trend_type("RW", supports_factors = TRUE, generate_rw_injection_stanvars)
-  register_trend_type("VAR", supports_factors = TRUE, generate_var_injection_stanvars)
-  register_trend_type("ZMVN", supports_factors = TRUE, generate_zmvn_injection_stanvars)
+  register_trend_type("AR", supports_factors = TRUE, generate_ar_trend_stanvars)
+  register_trend_type("RW", supports_factors = TRUE, generate_rw_trend_stanvars)
+  register_trend_type("VAR", supports_factors = TRUE, generate_var_trend_stanvars)
+  register_trend_type("GP", supports_factors = TRUE, generate_gp_trend_stanvars)
+  register_trend_type("P-spline", supports_factors = TRUE, generate_spline_trend_stanvars)
+  register_trend_type("Factor", supports_factors = TRUE, generate_factor_trend_stanvars)
+  register_trend_type("None", supports_factors = TRUE, generate_none_trend_stanvars)
   
   # Factor-incompatible trends (series-specific dynamics)
-  register_trend_type("PW", supports_factors = FALSE, generate_pw_injection_stanvars)
-  register_trend_type("PWlinear", supports_factors = FALSE, generate_pw_injection_stanvars) 
-  register_trend_type("PWlogistic", supports_factors = FALSE, generate_pw_injection_stanvars)
-  register_trend_type("CAR", supports_factors = FALSE, generate_car_injection_stanvars)
+  register_trend_type("CAR", supports_factors = FALSE, generate_car_trend_stanvars)
   
   invisible(TRUE)
 }
@@ -230,7 +230,7 @@ register_custom_trend <- function(name, supports_factors = FALSE, generator_func
 #' @return Logical indicating if registry is initialized
 #' @noRd
 is_registry_initialized <- function() {
-  core_trends <- c("AR", "RW", "VAR", "ZMVN", "PW", "CAR")
+  core_trends <- c("AR", "RW", "VAR", "GP", "P-spline", "Factor", "None", "CAR")
   all(core_trends %in% ls(trend_registry))
 }
 
