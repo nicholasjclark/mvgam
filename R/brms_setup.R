@@ -16,6 +16,25 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   checkmate::assert_formula(formula)
   checkmate::assert_data_frame(data, min.rows = 1)
 
+  # Handle trend formulas without response variables
+  # Check if formula lacks response variable (e.g., ~ 1, ~ x + y) 
+  formula_chr <- deparse(formula)
+  if (!grepl("~.*~", formula_chr) && grepl("^\\s*~", formula_chr)) {
+    # This is a trend formula without response variable
+    # Add fake trend_y response variable following mvgam pattern
+    data <- data
+    data$trend_y <- rnorm(nrow(data))
+    
+    # Update formula to include trend_y response
+    if (attr(terms(formula), 'intercept') == 1) {
+      # Has intercept: trend_y ~ . - 1 (drop intercept for identifiability)
+      formula <- update(formula, trend_y ~ . - 1)
+    } else {
+      # No intercept: trend_y ~ .
+      formula <- update(formula, trend_y ~ .)
+    }
+  }
+
   # Validate brms formula compatibility
   formula_validation <- mvgam:::validate_brms_formula(formula)
   if (!formula_validation$valid) {
@@ -26,31 +45,16 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   }
 
   # Use mock backend for rapid setup (creates brmsfit object needed for prediction)
-  mock_setup <- try({
-    brms::brm(
-      formula = formula,
-      data = data,
-      family = family,
-      stanvars = stanvars,
-      backend = "mock",
-      mock_fit = 1,
-      rename = FALSE
-    )
-  }, silent = TRUE)
-
-  if (inherits(mock_setup, "try-error")) {
-    # Mock backend should never fail - this indicates a bug in our code
-    error_msg <- attr(mock_setup, "condition")$message
-    stop(insight::format_error(
-      "Mock backend failed unexpectedly - this indicates a bug in mvgam.",
-      paste("brms error:", error_msg),
-      "Check formula, data, family, and stanvars for issues.",
-      paste("Formula:", deparse(formula)),
-      paste("Family:", deparse(substitute(family))),
-      paste("Data dimensions:", paste(dim(data), collapse = " x ")),
-      paste("Stanvars provided:", !is.null(stanvars))
-    ))
-  }
+  # Let brms errors bubble up naturally - no masking
+  mock_setup <- brms::brm(
+    formula = formula,
+    data = data,
+    family = family,
+    stanvars = stanvars,
+    backend = "mock",
+    mock_fit = 1,
+    rename = FALSE
+  )
 
   # Extract key components for mvgam integration
   setup_components <- list(
@@ -81,11 +85,8 @@ extract_stancode_from_setup <- function(setup_object) {
   } else if (!is.null(setup_object$model)) {
     return(setup_object$model)
   } else {
-    # Extract from internal structure
-    code <- try(setup_object@stancode, silent = TRUE)
-    if (inherits(code, "try-error")) {
-      return(NULL)
-    }
+    # Extract from internal structure - let errors bubble up
+    code <- setup_object@stancode
     return(code)
   }
 }
@@ -100,11 +101,8 @@ extract_standata_from_setup <- function(setup_object) {
   } else if (!is.null(setup_object$data)) {
     return(setup_object$data)
   } else {
-    # Extract from internal structure
-    data <- try(setup_object@standata, silent = TRUE)
-    if (inherits(data, "try-error")) {
-      return(NULL)
-    }
+    # Extract from internal structure - let errors bubble up
+    data <- setup_object@standata
     return(data)
   }
 }
@@ -114,18 +112,12 @@ extract_standata_from_setup <- function(setup_object) {
 #' @return Data frame of prior specifications
 #' @noRd
 extract_prior_from_setup <- function(setup_object) {
-  # Try to extract prior information
-  prior_info <- try({
-    if (!is.null(setup_object$prior)) {
-      setup_object$prior
-    } else {
-      # Reconstruct from formula and data
-      brms::get_prior(setup_object$formula, setup_object$data, setup_object$family)
-    }
-  }, silent = TRUE)
-
-  if (inherits(prior_info, "try-error")) {
-    return(NULL)
+  # Extract prior information - let errors bubble up
+  if (!is.null(setup_object$prior)) {
+    prior_info <- setup_object$prior
+  } else {
+    # Reconstruct from formula and data
+    prior_info <- brms::get_prior(setup_object$formula, setup_object$data, setup_object$family)
   }
 
   return(prior_info)
@@ -136,16 +128,11 @@ extract_prior_from_setup <- function(setup_object) {
 #' @return brmsterms object
 #' @noRd
 extract_brmsterms_from_setup <- function(setup_object) {
-  terms_info <- try({
-    if (!is.null(setup_object$formula)) {
-      brms::brmsterms(setup_object$formula)
-    } else {
-      NULL
-    }
-  }, silent = TRUE)
-
-  if (inherits(terms_info, "try-error")) {
-    return(NULL)
+  # Extract brms terms - let errors bubble up
+  if (!is.null(setup_object$formula)) {
+    terms_info <- brms::brmsterms(setup_object$formula)
+  } else {
+    terms_info <- NULL
   }
 
   return(terms_info)

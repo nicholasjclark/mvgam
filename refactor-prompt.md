@@ -35,4 +35,6 @@ Before starting work:
 4. How can I implement the current objectives incrementally?
 </thinking>
 
-Please load the context files in `/active` and confirm your understanding of the current sprint objectives. Use extended thinking to build a plan to achieve the current objectives. Focus on actionable implementation steps for Stan assembly validation. DO NOT write any code yet.
+Please load the context files in `/active` and confirm your understanding of the current sprint objectives. Use the r-package-analyzer agent to gain a full understanding of how brms::stanvar() works and what it expects. In light of this information about stanvar, please look over the code in R/trend_injection_generators.R and R/brms_setup.R to ensure we are using stanvar appropriately. DO NOT use try() or tryCatch() in any tests or function edits to mask any errors. Please then use the test runner agent to run tests in test-trend-dispatcher and report back to me.
+
+Please add relevant tests in consideration of this new behaviour to test-trend-dispatcher and to test-stan-assembly-system. Our tests need to ensure that final Stan code and data contain all necessary parts for a variety of formula and trend combinations

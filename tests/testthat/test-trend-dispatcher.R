@@ -369,8 +369,22 @@ test_that("custom trend registration works correctly", {
     )
   }
 
-  # Register the custom trend
-  mvgam:::register_custom_trend("CUSTOM", custom_constructor)
+  # Create a simple generator function for the custom trend
+  custom_generator <- function(trend_spec, data_info) {
+    # Simple generator that returns basic stanvars
+    list(
+      custom_param = brms::stanvar(
+        name = "custom_param",
+        scode = "real custom_param;", 
+        block = "parameters"
+      )
+    )
+  }
+  
+  # Register the custom trend with the registry system
+  mvgam:::register_trend_type("CUSTOM", supports_factors = FALSE, 
+                               generator_func = custom_generator,
+                               incompatibility_reason = "Custom trend for testing")
 
   # Test it appears in registry
   choices <- mvgam_trend_choices()

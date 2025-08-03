@@ -1,14 +1,11 @@
 # Stan Assembly System Tests
 # Tests for the two-stage Stan code assembly with validation
 
-library(testthat)
-library(mvgam)
-
 # Test data setup helpers
 setup_test_data <- function() {
   set.seed(123)
   n <- 50
-  
+
   # Simple univariate time series
   simple_univariate <- data.frame(
     time = 1:n,
@@ -16,7 +13,7 @@ setup_test_data <- function() {
     y = rnorm(n),
     x = rnorm(n)
   )
-  
+
   # Multivariate time series
   multivariate <- data.frame(
     time = rep(1:(n/2), 2),
@@ -24,7 +21,7 @@ setup_test_data <- function() {
     y = rnorm(n),
     x = rnorm(n)
   )
-  
+
   list(
     simple_univariate = simple_univariate,
     multivariate = multivariate
@@ -34,14 +31,14 @@ setup_test_data <- function() {
 # Tests for brms setup function
 test_that("setup_brms_lightweight creates valid brms setup", {
   data <- setup_test_data()$simple_univariate
-  
+
   # Test basic observation model setup
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ x,
     data = data,
     family = gaussian()
   )
-  
+
   expect_type(obs_setup, "list")
   expect_true("stancode" %in% names(obs_setup))
   expect_true("standata" %in% names(obs_setup))
@@ -53,14 +50,14 @@ test_that("setup_brms_lightweight creates valid brms setup", {
 test_that("setup_brms_lightweight handles different families", {
   data <- setup_test_data()$simple_univariate
   data$y_count <- rpois(nrow(data), 5)  # Count data
-  
+
   # Test Poisson family
   pois_setup <- mvgam:::setup_brms_lightweight(
     formula = y_count ~ x,
     data = data,
     family = poisson()
   )
-  
+
   expect_type(pois_setup, "list")
   expect_type(pois_setup$stancode, "character")
   expect_match(pois_setup$stancode, "poisson")
@@ -72,17 +69,17 @@ test_that("trend registry basic functionality works", {
   mock_generator <- function(trend_spec, data_info) {
     list(test_stanvar = "mock content")
   }
-  
-  mvgam:::register_trend_type("TEST_TREND", 
-                             supports_factors = TRUE, 
+
+  mvgam:::register_trend_type("TEST_TREND",
+                             supports_factors = TRUE,
                              mock_generator)
-  
+
   # Test retrieval
   trend_info <- mvgam:::get_trend_info("TEST_TREND")
   expect_type(trend_info, "list")
   expect_true(trend_info$supports_factors)
   expect_identical(trend_info$generator, mock_generator)
-  
+
   # Test listing
   available_trends <- mvgam:::list_trend_types()
   expect_true("TEST_TREND" %in% available_trends$trend_type)
@@ -94,26 +91,26 @@ test_that("factor model compatibility validation works", {
     trend_model = "RW",
     n_lv = 2
   )
-  
+
   expect_silent({
     mvgam:::validate_factor_compatibility(compatible_trend_spec)
   })
-  
+
   # Test with factor-incompatible trends (should error)
   incompatible_trend_spec <- list(
     trend_model = "CAR",
     n_lv = 2
   )
-  
+
   expect_error({
     mvgam:::validate_factor_compatibility(incompatible_trend_spec)
   }, regexp = "Factor models.*not supported")
-  
+
   # Test without n_lv (should be silent)
   no_factor_trend_spec <- list(
     trend_model = "CAR"
   )
-  
+
   expect_silent({
     mvgam:::validate_factor_compatibility(no_factor_trend_spec)
   })
@@ -126,17 +123,17 @@ test_that("trend injection generators produce valid output", {
     n_series = 1,
     series_var = "series"
   )
-  
+
   # Test RW generator (non-factor model, no n_lv specified)
   rw_spec <- list(
     trend_type = "RW",
     correlation = FALSE
   )
-  
+
   rw_stanvars <- mvgam:::generate_trend_injection_stanvars(rw_spec, data_info)
   expect_type(rw_stanvars, "list")
   expect_gt(length(rw_stanvars), 0)
-  
+
   # Test VAR generator (for valid factor model, need n_series > n_lv)
   data_info_multivariate <- list(n_obs = 50, n_series = 3, series_var = "series")
   var_spec <- list(
@@ -144,7 +141,7 @@ test_that("trend injection generators produce valid output", {
     n_lv = 2,  # Valid factor model: n_lv < n_series (2 < 3)
     lags = 1
   )
-  
+
   var_stanvars <- mvgam:::generate_trend_injection_stanvars(var_spec, data_info_multivariate)
   expect_type(var_stanvars, "list")
   expect_gt(length(var_stanvars), 0)
@@ -153,25 +150,25 @@ test_that("trend injection generators produce valid output", {
 test_that("trend generators handle different specifications", {
   # Use multivariate data for factor model tests
   data_info_factor <- list(n_obs = 50, n_series = 4, series_var = "series")
-  
+
   # Test correlated RW with valid factor model
   rw_corr_spec <- list(
     trend_type = "RW",
     n_lv = 3,  # Valid factor model: n_lv < n_series (3 < 4)
     correlation = TRUE
   )
-  
+
   rw_corr_stanvars <- mvgam:::generate_trend_injection_stanvars(rw_corr_spec, data_info_factor)
   expect_type(rw_corr_stanvars, "list")
   expect_gt(length(rw_corr_stanvars), 0)
-  
+
   # Test AR generator with valid factor model
   ar_spec <- list(
     trend_type = "AR",
     n_lv = 2,  # Valid factor model: n_lv < n_series (2 < 4)
     lags = 2
   )
-  
+
   ar_stanvars <- mvgam:::generate_trend_injection_stanvars(ar_spec, data_info_factor)
   expect_type(ar_stanvars, "list")
   expect_gt(length(ar_stanvars), 0)
@@ -179,22 +176,22 @@ test_that("trend generators handle different specifications", {
 
 test_that("trend generators handle edge cases", {
   data_info <- list(n_obs = 10, n_series = 1, series_var = "series")
-  
+
   # Test with None trend
   none_spec <- list(
     trend_type = "None"
   )
-  
+
   none_stanvars <- mvgam:::generate_trend_injection_stanvars(none_spec, data_info)
   expect_type(none_stanvars, "list")
   # Should return empty list for None trend
   expect_equal(length(none_stanvars), 0)
-  
+
   # Test with minimal specification
   minimal_spec <- list(
     trend_type = "RW"
   )
-  
+
   minimal_stanvars <- mvgam:::generate_trend_injection_stanvars(minimal_spec, data_info)
   expect_type(minimal_stanvars, "list")
   expect_gt(length(minimal_stanvars), 0)
@@ -207,13 +204,13 @@ test_that("extract_trend_stanvars_from_setup handles valid inputs", {
     stancode = "mock trend code",
     standata = list(n = 50)
   )
-  
+
   # Mock trend spec
   trend_spec <- list(
     trend_type = "RW",
     n_lv = 1
   )
-  
+
   result <- mvgam:::extract_trend_stanvars_from_setup(trend_setup, trend_spec)
   expect_type(result, "list")
   expect_gt(length(result), 0)
@@ -224,11 +221,11 @@ test_that("extract_trend_stanvars_from_setup handles None trend", {
     stancode = "mock code",
     standata = list()
   )
-  
+
   trend_spec <- list(
     trend_type = "None"
   )
-  
+
   result <- mvgam:::extract_trend_stanvars_from_setup(trend_setup, trend_spec)
   expect_type(result, "list")
   expect_equal(length(result), 0)
@@ -248,14 +245,14 @@ test_that("combine_stan_components merges observation and trend code", {
     y ~ normal(alpha, 1);
   }
   "
-  
+
   obs_data <- list(N = 50, y = rnorm(50))
-  
+
   # Mock trend stanvars (empty for simple test)
   trend_stanvars <- list()
-  
+
   result <- mvgam:::combine_stan_components(obs_code, obs_data, trend_stanvars)
-  
+
   expect_type(result, "list")
   expect_true("stancode" %in% names(result))
   expect_true("standata" %in% names(result))
@@ -278,9 +275,9 @@ test_that("combine_stan_components handles trend addition", {
     alpha ~ normal(0, 1);
   }
   "
-  
+
   obs_data <- list(N = 50)
-  
+
   # Mock trend stanvars with simple additions
   trend_stanvars <- list(
     trend_params = structure(list(
@@ -293,16 +290,16 @@ test_that("combine_stan_components handles trend addition", {
       block = "parameters"
     ), class = "stanvar")
   )
-  
+
   result <- mvgam:::combine_stan_components(obs_code, obs_data, trend_stanvars)
-  
+
   expect_type(result, "list")
   expect_true(result$has_trends)
   expect_match(result$stancode, "trend_param")
 })
 
 # Tests for Stan code validation
-test_that("validate_stan_syntax catches syntax errors", {
+test_that("validate_stan_code catches syntax errors", {
   # Valid Stan code
   valid_code <- "
   data {
@@ -315,9 +312,9 @@ test_that("validate_stan_syntax catches syntax errors", {
     alpha ~ normal(0, 1);
   }
   "
-  
-  expect_true(mvgam:::validate_stan_syntax(valid_code, silent = TRUE))
-  
+
+  expect_invisible(mvgam:::validate_stan_code(valid_code))
+
   # Invalid Stan code (missing semicolon)
   invalid_code <- "
   data {
@@ -330,14 +327,14 @@ test_that("validate_stan_syntax catches syntax errors", {
     alpha ~ normal(0, 1);
   }
   "
-  
-  expect_false(mvgam:::validate_stan_syntax(invalid_code, silent = TRUE))
+
+  expect_error(mvgam:::validate_stan_code(invalid_code))
 })
 
-test_that("validate_stan_syntax handles edge cases", {
+test_that("validate_stan_code handles edge cases", {
   # Empty code
-  expect_false(mvgam:::validate_stan_syntax("", silent = TRUE))
-  
+  expect_error(mvgam:::validate_stan_code(""))
+
   # Very minimal valid code
   minimal_code <- "
   parameters {
@@ -347,14 +344,14 @@ test_that("validate_stan_syntax handles edge cases", {
     x ~ normal(0, 1);
   }
   "
-  
-  expect_true(mvgam:::validate_stan_syntax(minimal_code, silent = TRUE))
+
+  expect_invisible(mvgam:::validate_stan_code(minimal_code))
 })
 
 # Tests for comprehensive validation
 test_that("validate_combined_stancode performs comprehensive checks", {
   data <- setup_test_data()$simple_univariate
-  
+
   # Create a complete, valid stancode structure
   complete_result <- list(
     stancode = "
@@ -378,7 +375,7 @@ test_that("validate_combined_stancode performs comprehensive checks", {
     ),
     has_trends = FALSE
   )
-  
+
   validation_result <- mvgam:::validate_combined_stancode(complete_result, silent = TRUE)
   expect_type(validation_result, "list")
   expect_true("valid" %in% names(validation_result))
@@ -409,7 +406,7 @@ test_that("validate_combined_stancode catches data mismatches", {
     ),
     has_trends = FALSE
   )
-  
+
   validation_result <- mvgam:::validate_combined_stancode(mismatched_result, silent = TRUE)
   expect_false(validation_result$data_valid)
 })
@@ -417,14 +414,14 @@ test_that("validate_combined_stancode catches data mismatches", {
 # Tests for production generate_combined_stancode function
 test_that("production generate_combined_stancode works with observation-only model", {
   data <- setup_test_data()$simple_univariate
-  
+
   # Create observation setup only
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ x,
     data = data,
     family = gaussian()
   )
-  
+
   # Test without trends
   combined_result <- mvgam:::generate_combined_stancode(
     obs_setup = obs_setup,
@@ -433,7 +430,7 @@ test_that("production generate_combined_stancode works with observation-only mod
     validate = FALSE,  # Skip validation to focus on generation
     silent = 2
   )
-  
+
   # Basic structure validation
   expect_type(combined_result, "list")
   expect_false(combined_result$has_trends)
@@ -444,21 +441,21 @@ test_that("production generate_combined_stancode works with observation-only mod
 
 test_that("production generate_combined_stancode works with trend models", {
   data <- setup_test_data()$simple_univariate
-  
+
   # Create observation setup
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ x,
     data = data,
     family = gaussian()
   )
-  
+
   # Create trend setup (simplified trend model)
   trend_setup <- mvgam:::setup_brms_lightweight(
     formula = ~ 1,  # Minimal trend formula
     data = data,
     family = gaussian()
   )
-  
+
   # Create basic trend specification
   trend_spec <- list(
     trend_type = "RW",  # Fixed: was trend_model, now trend_type
@@ -466,7 +463,7 @@ test_that("production generate_combined_stancode works with trend models", {
     series_var = "series",
     n_series = 1
   )
-  
+
   # Test production function with both observation and trend components
   combined_result <- mvgam:::generate_combined_stancode(
     obs_setup = obs_setup,
@@ -475,7 +472,7 @@ test_that("production generate_combined_stancode works with trend models", {
     validate = FALSE,  # Skip validation to focus on generation
     silent = 2
   )
-  
+
   # Validate structure with trends
   expect_type(combined_result, "list")
   expect_true(combined_result$has_trends)
@@ -487,14 +484,14 @@ test_that("production generate_combined_stancode works with trend models", {
 # Tests for production Stan code validation
 test_that("production Stan code validation works", {
   data <- setup_test_data()$simple_univariate
-  
+
   # Generate valid Stan code using production pipeline
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ x,
     data = data,
     family = gaussian()
   )
-  
+
   combined_result <- mvgam:::generate_combined_stancode(
     obs_setup = obs_setup,
     trend_setup = NULL,
@@ -502,10 +499,10 @@ test_that("production Stan code validation works", {
     validate = FALSE,
     silent = 2
   )
-  
+
   # Validate the generated code
   validation_result <- mvgam:::validate_combined_stancode(combined_result, silent = TRUE)
-  
+
   expect_type(validation_result, "list")
   expect_true(validation_result$valid)
   expect_true(validation_result$syntax_valid)
@@ -534,13 +531,13 @@ test_that("production validation catches real issues", {
       # missing_var not provided
     )
   )
-  
+
   broken_result <- list(
     stancode = broken_setup$stancode,
     standata = broken_setup$standata,
     has_trends = FALSE
   )
-  
+
   validation_result <- mvgam:::validate_combined_stancode(broken_result, silent = TRUE)
   expect_false(validation_result$valid)
   expect_false(validation_result$data_valid)
@@ -549,27 +546,27 @@ test_that("production validation catches real issues", {
 # Tests for error handling and edge cases
 test_that("system handles missing components gracefully", {
   data <- setup_test_data()$simple_univariate
-  
+
   # Test with NULL observation setup
   expect_error({
     mvgam:::generate_combined_stancode(
       obs_setup = NULL,
-      trend_setup = NULL, 
+      trend_setup = NULL,
       trend_spec = NULL
     )
   })
-  
+
   # Test with invalid trend specification
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ x,
     data = data,
     family = gaussian()
   )
-  
+
   invalid_trend_spec <- list(
     trend_type = "NONEXISTENT_TREND"
   )
-  
+
   expect_error({
     mvgam:::generate_combined_stancode(
       obs_setup = obs_setup,
@@ -587,7 +584,7 @@ test_that("system provides informative error messages", {
     data = data,
     family = gaussian()
   )
-  
+
   # Test error message quality
   expect_error({
     mvgam:::generate_combined_stancode(
@@ -601,20 +598,20 @@ test_that("system provides informative error messages", {
 # Integration tests
 test_that("full pipeline integration works end-to-end", {
   data <- setup_test_data()$multivariate
-  
+
   # Test complete pipeline with multivariate data
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ x,
     data = data,
     family = gaussian()
   )
-  
+
   trend_setup <- mvgam:::setup_brms_lightweight(
     formula = ~ 1,
     data = data,
     family = gaussian()
   )
-  
+
   trend_spec <- list(
     trend_type = "VAR",
     n_lv = 2,
@@ -622,7 +619,7 @@ test_that("full pipeline integration works end-to-end", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   # Full pipeline with validation
   final_result <- mvgam:::generate_combined_stancode(
     obs_setup = obs_setup,
@@ -631,7 +628,7 @@ test_that("full pipeline integration works end-to-end", {
     validate = TRUE,
     silent = 1
   )
-  
+
   expect_type(final_result, "list")
   expect_true(final_result$has_trends)
   expect_true(final_result$validation_passed)
@@ -642,19 +639,19 @@ test_that("full pipeline integration works end-to-end", {
 
 test_that("system handles complex trend specifications", {
   data <- setup_test_data()$multivariate
-  
+
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ x,
     data = data,
     family = poisson()  # Different family
   )
-  
+
   trend_setup <- mvgam:::setup_brms_lightweight(
     formula = ~ 1,
     data = data,
     family = gaussian()
   )
-  
+
   # Complex trend specification
   complex_trend_spec <- list(
     trend_type = "RW",
@@ -663,7 +660,7 @@ test_that("system handles complex trend specifications", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   complex_result <- mvgam:::generate_combined_stancode(
     obs_setup = obs_setup,
     trend_setup = trend_setup,
@@ -671,11 +668,11 @@ test_that("system handles complex trend specifications", {
     validate = TRUE,
     silent = 2
   )
-  
+
   expect_type(complex_result, "list")
   expect_true(complex_result$has_trends)
   expect_true(complex_result$validation_passed)
-  
+
   # Should contain correlation-specific code
   expect_match(complex_result$stancode, "(cholesky|correlation|L_Omega)")
 })
@@ -683,7 +680,7 @@ test_that("system handles complex trend specifications", {
 # Comprehensive tests for all trend types and new features
 test_that("CAR trend generator works correctly", {
   data_info <- list(n_obs = 50, n_series = 3, series_var = "series")
-  
+
   # Test simple CAR (factor models not supported for CAR)
   car_spec <- list(
     trend_type = "CAR",
@@ -693,7 +690,7 @@ test_that("CAR trend generator works correctly", {
   expect_type(car_stanvars, "list")
   expect_gt(length(car_stanvars), 0)
   expect_true(any(grepl("car", names(car_stanvars), ignore.case = TRUE)))
-  
+
   # Test hierarchical CAR
   car_hierarchical_spec <- list(
     trend_type = "CAR",
@@ -701,7 +698,7 @@ test_that("CAR trend generator works correctly", {
     gr = "group",
     unit = "site"
   )
-  car_hier_stanvars <- mvgam:::generate_trend_injection_stanvars(car_hierarchical_spec, 
+  car_hier_stanvars <- mvgam:::generate_trend_injection_stanvars(car_hierarchical_spec,
     c(data_info, list(n_groups = 2, n_subgroups = 3)))
   expect_type(car_hier_stanvars, "list")
   expect_gt(length(car_hier_stanvars), 0)
@@ -710,7 +707,7 @@ test_that("CAR trend generator works correctly", {
 
 test_that("ZMVN trend generator works correctly", {
   data_info <- list(n_obs = 50, n_series = 4, series_var = "series")
-  
+
   # Test simple ZMVN
   zmvn_spec <- list(
     trend_type = "ZMVN",
@@ -720,7 +717,7 @@ test_that("ZMVN trend generator works correctly", {
   expect_type(zmvn_stanvars, "list")
   expect_gt(length(zmvn_stanvars), 0)
   expect_true(any(grepl("zmvn", names(zmvn_stanvars), ignore.case = TRUE)))
-  
+
   # Test hierarchical ZMVN
   zmvn_hierarchical_spec <- list(
     trend_type = "ZMVN",
@@ -728,7 +725,7 @@ test_that("ZMVN trend generator works correctly", {
     gr = "group",
     unit = "site"
   )
-  zmvn_hier_stanvars <- mvgam:::generate_trend_injection_stanvars(zmvn_hierarchical_spec, 
+  zmvn_hier_stanvars <- mvgam:::generate_trend_injection_stanvars(zmvn_hierarchical_spec,
     c(data_info, list(n_groups = 3, n_subgroups = 2)))
   expect_type(zmvn_hier_stanvars, "list")
   expect_gt(length(zmvn_hier_stanvars), 0)
@@ -737,8 +734,8 @@ test_that("ZMVN trend generator works correctly", {
 
 test_that("PW trend generator works correctly", {
   data_info <- list(n_obs = 50, n_series = 2, series_var = "series")
-  
-  # Test simple PW 
+
+  # Test simple PW
   pw_spec <- list(
     trend_type = "PW",
     n_lv = 2,
@@ -753,7 +750,7 @@ test_that("PW trend generator works correctly", {
 test_that("Factor model support works for all compatible trends", {
   # Test with n_lv < n_series (valid factor model)
   data_info <- list(n_obs = 50, n_series = 4, series_var = "series")
-  
+
   # Test AR with factor model
   ar_factor_spec <- list(
     trend_type = "AR",
@@ -764,7 +761,7 @@ test_that("Factor model support works for all compatible trends", {
   expect_type(ar_factor_stanvars, "list")
   expect_gt(length(ar_factor_stanvars), 0)
   expect_true(any(grepl("z_matrix", names(ar_factor_stanvars), ignore.case = TRUE)))
-  
+
   # Test RW with factor model
   rw_factor_spec <- list(
     trend_type = "RW",
@@ -775,7 +772,7 @@ test_that("Factor model support works for all compatible trends", {
   expect_type(rw_factor_stanvars, "list")
   expect_gt(length(rw_factor_stanvars), 0)
   expect_true(any(grepl("z_matrix", names(rw_factor_stanvars), ignore.case = TRUE)))
-  
+
   # Test VAR with factor model
   var_factor_spec <- list(
     trend_type = "VAR",
@@ -786,10 +783,10 @@ test_that("Factor model support works for all compatible trends", {
   expect_type(var_factor_stanvars, "list")
   expect_gt(length(var_factor_stanvars), 0)
   expect_true(any(grepl("z_matrix", names(var_factor_stanvars), ignore.case = TRUE)))
-  
+
   # Test ZMVN with factor model
   zmvn_factor_spec <- list(
-    trend_type = "ZMVN", 
+    trend_type = "ZMVN",
     n_lv = 3   # n_lv < n_series
   )
   zmvn_factor_stanvars <- mvgam:::generate_trend_injection_stanvars(zmvn_factor_spec, data_info)
@@ -799,9 +796,9 @@ test_that("Factor model support works for all compatible trends", {
 })
 
 test_that("Hierarchical correlation support works for all trends", {
-  data_info <- list(n_obs = 50, n_series = 4, series_var = "series", 
+  data_info <- list(n_obs = 50, n_series = 4, series_var = "series",
                    n_groups = 2, n_subgroups = 3)
-  
+
   # Test AR with hierarchical correlations (valid factor model)
   ar_hier_spec <- list(
     trend_type = "AR",
@@ -813,12 +810,12 @@ test_that("Hierarchical correlation support works for all trends", {
   expect_type(ar_hier_stanvars, "list")
   expect_gt(length(ar_hier_stanvars), 0)
   expect_true(any(grepl("hierarchical", names(ar_hier_stanvars), ignore.case = TRUE)))
-  
+
   # Test VAR with hierarchical correlations
   var_hier_spec <- list(
     trend_type = "VAR",
     n_lv = 3,
-    gr = "group", 
+    gr = "group",
     unit = "site"
   )
   var_hier_stanvars <- mvgam:::generate_trend_injection_stanvars(var_hier_spec, data_info)
@@ -829,9 +826,9 @@ test_that("Hierarchical correlation support works for all trends", {
 
 test_that("Universal trend computation pattern is used", {
   data_info <- list(n_obs = 50, n_series = 4, series_var = "series")
-  
+
   trend_types <- c("AR", "RW", "VAR", "ZMVN")
-  
+
   for (trend_type in trend_types) {
     spec <- list(
       trend_type = trend_type,
@@ -840,7 +837,7 @@ test_that("Universal trend computation pattern is used", {
     stanvars <- mvgam:::generate_trend_injection_stanvars(spec, data_info)
     expect_type(stanvars, "list")
     expect_gt(length(stanvars), 0)
-    
+
     # Check for universal trend computation pattern
     expect_true(any(grepl("trend_computation", names(stanvars), ignore.case = TRUE)))
   }
@@ -851,31 +848,297 @@ test_that("Shared utility functions work correctly", {
   z_factor <- mvgam:::generate_matrix_z_stanvars(TRUE, 2, 4)
   expect_type(z_factor, "list")
   expect_gt(length(z_factor), 0)
-  
-  z_non_factor <- mvgam:::generate_matrix_z_stanvars(FALSE, 3, 3) 
+
+  z_non_factor <- mvgam:::generate_matrix_z_stanvars(FALSE, 3, 3)
   expect_type(z_non_factor, "list")
   expect_gt(length(z_non_factor), 0)
-  
+
   # Test trend computation generation
   trend_comp <- mvgam:::generate_trend_computation_code(2, 3)
   expect_type(trend_comp, "list")
   expect_gt(length(trend_comp), 0)
-  
+
   # Test factor model priors
   factor_priors <- mvgam:::generate_factor_model_priors(TRUE, 2)
   expect_type(factor_priors, "list")
   expect_gt(length(factor_priors), 0)
-  
+
   # Test hierarchical functions
   hier_funcs <- mvgam:::generate_hierarchical_functions()
   expect_type(hier_funcs, "list")
   expect_gt(length(hier_funcs), 0)
-  
+
   hier_params <- mvgam:::generate_hierarchical_correlation_params(2, 3)
   expect_type(hier_params, "list")
   expect_gt(length(hier_params), 0)
-  
+
   hier_priors <- mvgam:::generate_hierarchical_correlation_priors(2)
   expect_type(hier_priors, "list")
   expect_gt(length(hier_priors), 0)
+})
+
+# Create test data
+setup_test_data <- function() {
+  data.frame(
+    y = rnorm(50, 0, 1),
+    x = rnorm(50, 0, 1),
+    time = 1:50,
+    series = factor(rep(1:2, length.out = 50))
+  )
+}
+
+# Create realistic trend stanvars using brms stanvar function
+create_realistic_trend_stanvars <- function() {
+  list(
+    rw_params = brms::stanvar(
+      name = "rw_params",
+      scode = "parameters { vector<lower=0>[2] sigma_rw; }",
+      block = "parameters"
+    ),
+    rw_model = brms::stanvar(
+      name = "rw_model", 
+      scode = "model { sigma_rw ~ inv_gamma(1, 1); }",
+      block = "model"
+    ),
+    rw_data = brms::stanvar(
+      x = 2,
+      name = "n_series",
+      scode = "int<lower=1> n_series;",
+      block = "data"
+    )
+  )
+}
+
+# Create invalid stanvars for testing
+create_invalid_stanvars <- function() {
+  list(
+    invalid_no_name = list(
+      scode = "parameters { real bad_param; }",
+      x = NULL
+    ),
+    invalid_no_scode = list(
+      name = "bad_stanvar",
+      x = NULL
+    ),
+    invalid_empty_scode = list(
+      name = "empty_stanvar",
+      scode = "",
+      x = NULL
+    ),
+    not_a_list = "this is not a stanvar"
+  )
+}
+
+# Unit Tests: Input Validation
+# ============================
+
+test_that("assembly functions validate inputs correctly", {
+  test_data <- setup_test_data()
+  trend_stanvars <- create_realistic_trend_stanvars()
+
+  # Test invalid formula
+  expect_error(
+    assemble_mvgam_stan_code("not a formula", trend_stanvars, test_data),
+    "Assertion on 'obs_formula' failed"
+  )
+
+  expect_error(
+    assemble_mvgam_stan_data("not a formula", trend_stanvars, test_data),
+    "Assertion on 'obs_formula' failed"
+  )
+
+  # Test invalid data
+  expect_error(
+    assemble_mvgam_stan_code(y ~ x, trend_stanvars, "not a data frame"),
+    "Assertion on 'data' failed"
+  )
+
+  expect_error(
+    assemble_mvgam_stan_data(y ~ x, trend_stanvars, "not a data frame"),
+    "Assertion on 'data' failed"
+  )
+
+  # Test invalid stanvars
+  expect_error(
+    assemble_mvgam_stan_code(y ~ x, "not a list", test_data),
+    "Assertion on 'trend_stanvars' failed"
+  )
+
+  expect_error(
+    assemble_mvgam_stan_data(y ~ x, "not a list", test_data),
+    "Assertion on 'trend_stanvars' failed"
+  )
+
+  # Test empty data
+  empty_data <- test_data[0, ]
+  expect_error(
+    assemble_mvgam_stan_code(y ~ x, trend_stanvars, empty_data),
+    "Assertion on 'data' failed"
+  )
+
+  expect_error(
+    assemble_mvgam_stan_data(y ~ x, trend_stanvars, empty_data),
+    "Assertion on 'data' failed"
+  )
+})
+
+# Unit Tests: Stan Data Consistency with brms
+# ===========================================
+
+test_that("stan data matches brms when no trend components added", {
+  test_data <- setup_test_data()
+
+  # Generate brms stan data directly
+  brms_standata <- brms::make_standata(y ~ x, data = test_data, family = gaussian())
+
+  # Generate stan data through our assembly system with empty stanvars
+  empty_stanvars <- list()
+  mvgam_standata <- assemble_mvgam_stan_data(
+    obs_formula = y ~ x,
+    trend_stanvars = empty_stanvars,
+    data = test_data,
+    family = gaussian()
+  )
+
+  # Core data should be identical
+  expect_equal(mvgam_standata$N, brms_standata$N)
+  expect_equal(mvgam_standata$Y, brms_standata$Y)
+  expect_equal(mvgam_standata$K, brms_standata$K)
+  expect_equal(mvgam_standata$X, brms_standata$X)
+
+  # All core brms data components should be present
+  core_components <- c("N", "Y", "K", "X")
+  for (component in core_components) {
+    if (component %in% names(brms_standata)) {
+      expect_true(component %in% names(mvgam_standata),
+                  info = paste("Missing component:", component))
+      expect_equal(mvgam_standata[[component]], brms_standata[[component]],
+                   info = paste("Mismatch in component:", component))
+    }
+  }
+})
+
+test_that("stan data preserves brms structure when adding trend components", {
+  test_data <- setup_test_data()
+  trend_stanvars <- create_realistic_trend_stanvars()
+
+  # Generate brms stan data directly
+  brms_standata <- brms::make_standata(y ~ x, data = test_data, family = gaussian())
+
+  # Generate stan data through our assembly system with trend stanvars
+  mvgam_standata <- assemble_mvgam_stan_data(
+    obs_formula = y ~ x,
+    trend_stanvars = trend_stanvars,
+    data = test_data,
+    family = gaussian()
+  )
+
+  # All original brms components should still be present and unchanged
+  for (name in names(brms_standata)) {
+    expect_true(name %in% names(mvgam_standata),
+                info = paste("Missing original brms component:", name))
+    expect_equal(mvgam_standata[[name]], brms_standata[[name]],
+                 info = paste("Original brms component changed:", name))
+  }
+
+  # Additional trend components should be added
+  expect_true("n_series" %in% names(mvgam_standata))
+  expect_equal(mvgam_standata$n_series, 2)
+})
+
+test_that("stan code contains required blocks", {
+  test_data <- setup_test_data()
+  trend_stanvars <- create_realistic_trend_stanvars()
+
+  # Generate stan code
+  stan_code <- assemble_mvgam_stan_code(
+    obs_formula = y ~ x,
+    trend_stanvars = trend_stanvars,
+    data = test_data,
+    family = gaussian()
+  )
+
+  # Should be a character string
+  expect_type(stan_code, "character")
+  expect_true(nchar(stan_code) > 0)
+
+  # Should contain required Stan blocks
+  expect_true(grepl("data\\s*\\{", stan_code))
+  expect_true(grepl("parameters\\s*\\{", stan_code))
+  expect_true(grepl("model\\s*\\{", stan_code))
+})
+
+# Unit Tests: Stanvar Preparation and Validation
+# ==============================================
+
+test_that("prepare_stanvars_for_brms filters valid stanvars", {
+  valid_stanvars <- create_realistic_trend_stanvars()
+  invalid_stanvars <- create_invalid_stanvars()
+  mixed_stanvars <- c(valid_stanvars, invalid_stanvars)
+
+  # Test with valid stanvars only
+  result_valid <- prepare_stanvars_for_brms(valid_stanvars)
+  expect_equal(length(result_valid), length(valid_stanvars))
+  expect_true(all(names(result_valid) %in% names(valid_stanvars)))
+
+  # Test with mixed stanvars - should filter out invalid ones
+  expect_warning(
+    result_mixed <- prepare_stanvars_for_brms(mixed_stanvars),
+    "Skipping invalid stanvar"
+  )
+  expect_equal(length(result_mixed), length(valid_stanvars))
+  expect_true(all(names(result_mixed) %in% names(valid_stanvars)))
+})
+
+test_that("is_valid_stanvar correctly identifies valid and invalid stanvars", {
+  valid_stanvars <- create_realistic_trend_stanvars()
+  invalid_stanvars <- create_invalid_stanvars()
+
+  # Test valid stanvars
+  for (stanvar in valid_stanvars) {
+    expect_true(is_valid_stanvar(stanvar))
+  }
+
+  # Test invalid stanvars
+  for (stanvar in invalid_stanvars) {
+    expect_false(is_valid_stanvar(stanvar))
+  }
+
+  # Test edge cases
+  expect_false(is_valid_stanvar(NULL))
+  expect_false(is_valid_stanvar(list()))
+  expect_false(is_valid_stanvar("not a list"))
+})
+
+# Unit Tests: Helper Functions
+# ============================
+
+test_that("helper functions work correctly", {
+  # Test null coalescing operator
+  expect_equal(NULL %||% "default", "default")
+  expect_equal("value" %||% "default", "value")
+  expect_equal(0 %||% "default", 0)
+  expect_equal(FALSE %||% "default", FALSE)
+
+  # Test data extraction helpers
+  test_data <- setup_test_data()
+
+  time_data <- extract_time_data(test_data)
+  expect_true("time" %in% names(time_data))
+  expect_true("n_time" %in% names(time_data))
+  expect_equal(time_data$n_time, length(unique(test_data$time)))
+
+  series_data <- extract_series_data(test_data)
+  expect_true("series" %in% names(series_data))
+  expect_true("n_series" %in% names(series_data))
+  expect_equal(series_data$n_series, length(unique(test_data$series)))
+
+  # Test braces balancing
+  expect_true(are_braces_balanced("{ }"))
+  expect_true(are_braces_balanced("{ { } }"))
+  expect_true(are_braces_balanced("data { int N; } parameters { real x; }"))
+
+  expect_false(are_braces_balanced("{ "))
+  expect_false(are_braces_balanced(" }"))
+  expect_false(are_braces_balanced("{ { }"))
 })

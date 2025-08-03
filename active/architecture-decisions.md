@@ -9,8 +9,8 @@
 **Rationale**: Enables seamless brms ecosystem integration while preserving multivariate correlations  
 **Implementation**: 
 - brms generates linear predictors (`mu`, `mu_trend`) from two formulae
-- Stan models from both are combined to contain with observation + trend components
-- Combined Stan model fit by mvgam for joint estimation
+- Stan models from two brmsfit objects (using `backend = "mock"`) are combined to contain observation + trend components
+- Combined Stan model is passed to Stan by mvgam for joint estimation
 
 ### 2. Formula-Centric Interface Design
 **Decision**: Extend brms formula syntax with `trend_formula` parameter  
@@ -207,7 +207,7 @@ generate_hierarchical_correlation_priors(n_groups)
 - **Compatibility**: Works with both factor and non-factor models
 - **Universal Support**: AR, VAR, CAR, and ZMVN all use identical hierarchical patterns
 
-**Hierarchical Correlation Pattern**:
+**Hierarchical Correlations**:
 ```stan
 // Shared hierarchical correlation functions
 functions {

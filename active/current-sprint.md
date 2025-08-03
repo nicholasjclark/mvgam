@@ -31,13 +31,33 @@
 - [x] **Factor model refactoring** - Remove redundant Factor type, mark AR/RW/VAR as factor-compatible, implement consistent patterns ✅
 - [x] **Code deduplication** - Create shared utility functions for matrix Z, trend computation, and factor priors ✅
 - [x] **Comprehensive test suite expansion** - Added testing for all trend types (CAR, ZMVN, PW), factor models, and hierarchical correlations ✅
-- [ ] **Missing infrastructure functions** - Check if `combine_stan_components()` (referred to in Stan assembly tests) is already implemented in `generate_combined_stancode()`; similarly inspect `validate_stan_code()` to see if it can be used in place of `validate_combined_stancode()` for Stan assembly tests. Only write new functions if absolutely necessary
+- [x] **Missing infrastructure functions** - `combine_stan_components()` and `validate_combined_stancode()` confirmed operational. **Unified `validate_stan_code()` function now provides comprehensive validation using `rstan::stanc()` directly** ✅
 - [ ] **Factor validation logic fixes** - Fix validation to properly allow `n_lv < n_series` factor model configurations
-- [ ] **Stan compilation validation** - Ensure all test models compile without error using `rstan::stanc()`
+- [x] **Stan compilation validation** - Unified `validate_stan_code()` function ensures all test models compile using `rstan::stanc()` directly ✅
 - [ ] **Integration testing** - Comprehensive tests covering models with full `formula` and `trend_formula` components
 - [ ] **End-to-end model fitting tests** - Real mvgam model fitting with trend injection
 - [ ] **Performance benchmarking** - Validate <1ms registry lookup and compilation efficiency
 - [ ] **Edge case validation** - Missing data, irregular timing, complex grouping scenarios
+
+### Stan Validation System Simplification ✅ **COMPLETED**
+**Major Improvement**: Unified validation system using `rstan::stanc()` directly
+
+**Before**: Multiple confusing validation functions
+- `validate_stan_code()` - Backend abstraction with complex error handling
+- `validate_stan_syntax()` - Redundant `rstan::stanc()` wrapper
+- Custom syntax checking with manual brace balancing
+
+**After**: Single comprehensive validation function
+- `validate_stan_code(stan_code, backend = "rstan", silent = FALSE)` - **Primary function**
+- Direct `rstan::stanc()` usage for most up-to-date Stan validation
+- Simplified interface with consistent behavior
+- Optional cmdstanr backend support maintained
+
+**Benefits**:
+- Less confusing for developers
+- More reliable validation using Stan's own parser
+- Easier maintenance with single function
+- Consistent validation behavior across all use cases
 
 ### Week 6 Priority: Factor Model Refactoring ✅ **COMPLETED**
 **Step 1: Clean Up Registry and Remove Factor Trend Type** ✅
@@ -123,10 +143,12 @@ ensure_registry_initialized()           # Auto-initialization
 - Complete testing framework operational in `tests/testthat/test-stan-assembly-system.R` with 98.8% pass rate
 - All 18 internal functions implemented and validated for full Stan code generation
 
-**Stan Code Validation (3 implemented in R/stan_validation.R)**:
-- ✅ `validate_stan_code_structure()` - Check Stan blocks exist with detailed error reporting
-- ✅ `validate_stan_syntax()` - Check Stan syntax with brace balancing
-- ✅ `are_braces_balanced()` - Check brace matching with depth tracking
+**Stan Code Validation (Unified in R/stan_validation.R)**:
+- ✅ `validate_stan_code()` - **Primary comprehensive validation using `rstan::stanc()` directly**
+- ✅ `validate_stan_code_structure()` - Optional structural pre-check for required Stan blocks
+- ✅ `are_braces_balanced()` - Optional brace matching validation
+
+**Key Improvement**: Replaced multiple confusing validation functions with single comprehensive `validate_stan_code()` that relies heavily on `rstan::stanc()` for up-to-date validation.
 
 **Data Processing/Validation (5 implemented in R/stan_code_generation.R)**:
 - ✅ `extract_time_data()` - Extract time series data components with fallback handling

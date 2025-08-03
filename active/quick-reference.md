@@ -153,12 +153,15 @@ complete_data <- assemble_mvgam_stan_data(
 
 ### Stan Code Validation Framework (R/stan_validation.R)
 ```r
-# Comprehensive validation pipeline
-validate_stan_code_structure(stan_code)    # Check required blocks
-validate_stan_syntax(stan_code)            # Syntax validation  
-are_braces_balanced(stan_code)             # Structural integrity
-validate_stan_code(stan_code, backend)     # Full rstan/cmdstanr validation
+# Unified comprehensive validation using rstan::stanc()
+validate_stan_code(stan_code, backend = "rstan", silent = FALSE)  # Primary validation function
+
+# Optional structural pre-checks for optimization
+validate_stan_code_structure(stan_code)    # Check required blocks exist
+are_braces_balanced(stan_code)             # Check brace matching
 ```
+
+**Key Change**: Single `validate_stan_code()` function replaces multiple validation functions and relies heavily on `rstan::stanc()` for comprehensive, up-to-date Stan validation.
 
 ## Trend Injection Patterns ✅ **OPERATIONAL**
 
@@ -321,7 +324,7 @@ mvgam_enhanced <- function(formula, trend_formula = NULL, data, family = gaussia
 **Stan Code Assembly**:
 - `generate_base_brms_stancode()` creates observation model with injected trend stanvars
 - `inject_trend_into_linear_predictor()` modifies Stan code to add trend effects to `mu`
-- `validate_stan_code()` ensures compilation with `rstan::stanc()` or `cmdstanr`
+- `validate_stan_code()` provides comprehensive validation using `rstan::stanc()` directly
 
 **Data Integration**:
 - `extract_trend_data_from_stanvars()` extracts time/series components 
@@ -398,7 +401,7 @@ bf(y ~ s(x) + AR(p = 1), sigma ~ s(z))
 **Stan Assembly Pipeline:**
 - `R/stan_assembly.R` - Two-stage assembly system (1400+ lines)
 - `R/stan_validation.R` - Validation framework (50+ lines)
-- `tests/testthat/test-stan-assembly-system.R` - Comprehensive test suite (60/61 tests pass)
+- `tests/testthat/test-stan-assembly-system.R` - Test suite
 
 **Architecture Documentation:**
 - `active/current-sprint.md` - Current status and achievements  

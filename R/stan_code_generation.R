@@ -122,7 +122,23 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
   checkmate::assert_list(trend_stanvars)
   
   # Combine existing stanvars with trend stanvars
-  all_stanvars <- c(obs_setup$stanvars, trend_stanvars)
+  # brms requires stanvars to be a list of stanvar objects, not concatenated vector
+  all_stanvars <- list()
+  if (!is.null(obs_setup$stanvars)) {
+    if (inherits(obs_setup$stanvars, "stanvar")) {
+      all_stanvars <- list(obs_setup$stanvars)
+    } else {
+      all_stanvars <- obs_setup$stanvars
+    }
+  }
+  if (!is.null(trend_stanvars)) {
+    if (inherits(trend_stanvars, "stanvar")) {
+      all_stanvars <- c(all_stanvars, list(trend_stanvars))
+    } else {
+      all_stanvars <- c(all_stanvars, trend_stanvars)
+    }
+  }
+  if (length(all_stanvars) == 0) all_stanvars <- NULL
   
   # Generate Stan code using brms with combined stanvars
   base_code <- try({
@@ -136,10 +152,11 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
   }, silent = TRUE)
   
   if (inherits(base_code, "try-error")) {
+    error_msg <- attr(base_code, 'condition')$message
     stop(insight::format_error(
       "Failed to generate base Stan code with trend stanvars.",
       "Check observation formula and trend stanvar compatibility.",
-      "Error: {attr(base_code, 'condition')$message}"
+      paste("Error:", error_msg)
     ))
   }
   
@@ -558,24 +575,32 @@ validate_stan_data_structure <- function(stan_data) {
 #' @return Logical indicating whether object is a valid stanvar
 #' @noRd
 is_valid_stanvar <- function(stanvar) {
+  # Handle NULL input
+  if (is.null(stanvar)) {
+    return(FALSE)
+  }
+  
   # Must be a list
   if (!is.list(stanvar)) {
     return(FALSE)
   }
   
-  # Must have name and scode components
-  required_components <- c("name", "scode")
+  # Check if it's a brms stanvar object (has required brms components)
+  required_components <- c("scode", "block")
   if (!all(required_components %in% names(stanvar))) {
     return(FALSE)
   }
   
-  # Name must be non-empty string
-  if (!is.character(stanvar$name) || length(stanvar$name) != 1 || nchar(stanvar$name) == 0) {
+  # scode must be character string (can be empty for data block stanvars)
+  if (!is.character(stanvar$scode) || length(stanvar$scode) != 1) {
     return(FALSE)
   }
   
-  # scode must be non-empty string
-  if (!is.character(stanvar$scode) || length(stanvar$scode) != 1 || nchar(stanvar$scode) == 0) {
+  # block must be valid Stan block name
+  valid_blocks <- c("data", "transformed_data", "parameters", "transformed_parameters", 
+                   "model", "generated_quantities")
+  if (!is.character(stanvar$block) || length(stanvar$block) != 1 || 
+      !stanvar$block %in% valid_blocks) {
     return(FALSE)
   }
   
@@ -794,12 +819,19 @@ prepare_stanvars_for_brms <- function(stanvars) {
   for (name in names(stanvars)) {
     stanvar <- stanvars[[name]]
     
-    if (is_valid_stanvar(stanvar)) {
+    # brms stanvars are containers - validate the actual stanvar element
+    stanvar_element <- if (inherits(stanvar, "stanvars") && length(stanvar) == 1) {
+      stanvar[[1]]
+    } else {
+      stanvar
+    }
+    
+    if (is_valid_stanvar(stanvar_element)) {
       valid_stanvars[[name]] <- stanvar
     } else {
       insight::format_warning(
         "Skipping invalid stanvar: {.field {name}}",
-        "Stanvar must have 'name' and 'scode' components."
+        "Stanvar must have valid 'scode' and 'block' components."
       )
     }
   }
