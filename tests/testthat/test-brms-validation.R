@@ -24,8 +24,8 @@ test_that("validate_obs_formula_brms rejects mvgam trend constructors", {
   )
 
   expect_error(
-    mvgam:::validate_obs_formula_brms(y ~ VAR() + GP() + x),
-    "Found: VAR\\(\\), GP\\(\\)"
+    mvgam:::validate_obs_formula_brms(y ~ VAR() + x),
+    "Found: VAR\\(\\)"
   )
 })
 

@@ -97,6 +97,82 @@ transformed parameters {
 }
 ```
 
+### 4. Factor Model Architecture: Matrix Z Patterns
+**Critical Design**: Factor models are a capability of compatible trend types, not a separate trend type
+
+**Factor Model Detection Logic**:
+- **Trigger**: Presence of `n_lv` parameter in trend specification
+- **Validation**: Only factor-compatible trend types can accept `n_lv` parameter
+- **Requirement**: `n_lv < n_series` (fewer latent variables than observed series)
+- **Compatible Trends**: AR, RW, VAR (including correlated variants)
+- **Incompatible Trends**: CAR (spatial structure), None (no dynamics)
+
+**Non-Factor Model Pattern** (no `n_lv` specified or `n_lv >= n_series`):
+```stan
+transformed data {
+  // Diagonal matrix Z for non-factor model
+  matrix[n_series, n_lv] Z = diag_matrix(rep_vector(1.0, n_lv));
+}
+
+transformed parameters {
+  matrix[n, n_series] trend;
+  
+  // Derived latent trends with no factor model
+  // Z must be diagonal matrix in transformed data
+  for (i in 1:n) {
+    for (s in 1:n_series) {
+      trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+    }
+  }
+}
+```
+
+**Factor Model Pattern** (`n_lv` specified and `n_lv < n_series`):
+```stan
+parameters {
+  // Loading matrix Z for factor model
+  matrix[n_series, n_lv] Z;
+  // Raw latent states (variances fixed to 1)
+  matrix[n, n_lv] LV_raw;
+}
+
+transformed parameters {
+  matrix[n, n_lv] LV;
+  matrix[n, n_series] trend;
+  
+  // Apply dynamics with fixed variance = 1
+  LV = LV_raw;
+  for (j in 1:n_lv) {
+    for (i in 2:n) {
+      LV[i, j] = LV[i-1, j] + LV[i, j];
+    }
+  }
+  
+  // Derived latent trends with factor model
+  // Z must be estimated in parameters
+  for (i in 1:n) {
+    for (s in 1:n_series) {
+      trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+    }
+  }
+}
+
+model {
+  // Priors for factor model innovations (variance = 1)
+  to_vector(LV_raw) ~ std_normal();
+  // Priors for loading matrix Z
+  to_vector(Z) ~ normal(0, 1);
+}
+```
+
+**Key Factor Model Requirements**:
+1. **Detection**: Factor models triggered by `n_lv < n_series` on compatible trend types
+2. **Validation**: Registry-based compatibility checking prevents invalid factor models
+3. **Variance Constraint**: Dynamic factor variances must be fixed to 1 for identifiability
+4. **Matrix Z Location**: Estimated in `parameters` block (factor model) vs `transformed data` (non-factor)
+5. **Universal Pattern**: All factor-compatible trends (AR, RW, VAR) use identical matrix Z patterns
+6. **Registration**: New trend types must explicitly declare factor compatibility in registry
+
 ## Validation Framework Principles
 
 ### 1. Context-Aware Validation

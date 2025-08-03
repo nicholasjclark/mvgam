@@ -26,6 +26,21 @@ generate_trend_injection_stanvars <- function(trend_spec, data_info) {
   checkmate::assert_list(trend_spec)
   checkmate::assert_list(data_info)
 
+  # Validate factor model compatibility if n_lv is specified
+  validate_factor_compatibility(trend_spec)
+  
+  # Additional validation for factor model requirements
+  if (!is.null(trend_spec$n_lv)) {
+    n_series <- data_info$n_series %||% 1
+    if (trend_spec$n_lv >= n_series) {
+      stop(insight::format_error(
+        "Factor models require {.field n_lv < n_series}.",
+        paste0("Got n_lv = ", trend_spec$n_lv, " and n_series = ", n_series, "."),
+        "Use fewer latent variables than observed series."
+      ))
+    }
+  }
+
   # Get trend info from registry
   trend_info <- get_trend_info(trend_spec$trend_type)
   if (is.null(trend_info)) {
@@ -51,102 +66,252 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
   n_lv <- trend_spec$n_lv %||% 1
   correlation <- trend_spec$correlation %||% FALSE
   n <- data_info$n_obs
+  n_series <- data_info$n_series %||% 1
+  
+  # Determine if this is a factor model
+  is_factor_model <- !is.null(trend_spec$n_lv) && n_lv < n_series
 
   # Initialize stanvars list
   stanvars <- list()
+  
+  # Matrix Z handling based on factor model status
+  if (is_factor_model) {
+    # Factor model: estimate Z in parameters
+    stanvars$z_matrix_factor <- stanvar(
+      name = "z_matrix_factor",
+      scode = glue::glue("
+      data {{
+        int<lower=1> n_lv;
+        int<lower=1> n_series;
+      }}
+      parameters {{
+        // Loading matrix Z for factor model
+        matrix[n_series, n_lv] Z;
+      }}
+      "),
+      block = "parameters"
+    )
+  } else {
+    # Non-factor model: diagonal Z in transformed data
+    stanvars$z_matrix_diagonal <- stanvar(
+      name = "z_matrix_diagonal",
+      scode = glue::glue("
+      data {{
+        int<lower=1> n_lv;
+        int<lower=1> n_series;
+      }}
+      transformed data {{
+        // Diagonal matrix Z for non-factor model
+        matrix[n_series, n_lv] Z = diag_matrix(rep_vector(1.0, n_lv));
+      }}
+      "),
+      block = "transformed data"
+    )
+  }
 
   if (correlation && n_lv > 1) {
     # Correlated case: RW(cor = TRUE) - multivariate approach
-    stanvars$rw_corr_data <- stanvar(
-      x = list(
-        n_lv = n_lv,
-        lv_coefs = matrix(1, nrow = n_lv, ncol = n_lv)
-      ),
-      name = "rw_corr_data",
-      scode = "
-      int<lower=1> n_lv;
-      matrix[n_lv, n_lv] lv_coefs;
-      "
-    )
-
-    stanvars$rw_corr_params <- stanvar(
-      name = "rw_corr_params",
-      scode = glue::glue("
-      parameters {{
-        // Latent variable correlations
-        cholesky_factor_corr[{n_lv}] L_Omega;
-        // Latent variable SDs
-        vector<lower=0>[{n_lv}] sigma_lv;
-        // Raw latent states for non-centered parameterization
-        matrix[n, {n_lv}] LV_raw;
-      }}
-      "),
-      block = "parameters"
-    )
-
-    stanvars$rw_corr_transformed <- stanvar(
-      name = "rw_corr_transformed",
-      scode = glue::glue("
-      transformed parameters {{
-        // Combined covariance matrix
-        matrix[{n_lv}, {n_lv}] Sigma = diag_pre_multiply(sigma_lv, L_Omega);
-        // Latent states with correlated RW
-        matrix[n, {n_lv}] LV;
-
-        // Apply correlated RW transformation
-        for (i in 1:n) {{
-          if (i == 1) {{
-            LV[i, :] = (Sigma * LV_raw[i, :]')';
-          }} else {{
-            LV[i, :] = LV[i-1, :] + (Sigma * LV_raw[i, :]')';
+    if (is_factor_model) {
+      # Factor model: fix variances to 1
+      stanvars$rw_corr_params <- stanvar(
+        name = "rw_corr_params",
+        scode = glue::glue("
+        parameters {{
+          // Latent variable correlations (variances fixed to 1)
+          cholesky_factor_corr[{n_lv}] L_Omega;
+          // Raw latent states for non-centered parameterization
+          matrix[n, {n_lv}] LV_raw;
+        }}
+        "),
+        block = "parameters"
+      )
+      
+      stanvars$rw_corr_transformed <- stanvar(
+        name = "rw_corr_transformed",
+        scode = glue::glue("
+        transformed parameters {{
+          // Latent states with correlated RW (variance = 1)
+          matrix[n, {n_lv}] LV;
+          // Derived latent trends with factor model
+          matrix[n, n_series] trend;
+  
+          // Apply correlated RW transformation with fixed variance
+          for (i in 1:n) {{
+            if (i == 1) {{
+              LV[i, :] = (L_Omega * LV_raw[i, :]')';
+            }} else {{
+              LV[i, :] = LV[i-1, :] + (L_Omega * LV_raw[i, :]')';
+            }}
+          }}
+          
+          // Compute trend using factor model pattern with Z estimated
+          for (i in 1:n) {{
+            for (s in 1:n_series) {{
+              trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+            }}
           }}
         }}
-      }}
-      "),
-      block = "transformed parameters"
-    )
+        "),
+        block = "transformed parameters"
+      )
+    } else {
+      # Non-factor model: estimate variances, diagonal Z
+      stanvars$rw_corr_params <- stanvar(
+        name = "rw_corr_params",
+        scode = glue::glue("
+        parameters {{
+          // Latent variable correlations
+          cholesky_factor_corr[{n_lv}] L_Omega;
+          // Latent variable SDs
+          vector<lower=0>[{n_lv}] sigma_lv;
+          // Raw latent states for non-centered parameterization
+          matrix[n, {n_lv}] LV_raw;
+        }}
+        "),
+        block = "parameters"
+      )
+
+      stanvars$rw_corr_transformed <- stanvar(
+        name = "rw_corr_transformed",
+        scode = glue::glue("
+        transformed parameters {{
+          // Combined covariance matrix
+          matrix[{n_lv}, {n_lv}] Sigma = diag_pre_multiply(sigma_lv, L_Omega);
+          // Latent states with correlated RW
+          matrix[n, {n_lv}] LV;
+          // Derived latent trends with no factor model
+          matrix[n, n_series] trend;
+  
+          // Apply correlated RW transformation
+          for (i in 1:n) {{
+            if (i == 1) {{
+              LV[i, :] = (Sigma * LV_raw[i, :]')';
+            }} else {{
+              LV[i, :] = LV[i-1, :] + (Sigma * LV_raw[i, :]')';
+            }}
+          }}
+          
+          // Compute trend using non-factor pattern with diagonal Z
+          for (i in 1:n) {{
+            for (s in 1:n_series) {{
+              trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+            }}
+          }}
+        }}
+        "),
+        block = "transformed parameters"
+      )
+    }
 
   } else {
     # Simple uncorrelated case: RW() - non-centered parameterization
-    stanvars$rw_simple_params <- stanvar(
-      name = "rw_simple_params",
-      scode = glue::glue("
-      parameters {{
-        // latent state SD parameters for RW
-        vector<lower=0>[{n_lv}] sigma;
-        // raw latent states for non-centered parameterization
-        matrix[n, {n_lv}] LV_raw;
-      }}
-      "),
-      block = "parameters"
-    )
-
-    stanvars$rw_simple_transformed <- stanvar(
-      name = "rw_simple_transformed",
-      scode = glue::glue("
-      transformed parameters {{
-        // latent states with non-centered parameterization
-        matrix[n, {n_lv}] LV;
-
-        // Apply non-centered RW transformation
-        LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
-        for (j in 1:{n_lv}) {{
-          for (i in 2:n) {{
-            LV[i, j] = LV[i-1, j] + LV[i, j];
+    if (is_factor_model) {
+      # Factor model: fix variances to 1
+      stanvars$rw_simple_params <- stanvar(
+        name = "rw_simple_params",
+        scode = glue::glue("
+        parameters {{
+          // Raw latent states for non-centered parameterization (variance = 1)
+          matrix[n, {n_lv}] LV_raw;
+        }}
+        "),
+        block = "parameters"
+      )
+      
+      stanvars$rw_simple_transformed <- stanvar(
+        name = "rw_simple_transformed",
+        scode = glue::glue("
+        transformed parameters {{
+          // Latent states with non-centered parameterization (variance = 1)
+          matrix[n, {n_lv}] LV;
+          // Derived latent trends with factor model
+          matrix[n, n_series] trend;
+  
+          // Apply non-centered RW transformation with fixed variance
+          LV = LV_raw;
+          for (j in 1:{n_lv}) {{
+            for (i in 2:n) {{
+              LV[i, j] = LV[i-1, j] + LV[i, j];
+            }}
+          }}
+          
+          // Compute trend using factor model pattern with Z estimated
+          for (i in 1:n) {{
+            for (s in 1:n_series) {{
+              trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+            }}
           }}
         }}
-      }}
-      "),
-      block = "transformed parameters"
-    )
+        "),
+        block = "transformed parameters"
+      )
+    } else {
+      # Non-factor model: estimate variances, diagonal Z
+      stanvars$rw_simple_params <- stanvar(
+        name = "rw_simple_params",
+        scode = glue::glue("
+        parameters {{
+          // Latent state SD parameters for RW
+          vector<lower=0>[{n_lv}] sigma;
+          // Raw latent states for non-centered parameterization
+          matrix[n, {n_lv}] LV_raw;
+        }}
+        "),
+        block = "parameters"
+      )
+  
+      stanvars$rw_simple_transformed <- stanvar(
+        name = "rw_simple_transformed",
+        scode = glue::glue("
+        transformed parameters {{
+          // Latent states with non-centered parameterization
+          matrix[n, {n_lv}] LV;
+          // Derived latent trends with no factor model
+          matrix[n, n_series] trend;
+  
+          // Apply non-centered RW transformation
+          LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
+          for (j in 1:{n_lv}) {{
+            for (i in 2:n) {{
+              LV[i, j] = LV[i-1, j] + LV[i, j];
+            }}
+          }}
+          
+          // Compute trend using non-factor pattern with diagonal Z
+          for (i in 1:n) {{
+            for (s in 1:n_series) {{
+              trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+            }}
+          }}
+        }}
+        "),
+        block = "transformed parameters"
+      )
 
-    stanvars$rw_simple_model <- stanvar(
-      name = "rw_simple_model",
+      stanvars$rw_simple_model <- stanvar(
+        name = "rw_simple_model",
+        scode = glue::glue("
+        model {{
+          // Priors for RW innovations
+          to_vector(LV_raw) ~ std_normal();
+          sigma ~ student_t(3, 0, 2.5);
+        }}
+        "),
+        block = "model"
+      )
+    }
+  }
+  
+  # Add factor model priors if applicable
+  if (is_factor_model) {
+    stanvars$factor_model_priors <- stanvar(
+      name = "factor_model_priors",
       scode = glue::glue("
       model {{
-        // priors for RW innovations
+        // Priors for factor model innovations (variance = 1)
         to_vector(LV_raw) ~ std_normal();
-        sigma ~ student_t(3, 0, 2.5);
+        // Priors for loading matrix Z
+        to_vector(Z) ~ normal(0, 1);
       }}
       "),
       block = "model"

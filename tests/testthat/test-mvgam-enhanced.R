@@ -315,30 +315,30 @@ test_that("generate_trend_stanvars processes multiple trend types", {
     trend_specs = list(
       count = structure(list(trend_type = "AR", pars = list(p = 1)), class = "mvgam_trend"),
       biomass = structure(list(trend_type = "RW", pars = list(cor = TRUE)), class = "mvgam_trend"),
-      presence = structure(list(trend_type = "GP", pars = list(k = 10)), class = "mvgam_trend")
+      presence = structure(list(trend_type = "VAR", pars = list(lags = 1)), class = "mvgam_trend")
     )
   )
   
   # Mock trend type generators
   ar_stanvars <- list(ar_code = "AR implementation")
   rw_stanvars <- list(rw_code = "RW implementation")  
-  gp_stanvars <- list(gp_code = "GP implementation")
+  var_stanvars <- list(var_code = "VAR implementation")
   
   with_mocked_bindings(
     generate_trend_type_stanvars = function(trend_spec, resp_name) {
       if (trend_spec$trend_type == "AR") ar_stanvars
       else if (trend_spec$trend_type == "RW") rw_stanvars
-      else if (trend_spec$trend_type == "GP") gp_stanvars
+      else if (trend_spec$trend_type == "VAR") var_stanvars
       else list()
     },
     {
       result <- mvgam:::generate_trend_stanvars(mv_spec)
       
       # Should combine stanvars from all trend types
-      expect_named(result, c("ar_code", "rw_code", "gp_code"))
+      expect_named(result, c("ar_code", "rw_code", "var_code"))
       expect_equal(result$ar_code, "AR implementation")
       expect_equal(result$rw_code, "RW implementation")
-      expect_equal(result$gp_code, "GP implementation")
+      expect_equal(result$var_code, "VAR implementation")
     }
   )
   
