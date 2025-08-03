@@ -25,7 +25,7 @@ generate_trend_injection_stanvars <- function(trend_spec, data_info) {
   # Validate inputs
   checkmate::assert_list(trend_spec)
   checkmate::assert_list(data_info)
-  
+
   # Get trend info from registry
   trend_info <- get_trend_info(trend_spec$trend_type)
   if (is.null(trend_info)) {
@@ -33,7 +33,7 @@ generate_trend_injection_stanvars <- function(trend_spec, data_info) {
       "Unknown trend type: {.field {trend_spec$trend_type}}"
     ))
   }
-  
+
   # Generate stanvars using the appropriate generator
   trend_info$generator(trend_spec, data_info)
 }
@@ -51,10 +51,10 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
   n_lv <- trend_spec$n_lv %||% 1
   correlation <- trend_spec$correlation %||% FALSE
   n <- data_info$n_obs
-  
+
   # Initialize stanvars list
   stanvars <- list()
-  
+
   if (correlation && n_lv > 1) {
     # Correlated case: RW(cor = TRUE) - multivariate approach
     stanvars$rw_corr_data <- stanvar(
@@ -68,7 +68,7 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
       matrix[n_lv, n_lv] lv_coefs;
       "
     )
-    
+
     stanvars$rw_corr_params <- stanvar(
       name = "rw_corr_params",
       scode = glue::glue("
@@ -83,7 +83,7 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
       "),
       block = "parameters"
     )
-    
+
     stanvars$rw_corr_transformed <- stanvar(
       name = "rw_corr_transformed",
       scode = glue::glue("
@@ -92,7 +92,7 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
         matrix[{n_lv}, {n_lv}] Sigma = diag_pre_multiply(sigma_lv, L_Omega);
         // Latent states with correlated RW
         matrix[n, {n_lv}] LV;
-        
+
         // Apply correlated RW transformation
         for (i in 1:n) {{
           if (i == 1) {{
@@ -127,7 +127,7 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
       transformed parameters {{
         // latent states with non-centered parameterization
         matrix[n, {n_lv}] LV;
-        
+
         // Apply non-centered RW transformation
         LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
         for (j in 1:{n_lv}) {{
@@ -152,7 +152,7 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
       block = "model"
     )
   }
-  
+
   return(stanvars)
 }
 
@@ -160,7 +160,7 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
 #'
 #' Generates Stan code components for vector autoregressive trends.
 #'
-#' @param trend_spec Trend specification for VAR model  
+#' @param trend_spec Trend specification for VAR model
 #' @param data_info Data information including dimensions
 #' @return List of stanvars for VAR trend
 #' @noRd
@@ -169,10 +169,10 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
   n_lv <- trend_spec$n_lv %||% 1
   lags <- trend_spec$lags %||% 1
   n <- data_info$n_obs
-  
+
   # Initialize stanvars list
   stanvars <- list()
-  
+
   # VAR data block
   stanvars$var_data <- stanvar(
     x = list(
@@ -187,10 +187,10 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
     array[n_lv, n_lv, n_lags] real lv_coefs;
     ")
   )
-  
+
   # VAR parameters
   stanvars$var_params <- stanvar(
-    name = "var_params", 
+    name = "var_params",
     scode = glue::glue("
     parameters {{
       // VAR coefficient matrices for each lag
@@ -203,7 +203,7 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
     "),
     block = "parameters"
   )
-  
+
   # VAR model block
   stanvars$var_model <- stanvar(
     name = "var_model",
@@ -217,7 +217,7 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
         }}
         LV[t, :] ~ multi_normal(mu', Sigma);
       }}
-      
+
       // Priors
       for (lag in 1:{lags}) {{
         to_vector(A[lag]) ~ normal(0, 0.5);
@@ -227,7 +227,7 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
     "),
     block = "model"
   )
-  
+
   return(stanvars)
 }
 
@@ -236,7 +236,7 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
 #' Generates Stan code components for autoregressive trends.
 #'
 #' @param trend_spec Trend specification for AR model
-#' @param data_info Data information including dimensions  
+#' @param data_info Data information including dimensions
 #' @return List of stanvars for AR trend
 #' @noRd
 generate_ar_trend_stanvars <- function(trend_spec, data_info) {
@@ -244,10 +244,10 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
   n_lv <- trend_spec$n_lv %||% 1
   lags <- trend_spec$lags %||% 1
   n <- data_info$n_obs
-  
+
   # Initialize stanvars list
   stanvars <- list()
-  
+
   # AR parameters
   stanvars$ar_params <- stanvar(
     name = "ar_params",
@@ -263,7 +263,7 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
     "),
     block = "parameters"
   )
-  
+
   # AR model block
   stanvars$ar_model <- stanvar(
     name = "ar_model",
@@ -279,7 +279,7 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
           LV[t, j] ~ normal(mu, sigma[j]);
         }}
       }}
-      
+
       // Priors
       to_vector(phi) ~ normal(0, 0.5);
       sigma ~ student_t(3, 0, 2.5);
@@ -287,7 +287,7 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
     "),
     block = "model"
   )
-  
+
   return(stanvars)
 }
 
@@ -304,10 +304,10 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
   n_lv <- trend_spec$n_lv %||% 1
   car_order <- trend_spec$car_order %||% 1
   n <- data_info$n_obs
-  
-  # Initialize stanvars list  
+
+  # Initialize stanvars list
   stanvars <- list()
-  
+
   # CAR data (adjacency structure)
   stanvars$car_data <- stanvar(
     x = list(
@@ -320,7 +320,7 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
     matrix[n_lv, n_lv] adj_matrix;
     "
   )
-  
+
   # CAR parameters
   stanvars$car_params <- stanvar(
     name = "car_params",
@@ -336,7 +336,7 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
     "),
     block = "parameters"
   )
-  
+
   # CAR model block
   stanvars$car_model <- stanvar(
     name = "car_model",
@@ -362,7 +362,7 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
           }}
         }}
       }}
-      
+
       // Priors
       tau ~ gamma(2, 1);
       rho ~ beta(1, 1);
@@ -370,7 +370,7 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
     "),
     block = "model"
   )
-  
+
   return(stanvars)
 }
 
@@ -382,147 +382,12 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
 #' @param data_info Data information including dimensions
 #' @return List of stanvars for GP trend
 #' @noRd
-generate_gp_trend_stanvars <- function(trend_spec, data_info) {
-  # Extract key parameters
-  n_lv <- trend_spec$n_lv %||% 1
-  kernel <- trend_spec$kernel %||% "squared_exponential"
-  n <- data_info$n_obs
-  
-  # Initialize stanvars list
-  stanvars <- list()
-  
-  # GP data (time points)
-  stanvars$gp_data <- stanvar(
-    x = list(
-      n_time = n,
-      time_points = 1:n
-    ),
-    name = "gp_data", 
-    scode = "
-    int<lower=1> n_time;
-    vector[n_time] time_points;
-    "
-  )
-  
-  # GP parameters
-  stanvars$gp_params <- stanvar(
-    name = "gp_params",
-    scode = glue::glue("
-    parameters {{
-      // GP hyperparameters for each latent variable
-      vector<lower=0>[{n_lv}] gp_alpha;  // marginal SD
-      vector<lower=0>[{n_lv}] gp_rho;    // length scale
-      // Latent function values
-      matrix[n, {n_lv}] LV;
-    }}
-    "),
-    block = "parameters"
-  )
-  
-  # GP model block
-  stanvars$gp_model <- stanvar(
-    name = "gp_model",
-    scode = glue::glue("
-    model {{
-      // GP process for each latent variable
-      for (j in 1:{n_lv}) {{
-        matrix[n, n] K;
-        // Compute covariance matrix
-        for (i in 1:n) {{
-          for (k in 1:n) {{
-            K[i, k] = gp_alpha[j]^2 * exp(-0.5 * ((time_points[i] - time_points[k]) / gp_rho[j])^2);
-            if (i == k) K[i, k] += 1e-6;  // numerical stability
-          }}
-        }}
-        LV[:, j] ~ multi_normal(rep_vector(0, n), K);
-      }}
-      
-      // Priors
-      gp_alpha ~ student_t(3, 0, 2.5);
-      gp_rho ~ inv_gamma(5, 5);
-    }}
-    "),
-    block = "model"
-  )
-  
-  return(stanvars)
-}
-
-#' Spline Trend Generator
-#'
-#' Generates Stan code components for penalized spline trends.
-#'
-#' @param trend_spec Trend specification for spline model
-#' @param data_info Data information including dimensions
-#' @return List of stanvars for spline trend  
-#' @noRd
-generate_spline_trend_stanvars <- function(trend_spec, data_info) {
-  # Extract key parameters
-  n_lv <- trend_spec$n_lv %||% 1
-  k_basis <- trend_spec$k_basis %||% 10
-  n <- data_info$n_obs
-  
-  # Initialize stanvars list
-  stanvars <- list()
-  
-  # Spline basis data
-  stanvars$spline_data <- stanvar(
-    x = list(
-      n_basis = k_basis,
-      basis_matrix = matrix(rnorm(n * k_basis), n, k_basis),
-      penalty_matrix = diag(k_basis)
-    ),
-    name = "spline_data",
-    scode = "
-    int<lower=1> n_basis;
-    matrix[n, n_basis] basis_matrix;
-    matrix[n_basis, n_basis] penalty_matrix;
-    "
-  )
-  
-  # Spline parameters
-  stanvars$spline_params <- stanvar(
-    name = "spline_params",
-    scode = glue::glue("
-    parameters {{
-      // Spline coefficients for each latent variable
-      matrix[{k_basis}, {n_lv}] beta_spline;
-      // Smoothing parameters
-      vector<lower=0>[{n_lv}] lambda;
-    }}
-    "),
-    block = "parameters"
-  )
-  
-  # Spline transformed parameters
-  stanvars$spline_transformed <- stanvar(
-    name = "spline_transformed", 
-    scode = glue::glue("
-    transformed parameters {{
-      // Compute smooth functions
-      matrix[n, {n_lv}] LV = basis_matrix * beta_spline;
-    }}
-    "),
-    block = "transformed parameters"
-  )
-  
-  # Spline model block
-  stanvars$spline_model <- stanvar(
-    name = "spline_model",
-    scode = glue::glue("
-    model {{
-      // Penalized spline priors
-      for (j in 1:{n_lv}) {{
-        beta_spline[:, j] ~ multi_normal(rep_vector(0, {k_basis}), 
-                                        inv(lambda[j] * penalty_matrix + diag_matrix(rep_vector(1e-6, {k_basis}))));
-      }}
-      lambda ~ gamma(2, 1);
-    }}
-    "),
-    block = "model"
-  )
-  
-  return(stanvars)
+# GP trends are handled via trend_formula, not as temporal dynamics
+generate_gp_injection_stanvars <- function(trend_spec, data_info) {
+  stop(insight::format_error(
+    "GP trends are handled via trend_formula, not as temporal dynamics.",
+    "Use: trend_formula = ~ gp(time, k = 10)..."
+  ))
 }
 
 #' Factor Trend Generator
@@ -538,10 +403,10 @@ generate_factor_trend_stanvars <- function(trend_spec, data_info) {
   n_lv <- trend_spec$n_lv %||% 2
   n_factors <- trend_spec$n_factors %||% 1
   n <- data_info$n_obs
-  
+
   # Initialize stanvars list
   stanvars <- list()
-  
+
   # Factor parameters
   stanvars$factor_params <- stanvar(
     name = "factor_params",
@@ -561,7 +426,7 @@ generate_factor_trend_stanvars <- function(trend_spec, data_info) {
     "),
     block = "parameters"
   )
-  
+
   # Factor transformed parameters
   stanvars$factor_transformed <- stanvar(
     name = "factor_transformed",
@@ -573,8 +438,8 @@ generate_factor_trend_stanvars <- function(trend_spec, data_info) {
     "),
     block = "transformed parameters"
   )
-  
-  # Factor model block  
+
+  # Factor model block
   stanvars$factor_model <- stanvar(
     name = "factor_model",
     scode = glue::glue("
@@ -586,14 +451,14 @@ generate_factor_trend_stanvars <- function(trend_spec, data_info) {
           factors[t, j] ~ normal(factors[t-1, j], sigma_factors[j]);
         }}
       }}
-      
+
       // Idiosyncratic errors
       for (j in 1:{n_lv}) {{
         for (t in 1:n) {{
           idio[t, j] ~ normal(0, sigma_idio[j]);
         }}
       }}
-      
+
       // Priors
       to_vector(lambda) ~ normal(0, 1);
       sigma_factors ~ student_t(3, 0, 2.5);
@@ -602,7 +467,7 @@ generate_factor_trend_stanvars <- function(trend_spec, data_info) {
     "),
     block = "model"
   )
-  
+
   return(stanvars)
 }
 
@@ -627,7 +492,7 @@ generate_none_trend_stanvars <- function(trend_spec, data_info) {
     forecast_function = "forecast_rw"
   ),
   VAR = list(
-    name = "Vector Autoregressive", 
+    name = "Vector Autoregressive",
     generator = generate_var_trend_stanvars,
     forecast_function = "forecast_var"
   ),
@@ -640,16 +505,6 @@ generate_none_trend_stanvars <- function(trend_spec, data_info) {
     name = "Conditional Autoregressive",
     generator = generate_car_trend_stanvars,
     forecast_function = "forecast_car"
-  ),
-  GP = list(
-    name = "Gaussian Process",
-    generator = generate_gp_trend_stanvars,
-    forecast_function = "forecast_gp"
-  ),
-  "P-spline" = list(
-    name = "Penalized Spline",
-    generator = generate_spline_trend_stanvars,
-    forecast_function = "forecast_spline"
   ),
   Factor = list(
     name = "Dynamic Factor",
@@ -691,7 +546,7 @@ validate_trend_spec <- function(trend_spec) {
   if (!is.list(trend_spec)) return(FALSE)
   if (is.null(trend_spec$trend_type)) return(FALSE)
   if (!trend_spec$trend_type %in% list_trend_types()) return(FALSE)
-  
+
   TRUE
 }
 
@@ -724,7 +579,7 @@ stanvar <- function(x = NULL, name, scode, block = NULL) {
       block <- "parameters"  # default fallback
     }
   }
-  
+
   # Use brms stanvar function with appropriate parameters
   if (is.null(x)) {
     brms::stanvar(scode = scode, block = block, name = name)
