@@ -1,7 +1,7 @@
 # Current Sprint: Registry-Based Stan Assembly (Weeks 5-6)
 
 **Status**: Week 5 in preparation
-**Goal**: Centralized trend registration system with Stan code generation  
+**Goal**: Centralized trend registration system and Stan assembly functions for complete Stan code generation and validation
 **Foundation**: Weeks 1-4 complete with proven architecture and 350+ test cases
 
 ## Immediate Objectives
@@ -10,16 +10,15 @@
 **Foundation Complete**: All Phase 1 deliverables validated
 - Single-fit dual-object system implemented and tested
 - Multiple imputation with Rubin's rules pooling operational  
-- brms integration via `backend = "mock"` confirmed (10-50x speedup)
+- brms integration via `backend = "mock"` confirmed
 - Formula validation system complete with autocorrelation separation
 - Trend dispatcher with custom registration (`register_trend_type()`) functional
 
 ### Week 5 Deliverables
-- [ ] **Validate two-stage Stan assembly** - Complete system operational with full test coverage
-- [ ] **Streamline registry functions** - No redundancy found; well-designed complementary functions
-- [ ] **Stan code matches brms exactly** - Validated via `generate_base_brms_stancode()`
-- [ ] **Parameter renaming validation** - Works across multivariate, distributional models  
-- [ ] **Stan compilation validation** - Complete framework with `rstan::stanc()` integration
+- [ ] **Validate two-stage Stan assembly** - Complete and fully test the Stan generation system
+- [ ] **Stan code matches brms exactly for non-trend models** - Validate via `generate_base_brms_stancode()`
+- [ ] **Validate parameter renaming** - Ensure this works across multivariate, distributional models  
+- [ ] **Stan compilation validation** - All models must compile using `rstan::stanc()` integration
 
 ### Week 6 Deliverables (Updated Focus)
 - [ ] **Integration testing** - Comprehensive tests covering models with full `formula` and `trend_formula` components
@@ -41,7 +40,7 @@ validate_autocor_separation() # Context-aware autocorr validation
 register_trend_type()         # Custom trend registration
 ```
 
-### Two-Stage Stan Assembly (Week 5 Focus)
+### Untested Two-Stage Stan Assembly (Week 5 Focus)
 ```r
 # Stage 1: Generate base Stan model with trend stanvars
 base_stancode <- brms::stancode(obs_formula, data, stanvars = trend_stanvars)
@@ -60,48 +59,9 @@ get_trend_info(name)                    # Retrieve trend information
 list_trend_types()                      # List all registered trends  
 validate_factor_compatibility(spec)     # Factor model validation
 ensure_registry_initialized()           # Auto-initialization
-
-# User-facing functions (R/trend_dispatcher.R)
-custom_trend(trend, tpars, ...)         # Create custom trend objects
-register_custom_trend(name, ...)        # User registration wrapper
-
-# All core trends auto-registered: AR, RW, VAR, ZMVN, PW, CAR, PWlinear, PWlogistic
 ```
 
-### Factor Model Compatibility (Already Validated)
-```r
-# Implemented constraint validation
-FACTOR_COMPATIBLE_TRENDS <- c("AR", "RW", "VAR", "ZMVN")
-FACTOR_INCOMPATIBLE_TRENDS <- c("PW", "CAR")  
-
-validate_factor_compatibility <- function(trend_type, n_lv, n_series) {
-  if (n_lv < n_series && !trend_type %in% FACTOR_COMPATIBLE_TRENDS) {
-    stop(sprintf(
-      "Trend type '%s' incompatible with factor models (n_lv < n_series)",
-      trend_type
-    ))
-  }
-}
-```
-
-### Stan Code Generation Pattern
-```r
-# Two-stage assembly following brms patterns
-generate_trend_stanvars_complete <- function(trend_obj, data_info) {
-  # Stage 1: Generate data stanvars
-  data_stanvars <- generate_trend_data_stanvars(trend_obj, data_info)
-  
-  # Stage 2: Generate code stanvars  
-  code_stanvars <- generate_trend_code_stanvars(trend_obj, data_info)
-  
-  # Stage 3: Validate no conflicts with brms
-  validate_stanvars_compatibility(c(data_stanvars, code_stanvars))
-  
-  return(c(data_stanvars, code_stanvars))
-}
-```
-
-### Missing But Necessary Utility Functions
+### Missing But Necessary Stan Code and Data Utility Functions
 - Testing structure for Stan code creation and compilation outlined in `tests/testthat/test-stan-assembly-system.R`
 - Multiple internal functions are required to ensure full Stan code is generated
 
