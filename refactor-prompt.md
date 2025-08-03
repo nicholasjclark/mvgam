@@ -34,4 +34,4 @@ Before starting work:
 4. How can I validate the implementation incrementally?
 </thinking>
 
-Please load the context files in `/active` and confirm your understanding of the current sprint objectives. Use extended thinking to build a plan to achieve the current objectives, but DO NOT write any code yet. Focus on actionable implementation steps for Stan assembly validation.
+Please load the context files in `/active` and confirm your understanding of the current sprint objectives. Use extended thinking to build a plan to achieve the current objectives. Focus on actionable implementation steps for Stan assembly validation. DO NOT write any code yet.
