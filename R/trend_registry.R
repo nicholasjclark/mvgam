@@ -106,11 +106,18 @@ validate_factor_compatibility <- function(trend_spec) {
   }
   
   # Check if trend type supports factor models
-  trend_info <- get_trend_info(trend_spec$trend_type)
+  # Handle both trend_type and trend_model field names for compatibility
+  trend_type <- trend_spec$trend_type %||% trend_spec$trend_model
+  if (is.null(trend_type)) {
+    stop(insight::format_error(
+      "trend_spec must contain {.field trend_type} or {.field trend_model} field"
+    ))
+  }
+  trend_info <- get_trend_info(trend_type)
   
   if (!trend_info$supports_factors) {
     stop(insight::format_error(
-      paste0("Factor models ({.field n_lv}) not supported for {.field ", trend_spec$trend_type, "} trends."),
+      paste0("Factor models ({.field n_lv}) not supported for {.field ", trend_type, "} trends."),
       trend_info$incompatibility_reason,
       paste0("Remove {.field n_lv} parameter or use factor-compatible trends: {.val ", paste(get_factor_compatible_trends(), collapse = ", "), "}")
     ))
@@ -167,14 +174,15 @@ get_default_incompatibility_reason <- function(name) {
 #' @noRd
 register_core_trends <- function() {
   # Factor-compatible trends (stationary dynamics work with factor structure)
-  register_trend_type("AR", supports_factors = FALSE, generate_ar_trend_stanvars)
+  register_trend_type("AR", supports_factors = TRUE, generate_ar_trend_stanvars)
   register_trend_type("RW", supports_factors = TRUE, generate_rw_trend_stanvars)
   register_trend_type("VAR", supports_factors = TRUE, generate_var_trend_stanvars)
-  register_trend_type("Factor", supports_factors = TRUE, generate_factor_trend_stanvars)
+  register_trend_type("ZMVN", supports_factors = TRUE, generate_zmvn_trend_stanvars)
   register_trend_type("None", supports_factors = FALSE, generate_none_trend_stanvars)
   
   # Factor-incompatible trends (series-specific dynamics)
   register_trend_type("CAR", supports_factors = FALSE, generate_car_trend_stanvars)
+  register_trend_type("PW", supports_factors = FALSE, generate_pw_trend_stanvars)
   
   invisible(TRUE)
 }
@@ -230,7 +238,7 @@ register_custom_trend <- function(name, supports_factors = FALSE, generator_func
 #' @return Logical indicating if registry is initialized
 #' @noRd
 is_registry_initialized <- function() {
-  core_trends <- c("AR", "RW", "VAR", "Factor", "None", "CAR")
+  core_trends <- c("AR", "RW", "VAR", "ZMVN", "None", "CAR", "PW")
   all(core_trends %in% ls(trend_registry))
 }
 

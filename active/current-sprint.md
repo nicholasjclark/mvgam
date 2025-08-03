@@ -28,12 +28,39 @@
 - **98.8% Test Pass Rate** - 81/82 tests passing with comprehensive validation framework
 
 ### Week 6 Deliverables (Updated Focus)
-- [ ] **Integration testing** - Comprehensive tests covering models with full `formula` and `trend_formula` components
+- [x] **Factor model refactoring** - Remove redundant Factor type, mark AR/RW/VAR as factor-compatible, implement consistent patterns ✅
+- [x] **Code deduplication** - Create shared utility functions for matrix Z, trend computation, and factor priors ✅
+- [x] **Comprehensive test suite expansion** - Added testing for all trend types (CAR, ZMVN, PW), factor models, and hierarchical correlations ✅
+- [ ] **Missing infrastructure functions** - Check if `combine_stan_components()` (referred to in Stan assembly tests) is already implemented in `generate_combined_stancode()`; similarly inspect `validate_stan_code()` to see if it can be used in place of `validate_combined_stancode()` for Stan assembly tests. Only write new functions if absolutely necessary
+- [ ] **Factor validation logic fixes** - Fix validation to properly allow `n_lv < n_series` factor model configurations
 - [ ] **Stan compilation validation** - Ensure all test models compile without error using `rstan::stanc()`
-- [ ] **Factor model compatibility** - Ensure factor models compile without error using `rstan::stanc()`
+- [ ] **Integration testing** - Comprehensive tests covering models with full `formula` and `trend_formula` components
 - [ ] **End-to-end model fitting tests** - Real mvgam model fitting with trend injection
 - [ ] **Performance benchmarking** - Validate <1ms registry lookup and compilation efficiency
 - [ ] **Edge case validation** - Missing data, irregular timing, complex grouping scenarios
+
+### Week 6 Priority: Factor Model Refactoring ✅ **COMPLETED**
+**Step 1: Clean Up Registry and Remove Factor Trend Type** ✅
+- ✅ Remove "Factor" trend registration from registry system
+- ✅ Update AR trend to support factors (supports_factors = TRUE)
+- ✅ Update registry initialization checks
+- ✅ Remove duplicate registry code in trend_injection_generators.R
+- ✅ Update tests to reflect AR factor compatibility
+- ✅ Add ZMVN and PW trend generators with proper factor compatibility
+- ✅ Fix validation to handle both trend_type and trend_model fields
+
+**Step 2: Implement Shared Utilities and Consistent Factor Patterns** ✅
+- ✅ Create shared utility functions: generate_matrix_z_stanvars(), generate_trend_computation_code(), generate_factor_model_priors()
+- ✅ Update all factor-compatible generators (AR, RW, VAR, ZMVN) to use shared utilities
+- ✅ Add missing matrix Z logic to AR generator
+- ✅ Ensure universal trend computation: trend[i,s] = dot_product(Z[s,:], LV[i,:]) + mu_trend[ytimes[i,s]]
+- ✅ Add comprehensive comments explaining WHY each component exists
+- ✅ Fix correlated RW factor model variance handling
+- ✅ Maintain ZMVN hierarchical correlation patterns for compatibility
+- ✅ Test coverage: 78/78 tests passing (100%)
+- ✅ **Hierarchical correlation support added** - AR, VAR, CAR, and ZMVN all support hierarchical correlations with groups/subgroups
+- ✅ **Code deduplication achieved** - Shared utility functions eliminate redundant hierarchical correlation code
+- ✅ **Universal compatibility** - All trends work with/without factor models and with/without hierarchical correlations
 
 ## Critical Implementation Patterns
 
@@ -130,8 +157,11 @@ ensure_registry_initialized()           # Auto-initialization
 - **Approach**: Two-stage validation - syntax first, then compilation
 - **Implementation**: `rstan::stanc()` validation for all generated code
 - **Performance**: Validate compilation time doesn't exceed setup gains
-- Inspect `tests/testthat/test-stan-assembly-system.R`, `R/stan_validations.R` and `R/stan_code_generation.R` and add missing utility functions as necessary
-- Re-run tests in `tests/testthat/test-stan-assembly-system.R` using r-test-runner agent and report back to user
+- ✅ **COMPLETED**: All trend types (AR, VAR, CAR, ZMVN) support hierarchical correlations and factor models
+- ✅ **COMPLETED**: Code deduplication with shared utility functions eliminates redundant patterns
+- ✅ **COMPLETED**: Comprehensive test suite expansion covering all trend types, factor models, and hierarchical correlations
+- [ ] **CURRENT PRIORITY**: Fix missing infrastructure functions (`combine_stan_components`, `validate_combined_stancode`) and factor validation logic
+- [ ] **Test Results**: 29/53 tests passing (55%), core infrastructure functions needed for full validation
 
 ### Parameter Renaming Scope (Week 5-6)
 - **Challenge**: Ensure parameter renaming works across all brms model types

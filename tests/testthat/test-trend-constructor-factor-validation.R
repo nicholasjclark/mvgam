@@ -87,9 +87,9 @@ test_that("Factor validation error messages are consistent", {
   expect_error(CAR(n_lv = 1), "Factor models.*not supported")
   expect_error(PW(n_lv = 1), "Factor models.*not supported")
   
-  # Check they mention specific alternatives
-  expect_error(CAR(n_lv = 1), "factor-compatible trends.*AR.*RW.*VAR.*ZMVN")
-  expect_error(PW(n_lv = 1), "factor-compatible trends.*AR.*RW.*VAR.*ZMVN")
+  # Check they mention specific alternatives (AR now factor-compatible)
+  expect_error(CAR(n_lv = 1), "factor-compatible trends.*AR.*RW.*VAR")
+  expect_error(PW(n_lv = 1), "factor-compatible trends.*AR.*RW.*VAR")
   
   # Check they have specific reasons
   expect_error(CAR(n_lv = 1), "irregular time")

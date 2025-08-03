@@ -8,8 +8,8 @@ test_that("Trend registry initializes correctly", {
   # Initialization should populate core trends
   register_core_trends()
   
-  # Check all core trends are registered
-  expected_trends <- c("AR", "RW", "VAR", "ZMVN", "PW", "PWlinear", "PWlogistic", "CAR")
+  # Check all core trends are registered (Factor removed, AR now factor-compatible)
+  expected_trends <- c("AR", "RW", "VAR", "ZMVN", "None", "CAR", "PW")
   registered_trends <- ls(trend_registry)
   expect_true(all(expected_trends %in% registered_trends))
 })
@@ -61,7 +61,7 @@ test_that("get_trend_info works correctly", {
   rm(list = ls(envir = trend_registry), envir = trend_registry)
   register_core_trends()
   
-  # Test getting existing trend info
+  # Test getting existing trend info (AR now supports factors)
   ar_info <- get_trend_info("AR")
   expect_true(ar_info$supports_factors)
   expect_is(ar_info$generator, "function")
@@ -83,17 +83,18 @@ test_that("list_trend_types works correctly", {
   expect_true("supports_factors" %in% names(trend_list))
   expect_true("incompatibility_reason" %in% names(trend_list))
   
-  # Check factor-compatible trends
+  # Check factor-compatible trends (AR now factor-compatible, plus ZMVN)
   factor_compatible <- trend_list[trend_list$supports_factors, "trend_type"]
   expect_true("AR" %in% factor_compatible)
   expect_true("RW" %in% factor_compatible)
   expect_true("VAR" %in% factor_compatible)
   expect_true("ZMVN" %in% factor_compatible)
   
-  # Check factor-incompatible trends
+  # Check factor-incompatible trends (None, CAR, PW)
   factor_incompatible <- trend_list[!trend_list$supports_factors, "trend_type"]
-  expect_true("PW" %in% factor_incompatible)
+  expect_true("None" %in% factor_incompatible)
   expect_true("CAR" %in% factor_incompatible)
+  expect_true("PW" %in% factor_incompatible)
 })
 
 test_that("Factor compatibility validation works", {

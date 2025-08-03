@@ -119,9 +119,10 @@ transformed parameters {
   
   // Derived latent trends with no factor model
   // Z must be diagonal matrix in transformed data
+  // mu_trend captures linear predictors from trend_formula
   for (i in 1:n) {
     for (s in 1:n_series) {
-      trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+      trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[ytimes[i, s]];
     }
   }
 }
@@ -150,9 +151,10 @@ transformed parameters {
   
   // Derived latent trends with factor model
   // Z must be estimated in parameters
+  // mu_trend captures linear predictors from trend_formula
   for (i in 1:n) {
     for (s in 1:n_series) {
-      trend[i, s] = dot_product(Z[s, :], LV[i, :]);
+      trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[ytimes[i, s]];
     }
   }
 }
@@ -170,8 +172,120 @@ model {
 2. **Validation**: Registry-based compatibility checking prevents invalid factor models
 3. **Variance Constraint**: Dynamic factor variances must be fixed to 1 for identifiability
 4. **Matrix Z Location**: Estimated in `parameters` block (factor model) vs `transformed data` (non-factor)
-5. **Universal Pattern**: All factor-compatible trends (AR, RW, VAR) use identical matrix Z patterns
-6. **Registration**: New trend types must explicitly declare factor compatibility in registry
+5. **Universal Computation**: All trends use `trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[ytimes[i, s]]`
+6. **Code Deduplication**: Shared utility functions ensure consistent patterns across trend types
+7. **Registration**: New trend types must explicitly declare factor compatibility in registry
+
+### 5. Code Deduplication for User Extensibility
+
+**Design Principle**: Eliminate redundant code patterns to simplify custom trend development
+
+**Shared Utility Functions** (`R/trend_injection_generators.R`):
+```r
+# Matrix Z generation based on factor model status
+generate_matrix_z_stanvars(is_factor_model, n_lv, n_series)
+
+# Universal trend computation pattern 
+generate_trend_computation_code(n_lv, n_series)
+
+# Factor model priors with variance constraints
+generate_factor_model_priors(is_factor_model, n_lv)
+
+# Hierarchical correlation support (NEW)
+generate_hierarchical_functions()
+generate_hierarchical_correlation_params(n_groups, n_subgroups)
+generate_hierarchical_correlation_priors(n_groups)
+```
+
+### 6. Hierarchical Correlation Architecture
+
+**Design Principle**: All trends (AR, VAR, CAR, ZMVN) support hierarchical correlations with groups and subgroups
+
+**Hierarchical Correlation Detection Logic**:
+- **Trigger**: Presence of `gr` parameter in trend specification (`trend_spec$gr != 'NA'`)
+- **Structure**: Global correlation + group-specific deviations with partial pooling
+- **Compatibility**: Works with both factor and non-factor models
+- **Universal Support**: AR, VAR, CAR, and ZMVN all use identical hierarchical patterns
+
+**Hierarchical Correlation Pattern**:
+```stan
+// Shared hierarchical correlation functions
+functions {
+  matrix combine_cholesky(matrix global_chol_cor, matrix local_chol_cor, real alpha) {
+    // Combines global and group-specific correlations with mixing parameter alpha
+  }
+}
+
+parameters {
+  // Global correlation structure (shared across all groups)
+  cholesky_factor_corr[n_subgroups] L_Omega_global;
+  // Group-specific correlation deviations  
+  array[n_groups] cholesky_factor_corr[n_subgroups] L_deviation_group;
+  // Mixing parameter for hierarchical correlation (0=local, 1=global)
+  real<lower=0, upper=1> alpha_cor;
+}
+
+model {
+  // Derived hierarchical correlation matrices
+  array[n_groups] cholesky_factor_corr[n_subgroups] L_Omega_group;
+  for (g in 1:n_groups) {
+    L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g], alpha_cor);
+  }
+  
+  // Apply group-specific correlations to trend dynamics
+  for (i in 1:n_unit) {
+    for (g in 1:n_groups) {
+      // Trend-specific dynamics with hierarchical correlation structure
+      to_vector(LV[group_unit_indices[i, g]]) ~ multi_normal_cholesky(mu, L_Omega_group[g]);
+    }
+  }
+  
+  // Hierarchical correlation priors
+  alpha_cor ~ beta(3, 2);                         // Favor global structure
+  L_Omega_global ~ lkj_corr_cholesky(1);          // Weakly informative global prior
+  for (g in 1:n_groups) {
+    L_deviation_group[g] ~ lkj_corr_cholesky(6);  // More regularized group deviations
+  }
+}
+```
+
+**Key Hierarchical Requirements**:
+1. **Universal Support**: All trends (AR, VAR, CAR, ZMVN) support hierarchical correlations
+2. **Code Deduplication**: Shared utility functions ensure consistent hierarchical patterns
+3. **Flexible Grouping**: Works with any unit variable (time, site, etc.) and grouping structure
+4. **Factor Compatibility**: Hierarchical correlations work with both factor and non-factor models
+5. **Partial Pooling**: Alpha parameter controls mixing between global and group-specific correlations
+
+**Benefits for Custom Trend Development**:
+- **Consistency**: All factor-compatible trends use identical matrix Z patterns
+- **Simplicity**: Custom trends call utility functions rather than duplicating Stan code
+- **Maintainability**: Bug fixes and improvements apply to all trend types automatically
+- **Documentation**: Utility functions contain detailed comments explaining WHY patterns exist
+
+**Custom Trend Template**:
+```r
+generate_custom_trend_stanvars <- function(trend_spec, data_info) {
+  # Extract parameters
+  n_lv <- trend_spec$n_lv %||% 1
+  n_series <- data_info$n_series %||% 1
+  is_factor_model <- !is.null(trend_spec$n_lv) && n_lv < n_series
+  
+  # Use shared utilities for consistent patterns
+  stanvars <- list()
+  stanvars <- c(stanvars, generate_matrix_z_stanvars(is_factor_model, n_lv, n_series))
+  
+  # Add custom trend-specific dynamics here
+  stanvars$custom_dynamics <- stanvar(...)
+  
+  # Use shared trend computation and priors
+  stanvars <- c(stanvars, generate_trend_computation_code(n_lv, n_series))
+  if (is_factor_model) {
+    stanvars <- c(stanvars, generate_factor_model_priors(is_factor_model, n_lv))
+  }
+  
+  return(stanvars)
+}
+```
 
 ## Validation Framework Principles
 

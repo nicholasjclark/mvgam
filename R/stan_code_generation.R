@@ -828,7 +828,9 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_spec) {
   base_stanvars <- trend_setup$stanvars %||% list()
   
   # Generate trend-specific stanvars if trend spec is provided
-  trend_stanvars <- if (!is.null(trend_spec) && !is.null(trend_spec$trend_model)) {
+  # Handle both trend_type and trend_model for compatibility
+  trend_type <- trend_spec$trend_type %||% trend_spec$trend_model
+  trend_stanvars <- if (!is.null(trend_spec) && !is.null(trend_type)) {
     # Prepare data info for trend stanvar generation
     data_info <- list(
       n_series = trend_spec$n_series %||% 1,
@@ -1226,5 +1228,117 @@ extract_trend_data_from_stanvars <- function(trend_stanvars, data) {
   }
   
   return(trend_data)
+}
+
+# Stan Component Combination Utilities
+# ====================================
+
+#' Combine Stan Components
+#' 
+#' @description
+#' Low-level utility function that combines observation Stan code, observation
+#' data, and trend stanvars into a complete Stan model specification.
+#' 
+#' This function merges stanvars into the observation code using brms stanvar
+#' injection system and combines the data components.
+#' 
+#' @param obs_code Character string containing observation model Stan code
+#' @param obs_data List containing observation model data
+#' @param trend_stanvars List of stanvar objects for trend models
+#' @return List with combined stancode, standata, and has_trends flag
+#' @noRd
+combine_stan_components <- function(obs_code, obs_data, trend_stanvars) {
+  checkmate::assert_string(obs_code, min.chars = 1)
+  checkmate::assert_list(obs_data, names = "named")
+  checkmate::assert_list(trend_stanvars)
+  
+  # Track whether trends were actually added
+  has_trends <- length(trend_stanvars) > 0
+  
+  # Start with observation code and data
+  combined_code <- obs_code
+  combined_data <- obs_data
+  
+  # If no trend stanvars, return observation model as-is
+  if (!has_trends) {
+    return(list(
+      stancode = combined_code,
+      standata = combined_data,
+      has_trends = FALSE
+    ))
+  }
+  
+  # Process each stanvar and inject into code
+  for (stanvar_name in names(trend_stanvars)) {
+    stanvar <- trend_stanvars[[stanvar_name]]
+    
+    if (is_valid_stanvar(stanvar)) {
+      # Inject stanvar code into appropriate Stan block
+      combined_code <- inject_stanvar_code(combined_code, stanvar)
+      
+      # Add stanvar data if present
+      if (!is.null(stanvar$sdata)) {
+        combined_data <- merge_stan_data(combined_data, stanvar$sdata)
+      }
+    }
+  }
+  
+  return(list(
+    stancode = combined_code,
+    standata = combined_data,
+    has_trends = has_trends
+  ))
+}
+
+#' Inject Stanvar Code into Stan Model
+#' 
+#' @description
+#' Injects a stanvar's code into the appropriate Stan block of existing code.
+#' 
+#' @param stan_code Character string containing existing Stan code
+#' @param stanvar Stanvar object to inject
+#' @return Updated Stan code with stanvar injected
+#' @noRd
+inject_stanvar_code <- function(stan_code, stanvar) {
+  checkmate::assert_string(stan_code)
+  
+  if (!is_valid_stanvar(stanvar)) {
+    return(stan_code)
+  }
+  
+  block <- stanvar$block %||% "parameters"
+  scode <- stanvar$scode %||% ""
+  
+  if (nchar(scode) == 0) {
+    return(stan_code)
+  }
+  
+  # Find the target block in Stan code
+  block_pattern <- paste0("\\b", block, "\\s*\\{")
+  
+  if (!grepl(block_pattern, stan_code)) {
+    # If block doesn't exist, append at end
+    stan_code <- paste0(stan_code, "\n", block, " {\n", scode, "\n}\n")
+  } else {
+    # Find insertion point within existing block
+    # This is a simplified implementation - more sophisticated block parsing
+    # would be needed for production use
+    
+    # For now, append to end of existing block content
+    # Find the closing brace of the target block
+    block_start <- regexpr(block_pattern, stan_code)
+    if (block_start > 0) {
+      # Simple approach: add content before the last closing brace
+      # This assumes the last } belongs to our target block (simplified)
+      last_brace <- tail(gregexpr("\\}", stan_code)[[1]], 1)
+      if (last_brace > 0) {
+        before_brace <- substr(stan_code, 1, last_brace - 1)
+        after_brace <- substr(stan_code, last_brace, nchar(stan_code))
+        stan_code <- paste0(before_brace, "\n", scode, "\n", after_brace)
+      }
+    }
+  }
+  
+  return(stan_code)
 }
 

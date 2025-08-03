@@ -13,6 +13,244 @@ compute_trend_data_info <- function(data_specs) {
   )
 }
 
+# Shared Utility Functions for Factor Model Consistency
+# These functions ensure all factor-compatible trends use identical patterns
+
+#' Generate Matrix Z Stanvars Based on Factor Model Status
+#'
+#' WHY: Factor models require estimated loading matrix Z in parameters for
+#' dimensionality reduction (n_lv < n_series). Non-factor models use diagonal
+#' Z in transformed data since each series has its own latent variable.
+#'
+#' This utility ensures consistent matrix Z patterns across all trend types,
+#' making custom trend development simpler and more maintainable.
+#'
+#' @param is_factor_model Logical indicating if this is a factor model
+#' @param n_lv Number of latent variables  
+#' @param n_series Number of observed series
+#' @return List of stanvars for matrix Z
+#' @noRd
+generate_matrix_z_stanvars <- function(is_factor_model, n_lv, n_series) {
+  stanvars <- list()
+  
+  if (is_factor_model) {
+    # Factor model: estimate Z in parameters for dimensionality reduction
+    stanvars$z_matrix_factor <- stanvar(
+      name = "z_matrix_factor",
+      scode = glue::glue("
+      data {{
+        int<lower=1> n_lv;
+        int<lower=1> n_series;
+      }}
+      parameters {{
+        // Loading matrix Z for factor model (estimated for dimensionality reduction)
+        matrix[n_series, n_lv] Z;
+      }}
+      "),
+      block = "parameters"
+    )
+  } else {
+    # Non-factor model: diagonal Z in transformed data (each series has own LV)
+    stanvars$z_matrix_diagonal <- stanvar(
+      name = "z_matrix_diagonal", 
+      scode = glue::glue("
+      data {{
+        int<lower=1> n_lv;
+        int<lower=1> n_series;
+      }}
+      transformed data {{
+        // Diagonal matrix Z for non-factor model (one-to-one series mapping)
+        matrix[n_series, n_lv] Z = diag_matrix(rep_vector(1.0, n_lv));
+      }}
+      "),
+      block = "tdata"
+    )
+  }
+  
+  return(stanvars)
+}
+
+#' Generate Universal Trend Computation Code 
+#'
+#' WHY: All trends must use the same computation pattern:
+#' trend[i,s] = dot_product(Z[s,:], LV[i,:]) + mu_trend[ytimes[i,s]]
+#' 
+#' The dot_product captures the state-space dynamics, while mu_trend captures
+#' any linear predictors from trend_formula. This universal pattern ensures
+#' consistency and makes custom trend development straightforward.
+#'
+#' @param n_lv Number of latent variables
+#' @param n_series Number of observed series  
+#' @return List of stanvars for trend computation
+#' @noRd
+generate_trend_computation_code <- function(n_lv, n_series) {
+  stanvars <- list()
+  
+  stanvars$trend_computation <- stanvar(
+    name = "trend_computation",
+    scode = glue::glue("
+    transformed parameters {{
+      // Derived latent trends using universal computation pattern
+      matrix[n, n_series] trend;
+      
+      // Universal trend computation: state-space dynamics + linear predictors
+      // dot_product captures dynamic component, mu_trend captures trend_formula
+      for (i in 1:n) {{
+        for (s in 1:n_series) {{
+          trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[ytimes[i, s]];
+        }}
+      }}
+    }}
+    "),
+    block = "tparameters"
+  )
+  
+  return(stanvars)
+}
+
+#' Generate Factor Model Priors
+#'
+#' WHY: Factor models need fixed variance=1 constraints for identifiability
+#' since the scale is captured by the loading matrix Z. Non-factor models
+#' estimate variance parameters directly.
+#'
+#' This utility handles the different prior structures required for factor
+#' vs non-factor models, ensuring proper model identification.
+#'
+#' @param is_factor_model Logical indicating if this is a factor model
+#' @param n_lv Number of latent variables
+#' @return List of stanvars for factor model priors
+#' @noRd  
+generate_factor_model_priors <- function(is_factor_model, n_lv) {
+  stanvars <- list()
+  
+  if (is_factor_model) {
+    # Factor model: fixed variance=1 for identifiability, priors for Z
+    stanvars$factor_model_priors <- stanvar(
+      name = "factor_model_priors",
+      scode = glue::glue("
+      model {{
+        // Priors for factor model innovations (variance = 1 for identifiability)
+        to_vector(LV_raw) ~ std_normal();
+        // Priors for loading matrix Z (scale captured here, not in LV)
+        to_vector(Z) ~ normal(0, 1);
+      }}
+      "),
+      block = "model"
+    )
+  }
+  
+  return(stanvars)
+}
+
+#' Generate Hierarchical Correlation Functions
+#'
+#' WHY: All trends (AR, VAR, CAR, ZMVN) need the same hierarchical correlation
+#' machinery when groups are specified. This function provides the Stan functions
+#' block code needed for combining global and group-specific correlations.
+#'
+#' Hierarchical correlations allow for partial pooling between a global correlation
+#' structure and group-specific deviations, enabling more flexible modeling of
+#' correlation patterns across different groups.
+#'
+#' @return List of stanvars containing hierarchical correlation functions
+#' @noRd
+generate_hierarchical_functions <- function() {
+  stanvars <- list()
+  
+  stanvars$hierarchical_functions <- stanvar(
+    x = NULL,
+    name = "hierarchical_functions",
+    scode = "
+    functions {
+      /* Function to compute a partially pooled correlation matrix 
+       * Combines global correlation structure with group-specific deviations
+       * alpha controls mixing: 1 = pure global, 0 = pure local
+       */
+      matrix combine_cholesky(matrix global_chol_cor, matrix local_chol_cor,
+                              real alpha) {
+        int dim = rows(local_chol_cor);
+        matrix[dim, dim] global_cor = multiply_lower_tri_self_transpose(global_chol_cor);
+        matrix[dim, dim] local_cor = multiply_lower_tri_self_transpose(local_chol_cor);
+        matrix[dim, dim] combined_chol_cor;
+        combined_chol_cor = cholesky_decompose(alpha * global_cor
+                                               + (1 - alpha) * local_cor);
+        return combined_chol_cor;
+      }
+    }
+    "
+  )
+  
+  return(stanvars)
+}
+
+#' Generate Hierarchical Correlation Parameters
+#'
+#' WHY: Hierarchical correlation models require consistent parameter structures
+#' across all trend types. This utility generates the standard hierarchical
+#' correlation parameters used by AR, VAR, CAR, and ZMVN trends.
+#'
+#' The hierarchical structure allows correlation patterns to vary by group
+#' while borrowing strength from a global correlation structure.
+#'
+#' @param n_groups Number of groups for hierarchical modeling
+#' @param n_subgroups Number of subgroups (typically n_lv)
+#' @return List of stanvars for hierarchical correlation parameters
+#' @noRd
+generate_hierarchical_correlation_params <- function(n_groups, n_subgroups) {
+  stanvars <- list()
+  
+  stanvars$hierarchical_params <- stanvar(
+    x = NULL,
+    name = "hierarchical_params",
+    scode = glue::glue("
+    parameters {{
+      // Global correlation structure (shared across all groups)
+      cholesky_factor_corr[{n_subgroups}] L_Omega_global;
+      // Group-specific correlation deviations
+      array[{n_groups}] cholesky_factor_corr[{n_subgroups}] L_deviation_group;
+      // Mixing parameter for hierarchical correlation (0=local, 1=global)
+      real<lower=0, upper=1> alpha_cor;
+    }}
+    ")
+  )
+  
+  return(stanvars)
+}
+
+#' Generate Hierarchical Correlation Priors
+#'
+#' WHY: Hierarchical correlation models require specific prior structures to
+#' ensure proper identification and reasonable shrinkage patterns. This utility
+#' provides standardized priors that work well across different trend types.
+#'
+#' The priors encourage moderate correlations globally while allowing flexibility
+#' in group-specific deviations.
+#'
+#' @param n_groups Number of groups for hierarchical modeling
+#' @return List of stanvars for hierarchical correlation priors
+#' @noRd
+generate_hierarchical_correlation_priors <- function(n_groups) {
+  stanvars <- list()
+  
+  stanvars$hierarchical_priors <- stanvar(
+    x = NULL,
+    name = "hierarchical_priors", 
+    scode = glue::glue("
+    model {{
+      // Hierarchical correlation priors
+      alpha_cor ~ beta(3, 2);                    // Favor global structure
+      L_Omega_global ~ lkj_corr_cholesky(1);     // Weakly informative global prior
+      for (g in 1:{n_groups}) {{
+        L_deviation_group[g] ~ lkj_corr_cholesky(6);  // More regularized group deviations
+      }}
+    }}
+    ")
+  )
+  
+  return(stanvars)
+}
+
 #' Generate Trend Injection Stanvars
 #'
 #' Dispatches to appropriate trend generator based on trend_spec type.
@@ -74,40 +312,8 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
   # Initialize stanvars list
   stanvars <- list()
   
-  # Matrix Z handling based on factor model status
-  if (is_factor_model) {
-    # Factor model: estimate Z in parameters
-    stanvars$z_matrix_factor <- stanvar(
-      name = "z_matrix_factor",
-      scode = glue::glue("
-      data {{
-        int<lower=1> n_lv;
-        int<lower=1> n_series;
-      }}
-      parameters {{
-        // Loading matrix Z for factor model
-        matrix[n_series, n_lv] Z;
-      }}
-      "),
-      block = "parameters"
-    )
-  } else {
-    # Non-factor model: diagonal Z in transformed data
-    stanvars$z_matrix_diagonal <- stanvar(
-      name = "z_matrix_diagonal",
-      scode = glue::glue("
-      data {{
-        int<lower=1> n_lv;
-        int<lower=1> n_series;
-      }}
-      transformed data {{
-        // Diagonal matrix Z for non-factor model
-        matrix[n_series, n_lv] Z = diag_matrix(rep_vector(1.0, n_lv));
-      }}
-      "),
-      block = "transformed data"
-    )
-  }
+  # Use shared matrix Z utility for consistent factor model patterns
+  stanvars <- c(stanvars, generate_matrix_z_stanvars(is_factor_model, n_lv, n_series))
 
   if (correlation && n_lv > 1) {
     # Correlated case: RW(cor = TRUE) - multivariate approach
@@ -132,8 +338,6 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
         transformed parameters {{
           // Latent states with correlated RW (variance = 1)
           matrix[n, {n_lv}] LV;
-          // Derived latent trends with factor model
-          matrix[n, n_series] trend;
   
           // Apply correlated RW transformation with fixed variance
           for (i in 1:n) {{
@@ -143,16 +347,9 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
               LV[i, :] = LV[i-1, :] + (L_Omega * LV_raw[i, :]')';
             }}
           }}
-          
-          // Compute trend using factor model pattern with Z estimated
-          for (i in 1:n) {{
-            for (s in 1:n_series) {{
-              trend[i, s] = dot_product(Z[s, :], LV[i, :]);
-            }}
-          }}
         }}
         "),
-        block = "transformed parameters"
+        block = "tparameters"
       )
     } else {
       # Non-factor model: estimate variances, diagonal Z
@@ -179,8 +376,6 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
           matrix[{n_lv}, {n_lv}] Sigma = diag_pre_multiply(sigma_lv, L_Omega);
           // Latent states with correlated RW
           matrix[n, {n_lv}] LV;
-          // Derived latent trends with no factor model
-          matrix[n, n_series] trend;
   
           // Apply correlated RW transformation
           for (i in 1:n) {{
@@ -190,16 +385,9 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
               LV[i, :] = LV[i-1, :] + (Sigma * LV_raw[i, :]')';
             }}
           }}
-          
-          // Compute trend using non-factor pattern with diagonal Z
-          for (i in 1:n) {{
-            for (s in 1:n_series) {{
-              trend[i, s] = dot_product(Z[s, :], LV[i, :]);
-            }}
-          }}
         }}
         "),
-        block = "transformed parameters"
+        block = "tparameters"
       )
     }
 
@@ -224,8 +412,6 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
         transformed parameters {{
           // Latent states with non-centered parameterization (variance = 1)
           matrix[n, {n_lv}] LV;
-          // Derived latent trends with factor model
-          matrix[n, n_series] trend;
   
           // Apply non-centered RW transformation with fixed variance
           LV = LV_raw;
@@ -234,16 +420,9 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
               LV[i, j] = LV[i-1, j] + LV[i, j];
             }}
           }}
-          
-          // Compute trend using factor model pattern with Z estimated
-          for (i in 1:n) {{
-            for (s in 1:n_series) {{
-              trend[i, s] = dot_product(Z[s, :], LV[i, :]);
-            }}
-          }}
         }}
         "),
-        block = "transformed parameters"
+        block = "tparameters"
       )
     } else {
       # Non-factor model: estimate variances, diagonal Z
@@ -266,8 +445,6 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
         transformed parameters {{
           // Latent states with non-centered parameterization
           matrix[n, {n_lv}] LV;
-          // Derived latent trends with no factor model
-          matrix[n, n_series] trend;
   
           // Apply non-centered RW transformation
           LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
@@ -276,16 +453,9 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
               LV[i, j] = LV[i-1, j] + LV[i, j];
             }}
           }}
-          
-          // Compute trend using non-factor pattern with diagonal Z
-          for (i in 1:n) {{
-            for (s in 1:n_series) {{
-              trend[i, s] = dot_product(Z[s, :], LV[i, :]);
-            }}
-          }}
         }}
         "),
-        block = "transformed parameters"
+        block = "tparameters"
       )
 
       stanvars$rw_simple_model <- stanvar(
@@ -302,20 +472,12 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
     }
   }
   
-  # Add factor model priors if applicable
+  # Use shared trend computation utility for universal pattern
+  stanvars <- c(stanvars, generate_trend_computation_code(n_lv, n_series))
+  
+  # Use shared factor model priors if applicable
   if (is_factor_model) {
-    stanvars$factor_model_priors <- stanvar(
-      name = "factor_model_priors",
-      scode = glue::glue("
-      model {{
-        // Priors for factor model innovations (variance = 1)
-        to_vector(LV_raw) ~ std_normal();
-        // Priors for loading matrix Z
-        to_vector(Z) ~ normal(0, 1);
-      }}
-      "),
-      block = "model"
-    )
+    stanvars <- c(stanvars, generate_factor_model_priors(is_factor_model, n_lv))
   }
 
   return(stanvars)
@@ -324,6 +486,7 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
 #' VAR Trend Generator
 #'
 #' Generates Stan code components for vector autoregressive trends.
+#' Supports factor models, hierarchical correlations, and consistent matrix Z patterns.
 #'
 #' @param trend_spec Trend specification for VAR model
 #' @param data_info Data information including dimensions
@@ -334,11 +497,20 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
   n_lv <- trend_spec$n_lv %||% 1
   lags <- trend_spec$lags %||% 1
   n <- data_info$n_obs
+  n_series <- data_info$n_series %||% 1
+  use_grouping <- !is.null(trend_spec$gr) && trend_spec$gr != 'NA'
+  unit_var <- trend_spec$unit %||% "time"
+  
+  # Determine if this is a factor model (n_lv < n_series)
+  is_factor_model <- !is.null(trend_spec$n_lv) && n_lv < n_series
 
   # Initialize stanvars list
   stanvars <- list()
+  
+  # Use shared matrix Z utility for consistent factor model patterns
+  stanvars <- c(stanvars, generate_matrix_z_stanvars(is_factor_model, n_lv, n_series))
 
-  # VAR data block
+  # VAR data block (needed for all cases)
   stanvars$var_data <- stanvar(
     x = list(
       n_lv = n_lv,
@@ -353,45 +525,159 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
     ")
   )
 
-  # VAR parameters
-  stanvars$var_params <- stanvar(
-    name = "var_params",
-    scode = glue::glue("
-    parameters {{
-      // VAR coefficient matrices for each lag
-      array[{lags}] matrix[{n_lv}, {n_lv}] A;
-      // Innovation covariance matrix
-      cov_matrix[{n_lv}] Sigma;
-      // Latent states
-      matrix[n, {n_lv}] LV;
-    }}
-    "),
-    block = "parameters"
-  )
+  if (use_grouping) {
+    # Hierarchical VAR case: VAR(p = 1, unit = site, gr = group, subgr = species)
+    n_groups <- data_info$n_groups %||% 1
+    n_subgroups <- data_info$n_subgroups %||% n_lv
 
-  # VAR model block
-  stanvars$var_model <- stanvar(
-    name = "var_model",
-    scode = glue::glue("
-    model {{
-      // VAR process
-      for (t in ({lags}+1):n) {{
-        vector[{n_lv}] mu = rep_vector(0, {n_lv});
-        for (lag in 1:{lags}) {{
-          mu += A[lag] * LV[t-lag, :]';
+    # Add shared hierarchical correlation utilities
+    stanvars <- c(stanvars, generate_hierarchical_functions())
+    stanvars <- c(stanvars, generate_hierarchical_correlation_params(n_groups, n_subgroups))
+
+    # VAR-specific parameters for hierarchical case
+    stanvars$var_hierarchical_params <- stanvar(
+      x = NULL,
+      name = "var_hierarchical_params",
+      scode = glue::glue("
+      parameters {{
+        // VAR coefficient matrices for each lag
+        array[{lags}] matrix[{n_lv}, {n_lv}] A;
+        // Latent states
+        matrix[n, {n_lv}] LV;
+      }}
+      ")
+    )
+
+    # Hierarchical VAR model implementation  
+    stanvars$var_hierarchical_model <- stanvar(
+      x = NULL,
+      name = "var_hierarchical_model",
+      scode = glue::glue("
+      model {{
+        // Derived hierarchical correlation matrices
+        array[{n_groups}] cholesky_factor_corr[{n_subgroups}] L_Omega_group;
+        for (g in 1 : {n_groups}) {{
+          L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g],
+                                              alpha_cor);
         }}
-        LV[t, :] ~ multi_normal(mu', Sigma);
-      }}
 
-      // Priors
-      for (lag in 1:{lags}) {{
-        to_vector(A[lag]) ~ normal(0, 0.5);
+        // Hierarchical VAR process with group-specific correlations
+        for (i in 1:n_{unit_var}) {{
+          for (g in 1:{n_groups}) {{
+            // VAR dynamics with hierarchical residual correlation
+            for (t in ({lags}+1):n) {{
+              vector[{n_subgroups}] mu = rep_vector(0, {n_subgroups});
+              for (lag in 1:{lags}) {{
+                mu += A[lag] * LV[t-lag, :]';
+              }}
+              to_vector(LV[group_unit_indices[i, g], t]) ~ multi_normal_cholesky(mu, L_Omega_group[g]);
+            }}
+          }}
+        }}
+
+        // VAR coefficient priors
+        for (lag in 1:{lags}) {{
+          to_vector(A[lag]) ~ normal(0, 0.5);
+        }}
       }}
-      Sigma ~ inv_wishart({n_lv} + 1, diag_matrix(rep_vector(1, {n_lv})));
-    }}
-    "),
-    block = "model"
-  )
+      ")
+    )
+
+    # Use shared hierarchical priors
+    stanvars <- c(stanvars, generate_hierarchical_correlation_priors(n_groups))
+
+  } else {
+    # Simple VAR case (no grouping)
+    if (is_factor_model) {
+      # Factor model: fixed variance in covariance, estimate Z
+      stanvars$var_params <- stanvar(
+        name = "var_params",
+        scode = glue::glue("
+        parameters {{
+          // VAR coefficient matrices for each lag
+          array[{lags}] matrix[{n_lv}, {n_lv}] A;
+          // Innovation correlation matrix (variances fixed to 1)
+          corr_matrix[{n_lv}] Omega;
+          // Latent states
+          matrix[n, {n_lv}] LV;
+        }}
+        "),
+        block = "parameters"
+      )
+
+      # VAR model block for factor case
+      stanvars$var_model <- stanvar(
+        name = "var_model",
+        scode = glue::glue("
+        model {{
+          // VAR process with fixed variance = 1
+          for (t in ({lags}+1):n) {{
+            vector[{n_lv}] mu = rep_vector(0, {n_lv});
+            for (lag in 1:{lags}) {{
+              mu += A[lag] * LV[t-lag, :]';
+            }}
+            LV[t, :] ~ multi_normal(mu', Omega);
+          }}
+
+          // Priors for factor model
+          for (lag in 1:{lags}) {{
+            to_vector(A[lag]) ~ normal(0, 0.5);
+          }}
+          Omega ~ lkj_corr(2);
+        }}
+        "),
+        block = "model"
+      )
+    } else {
+      # Non-factor model: estimate full covariance, diagonal Z
+      stanvars$var_params <- stanvar(
+        name = "var_params",
+        scode = glue::glue("
+        parameters {{
+          // VAR coefficient matrices for each lag
+          array[{lags}] matrix[{n_lv}, {n_lv}] A;
+          // Innovation covariance matrix
+          cov_matrix[{n_lv}] Sigma;
+          // Latent states
+          matrix[n, {n_lv}] LV;
+        }}
+        "),
+        block = "parameters"
+      )
+
+      # VAR model block for non-factor case
+      stanvars$var_model <- stanvar(
+        name = "var_model",
+        scode = glue::glue("
+        model {{
+          // VAR process
+          for (t in ({lags}+1):n) {{
+            vector[{n_lv}] mu = rep_vector(0, {n_lv});
+            for (lag in 1:{lags}) {{
+              mu += A[lag] * LV[t-lag, :]';
+            }}
+            LV[t, :] ~ multi_normal(mu', Sigma);
+          }}
+
+          // Priors for non-factor model
+          for (lag in 1:{lags}) {{
+            to_vector(A[lag]) ~ normal(0, 0.5);
+          }}
+          Sigma ~ inv_wishart({n_lv} + 1, diag_matrix(rep_vector(1, {n_lv})));
+        }}
+        "),
+        block = "model"
+      )
+    }
+    
+    # Use shared factor model priors if applicable
+    if (is_factor_model) {
+      stanvars <- c(stanvars, generate_factor_model_priors(is_factor_model, n_lv))
+    }
+  }
+  
+  # Use shared trend computation utility for universal pattern
+  stanvars <- c(stanvars, generate_trend_computation_code(n_lv, n_series))
 
   return(stanvars)
 }
@@ -399,6 +685,7 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
 #' AR Trend Generator
 #'
 #' Generates Stan code components for autoregressive trends.
+#' Supports factor models, hierarchical correlations, and consistent matrix Z patterns.
 #'
 #' @param trend_spec Trend specification for AR model
 #' @param data_info Data information including dimensions
@@ -409,49 +696,180 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
   n_lv <- trend_spec$n_lv %||% 1
   lags <- trend_spec$lags %||% 1
   n <- data_info$n_obs
+  n_series <- data_info$n_series %||% 1
+  use_grouping <- !is.null(trend_spec$gr) && trend_spec$gr != 'NA'
+  unit_var <- trend_spec$unit %||% "time"
+  
+  # Determine if this is a factor model (n_lv < n_series)
+  is_factor_model <- !is.null(trend_spec$n_lv) && n_lv < n_series
 
   # Initialize stanvars list
   stanvars <- list()
+  
+  # Use shared matrix Z utility for consistent factor model patterns
+  stanvars <- c(stanvars, generate_matrix_z_stanvars(is_factor_model, n_lv, n_series))
 
-  # AR parameters
-  stanvars$ar_params <- stanvar(
-    name = "ar_params",
-    scode = glue::glue("
-    parameters {{
-      // AR coefficients for each latent variable
-      matrix[{n_lv}, {lags}] phi;
-      // Innovation standard deviations
-      vector<lower=0>[{n_lv}] sigma;
-      // Latent states
-      matrix[n, {n_lv}] LV;
-    }}
-    "),
-    block = "parameters"
-  )
+  if (use_grouping) {
+    # Hierarchical AR case: AR(p = 1, unit = site, gr = group, subgr = species)
+    n_groups <- data_info$n_groups %||% 1
+    n_subgroups <- data_info$n_subgroups %||% n_lv
 
-  # AR model block
-  stanvars$ar_model <- stanvar(
-    name = "ar_model",
-    scode = glue::glue("
-    model {{
-      // AR process for each series independently
-      for (j in 1:{n_lv}) {{
-        for (t in ({lags}+1):n) {{
-          real mu = 0;
-          for (lag in 1:{lags}) {{
-            mu += phi[j, lag] * LV[t-lag, j];
-          }}
-          LV[t, j] ~ normal(mu, sigma[j]);
-        }}
+    # Add shared hierarchical correlation utilities
+    stanvars <- c(stanvars, generate_hierarchical_functions())
+    stanvars <- c(stanvars, generate_hierarchical_correlation_params(n_groups, n_subgroups))
+
+    # AR-specific parameters for hierarchical case
+    stanvars$ar_hierarchical_params <- stanvar(
+      x = NULL,
+      name = "ar_hierarchical_params",
+      scode = glue::glue("
+      parameters {{
+        // AR coefficients for each latent variable
+        matrix[{n_lv}, {lags}] phi;
+        // Latent states
+        matrix[n, {n_lv}] LV;
       }}
+      ")
+    )
 
-      // Priors
-      to_vector(phi) ~ normal(0, 0.5);
-      sigma ~ student_t(3, 0, 2.5);
-    }}
-    "),
-    block = "model"
-  )
+    # Hierarchical AR model implementation
+    stanvars$ar_hierarchical_model <- stanvar(
+      x = NULL,
+      name = "ar_hierarchical_model",
+      scode = glue::glue("
+      model {{
+        // Derived hierarchical correlation matrices
+        array[{n_groups}] cholesky_factor_corr[{n_subgroups}] L_Omega_group;
+        for (g in 1 : {n_groups}) {{
+          L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g],
+                                              alpha_cor);
+        }}
+
+        // Hierarchical AR process with group-specific correlations
+        for (i in 1:n_{unit_var}) {{
+          for (g in 1:{n_groups}) {{
+            // AR dynamics with hierarchical residual correlation
+            for (t in ({lags}+1):n) {{
+              vector[{n_subgroups}] mu = rep_vector(0, {n_subgroups});
+              for (lag in 1:{lags}) {{
+                for (j in 1:{n_lv}) {{
+                  mu[j] += phi[j, lag] * LV[t-lag, j];
+                }}
+              }}
+              to_vector(LV[group_unit_indices[i, g], t]) ~ multi_normal_cholesky(mu, L_Omega_group[g]);
+            }}
+          }}
+        }}
+
+        // AR coefficient priors
+        to_vector(phi) ~ normal(0, 0.5);
+      }}
+      ")
+    )
+
+    # Use shared hierarchical priors
+    stanvars <- c(stanvars, generate_hierarchical_correlation_priors(n_groups))
+
+  } else {
+    # Simple AR case (no grouping)
+    if (is_factor_model) {
+      # Factor model: fixed variance = 1, estimate Z
+      stanvars$ar_params <- stanvar(
+        name = "ar_params",
+        scode = glue::glue("
+        parameters {{
+          // AR coefficients for each latent variable
+          matrix[{n_lv}, {lags}] phi;
+          // Raw latent states for factor model (variance = 1)
+          matrix[n, {n_lv}] LV_raw;
+        }}
+        "),
+        block = "parameters"
+      )
+      
+      stanvars$ar_transformed <- stanvar(
+        name = "ar_transformed",
+        scode = glue::glue("
+        transformed parameters {{
+          // Apply AR dynamics with fixed variance = 1
+          matrix[n, {n_lv}] LV;
+          LV = LV_raw;
+          
+          for (j in 1:{n_lv}) {{
+            for (t in ({lags}+1):n) {{
+              real mu = 0;
+              for (lag in 1:{lags}) {{
+                mu += phi[j, lag] * LV[t-lag, j];
+              }}
+              LV[t, j] = mu + LV_raw[t, j];
+            }}
+          }}
+        }}
+        "),
+        block = "tparameters"
+      )
+    } else {
+      # Non-factor model: estimate variances, diagonal Z  
+      stanvars$ar_params <- stanvar(
+        name = "ar_params",
+        scode = glue::glue("
+        parameters {{
+          // AR coefficients for each latent variable
+          matrix[{n_lv}, {lags}] phi;
+          // Innovation standard deviations
+          vector<lower=0>[{n_lv}] sigma;
+          // Latent states
+          matrix[n, {n_lv}] LV;
+        }}
+        "),
+        block = "parameters"
+      )
+
+      # AR model block for non-factor case
+      stanvars$ar_model <- stanvar(
+        name = "ar_model",
+        scode = glue::glue("
+        model {{
+          // AR process for each series independently
+          for (j in 1:{n_lv}) {{
+            for (t in ({lags}+1):n) {{
+              real mu = 0;
+              for (lag in 1:{lags}) {{
+                mu += phi[j, lag] * LV[t-lag, j];
+              }}
+              LV[t, j] ~ normal(mu, sigma[j]);
+            }}
+          }}
+
+          // Priors for non-factor model
+          to_vector(phi) ~ normal(0, 0.5);
+          sigma ~ student_t(3, 0, 2.5);
+        }}
+        "),
+        block = "model"
+      )
+    }
+
+    # Use shared factor model priors if applicable
+    if (is_factor_model) {
+      stanvars <- c(stanvars, generate_factor_model_priors(is_factor_model, n_lv))
+      
+      # Add AR-specific priors for factor model
+      stanvars$ar_factor_priors <- stanvar(
+        name = "ar_factor_priors", 
+        scode = glue::glue("
+        model {{
+          // AR coefficient priors for factor model
+          to_vector(phi) ~ normal(0, 0.5);
+        }}
+        "),
+        block = "model"
+      )
+    }
+  }
+  
+  # Use shared trend computation utility for universal pattern
+  stanvars <- c(stanvars, generate_trend_computation_code(n_lv, n_series))
 
   return(stanvars)
 }
@@ -459,6 +877,7 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
 #' CAR Trend Generator
 #'
 #' Generates Stan code components for conditional autoregressive trends.
+#' Supports hierarchical correlations but NOT factor models (spatial structure incompatible).
 #'
 #' @param trend_spec Trend specification for CAR model
 #' @param data_info Data information including dimensions
@@ -469,11 +888,20 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
   n_lv <- trend_spec$n_lv %||% 1
   car_order <- trend_spec$car_order %||% 1
   n <- data_info$n_obs
+  n_series <- data_info$n_series %||% 1
+  use_grouping <- !is.null(trend_spec$gr) && trend_spec$gr != 'NA'
+  unit_var <- trend_spec$unit %||% "time"
+
+  # CAR does not support factor models (spatial structure incompatible)
+  is_factor_model <- FALSE
 
   # Initialize stanvars list
   stanvars <- list()
+  
+  # Use shared matrix Z utility (always diagonal for CAR)
+  stanvars <- c(stanvars, generate_matrix_z_stanvars(is_factor_model, n_lv, n_series))
 
-  # CAR data (adjacency structure)
+  # CAR data (adjacency structure - needed for all cases)
   stanvars$car_data <- stanvar(
     x = list(
       n_neighbors = 4,  # Simple 2D grid assumption
@@ -486,55 +914,137 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
     "
   )
 
-  # CAR parameters
-  stanvars$car_params <- stanvar(
-    name = "car_params",
-    scode = glue::glue("
-    parameters {{
-      // CAR precision parameter
-      real<lower=0> tau;
-      // Spatial autocorrelation
-      real<lower=0, upper=1> rho;
-      // Latent spatial states
-      matrix[n, {n_lv}] LV;
-    }}
-    "),
-    block = "parameters"
-  )
+  if (use_grouping) {
+    # Hierarchical CAR case: CAR(unit = site, gr = group, subgr = species)
+    n_groups <- data_info$n_groups %||% 1
+    n_subgroups <- data_info$n_subgroups %||% n_lv
 
-  # CAR model block
-  stanvars$car_model <- stanvar(
-    name = "car_model",
-    scode = glue::glue("
-    model {{
-      // CAR prior for spatial correlation
-      for (t in 1:n) {{
-        for (i in 1:{n_lv}) {{
-          real mu = 0;
-          real var_adj = 0;
-          // Sum over neighbors
-          for (j in 1:{n_lv}) {{
-            if (adj_matrix[i, j] > 0) {{
-              mu += adj_matrix[i, j] * LV[t, j];
-              var_adj += adj_matrix[i, j];
+    # Add shared hierarchical correlation utilities
+    stanvars <- c(stanvars, generate_hierarchical_functions())
+    stanvars <- c(stanvars, generate_hierarchical_correlation_params(n_groups, n_subgroups))
+
+    # CAR-specific parameters for hierarchical case
+    stanvars$car_hierarchical_params <- stanvar(
+      x = NULL,
+      name = "car_hierarchical_params",
+      scode = glue::glue("
+      parameters {{
+        // CAR precision parameter
+        real<lower=0> tau;
+        // Spatial autocorrelation
+        real<lower=0, upper=1> rho;
+        // Latent spatial states
+        matrix[n, {n_lv}] LV;
+      }}
+      ")
+    )
+
+    # Hierarchical CAR model implementation
+    stanvars$car_hierarchical_model <- stanvar(
+      x = NULL,
+      name = "car_hierarchical_model",
+      scode = glue::glue("
+      model {{
+        // Derived hierarchical correlation matrices
+        array[{n_groups}] cholesky_factor_corr[{n_subgroups}] L_Omega_group;
+        for (g in 1 : {n_groups}) {{
+          L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g],
+                                              alpha_cor);
+        }}
+
+        // Hierarchical CAR process with group-specific correlations
+        for (i in 1:n_{unit_var}) {{
+          for (g in 1:{n_groups}) {{
+            // CAR spatial correlation with hierarchical residual correlation
+            for (t in 1:n) {{
+              vector[{n_subgroups}] spatial_mu = rep_vector(0, {n_subgroups});
+              
+              // Compute spatial means for CAR process
+              for (j in 1:{n_lv}) {{
+                real mu = 0;
+                real var_adj = 0;
+                for (k in 1:{n_lv}) {{
+                  if (adj_matrix[j, k] > 0) {{
+                    mu += adj_matrix[j, k] * LV[t, k];
+                    var_adj += adj_matrix[j, k];
+                  }}
+                }}
+                if (var_adj > 0) {{
+                  spatial_mu[j] = rho * mu / var_adj;
+                }}
+              }}
+              
+              // Apply CAR with hierarchical correlation structure
+              to_vector(LV[group_unit_indices[i, g], t]) ~ multi_normal_cholesky(spatial_mu, 
+                                                                                 L_Omega_group[g] / sqrt(tau));
             }}
           }}
-          if (var_adj > 0) {{
-            mu = rho * mu / var_adj;
-            LV[t, i] ~ normal(mu, sqrt(1.0 / (tau * var_adj)));
-          }} else {{
-            LV[t, i] ~ normal(0, sqrt(1.0 / tau));
+        }}
+
+        // CAR parameter priors
+        tau ~ gamma(2, 1);
+        rho ~ beta(1, 1);
+      }}
+      ")
+    )
+
+    # Use shared hierarchical priors
+    stanvars <- c(stanvars, generate_hierarchical_correlation_priors(n_groups))
+
+  } else {
+    # Simple CAR case (no grouping)
+    stanvars$car_params <- stanvar(
+      name = "car_params",
+      scode = glue::glue("
+      parameters {{
+        // CAR precision parameter
+        real<lower=0> tau;
+        // Spatial autocorrelation
+        real<lower=0, upper=1> rho;
+        // Latent spatial states
+        matrix[n, {n_lv}] LV;
+      }}
+      "),
+      block = "parameters"
+    )
+
+    # CAR model block for simple case
+    stanvars$car_model <- stanvar(
+      name = "car_model",
+      scode = glue::glue("
+      model {{
+        // CAR prior for spatial correlation
+        for (t in 1:n) {{
+          for (i in 1:{n_lv}) {{
+            real mu = 0;
+            real var_adj = 0;
+            // Sum over neighbors
+            for (j in 1:{n_lv}) {{
+              if (adj_matrix[i, j] > 0) {{
+                mu += adj_matrix[i, j] * LV[t, j];
+                var_adj += adj_matrix[i, j];
+              }}
+            }}
+            if (var_adj > 0) {{
+              mu = rho * mu / var_adj;
+              LV[t, i] ~ normal(mu, sqrt(1.0 / (tau * var_adj)));
+            }} else {{
+              LV[t, i] ~ normal(0, sqrt(1.0 / tau));
+            }}
           }}
         }}
-      }}
 
-      // Priors
-      tau ~ gamma(2, 1);
-      rho ~ beta(1, 1);
-    }}
-    "),
-    block = "model"
-  )
+        // Priors
+        tau ~ gamma(2, 1);
+        rho ~ beta(1, 1);
+      }}
+      "),
+      block = "model"
+    )
+  }
+  
+  # Use shared trend computation utility for universal pattern
+  stanvars <- c(stanvars, generate_trend_computation_code(n_lv, n_series))
 
   return(stanvars)
 }
@@ -555,79 +1065,169 @@ generate_gp_injection_stanvars <- function(trend_spec, data_info) {
   ))
 }
 
-#' Factor Trend Generator
+# Factor trend generator removed - factor models are now a capability of compatible trend types (AR, RW, VAR)
+# Factor models are detected by n_lv < n_series on compatible trends, not as a separate trend type
+
+#' ZMVN Trend Generator
 #'
-#' Generates Stan code components for dynamic factor trends.
+#' Generates Stan code components for zero-mean multivariate normal trends.
 #'
-#' @param trend_spec Trend specification for factor model
+#' @param trend_spec Trend specification for ZMVN model
 #' @param data_info Data information including dimensions
-#' @return List of stanvars for factor trend
+#' @return List of stanvars for ZMVN trend
 #' @noRd
-generate_factor_trend_stanvars <- function(trend_spec, data_info) {
+generate_zmvn_trend_stanvars <- function(trend_spec, data_info) {
+  # Extract key parameters following original ZMVN pattern
+  n_lv <- trend_spec$n_lv %||% data_info$n_lv %||% data_info$n_series %||% 1
+  n <- data_info$n_obs
+  n_series <- data_info$n_series %||% 1
+  use_grouping <- !is.null(trend_spec$gr) && trend_spec$gr != 'NA'
+  unit_var <- trend_spec$unit %||% "time"
+  
+  # Determine if this is a factor model (n_lv < n_series)
+  is_factor_model <- !is.null(trend_spec$n_lv) && n_lv < n_series
+
+  # Initialize stanvars list
+  stanvars <- list()
+  
+  # Use shared matrix Z utility for consistent factor model patterns
+  stanvars <- c(stanvars, generate_matrix_z_stanvars(is_factor_model, n_lv, n_series))
+
+  if (use_grouping) {
+    # Hierarchical ZMVN case: ZMVN(unit = site, gr = group, subgr = species)
+    n_groups <- data_info$n_groups %||% 1
+    n_subgroups <- data_info$n_subgroups %||% n_lv
+
+    # Add shared hierarchical correlation utilities
+    stanvars <- c(stanvars, generate_hierarchical_functions())
+    stanvars <- c(stanvars, generate_hierarchical_correlation_params(n_groups, n_subgroups))
+
+    # ZMVN-specific parameters for hierarchical case
+    stanvars$zmvn_hierarchical_params <- stanvar(
+      x = NULL,
+      name = "zmvn_hierarchical_params",
+      scode = glue::glue("
+      parameters {{
+        // Latent states for ZMVN
+        matrix[n, {n_lv}] LV;
+      }}
+      ")
+    )
+
+    # Hierarchical ZMVN model implementation
+    stanvars$zmvn_hierarchical_model <- stanvar(
+      x = NULL,
+      name = "zmvn_hierarchical_model",
+      scode = glue::glue("
+      model {{
+        // Derived hierarchical correlation matrices
+        array[{n_groups}] cholesky_factor_corr[{n_subgroups}] L_Omega_group;
+        for (g in 1 : {n_groups}) {{
+          L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g],
+                                              alpha_cor);
+        }}
+
+        // ZMVN residual correlation by {unit_var}
+        for (i in 1:n_{unit_var}) {{
+          for (g in 1:{n_groups}) {{
+            to_vector(LV[group_unit_indices[i, g]]) ~ multi_normal_cholesky(rep_vector(0, {n_subgroups}),
+                                                                             L_Omega_group[g]);
+          }}
+        }}
+      }}
+      ")
+    )
+
+    # Use shared hierarchical priors
+    stanvars <- c(stanvars, generate_hierarchical_correlation_priors(n_groups))
+
+  } else {
+    # Simple ZMVN case: ZMVN(unit = site, subgr = species)
+    stanvars$zmvn_simple_params <- stanvar(
+      x = NULL,
+      name = "zmvn_simple_params",
+      scode = glue::glue("
+      parameters {{
+        // correlation matrix for ZMVN
+        cholesky_factor_corr[{n_lv}] L_Omega;
+        // Latent states for ZMVN
+        matrix[n, {n_lv}] LV;
+      }}
+      ")
+    )
+
+    stanvars$zmvn_simple_model <- stanvar(
+      x = NULL,
+      name = "zmvn_simple_model",
+      scode = glue::glue("
+      model {{
+        // Simple ZMVN residual correlation by {unit_var}
+        L_Omega ~ lkj_corr_cholesky(2);
+        for (i in 1:n_{unit_var}) {{
+          to_vector(LV[{unit_var}_indices[i]]) ~ multi_normal_cholesky(rep_vector(0, {n_lv}), L_Omega);
+        }}
+      }}
+      ")
+    )
+  }
+  
+  # Use shared trend computation utility for universal pattern
+  stanvars <- c(stanvars, generate_trend_computation_code(n_lv, n_series))
+  
+  # Use shared factor model priors if applicable (only for factor models)
+  if (is_factor_model) {
+    stanvars <- c(stanvars, generate_factor_model_priors(is_factor_model, n_lv))
+  }
+
+  return(stanvars)
+}
+
+#' PW Trend Generator
+#'
+#' Generates Stan code components for piecewise trends.
+#'
+#' @param trend_spec Trend specification for PW model
+#' @param data_info Data information including dimensions
+#' @return List of stanvars for PW trend
+#' @noRd
+generate_pw_trend_stanvars <- function(trend_spec, data_info) {
   # Extract key parameters
-  n_lv <- trend_spec$n_lv %||% 2
-  n_factors <- trend_spec$n_factors %||% 1
+  n_lv <- trend_spec$n_lv %||% 1
+  n_changepoints <- trend_spec$n_changepoints %||% 1
   n <- data_info$n_obs
 
   # Initialize stanvars list
   stanvars <- list()
 
-  # Factor parameters
-  stanvars$factor_params <- stanvar(
-    name = "factor_params",
+  # PW parameters
+  stanvars$pw_params <- stanvar(
+    name = "pw_params",
     scode = glue::glue("
     parameters {{
-      // Factor loadings
-      matrix[{n_lv}, {n_factors}] lambda;
-      // Common factors
-      matrix[n, {n_factors}] factors;
-      // Idiosyncratic errors
-      matrix[n, {n_lv}] idio;
-      // Factor innovation SDs
-      vector<lower=0>[{n_factors}] sigma_factors;
-      // Idiosyncratic SDs
-      vector<lower=0>[{n_lv}] sigma_idio;
+      // Changepoint locations
+      vector<lower=1, upper=n>[{n_changepoints}] changepoints;
+      // Trend levels for each segment
+      matrix[{n_changepoints}+1, {n_lv}] levels;
+      // Innovation variance
+      vector<lower=0>[{n_lv}] sigma;
     }}
     "),
     block = "parameters"
   )
 
-  # Factor transformed parameters
-  stanvars$factor_transformed <- stanvar(
-    name = "factor_transformed",
-    scode = glue::glue("
-    transformed parameters {{
-      // Latent variables as factor model
-      matrix[n, {n_lv}] LV = factors * lambda' + idio;
-    }}
-    "),
-    block = "transformed parameters"
-  )
-
-  # Factor model block
-  stanvars$factor_model <- stanvar(
-    name = "factor_model",
+  # PW model block
+  stanvars$pw_model <- stanvar(
+    name = "pw_model",
     scode = glue::glue("
     model {{
-      // Factor dynamics (RW)
-      for (j in 1:{n_factors}) {{
-        factors[1, j] ~ normal(0, sigma_factors[j]);
-        for (t in 2:n) {{
-          factors[t, j] ~ normal(factors[t-1, j], sigma_factors[j]);
-        }}
-      }}
-
-      // Idiosyncratic errors
-      for (j in 1:{n_lv}) {{
-        for (t in 1:n) {{
-          idio[t, j] ~ normal(0, sigma_idio[j]);
-        }}
-      }}
-
-      // Priors
-      to_vector(lambda) ~ normal(0, 1);
-      sigma_factors ~ student_t(3, 0, 2.5);
-      sigma_idio ~ student_t(3, 0, 2.5);
+      // Priors for changepoints (uniform over time)
+      changepoints ~ uniform(1, n);
+      
+      // Priors for levels
+      to_vector(levels) ~ normal(0, 1);
+      
+      // Prior for innovation variance
+      sigma ~ student_t(3, 0, 2.5);
     }}
     "),
     block = "model"
@@ -648,57 +1248,8 @@ generate_none_trend_stanvars <- function(trend_spec, data_info) {
   list()  # No trend components needed
 }
 
-# Trend Registry
-#' @noRd
-.trend_registry <- list(
-  RW = list(
-    name = "Random Walk",
-    generator = generate_rw_trend_stanvars,
-    forecast_function = "forecast_rw"
-  ),
-  VAR = list(
-    name = "Vector Autoregressive",
-    generator = generate_var_trend_stanvars,
-    forecast_function = "forecast_var"
-  ),
-  AR = list(
-    name = "Autoregressive",
-    generator = generate_ar_trend_stanvars,
-    forecast_function = "forecast_ar"
-  ),
-  CAR = list(
-    name = "Conditional Autoregressive",
-    generator = generate_car_trend_stanvars,
-    forecast_function = "forecast_car"
-  ),
-  Factor = list(
-    name = "Dynamic Factor",
-    generator = generate_factor_trend_stanvars,
-    forecast_function = "forecast_factor"
-  ),
-  None = list(
-    name = "No Trend",
-    generator = generate_none_trend_stanvars,
-    forecast_function = "forecast_none"
-  )
-)
-
-#' Get Trend Information from Registry
-#'
-#' @param trend_type Character string identifying trend type
-#' @return List with trend information or NULL if not found
-#' @noRd
-get_trend_info <- function(trend_type) {
-  .trend_registry[[trend_type]]
-}
-
-#' List Available Trend Types
-#'
-#' @return Character vector of available trend type names
-#' @noRd
-list_trend_types <- function() {
-  names(.trend_registry)
-}
+# Note: Trend registry functionality moved to R/trend_registry.R
+# This avoids duplicate registry definitions and centralizes all trend registration
 
 #' Validate Trend Specification
 #'
@@ -735,11 +1286,17 @@ stanvar <- function(x = NULL, name, scode, block = NULL) {
     if (grepl("parameters\\s*\\{", scode)) {
       block <- "parameters"
     } else if (grepl("transformed parameters\\s*\\{", scode)) {
-      block <- "transformed parameters"
+      block <- "tparameters"
+    } else if (grepl("transformed data\\s*\\{", scode)) {
+      block <- "tdata"
     } else if (grepl("model\\s*\\{", scode)) {
       block <- "model"
     } else if (grepl("generated quantities\\s*\\{", scode)) {
-      block <- "generated quantities"
+      block <- "genquant"
+    } else if (grepl("data\\s*\\{", scode)) {
+      block <- "data"
+    } else if (grepl("functions\\s*\\{", scode)) {
+      block <- "functions"
     } else {
       block <- "parameters"  # default fallback
     }

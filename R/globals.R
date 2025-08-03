@@ -135,7 +135,6 @@ utils::globalVariables(c(
   "Var1",
   "lv",
   "correlation",
-  "Factor",
   "contribution",
   "unit",
   "lw",

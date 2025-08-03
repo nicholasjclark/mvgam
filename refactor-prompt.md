@@ -12,9 +12,10 @@ You are an expert R package developer working on a critical refactoring project.
 <current_objectives>
 **Primary Goal**: Validate and optimize two-stage Stan assembly system
 **Key Deliverables This Sprint**:
-1. Confirm that the complete, generated Stan code matches brms Stan code **exactly** when no mvgam additions are present, apart from the mvgam header comments
-2. Ensure parameter renaming works across brms model types (multivariate, distributional)
-3. Validate all complete Stan files will compile correctly with `rstan::stanc()` for all trend types and with a variety of brms model types (multivariate, distributional, using `s()` and `gp()` effects)
+1. Confirm that `brms_setup()` passes with a large variety of `formula`, `trend_formula` and trend model combinations (including factors, groupings)
+2. Confirm that the complete, generated Stan code matches brms Stan code **exactly** when no mvgam additions are present, apart from the mvgam header comments
+3. Ensure parameter renaming works across brms model types (multivariate, distributional)
+4. Validate all complete Stan files will compile correctly with `rstan::stanc()` for all trend types and with a variety of brms model types (multivariate, distributional, using `s()` and `gp()` effects)
 
 **Success Criteria**: All generated Stan code compiles cleanly and integrates seamlessly with brms
 </current_objectives>
@@ -29,10 +30,9 @@ You are an expert R package developer working on a critical refactoring project.
 <thinking>
 Before starting work:
 1. What specific brms integration task am I working on?
-2. How does this connect to the validated foundation from Weeks 1-4?
-3. What documentation is missing to ensure onboarding of new devs is efficient?
+2. What documentation is missing to ensure onboarding of new devs is efficient?
 3. What are the potential blockers for Stan code compilation?
-4. How can I validate the implementation incrementally?
+4. How can I implement the current objectives incrementally?
 </thinking>
 
 Please load the context files in `/active` and confirm your understanding of the current sprint objectives. Use extended thinking to build a plan to achieve the current objectives. Focus on actionable implementation steps for Stan assembly validation. DO NOT write any code yet.

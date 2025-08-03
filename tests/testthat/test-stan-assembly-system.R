@@ -127,10 +127,9 @@ test_that("trend injection generators produce valid output", {
     series_var = "series"
   )
   
-  # Test RW generator
+  # Test RW generator (non-factor model, no n_lv specified)
   rw_spec <- list(
     trend_type = "RW",
-    n_lv = 1,
     correlation = FALSE
   )
   
@@ -138,40 +137,42 @@ test_that("trend injection generators produce valid output", {
   expect_type(rw_stanvars, "list")
   expect_gt(length(rw_stanvars), 0)
   
-  # Test VAR generator
+  # Test VAR generator (for valid factor model, need n_series > n_lv)
+  data_info_multivariate <- list(n_obs = 50, n_series = 3, series_var = "series")
   var_spec <- list(
     trend_type = "VAR",
-    n_lv = 2,
+    n_lv = 2,  # Valid factor model: n_lv < n_series (2 < 3)
     lags = 1
   )
   
-  var_stanvars <- mvgam:::generate_trend_injection_stanvars(var_spec, data_info)
+  var_stanvars <- mvgam:::generate_trend_injection_stanvars(var_spec, data_info_multivariate)
   expect_type(var_stanvars, "list")
   expect_gt(length(var_stanvars), 0)
 })
 
 test_that("trend generators handle different specifications", {
-  data_info <- list(n_obs = 50, n_series = 1, series_var = "series")
+  # Use multivariate data for factor model tests
+  data_info_factor <- list(n_obs = 50, n_series = 4, series_var = "series")
   
-  # Test correlated RW
+  # Test correlated RW with valid factor model
   rw_corr_spec <- list(
     trend_type = "RW",
-    n_lv = 3,
+    n_lv = 3,  # Valid factor model: n_lv < n_series (3 < 4)
     correlation = TRUE
   )
   
-  rw_corr_stanvars <- mvgam:::generate_trend_injection_stanvars(rw_corr_spec, data_info)
+  rw_corr_stanvars <- mvgam:::generate_trend_injection_stanvars(rw_corr_spec, data_info_factor)
   expect_type(rw_corr_stanvars, "list")
   expect_gt(length(rw_corr_stanvars), 0)
   
-  # Test AR generator
+  # Test AR generator with valid factor model
   ar_spec <- list(
     trend_type = "AR",
-    n_lv = 2,
+    n_lv = 2,  # Valid factor model: n_lv < n_series (2 < 4)
     lags = 2
   )
   
-  ar_stanvars <- mvgam:::generate_trend_injection_stanvars(ar_spec, data_info)
+  ar_stanvars <- mvgam:::generate_trend_injection_stanvars(ar_spec, data_info_factor)
   expect_type(ar_stanvars, "list")
   expect_gt(length(ar_stanvars), 0)
 })
@@ -677,4 +678,204 @@ test_that("system handles complex trend specifications", {
   
   # Should contain correlation-specific code
   expect_match(complex_result$stancode, "(cholesky|correlation|L_Omega)")
+})
+
+# Comprehensive tests for all trend types and new features
+test_that("CAR trend generator works correctly", {
+  data_info <- list(n_obs = 50, n_series = 3, series_var = "series")
+  
+  # Test simple CAR (factor models not supported for CAR)
+  car_spec <- list(
+    trend_type = "CAR",
+    n_lv = 3
+  )
+  car_stanvars <- mvgam:::generate_trend_injection_stanvars(car_spec, data_info)
+  expect_type(car_stanvars, "list")
+  expect_gt(length(car_stanvars), 0)
+  expect_true(any(grepl("car", names(car_stanvars), ignore.case = TRUE)))
+  
+  # Test hierarchical CAR
+  car_hierarchical_spec <- list(
+    trend_type = "CAR",
+    n_lv = 3,
+    gr = "group",
+    unit = "site"
+  )
+  car_hier_stanvars <- mvgam:::generate_trend_injection_stanvars(car_hierarchical_spec, 
+    c(data_info, list(n_groups = 2, n_subgroups = 3)))
+  expect_type(car_hier_stanvars, "list")
+  expect_gt(length(car_hier_stanvars), 0)
+  expect_true(any(grepl("hierarchical", names(car_hier_stanvars), ignore.case = TRUE)))
+})
+
+test_that("ZMVN trend generator works correctly", {
+  data_info <- list(n_obs = 50, n_series = 4, series_var = "series")
+  
+  # Test simple ZMVN
+  zmvn_spec <- list(
+    trend_type = "ZMVN",
+    n_lv = 2
+  )
+  zmvn_stanvars <- mvgam:::generate_trend_injection_stanvars(zmvn_spec, data_info)
+  expect_type(zmvn_stanvars, "list")
+  expect_gt(length(zmvn_stanvars), 0)
+  expect_true(any(grepl("zmvn", names(zmvn_stanvars), ignore.case = TRUE)))
+  
+  # Test hierarchical ZMVN
+  zmvn_hierarchical_spec <- list(
+    trend_type = "ZMVN",
+    n_lv = 2,
+    gr = "group",
+    unit = "site"
+  )
+  zmvn_hier_stanvars <- mvgam:::generate_trend_injection_stanvars(zmvn_hierarchical_spec, 
+    c(data_info, list(n_groups = 3, n_subgroups = 2)))
+  expect_type(zmvn_hier_stanvars, "list")
+  expect_gt(length(zmvn_hier_stanvars), 0)
+  expect_true(any(grepl("hierarchical", names(zmvn_hier_stanvars), ignore.case = TRUE)))
+})
+
+test_that("PW trend generator works correctly", {
+  data_info <- list(n_obs = 50, n_series = 2, series_var = "series")
+  
+  # Test simple PW 
+  pw_spec <- list(
+    trend_type = "PW",
+    n_lv = 2,
+    n_changepoints = 2
+  )
+  pw_stanvars <- mvgam:::generate_trend_injection_stanvars(pw_spec, data_info)
+  expect_type(pw_stanvars, "list")
+  expect_gt(length(pw_stanvars), 0)
+  expect_true(any(grepl("pw", names(pw_stanvars), ignore.case = TRUE)))
+})
+
+test_that("Factor model support works for all compatible trends", {
+  # Test with n_lv < n_series (valid factor model)
+  data_info <- list(n_obs = 50, n_series = 4, series_var = "series")
+  
+  # Test AR with factor model
+  ar_factor_spec <- list(
+    trend_type = "AR",
+    n_lv = 2,  # n_lv < n_series
+    lags = 1
+  )
+  ar_factor_stanvars <- mvgam:::generate_trend_injection_stanvars(ar_factor_spec, data_info)
+  expect_type(ar_factor_stanvars, "list")
+  expect_gt(length(ar_factor_stanvars), 0)
+  expect_true(any(grepl("z_matrix", names(ar_factor_stanvars), ignore.case = TRUE)))
+  
+  # Test RW with factor model
+  rw_factor_spec <- list(
+    trend_type = "RW",
+    n_lv = 3,  # n_lv < n_series
+    correlation = TRUE
+  )
+  rw_factor_stanvars <- mvgam:::generate_trend_injection_stanvars(rw_factor_spec, data_info)
+  expect_type(rw_factor_stanvars, "list")
+  expect_gt(length(rw_factor_stanvars), 0)
+  expect_true(any(grepl("z_matrix", names(rw_factor_stanvars), ignore.case = TRUE)))
+  
+  # Test VAR with factor model
+  var_factor_spec <- list(
+    trend_type = "VAR",
+    n_lv = 2,  # n_lv < n_series
+    lags = 1
+  )
+  var_factor_stanvars <- mvgam:::generate_trend_injection_stanvars(var_factor_spec, data_info)
+  expect_type(var_factor_stanvars, "list")
+  expect_gt(length(var_factor_stanvars), 0)
+  expect_true(any(grepl("z_matrix", names(var_factor_stanvars), ignore.case = TRUE)))
+  
+  # Test ZMVN with factor model
+  zmvn_factor_spec <- list(
+    trend_type = "ZMVN", 
+    n_lv = 3   # n_lv < n_series
+  )
+  zmvn_factor_stanvars <- mvgam:::generate_trend_injection_stanvars(zmvn_factor_spec, data_info)
+  expect_type(zmvn_factor_stanvars, "list")
+  expect_gt(length(zmvn_factor_stanvars), 0)
+  expect_true(any(grepl("z_matrix", names(zmvn_factor_stanvars), ignore.case = TRUE)))
+})
+
+test_that("Hierarchical correlation support works for all trends", {
+  data_info <- list(n_obs = 50, n_series = 4, series_var = "series", 
+                   n_groups = 2, n_subgroups = 3)
+  
+  # Test AR with hierarchical correlations (valid factor model)
+  ar_hier_spec <- list(
+    trend_type = "AR",
+    n_lv = 3,  # Valid factor model: n_lv < n_series (3 < 4)
+    gr = "group",
+    unit = "site"
+  )
+  ar_hier_stanvars <- mvgam:::generate_trend_injection_stanvars(ar_hier_spec, data_info)
+  expect_type(ar_hier_stanvars, "list")
+  expect_gt(length(ar_hier_stanvars), 0)
+  expect_true(any(grepl("hierarchical", names(ar_hier_stanvars), ignore.case = TRUE)))
+  
+  # Test VAR with hierarchical correlations
+  var_hier_spec <- list(
+    trend_type = "VAR",
+    n_lv = 3,
+    gr = "group", 
+    unit = "site"
+  )
+  var_hier_stanvars <- mvgam:::generate_trend_injection_stanvars(var_hier_spec, data_info)
+  expect_type(var_hier_stanvars, "list")
+  expect_gt(length(var_hier_stanvars), 0)
+  expect_true(any(grepl("hierarchical", names(var_hier_stanvars), ignore.case = TRUE)))
+})
+
+test_that("Universal trend computation pattern is used", {
+  data_info <- list(n_obs = 50, n_series = 4, series_var = "series")
+  
+  trend_types <- c("AR", "RW", "VAR", "ZMVN")
+  
+  for (trend_type in trend_types) {
+    spec <- list(
+      trend_type = trend_type,
+      n_lv = 3  # Valid factor model: n_lv < n_series (3 < 4)
+    )
+    stanvars <- mvgam:::generate_trend_injection_stanvars(spec, data_info)
+    expect_type(stanvars, "list")
+    expect_gt(length(stanvars), 0)
+    
+    # Check for universal trend computation pattern
+    expect_true(any(grepl("trend_computation", names(stanvars), ignore.case = TRUE)))
+  }
+})
+
+test_that("Shared utility functions work correctly", {
+  # Test matrix Z generation
+  z_factor <- mvgam:::generate_matrix_z_stanvars(TRUE, 2, 4)
+  expect_type(z_factor, "list")
+  expect_gt(length(z_factor), 0)
+  
+  z_non_factor <- mvgam:::generate_matrix_z_stanvars(FALSE, 3, 3) 
+  expect_type(z_non_factor, "list")
+  expect_gt(length(z_non_factor), 0)
+  
+  # Test trend computation generation
+  trend_comp <- mvgam:::generate_trend_computation_code(2, 3)
+  expect_type(trend_comp, "list")
+  expect_gt(length(trend_comp), 0)
+  
+  # Test factor model priors
+  factor_priors <- mvgam:::generate_factor_model_priors(TRUE, 2)
+  expect_type(factor_priors, "list")
+  expect_gt(length(factor_priors), 0)
+  
+  # Test hierarchical functions
+  hier_funcs <- mvgam:::generate_hierarchical_functions()
+  expect_type(hier_funcs, "list")
+  expect_gt(length(hier_funcs), 0)
+  
+  hier_params <- mvgam:::generate_hierarchical_correlation_params(2, 3)
+  expect_type(hier_params, "list")
+  expect_gt(length(hier_params), 0)
+  
+  hier_priors <- mvgam:::generate_hierarchical_correlation_priors(2)
+  expect_type(hier_priors, "list")
+  expect_gt(length(hier_priors), 0)
 })
