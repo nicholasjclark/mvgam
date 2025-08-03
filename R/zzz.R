@@ -73,6 +73,7 @@ mvgam_attach <- function() {
 #' @param libname Library name  
 #' @param pkgname Package name
 .onLoad <- function(libname, pkgname) {
-  # Any namespace-level initialization can go here
+  # Initialize trend registry with core trend types
+  ensure_registry_initialized()
   invisible()
 }

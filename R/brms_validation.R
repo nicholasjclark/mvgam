@@ -29,6 +29,49 @@ NULL
 # Null-coalescing operator helper
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
+#' Validate brms Formula Structure
+#'
+#' @description
+#' Validates that a formula is compatible with brms and mvgam integration.
+#' Returns a list with validation results instead of stopping on errors.
+#'
+#' @param formula Formula to validate
+#' @return List with 'valid' (logical) and 'issues' (character vector) components
+#' @noRd
+validate_brms_formula <- function(formula) {
+  issues <- character(0)
+  
+  # Check if formula is NULL
+  if (is.null(formula)) {
+    return(list(valid = FALSE, issues = "Formula cannot be NULL"))
+  }
+  
+  # Check formula class
+  valid_classes <- c("formula", "brmsformula", "bform")
+  if (!any(sapply(valid_classes, function(cls) inherits(formula, cls)))) {
+    issues <- c(issues, paste(
+      "Formula must be of class:", paste(valid_classes, collapse = ", "),
+      "but got:", class(formula)[1]
+    ))
+  }
+  
+  # Try to validate with existing brms validation function
+  validation_result <- try({
+    validate_obs_formula_brms(formula)
+    NULL  # No issues if validation succeeds
+  }, silent = TRUE)
+  
+  if (inherits(validation_result, "try-error")) {
+    error_msg <- attr(validation_result, "condition")$message
+    issues <- c(issues, paste("brms validation failed:", error_msg))
+  }
+  
+  return(list(
+    valid = length(issues) == 0,
+    issues = issues
+  ))
+}
+
 # Utility function to extract formula string using brms pattern
 formula2str_mvgam <- function(formula, space = "trim") {
   if (is.null(formula)) {

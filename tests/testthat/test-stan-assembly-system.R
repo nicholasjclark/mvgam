@@ -444,3 +444,126 @@ test_that("brace matching utility works", {
   empty_input <- mvgam:::find_matching_brace(character(0), integer(0))
   expect_length(empty_input, 0)
 })
+
+# Week 6 Deliverable Tests: Production Stan Code Generation Validation
+# ====================================================================
+
+test_that("production generate_combined_stancode works with observation-only model", {
+  data <- setup_test_data()$simple_univariate
+  
+  # Create observation setup using production brms setup function
+  obs_setup <- mvgam:::setup_brms_lightweight(
+    formula = y ~ x,
+    data = data,
+    family = gaussian()
+  )
+  
+  # Test production function with observation-only (no trends)
+  combined_result <- mvgam:::generate_combined_stancode(
+    obs_setup = obs_setup,
+    trend_setup = NULL,
+    trend_spec = NULL,
+    validate = FALSE,
+    silent = 2
+  )
+  
+  # Validate structure of production result
+  expect_type(combined_result, "list")
+  expect_named(combined_result, c("stancode", "standata", "has_trends"))
+  expect_false(combined_result$has_trends)
+  expect_type(combined_result$stancode, "character")
+  expect_gt(nchar(combined_result$stancode), 100)
+  expect_match(combined_result$stancode, "model\\s*\\{")
+})
+
+test_that("production generate_combined_stancode works with trend models", {
+  data <- setup_test_data()$simple_univariate
+  
+  # Create observation setup
+  obs_setup <- mvgam:::setup_brms_lightweight(
+    formula = y ~ x,
+    data = data,
+    family = gaussian()
+  )
+  
+  # Create trend setup (simplified trend model)
+  trend_setup <- mvgam:::setup_brms_lightweight(
+    formula = ~ 1,  # Minimal trend formula
+    data = data,
+    family = gaussian()
+  )
+  
+  # Create basic trend specification
+  trend_spec <- list(
+    trend_model = "RW",
+    time_var = "time",
+    series_var = "series",
+    n_series = 1
+  )
+  
+  # Test production function with both observation and trend components
+  combined_result <- mvgam:::generate_combined_stancode(
+    obs_setup = obs_setup,
+    trend_setup = trend_setup,
+    trend_spec = trend_spec,
+    validate = FALSE,  # Skip validation to focus on generation
+    silent = 2
+  )
+  
+  # Validate structure with trends
+  expect_type(combined_result, "list")
+  expect_true(combined_result$has_trends)
+  expect_type(combined_result$stancode, "character")
+  expect_gt(nchar(combined_result$stancode), 100)
+  expect_type(combined_result$standata, "list")
+})
+
+test_that("production Stan code validation works", {
+  data <- setup_test_data()$simple_univariate
+  
+  # Create simple observation setup
+  obs_setup <- mvgam:::setup_brms_lightweight(
+    formula = y ~ x,
+    data = data,
+    family = gaussian()
+  )
+  
+  # Generate observation-only Stan code
+  combined_result <- mvgam:::generate_combined_stancode(
+    obs_setup = obs_setup,
+    trend_setup = NULL,
+    trend_spec = NULL,
+    validate = TRUE,  # Enable validation
+    silent = 2
+  )
+  
+  # Verify validation worked
+  expect_type(combined_result$stancode, "character")
+  expect_match(combined_result$stancode, "data\\s*\\{")
+  expect_match(combined_result$stancode, "parameters\\s*\\{")
+  expect_match(combined_result$stancode, "model\\s*\\{")
+  
+  # Test direct validation function
+  validation_result <- mvgam:::validate_stan_code(
+    combined_result$stancode,
+    backend = "rstan",
+    silent = 2
+  )
+  
+  expect_type(validation_result, "character")
+  expect_gt(nchar(validation_result), 100)
+})
+
+test_that("production data setup structures work correctly", {
+  data <- setup_test_data()
+  
+  # Test multivariate data structure
+  expect_true(nrow(data$multivariate) > 30)
+  expect_true("series" %in% names(data$multivariate))
+  expect_true(length(unique(data$multivariate$series)) > 1)
+  
+  # Test distributional data structure
+  expect_true("z" %in% names(data$distributional))
+  expect_type(data$distributional$z, "double")
+  expect_true(nrow(data$distributional) > 15)
+})

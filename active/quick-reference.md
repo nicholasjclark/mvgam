@@ -160,15 +160,10 @@ transformed parameters {
 }
 ```
 
-## Performance Achievements ✅
-
-### Validated Performance (Week 5 Testing)
-- **Registry dispatch**: ✅ Sub-millisecond trend type lookup confirmed
-- **Stan assembly**: ✅ Two-stage system with minimal overhead
-- **Validation framework**: ✅ 60/61 comprehensive tests pass in <30 seconds
-- **brms compatibility**: ✅ Perfect integration with `backend = "mock"` (10-50x speedup)
-
-### Next Phase Benchmarking (Week 6)
+### Next Phase Benchmarking (Week 5)
+- **Registry dispatch**: Sub-millisecond trend type lookup confirmed
+- **Stan assembly**: Two-stage system with minimal overhead
+- **Validation framework**: Comprehensive tests should all pass
 - **Registry lookup**: Validate <1ms overhead under load
 - **Compilation efficiency**: Stan code generation speed vs. brms baseline
 - **Memory usage**: Stanvar memory footprint analysis
@@ -245,10 +240,9 @@ bf(y ~ s(x) + AR(p = 1), sigma ~ s(z))
 - `planning/full-timeline.md` - Complete project timeline
 
 ### Next Phase Priority (Week 6)
-1. **Registry Auto-initialization**: Add `ensure_registry_initialized()` to package startup
-2. **End-to-end Integration**: Real mvgam model fitting with trend injection
-3. **Performance Benchmarking**: Registry lookup speed and compilation efficiency
-4. **Edge Case Testing**: Missing data, irregular timing, complex grouping
+1. **End-to-end Integration**: Real mvgam model fitting with trend injection
+2. **Performance Benchmarking**: Registry lookup speed and compilation efficiency
+3. **Edge Case Testing**: Missing data, irregular timing, complex grouping
 
 ### Quick Start for Extensions
 ```r
