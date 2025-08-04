@@ -49,11 +49,6 @@ terms (i.e. \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, \code{dynamic()},
 ensure that each factor captures a different axis of variation. See the
 example below as an illustration}
 
-\item{knots}{An optional \code{list} containing user specified knot values for
-basis construction. For most bases the user simply supplies the knots to be
-used, which must match up with the \code{k} value supplied. Different terms can
-use different numbers of knots, unless they share a covariate.}
-
 \item{factor_knots}{An optional \code{list} containing user specified knot
 values to be used for basis construction of any smooth terms in
 \code{factor_formula}. For most bases the user simply supplies the knots to be
@@ -64,10 +59,6 @@ numbers of knots, unless they share a covariate}
 \item{data}{A \code{dataframe} or \code{list} containing the model response
 variable and covariates required by the GAM \code{formula} and
 \code{factor_formula} objects}
-
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same
-variables as in \code{data}. If included, observations in variable \code{y} will be
-set to \code{NA} when fitting the model so that posterior simulations can be obtained.}
 
 \item{family}{\code{family} specifying the observation family for the
 outcomes. Currently supported families are:
@@ -98,11 +89,6 @@ explanations}
 different response units in \code{data} (usually \code{'species'} in a JSDM).
 Defaults to \code{series} to be consistent with other \code{mvgam} models}
 
-\item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family} has additional
-family-specific observation parameters (e.g., variance components, dispersion
-parameters), these will be shared across all outcome variables. Useful when
-multiple outcomes share properties. Default is \code{FALSE}.}
-
 \item{priors}{An optional \code{data.frame} with prior definitions (in Stan
 syntax) or, preferentially, a vector containing objects of class
 \code{brmsprior} (see. \code{\link[brms]{prior}} for details). See
@@ -112,65 +98,11 @@ distributions}
 \item{n_lv}{\code{integer} the number of latent factors to use for modelling
 residual associations. Cannot be \verb{> n_species}. Defaults arbitrarily to \code{2}}
 
-\item{backend}{Character string naming the package for Stan model fitting.
-Options are \code{"cmdstanr"} (default) or \code{"rstan"}. Can be set globally via
-\code{"brms.backend"} option. See https://mc-stan.org/rstan/ and
-https://mc-stan.org/cmdstanr/ for details.}
-
-\item{algorithm}{Character string naming the estimation approach:
-\itemize{
-\item \code{"sampling"}: MCMC (default)
-\item \code{"meanfield"}: Variational inference with factorized normal distributions
-\item \code{"fullrank"}: Variational inference with multivariate normal distribution
-\item \code{"laplace"}: Laplace approximation (cmdstanr only)
-\item \code{"pathfinder"}: Pathfinder algorithm (cmdstanr only)
-}
-
-Can be set globally via \code{"brms.algorithm"} option. Limited testing suggests
-\code{"meanfield"} performs best among non-MCMC approximations for dynamic GAMs.}
-
-\item{control}{Named \code{list} for controlling sampler behaviour. Valid elements
-include \code{max_treedepth}, \code{adapt_delta} and \code{init}.}
-
-\item{chains}{\code{integer} specifying the number of parallel chains for the model.
-Ignored for variational inference algorithms.}
-
-\item{burnin}{\code{integer} specifying the number of warmup iterations to tune
-sampling algorithms. Ignored for variational inference algorithms.}
-
-\item{samples}{\code{integer} specifying the number of post-warmup iterations for
-sampling the posterior distribution.}
-
-\item{thin}{Thinning interval for monitors. Ignored for variational inference
-algorithms.}
-
-\item{parallel}{\code{logical} specifying whether to use multiple cores for parallel
-MCMC simulation. If \code{TRUE}, uses \code{min(c(chains, parallel::detectCores() - 1))} cores.}
-
 \item{threads}{\code{integer} Experimental option to use multithreading for
 within-chain parallelisation in \code{Stan}. We recommend its use only if
 you are experienced with \code{Stan}'s \code{reduce_sum} function and have a
 slow running model that cannot be sped up by any other means. Currently
 works for all families when using \pkg{cmdstanr} as the backend}
-
-\item{silent}{Verbosity level between \code{0} and \code{2}. If \code{1} (default), most
-informational messages are suppressed. If \code{2}, even more messages are
-suppressed. Sampling progress is still printed - set \code{refresh = 0} to
-disable. For \code{backend = "rstan"}, also set \code{open_progress = FALSE} to
-prevent additional progress bars.}
-
-\item{run_model}{\code{logical}. If \code{FALSE}, the model is not fitted but instead
-the function returns the model file and the data/initial values needed to
-fit the model outside of \code{mvgam}.}
-
-\item{return_model_data}{\code{logical}. If \code{TRUE}, the list of data needed to fit
-the model is returned, along with initial values for smooth and AR parameters,
-once the model is fitted. Helpful for users who wish to modify the model file
-to add other stochastic elements. Default is \code{FALSE} unless \code{run_model == FALSE}.}
-
-\item{residuals}{\code{logical}. Whether to compute series-level randomized quantile
-residuals. Default is \code{TRUE}. Set to \code{FALSE} to save time and reduce object
-size (can add later using \link{add_residuals}).}
 
 \item{...}{Other arguments to pass to \link{mvgam}}
 }

@@ -2,7 +2,7 @@
 #'
 #' @description
 #' Complete Stan code generation and validation pipeline for mvgam-brms
-#' integration. This file consolidates the two-stage assembly system, 
+#' integration. This file consolidates the two-stage assembly system,
 #' trend-specific Stan code generators, and validation framework.
 #'
 #' @section Architecture:
@@ -19,7 +19,7 @@
 # because it allows mvgam to extend brms models without modifying brms
 # internals. Stage 1 leverages brms' robust model compilation, while Stage 2
 # adds mvgam-specific trend dynamics through stanvars injection.#' @noRd
-generate_combined_stancode <- function(obs_setup, trend_setup = NULL, 
+generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
                                       trend_spec = NULL, backend = "rstan",
                                       validate = TRUE, silent = 1) {
   checkmate::assert_list(obs_setup, names = "named")
@@ -28,74 +28,74 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
   checkmate::assert_choice(backend, c("rstan", "cmdstanr"))
   checkmate::assert_flag(validate)
   checkmate::assert_number(silent)
-  
+
   # If no trend specification, return observation model as-is
   if (is.null(trend_setup) || is.null(trend_spec)) {
     insight::format_warning(
       "No trend specification provided.",
       "Returning observation model without trend components."
     )
-    
+
     return(list(
       stancode = obs_setup$stancode,
       standata = obs_setup$standata,
       has_trends = FALSE
     ))
   }
-  
+
   # Stage 1: Extract trend stanvars from brms setup
   if (silent < 2) {
     message("Stage 1: Extracting trend stanvars from brms setup...")
   }
-  
+
   trend_stanvars <- extract_trend_stanvars_from_setup(trend_setup, trend_spec)
-  
+
   # Generate base observation Stan code with trend stanvars
   base_stancode <- generate_base_stancode_with_stanvars(
-    obs_setup, 
-    trend_stanvars, 
+    obs_setup,
+    trend_stanvars,
     backend = backend,
     silent = silent
   )
-  
+
   # Stage 2: Modify observation linear predictor with trend injection
   if (silent < 2) {
     message("Stage 2: Injecting trend into observation linear predictor...")
   }
-  
+
   combined_stancode <- inject_trend_into_linear_predictor(
-    base_stancode, 
-    trend_stanvars, 
+    base_stancode,
+    trend_stanvars,
     trend_spec
   )
-  
+
   # Combine Stan data from both models
   combined_standata <- combine_stan_data(obs_setup$standata, trend_setup$standata)
-  
+
   # Validate final Stan code if requested
   if (validate) {
     if (silent < 2) {
       message("Validating combined Stan code...")
     }
-    
+
     validated_code <- validate_stan_code(
-      combined_stancode, 
-      backend = backend, 
+      combined_stancode,
+      backend = backend,
       silent = silent
     )
-    
+
     combined_stancode <- validated_code
   }
-  
+
   # Apply any necessary autoformatting
   if (exists(".autoformat", envir = asNamespace("mvgam"))) {
     combined_stancode <- mvgam:::.autoformat(
-      combined_stancode, 
-      backend = backend, 
+      combined_stancode,
+      backend = backend,
       silent = silent >= 1
     )
   }
-  
+
   return(list(
     stancode = combined_stancode,
     standata = combined_standata,
@@ -106,22 +106,22 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
 }
 
 #' Generate Base Stan Code with Stanvars
-#' 
+#'
 #' @description
 #' Generates base brms Stan code incorporating trend stanvars.
 #' Uses brms::make_stancode with injected stanvars.
-#' 
+#'
 #' @param obs_setup List containing observation model setup
 #' @param trend_stanvars List of trend stanvars to inject
 #' @param backend Character string specifying backend
 #' @param silent Numeric indicating verbosity level
 #' @return Character string of base Stan code with stanvars
 #' @noRd
-generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars, 
+generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
                                                 backend = "rstan", silent = 1) {
   checkmate::assert_list(obs_setup)
   checkmate::assert_list(trend_stanvars)
-  
+
   # Combine existing stanvars with trend stanvars
   # brms requires stanvars to be a list of stanvar objects, not concatenated vector
   all_stanvars <- list()
@@ -140,7 +140,7 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
     }
   }
   if (length(all_stanvars) == 0) all_stanvars <- NULL
-  
+
   # Generate Stan code using brms with combined stanvars
   base_code <- try({
     brms::make_stancode(
@@ -151,7 +151,7 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
       prior = obs_setup$prior
     )
   }, silent = TRUE)
-  
+
   if (inherits(base_code, "try-error")) {
     error_msg <- attr(base_code, 'condition')$message
     stop(insight::format_error(
@@ -160,15 +160,15 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
       paste("Error:", error_msg)
     ))
   }
-  
+
   return(base_code)
 }
 
 #' Combine Stan Data
-#' 
+#'
 #' @description
 #' Combines Stan data from observation and trend models, handling conflicts.
-#' 
+#'
 #' @param obs_data List containing observation model Stan data
 #' @param trend_data List containing trend model Stan data
 #' @return List of combined Stan data
@@ -176,33 +176,33 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
 combine_stan_data <- function(obs_data, trend_data) {
   checkmate::assert_list(obs_data)
   checkmate::assert_list(trend_data)
-  
+
   # Start with observation data as base
   combined_data <- obs_data
-  
+
   # Add trend-specific data elements
   trend_only_names <- setdiff(names(trend_data), names(obs_data))
   combined_data[trend_only_names] <- trend_data[trend_only_names]
-  
+
   # Handle conflicts by preferring trend data for trend-related elements
   trend_priority_patterns <- c("^trend_", "^n_trend", "^ar_", "^var_", "^rw_")
-  
+
   for (pattern in trend_priority_patterns) {
     matching_names <- grep(pattern, names(trend_data), value = TRUE)
     combined_data[matching_names] <- trend_data[matching_names]
   }
-  
+
   # Validate combined data consistency
   validate_combined_standata(combined_data, obs_data, trend_data)
-  
+
   return(combined_data)
 }
 
 #' Validate Combined Stan Data
-#' 
+#'
 #' @description
 #' Validates that combined Stan data is consistent and contains required elements.
-#' 
+#'
 #' @param combined_data List of combined Stan data
 #' @param obs_data List of observation Stan data
 #' @param trend_data List of trend Stan data
@@ -212,19 +212,19 @@ validate_combined_standata <- function(combined_data, obs_data, trend_data) {
   checkmate::assert_list(combined_data, names = "named")
   checkmate::assert_list(obs_data, names = "named")
   checkmate::assert_list(trend_data, names = "named")
-  
+
   # Check that essential observation data elements are preserved
   essential_obs <- c("N", "K", "y", "X")
   missing_obs <- setdiff(essential_obs, names(combined_data))
   missing_obs <- missing_obs[missing_obs %in% names(obs_data)]
-  
+
   if (length(missing_obs) > 0) {
     stop(insight::format_error(
       "Essential observation data elements missing from combined data:",
       paste(missing_obs, collapse = ", ")
     ))
   }
-  
+
   # Check for dimensional consistency
   if ("N" %in% names(combined_data) && "n" %in% names(combined_data)) {
     if (combined_data$N != combined_data$n) {
@@ -234,7 +234,7 @@ validate_combined_standata <- function(combined_data, obs_data, trend_data) {
       )
     }
   }
-  
+
   # Check that trend data makes sense
   if ("n_series" %in% names(combined_data)) {
     if (combined_data$n_series < 1) {
@@ -244,15 +244,15 @@ validate_combined_standata <- function(combined_data, obs_data, trend_data) {
       ))
     }
   }
-  
+
   invisible(TRUE)
 }
 
 #' Create Stanvar Objects
-#' 
+#'
 #' @description
 #' Helper function to create brms stanvar objects for trend injection.
-#' 
+#'
 #' @param x Data object to include in Stan model
 #' @param name Character string name for the object in Stan
 #' @param scode Character string Stan code type declaration
@@ -264,7 +264,7 @@ stanvar <- function(x, name, scode = "data") {
       "Package {.pkg brms} is required for stanvar creation."
     ))
   }
-  
+
   # Use brms::stanvar if available
   if (exists("stanvar", where = asNamespace("brms"))) {
     return(brms::stanvar(x = x, name = name, scode = scode))
@@ -282,13 +282,13 @@ stanvar <- function(x, name, scode = "data") {
 }
 
 #' Integration with Enhanced mvgam Function
-#' 
+#'
 #' @description
 #' Integration point for enhanced mvgam function to use two-stage assembly.
 #' Includes time series validation to ensure data compatibility.
-#' 
+#'
 #' @param obs_setup Observation model setup from setup_brms_lightweight
-#' @param trend_setup Trend model setup from setup_brms_lightweight  
+#' @param trend_setup Trend model setup from setup_brms_lightweight
 #' @param trend_spec Parsed trend specification
 #' @param data Original data for validation
 #' @param backend Stan backend to use
@@ -296,15 +296,15 @@ stanvar <- function(x, name, scode = "data") {
 #' @param silent Verbosity level
 #' @return List ready for mvgam model fitting
 #' @noRd
-prepare_mvgam_stancode <- function(obs_setup, trend_setup, trend_spec, 
-                                  data = NULL, backend = "rstan", 
+prepare_mvgam_stancode <- function(obs_setup, trend_setup, trend_spec,
+                                  data = NULL, backend = "rstan",
                                   validate = TRUE, silent = 1) {
-  
+
   # Validate time series structure if data provided and trends specified
   if (!is.null(data) && !is.null(trend_spec)) {
     validate_time_series_for_trends(data, trend_spec, silent = silent)
   }
-  
+
   # Generate combined Stan code and data
   stan_components <- generate_combined_stancode(
     obs_setup = obs_setup,
@@ -314,7 +314,7 @@ prepare_mvgam_stancode <- function(obs_setup, trend_setup, trend_spec,
     validate = validate,
     silent = silent
   )
-  
+
   # Return in format expected by mvgam fitting functions
   return(list(
     model_code = stan_components$stancode,
@@ -327,11 +327,11 @@ prepare_mvgam_stancode <- function(obs_setup, trend_setup, trend_spec,
 }
 
 #' Validate Time Series Structure for Trends
-#' 
+#'
 #' @description
 #' Ensures time series data is compatible with specified trend models.
 #' Leverages existing mvgam validation functions.
-#' 
+#'
 #' @param data Data to validate (data.frame or list)
 #' @param trend_spec Trend specification containing trend model info
 #' @param silent Verbosity level
@@ -340,10 +340,10 @@ prepare_mvgam_stancode <- function(obs_setup, trend_setup, trend_spec,
 validate_time_series_for_trends <- function(data, trend_spec, silent = 1) {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_list(trend_spec)
-  
+
   # Extract trend model type for validation
   trend_model <- trend_spec$type %||% "None"
-  
+
   # Use existing mvgam validation function
   # This will check for proper time/series structure
   validated_data <- try({
@@ -355,7 +355,7 @@ validate_time_series_for_trends <- function(data, trend_spec, silent = 1) {
       check_times = TRUE
     )
   }, silent = TRUE)
-  
+
   if (inherits(validated_data, "try-error")) {
     stop(insight::format_error(
       "Time series validation failed for trend model '{trend_model}'.",
@@ -363,7 +363,7 @@ validate_time_series_for_trends <- function(data, trend_spec, silent = 1) {
       "Error: {attr(validated_data, 'condition')$message}"
     ))
   }
-  
+
   # Additional brms-specific validations for time series
   if (trend_model != "None") {
     # Ensure regular time intervals for State-Space models
@@ -371,19 +371,19 @@ validate_time_series_for_trends <- function(data, trend_spec, silent = 1) {
       check_regular_time_intervals(data, silent = silent)
     }
   }
-  
+
   if (silent < 2) {
     message("Time series structure validated for trend model: ", trend_model)
   }
-  
+
   invisible(TRUE)
 }
 
 #' Check Regular Time Intervals
-#' 
+#'
 #' @description
 #' Ensures time series has regular sampling intervals for State-Space models.
-#' 
+#'
 #' @param data Data to check
 #' @param silent Verbosity level
 #' @return Invisible TRUE if valid, stops with error if invalid
@@ -392,7 +392,7 @@ check_regular_time_intervals <- function(data, silent = 1) {
   if (!"time" %in% names(data)) {
     return(invisible(TRUE))  # Will be caught by main validation
   }
-  
+
   # Check for regular intervals within each series
   if ("series" %in% names(data)) {
     data %>%
@@ -402,9 +402,9 @@ check_regular_time_intervals <- function(data, silent = 1) {
         regular = length(unique(diff(sort(unique(time))))) <= 1,
         .groups = "drop"
       ) -> time_checks
-    
+
     irregular_series <- time_checks$series[!time_checks$regular]
-    
+
     if (length(irregular_series) > 0) {
       stop(insight::format_error(
         "Irregular time intervals detected in series: {paste(irregular_series, collapse = ', ')}",
@@ -423,7 +423,7 @@ check_regular_time_intervals <- function(data, silent = 1) {
       ))
     }
   }
-  
+
   invisible(TRUE)
 }
 
@@ -431,23 +431,23 @@ check_regular_time_intervals <- function(data, silent = 1) {
 # ========================================
 
 #' Extract Time Data Components
-#' 
+#'
 #' @description
 #' Extracts time-related data components from a dataset for Stan models.
-#' 
+#'
 #' @param data Data frame containing time series data
 #' @return List with time components or empty list if no time data found
 #' @noRd
 extract_time_data <- function(data) {
   checkmate::assert_data_frame(data)
-  
+
   if (!"time" %in% names(data)) {
     return(list())
   }
-  
+
   time_vals <- data$time
   unique_times <- sort(unique(time_vals))
-  
+
   return(list(
     time = unique_times,
     n_time = length(unique_times)
@@ -455,23 +455,23 @@ extract_time_data <- function(data) {
 }
 
 #' Extract Series Data Components
-#' 
+#'
 #' @description
 #' Extracts series-related data components from a dataset for Stan models.
-#' 
+#'
 #' @param data Data frame containing series data
 #' @return List with series components or empty list if no series data found
 #' @noRd
 extract_series_data <- function(data) {
   checkmate::assert_data_frame(data)
-  
+
   if (!"series" %in% names(data)) {
     return(list())
   }
-  
+
   series_vals <- data$series
   unique_series <- sort(unique(series_vals))
-  
+
   return(list(
     series = unique_series,
     n_series = length(unique_series)
@@ -479,11 +479,11 @@ extract_series_data <- function(data) {
 }
 
 #' Merge Stan Data from Multiple Sources
-#' 
+#'
 #' @description
 #' Merges Stan data lists from different sources (e.g., observation and trend models).
 #' Handles conflicts by preferring trend-specific data elements.
-#' 
+#'
 #' @param base_data List containing base Stan data
 #' @param trend_data List containing trend-specific Stan data
 #' @return List of merged Stan data
@@ -491,10 +491,10 @@ extract_series_data <- function(data) {
 merge_stan_data <- function(base_data, trend_data) {
   checkmate::assert_list(base_data)
   checkmate::assert_list(trend_data)
-  
+
   # Start with base data
   merged_data <- base_data
-  
+
   # Flatten trend_data if it has nested structure
   if (any(sapply(trend_data, is.list))) {
     flattened_trend <- list()
@@ -511,10 +511,10 @@ merge_stan_data <- function(base_data, trend_data) {
     }
     trend_data <- flattened_trend
   }
-  
+
   # Identify conflicting names
   conflicting_names <- intersect(names(base_data), names(trend_data))
-  
+
   # Warn about conflicts but prefer trend data
   if (length(conflicting_names) > 0) {
     insight::format_warning(
@@ -522,26 +522,26 @@ merge_stan_data <- function(base_data, trend_data) {
       "Using trend data values."
     )
   }
-  
+
   # Add all trend data (overwriting conflicts)
   for (name in names(trend_data)) {
     merged_data[[name]] <- trend_data[[name]]
   }
-  
+
   return(merged_data)
 }
 
 #' Validate Stan Data Structure
-#' 
+#'
 #' @description
 #' Validates that Stan data has proper structure and types.
-#' 
+#'
 #' @param stan_data List containing Stan data
 #' @return Invisible TRUE if valid, stops/warns for issues
 #' @noRd
 validate_stan_data_structure <- function(stan_data) {
   checkmate::assert_list(stan_data)
-  
+
   # Check for empty data
   if (length(stan_data) == 0) {
     stop(insight::format_error(
@@ -549,13 +549,13 @@ validate_stan_data_structure <- function(stan_data) {
       "Stan models require at least some data elements."
     ))
   }
-  
+
   # Check data types (Stan expects numeric, integer, or array types)
   valid_types <- c("numeric", "integer", "logical", "matrix", "array")
-  
+
   for (name in names(stan_data)) {
     data_type <- class(stan_data[[name]])[1]
-    
+
     if (!data_type %in% valid_types && !is.numeric(stan_data[[name]])) {
       insight::format_warning(
         "Unexpected data type for Stan element '{name}': {data_type}",
@@ -563,15 +563,15 @@ validate_stan_data_structure <- function(stan_data) {
       )
     }
   }
-  
+
   invisible(TRUE)
 }
 
 #' Check if Object is Valid Stanvar
-#' 
+#'
 #' @description
 #' Validates that an object has the structure expected for a brms stanvar.
-#' 
+#'
 #' @param stanvar Object to validate
 #' @return Logical indicating whether object is a valid stanvar
 #' @noRd
@@ -580,31 +580,31 @@ is_valid_stanvar <- function(stanvar) {
   if (is.null(stanvar)) {
     return(FALSE)
   }
-  
+
   # Must be a list
   if (!is.list(stanvar)) {
     return(FALSE)
   }
-  
+
   # Check if it's a brms stanvar object (has required brms components)
   required_components <- c("scode", "block")
   if (!all(required_components %in% names(stanvar))) {
     return(FALSE)
   }
-  
+
   # scode must be character string (can be empty for data block stanvars)
   if (!is.character(stanvar$scode) || length(stanvar$scode) != 1) {
     return(FALSE)
   }
-  
+
   # block must be valid Stan block name
-  valid_blocks <- c("data", "transformed_data", "parameters", "transformed_parameters", 
+  valid_blocks <- c("data", "transformed_data", "parameters", "transformed_parameters",
                    "model", "generated_quantities")
-  if (!is.character(stanvar$block) || length(stanvar$block) != 1 || 
+  if (!is.character(stanvar$block) || length(stanvar$block) != 1 ||
       !stanvar$block %in% valid_blocks) {
     return(FALSE)
   }
-  
+
   return(TRUE)
 }
 
@@ -612,10 +612,10 @@ is_valid_stanvar <- function(stanvar) {
 # ==============================
 
 #' Extract Code Block from Stan Code
-#' 
+#'
 #' @description
 #' Extracts a specific block (e.g., "data", "parameters", "model") from Stan code.
-#' 
+#'
 #' @param code_lines Character vector of Stan code lines
 #' @param block_name Character string name of block to extract
 #' @return Character string of block contents or NULL if not found
@@ -623,24 +623,24 @@ is_valid_stanvar <- function(stanvar) {
 extract_code_block <- function(code_lines, block_name) {
   checkmate::assert_character(code_lines)
   checkmate::assert_string(block_name)
-  
+
   # Find block start line
   block_pattern <- paste0("^\\s*", block_name, "\\s*\\{\\s*$")
   start_line <- which(grepl(block_pattern, code_lines))
-  
+
   if (length(start_line) == 0) {
     return(NULL)
   }
-  
+
   start_line <- start_line[1]  # Take first match
-  
+
   # Find matching closing brace
   end_line <- find_matching_brace(code_lines, start_line)
-  
+
   if (length(end_line) == 0) {
     return(NULL)
   }
-  
+
   # Extract block content (excluding the block declaration and closing brace)
   if (end_line > start_line + 1) {
     block_content <- code_lines[(start_line + 1):(end_line - 1)]
@@ -651,10 +651,10 @@ extract_code_block <- function(code_lines, block_name) {
 }
 
 #' Find Matching Brace
-#' 
+#'
 #' @description
 #' Finds the line number of the closing brace that matches an opening brace.
-#' 
+#'
 #' @param code_lines Character vector of Stan code lines
 #' @param start_line Integer line number containing opening brace
 #' @return Integer line number of matching closing brace or integer(0) if not found
@@ -662,45 +662,45 @@ extract_code_block <- function(code_lines, block_name) {
 find_matching_brace <- function(code_lines, start_line) {
   checkmate::assert_character(code_lines)
   checkmate::assert_integerish(start_line)
-  
+
   # Handle empty input
   if (length(code_lines) == 0 || length(start_line) == 0) {
     return(integer(0))
   }
-  
+
   if (start_line < 1 || start_line > length(code_lines)) {
     return(integer(0))
   }
-  
+
   # Count braces starting from start_line
   depth <- 0
   found_opening <- FALSE
-  
+
   for (i in start_line:length(code_lines)) {
     line <- code_lines[i]
-    
+
     # Count opening and closing braces in this line
     opening_braces <- lengths(regmatches(line, gregexpr("\\{", line)))
     closing_braces <- lengths(regmatches(line, gregexpr("\\}", line)))
-    
+
     depth <- depth + opening_braces - closing_braces
-    
+
     # Mark that we've seen at least one opening brace
     if (opening_braces > 0) {
       found_opening <- TRUE
     }
-    
+
     # If depth returns to 0 after seeing an opening brace, we found the match
     if (found_opening && depth == 0) {
       return(i)
     }
-    
+
     # If depth goes negative, braces are unbalanced
     if (depth < 0) {
       return(integer(0))
     }
   }
-  
+
   # No matching brace found
   return(integer(0))
 }
@@ -709,23 +709,23 @@ find_matching_brace <- function(code_lines, start_line) {
 # ===========================
 
 #' Check if Stanvars Have Time Component
-#' 
+#'
 #' @description
 #' Checks if stanvars contain time-related components.
-#' 
+#'
 #' @param stanvars List of stanvar objects
 #' @return Logical indicating presence of time components
 #' @noRd
 has_time_component <- function(stanvars) {
   checkmate::assert_list(stanvars)
-  
+
   # Look for time-related patterns in stanvar code
   time_patterns <- c("n_time", "time_vals", "time_data", "\\btime\\b")
-  
+
   for (stanvar in stanvars) {
     if (is_valid_stanvar(stanvar)) {
       scode <- stanvar$scode
-      
+
       for (pattern in time_patterns) {
         if (grepl(pattern, scode)) {
           return(TRUE)
@@ -733,28 +733,28 @@ has_time_component <- function(stanvars) {
       }
     }
   }
-  
+
   return(FALSE)
 }
 
 #' Check if Stanvars Have Series Component
-#' 
+#'
 #' @description
 #' Checks if stanvars contain series-related components.
-#' 
+#'
 #' @param stanvars List of stanvar objects
 #' @return Logical indicating presence of series components
 #' @noRd
 has_series_component <- function(stanvars) {
   checkmate::assert_list(stanvars)
-  
+
   # Look for series-related patterns in stanvar code
   series_patterns <- c("n_series", "series_data", "\\bseries\\b")
-  
+
   for (stanvar in stanvars) {
     if (is_valid_stanvar(stanvar)) {
       scode <- stanvar$scode
-      
+
       for (pattern in series_patterns) {
         if (grepl(pattern, scode)) {
           return(TRUE)
@@ -762,28 +762,28 @@ has_series_component <- function(stanvars) {
       }
     }
   }
-  
+
   return(FALSE)
 }
 
 #' Check if Stanvars Have Correlation Component
-#' 
+#'
 #' @description
 #' Checks if stanvars contain correlation/covariance components.
-#' 
+#'
 #' @param stanvars List of stanvar objects
 #' @return Logical indicating presence of correlation components
 #' @noRd
 has_correlation_component <- function(stanvars) {
   checkmate::assert_list(stanvars)
-  
+
   # Look for correlation-related patterns in stanvar code
   corr_patterns <- c("cov_matrix", "corr_matrix", "Sigma", "correlation", "covariance")
-  
+
   for (stanvar in stanvars) {
     if (is_valid_stanvar(stanvar)) {
       scode <- stanvar$scode
-      
+
       for (pattern in corr_patterns) {
         if (grepl(pattern, scode)) {
           return(TRUE)
@@ -791,7 +791,7 @@ has_correlation_component <- function(stanvars) {
       }
     }
   }
-  
+
   return(FALSE)
 }
 
@@ -799,34 +799,34 @@ has_correlation_component <- function(stanvars) {
 # =============================
 
 #' Prepare Stanvars for brms Integration
-#' 
+#'
 #' @description
 #' Prepares stanvars for integration with brms by filtering invalid ones
 #' and ensuring proper format.
-#' 
+#'
 #' @param stanvars List of stanvar objects
 #' @return List of valid stanvars ready for brms
 #' @noRd
 prepare_stanvars_for_brms <- function(stanvars) {
   checkmate::assert_list(stanvars)
-  
+
   if (length(stanvars) == 0) {
     return(list())
   }
-  
+
   # Filter to valid stanvars only
   valid_stanvars <- list()
-  
+
   for (name in names(stanvars)) {
     stanvar <- stanvars[[name]]
-    
+
     # brms stanvars are containers - validate the actual stanvar element
     stanvar_element <- if (inherits(stanvar, "stanvars") && length(stanvar) == 1) {
       stanvar[[1]]
     } else {
       stanvar
     }
-    
+
     if (is_valid_stanvar(stanvar_element)) {
       valid_stanvars[[name]] <- stanvar
     } else {
@@ -836,7 +836,7 @@ prepare_stanvars_for_brms <- function(stanvars) {
       )
     }
   }
-  
+
   return(valid_stanvars)
 }
 
@@ -844,11 +844,11 @@ prepare_stanvars_for_brms <- function(stanvars) {
 # ============================
 
 #' Extract Trend Stanvars from Setup
-#' 
+#'
 #' @description
 #' Extracts trend stanvars from brms setup and generates additional trend-specific stanvars.
 #' Integrates with the trend injection system.
-#' 
+#'
 #' @param trend_setup List containing trend model setup
 #' @param trend_spec List containing trend specification
 #' @return List of trend stanvars
@@ -856,10 +856,10 @@ prepare_stanvars_for_brms <- function(stanvars) {
 extract_trend_stanvars_from_setup <- function(trend_setup, trend_spec) {
   checkmate::assert_list(trend_setup, names = "named")
   checkmate::assert_list(trend_spec, names = "named")
-  
+
   # Extract base stanvars from trend setup
   base_stanvars <- trend_setup$stanvars %||% list()
-  
+
   # Generate trend-specific stanvars if trend spec is provided
   # Handle both trend_type and trend_model for compatibility
   trend_type <- trend_spec$trend_type %||% trend_spec$trend_model
@@ -872,25 +872,25 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_spec) {
       n_groups = trend_spec$n_groups,
       n_subgroups = trend_spec$n_subgroups
     )
-    
+
     # Use the existing trend injection system
     generate_trend_injection_stanvars(trend_spec, data_info)
   } else {
     list()
   }
-  
+
   # Combine base and trend-specific stanvars
   combined_stanvars <- c(base_stanvars, trend_stanvars)
-  
+
   return(combined_stanvars)
 }
 
 #' Inject Trend into Linear Predictor
-#' 
+#'
 #' @description
 #' Injects trend effects into Stan linear predictor by modifying the transformed parameters
 #' or model block to add trend components to mu.
-#' 
+#'
 #' @param base_stancode Character string of base Stan code
 #' @param trend_stanvars List of trend stanvars
 #' @param trend_spec List containing trend specification
@@ -900,29 +900,29 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars, tr
   checkmate::assert_string(base_stancode)
   checkmate::assert_list(trend_stanvars)
   checkmate::assert_list(trend_spec)
-  
+
   # If no trends, return unchanged
   if (length(trend_stanvars) == 0 || is.null(trend_spec$trend_model)) {
     return(base_stancode)
   }
-  
+
   # Split code into lines for easier manipulation
   code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
-  
+
   # Find the transformed parameters block or create one if it doesn't exist
   tp_block_start <- which(grepl("^\\s*transformed\\s+parameters\\s*\\{", code_lines))
-  
+
   if (length(tp_block_start) == 0) {
     # No transformed parameters block exists, create one before model block
     model_block_start <- which(grepl("^\\s*model\\s*\\{", code_lines))
-    
+
     if (length(model_block_start) == 0) {
       stop(insight::format_error(
         "Cannot find model block in Stan code for trend injection.",
         "Stan code structure is invalid."
       ))
     }
-    
+
     # Insert transformed parameters block before model block
     new_tp_block <- c(
       "transformed parameters {",
@@ -935,7 +935,7 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars, tr
       "  }",
       "}"
     )
-    
+
     # Insert the new block
     code_lines <- c(
       code_lines[1:(model_block_start[1] - 1)],
@@ -943,26 +943,26 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars, tr
       "",
       code_lines[model_block_start[1]:length(code_lines)]
     )
-    
+
   } else {
     # Transformed parameters block exists, modify it
     tp_start <- tp_block_start[1]
     tp_end <- find_matching_brace(code_lines, tp_start)
-    
+
     if (length(tp_end) == 0) {
       stop(insight::format_error(
         "Cannot find end of transformed parameters block.",
         "Stan code structure may be invalid."
       ))
     }
-    
+
     # Find mu declaration and modify it
     mu_lines <- which(grepl("vector\\[.*\\]\\s+mu\\s*=", code_lines[(tp_start+1):(tp_end-1)]))
-    
+
     if (length(mu_lines) > 0) {
       # mu is declared in transformed parameters, modify it
       mu_line_idx <- tp_start + mu_lines[1]
-      
+
       # Insert trend addition after mu declaration
       trend_addition <- c(
         "",
@@ -971,38 +971,38 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars, tr
         "    mu += trend[obs_ind];",
         "  }"
       )
-      
+
       code_lines <- c(
         code_lines[1:mu_line_idx],
         trend_addition,
         code_lines[(mu_line_idx+1):length(code_lines)]
       )
-      
+
     } else {
       # mu not found in transformed parameters, add combined predictor
       trend_addition <- c(
-        "  // Combined linear predictor with trend effects", 
+        "  // Combined linear predictor with trend effects",
         "  vector[N] mu_combined = mu;",
         "  if (size(trend) > 0) {",
         "    mu_combined += trend[obs_ind];",
         "  }"
       )
-      
+
       # Insert before closing brace of transformed parameters
       code_lines <- c(
         code_lines[1:(tp_end-1)],
         trend_addition,
         code_lines[tp_end:length(code_lines)]
       )
-      
+
       # Update likelihood to use mu_combined instead of mu
       code_lines <- gsub("\\bmu\\b", "mu_combined", code_lines)
     }
   }
-  
+
   # Rejoin the code
   modified_code <- paste(code_lines, collapse = "\n")
-  
+
   return(modified_code)
 }
 
@@ -1010,11 +1010,11 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars, tr
 # =======================
 
 #' Assemble Complete mvgam Stan Code
-#' 
+#'
 #' @description
 #' Main orchestrator function that assembles complete Stan code for mvgam models
 #' by combining observation and trend components.
-#' 
+#'
 #' @param obs_formula Formula for observation model
 #' @param trend_stanvars List of trend stanvars
 #' @param data Data for the model
@@ -1023,13 +1023,13 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars, tr
 #' @param validate Whether to validate final Stan code
 #' @return Character string of complete Stan code
 #' @noRd
-assemble_mvgam_stan_code <- function(obs_formula, trend_stanvars = NULL, data, 
-                                    family = gaussian(), backend = "rstan", 
+assemble_mvgam_stan_code <- function(obs_formula, trend_stanvars = NULL, data,
+                                    family = gaussian(), backend = "rstan",
                                     validate = TRUE) {
   checkmate::assert_class(obs_formula, "formula")
   checkmate::assert_list(trend_stanvars, null.ok = TRUE)
   checkmate::assert_data_frame(data)
-  
+
   # Generate base brms Stan code
   base_stancode <- generate_base_brms_stancode(
     formula = obs_formula,
@@ -1038,7 +1038,7 @@ assemble_mvgam_stan_code <- function(obs_formula, trend_stanvars = NULL, data,
     stanvars = trend_stanvars,
     backend = backend
   )
-  
+
   # If no trend stanvars, return base code
   if (is.null(trend_stanvars) || length(trend_stanvars) == 0) {
     if (validate) {
@@ -1046,43 +1046,43 @@ assemble_mvgam_stan_code <- function(obs_formula, trend_stanvars = NULL, data,
     }
     return(base_stancode)
   }
-  
+
   # Extract trend specification from stanvars (if available)
   trend_spec <- extract_trend_spec_from_stanvars(trend_stanvars)
-  
+
   # Inject trend effects into linear predictor
   final_stancode <- inject_trend_into_linear_predictor(
-    base_stancode, 
-    trend_stanvars, 
+    base_stancode,
+    trend_stanvars,
     trend_spec
   )
-  
+
   # Validate final code if requested
   if (validate) {
     final_stancode <- validate_stan_code(final_stancode, backend = backend)
   }
-  
+
   return(final_stancode)
 }
 
 #' Assemble Complete mvgam Stan Data
-#' 
+#'
 #' @description
 #' Assembles complete Stan data for mvgam models by combining observation
 #' and trend data components.
-#' 
+#'
 #' @param obs_formula Formula for observation model
 #' @param trend_stanvars List of trend stanvars
 #' @param data Data for the model
 #' @param family Family specification
 #' @return List of complete Stan data
 #' @noRd
-assemble_mvgam_stan_data <- function(obs_formula, trend_stanvars = NULL, data, 
+assemble_mvgam_stan_data <- function(obs_formula, trend_stanvars = NULL, data,
                                     family = gaussian()) {
   checkmate::assert_class(obs_formula, "formula")
   checkmate::assert_list(trend_stanvars, null.ok = TRUE)
   checkmate::assert_data_frame(data)
-  
+
   # Generate base brms Stan data
   base_standata <- generate_base_brms_standata(
     formula = obs_formula,
@@ -1090,29 +1090,29 @@ assemble_mvgam_stan_data <- function(obs_formula, trend_stanvars = NULL, data,
     family = family,
     stanvars = trend_stanvars
   )
-  
+
   # If no trend stanvars, return base data
   if (is.null(trend_stanvars) || length(trend_stanvars) == 0) {
     return(base_standata)
   }
-  
+
   # Extract trend-specific data from stanvars
   trend_data <- extract_trend_data_from_stanvars(trend_stanvars, data)
-  
+
   # Merge base and trend data
   final_standata <- merge_stan_data(base_standata, trend_data)
-  
+
   # Validate final data structure
   validate_stan_data_structure(final_standata)
-  
+
   return(final_standata)
 }
 
 #' Generate Base brms Stan Code
-#' 
+#'
 #' @description
 #' Generates base Stan code using brms with optional stanvars injection.
-#' 
+#'
 #' @param formula Formula for the model
 #' @param data Data for the model
 #' @param family Family specification
@@ -1120,11 +1120,11 @@ assemble_mvgam_stan_data <- function(obs_formula, trend_stanvars = NULL, data,
 #' @param backend Stan backend
 #' @return Character string of Stan code
 #' @noRd
-generate_base_brms_stancode <- function(formula, data, family = gaussian(), 
+generate_base_brms_stancode <- function(formula, data, family = gaussian(),
                                        stanvars = NULL, backend = "rstan") {
   checkmate::assert_class(formula, "formula")
   checkmate::assert_data_frame(data)
-  
+
   # Use brms to generate Stan code
   stancode <- try({
     brms::make_stancode(
@@ -1135,7 +1135,7 @@ generate_base_brms_stancode <- function(formula, data, family = gaussian(),
       backend = backend
     )
   }, silent = TRUE)
-  
+
   if (inherits(stancode, "try-error")) {
     stop(insight::format_error(
       "Failed to generate base brms Stan code.",
@@ -1143,26 +1143,26 @@ generate_base_brms_stancode <- function(formula, data, family = gaussian(),
       "brms error: {attr(stancode, 'condition')$message}"
     ))
   }
-  
+
   return(stancode)
 }
 
 #' Generate Base brms Stan Data
-#' 
+#'
 #' @description
 #' Generates base Stan data using brms with optional stanvars injection.
-#' 
+#'
 #' @param formula Formula for the model
 #' @param data Data for the model
 #' @param family Family specification
 #' @param stanvars Optional stanvars to inject
 #' @return List of Stan data
 #' @noRd
-generate_base_brms_standata <- function(formula, data, family = gaussian(), 
+generate_base_brms_standata <- function(formula, data, family = gaussian(),
                                        stanvars = NULL) {
   checkmate::assert_class(formula, "formula")
   checkmate::assert_data_frame(data)
-  
+
   # Use brms to generate Stan data
   standata <- try({
     brms::make_standata(
@@ -1172,7 +1172,7 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
       stanvars = stanvars
     )
   }, silent = TRUE)
-  
+
   if (inherits(standata, "try-error")) {
     stop(insight::format_error(
       "Failed to generate base brms Stan data.",
@@ -1180,7 +1180,7 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
       "brms error: {attr(standata, 'condition')$message}"
     ))
   }
-  
+
   return(standata)
 }
 
@@ -1188,10 +1188,10 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
 # ==================================
 
 #' Extract Trend Specification from Stanvars
-#' 
+#'
 #' @description
 #' Extracts trend specification information from stanvars metadata.
-#' 
+#'
 #' @param trend_stanvars List of trend stanvars
 #' @return List with trend specification or NULL
 #' @noRd
@@ -1199,7 +1199,7 @@ extract_trend_spec_from_stanvars <- function(trend_stanvars) {
   if (is.null(trend_stanvars) || length(trend_stanvars) == 0) {
     return(NULL)
   }
-  
+
   # Look for trend specification in stanvar metadata
   for (stanvar in trend_stanvars) {
     if (is_valid_stanvar(stanvar)) {
@@ -1214,7 +1214,7 @@ extract_trend_spec_from_stanvars <- function(trend_stanvars) {
       }
     }
   }
-  
+
   # Fallback: return minimal trend specification
   return(list(
     trend_model = "RW",
@@ -1224,10 +1224,10 @@ extract_trend_spec_from_stanvars <- function(trend_stanvars) {
 }
 
 #' Extract Trend Data from Stanvars
-#' 
+#'
 #' @description
 #' Extracts trend-specific data components from stanvars and original data.
-#' 
+#'
 #' @param trend_stanvars List of trend stanvars
 #' @param data Original data frame
 #' @return List of trend data components
@@ -1236,21 +1236,21 @@ extract_trend_data_from_stanvars <- function(trend_stanvars, data) {
   if (is.null(trend_stanvars) || length(trend_stanvars) == 0) {
     return(list())
   }
-  
+
   trend_data <- list()
-  
+
   # Extract time-related data if available
   time_data <- extract_time_data(data)
   if (length(time_data) > 0) {
     trend_data <- c(trend_data, time_data)
   }
-  
+
   # Extract series-related data if available
   series_data <- extract_series_data(data)
   if (length(series_data) > 0) {
     trend_data <- c(trend_data, series_data)
   }
-  
+
   # Look for additional data in stanvars metadata
   for (stanvar in trend_stanvars) {
     if (is_valid_stanvar(stanvar) && !is.null(stanvar$sdata)) {
@@ -1259,7 +1259,7 @@ extract_trend_data_from_stanvars <- function(trend_stanvars, data) {
       trend_data[[stanvar_name]] <- stanvar$sdata
     }
   }
-  
+
   return(trend_data)
 }
 
@@ -1267,14 +1267,14 @@ extract_trend_data_from_stanvars <- function(trend_stanvars, data) {
 # ====================================
 
 #' Combine Stan Components
-#' 
+#'
 #' @description
 #' Low-level utility function that combines observation Stan code, observation
 #' data, and trend stanvars into a complete Stan model specification.
-#' 
+#'
 #' This function merges stanvars into the observation code using brms stanvar
 #' injection system and combines the data components.
-#' 
+#'
 #' @param obs_code Character string containing observation model Stan code
 #' @param obs_data List containing observation model data
 #' @param trend_stanvars List of stanvar objects for trend models
@@ -1284,14 +1284,14 @@ combine_stan_components <- function(obs_code, obs_data, trend_stanvars) {
   checkmate::assert_string(obs_code, min.chars = 1)
   checkmate::assert_list(obs_data, names = "named")
   checkmate::assert_list(trend_stanvars)
-  
+
   # Track whether trends were actually added
   has_trends <- length(trend_stanvars) > 0
-  
+
   # Start with observation code and data
   combined_code <- obs_code
   combined_data <- obs_data
-  
+
   # If no trend stanvars, return observation model as-is
   if (!has_trends) {
     return(list(
@@ -1300,22 +1300,22 @@ combine_stan_components <- function(obs_code, obs_data, trend_stanvars) {
       has_trends = FALSE
     ))
   }
-  
+
   # Process each stanvar and inject into code
   for (stanvar_name in names(trend_stanvars)) {
     stanvar <- trend_stanvars[[stanvar_name]]
-    
+
     if (is_valid_stanvar(stanvar)) {
       # Inject stanvar code into appropriate Stan block
       combined_code <- inject_stanvar_code(combined_code, stanvar)
-      
+
       # Add stanvar data if present
       if (!is.null(stanvar$sdata)) {
         combined_data <- merge_stan_data(combined_data, stanvar$sdata)
       }
     }
   }
-  
+
   return(list(
     stancode = combined_code,
     standata = combined_data,
@@ -1324,31 +1324,31 @@ combine_stan_components <- function(obs_code, obs_data, trend_stanvars) {
 }
 
 #' Inject Stanvar Code into Stan Model
-#' 
+#'
 #' @description
 #' Injects a stanvar's code into the appropriate Stan block of existing code.
-#' 
+#'
 #' @param stan_code Character string containing existing Stan code
 #' @param stanvar Stanvar object to inject
 #' @return Updated Stan code with stanvar injected
 #' @noRd
 inject_stanvar_code <- function(stan_code, stanvar) {
   checkmate::assert_string(stan_code)
-  
+
   if (!is_valid_stanvar(stanvar)) {
     return(stan_code)
   }
-  
+
   block <- stanvar$block %||% "parameters"
   scode <- stanvar$scode %||% ""
-  
+
   if (nchar(scode) == 0) {
     return(stan_code)
   }
-  
+
   # Find the target block in Stan code
   block_pattern <- paste0("\\b", block, "\\s*\\{")
-  
+
   if (!grepl(block_pattern, stan_code)) {
     # If block doesn't exist, append at end
     stan_code <- paste0(stan_code, "\n", block, " {\n", scode, "\n}\n")
@@ -1356,7 +1356,7 @@ inject_stanvar_code <- function(stan_code, stanvar) {
     # Find insertion point within existing block
     # This is a simplified implementation - more sophisticated block parsing
     # would be needed for production use
-    
+
     # For now, append to end of existing block content
     # Find the closing brace of the target block
     block_start <- regexpr(block_pattern, stan_code)
@@ -1371,12 +1371,12 @@ inject_stanvar_code <- function(stan_code, stanvar) {
       }
     }
   }
-  
+
   return(stan_code)
 }
 
 # =============================================================================
-# SECTION 2: TREND-SPECIFIC STAN CODE GENERATORS  
+# SECTION 2: TREND-SPECIFIC STAN CODE GENERATORS
 # =============================================================================
 # WHY: Each trend type requires specialized Stan code with unique parameters,
 # priors, and computational patterns. Generators provide modular, extensible
@@ -1395,6 +1395,47 @@ compute_trend_data_info <- function(data_specs) {
 # Shared Utility Functions for Factor Model Consistency
 # These functions ensure all factor-compatible trends use identical patterns
 
+#' Combine Stanvars Properly
+#'
+#' Helper function to safely combine stanvars while preserving class structure.
+#' Prevents corruption from using list() + $ assignment pattern.
+#'
+#' @param base_stanvars Initial stanvars object (can be NULL)
+#' @param ... Additional stanvar objects to combine
+#' @return Combined stanvars with proper class structure
+#' @noRd
+combine_stanvars <- function(base_stanvars = NULL, ...) {
+  # Validate base_stanvars
+  if (!is.null(base_stanvars) && !inherits(base_stanvars, "stanvars")) {
+    stop("base_stanvars must be NULL or have class 'stanvars'")
+  }
+  
+  new_stanvars <- list(...)
+  # Filter out NULL values and validate each
+  valid_stanvars <- list()
+  for (sv in new_stanvars) {
+    if (!is.null(sv)) {
+      if (!inherits(sv, c("stanvar", "stanvars"))) {
+        stop("All stanvars must have class 'stanvar' or 'stanvars'")
+      }
+      valid_stanvars <- append(valid_stanvars, list(sv))
+    }
+  }
+  
+  # Combine and validate result
+  result <- base_stanvars
+  for (sv in valid_stanvars) {
+    result <- if (is.null(result)) sv else c(result, sv)
+  }
+  
+  # Validate final result
+  if (!is.null(result) && !inherits(result, "stanvars")) {
+    stop("Failed to create proper stanvars collection")
+  }
+  
+  return(result)
+}
+
 #' Generate Data Block Injections for Matrix Z
 #'
 #' @param is_factor_model Logical indicating if this is a factor model
@@ -1403,24 +1444,23 @@ compute_trend_data_info <- function(data_specs) {
 #' @return List of data block stanvars
 #' @noRd
 generate_matrix_z_data_injectors <- function(is_factor_model, n_lv, n_series) {
-  stanvars <- list()
-
-  # Both factor and non-factor models need these data declarations
-  stanvars$n_lv_data <- brms::stanvar(
+  # Create individual stanvar objects
+  n_lv_stanvar <- brms::stanvar(
     x = n_lv,
     name = "n_lv",
     scode = "int<lower=1> n_lv;",
     block = "data"
   )
 
-  stanvars$n_series_data <- brms::stanvar(
+  n_series_stanvar <- brms::stanvar(
     x = n_series,
     name = "n_series",
     scode = "int<lower=1> n_series;",
     block = "data"
   )
 
-  return(stanvars)
+  # Combine using brms c() method to create proper stanvars collection
+  return(c(n_lv_stanvar, n_series_stanvar))
 }
 
 #' Generate Parameter Block Injections for Matrix Z
@@ -1431,18 +1471,18 @@ generate_matrix_z_data_injectors <- function(is_factor_model, n_lv, n_series) {
 #' @return List of parameter block stanvars
 #' @noRd
 generate_matrix_z_parameter_injectors <- function(is_factor_model, n_lv, n_series) {
-  stanvars <- list()
-
   if (is_factor_model) {
     # Factor model: estimate Z in parameters for dimensionality reduction
-    stanvars$z_matrix_factor <- brms::stanvar(
+    z_matrix_stanvar <- brms::stanvar(
       name = "Z",
       scode = glue::glue("matrix[n_series, n_lv] Z;"),
       block = "parameters"
     )
+    return(z_matrix_stanvar)
+  } else {
+    # Return NULL for empty case
+    return(NULL)
   }
-
-  return(stanvars)
 }
 
 #' Generate Transformed Data Block Injections for Matrix Z
@@ -1453,18 +1493,18 @@ generate_matrix_z_parameter_injectors <- function(is_factor_model, n_lv, n_serie
 #' @return List of transformed data block stanvars
 #' @noRd
 generate_matrix_z_transformed_data_injectors <- function(is_factor_model, n_lv, n_series) {
-  stanvars <- list()
-
   if (!is_factor_model) {
     # Non-factor model: diagonal Z in transformed data
-    stanvars$z_matrix_diagonal <- brms::stanvar(
+    z_matrix_stanvar <- brms::stanvar(
       name = "Z",
       scode = glue::glue("matrix[n_series, n_lv] Z = diag_matrix(rep_vector(1.0, n_lv));"),
       block = "tdata"
     )
+    return(z_matrix_stanvar)
+  } else {
+    # Return NULL for empty case
+    return(NULL)
   }
-
-  return(stanvars)
 }
 
 #' Generate Matrix Z Stanvars (Consolidated Utility)
@@ -1478,14 +1518,22 @@ generate_matrix_z_transformed_data_injectors <- function(is_factor_model, n_lv, 
 #' @return List of stanvars for matrix Z across all required blocks
 #' @noRd
 generate_matrix_z_stanvars <- function(is_factor_model, n_lv, n_series) {
-  stanvars <- list()
-  
-  # Combine stanvars from all matrix Z injection functions
-  stanvars <- c(stanvars, generate_matrix_z_data_injectors(is_factor_model, n_lv, n_series))
-  stanvars <- c(stanvars, generate_matrix_z_parameter_injectors(is_factor_model, n_lv, n_series))
-  stanvars <- c(stanvars, generate_matrix_z_transformed_data_injectors(is_factor_model, n_lv, n_series))
-  
-  return(stanvars)
+  # Get individual stanvar components
+  data_stanvars <- generate_matrix_z_data_injectors(is_factor_model, n_lv, n_series)
+  param_stanvars <- generate_matrix_z_parameter_injectors(is_factor_model, n_lv, n_series)
+  tdata_stanvars <- generate_matrix_z_transformed_data_injectors(is_factor_model, n_lv, n_series)
+
+  # Combine using brms's native c() method for stanvars
+  # This should preserve proper class structure
+  combined_stanvars <- data_stanvars
+  if (!is.null(param_stanvars)) {
+    combined_stanvars <- c(combined_stanvars, param_stanvars)
+  }
+  if (!is.null(tdata_stanvars)) {
+    combined_stanvars <- c(combined_stanvars, tdata_stanvars)
+  }
+
+  return(combined_stanvars)
 }
 
 #' Generate Factor Model Priors (Consolidated Utility)
@@ -1498,68 +1546,6 @@ generate_matrix_z_stanvars <- function(is_factor_model, n_lv, n_series) {
 #' @return List of stanvars for factor model priors
 #' @noRd
 generate_factor_model_priors <- function(is_factor_model, n_lv) {
-  stanvars <- list()
-  
-  if (is_factor_model) {
-    # Factor model: fixed variance=1 for identifiability, priors for Z
-    stanvars$factor_lv_priors <- brms::stanvar(
-      name = "factor_lv_priors",
-      scode = "to_vector(LV_raw) ~ std_normal();",
-      block = "model"
-    )
-    
-    stanvars$factor_z_priors <- brms::stanvar(
-      name = "factor_z_priors", 
-      scode = "to_vector(Z) ~ normal(0, 1);",
-      block = "model"
-    )
-  }
-  
-  return(stanvars)
-}
-
-#' Generate Transformed Parameters Block Injections for Trend Computation
-#'
-#' WHY: All trends must use the same computation pattern:
-#' trend[i,s] = dot_product(Z[s,:], LV[i,:]) + mu_trend[ytimes[i,s]]
-#'
-#' @param n_lv Number of latent variables
-#' @param n_series Number of observed series
-#' @return List of transformed parameters block stanvars
-#' @noRd
-generate_trend_computation_transformed_parameters_injectors <- function(n_lv, n_series) {
-  stanvars <- list()
-
-  stanvars$trend_computation <- brms::stanvar(
-    name = "trend",
-    scode = glue::glue("
-      // Derived latent trends using universal computation pattern
-      matrix[n, n_series] trend;
-
-      // Universal trend computation: state-space dynamics + linear predictors
-      // dot_product captures dynamic component, mu_trend captures trend_formula
-      for (i in 1:n) {{
-        for (s in 1:n_series) {{
-          trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[ytimes[i, s]];
-        }}
-      }}
-    "),
-    block = "tparameters"
-  )
-
-  return(stanvars)
-}
-
-#' Generate Model Block Injections for Factor Model Priors
-#'
-#' WHY: Factor models need fixed variance=1 constraints for identifiability
-#' since the scale is captured by the loading matrix Z.
-#'
-#' @param is_factor_model Logical indicating if this is a factor model
-#' @param n_lv Number of latent variables
-#' @return List of model block stanvars
-#' @noRd
-generate_factor_model_model_injectors <- function(is_factor_model, n_lv) {
   stanvars <- list()
 
   if (is_factor_model) {
@@ -1578,6 +1564,68 @@ generate_factor_model_model_injectors <- function(is_factor_model, n_lv) {
   }
 
   return(stanvars)
+}
+
+#' Generate Transformed Parameters Block Injections for Trend Computation
+#'
+#' WHY: All trends must use the same computation pattern:
+#' trend[i,s] = dot_product(Z[s,:], LV[i,:]) + mu_trend[ytimes[i,s]]
+#'
+#' @param n_lv Number of latent variables
+#' @param n_series Number of observed series
+#' @return List of transformed parameters block stanvars
+#' @noRd
+generate_trend_computation_transformed_parameters_injectors <- function(n_lv, n_series) {
+  # Create individual stanvar
+  trend_computation_stanvar <- brms::stanvar(
+    name = "trend",
+    scode = glue::glue("
+      // Derived latent trends using universal computation pattern
+      matrix[n, n_series] trend;
+
+      // Universal trend computation: state-space dynamics + linear predictors
+      // dot_product captures dynamic component, mu_trend captures trend_formula
+      for (i in 1:n) {{
+        for (s in 1:n_series) {{
+          trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[ytimes[i, s]];
+        }}
+      }}
+    "),
+    block = "tparameters"
+  )
+
+  return(trend_computation_stanvar)
+}
+
+#' Generate Model Block Injections for Factor Model Priors
+#'
+#' WHY: Factor models need fixed variance=1 constraints for identifiability
+#' since the scale is captured by the loading matrix Z.
+#'
+#' @param is_factor_model Logical indicating if this is a factor model
+#' @param n_lv Number of latent variables
+#' @return List of model block stanvars
+#' @noRd
+generate_factor_model_model_injectors <- function(is_factor_model, n_lv) {
+  if (is_factor_model) {
+    # Factor model: fixed variance=1 for identifiability, priors for Z
+    lv_priors_stanvar <- brms::stanvar(
+      name = "factor_lv_priors",
+      scode = "to_vector(LV_raw) ~ std_normal();",
+      block = "model"
+    )
+
+    z_priors_stanvar <- brms::stanvar(
+      name = "factor_z_priors",
+      scode = "to_vector(Z) ~ normal(0, 1);",
+      block = "model"
+    )
+
+    # Combine using brms c() method
+    return(c(lv_priors_stanvar, z_priors_stanvar))
+  } else {
+    return(NULL)
+  }
 }
 
 #' Generate Functions Block Injections for Hierarchical Correlations
@@ -1711,12 +1759,12 @@ generate_trend_injection_stanvars <- function(trend_spec, data_info) {
       "trend_spec must contain {.field trend_type} or {.field trend} field"
     ))
   }
-  
+
   # Handle PW variations - PWlinear and PWlogistic both use PW generator
   if (trend_type %in% c("PWlinear", "PWlogistic")) {
     trend_type <- "PW"
   }
-  
+
   # Get trend info from registry
   trend_info <- get_trend_info(trend_type)
   if (is.null(trend_info)) {
@@ -1747,30 +1795,30 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
   # Determine if this is a factor model
   is_factor_model <- !is.null(trend_spec$n_lv) && n_lv < n_series
 
-  # Initialize stanvars list
-  stanvars <- list()
-
   # Generate block-specific injectors for matrix Z
-  stanvars <- c(stanvars, generate_matrix_z_stanvars(is_factor_model, n_lv, n_series))
+  matrix_z_stanvars <- generate_matrix_z_stanvars(is_factor_model, n_lv, n_series)
+  
+  # Start with matrix Z stanvars
+  result_stanvars <- matrix_z_stanvars
 
   if (correlation && n_lv > 1) {
     # Correlated case: RW(cor = TRUE) - multivariate approach
     if (is_factor_model) {
       # Factor model: fix variances to 1 - parameters block
-      stanvars$L_Omega <- brms::stanvar(
+      L_Omega_stanvar <- brms::stanvar(
         name = "L_Omega",
         scode = glue::glue("cholesky_factor_corr[{n_lv}] L_Omega;"),
         block = "parameters"
       )
 
-      stanvars$LV_raw <- brms::stanvar(
+      LV_raw_stanvar <- brms::stanvar(
         name = "LV_raw",
         scode = glue::glue("matrix[n, {n_lv}] LV_raw;"),
         block = "parameters"
       )
 
       # Transformed parameters block - same Stan code, proper stanvar
-      stanvars$LV_transformed <- brms::stanvar(
+      LV_transformed_stanvar <- brms::stanvar(
         name = "LV",
         scode = glue::glue("
           // Latent states with correlated RW (variance = 1)
@@ -1787,34 +1835,37 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
         "),
         block = "tparameters"
       )
+      
+      # Combine with existing stanvars
+      result_stanvars <- combine_stanvars(result_stanvars, L_Omega_stanvar, LV_raw_stanvar, LV_transformed_stanvar)
     } else {
       # Non-factor model: estimate variances, diagonal Z - parameters block
-      stanvars$L_Omega <- brms::stanvar(
+      L_Omega_stanvar <- brms::stanvar(
         name = "L_Omega",
         scode = glue::glue("cholesky_factor_corr[{n_lv}] L_Omega;"),
         block = "parameters"
       )
 
-      stanvars$sigma_lv <- brms::stanvar(
+      sigma_lv_stanvar <- brms::stanvar(
         name = "sigma_lv",
         scode = glue::glue("vector<lower=0>[{n_lv}] sigma_lv;"),
         block = "parameters"
       )
 
-      stanvars$LV_raw <- brms::stanvar(
+      LV_raw_stanvar <- brms::stanvar(
         name = "LV_raw",
         scode = glue::glue("matrix[n, {n_lv}] LV_raw;"),
         block = "parameters"
       )
 
       # Transformed parameters block - same Stan code, proper stanvars
-      stanvars$Sigma_transformed <- brms::stanvar(
+      Sigma_transformed_stanvar <- brms::stanvar(
         name = "Sigma",
         scode = glue::glue("matrix[{n_lv}, {n_lv}] Sigma = diag_pre_multiply(sigma_lv, L_Omega);"),
         block = "tparameters"
       )
 
-      stanvars$LV_transformed <- brms::stanvar(
+      LV_transformed_stanvar <- brms::stanvar(
         name = "LV",
         scode = glue::glue("
           // Latent states with correlated RW
@@ -1831,20 +1882,24 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
         "),
         block = "tparameters"
       )
+      
+      # Combine with existing stanvars
+      result_stanvars <- combine_stanvars(result_stanvars, L_Omega_stanvar, sigma_lv_stanvar, 
+                                        LV_raw_stanvar, Sigma_transformed_stanvar, LV_transformed_stanvar)
     }
 
   } else {
     # Simple uncorrelated case: RW() - non-centered parameterization
     if (is_factor_model) {
       # Factor model: fix variances to 1 - parameters block
-      stanvars$LV_raw <- brms::stanvar(
+      LV_raw_stanvar <- brms::stanvar(
         name = "LV_raw",
         scode = glue::glue("matrix[n, {n_lv}] LV_raw;"),
         block = "parameters"
       )
 
       # Transformed parameters block - same Stan code, proper stanvar
-      stanvars$LV_transformed <- brms::stanvar(
+      LV_transformed_stanvar <- brms::stanvar(
         name = "LV",
         scode = glue::glue("
           // Latent states with non-centered parameterization (variance = 1)
@@ -1860,22 +1915,25 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
         "),
         block = "tparameters"
       )
+      
+      # Combine with existing stanvars
+      result_stanvars <- combine_stanvars(result_stanvars, LV_raw_stanvar, LV_transformed_stanvar)
     } else {
       # Non-factor model: estimate variances, diagonal Z - parameters block
-      stanvars$sigma <- brms::stanvar(
+      sigma_stanvar <- brms::stanvar(
         name = "sigma",
         scode = glue::glue("vector<lower=0>[{n_lv}] sigma;"),
         block = "parameters"
       )
 
-      stanvars$LV_raw <- brms::stanvar(
+      LV_raw_stanvar <- brms::stanvar(
         name = "LV_raw",
         scode = glue::glue("matrix[n, {n_lv}] LV_raw;"),
         block = "parameters"
       )
 
       # Transformed parameters block - same Stan code, proper stanvar
-      stanvars$LV_transformed <- brms::stanvar(
+      LV_transformed_stanvar <- brms::stanvar(
         name = "LV",
         scode = glue::glue("
           // Latent states with non-centered parameterization
@@ -1893,29 +1951,35 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
       )
 
       # Model block - same Stan code, proper stanvars
-      stanvars$LV_raw_prior <- brms::stanvar(
+      LV_raw_prior_stanvar <- brms::stanvar(
         name = "LV_raw_prior",
         scode = "to_vector(LV_raw) ~ std_normal();",
         block = "model"
       )
 
-      stanvars$sigma_prior <- brms::stanvar(
+      sigma_prior_stanvar <- brms::stanvar(
         name = "sigma_prior",
         scode = "sigma ~ student_t(3, 0, 2.5);",
         block = "model"
       )
+      
+      # Combine with existing stanvars
+      result_stanvars <- combine_stanvars(result_stanvars, sigma_stanvar, LV_raw_stanvar, 
+                                        LV_transformed_stanvar, LV_raw_prior_stanvar, sigma_prior_stanvar)
     }
   }
 
-  # Use shared trend computation utility for universal pattern
-  stanvars <- c(stanvars, generate_trend_computation_transformed_parameters_injectors(n_lv, n_series))
+  # Add trend computation stanvars
+  trend_computation <- generate_trend_computation_transformed_parameters_injectors(n_lv, n_series)
+  result_stanvars <- combine_stanvars(result_stanvars, trend_computation)
 
-  # Use shared factor model priors if applicable
+  # Add factor model priors if applicable
   if (is_factor_model) {
-    stanvars <- c(stanvars, generate_factor_model_model_injectors(is_factor_model, n_lv))
+    factor_priors <- generate_factor_model_model_injectors(is_factor_model, n_lv)
+    result_stanvars <- combine_stanvars(result_stanvars, factor_priors)
   }
 
-  return(stanvars)
+  return(result_stanvars)
 }
 
 #' VAR Trend Generator
@@ -1939,14 +2003,14 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
   # Determine if this is a factor model (n_lv < n_series)
   is_factor_model <- !is.null(trend_spec$n_lv) && n_lv < n_series
 
-  # Initialize stanvars list
-  stanvars <- list()
-
-  # Use shared matrix Z utility for consistent factor model patterns
-  stanvars <- c(stanvars, generate_matrix_z_stanvars(is_factor_model, n_lv, n_series))
+  # Generate block-specific injectors for matrix Z
+  matrix_z_stanvars <- generate_matrix_z_stanvars(is_factor_model, n_lv, n_series)
+  
+  # Start with matrix Z stanvars
+  result_stanvars <- matrix_z_stanvars
 
   # VAR data block (needed for all cases)
-  stanvars$var_data <- brms::stanvar(
+  var_data_stanvar <- brms::stanvar(
     x = list(
       n_lv = n_lv,
       n_lags = lags,
@@ -1966,11 +2030,11 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
     n_subgroups <- data_info$n_subgroups %||% n_lv
 
     # Add shared hierarchical correlation utilities
-    stanvars <- c(stanvars, generate_hierarchical_functions_injectors())
-    stanvars <- c(stanvars, generate_hierarchical_correlation_parameter_injectors(n_groups, n_subgroups))
+    hierarchical_functions <- generate_hierarchical_functions_injectors()
+    hierarchical_params <- generate_hierarchical_correlation_parameter_injectors(n_groups, n_subgroups)
 
     # VAR-specific parameters for hierarchical case
-    stanvars$var_hierarchical_params <- brms::stanvar(
+    var_hierarchical_params_stanvar <- brms::stanvar(
       x = NULL,
       name = "var_hierarchical_params",
       scode = glue::glue("
@@ -1984,7 +2048,7 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
     )
 
     # Hierarchical VAR model implementation
-    stanvars$var_hierarchical_model <- brms::stanvar(
+    var_hierarchical_model_stanvar <- brms::stanvar(
       x = NULL,
       name = "var_hierarchical_model",
       scode = glue::glue("
@@ -2019,13 +2083,18 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
     )
 
     # Use shared hierarchical priors
-    stanvars <- c(stanvars, generate_hierarchical_correlation_model_injectors(n_groups))
+    hierarchical_priors <- generate_hierarchical_correlation_model_injectors(n_groups)
+    
+    # Combine stanvars for hierarchical case
+    result_stanvars <- combine_stanvars(result_stanvars, var_data_stanvar, hierarchical_functions, 
+                                      hierarchical_params, var_hierarchical_params_stanvar, 
+                                      var_hierarchical_model_stanvar, hierarchical_priors)
 
   } else {
     # Simple VAR case (no grouping)
     if (is_factor_model) {
       # Factor model: fixed variance in covariance, estimate Z
-      stanvars$var_params <- brms::stanvar(
+      var_params_stanvar <- brms::stanvar(
         name = "var_params",
         scode = glue::glue("
         parameters {{
@@ -2041,7 +2110,7 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
       )
 
       # VAR model block for factor case
-      stanvars$var_model <- brms::stanvar(
+      var_model_stanvar <- brms::stanvar(
         name = "var_model",
         scode = glue::glue("
         model {{
@@ -2065,7 +2134,7 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
       )
     } else {
       # Non-factor model: estimate full covariance, diagonal Z
-      stanvars$var_params <- brms::stanvar(
+      var_params_stanvar <- brms::stanvar(
         name = "var_params",
         scode = glue::glue("
         parameters {{
@@ -2081,7 +2150,7 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
       )
 
       # VAR model block for non-factor case
-      stanvars$var_model <- brms::stanvar(
+      var_model_stanvar <- brms::stanvar(
         name = "var_model",
         scode = glue::glue("
         model {{
@@ -2105,16 +2174,22 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
       )
     }
 
+    # Combine stanvars for non-hierarchical case  
+    result_stanvars <- combine_stanvars(result_stanvars, var_data_stanvar, 
+                                      var_params_stanvar, var_model_stanvar)
+    
     # Use shared factor model priors if applicable
     if (is_factor_model) {
-      stanvars <- c(stanvars, generate_factor_model_model_injectors(is_factor_model, n_lv))
+      factor_priors <- generate_factor_model_model_injectors(is_factor_model, n_lv)
+      result_stanvars <- combine_stanvars(result_stanvars, factor_priors)
     }
   }
 
-  # Use shared trend computation utility for universal pattern
-  stanvars <- c(stanvars, generate_trend_computation_transformed_parameters_injectors(n_lv, n_series))
+  # Add trend computation stanvars
+  trend_computation <- generate_trend_computation_transformed_parameters_injectors(n_lv, n_series)
+  result_stanvars <- combine_stanvars(result_stanvars, trend_computation)
 
-  return(stanvars)
+  return(result_stanvars)
 }
 
 #' AR Trend Generator
@@ -2138,11 +2213,11 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
   # Determine if this is a factor model (n_lv < n_series)
   is_factor_model <- !is.null(trend_spec$n_lv) && n_lv < n_series
 
-  # Initialize stanvars list
-  stanvars <- list()
-
-  # Use shared matrix Z utility for consistent factor model patterns
-  stanvars <- c(stanvars, generate_matrix_z_stanvars(is_factor_model, n_lv, n_series))
+  # Generate block-specific injectors for matrix Z
+  matrix_z_stanvars <- generate_matrix_z_stanvars(is_factor_model, n_lv, n_series)
+  
+  # Start with matrix Z stanvars
+  result_stanvars <- matrix_z_stanvars
 
   if (use_grouping) {
     # Hierarchical AR case: AR(p = 1, unit = site, gr = group, subgr = species)
@@ -2150,11 +2225,11 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
     n_subgroups <- data_info$n_subgroups %||% n_lv
 
     # Add shared hierarchical correlation utilities
-    stanvars <- c(stanvars, generate_hierarchical_functions_injectors())
-    stanvars <- c(stanvars, generate_hierarchical_correlation_parameter_injectors(n_groups, n_subgroups))
+    hierarchical_functions <- generate_hierarchical_functions_injectors()
+    hierarchical_params <- generate_hierarchical_correlation_parameter_injectors(n_groups, n_subgroups)
 
     # AR-specific parameters for hierarchical case
-    stanvars$ar_hierarchical_params <- brms::stanvar(
+    ar_hierarchical_params_stanvar <- brms::stanvar(
       x = NULL,
       name = "ar_hierarchical_params",
       scode = glue::glue("
@@ -2168,7 +2243,7 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
     )
 
     # Hierarchical AR model implementation
-    stanvars$ar_hierarchical_model <- brms::stanvar(
+    ar_hierarchical_model_stanvar <- brms::stanvar(
       x = NULL,
       name = "ar_hierarchical_model",
       scode = glue::glue("
@@ -2203,13 +2278,18 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
     )
 
     # Use shared hierarchical priors
-    stanvars <- c(stanvars, generate_hierarchical_correlation_model_injectors(n_groups))
+    hierarchical_priors <- generate_hierarchical_correlation_model_injectors(n_groups)
+    
+    # Combine stanvars for hierarchical case
+    result_stanvars <- combine_stanvars(result_stanvars, hierarchical_functions, 
+                                      hierarchical_params, ar_hierarchical_params_stanvar, 
+                                      ar_hierarchical_model_stanvar, hierarchical_priors)
 
   } else {
     # Simple AR case (no grouping)
     if (is_factor_model) {
       # Factor model: fixed variance = 1, estimate Z
-      stanvars$ar_params <- brms::stanvar(
+      ar_params_stanvar <- brms::stanvar(
         name = "ar_params",
         scode = glue::glue("
         parameters {{
@@ -2222,7 +2302,7 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
         block = "parameters"
       )
 
-      stanvars$ar_transformed <- brms::stanvar(
+      ar_transformed_stanvar <- brms::stanvar(
         name = "ar_transformed",
         scode = glue::glue("
         transformed parameters {{
@@ -2245,7 +2325,7 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
       )
     } else {
       # Non-factor model: estimate variances, diagonal Z
-      stanvars$ar_params <- brms::stanvar(
+      ar_params_stanvar <- brms::stanvar(
         name = "ar_params",
         scode = glue::glue("
         parameters {{
@@ -2261,7 +2341,7 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
       )
 
       # AR model block for non-factor case
-      stanvars$ar_model <- brms::stanvar(
+      ar_model_stanvar <- brms::stanvar(
         name = "ar_model",
         scode = glue::glue("
         model {{
@@ -2285,12 +2365,15 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
       )
     }
 
-    # Use shared factor model priors if applicable
+    # Combine stanvars for non-hierarchical case
     if (is_factor_model) {
-      stanvars <- c(stanvars, generate_factor_model_priors(is_factor_model, n_lv))
+      result_stanvars <- combine_stanvars(result_stanvars, ar_params_stanvar, ar_transformed_stanvar)
+      
+      # Use shared factor model priors
+      factor_priors <- generate_factor_model_priors(is_factor_model, n_lv)
 
       # Add AR-specific priors for factor model
-      stanvars$ar_factor_priors <- brms::stanvar(
+      ar_factor_priors_stanvar <- brms::stanvar(
         name = "ar_factor_priors",
         scode = glue::glue("
         model {{
@@ -2300,13 +2383,18 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
         "),
         block = "model"
       )
+      
+      result_stanvars <- combine_stanvars(result_stanvars, factor_priors, ar_factor_priors_stanvar)
+    } else {
+      result_stanvars <- combine_stanvars(result_stanvars, ar_params_stanvar, ar_model_stanvar)
     }
   }
 
-  # Use shared trend computation utility for universal pattern
-  stanvars <- c(stanvars, generate_trend_computation_transformed_parameters_injectors(n_lv, n_series))
+  # Add trend computation stanvars
+  trend_computation <- generate_trend_computation_transformed_parameters_injectors(n_lv, n_series)
+  result_stanvars <- combine_stanvars(result_stanvars, trend_computation)
 
-  return(stanvars)
+  return(result_stanvars)
 }
 
 #' Calculate Time Distances for CAR Models
@@ -2315,13 +2403,13 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
 #' Uses pmax(1e-3, dis_time) to prevent zero distances.
 #'
 #' @param data_info Data information containing data, time variable, and series
-#' @return Matrix of time distances [n, n_series]  
+#' @return Matrix of time distances [n, n_series]
 #' @noRd
 calculate_car_time_distances <- function(data_info) {
   data <- data_info$data
   time_var <- data_info$time_var %||% "time"
   series_var <- data_info$series_var %||% "series"
-  
+
   # Prepare time and series data
   all_times <- data.frame(
     series = as.numeric(data[[series_var]]),
@@ -2337,22 +2425,22 @@ calculate_car_time_distances <- function(data_info) {
     ) %>%
     dplyr::ungroup() %>%
     dplyr::arrange(time, series)
-  
+
   # Convert to matrix format [n_time, n_series]
   n_time <- length(unique(all_times$time))
   n_series <- length(unique(all_times$series))
-  
+
   time_dis <- matrix(
     NA,
     nrow = n_time,
     ncol = n_series
   )
-  
+
   for (s in seq_len(n_series)) {
     series_data <- all_times[all_times$series == s, ]
     time_dis[seq_len(nrow(series_data)), s] <- series_data$dis_time
   }
-  
+
   return(time_dis)
 }
 
@@ -2370,8 +2458,8 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
   n_lv <- trend_spec$n_lv %||% data_info$n_series %||% 1
   n <- data_info$n_obs
   n_series <- data_info$n_series %||% 1
-  
-  # CAR does not support factor models (continuous-time AR requires 
+
+  # CAR does not support factor models (continuous-time AR requires
   # series-specific temporal evolution)
   if (!is.null(trend_spec$n_lv) && trend_spec$n_lv < n_series) {
     stop(insight::format_error(
@@ -2379,7 +2467,7 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
       "Continuous-time AR requires series-specific temporal evolution modeling."
     ))
   }
-  
+
   # CAR does not support hierarchical correlations
   if (!is.null(trend_spec$gr) && trend_spec$gr != 'NA') {
     rlang::warn(
@@ -2387,46 +2475,43 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
       .frequency = "once"
     )
   }
-  
+
   # Calculate time distances for continuous-time AR evolution
   time_dis <- calculate_car_time_distances(data_info)
-  
-  # Initialize stanvars list
-  stanvars <- list()
-  
+
   # Time distance data for continuous-time AR
-  stanvars$time_dis_data <- brms::stanvar(
+  time_dis_data_stanvar <- brms::stanvar(
     x = time_dis,
     name = "time_dis",
     scode = glue::glue("  array[n, n_series] real<lower=0> time_dis;"),
     block = "data"
   )
-  
+
   # CAR parameters (continuous-time AR1)
-  stanvars$car_params <- brms::stanvar(
+  car_params_stanvar <- brms::stanvar(
     name = "car_params",
     scode = glue::glue("
   // CAR AR1 parameters
   vector<lower=-1,upper=1>[n_lv] ar1;
-  
+
   // latent state SD terms
   vector<lower=0>[n_lv] sigma;
-  
+
   // raw latent states
   matrix[n, n_lv] LV_raw;"),
     block = "parameters"
   )
-  
+
   # CAR transformed parameters (continuous-time evolution only)
-  stanvars$car_lv_evolution <- brms::stanvar(
+  car_lv_evolution_stanvar <- brms::stanvar(
     name = "car_lv_evolution",
     scode = glue::glue("
   // CAR latent variable evolution
   matrix[n, n_lv] LV;
-  
+
   // Apply continuous-time AR evolution
   LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
-  
+
   for (j in 1 : n_lv) {{
     LV[1, j] += mu_trend[ytimes_trend[1, j]];
     for (i in 2 : n) {{
@@ -2437,22 +2522,27 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
   }}"),
     block = "tparameters"
   )
-  
+
   # Use shared trend computation utility (consistent with all other trends)
-  stanvars <- c(stanvars, generate_trend_computation_transformed_parameters_injectors(n_lv, n_series))
-  
+  trend_computation <- generate_trend_computation_transformed_parameters_injectors(n_lv, n_series)
+
   # CAR model priors
-  stanvars$car_priors <- brms::stanvar(
+  car_priors_stanvar <- brms::stanvar(
     name = "car_priors",
     scode = "
-  // CAR priors  
+  // CAR priors
   ar1 ~ std_normal();
   sigma ~ exponential(3);
   to_vector(LV_raw) ~ std_normal();",
     block = "model"
   )
-  
-  return(stanvars)
+
+  # Combine all stanvars
+  result_stanvars <- combine_stanvars(time_dis_data_stanvar, car_params_stanvar, 
+                                    car_lv_evolution_stanvar, trend_computation, 
+                                    car_priors_stanvar)
+
+  return(result_stanvars)
 }
 
 #' GP Trend Generator
@@ -2493,11 +2583,11 @@ generate_zmvn_trend_stanvars <- function(trend_spec, data_info) {
   # Determine if this is a factor model (n_lv < n_series)
   is_factor_model <- !is.null(trend_spec$n_lv) && n_lv < n_series
 
-  # Initialize stanvars list
-  stanvars <- list()
-
-  # Use shared matrix Z utility for consistent factor model patterns
-  stanvars <- c(stanvars, generate_matrix_z_stanvars(is_factor_model, n_lv, n_series))
+  # Generate block-specific injectors for matrix Z
+  matrix_z_stanvars <- generate_matrix_z_stanvars(is_factor_model, n_lv, n_series)
+  
+  # Start with matrix Z stanvars
+  result_stanvars <- matrix_z_stanvars
 
   if (use_grouping) {
     # Hierarchical ZMVN case: ZMVN(unit = site, gr = group, subgr = species)
@@ -2505,11 +2595,11 @@ generate_zmvn_trend_stanvars <- function(trend_spec, data_info) {
     n_subgroups <- data_info$n_subgroups %||% n_lv
 
     # Add shared hierarchical correlation utilities
-    stanvars <- c(stanvars, generate_hierarchical_functions_injectors())
-    stanvars <- c(stanvars, generate_hierarchical_correlation_parameter_injectors(n_groups, n_subgroups))
+    hierarchical_functions <- generate_hierarchical_functions_injectors()
+    hierarchical_params <- generate_hierarchical_correlation_parameter_injectors(n_groups, n_subgroups)
 
     # ZMVN-specific parameters for hierarchical case
-    stanvars$zmvn_hierarchical_params <- brms::stanvar(
+    zmvn_hierarchical_params_stanvar <- brms::stanvar(
       x = NULL,
       name = "zmvn_hierarchical_params",
       scode = glue::glue("
@@ -2521,7 +2611,7 @@ generate_zmvn_trend_stanvars <- function(trend_spec, data_info) {
     )
 
     # Hierarchical ZMVN model implementation
-    stanvars$zmvn_hierarchical_model <- brms::stanvar(
+    zmvn_hierarchical_model_stanvar <- brms::stanvar(
       x = NULL,
       name = "zmvn_hierarchical_model",
       scode = glue::glue("
@@ -2545,11 +2635,16 @@ generate_zmvn_trend_stanvars <- function(trend_spec, data_info) {
     )
 
     # Use shared hierarchical priors
-    stanvars <- c(stanvars, generate_hierarchical_correlation_model_injectors(n_groups))
+    hierarchical_priors <- generate_hierarchical_correlation_model_injectors(n_groups)
+    
+    # Combine stanvars for hierarchical case
+    result_stanvars <- combine_stanvars(result_stanvars, hierarchical_functions, 
+                                      hierarchical_params, zmvn_hierarchical_params_stanvar, 
+                                      zmvn_hierarchical_model_stanvar, hierarchical_priors)
 
   } else {
     # Simple ZMVN case: ZMVN(unit = site, subgr = species)
-    stanvars$zmvn_simple_params <- brms::stanvar(
+    zmvn_simple_params_stanvar <- brms::stanvar(
       x = NULL,
       name = "zmvn_simple_params",
       scode = glue::glue("
@@ -2562,7 +2657,7 @@ generate_zmvn_trend_stanvars <- function(trend_spec, data_info) {
       ")
     )
 
-    stanvars$zmvn_simple_model <- brms::stanvar(
+    zmvn_simple_model_stanvar <- brms::stanvar(
       x = NULL,
       name = "zmvn_simple_model",
       scode = glue::glue("
@@ -2575,17 +2670,23 @@ generate_zmvn_trend_stanvars <- function(trend_spec, data_info) {
       }}
       ")
     )
+    
+    # Combine stanvars for simple case
+    result_stanvars <- combine_stanvars(result_stanvars, zmvn_simple_params_stanvar, 
+                                      zmvn_simple_model_stanvar)
   }
 
-  # Use shared trend computation utility for universal pattern
-  stanvars <- c(stanvars, generate_trend_computation_transformed_parameters_injectors(n_lv, n_series))
+  # Add trend computation stanvars
+  trend_computation <- generate_trend_computation_transformed_parameters_injectors(n_lv, n_series)
+  result_stanvars <- combine_stanvars(result_stanvars, trend_computation)
 
-  # Use shared factor model priors if applicable (only for factor models)
+  # Add factor model priors if applicable
   if (is_factor_model) {
-    stanvars <- c(stanvars, generate_factor_model_priors(is_factor_model, n_lv))
+    factor_priors <- generate_factor_model_priors(is_factor_model, n_lv)
+    result_stanvars <- combine_stanvars(result_stanvars, factor_priors)
   }
 
-  return(stanvars)
+  return(result_stanvars)
 }
 
 #' PW Trend Generator
@@ -2618,14 +2719,14 @@ generate_pw_trend_stanvars <- function(trend_spec, data_info) {
   # PW trends do not support factor models (series-specific changepoints required)
   is_factor_model <- FALSE
 
-  # Initialize stanvars list
-  stanvars <- list()
-
-  # Use shared matrix Z utility (always diagonal for PW)
-  stanvars <- c(stanvars, generate_matrix_z_stanvars(is_factor_model, n_lv, n_series))
+  # Generate block-specific injectors for matrix Z
+  matrix_z_stanvars <- generate_matrix_z_stanvars(is_factor_model, n_lv, n_series)
+  
+  # Start with matrix Z stanvars
+  result_stanvars <- matrix_z_stanvars
 
   # Functions block - Prophet-style piecewise functions
-  stanvars$pw_functions <- brms::stanvar(
+  pw_functions_stanvar <- brms::stanvar(
     name = "pw_functions",
     scode = "
       matrix get_changepoint_matrix(vector t, vector t_change, int T, int S) {
@@ -2686,7 +2787,7 @@ generate_pw_trend_stanvars <- function(trend_spec, data_info) {
   )
 
   # Data block - piecewise-specific data components
-  stanvars$pw_data <- brms::stanvar(
+  pw_data_stanvar <- brms::stanvar(
     x = list(
       n_changepoints = n_changepoints,
       t_change = seq(0.1, 0.9, length.out = n_changepoints),  # Default changepoint times
@@ -2703,7 +2804,7 @@ generate_pw_trend_stanvars <- function(trend_spec, data_info) {
 
   # Logistic-specific data (carrying capacity)
   if (trend_type == "logistic") {
-    stanvars$pw_logistic_data <- brms::stanvar(
+    pw_logistic_data_stanvar <- brms::stanvar(
       x = matrix(10, nrow = n, ncol = n_series),  # Default carrying capacity
       name = "cap",
       scode = glue::glue("matrix[n, n_series] cap; // carrying capacities"),
@@ -2712,7 +2813,7 @@ generate_pw_trend_stanvars <- function(trend_spec, data_info) {
   }
 
   # Transformed data block - changepoint matrix computation
-  stanvars$pw_transformed_data <- brms::stanvar(
+  pw_transformed_data_stanvar <- brms::stanvar(
     name = "pw_transformed_data",
     scode = glue::glue("
       // sorted changepoint matrix
@@ -2722,7 +2823,7 @@ generate_pw_trend_stanvars <- function(trend_spec, data_info) {
   )
 
   # Parameters block - piecewise trend parameters
-  stanvars$pw_parameters <- brms::stanvar(
+  pw_parameters_stanvar <- brms::stanvar(
     name = "pw_parameters",
     scode = glue::glue("
       // base trend growth rates
@@ -2739,7 +2840,7 @@ generate_pw_trend_stanvars <- function(trend_spec, data_info) {
 
   # Transformed parameters block - trend computation (type-specific)
   if (trend_type == "logistic") {
-    stanvars$pw_transformed_parameters <- brms::stanvar(
+    pw_transformed_parameters_stanvar <- brms::stanvar(
       name = "LV",
       scode = glue::glue("
         // raw latent variables (logistic piecewise trends)
@@ -2757,7 +2858,7 @@ generate_pw_trend_stanvars <- function(trend_spec, data_info) {
     )
   } else {
     # Linear type
-    stanvars$pw_transformed_parameters <- brms::stanvar(
+    pw_transformed_parameters_stanvar <- brms::stanvar(
       name = "LV",
       scode = glue::glue("
         // raw latent variables (linear piecewise trends)
@@ -2774,11 +2875,11 @@ generate_pw_trend_stanvars <- function(trend_spec, data_info) {
     )
   }
 
-  # Use shared trend computation utility for universal pattern
-  stanvars <- c(stanvars, generate_trend_computation_transformed_parameters_injectors(n_lv, n_series))
+  # Add trend computation stanvars
+  trend_computation <- generate_trend_computation_transformed_parameters_injectors(n_lv, n_series)
 
-  # Model block - piecewise trend priors
-  stanvars$pw_model <- brms::stanvar(
+  # Add model block priors
+  pw_model_stanvar <- brms::stanvar(
     name = "pw_model",
     scode = glue::glue("
       // trend parameter priors
@@ -2789,7 +2890,20 @@ generate_pw_trend_stanvars <- function(trend_spec, data_info) {
     block = "model"
   )
 
-  return(stanvars)
+  # Combine all stanvars
+  if (trend_type == "logistic") {
+    result_stanvars <- combine_stanvars(result_stanvars, pw_functions_stanvar, pw_data_stanvar, 
+                                      pw_logistic_data_stanvar, pw_transformed_data_stanvar, 
+                                      pw_parameters_stanvar, pw_transformed_parameters_stanvar, 
+                                      trend_computation, pw_model_stanvar)
+  } else {
+    result_stanvars <- combine_stanvars(result_stanvars, pw_functions_stanvar, pw_data_stanvar, 
+                                      pw_transformed_data_stanvar, pw_parameters_stanvar, 
+                                      pw_transformed_parameters_stanvar, trend_computation, 
+                                      pw_model_stanvar)
+  }
+
+  return(result_stanvars)
 }
 
 #' PWlinear Trend Generator
@@ -3024,17 +3138,6 @@ validate_stan_code_structure <- function(stan_code) {
 
   invisible(TRUE)
 }
-
-#' Validate Stan Syntax
-#'
-#' @description
-#' Validates basic Stan syntax including brace balancing.
-#'
-#' @param stan_code Character string containing Stan model code
-#' @param silent Logical indicating whether to suppress error messages
-#' @return Logical indicating whether syntax is valid (if silent=TRUE), otherwise invisible TRUE or stops with error
-#' @noRd
-# validate_stan_syntax removed - functionality merged into validate_stan_code
 
 #' Check if Braces are Balanced
 #'

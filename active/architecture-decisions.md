@@ -368,6 +368,93 @@ ZMVN()            # trend = 'ZMVN'
 **Policy**: Maintain compatibility with existing mvgam interfaces where possible
 **Exception**: Breaking changes allowed only when essential for brms integration
 
+### 7. Stanvars Combination Architecture (January 2025)
+
+**Critical Design Decision**: All trend generators must return proper brms "stanvars" class objects
+
+**Problem Solved**: Using `stanvars$name <- brms::stanvar(...)` creates regular lists that corrupt the brms class structure, causing "object of type 'symbol' is not subsettable" errors.
+
+**Solution Architecture**:
+```r
+# Helper function with full validation
+combine_stanvars <- function(base_stanvars = NULL, ...) {
+  # Validates all inputs have proper class ("stanvar" or "stanvars")
+  # Safely combines using brms's native c() method
+  # Validates output has "stanvars" class
+  # Throws clear errors if validation fails
+}
+```
+
+**Standard Pattern for All Trend Generators**:
+```r
+generate_trend_stanvars <- function(trend_spec, data_info) {
+  # 1. Generate base stanvars (e.g., matrix Z)
+  matrix_z_stanvars <- generate_matrix_z_stanvars(...)
+  result_stanvars <- matrix_z_stanvars
+  
+  # 2. Create individual stanvar objects (NOT list assignments)
+  param_stanvar <- brms::stanvar(name = "param", scode = "...", block = "parameters")
+  model_stanvar <- brms::stanvar(name = "model", scode = "...", block = "model")
+  
+  # 3. Combine using validated helper
+  result_stanvars <- combine_stanvars(result_stanvars, param_stanvar, model_stanvar)
+  
+  # 4. Return proper "stanvars" object
+  return(result_stanvars)
+}
+```
+
+**Key Requirements**:
+1. **Never use** `stanvars$name <- brms::stanvar(...)` pattern
+2. **Always create** individual stanvar variables
+3. **Always use** `combine_stanvars()` for combining
+4. **Always validate** that returned object has class "stanvars"
+
+**Benefits**:
+- **Prevents class corruption** that breaks brms integration
+- **Early error detection** through validation in helper
+- **Consistent pattern** for all trend generators
+- **Clear debugging** when stanvar issues occur
+
+**Implementation Status**: ✅ All trend generators (RW, AR, VAR, CAR, ZMVN, PW) fully converted to new pattern
+
+### 8. Trend Parameter Naming Convention (January 2025)
+
+**Critical Design Decision**: Trend variance parameters must avoid naming conflicts with brms observation model parameters
+
+**Problem Identified**: Trend generators declaring parameters like `sigma` conflict with brms family parameters (e.g., gaussian family's `sigma` for residual variance).
+
+**Naming Convention**:
+```stan
+// Trend variance parameters - use _trend suffix
+vector<lower=0>[n_lv] sigma_trend;     // Univariate trend variances
+matrix[n_lv, n_lv] Sigma_trend;        // Multivariate trend covariance
+
+// NOT allowed - conflicts with brms parameters
+vector<lower=0>[n_lv] sigma;           // CONFLICTS with gaussian family
+matrix[n_lv, n_lv] Sigma;              // CONFLICTS with multivariate families
+```
+
+**Standardized Parameter Names**:
+- **Trend variances**: `sigma_trend` (univariate) or `sigma_lv` (latent variables)
+- **Trend covariances**: `Sigma_trend` (full covariance) or `L_Omega` (Cholesky factor)
+- **AR coefficients**: `ar_coefs` (never just `ar` which conflicts with brms)
+- **VAR coefficients**: `lv_coefs` or `var_coefs`
+- **CAR parameters**: `car_rho`, `car_sigma`
+- **Factor loadings**: `Z` (matrix), `z_loading` (vectors)
+
+**Benefits**:
+- **Prevents compilation errors** from parameter name conflicts
+- **Clear separation** between observation and trend parameters
+- **Easier debugging** when parameters have descriptive names
+- **Consistent pattern** across all trend types
+
+**Implementation Requirements**:
+1. All trend generators must use `_trend` suffix for variance parameters
+2. Review existing generators for compliance
+3. Update tests to verify no naming conflicts
+4. Document in trend development guide
+
 ## Developer Onboarding Guide ✅ **POST-CONSOLIDATION UPDATE**
 
 ### Key Files for New Developers (After Week 5-6 Consolidation)

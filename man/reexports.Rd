@@ -2,7 +2,7 @@
 % Please edit documentation in R/as.data.frame.mvgam.R, R/conditional_effects.R,
 %   R/forecast.mvgam.R, R/get_mvgam_priors.R, R/loo.mvgam.R,
 %   R/marginaleffects.mvgam.R, R/mcmc_plot.mvgam.R, R/posterior_epred.mvgam.R,
-%   R/stan_utils.R, R/tidier_methods.R
+%   R/tidier_methods.R
 \docType{import}
 \name{reexports}
 \alias{reexports}
@@ -35,8 +35,6 @@
 \alias{posterior_predict}
 \alias{posterior_epred}
 \alias{posterior_linpred}
-\alias{stancode}
-\alias{standata}
 \alias{tidy}
 \alias{augment}
 \title{Objects exported from other packages}
@@ -46,7 +44,7 @@ These objects are imported from other packages. Follow the links
 below to see their documentation.
 
 \describe{
-  \item{brms}{\code{\link[brms:conditional_effects.brmsfit]{conditional_effects}}, \code{\link[brms:mcmc_plot.brmsfit]{mcmc_plot}}, \code{\link[brms:set_prior]{prior}}, \code{\link[brms:set_prior]{prior_}}, \code{\link[brms:set_prior]{prior_string}}, \code{\link[brms]{set_prior}}, \code{\link[brms]{stancode}}, \code{\link[brms]{standata}}}
+  \item{brms}{\code{\link[brms:conditional_effects.brmsfit]{conditional_effects}}, \code{\link[brms:mcmc_plot.brmsfit]{mcmc_plot}}, \code{\link[brms:set_prior]{prior}}, \code{\link[brms:set_prior]{prior_}}, \code{\link[brms:set_prior]{prior_string}}, \code{\link[brms]{set_prior}}}
 
   \item{generics}{\code{\link[generics]{augment}}, \code{\link[generics]{forecast}}, \code{\link[generics]{tidy}}}
 

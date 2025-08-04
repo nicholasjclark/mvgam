@@ -22,108 +22,38 @@ get_mvgam_priors(
 )
 }
 \arguments{
-\item{formula}{A \code{formula} object specifying the GAM observation model formula.
-These are exactly like the formula for a GLM except that smooth terms, \code{s()},
-\code{te()}, \code{ti()}, \code{t2()}, as well as time-varying \code{dynamic()} terms,
-nonparametric \code{gp()} terms and offsets using \code{offset()}, can be added to the
-right hand side to specify that the linear predictor depends on smooth
-functions of predictors (or linear functionals of these).
-
-In \code{nmix()} family models, the \code{formula} is used to set up a linear predictor
-for the detection probability. Details of the formula syntax used by
-\pkg{mvgam} can be found in \code{\link{mvgam_formulae}}}
-
-\item{trend_formula}{An optional \code{formula} object specifying the GAM process
-model formula. If supplied, a linear predictor will be modelled for the
-latent trends to capture process model evolution separately from the
-observation model.
-
-\strong{Important notes:}
-\itemize{
-\item Should not have a response variable specified on the left-hand side
-(e.g., \code{~ season + s(year)})
-\item Use \code{trend} instead of \code{series} for effects that vary across time series
-\item Only available for \code{RW()}, \code{AR()} and \code{VAR()} trend models
-\item In \code{nmix()} family models, sets up linear predictor for latent abundance
-\item Consider dropping one intercept using \code{- 1} convention to avoid
-estimation challenges
-}}
+\item{formula}{A \code{formula} object specifying the GAM observation model
+formula. These are exactly like the formula for a GLM except that smooth
+terms, \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, as well as time-varying \code{dynamic()}
+terms, nonparametric \code{gp()} terms and offsets using \code{offset()}, can be
+added to the right hand side to specify that the linear predictor depends
+on smooth functions of predictors (or linear functionals of these).
+Details of the formula syntax used by \pkg{mvgam} can be found in
+\code{\link{mvgam_formulae}}}
 
 \item{factor_formula}{Can be supplied instead \code{trend_formula} to match
 syntax from \link{jsdgam}}
 
-\item{knots}{An optional \code{list} containing user specified knot values for
-basis construction. For most bases the user simply supplies the knots to be
-used, which must match up with the \code{k} value supplied. Different terms can
-use different numbers of knots, unless they share a covariate.}
-
-\item{trend_knots}{As for \code{knots} above, this is an optional \code{list} of knot
-values for smooth functions within the \code{trend_formula}.}
-
-\item{trend_model}{\code{character} or \code{function} specifying the time series dynamics
-for the latent trend.
-
-\strong{Available options:}
+\item{family}{\code{family} specifying the observation family for the
+outcomes. Currently supported families are:
 \itemize{
-\item \code{None}: No latent trend component (GAM component only, like \code{\link[mgcv]{gam}})
-\item \code{ZMVN} or \code{ZMVN()}: Zero-Mean Multivariate Normal (Stan only)
-\item \code{'RW'} or \code{RW()}: Random Walk
-\item \code{'AR1'}, \code{'AR2'}, \code{'AR3'} or \code{AR(p = 1, 2, 3)}: Autoregressive models
-\item \code{'CAR1'} or \code{CAR(p = 1)}: Continuous-time AR (Ornstein–Uhlenbeck process)
-\item \code{'VAR1'} or \code{VAR()}: Vector Autoregressive (Stan only)
-\item \code{'PWlogistic'}, \code{'PWlinear'} or \code{PW()}: Piecewise trends (Stan only)
-\item \code{'GP'} or \code{GP()}: Gaussian Process with squared exponential kernel (Stan only)
-}
+\item\code{gaussian()} for real-valued data
+\item\code{betar()} for proportional data on \verb{(0,1)}
+\item\code{lognormal()} for non-negative real-valued data
+\item\code{student_t()} for real-valued data
+\item\code{Gamma()} for non-negative real-valued data
+\item\code{bernoulli()} for binary data
+\item\code{poisson()} for count data
+\item\code{nb()} for overdispersed count data
+\item\code{binomial()} for count data with imperfect detection when the number
+of trials is known; note that the \code{cbind()} function must be used to
+bind the discrete observations and the discrete number of trials
+\item\code{beta_binomial()} as for \code{binomial()} but allows for overdispersion}
+Default is \code{poisson()}. See \code{\link{mvgam_families}} for more details}
 
-\strong{Additional features:}
-\itemize{
-\item Moving average and/or correlated process error terms available for most types
-(e.g., \code{RW(cor = TRUE)} for multivariate Random Walk)
-\item Hierarchical correlations possible for structured data
-\item See \link{mvgam_trends} for details and \code{\link[=ZMVN]{ZMVN()}} for examples
-}}
-
-\item{family}{\code{family} specifying the exponential observation family for the series.
-
-\strong{Supported families:}
-\itemize{
-\item \code{gaussian()}: Real-valued data
-\item \code{betar()}: Proportional data on \verb{(0,1)}
-\item \code{lognormal()}: Non-negative real-valued data
-\item \code{student_t()}: Real-valued data
-\item \code{Gamma()}: Non-negative real-valued data
-\item \code{bernoulli()}: Binary data
-\item \code{poisson()}: Count data (default)
-\item \code{nb()}: Overdispersed count data
-\item \code{binomial()}: Count data with imperfect detection when number of trials is known
-(use \code{cbind()} to bind observations and trials)
-\item \code{beta_binomial()}: As \code{binomial()} but allows for overdispersion
-\item \code{nmix()}: Count data with imperfect detection when number of trials is unknown
-(State-Space N-Mixture model with Poisson latent states and Binomial observations)
-}
-
-See \code{\link{mvgam_families}} for more details.}
-
-\item{data}{A \code{dataframe} or \code{list} containing the model response variable
-and covariates required by the GAM \code{formula} and optional \code{trend_formula}.
-
-\strong{Required columns for most models:}
-\itemize{
-\item \code{series}: A \code{factor} index of the series IDs (number of levels should equal
-number of unique series labels)
-\item \code{time}: \code{numeric} or \code{integer} index of time points. For most dynamic trend
-types, time should be measured in discrete, regularly spaced intervals
-(i.e., \code{c(1, 2, 3, ...)}). Irregular spacing is allowed for \code{trend_model = CAR(1)},
-but zero intervals are adjusted to \code{1e-12} to prevent sampling errors.
-}
-
-\strong{Special cases:}
-\itemize{
-\item Models with hierarchical temporal correlation (e.g., \code{AR(gr = region, subgr = species)})
-should NOT include a \code{series} identifier
-\item Models without temporal dynamics (\code{trend_model = 'None'} or \code{trend_model = ZMVN()})
-don't require a \code{time} variable
-}}
+\item{data}{A \code{dataframe} or \code{list} containing the model response
+variable and covariates required by the GAM \code{formula} and
+\code{factor_formula} objects}
 
 \item{unit}{The unquoted name of the variable that represents the unit of
 analysis in \code{data} over which latent residuals should be correlated. This
@@ -137,31 +67,8 @@ explanations}
 different response units in \code{data} (usually \code{'species'} in a JSDM).
 Defaults to \code{series} to be consistent with other \code{mvgam} models}
 
-\item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
-latent trends in a reduced dimension format. Only available for \code{RW()},
-\code{AR()} and \code{GP()} trend models. Default is \code{FALSE}.
-See \code{\link{lv_correlations}} for examples.}
-
-\item{n_lv}{\code{integer} specifying the number of latent dynamic factors to use
-if \code{use_lv == TRUE}. Cannot exceed \code{n_series}. Default is
-\code{min(2, floor(n_series / 2))}.}
-
-\item{trend_map}{Optional \code{data.frame} specifying which series should depend on
-which latent trends. Enables multiple series to depend on the same latent
-trend process with different observation processes.
-
-\strong{Required structure:}
-\itemize{
-\item Column \code{series}: Single unique entry for each series (matching factor levels in data)
-\item Column \code{trend}: Integer values indicating which trend each series depends on
-}
-
-\strong{Notes:}
-\itemize{
-\item Sets up latent factor model by enabling \code{use_lv = TRUE}
-\item Process model intercept is NOT automatically suppressed
-\item Not yet supported for continuous time models (\code{CAR()})
-}}
+\item{n_lv}{\code{integer} the number of latent factors to use for modelling
+residual associations. Cannot be \verb{> n_species}. Defaults arbitrarily to \code{2}}
 
 \item{...}{Not currently used}
 }
