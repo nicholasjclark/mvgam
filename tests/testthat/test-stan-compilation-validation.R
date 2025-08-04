@@ -1,5 +1,5 @@
 # Stan Compilation Validation Tests
-# 
+#
 # Comprehensive test suite for systematic Stan compilation validation
 # Testing Stan compilation across all registered trend types with systematic
 # formula patterns and model configurations.
@@ -12,7 +12,7 @@ setup_compilation_test_data <- function() {
   set.seed(42)  # Consistent seed for reproducible tests
   n_time <- 20
   n_series <- 3
-  
+
   # Simple univariate time series
   univariate_data <- data.frame(
     time = 1:n_time,
@@ -22,7 +22,7 @@ setup_compilation_test_data <- function() {
     x2 = runif(n_time, -1, 1),
     group = factor(rep(c("A", "B"), length.out = n_time))
   )
-  
+
   # Multivariate time series
   multivariate_data <- data.frame(
     time = rep(1:n_time, n_series),
@@ -32,14 +32,14 @@ setup_compilation_test_data <- function() {
     x2 = runif(n_time * n_series, -1, 1),
     group = factor(rep(c("A", "B", "C"), length.out = n_time * n_series))
   )
-  
+
   # Data with different response types
   count_data <- univariate_data
   count_data$y <- rpois(n_time, lambda = 5)
-  
-  binary_data <- univariate_data  
+
+  binary_data <- univariate_data
   binary_data$y <- rbinom(n_time, size = 1, prob = 0.3)
-  
+
   list(
     univariate = univariate_data,
     multivariate = multivariate_data,
@@ -53,13 +53,13 @@ setup_compilation_test_data <- function() {
 get_test_trend_types <- function() {
   # Ensure registry is initialized
   mvgam:::ensure_registry_initialized()
-  
+
   # Get all registered trend types
   trend_info <- mvgam:::list_trend_types()
-  
+
   # Remove "None" as it's not a real trend for compilation testing
   trend_types <- trend_info$trend_type[trend_info$trend_type != "None"]
-  
+
   list(
     all_types = trend_types,
     factor_compatible = trend_info$trend_type[trend_info$supports_factors & trend_info$trend_type != "None"],
@@ -71,14 +71,14 @@ get_test_trend_types <- function() {
 
 test_that("AR trend stanvar generation works", {
   data <- setup_compilation_test_data()$univariate
-  
+
   # Generate trend stanvars
   trend_spec <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1),
     n_lv = NULL
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 1,
@@ -86,14 +86,14 @@ test_that("AR trend stanvar generation works", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   # Test stanvar generation
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
-  
+
   # Check that the result has the correct class structure
   expect_true(inherits(stanvars, "stanvars"))
   expect_true(length(stanvars) > 0)
-  
+
   # Test that stanvars work with brms
   test_code <- try({
     brms::make_stancode(
@@ -103,14 +103,14 @@ test_that("AR trend stanvar generation works", {
       stanvars = stanvars
     )
   }, silent = TRUE)
-  
+
   expect_false(inherits(test_code, "try-error"))
   expect_type(test_code, "character")
 })
 
 test_that("brms lightweight setup works", {
   data <- setup_compilation_test_data()$univariate
-  
+
   # Test basic brms setup
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ 1,
@@ -118,7 +118,7 @@ test_that("brms lightweight setup works", {
     family = gaussian(),
     backend = "rstan"
   )
-  
+
   expect_type(obs_setup, "list")
   expect_true("stancode" %in% names(obs_setup))
   expect_true("standata" %in% names(obs_setup))
@@ -128,19 +128,14 @@ test_that("brms lightweight setup works", {
 
 test_that("test stanvar combination logic", {
   data <- setup_compilation_test_data()$univariate
-  
+
   # Test creating individual stanvars with brms
   sv1 <- brms::stanvar(x = 1, name = "test1", scode = "int<lower=1> test1;", block = "data")
   sv2 <- brms::stanvar(x = 2, name = "test2", scode = "int<lower=1> test2;", block = "data")
-  
-  cat("Individual stanvar classes:\n")
-  cat("sv1:", paste(class(sv1), collapse = ", "), "\n")
-  cat("sv2:", paste(class(sv2), collapse = ", "), "\n")
-  
+
   # Test proper combination using brms c() method for stanvars
   combined_proper <- c(sv1, sv2)
-  cat("Properly combined class:", paste(class(combined_proper), collapse = ", "), "\n")
-  
+
   # Test if properly combined stanvars work with brms
   test_proper <- try({
     brms::make_stancode(
@@ -150,20 +145,20 @@ test_that("test stanvar combination logic", {
       stanvars = combined_proper
     )
   }, silent = TRUE)
-  
+
   expect_false(inherits(test_proper, "try-error"))
 })
 
 test_that("RW trend simple intercept model compiles", {
   data <- setup_compilation_test_data()$univariate
-  
+
   # Generate trend stanvars
   trend_spec <- list(
     trend = "RW",
     trend_formula = ~ RW(),
     n_lv = NULL
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 1,
@@ -171,12 +166,12 @@ test_that("RW trend simple intercept model compiles", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   # Test stanvar generation
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
   expect_type(stanvars, "list")
   expect_true(length(stanvars) > 0)
-  
+
   # Test basic Stan code assembly
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ 1,
@@ -184,37 +179,37 @@ test_that("RW trend simple intercept model compiles", {
     family = gaussian(),
     backend = "rstan"
   )
-  
+
   # Generate combined Stan code
   combined_code <- mvgam:::generate_base_stancode_with_stanvars(
-    obs_setup, 
-    stanvars, 
+    obs_setup,
+    stanvars,
     backend = "rstan",
   )
-  
+
   expect_type(combined_code, "character")
   expect_gt(nchar(combined_code), 100)
-  
+
   # Validate Stan compilation
   validation_result <- mvgam:::validate_stan_code(
-    combined_code, 
-    backend = "rstan", 
+    combined_code,
+    backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation_result, "character")
 })
 
 test_that("VAR trend simple intercept model compiles", {
   data <- setup_compilation_test_data()$univariate
-  
+
   # Generate trend stanvars
   trend_spec <- list(
     trend = "VAR",
     trend_formula = ~ VAR(p = 1),
     n_lv = NULL
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 1,
@@ -222,12 +217,12 @@ test_that("VAR trend simple intercept model compiles", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   # Test stanvar generation
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
   expect_type(stanvars, "list")
   expect_true(length(stanvars) > 0)
-  
+
   # Test basic Stan code assembly
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ 1,
@@ -235,37 +230,37 @@ test_that("VAR trend simple intercept model compiles", {
     family = gaussian(),
     backend = "rstan"
   )
-  
+
   # Generate combined Stan code
   combined_code <- mvgam:::generate_base_stancode_with_stanvars(
-    obs_setup, 
-    stanvars, 
+    obs_setup,
+    stanvars,
     backend = "rstan",
   )
-  
+
   expect_type(combined_code, "character")
   expect_gt(nchar(combined_code), 100)
-  
+
   # Validate Stan compilation
   validation_result <- mvgam:::validate_stan_code(
-    combined_code, 
-    backend = "rstan", 
+    combined_code,
+    backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation_result, "character")
 })
 
 test_that("CAR trend simple intercept model compiles", {
   data <- setup_compilation_test_data()$univariate
-  
+
   # Generate trend stanvars
   trend_spec <- list(
     trend = "CAR",
     trend_formula = ~ CAR(),
     n_lv = NULL
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 1,
@@ -273,12 +268,12 @@ test_that("CAR trend simple intercept model compiles", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   # Test stanvar generation
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
   expect_type(stanvars, "list")
   expect_true(length(stanvars) > 0)
-  
+
   # Test basic Stan code assembly
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ 1,
@@ -286,37 +281,37 @@ test_that("CAR trend simple intercept model compiles", {
     family = gaussian(),
     backend = "rstan"
   )
-  
+
   # Generate combined Stan code
   combined_code <- mvgam:::generate_base_stancode_with_stanvars(
-    obs_setup, 
-    stanvars, 
+    obs_setup,
+    stanvars,
     backend = "rstan",
   )
-  
+
   expect_type(combined_code, "character")
   expect_gt(nchar(combined_code), 100)
-  
+
   # Validate Stan compilation
   validation_result <- mvgam:::validate_stan_code(
-    combined_code, 
-    backend = "rstan", 
+    combined_code,
+    backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation_result, "character")
 })
 
 test_that("ZMVN trend simple intercept model compiles", {
   data <- setup_compilation_test_data()$univariate
-  
+
   # Generate trend stanvars
   trend_spec <- list(
     trend = "ZMVN",
     trend_formula = ~ ZMVN(),
     n_lv = NULL
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 1,
@@ -324,12 +319,12 @@ test_that("ZMVN trend simple intercept model compiles", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   # Test stanvar generation
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
   expect_type(stanvars, "list")
   expect_true(length(stanvars) > 0)
-  
+
   # Test basic Stan code assembly
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ 1,
@@ -337,37 +332,37 @@ test_that("ZMVN trend simple intercept model compiles", {
     family = gaussian(),
     backend = "rstan"
   )
-  
+
   # Generate combined Stan code
   combined_code <- mvgam:::generate_base_stancode_with_stanvars(
-    obs_setup, 
-    stanvars, 
+    obs_setup,
+    stanvars,
     backend = "rstan",
   )
-  
+
   expect_type(combined_code, "character")
   expect_gt(nchar(combined_code), 100)
-  
+
   # Validate Stan compilation
   validation_result <- mvgam:::validate_stan_code(
-    combined_code, 
-    backend = "rstan", 
+    combined_code,
+    backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation_result, "character")
 })
 
 test_that("PW trend simple intercept model compiles", {
   data <- setup_compilation_test_data()$univariate
-  
+
   # Generate trend stanvars
   trend_spec <- list(
     trend = "PW",
     trend_formula = ~ PW(),
     n_lv = NULL
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 1,
@@ -375,12 +370,12 @@ test_that("PW trend simple intercept model compiles", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   # Test stanvar generation
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
   expect_type(stanvars, "list")
   expect_true(length(stanvars) > 0)
-  
+
   # Test basic Stan code assembly
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ 1,
@@ -388,24 +383,24 @@ test_that("PW trend simple intercept model compiles", {
     family = gaussian(),
     backend = "rstan"
   )
-  
+
   # Generate combined Stan code
   combined_code <- mvgam:::generate_base_stancode_with_stanvars(
-    obs_setup, 
-    stanvars, 
+    obs_setup,
+    stanvars,
     backend = "rstan",
   )
-  
+
   expect_type(combined_code, "character")
   expect_gt(nchar(combined_code), 100)
-  
+
   # Validate Stan compilation
   validation_result <- mvgam:::validate_stan_code(
-    combined_code, 
-    backend = "rstan", 
+    combined_code,
+    backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation_result, "character")
 })
 
@@ -413,13 +408,13 @@ test_that("PW trend simple intercept model compiles", {
 
 test_that("AR trend with covariates compiles", {
   data <- setup_compilation_test_data()$univariate
-  
+
   trend_spec <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1),
     n_lv = NULL
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 1,
@@ -427,10 +422,10 @@ test_that("AR trend with covariates compiles", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   # Generate stanvars
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
-  
+
   # Test with covariates in observation model
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ x1 + x2,
@@ -438,20 +433,20 @@ test_that("AR trend with covariates compiles", {
     family = gaussian(),
     backend = "rstan"
   )
-  
+
   # Generate and validate Stan code
   combined_code <- mvgam:::generate_base_stancode_with_stanvars(
-    obs_setup, 
-    stanvars, 
+    obs_setup,
+    stanvars,
     backend = "rstan",
   )
-  
+
   validation_result <- mvgam:::validate_stan_code(
-    combined_code, 
-    backend = "rstan", 
+    combined_code,
+    backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation_result, "character")
 })
 
@@ -459,13 +454,13 @@ test_that("AR trend with covariates compiles", {
 
 test_that("AR trend with poisson family compiles", {
   data <- setup_compilation_test_data()$count
-  
+
   trend_spec <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1),
     n_lv = NULL
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 1,
@@ -473,28 +468,28 @@ test_that("AR trend with poisson family compiles", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
-  
+
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ 1,
     data = data,
     family = poisson(),
     backend = "rstan"
   )
-  
+
   combined_code <- mvgam:::generate_base_stancode_with_stanvars(
-    obs_setup, 
-    stanvars, 
+    obs_setup,
+    stanvars,
     backend = "rstan",
   )
-  
+
   validation_result <- mvgam:::validate_stan_code(
-    combined_code, 
-    backend = "rstan", 
+    combined_code,
+    backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation_result, "character")
 })
 
@@ -502,25 +497,25 @@ test_that("AR trend with poisson family compiles", {
 
 test_that("AR trend accepts n_lv parameter for factor models", {
   data <- setup_compilation_test_data()$multivariate
-  
+
   trend_spec <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1, n_lv = 2),
     n_lv = 2
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 3,
     n_obs = nrow(data),
-    time_var = "time", 
+    time_var = "time",
     series_var = "series"
   )
-  
+
   # Should not throw factor compatibility error
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
   expect_true(inherits(stanvars, "stanvars"))
-  
+
   # Test that stanvars work with brms and contain factor model components
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ 1,
@@ -528,27 +523,27 @@ test_that("AR trend accepts n_lv parameter for factor models", {
     family = gaussian(),
     backend = "rstan"
   )
-  
+
   # Generate Stan code to check for matrix Z
   combined_code <- mvgam:::generate_base_stancode_with_stanvars(
-    obs_setup, 
-    stanvars, 
+    obs_setup,
+    stanvars,
     backend = "rstan",
   )
-  
+
   # Check that matrix Z is in parameters block (factor model indicator)
   expect_true(grepl("parameters\\s*\\{[^}]*matrix\\[n_series, n_lv\\] Z;", combined_code))
 })
 
 test_that("CAR trend rejects n_lv parameter", {
   data <- setup_compilation_test_data()$multivariate
-  
+
   trend_spec <- list(
     trend = "CAR",
     trend_formula = ~ CAR(n_lv = 2),
     n_lv = 2
   )
-  
+
   # Should throw factor compatibility error
   expect_error({
     mvgam:::validate_factor_compatibility(trend_spec)
@@ -557,13 +552,13 @@ test_that("CAR trend rejects n_lv parameter", {
 
 test_that("PW trend rejects n_lv parameter", {
   data <- setup_compilation_test_data()$multivariate
-  
+
   trend_spec <- list(
     trend = "PW",
     trend_formula = ~ PW(n_lv = 2),
     n_lv = 2
   )
-  
+
   # Should throw factor compatibility error
   expect_error({
     mvgam:::validate_factor_compatibility(trend_spec)
@@ -574,10 +569,10 @@ test_that("PW trend rejects n_lv parameter", {
 
 test_that("AR trend supports hierarchical correlations", {
   data <- setup_compilation_test_data()$multivariate
-  
+
   # Add grouping variable for hierarchical correlations
   data$group <- factor(rep(c("A", "B"), length.out = nrow(data)))
-  
+
   trend_spec <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1, gr = group),
@@ -586,7 +581,7 @@ test_that("AR trend supports hierarchical correlations", {
     n_groups = 2,
     n_subgroups = 3
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 3,
@@ -596,10 +591,10 @@ test_that("AR trend supports hierarchical correlations", {
     n_groups = 2,
     n_subgroups = 3
   )
-  
+
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
   expect_true(inherits(stanvars, "stanvars"))
-  
+
   # Test Stan code compilation
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ 1,
@@ -607,30 +602,30 @@ test_that("AR trend supports hierarchical correlations", {
     family = gaussian(),
     backend = "rstan"
   )
-  
+
   combined_code <- mvgam:::generate_base_stancode_with_stanvars(
-    obs_setup, 
-    stanvars, 
+    obs_setup,
+    stanvars,
     backend = "rstan",
   )
-  
+
   # Check for hierarchical correlation components in generated code
   expect_true(grepl("L_Omega_global", combined_code))
   expect_true(grepl("alpha_cor", combined_code))
-  
+
   validation_result <- mvgam:::validate_stan_code(
-    combined_code, 
-    backend = "rstan", 
+    combined_code,
+    backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation_result, "character")
 })
 
 test_that("RW trend ignores grouping parameter", {
   data <- setup_compilation_test_data()$multivariate
   data$group <- factor(rep(c("A", "B"), length.out = nrow(data)))
-  
+
   # RW doesn't support hierarchical correlations - should warn
   expect_warning({
     trend_spec <- list(
@@ -639,7 +634,7 @@ test_that("RW trend ignores grouping parameter", {
       n_lv = NULL,
       gr = "group"
     )
-    
+
     data_info <- list(
       data = data,
       n_series = 3,
@@ -647,10 +642,10 @@ test_that("RW trend ignores grouping parameter", {
       time_var = "time",
       series_var = "series"
     )
-    
+
     stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
     expect_true(inherits(stanvars, "stanvars"))
-    
+
     # Generate Stan code to verify no hierarchical components
     obs_setup <- mvgam:::setup_brms_lightweight(
       formula = y ~ 1,
@@ -658,17 +653,17 @@ test_that("RW trend ignores grouping parameter", {
       family = gaussian(),
       backend = "rstan"
     )
-    
+
     combined_code <- mvgam:::generate_base_stancode_with_stanvars(
-      obs_setup, 
-      stanvars, 
+      obs_setup,
+      stanvars,
       backend = "rstan",
       )
-    
+
     # Should not contain hierarchical correlation components
     expect_false(grepl("L_Omega_global", combined_code))
     expect_false(grepl("alpha_cor", combined_code))
-    
+
   }, "correlations.*ignored")
 })
 
@@ -676,13 +671,13 @@ test_that("RW trend ignores grouping parameter", {
 
 test_that("RW trend full Stan assembly pipeline works", {
   data <- setup_compilation_test_data()$univariate
-  
+
   trend_spec <- list(
     trend = "RW",
     trend_formula = ~ RW(),
     n_lv = NULL
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 1,
@@ -690,11 +685,11 @@ test_that("RW trend full Stan assembly pipeline works", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   # 1. Generate trend stanvars
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
   expect_true(inherits(stanvars, "stanvars"))
-  
+
   # 2. Setup brms observation model
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ 1,
@@ -702,7 +697,7 @@ test_that("RW trend full Stan assembly pipeline works", {
     family = gaussian(),
     backend = "rstan"
   )
-  
+
   # 3. Assemble full Stan code
   stan_code <- mvgam:::assemble_mvgam_stan_code(
     obs_formula = y ~ 1,
@@ -711,29 +706,29 @@ test_that("RW trend full Stan assembly pipeline works", {
     family = gaussian(),
     backend = "rstan",
   )
-  
+
   expect_type(stan_code, "character")
   expect_true(grepl("matrix\\[n, n_lv\\] LV", stan_code))
-  
+
   # 4. Validate Stan compilation
   validation <- mvgam:::validate_stan_code(
     stan_code,
     backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation, "character")
 })
 
 test_that("AR trend full Stan assembly pipeline works", {
   data <- setup_compilation_test_data()$univariate
-  
+
   trend_spec <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1),
     n_lv = NULL
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 1,
@@ -741,11 +736,11 @@ test_that("AR trend full Stan assembly pipeline works", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   # 1. Generate trend stanvars
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
   expect_true(inherits(stanvars, "stanvars"))
-  
+
   # 2. Assemble full Stan code
   stan_code <- mvgam:::assemble_mvgam_stan_code(
     obs_formula = y ~ 1,
@@ -754,29 +749,29 @@ test_that("AR trend full Stan assembly pipeline works", {
     family = gaussian(),
     backend = "rstan",
   )
-  
+
   expect_type(stan_code, "character")
   expect_true(grepl("ar_coefs", stan_code))
-  
+
   # 3. Validate Stan compilation
   validation <- mvgam:::validate_stan_code(
     stan_code,
     backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation, "character")
 })
 
 test_that("VAR trend full Stan assembly pipeline works", {
   data <- setup_compilation_test_data()$univariate
-  
+
   trend_spec <- list(
     trend = "VAR",
     trend_formula = ~ VAR(p = 1),
     n_lv = NULL
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 1,
@@ -784,11 +779,11 @@ test_that("VAR trend full Stan assembly pipeline works", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   # Generate and validate
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
   expect_true(inherits(stanvars, "stanvars"))
-  
+
   stan_code <- mvgam:::assemble_mvgam_stan_code(
     obs_formula = y ~ 1,
     trend_stanvars = stanvars,
@@ -796,28 +791,28 @@ test_that("VAR trend full Stan assembly pipeline works", {
     family = gaussian(),
     backend = "rstan",
   )
-  
+
   expect_type(stan_code, "character")
   expect_true(grepl("lv_coefs", stan_code))
-  
+
   validation <- mvgam:::validate_stan_code(
     stan_code,
     backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation, "character")
 })
 
 test_that("CAR trend full Stan assembly pipeline works", {
   data <- setup_compilation_test_data()$univariate
-  
+
   trend_spec <- list(
     trend = "CAR",
     trend_formula = ~ CAR(),
     n_lv = NULL
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 1,
@@ -825,10 +820,10 @@ test_that("CAR trend full Stan assembly pipeline works", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
   expect_true(inherits(stanvars, "stanvars"))
-  
+
   stan_code <- mvgam:::assemble_mvgam_stan_code(
     obs_formula = y ~ 1,
     trend_stanvars = stanvars,
@@ -836,16 +831,16 @@ test_that("CAR trend full Stan assembly pipeline works", {
     family = gaussian(),
     backend = "rstan",
   )
-  
+
   expect_type(stan_code, "character")
   expect_true(grepl("car_rho", stan_code))
-  
+
   validation <- mvgam:::validate_stan_code(
     stan_code,
     backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation, "character")
 })
 
@@ -853,13 +848,13 @@ test_that("CAR trend full Stan assembly pipeline works", {
 
 test_that("RW factor model compiles correctly", {
   data <- setup_compilation_test_data()$multivariate
-  
+
   trend_spec <- list(
     trend = "RW",
     trend_formula = ~ RW(n_lv = 2),
     n_lv = 2
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 3,
@@ -867,10 +862,10 @@ test_that("RW factor model compiles correctly", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
   expect_true(inherits(stanvars, "stanvars"))
-  
+
   stan_code <- mvgam:::assemble_mvgam_stan_code(
     obs_formula = y ~ 1 + (1|series),
     trend_stanvars = stanvars,
@@ -878,29 +873,29 @@ test_that("RW factor model compiles correctly", {
     family = gaussian(),
     backend = "rstan",
   )
-  
+
   # Check for factor model indicators
   expect_true(grepl("parameters\\s*\\{[^}]*matrix\\[n_series, n_lv\\] Z;", stan_code))
   expect_true(grepl("to_vector\\(Z\\) ~ normal\\(0, 1\\)", stan_code))
-  
+
   validation <- mvgam:::validate_stan_code(
     stan_code,
     backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation, "character")
 })
 
 test_that("AR factor model compiles correctly", {
   data <- setup_compilation_test_data()$multivariate
-  
+
   trend_spec <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1, n_lv = 2),
     n_lv = 2
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 3,
@@ -908,10 +903,10 @@ test_that("AR factor model compiles correctly", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
   expect_true(inherits(stanvars, "stanvars"))
-  
+
   stan_code <- mvgam:::assemble_mvgam_stan_code(
     obs_formula = y ~ 1,
     trend_stanvars = stanvars,
@@ -919,17 +914,17 @@ test_that("AR factor model compiles correctly", {
     family = gaussian(),
     backend = "rstan",
   )
-  
+
   # Factor model with AR dynamics
   expect_true(grepl("parameters\\s*\\{[^}]*matrix\\[n_series, n_lv\\] Z;", stan_code))
   expect_true(grepl("ar_coefs", stan_code))
-  
+
   validation <- mvgam:::validate_stan_code(
     stan_code,
     backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation, "character")
 })
 
@@ -937,13 +932,13 @@ test_that("AR factor model compiles correctly", {
 
 test_that("RW trend with smooth covariates compiles", {
   data <- setup_compilation_test_data()$univariate
-  
+
   trend_spec <- list(
     trend = "RW",
     trend_formula = ~ RW(),
     n_lv = NULL
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 1,
@@ -951,9 +946,9 @@ test_that("RW trend with smooth covariates compiles", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
-  
+
   # Complex observation formula with smooths
   stan_code <- mvgam:::assemble_mvgam_stan_code(
     obs_formula = y ~ s(x1) + s(x2),
@@ -962,18 +957,18 @@ test_that("RW trend with smooth covariates compiles", {
     family = gaussian(),
     backend = "rstan",
   )
-  
+
   # Should have both smooths and trend
   expect_true(grepl("s_x1", stan_code))
   expect_true(grepl("s_x2", stan_code))
   expect_true(grepl("matrix\\[n, n_lv\\] LV", stan_code))
-  
+
   validation <- mvgam:::validate_stan_code(
     stan_code,
     backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation, "character")
 })
 
@@ -981,13 +976,13 @@ test_that("RW trend with smooth covariates compiles", {
 
 test_that("AR trend with Poisson family compiles", {
   data <- setup_compilation_test_data()$count
-  
+
   trend_spec <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1),
     n_lv = NULL
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 1,
@@ -995,9 +990,9 @@ test_that("AR trend with Poisson family compiles", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
-  
+
   stan_code <- mvgam:::assemble_mvgam_stan_code(
     obs_formula = y ~ 1,
     trend_stanvars = stanvars,
@@ -1005,29 +1000,29 @@ test_that("AR trend with Poisson family compiles", {
     family = poisson(),
     backend = "rstan",
   )
-  
+
   # Should have Poisson likelihood
   expect_true(grepl("poisson_log_lpmf", stan_code))
   expect_true(grepl("ar_coefs", stan_code))
-  
+
   validation <- mvgam:::validate_stan_code(
     stan_code,
     backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation, "character")
 })
 
 test_that("RW trend with binomial family compiles", {
   data <- setup_compilation_test_data()$binary
-  
+
   trend_spec <- list(
     trend = "RW",
     trend_formula = ~ RW(),
     n_lv = NULL
   )
-  
+
   data_info <- list(
     data = data,
     n_series = 1,
@@ -1035,9 +1030,9 @@ test_that("RW trend with binomial family compiles", {
     time_var = "time",
     series_var = "series"
   )
-  
+
   stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
-  
+
   stan_code <- mvgam:::assemble_mvgam_stan_code(
     obs_formula = y ~ 1,
     trend_stanvars = stanvars,
@@ -1045,16 +1040,16 @@ test_that("RW trend with binomial family compiles", {
     family = binomial(),
     backend = "rstan",
   )
-  
+
   # Should have binomial likelihood
   expect_true(grepl("bernoulli_logit_lpmf", stan_code))
   expect_true(grepl("matrix\\[n, n_lv\\] LV", stan_code))
-  
+
   validation <- mvgam:::validate_stan_code(
     stan_code,
     backend = "rstan",
     silent = TRUE
   )
-  
+
   expect_type(validation, "character")
 })

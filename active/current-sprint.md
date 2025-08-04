@@ -20,9 +20,53 @@
 - Factor model architecture with shared utility functions
 - Hierarchical correlation support across compatible trends
 
+## 🚨 CRITICAL: Stan Compilation Test Results (January 2025)
+
+### Test Execution Summary
+**Status**: 58% Pass Rate (26/45 tests passing)  
+**Critical Finding**: Systematic failures in Stan code generation pipeline
+
+### High Priority Issues Identified
+
+#### 1. **Duplicate Parameter Names** (CRITICAL - Blocks all RW models)
+- **Issue**: RW trend declares `sigma` conflicting with brms gaussian family's `sigma`
+- **Error**: "Identifier 'sigma' is already in use"
+- **Fix**: Rename to `sigma_trend` or `sigma_lv` per architecture decisions
+- **Impact**: All RW trend models with gaussian family failing
+
+#### 2. **Invalid Nested Parameters Blocks** (CRITICAL - Structural issue)
+- **Issue**: Stan assembly creating `parameters { ... parameters { ... } }` nesting
+- **Error**: "Invalid nested 'parameters' blocks"
+- **Root Cause**: Stanvar injection logic incorrectly handling block boundaries
+- **Impact**: AR, VAR full pipeline tests failing
+
+#### 3. **Missing Data in Stanvars** (HIGH - Blocks ZMVN/hierarchical)
+- **Issue**: Data block stanvars missing required `x` parameter
+- **Error**: "Argument 'x' is required if block = 'data'"
+- **Fix**: Add actual data values when creating data block stanvars
+- **Impact**: ZMVN trends and hierarchical correlations broken
+
+#### 4. **Invalid Stanvars Objects** (HIGH - Basic functionality)
+- **Issue**: `generate_trend_injection_stanvars()` returning invalid objects
+- **Error**: "Argument 'stanvars' is invalid"
+- **Root Cause**: Stanvar combination not preserving brms class requirements
+- **Impact**: 6 basic trend tests failing
+
+#### 5. **Stanvar Class Validation** (MEDIUM - Factor models)
+- **Issue**: `combine_stanvars()` rejecting valid combinations
+- **Error**: "All stanvars must have class 'stanvar' or 'stanvars'"
+- **Fix**: Handle mixed stanvar/stanvars objects properly
+- **Impact**: Factor model tests failing
+
+### Immediate Action Plan
+1. **Fix parameter naming**: Update all `sigma` → `sigma_trend` in trend generators
+2. **Debug block nesting**: Fix stanvar injection to prevent nested blocks
+3. **Fix data stanvars**: Add proper `x` parameters with data
+4. **Review combine_stanvars**: Ensure proper class handling
+
 ## Week 7 Deliverables: Systematic Stan Compilation Testing
 
-### Phase 1: Core Trend Type Validation
+### Phase 1: Core Trend Type Validation (BLOCKED BY ABOVE ISSUES)
 **Objective**: Validate Stan compilation for all registered trend types with comprehensive formula patterns
 
 **1.1 Univariate Model Testing**
