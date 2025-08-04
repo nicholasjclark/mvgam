@@ -218,8 +218,6 @@ ensure_registry_initialized()           # Auto-initialization
 - ✅ **COMPLETED**: All trend types (AR, VAR, CAR, ZMVN) support hierarchical correlations and factor models
 - ✅ **COMPLETED**: Code deduplication with shared utility functions eliminates redundant patterns
 - ✅ **COMPLETED**: Comprehensive test suite expansion covering all trend types, factor models, and hierarchical correlations
-- [ ] **CURRENT PRIORITY**: Fix missing infrastructure functions (`combine_stan_components`, `validate_combined_stancode`) and factor validation logic
-- [ ] **Test Results**: 29/53 tests passing (55%), core infrastructure functions needed for full validation
 
 ### Parameter Renaming Scope (Week 5-6)
 - **Challenge**: Ensure parameter renaming works across all brms model types

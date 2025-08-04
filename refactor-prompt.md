@@ -38,4 +38,6 @@ Please load the context files in `/active` and confirm your understanding of the
 
 
 
-Please add relevant tests in consideration of this new behaviour to test-trend-dispatcher and to test-stan-assembly-system. Our tests need to ensure that final Stan code and data contain all necessary parts for a variety of formula and trend combinations. Use the r-test-runner agent to run test-trend-dispatcher, test-brms-setup and test-stan-assembly-system, and then report back to me. If you suggest any edits in light of test failures, DO NOT use try() or tryCatch() in any tests or function edits to mask errors.
+Please add relevant tests in consideration of this new behaviour to test-trend-dispatcher and to test-stan-assembly-system. Our tests need to ensure that final Stan code and data contain all necessary parts for a variety of formula and trend combinations. 
+
+I believe there are still a few minor issues to tackle in the trend injection generators and in the brms assembly. Please the r-test-runner agent to run test-trend-dispatcher, test-brms-setup and test-stan-assembly-system, and then report back to me. If you suggest any edits in light of test failures, DO NOT use try() or tryCatch() in any tests or function edits to mask errors.
