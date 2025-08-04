@@ -391,23 +391,28 @@ bf(y ~ s(x) + AR(p = 1), sigma ~ s(z))
 
 ## Developer Onboarding Guide
 
-### Key Files for New Developers
+### Key Files for New Developers ✅ **POST-CONSOLIDATION UPDATE**
 
-**Registry System:**
-- `R/trend_registry.R` - Core registry infrastructure (250 lines)
-- `R/trend_dispatcher.R` - User-facing functions and validation (875 lines)
-- `R/trend_injection_generators.R` - Trend-specific Stan code generators
+**Consolidated Architecture Files (Week 5-6 Refactoring Complete):**
+- `R/trend_system.R` - Complete trend infrastructure (registry, validation, parsing, constructors)
+- `R/stan_assembly.R` - Two-stage Stan assembly orchestration and validation  
+- `R/brms_integration.R` - Enhanced brms setup and ecosystem integration
+- `R/mvgam_core.R` - Enhanced fitting, dual-object system, multiple imputation
 
-**Stan Assembly Pipeline:**
-- `R/stan_assembly.R` - Two-stage assembly system (1400+ lines)
-- `R/stan_validation.R` - Validation framework (50+ lines)
-- `tests/testthat/test-stan-assembly-system.R` - Test suite
+**Test Infrastructure:**
+- `tests/testthat/test-trend-dispatcher.R` - Trend system validation (85 tests)
+- `tests/testthat/test-brms-setup.R` - brms integration testing
+- `tests/testthat/test-stan-assembly-system.R` - Stan assembly validation
+
+**Legacy Files (13 files consolidated into 4 thematic files above):**
+- All functions preserved with <80 character line widths
+- Purpose-driven WHY annotations throughout consolidated code
+- Consistent error handling and validation patterns
 
 **Architecture Documentation:**
 - `active/current-sprint.md` - Current status and achievements  
 - `active/architecture-decisions.md` - Core design principles
-- `reference/validation-rules.md` - Validation work details
-- `planning/full-timeline.md` - Complete project timeline
+- `active/quick-reference.md` - Developer quick start guide
 
 ### Next Phase Priority (Week 6)
 1. **End-to-end Integration**: Real mvgam model fitting with trend injection

@@ -367,3 +367,30 @@ ZMVN()            # trend = 'ZMVN'
 ### 4. Backward Compatibility
 **Policy**: Maintain compatibility with existing mvgam interfaces where possible
 **Exception**: Breaking changes allowed only when essential for brms integration
+
+## Developer Onboarding Guide ✅ **POST-CONSOLIDATION UPDATE**
+
+### Key Files for New Developers (After Week 5-6 Consolidation)
+
+**Consolidated Architecture Files (4 Core Files):**
+- `R/trend_system.R` - Complete trend infrastructure (registry, validation, parsing, constructors)
+- `R/stan_assembly.R` - Two-stage Stan assembly orchestration and validation  
+- `R/brms_integration.R` - Enhanced brms setup and ecosystem integration
+- `R/mvgam_core.R` - Enhanced fitting, dual-object system, multiple imputation
+
+**Test Infrastructure:**
+- `tests/testthat/test-trend-dispatcher.R` - Trend system validation
+- `tests/testthat/test-brms-setup.R` - brms integration testing
+- `tests/testthat/test-stan-assembly-system.R` - Stan assembly validation
+
+**Architecture Documentation:**
+- `active/current-sprint.md` - Current status and achievements  
+- `active/architecture-decisions.md` - Core design principles
+- `active/quick-reference.md` - Developer quick start guide
+
+### Consolidation Benefits
+
+**Navigability**: 13 scattered files reduced to 4 thematic files with purpose-driven annotations
+**Maintainability**: All functions preserved with <80 character line widths and consistent formatting
+**Understanding**: Each section explains WHY components exist for mvgam-brms integration
+**Consistency**: Unified coding patterns and error handling throughout consolidated codebase
