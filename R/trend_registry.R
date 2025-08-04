@@ -106,11 +106,11 @@ validate_factor_compatibility <- function(trend_spec) {
   }
   
   # Check if trend type supports factor models
-  # Handle both trend_type and trend_model field names for compatibility
-  trend_type <- trend_spec$trend_type %||% trend_spec$trend_model
+  # Handle both trend_type and trend field names for compatibility
+  trend_type <- trend_spec$trend_type %||% trend_spec$trend
   if (is.null(trend_type)) {
     stop(insight::format_error(
-      "trend_spec must contain {.field trend_type} or {.field trend_model} field"
+      "trend_spec must contain {.field trend_type} or {.field trend} field"
     ))
   }
   trend_info <- get_trend_info(trend_type)

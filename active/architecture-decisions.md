@@ -338,6 +338,32 @@ generate_custom_trend_stanvars <- function(trend_spec, data_info) {
 **Principle**: Preserve all brms Stan optimizations (GLM primitives, threading, etc.)
 **Implementation**: Let brms handle observation model complexity entirely
 
-### 3. Backward Compatibility
+### 3. Trend Constructor Interface Standardization
+**Decision**: All trend constructors output only a `trend` field, removing redundant `trend_model` field
+**Rationale**: Eliminates interface inconsistencies and simplifies trend type identification
+
+**Standardized Output Pattern**:
+```r
+# All constructors now return consistent trend field
+RW()              # trend = 'RW'
+AR(p = 1)         # trend = 'AR1' 
+AR(p = c(1, 12))  # trend = 'AR(1,12)'
+VAR(p = 2)        # trend = 'VAR2'
+CAR()             # trend = 'CAR'
+GP()              # trend = 'GP'
+PW(growth = 'linear')   # trend = 'PWlinear'
+PW(growth = 'logistic') # trend = 'PWlogistic'
+ZMVN()            # trend = 'ZMVN'
+```
+
+**Benefits**:
+- **Consistency**: Single source of truth for trend type identification
+- **Simplicity**: Registry and validation systems only need to check one field
+- **Maintainability**: Eliminates duplicate information and potential inconsistencies
+- **Clean Interface**: Removes confusion between `trend` and `trend_model` fields
+
+**Implementation**: Registry compatibility layer handles both `trend` and legacy `trend_type` field names for backward compatibility during transition.
+
+### 4. Backward Compatibility
 **Policy**: Maintain compatibility with existing mvgam interfaces where possible
 **Exception**: Breaking changes allowed only when essential for brms integration

@@ -197,6 +197,266 @@ test_that("trend generators handle edge cases", {
   expect_gt(length(minimal_stanvars), 0)
 })
 
+# Tests for piecewise trend generators
+test_that("piecewise trend generators produce valid Stan components", {
+  data_info <- list(n_obs = 50, n_series = 2, series_var = "series")
+  
+  # Test PWlinear generator
+  pw_linear_spec <- list(
+    trend_type = "PW",
+    type = "linear",
+    n_changepoints = 8,
+    changepoint_scale = 0.1
+  )
+  
+  pw_linear_stanvars <- mvgam:::generate_trend_injection_stanvars(pw_linear_spec, data_info)
+  expect_type(pw_linear_stanvars, "list")
+  expect_gt(length(pw_linear_stanvars), 0)
+  
+  # Check for required components
+  stanvar_names <- names(pw_linear_stanvars)
+  expect_true("pw_functions" %in% stanvar_names)  # Prophet functions
+  expect_true("pw_data" %in% stanvar_names)      # Data block components
+  expect_true("pw_transformed_data" %in% stanvar_names)  # Changepoint matrix
+  expect_true("pw_parameters" %in% stanvar_names)       # Parameters block
+  expect_true("pw_transformed_parameters" %in% stanvar_names)  # LV computation
+  expect_true("pw_model" %in% stanvar_names)     # Model block priors
+  expect_true("trend" %in% stanvar_names)        # Shared trend computation
+  
+  # Verify functions block contains Prophet functions
+  functions_stanvar <- pw_linear_stanvars$pw_functions
+  expect_true(grepl("get_changepoint_matrix", functions_stanvar$scode))
+  expect_true(grepl("linear_trend", functions_stanvar$scode))
+  expect_true(grepl("logistic_trend", functions_stanvar$scode))
+  expect_true(grepl("logistic_gamma", functions_stanvar$scode))
+  
+  # Test PWlogistic generator
+  pw_logistic_spec <- list(
+    trend_type = "PW", 
+    type = "logistic",
+    n_changepoints = 12,
+    changepoint_scale = 0.05
+  )
+  
+  pw_logistic_stanvars <- mvgam:::generate_trend_injection_stanvars(pw_logistic_spec, data_info)
+  expect_type(pw_logistic_stanvars, "list")
+  expect_gt(length(pw_logistic_stanvars), 0)
+  
+  # Logistic should have additional carrying capacity data
+  expect_true("pw_logistic_data" %in% names(pw_logistic_stanvars))
+  
+  # Verify transformed parameters uses logistic function
+  tparams_stanvar <- pw_logistic_stanvars$pw_transformed_parameters
+  expect_true(grepl("logistic_trend", tparams_stanvar$scode))
+  expect_true(grepl("cap", tparams_stanvar$scode))
+})
+
+test_that("piecewise trend generators handle different specifications", {
+  data_info <- list(n_obs = 30, n_series = 1, series_var = "series")
+  
+  # Test PWlinear specific generator
+  pwlinear_spec <- list(
+    trend_type = "PWlinear",
+    n_changepoints = 15,
+    changepoint_scale = 0.2
+  )
+  
+  pwlinear_stanvars <- mvgam:::generate_trend_injection_stanvars(pwlinear_spec, data_info)
+  expect_type(pwlinear_stanvars, "list") 
+  expect_gt(length(pwlinear_stanvars), 0)
+  
+  # Should use linear computation in transformed parameters
+  tparams_stanvar <- pwlinear_stanvars$pw_transformed_parameters
+  expect_true(grepl("linear_trend", tparams_stanvar$scode))
+  expect_false(grepl("logistic_trend", tparams_stanvar$scode))
+  
+  # Should NOT include carrying capacity data
+  expect_false("pw_logistic_data" %in% names(pwlinear_stanvars))
+  
+  # Test PWlogistic specific generator  
+  pwlogistic_spec <- list(
+    trend_type = "PWlogistic",
+    n_changepoints = 20,
+    changepoint_scale = 0.03
+  )
+  
+  pwlogistic_stanvars <- mvgam:::generate_trend_injection_stanvars(pwlogistic_spec, data_info)
+  expect_type(pwlogistic_stanvars, "list")
+  expect_gt(length(pwlogistic_stanvars), 0)
+  
+  # Should use logistic computation
+  tparams_stanvar <- pwlogistic_stanvars$pw_transformed_parameters
+  expect_true(grepl("logistic_trend", tparams_stanvar$scode))
+  expect_true(grepl("cap", tparams_stanvar$scode))
+  
+  # Should include carrying capacity data
+  expect_true("pw_logistic_data" %in% names(pwlogistic_stanvars))
+})
+
+test_that("piecewise trend generators validate input correctly", {
+  data_info <- list(n_obs = 25, n_series = 1, series_var = "series")
+  
+  # Test invalid trend type in PW spec  
+  invalid_type_spec <- list(
+    trend_type = "PW",
+    type = "exponential"  # Invalid type
+  )
+  
+  expect_error(
+    mvgam:::generate_trend_injection_stanvars(invalid_type_spec, data_info),
+    "Piecewise trend type must be 'linear' or 'logistic'"
+  )
+  
+  # Test PW trends reject factor models
+  factor_spec <- list(
+    trend_type = "PW",
+    type = "linear", 
+    n_lv = 2
+  )
+  
+  # Note: This should be caught by validate_factor_compatibility
+  expect_error(
+    mvgam:::generate_trend_injection_stanvars(factor_spec, data_info),
+    "Factor models.*not supported.*PW"
+  )
+})
+
+test_that("piecewise trends produce valid Stan code structure", {
+  data_info <- list(n_obs = 40, n_series = 3, series_var = "series")
+  
+  # Test complete linear piecewise structure
+  pw_spec <- list(
+    trend_type = "PWlinear",
+    n_changepoints = 10,
+    changepoint_scale = 0.08
+  )
+  
+  stanvars <- mvgam:::generate_trend_injection_stanvars(pw_spec, data_info)
+  
+  # Verify all stanvars have proper block assignments
+  expect_equal(stanvars$pw_functions$block, "functions")
+  expect_equal(stanvars$pw_data$block, "data") 
+  expect_equal(stanvars$pw_transformed_data$block, "tdata")
+  expect_equal(stanvars$pw_parameters$block, "parameters")
+  expect_equal(stanvars$pw_transformed_parameters$block, "tparameters")
+  expect_equal(stanvars$pw_model$block, "model")
+  
+  # Verify data components include required elements
+  data_stanvar <- stanvars$pw_data
+  expect_true(grepl("n_changepoints", data_stanvar$scode))
+  expect_true(grepl("t_change", data_stanvar$scode))
+  expect_true(grepl("changepoint_scale", data_stanvar$scode))
+  
+  # Verify parameters include trend parameters
+  params_stanvar <- stanvars$pw_parameters  
+  expect_true(grepl("k_trend", params_stanvar$scode))
+  expect_true(grepl("m_trend", params_stanvar$scode))
+  expect_true(grepl("delta_trend", params_stanvar$scode))
+  
+  # Verify model block includes priors
+  model_stanvar <- stanvars$pw_model
+  expect_true(grepl("m_trend ~ student_t", model_stanvar$scode))
+  expect_true(grepl("k_trend ~ std_normal", model_stanvar$scode))
+  expect_true(grepl("delta_trend.*double_exponential", model_stanvar$scode))
+})
+
+# Tests for piecewise trends in complete Stan assembly
+test_that("piecewise trends integrate with complete Stan assembly", {
+  data <- setup_test_data()$multivariate
+  
+  # Test PWlinear integration with observation model
+  obs_setup <- mvgam:::setup_brms_lightweight(
+    formula = y ~ x,
+    data = data,
+    family = gaussian()
+  )
+  
+  # Create PWlinear trend spec
+  pw_trend_spec <- list(
+    trend_type = "PWlinear",
+    n_changepoints = 6,
+    changepoint_scale = 0.15
+  )
+  
+  # Extract trend stanvars
+  trend_stanvars <- mvgam:::extract_trend_stanvars_from_setup(
+    trend_setup = obs_setup,  # Mock trend setup
+    trend_spec = pw_trend_spec
+  )
+  
+  expect_type(trend_stanvars, "list")
+  expect_gt(length(trend_stanvars), 0)
+  
+  # Test combination with observation model
+  combined_result <- mvgam:::combine_stan_components(
+    obs_stancode = obs_setup$stancode,
+    obs_standata = obs_setup$standata,
+    trend_stanvars = trend_stanvars
+  )
+  
+  expect_type(combined_result, "list")
+  expect_true("stancode" %in% names(combined_result))
+  expect_true("standata" %in% names(combined_result))
+  expect_true("has_trends" %in% names(combined_result))
+  expect_true(combined_result$has_trends)
+  
+  # Verify combined code includes piecewise functions
+  expect_true(grepl("get_changepoint_matrix", combined_result$stancode))
+  expect_true(grepl("linear_trend", combined_result$stancode))
+  expect_true(grepl("k_trend", combined_result$stancode))
+  expect_true(grepl("delta_trend", combined_result$stancode))
+})
+
+test_that("piecewise Stan code validates and compiles correctly", {
+  data_info <- list(n_obs = 30, n_series = 2, series_var = "series")
+  
+  # Test linear piecewise generates valid Stan code
+  pw_linear_spec <- list(
+    trend_type = "PWlinear",
+    n_changepoints = 5,
+    changepoint_scale = 0.1
+  )
+  
+  stanvars <- mvgam:::generate_trend_injection_stanvars(pw_linear_spec, data_info)
+  
+  # Create minimal Stan code with piecewise components for validation
+  minimal_stancode <- "
+  functions {
+    // Functions will be injected here
+  }
+  data {
+    int<lower=1> N;
+    vector[N] time;
+    // Data will be injected here
+  }
+  parameters {
+    // Piecewise parameters will be injected here  
+  }
+  transformed parameters {
+    // Piecewise computations will be injected here
+  }
+  model {
+    // Piecewise priors will be injected here
+  }
+  "
+  
+  # Test that individual stanvar components have valid Stan syntax
+  functions_code <- stanvars$pw_functions$scode
+  expect_invisible(mvgam:::validate_stan_code_structure(functions_code))
+  
+  data_code <- stanvars$pw_data$scode  
+  expect_invisible(mvgam:::validate_stan_code_structure(data_code))
+  
+  params_code <- stanvars$pw_parameters$scode
+  expect_invisible(mvgam:::validate_stan_code_structure(params_code))
+  
+  tparams_code <- stanvars$pw_transformed_parameters$scode
+  expect_invisible(mvgam:::validate_stan_code_structure(tparams_code))
+  
+  model_code <- stanvars$pw_model$scode
+  expect_invisible(mvgam:::validate_stan_code_structure(model_code))
+})
+
 # Tests for Stan code generation pipeline
 test_that("extract_trend_stanvars_from_setup handles valid inputs", {
   # Mock trend setup
@@ -854,7 +1114,7 @@ test_that("Shared utility functions work correctly", {
   expect_gt(length(z_non_factor), 0)
 
   # Test trend computation generation
-  trend_comp <- mvgam:::generate_trend_computation_code(2, 3)
+  trend_comp <- mvgam:::generate_trend_computation_transformed_parameters_injectors(2, 3)
   expect_type(trend_comp, "list")
   expect_gt(length(trend_comp), 0)
 

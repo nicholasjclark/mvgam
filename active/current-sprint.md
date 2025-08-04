@@ -173,6 +173,32 @@ ensure_registry_initialized()           # Auto-initialization
 - ✅ `extract_trend_spec_from_stanvars()` - Extract trend specifications from stanvar metadata
 - ✅ `extract_trend_data_from_stanvars()` - Extract trend-specific data components
 
+**Trend Injection System (R/trend_injection_generators.R)**:
+- ✅ `generate_matrix_z_stanvars()` - **Consolidated utility** combining data, parameter, and transformed data matrix Z injectors for factor/non-factor models
+- ✅ `generate_factor_model_priors()` - **Consolidated utility** providing standardized priors for factor models with fixed variance=1 constraint
+- ✅ `generate_matrix_z_data_injectors()` - Generate data block stanvars for matrix Z (n_lv, n_series declarations)
+- ✅ `generate_matrix_z_parameter_injectors()` - Generate parameter block stanvars for matrix Z (factor model estimation)
+- ✅ `generate_matrix_z_transformed_data_injectors()` - Generate transformed data block stanvars for matrix Z (diagonal for non-factor models)
+- ✅ `generate_trend_computation_transformed_parameters_injectors()` - Universal trend computation pattern: `trend[i,s] = dot_product(Z[s,:], LV[i,:]) + mu_trend[ytimes[i,s]]`
+- ✅ `generate_hierarchical_functions()` - Shared Stan functions for hierarchical correlation structures
+- ✅ `generate_hierarchical_correlation_params()` - Parameters for group-specific correlation matrices with partial pooling
+- ✅ `generate_hierarchical_correlation_priors()` - Priors for hierarchical correlation mixing parameter and group deviations
+
+**Trend-Specific Generators** (All use shared utilities above):
+- ✅ `generate_rw_injection_stanvars()` - Random walk trends with optional MA, correlation, factor models, hierarchical correlations
+- ✅ `generate_ar_injection_stanvars()` - Autoregressive trends with multiple lags, correlation, factor models, hierarchical correlations  
+- ✅ `generate_var_injection_stanvars()` - Vector autoregression with cross-series dynamics, correlation, factor models, hierarchical correlations
+- ✅ `generate_car_injection_stanvars()` - Continuous-time autoregressive trends with irregular time intervals
+- ✅ `generate_zmvn_injection_stanvars()` - Zero-mean multivariate normal trends for unit-level correlations, hierarchical correlations
+- ✅ `generate_pw_injection_stanvars()` - Piecewise trends (Prophet-style) with linear/logistic growth and changepoint detection
+
+**Key Design Principles**:
+- **Code Deduplication**: All factor-compatible trends use shared matrix Z and prior utilities
+- **Universal Computation**: All trends compute `trend[i,s] = dot_product(Z[s,:], LV[i,:]) + mu_trend[ytimes[i,s]]`
+- **Hierarchical Support**: AR, VAR, CAR, ZMVN support hierarchical correlations via shared functions
+- **Factor Compatibility**: AR, RW, VAR, ZMVN support factor models; PW, CAR do not
+- **brms Integration**: All stanvars designed for seamless brms stanvars system integration
+
 ## Decision Points This Sprint
 
 ### Stan Code Validation Strategy (Week 5 Priority)

@@ -1041,3 +1041,181 @@ test_that("PW cap argument integrates with stanvar generation", {
   expect_true(nzchar(pw_logistic$series))
   expect_true(nzchar(pw_logistic$cap))
 })
+
+# Test piecewise trend dispatcher functionality
+test_that("piecewise trend types work correctly with dispatcher", {
+  suppressWarnings({
+    
+    # Test PW constructor with linear growth
+    pw_linear <- PW(time = week, series = species, growth = 'linear', n_changepoints = 8)
+    expect_s3_class(pw_linear, "mvgam_trend")
+    expect_equal(pw_linear$trend_model, "PWlinear")
+    expect_equal(pw_linear$growth, "linear")
+    expect_equal(pw_linear$n_changepoints, 8)
+    expect_true(is.mvgam_trend(pw_linear))
+    
+    # Test PW constructor with logistic growth
+    pw_logistic <- PW(time = month, series = population, cap = carrying_cap, 
+                      growth = 'logistic', n_changepoints = 15, changepoint_scale = 0.05)
+    expect_s3_class(pw_logistic, "mvgam_trend")
+    expect_equal(pw_logistic$trend_model, "PWlogistic")
+    expect_equal(pw_logistic$growth, "logistic")
+    expect_equal(pw_logistic$cap, "carrying_cap")
+    expect_equal(pw_logistic$n_changepoints, 15)
+    expect_equal(pw_logistic$changepoint_scale, 0.05)
+    
+    # Test PWlinear constructor
+    pwlin <- PWlinear(time = daily, series = biomass, n_changepoints = 10)
+    expect_s3_class(pwlin, "mvgam_trend") 
+    expect_equal(pwlin$trend, "PWlinear")
+    expect_equal(pwlin$trend_model, "PWlinear")
+    expect_equal(pwlin$growth, "linear")
+    expect_equal(pwlin$time, "daily")
+    expect_equal(pwlin$series, "biomass")
+    expect_equal(pwlin$n_changepoints, 10)
+    
+    # Test PWlogistic constructor
+    pwlog <- PWlogistic(time = yearly, series = cells, cap = max_size, 
+                        n_changepoints = 20, changepoint_range = 0.8)
+    expect_s3_class(pwlog, "mvgam_trend")
+    expect_equal(pwlog$trend, "PWlogistic")
+    expect_equal(pwlog$trend_model, "PWlogistic")
+    expect_equal(pwlog$growth, "logistic")
+    expect_equal(pwlog$cap, "max_size")
+    expect_equal(pwlog$time, "yearly")
+    expect_equal(pwlog$series, "cells")
+    expect_equal(pwlog$n_changepoints, 20)
+    expect_equal(pwlog$changepoint_range, 0.8)
+  })
+})
+
+# Test piecewise trends in formula parsing
+test_that("piecewise trends work correctly in formula parsing", {
+  suppressWarnings({
+    
+    # Test simple linear piecewise formula
+    f1 <- ~ s(temp) + PWlinear(time = week, series = species, n_changepoints = 12)
+    parsed1 <- mvgam:::parse_trend_formula(f1)
+    expect_equal(length(parsed1$trend_components), 1)
+    trend_comp1 <- parsed1$trend_components[[1]]
+    expect_equal(trend_comp1$trend, "PWlinear")
+    expect_equal(trend_comp1$trend_model, "PWlinear")
+    expect_equal(trend_comp1$time, "week")
+    expect_equal(trend_comp1$series, "species")
+    expect_equal(trend_comp1$n_changepoints, 12)
+    
+    # Test logistic piecewise with cap formula
+    f2 <- ~ cov1 + PWlogistic(time = month, series = population, cap = max_capacity, 
+                              n_changepoints = 25, changepoint_scale = 0.02) + s(x)
+    parsed2 <- mvgam:::parse_trend_formula(f2)
+    expect_equal(length(parsed2$trend_components), 1)
+    trend_comp2 <- parsed2$trend_components[[1]]
+    expect_equal(trend_comp2$trend, "PWlogistic")
+    expect_equal(trend_comp2$trend_model, "PWlogistic") 
+    expect_equal(trend_comp2$cap, "max_capacity")
+    expect_equal(trend_comp2$n_changepoints, 25)
+    expect_equal(trend_comp2$changepoint_scale, 0.02)
+    
+    # Test general PW constructor in formula
+    f3 <- ~ PW(time = daily, series = biomass, growth = 'linear', 
+               n_changepoints = 8, changepoint_range = 0.75) + s(season)
+    parsed3 <- mvgam:::parse_trend_formula(f3)
+    expect_equal(length(parsed3$trend_components), 1)
+    trend_comp3 <- parsed3$trend_components[[1]]
+    expect_equal(trend_comp3$trend, "PW")
+    expect_equal(trend_comp3$trend_model, "PWlinear")
+    expect_equal(trend_comp3$growth, "linear")
+    expect_equal(trend_comp3$changepoint_range, 0.75)
+    
+    # Test mixed piecewise and other trends
+    f4 <- ~ AR(p = 1) + PWlinear(time = week, series = site, n_changepoints = 6) + 
+           s(temperature) + RW(cor = TRUE)
+    parsed4 <- mvgam:::parse_trend_formula(f4)
+    expect_equal(length(parsed4$trend_components), 3)
+    
+    # Find each trend type
+    ar_found <- FALSE
+    pw_found <- FALSE  
+    rw_found <- FALSE
+    for (comp in parsed4$trend_components) {
+      if (comp$trend == "AR1") ar_found <- TRUE
+      if (comp$trend == "PWlinear") pw_found <- TRUE
+      if (comp$trend == "RW") rw_found <- TRUE
+    }
+    expect_true(ar_found)
+    expect_true(pw_found)
+    expect_true(rw_found)
+  })
+})
+
+# Test piecewise trend registry integration
+test_that("piecewise trends integrate correctly with registry system", {
+  
+  # Test that PW trends are in registry
+  choices <- mvgam_trend_choices()
+  expect_true("PW" %in% choices)
+  # PWlinear and PWlogistic are trend_model variants of PW type
+  
+  # Test pattern includes piecewise trends
+  pattern <- mvgam:::mvgam_trend_pattern()
+  expect_true(grepl("PW", pattern))
+  # Pattern should include base PW type
+  
+  # Test registry info for piecewise trends
+  pw_info <- mvgam:::get_trend_info("PW")
+  expect_type(pw_info, "list")
+  expect_false(pw_info$supports_factors)  # PW doesn't support factors
+  expect_type(pw_info$generator, "function")
+  
+  # Test that we can get PW info (PWlinear is a trend_model variant)
+  pwlin_info <- mvgam:::get_trend_info("PW") 
+  expect_type(pwlin_info, "list")
+  expect_false(pwlin_info$supports_factors)
+  
+  # Test that PWlogistic also uses PW registry entry
+  pwlog_info <- mvgam:::get_trend_info("PW")
+  expect_type(pwlog_info, "list") 
+  expect_false(pwlog_info$supports_factors)
+})
+
+# Test piecewise parameter validation edge cases
+test_that("piecewise parameter validation handles edge cases correctly", {
+  
+  # Test boundary values for n_changepoints
+  suppressWarnings({
+    pw_min <- PW(n_changepoints = 1, growth = 'linear')
+    expect_equal(pw_min$n_changepoints, 1)
+    
+    pw_large <- PW(n_changepoints = 100, growth = 'linear') 
+    expect_equal(pw_large$n_changepoints, 100)
+  })
+  
+  # Test boundary values for changepoint_range
+  suppressWarnings({
+    pw_range_min <- PW(changepoint_range = 0.0001, growth = 'linear')
+    expect_equal(pw_range_min$changepoint_range, 0.0001)
+    
+    pw_range_max <- PW(changepoint_range = 0.9999, growth = 'linear')
+    expect_equal(pw_range_max$changepoint_range, 0.9999)
+  })
+  
+  # Test boundary values for changepoint_scale
+  suppressWarnings({
+    pw_scale_small <- PW(changepoint_scale = 0.001, growth = 'linear')
+    expect_equal(pw_scale_small$changepoint_scale, 0.001)
+    
+    pw_scale_large <- PW(changepoint_scale = 10.0, growth = 'linear')
+    expect_equal(pw_scale_large$changepoint_scale, 10.0)
+  })
+  
+  # Test that factor model validation rejects PW with n_lv
+  expect_error(
+    PW(n_lv = 3, growth = 'linear'),
+    "Factor models.*not supported.*PW"
+  )
+  
+  expect_error(
+    PW(n_lv = 2, growth = 'logistic', cap = max_size),
+    "Factor models.*not supported.*PW"
+  )
+})

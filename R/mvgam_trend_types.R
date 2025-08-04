@@ -377,7 +377,6 @@ RW = function(
   out <- structure(
     list(
       trend = 'RW',
-      trend_model = 'RW',  # Backwards compatibility
       ma = ma,
       cor = cor,
       time = time,
@@ -477,7 +476,6 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
   out <- structure(
     list(
       trend = if(length(p) == 1) paste0('AR', p) else paste0('AR(', paste(p, collapse = ','), ')'),
-      trend_model = if(length(p) == 1) paste0('AR', p) else paste0('AR(', paste(p, collapse = ','), ')'),  # Backwards compatibility
       p = p,
       ar_lags = ar_lags,
       max_lag = max_lag,
@@ -554,7 +552,7 @@ CAR = function(time = NA, series = NA, p = 1, n_lv = NULL) {
   }
   out <- structure(
     list(
-      trend_model = 'CAR',
+      trend = 'CAR',
       ma = FALSE,
       cor = FALSE,
       time = time,
@@ -621,7 +619,6 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, 
   out <- structure(
     list(
       trend = paste0('VAR', p),
-      trend_model = paste0('VAR', p),  # Backwards compatibility
       p = p,
       ma = ma,
       cor = cor,
@@ -724,7 +721,7 @@ GP = function(time = NA, series = NA, ...) {
 
   out <- structure(
     list(
-      trend_model = 'GP',
+      trend = 'GP',
       ma = FALSE,
       cor = FALSE,
       time = time,
@@ -988,13 +985,13 @@ PW = function(
     ))
   }
 
-  trend_model <- 'PWlinear'
+  trend_value <- 'PWlinear'
   if (growth == 'logistic') {
-    trend_model = 'PWlogistic'
+    trend_value = 'PWlogistic'
   }
   out <- structure(
     list(
-      trend_model = trend_model,
+      trend = trend_value,
       n_changepoints = n_changepoints,
       changepoint_range = changepoint_range,
       changepoint_scale = changepoint_scale,
@@ -1159,7 +1156,7 @@ ZMVN = function(unit = time, gr = NA, subgr = series) {
 
   out <- structure(
     list(
-      trend_model = 'ZMVN',
+      trend = 'ZMVN',
       ma = FALSE,
       cor = TRUE,
       unit = unit,
