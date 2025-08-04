@@ -172,7 +172,7 @@ model {
 2. **Validation**: Registry-based compatibility checking prevents invalid factor models
 3. **Variance Constraint**: Dynamic factor variances must be fixed to 1 for identifiability
 4. **Matrix Z Location**: Estimated in `parameters` block (factor model) vs `transformed data` (non-factor)
-5. **Universal Computation**: All trends use `trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[ytimes[i, s]]`
+5. **Universal Computation**: All factor models use `trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[ytimes[i, s]]`; non-factor models use `trend[i, s] = dot_product(Z[s, :], LV[i, :]);`
 6. **Code Deduplication**: Shared utility functions ensure consistent patterns across trend types
 7. **Registration**: New trend types must explicitly declare factor compatibility in registry
 
