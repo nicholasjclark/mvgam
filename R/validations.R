@@ -587,7 +587,7 @@ validate_trend_model = function(
     }
   }
 
-  trend_model <- match.arg(arg = trend_model, choices = trend_model_choices())
+  trend_model <- match.arg(arg = trend_model, choices = mvgam_trend_choices())
 
   if (trend_model == 'VAR') {
     trend_model <- 'VAR1'

@@ -2309,10 +2309,57 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
   return(stanvars)
 }
 
+#' Calculate Time Distances for CAR Models
+#'
+#' Calculate temporal distances between observations for continuous-time AR.
+#' Uses pmax(1e-3, dis_time) to prevent zero distances.
+#'
+#' @param data_info Data information containing data, time variable, and series
+#' @return Matrix of time distances [n, n_series]  
+#' @noRd
+calculate_car_time_distances <- function(data_info) {
+  data <- data_info$data
+  time_var <- data_info$time_var %||% "time"
+  series_var <- data_info$series_var %||% "series"
+  
+  # Prepare time and series data
+  all_times <- data.frame(
+    series = as.numeric(data[[series_var]]),
+    time = data[[time_var]]
+  ) %>%
+    dplyr::group_by(series) %>%
+    dplyr::arrange(time) %>%
+    dplyr::mutate(
+      time_lag = dplyr::lag(time),
+      dis_time = time - time_lag,
+      dis_time = ifelse(is.na(dis_time), 1, dis_time),
+      dis_time = pmax(1e-3, dis_time)  # Critical: cannot let distance go to zero
+    ) %>%
+    dplyr::ungroup() %>%
+    dplyr::arrange(time, series)
+  
+  # Convert to matrix format [n_time, n_series]
+  n_time <- length(unique(all_times$time))
+  n_series <- length(unique(all_times$series))
+  
+  time_dis <- matrix(
+    NA,
+    nrow = n_time,
+    ncol = n_series
+  )
+  
+  for (s in seq_len(n_series)) {
+    series_data <- all_times[all_times$series == s, ]
+    time_dis[seq_len(nrow(series_data)), s] <- series_data$dis_time
+  }
+  
+  return(time_dis)
+}
+
 #' CAR Trend Generator
 #'
-#' Generates Stan code components for conditional autoregressive trends.
-#' Supports hierarchical correlations but NOT factor models (spatial structure incompatible).
+#' Generates Stan code components for continuous-time autoregressive trends.
+#' Does NOT support factor models or hierarchical correlations.
 #'
 #' @param trend_spec Trend specification for CAR model
 #' @param data_info Data information including dimensions
@@ -2320,167 +2367,91 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
 #' @noRd
 generate_car_trend_stanvars <- function(trend_spec, data_info) {
   # Extract key parameters
-  n_lv <- trend_spec$n_lv %||% 1
-  car_order <- trend_spec$car_order %||% 1
+  n_lv <- trend_spec$n_lv %||% data_info$n_series %||% 1
   n <- data_info$n_obs
   n_series <- data_info$n_series %||% 1
-  use_grouping <- !is.null(trend_spec$gr) && trend_spec$gr != 'NA'
-  unit_var <- trend_spec$unit %||% "time"
-
-  # CAR does not support factor models (spatial structure incompatible)
-  is_factor_model <- FALSE
-
-  # Initialize stanvars list
-  stanvars <- list()
-
-  # Use shared matrix Z utility (always diagonal for CAR)
-  stanvars <- c(stanvars, generate_matrix_z_stanvars(is_factor_model, n_lv, n_series))
-
-  # CAR data (adjacency structure - needed for all cases)
-  stanvars$car_data <- brms::stanvar(
-    x = list(
-      n_neighbors = 4,  # Simple 2D grid assumption
-      adj_matrix = matrix(0, nrow = n_lv, ncol = n_lv)
-    ),
-    name = "car_data",
-    scode = "
-    int<lower=0> n_neighbors;
-    matrix[n_lv, n_lv] adj_matrix;
-    "
-  )
-
-  if (use_grouping) {
-    # Hierarchical CAR case: CAR(unit = site, gr = group, subgr = species)
-    n_groups <- data_info$n_groups %||% 1
-    n_subgroups <- data_info$n_subgroups %||% n_lv
-
-    # Add shared hierarchical correlation utilities
-    stanvars <- c(stanvars, generate_hierarchical_functions_injectors())
-    stanvars <- c(stanvars, generate_hierarchical_correlation_parameter_injectors(n_groups, n_subgroups))
-
-    # CAR-specific parameters for hierarchical case
-    stanvars$car_hierarchical_params <- brms::stanvar(
-      x = NULL,
-      name = "car_hierarchical_params",
-      scode = glue::glue("
-      parameters {{
-        // CAR precision parameter
-        real<lower=0> tau;
-        // Spatial autocorrelation
-        real<lower=0, upper=1> rho;
-        // Latent spatial states
-        matrix[n, {n_lv}] LV;
-      }}
-      ")
-    )
-
-    # Hierarchical CAR model implementation
-    stanvars$car_hierarchical_model <- brms::stanvar(
-      x = NULL,
-      name = "car_hierarchical_model",
-      scode = glue::glue("
-      model {{
-        // Derived hierarchical correlation matrices
-        array[{n_groups}] cholesky_factor_corr[{n_subgroups}] L_Omega_group;
-        for (g in 1 : {n_groups}) {{
-          L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g],
-                                              alpha_cor);
-        }}
-
-        // Hierarchical CAR process with group-specific correlations
-        for (i in 1:n_{unit_var}) {{
-          for (g in 1:{n_groups}) {{
-            // CAR spatial correlation with hierarchical residual correlation
-            for (t in 1:n) {{
-              vector[{n_subgroups}] spatial_mu = rep_vector(0, {n_subgroups});
-
-              // Compute spatial means for CAR process
-              for (j in 1:{n_lv}) {{
-                real mu = 0;
-                real var_adj = 0;
-                for (k in 1:{n_lv}) {{
-                  if (adj_matrix[j, k] > 0) {{
-                    mu += adj_matrix[j, k] * LV[t, k];
-                    var_adj += adj_matrix[j, k];
-                  }}
-                }}
-                if (var_adj > 0) {{
-                  spatial_mu[j] = rho * mu / var_adj;
-                }}
-              }}
-
-              // Apply CAR with hierarchical correlation structure
-              to_vector(LV[group_unit_indices[i, g], t]) ~ multi_normal_cholesky(spatial_mu,
-                                                                                 L_Omega_group[g] / sqrt(tau));
-            }}
-          }}
-        }}
-
-        // CAR parameter priors
-        tau ~ gamma(2, 1);
-        rho ~ beta(1, 1);
-      }}
-      ")
-    )
-
-    # Use shared hierarchical priors
-    stanvars <- c(stanvars, generate_hierarchical_correlation_model_injectors(n_groups))
-
-  } else {
-    # Simple CAR case (no grouping)
-    stanvars$car_params <- brms::stanvar(
-      name = "car_params",
-      scode = glue::glue("
-      parameters {{
-        // CAR precision parameter
-        real<lower=0> tau;
-        // Spatial autocorrelation
-        real<lower=0, upper=1> rho;
-        // Latent spatial states
-        matrix[n, {n_lv}] LV;
-      }}
-      "),
-      block = "parameters"
-    )
-
-    # CAR model block for simple case
-    stanvars$car_model <- brms::stanvar(
-      name = "car_model",
-      scode = glue::glue("
-      model {{
-        // CAR prior for spatial correlation
-        for (t in 1:n) {{
-          for (i in 1:{n_lv}) {{
-            real mu = 0;
-            real var_adj = 0;
-            // Sum over neighbors
-            for (j in 1:{n_lv}) {{
-              if (adj_matrix[i, j] > 0) {{
-                mu += adj_matrix[i, j] * LV[t, j];
-                var_adj += adj_matrix[i, j];
-              }}
-            }}
-            if (var_adj > 0) {{
-              mu = rho * mu / var_adj;
-              LV[t, i] ~ normal(mu, sqrt(1.0 / (tau * var_adj)));
-            }} else {{
-              LV[t, i] ~ normal(0, sqrt(1.0 / tau));
-            }}
-          }}
-        }}
-
-        // Priors
-        tau ~ gamma(2, 1);
-        rho ~ beta(1, 1);
-      }}
-      "),
-      block = "model"
+  
+  # CAR does not support factor models (continuous-time AR requires 
+  # series-specific temporal evolution)
+  if (!is.null(trend_spec$n_lv) && trend_spec$n_lv < n_series) {
+    stop(insight::format_error(
+      "CAR trends do not support factor models (n_lv < n_series).",
+      "Continuous-time AR requires series-specific temporal evolution modeling."
+    ))
+  }
+  
+  # CAR does not support hierarchical correlations
+  if (!is.null(trend_spec$gr) && trend_spec$gr != 'NA') {
+    rlang::warn(
+      "CAR trends do not support hierarchical correlations; ignoring 'gr' parameter",
+      .frequency = "once"
     )
   }
-
-  # Use shared trend computation utility for universal pattern
+  
+  # Calculate time distances for continuous-time AR evolution
+  time_dis <- calculate_car_time_distances(data_info)
+  
+  # Initialize stanvars list
+  stanvars <- list()
+  
+  # Time distance data for continuous-time AR
+  stanvars$time_dis_data <- brms::stanvar(
+    x = time_dis,
+    name = "time_dis",
+    scode = glue::glue("  array[n, n_series] real<lower=0> time_dis;"),
+    block = "data"
+  )
+  
+  # CAR parameters (continuous-time AR1)
+  stanvars$car_params <- brms::stanvar(
+    name = "car_params",
+    scode = glue::glue("
+  // CAR AR1 parameters
+  vector<lower=-1,upper=1>[n_lv] ar1;
+  
+  // latent state SD terms
+  vector<lower=0>[n_lv] sigma;
+  
+  // raw latent states
+  matrix[n, n_lv] LV_raw;"),
+    block = "parameters"
+  )
+  
+  # CAR transformed parameters (continuous-time evolution only)
+  stanvars$car_lv_evolution <- brms::stanvar(
+    name = "car_lv_evolution",
+    scode = glue::glue("
+  // CAR latent variable evolution
+  matrix[n, n_lv] LV;
+  
+  // Apply continuous-time AR evolution
+  LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
+  
+  for (j in 1 : n_lv) {{
+    LV[1, j] += mu_trend[ytimes_trend[1, j]];
+    for (i in 2 : n) {{
+      LV[i, j] += mu_trend[ytimes_trend[i, j]]
+                  + pow(ar1[j], time_dis[i, j])
+                    * (LV[i - 1, j] - mu_trend[ytimes_trend[i - 1, j]]);
+    }}
+  }}"),
+    block = "tparameters"
+  )
+  
+  # Use shared trend computation utility (consistent with all other trends)
   stanvars <- c(stanvars, generate_trend_computation_transformed_parameters_injectors(n_lv, n_series))
-
+  
+  # CAR model priors
+  stanvars$car_priors <- brms::stanvar(
+    name = "car_priors",
+    scode = "
+  // CAR priors  
+  ar1 ~ std_normal();
+  sigma ~ exponential(3);
+  to_vector(LV_raw) ~ std_normal();",
+    block = "model"
+  )
+  
   return(stanvars)
 }
 

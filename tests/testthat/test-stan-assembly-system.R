@@ -939,30 +939,96 @@ test_that("system handles complex trend specifications", {
 
 # Comprehensive tests for all trend types and new features
 test_that("CAR trend generator works correctly", {
-  data_info <- list(n_obs = 50, n_series = 3, series_var = "series")
-
-  # Test simple CAR (factor models not supported for CAR)
-  car_spec <- list(
-    trend_type = "CAR",
-    n_lv = 3
+  # Create mock data with time variable for time distance calculation
+  mock_data <- data.frame(
+    time = c(1, 2.5, 4.2, 5, 7.3), 
+    series = rep(1, 5)
   )
-  car_stanvars <- mvgam:::generate_trend_injection_stanvars(car_spec, data_info)
+  data_info <- list(
+    n_obs = 50, 
+    n_series = 3, 
+    series_var = "series",
+    time_var = "time",
+    data = mock_data
+  )
+
+  # Test simple CAR (continuous-time AR, no factor models)
+  car_spec <- list(
+    trend_type = "CAR"
+    # Note: CAR doesn't support n_lv parameter (no factor models)
+  )
+  car_stanvars <- mvgam:::generate_car_trend_stanvars(car_spec, data_info)
   expect_type(car_stanvars, "list")
   expect_gt(length(car_stanvars), 0)
-  expect_true(any(grepl("car", names(car_stanvars), ignore.case = TRUE)))
+  expect_true(any(grepl("time_dis", names(car_stanvars))))
+  expect_true(any(grepl("car_params", names(car_stanvars))))
+  expect_true(any(grepl("car_lv_evolution", names(car_stanvars))))
+  expect_true(any(grepl("car_priors", names(car_stanvars))))
 
-  # Test hierarchical CAR
+  # Test CAR rejects factor models
+  car_factor_spec <- list(
+    trend_type = "CAR",
+    n_lv = 2
+  )
+  expect_error(
+    mvgam:::generate_car_trend_stanvars(car_factor_spec, data_info),
+    "CAR trends do not support factor models"
+  )
+
+  # Test CAR ignores hierarchical correlations with warning
   car_hierarchical_spec <- list(
     trend_type = "CAR",
-    n_lv = 3,
-    gr = "group",
-    unit = "site"
+    gr = "group"
   )
-  car_hier_stanvars <- mvgam:::generate_trend_injection_stanvars(car_hierarchical_spec,
-    c(data_info, list(n_groups = 2, n_subgroups = 3)))
-  expect_type(car_hier_stanvars, "list")
-  expect_gt(length(car_hier_stanvars), 0)
-  expect_true(any(grepl("hierarchical", names(car_hier_stanvars), ignore.case = TRUE)))
+  expect_warning(
+    mvgam:::generate_car_trend_stanvars(car_hierarchical_spec, data_info),
+    "CAR trends do not support hierarchical correlations"
+  )
+})
+
+test_that("CAR time distance calculation works correctly", {
+  # Test time distance calculation with irregular intervals
+  irregular_data <- data.frame(
+    time = c(1, 2.5, 4.2, 5, 7.3, 1.2, 3, 4.8, 6.1, 8),
+    series = c(rep(1, 5), rep(2, 5))
+  )
+  data_info <- list(
+    n_obs = 10,
+    n_series = 2,
+    series_var = "series", 
+    time_var = "time",
+    data = irregular_data
+  )
+  
+  time_dis <- mvgam:::calculate_car_time_distances(data_info)
+  expect_type(time_dis, "double")
+  expect_true(is.matrix(time_dis))
+  expect_equal(nrow(time_dis), 5)  # n_time points per series
+  expect_equal(ncol(time_dis), 2)  # n_series
+  
+  # Check that first time point defaults to 1
+  expect_equal(time_dis[1, 1], 1)
+  expect_equal(time_dis[1, 2], 1)
+  
+  # Check that minimum threshold is applied (pmax(1e-3, dis_time))
+  expect_true(all(time_dis >= 1e-3, na.rm = TRUE))
+  
+  # Test with regular intervals
+  regular_data <- data.frame(
+    time = rep(1:5, 2),
+    series = c(rep(1, 5), rep(2, 5))
+  )
+  data_info_regular <- list(
+    n_obs = 10,
+    n_series = 2,
+    series_var = "series",
+    time_var = "time", 
+    data = regular_data
+  )
+  
+  time_dis_regular <- mvgam:::calculate_car_time_distances(data_info_regular)
+  expect_equal(time_dis_regular[2:5, 1], rep(1, 4))  # Regular intervals of 1
+  expect_equal(time_dis_regular[2:5, 2], rep(1, 4))
 })
 
 test_that("ZMVN trend generator works correctly", {

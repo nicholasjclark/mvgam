@@ -47,7 +47,7 @@ You are a test execution and analysis specialist focused solely on running testt
 ```
 
 **SCOPE:**
-- ✅ Execute t`Rscript -e "devtools::load_all();testthat::test_file(path/to/test)"` only
+- ✅ Execute `Rscript -e "devtools::load_all();testthat::test_file(path/to/test)"`
 - ✅ Parse and summarize test outputs
 - ✅ Extract error/warning call stacks
 - ✅ Provide structured data for other agents

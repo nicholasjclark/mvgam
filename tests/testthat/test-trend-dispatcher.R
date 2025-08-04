@@ -3,21 +3,18 @@
 #' Comprehensive tests for the trend type registry, validation, and formula
 #' parsing functionality. Includes edge cases based on brms testing patterns.
 
-test_that("CAR constructor rejects factor models correctly", {
-  # CAR with n_lv should error immediately
-  expect_error(CAR(n_lv = 2),
-               "Factor models.*not supported for CAR trends")
-  expect_error(CAR(n_lv = 2),
-               "irregular time intervals")
-  expect_error(CAR(n_lv = 2),
-               "Remove.*n_lv.*parameter")
-
-  # CAR without n_lv should work
-  suppressWarnings({
-    car_trend <- CAR()
-    expect_is(car_trend, "mvgam_trend")
-    expect_equal(car_trend$trend, "CAR")
-  })
+test_that("CAR constructor works for continuous-time AR", {
+  # CAR should work without n_lv parameter (continuous-time AR)
+  car_trend <- CAR()
+  expect_s3_class(car_trend, "mvgam_trend")
+  expect_equal(car_trend$trend_model, "CAR1")
+  expect_false(car_trend$cor)
+  expect_false(car_trend$ma)
+  expect_equal(car_trend$gr, "NA")
+  expect_equal(car_trend$subgr, "series")
+  
+  # CAR only supports p = 1 (continuous-time AR1)
+  expect_error(CAR(p = 2), "Argument 'p' must be = 1")
 })
 
 test_that("PW constructor rejects factor models correctly", {
@@ -88,16 +85,14 @@ test_that("VAR constructor accepts factor models", {
 
 test_that("Factor validation error messages are consistent", {
   # Check that all factor-incompatible trends give similar error structure
-
-  expect_error(CAR(n_lv = 1), "Factor models.*not supported")
+  # Note: CAR() constructor doesn't accept n_lv parameter, errors happen at stanvars level
+  
   expect_error(PW(n_lv = 1), "Factor models.*not supported")
 
   # Check they mention specific alternatives (AR now factor-compatible)
-  expect_error(CAR(n_lv = 1), "factor-compatible trends.*AR.*RW.*VAR")
   expect_error(PW(n_lv = 1), "factor-compatible trends.*AR.*RW.*VAR")
 
   # Check they have specific reasons
-  expect_error(CAR(n_lv = 1), "irregular time")
   expect_error(PW(n_lv = 1), "changepoint")
 })
 

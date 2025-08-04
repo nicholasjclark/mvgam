@@ -242,7 +242,7 @@ test_that("Factor validation error messages are informative", {
   expect_error(validate_factor_compatibility(car_spec), 
                "Factor models.*not supported.*CAR.*trends")
   expect_error(validate_factor_compatibility(car_spec), 
-               "irregular time intervals")
+               "series-specific temporal evolution")
   
   # Test PW with n_lv
   pw_spec <- list(trend_model = "PW", n_lv = 2)  
