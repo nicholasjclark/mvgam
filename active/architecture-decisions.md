@@ -10,7 +10,7 @@
 **Implementation**: 
 - brms generates linear predictors (`mu`, `mu_trend`) from two formulae
 - Stan models from two brmsfit objects (using `backend = "mock"`) are combined to contain observation + trend components
-- Combined Stan model is passed to Stan by mvgam for joint estimation
+- Combined Stan model passed to Stan for joint estimation
 
 ### 2. Formula-Centric Interface Design
 **Decision**: Extend brms formula syntax with `trend_formula` parameter  
@@ -368,13 +368,11 @@ ZMVN()            # trend = 'ZMVN'
 **Policy**: Maintain compatibility with existing mvgam interfaces where possible
 **Exception**: Breaking changes allowed only when essential for brms integration
 
-### 7. Stanvars Combination Architecture (January 2025)
+### 5. Stanvars Combination Architecture
 
 **Critical Design Decision**: All trend generators must return proper brms "stanvars" class objects
 
-**Problem Solved**: Using `stanvars$name <- brms::stanvar(...)` creates regular lists that corrupt the brms class structure, causing "object of type 'symbol' is not subsettable" errors.
-
-**Solution Architecture**:
+**Standard Pattern for All Trend Generators**:
 ```r
 # Helper function with full validation
 combine_stanvars <- function(base_stanvars = NULL, ...) {
@@ -383,10 +381,7 @@ combine_stanvars <- function(base_stanvars = NULL, ...) {
   # Validates output has "stanvars" class
   # Throws clear errors if validation fails
 }
-```
 
-**Standard Pattern for All Trend Generators**:
-```r
 generate_trend_stanvars <- function(trend_spec, data_info) {
   # 1. Generate base stanvars (e.g., matrix Z)
   matrix_z_stanvars <- generate_matrix_z_stanvars(...)
@@ -410,19 +405,9 @@ generate_trend_stanvars <- function(trend_spec, data_info) {
 3. **Always use** `combine_stanvars()` for combining
 4. **Always validate** that returned object has class "stanvars"
 
-**Benefits**:
-- **Prevents class corruption** that breaks brms integration
-- **Early error detection** through validation in helper
-- **Consistent pattern** for all trend generators
-- **Clear debugging** when stanvar issues occur
+### 6. Trend Parameter Naming Convention
 
-**Implementation Status**: ✅ All trend generators (RW, AR, VAR, CAR, ZMVN, PW) fully converted to new pattern
-
-### 8. Trend Parameter Naming Convention (January 2025)
-
-**Critical Design Decision**: Trend variance parameters must avoid naming conflicts with brms observation model parameters
-
-**Problem Identified**: Trend generators declaring parameters like `sigma` conflict with brms family parameters (e.g., gaussian family's `sigma` for residual variance).
+**Critical Design Decision**: Trend parameters (variances, ar parameters, etc..) must avoid naming conflicts with brms observation model parameters
 
 **Naming Convention**:
 ```stan
@@ -450,14 +435,12 @@ matrix[n_lv, n_lv] Sigma;              // CONFLICTS with multivariate families
 - **Consistent pattern** across all trend types
 
 **Implementation Requirements**:
-1. All trend generators must use `_trend` suffix for variance parameters
+1. All trend generators must use `_trend` suffix for estimated parameters
 2. Review existing generators for compliance
 3. Update tests to verify no naming conflicts
 4. Document in trend development guide
 
-## Developer Onboarding Guide ✅ **POST-CONSOLIDATION UPDATE**
-
-### Key Files for New Developers (After Week 5-6 Consolidation)
+## Developer Onboarding Guide
 
 **Consolidated Architecture Files (4 Core Files):**
 - `R/trend_system.R` - Complete trend infrastructure (registry, validation, parsing, constructors)
@@ -474,10 +457,3 @@ matrix[n_lv, n_lv] Sigma;              // CONFLICTS with multivariate families
 - `active/current-sprint.md` - Current status and achievements  
 - `active/architecture-decisions.md` - Core design principles
 - `active/quick-reference.md` - Developer quick start guide
-
-### Consolidation Benefits
-
-**Navigability**: 13 scattered files reduced to 4 thematic files with purpose-driven annotations
-**Maintainability**: All functions preserved with <80 character line widths and consistent formatting
-**Understanding**: Each section explains WHY components exist for mvgam-brms integration
-**Consistency**: Unified coding patterns and error handling throughout consolidated codebase
