@@ -146,20 +146,7 @@
 **Root Cause**: Trend generators were creating regular `list()` objects with `$` assignments instead of proper stanvars collections
 
 ### Problem Description
-The trend generator functions were producing stanvar objects with corrupted class structure, causing `brms::make_stancode()` to fail with "object of type 'symbol' is not subsettable" error.
-
-### Complete Resolution Applied (January 2025)
-
-**Root Cause**:
-1. **Trend generators used wrong pattern**: All trend generators used `stanvars$name <- brms::stanvar(...)` 
-2. **This created lists of stanvars** instead of proper stanvars collections that brms expects
-3. **brms requires specific class structure** where individual stanvars must be combined using `c()` or `+`
-
-**Complete Fix Implementation**:
-1. **Created robust helper function** `combine_stanvars()` with full class validation
-2. **Fixed ALL trend generators** to use individual stanvar variables
-3. **Replaced all problematic patterns** - no more `stanvars$name <-` assignments
-4. **Established clear pattern** for future trend development
+Trend generator functions were producing `stanvar` objects with corrupted class structure, causing `brms::make_stancode()` to fail with "object of type 'symbol' is not subsettable" error.
 
 **All Trend Generators Fixed**:
 - ✅ `generate_rw_trend_stanvars()` - Fixed and tested with brms
@@ -171,17 +158,14 @@ The trend generator functions were producing stanvar objects with corrupted clas
 
 ### New Architecture Pattern
 
-**Helper Function Added**:
+**Standard Pattern for Trend Generators**:
 ```r
 combine_stanvars <- function(base_stanvars = NULL, ...) {
   # Validates all inputs have proper class
   # Safely combines using brms's c() method
   # Returns validated "stanvars" object
 }
-```
 
-**Standard Pattern for Trend Generators**:
-```r
 # 1. Start with base stanvars
 result_stanvars <- matrix_z_stanvars
 
