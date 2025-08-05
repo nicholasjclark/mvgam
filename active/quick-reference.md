@@ -81,7 +81,7 @@ custom_trend(trend, tpars, ...)         # Create custom trend objects
 
 **Auto-registered Core Trends:**
 - `AR`, `RW`, `VAR`, `ZMVN` (factor-compatible)
-- `PW`, `PWlinear`, `PWlogistic`, `CAR` (factor-incompatible)
+- `PW`, `CAR` (factor-incompatible)
 
 ### Factor Model Compatibility (Automatic Validation)
 
@@ -161,8 +161,6 @@ validate_stan_code_structure(stan_code)    # Check required blocks exist
 are_braces_balanced(stan_code)             # Check brace matching
 ```
 
-**Key Change**: Single `validate_stan_code()` function replaces multiple validation functions and relies heavily on `rstan::stanc()` for comprehensive, up-to-date Stan validation.
-
 ## Trend Injection Patterns ✅ **OPERATIONAL**
 
 ### Stan Code Modification Strategy (inject_trend_into_linear_predictor)
@@ -225,19 +223,6 @@ mu_biomass += trend_biomass[obs_ind_biomass];
 // Response-specific likelihoods
 count ~ poisson_log(mu_count);
 biomass ~ normal(mu_biomass, sigma_biomass);
-```
-
-### Non-Centered Parameterization
-```stan
-parameters {
-  matrix[n, n_lv] LV_raw;          // Raw innovations
-  vector<lower=0>[n_lv] sigma;     // Scaling
-}
-
-transformed parameters {
-  matrix[n, n_lv] LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
-  // Apply trend evolution...
-}
 ```
 
 ## Stan Assembly Integration with mvgam_enhanced() ✅ **OPERATIONAL**
@@ -331,18 +316,6 @@ mvgam_enhanced <- function(formula, trend_formula = NULL, data, family = gaussia
 - `merge_stan_data()` combines observation and trend data with conflict resolution
 - `validate_stan_data_structure()` ensures proper Stan data types
 
-### Performance Benchmarks ✅ **ACHIEVED**
-- **Registry dispatch**: <1ms trend type lookup confirmed (98.8% test pass rate)
-- **Stan assembly**: Two-stage system with minimal overhead operational
-- **Validation framework**: Comprehensive `rstan::stanc()` integration working
-- **Compilation efficiency**: Direct brms integration preserves all optimizations  
-- **Memory usage**: Efficient stanvar generation without redundant copies
-
-### Memory Optimization
-- **Object size**: 30-50% reduction through compression
-- **Missing data**: Efficient handling without redundant copies
-- **Dual objects**: Shared parameter storage
-
 ## Validation Framework
 
 ### Fast-Fail Principles
@@ -387,49 +360,4 @@ bf(y ~ s(x), sigma ~ s(z) + AR(p = 1))
 
 # ✅ Correct: Trend only on main parameter
 bf(y ~ s(x) + AR(p = 1), sigma ~ s(z))
-```
-
-## Developer Onboarding Guide
-
-### Key Files for New Developers ✅ **POST-CONSOLIDATION UPDATE**
-
-**Consolidated Architecture Files (Week 5-6 Refactoring Complete):**
-- `R/trend_system.R` - Complete trend infrastructure (registry, validation, parsing, constructors)
-- `R/stan_assembly.R` - Two-stage Stan assembly orchestration and validation  
-- `R/brms_integration.R` - Enhanced brms setup and ecosystem integration
-- `R/mvgam_core.R` - Enhanced fitting, dual-object system, multiple imputation
-
-**Test Infrastructure:**
-- `tests/testthat/test-trend-dispatcher.R` - Trend system validation (85 tests)
-- `tests/testthat/test-brms-setup.R` - brms integration testing
-- `tests/testthat/test-stan-assembly-system.R` - Stan assembly validation
-
-**Legacy Files (13 files consolidated into 4 thematic files above):**
-- All functions preserved with <80 character line widths
-- Purpose-driven WHY annotations throughout consolidated code
-- Consistent error handling and validation patterns
-
-**Architecture Documentation:**
-- `active/current-sprint.md` - Current status and achievements  
-- `active/architecture-decisions.md` - Core design principles
-- `active/quick-reference.md` - Developer quick start guide
-
-### Next Phase Priority (Week 6)
-1. **End-to-end Integration**: Real mvgam model fitting with trend injection
-2. **Performance Benchmarking**: Registry lookup speed and compilation efficiency
-3. **Edge Case Testing**: Missing data, irregular timing, complex grouping
-
-### Quick Start for Extensions
-```r
-# Register new trend type
-register_custom_trend(
-  name = "GARCH",
-  supports_factors = FALSE,
-  generator_func = generate_garch_injection_stanvars,
-  incompatibility_reason = "GARCH requires series-specific volatility modeling"
-)
-
-# Check registry status
-list_trend_types()  # View all registered trends
-get_trend_info("GARCH")  # Inspect specific trend
 ```
