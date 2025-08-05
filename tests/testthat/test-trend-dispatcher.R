@@ -7,7 +7,7 @@ test_that("CAR constructor works for continuous-time AR", {
   # CAR should work without n_lv parameter (continuous-time AR)
   car_trend <- CAR()
   expect_s3_class(car_trend, "mvgam_trend")
-  expect_equal(car_trend$trend_model, "CAR1")
+  expect_equal(car_trend$trend, "CAR")
   expect_false(car_trend$cor)
   expect_false(car_trend$ma)
   expect_equal(car_trend$gr, "NA")
@@ -147,9 +147,8 @@ test_that("trend constructors work with dispatcher integration", {
     expect_equal(ar_seasonal$p, c(1, 12, 24))
     expect_equal(ar_seasonal$ar_lags, c(1, 12, 24))
     expect_equal(ar_seasonal$max_lag, 24)
-    expect_true("ar1" %in% ar_seasonal$tpars)
-    expect_true("ar12" %in% ar_seasonal$tpars)
-    expect_true("ar24" %in% ar_seasonal$tpars)
+    expect_true("ar_trend" %in% ar_seasonal$tpars)
+    expect_true("sigma_trend" %in% ar_seasonal$tpars)
 
     # Test VAR constructor with order
     var2_trend <- VAR(p = 2, cor = TRUE)
@@ -157,8 +156,8 @@ test_that("trend constructors work with dispatcher integration", {
     expect_equal(var2_trend$trend, "VAR2")
     expect_equal(var2_trend$p, 2)
     expect_true(var2_trend$cor)
-    expect_true("A1" %in% var2_trend$tpars)
-    expect_true("A2" %in% var2_trend$tpars)
+    expect_true("A_trend" %in% var2_trend$tpars)
+    expect_true("Sigma_trend" %in% var2_trend$tpars)
   })
 })
 
@@ -455,7 +454,7 @@ test_that("custom trend registration works correctly", {
       list(
         trend = "CUSTOM",
         param = param,
-        tpars = "custom_param",
+        tpars = "custom_param_trend",
         characteristics = list(supports_factors = FALSE)
       ),
       class = "mvgam_trend"

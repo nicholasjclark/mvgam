@@ -281,7 +281,67 @@ ensure_registry_initialized <- function() {
 # WHY: Trend validation ensures data integrity and prevents runtime errors
 # during Stan model compilation. Formula parsing enables complex multivariate
 # trend specifications while maintaining compatibility with brms syntax.
-# This layer bridges user-friendly R formulas to internal trend objects.#' @noRd
+# This layer bridges user-friendly R formulas to internal trend objects.
+
+#' Process trend parameters and bounds
+#'
+#' @description
+#' This function processes trend model parameters by adding a "_trend" suffix to
+#' avoid naming conflicts with brms observation model parameters. It handles both
+#' parameter names and their associated bounds in a single operation.
+#'
+#' @details
+#' All trend parameters are defined as arrays in Stan for consistency, even
+#' when n_series = 1. This simplifies forecasting functions and ensures uniform
+#' parameter handling across all trend types.
+#'
+#' When creating custom trend types, define parameters and bounds using their
+#' base names. This function will automatically add the "_trend" suffix and
+#' update the bounds accordingly.
+#'
+#' @param param_bounds Named list of parameter bounds, where names are parameter
+#'   names and values are numeric vectors of length 2 (lower, upper bounds) or NULL
+#' @return List with two elements:
+#'   - tpars: Character vector of parameter names with _trend suffix
+#'   - bounds: Named list of bounds with updated parameter names
+#' @examples
+#' # Define parameters with bounds
+#' params <- list(sigma = c(0, Inf), ar = c(-1, 1), theta = NULL)
+#' result <- process_trend_params(params)
+#' # result$tpars: c("sigma_trend", "ar_trend")
+#' # result$bounds: list(sigma_trend = c(0, Inf), ar_trend = c(-1, 1))
+#'
+#' @noRd
+process_trend_params <- function(param_bounds) {
+  checkmate::assert_list(param_bounds, names = "unique")
+  
+  # Extract parameter names (excluding NULL entries)
+  params <- names(param_bounds)
+  non_null_params <- params[!sapply(param_bounds, is.null)]
+  
+  # Add suffix to parameter names
+  params_with_suffix <- character(length(non_null_params))
+  for (i in seq_along(non_null_params)) {
+    if (!grepl("_trend", non_null_params[i])) {
+      params_with_suffix[i] <- paste0(non_null_params[i], "_trend")
+    } else {
+      params_with_suffix[i] <- non_null_params[i]
+    }
+  }
+  
+  # Create new bounds list with updated names
+  bounds_with_suffix <- list()
+  for (i in seq_along(non_null_params)) {
+    bounds_with_suffix[[params_with_suffix[i]]] <- param_bounds[[non_null_params[i]]]
+  }
+  
+  return(list(
+    tpars = params_with_suffix,
+    bounds = bounds_with_suffix
+  ))
+}
+
+#' @noRd
 validate_trend <- function(trend_obj, ...) {
   
   # Basic validation
@@ -1220,6 +1280,52 @@ print.mvgam_trend <- function(x, ...) {
 #'   version on the package website at:
 #'   https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html
 #'
+#' @section Parameter Naming Convention:
+#' All trend model parameters automatically receive a "_trend" suffix to prevent
+#' naming conflicts with observation model parameters. For example:
+#' \itemize{
+#'   \item \code{sigma} becomes \code{sigma_trend}
+#'   \item \code{theta} becomes \code{theta_trend} (when \code{ma = TRUE})
+#'   \item \code{Sigma} becomes \code{Sigma_trend} (when \code{cor = TRUE})
+#'   \item \code{ar[p]} becomes \code{ar_trend[p]} (for AR trends)
+#'   \item \code{A[p]} becomes \code{A_trend[p]} (for VAR trends)
+#' }
+#' 
+#' This naming convention is applied consistently across all trend types and must
+#' be considered when:
+#' \itemize{
+#'   \item Specifying priors (use \code{prior(normal(0, 1), class = sigma_trend)})
+#'   \item Extracting parameters from fitted models
+#'   \item Creating custom trend types
+#' }
+#'
+#' @section Custom Trend Development:
+#' When creating custom trend types, define parameters and bounds using their
+#' base names (e.g., "sigma", "alpha"). The \code{process_trend_params()} function
+#' will automatically add the "_trend" suffix and handle bounds consistently. 
+#' 
+#' Example custom trend constructor pattern:
+#' \preformatted{
+#' custom_trend <- function(...) {
+#'   # Define parameters with bounds using base names
+#'   param_bounds <- list(
+#'     decay = c(0, 1),
+#'     amplitude = c(0, Inf),
+#'     phase = NULL  # NULL means no bounds needed
+#'   )
+#'   
+#'   # Process automatically
+#'   processed <- process_trend_params(param_bounds)
+#'   
+#'   # Use in trend object
+#'   structure(list(
+#'     trend = "Custom",
+#'     tpars = processed$tpars,  # c("decay_trend", "amplitude_trend")
+#'     bounds = processed$bounds # list(decay_trend = c(0, 1), ...)
+#'   ), class = "mvgam_trend")
+#' }
+#' }
+#'
 #' @author Nicholas J Clark
 #'
 #' @examples
@@ -1507,6 +1613,16 @@ RW = function(
   # Validate and adjust correlation requirements
   cor <- validate_correlation_requirements(gr, cor)
 
+  # Define parameters with their bounds (base names)
+  param_bounds <- list(
+    sigma = c(0, Inf),
+    theta = if(ma) c(-1, 1) else NULL,
+    Sigma = if(cor || gr != 'NA') c(-1, 1) else NULL
+  )
+  
+  # Process parameters and bounds with trend suffix
+  processed_params <- process_trend_params(param_bounds)
+  
   # Create trend object with dispatcher integration
   out <- structure(
     list(
@@ -1519,17 +1635,11 @@ RW = function(
       subgr = subgr,
       n_lv = n_lv,
       label = build_trend_label('RW', cor = cor, ma = ma, gr = gr, n_lv = n_lv),
-      tpars = c('sigma', if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
-      monitor_pars = c('trend', 'sigma', if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
-      extract_pars = c('sigma', if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
+      tpars = processed_params$tpars,
       forecast_fun = 'forecast_rw_rcpp',
       stancode_fun = 'rw_stan_code',
       standata_fun = 'rw_stan_data',
-      bounds = Filter(Negate(is.null), list(
-        sigma = c(0, Inf),
-        theta = if(ma) c(-1, 1) else NULL,
-        Sigma = if(cor || gr != 'NA') c(-1, 1) else NULL
-      )),
+      bounds = processed_params$bounds,
       characteristics = list(
         supports_predictors = TRUE,
         supports_correlation = TRUE,
@@ -1593,18 +1703,16 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
   # Validate and adjust correlation requirements
   cor <- validate_correlation_requirements(gr, cor)
 
-  # Determine parameter names based on AR lags
-  ar_params <- paste0('ar', ar_lags)
-  ar_params_bracketed <- paste0('ar[', ar_lags, ']')
-  param_names <- c('trend', 'tau', 'sigma', ar_params, if(ma) 'theta', if(cor || gr != 'NA') 'Sigma', 'error', 'drift')
-  param_labels <- c('trend_estimates', 'precision_parameter', 'standard_deviation',
-                   paste0('autoregressive_coef_lag_', ar_lags),
-                   if(ma) 'moving_average_coef' else NULL,
-                   if(cor || gr != 'NA') 'covariance_matrix' else NULL,
-                   'process_errors', 'drift_parameter')
-
-  # Create AR bounds list
-  ar_bounds <- setNames(rep(list(c(-1, 1)), length(ar_params)), ar_params)
+  # Define parameters with their bounds (base names - ar will be array in Stan)
+  param_bounds <- list(
+    sigma = c(0, Inf),
+    ar = c(-1, 1),
+    theta = if(ma) c(-1, 1) else NULL,
+    Sigma = if(cor || gr != 'NA') c(-1, 1) else NULL
+  )
+  
+  # Process parameters and bounds with trend suffix
+  processed_params <- process_trend_params(param_bounds)
 
   # Create trend object with dispatcher integration
   out <- structure(
@@ -1621,18 +1729,11 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
       subgr = subgr,
       n_lv = n_lv,
       label = build_trend_label('AR', cor = cor, ma = ma, gr = gr, n_lv = n_lv, p = max_lag),
-      tpars = c('sigma', ar_params, if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
-      monitor_pars = c('trend', 'sigma', ar_params_bracketed, if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
-      extract_pars = c('sigma', ar_params_bracketed, if(ma) 'theta', if(cor || gr != 'NA') 'Sigma'),
+      tpars = processed_params$tpars,
       forecast_fun = 'forecast_ar_rcpp',
       stancode_fun = 'ar_stan_code',
       standata_fun = 'ar_stan_data',
-      bounds = c(
-        list(sigma = c(0, Inf)),
-        ar_bounds,
-        if(ma) list(theta = c(-1, 1)) else list(),
-        if(cor || gr != 'NA') list(Sigma = c(-1, 1)) else list()
-      ),
+      bounds = processed_params$bounds,
       characteristics = list(
         supports_predictors = TRUE,
         supports_correlation = TRUE,
@@ -1684,6 +1785,16 @@ CAR = function(time = NA, series = NA, p = 1, n_lv = NULL) {
   if (p > 1) {
     stop("Argument 'p' must be = 1", call. = FALSE)
   }
+  
+  # Define parameters with their bounds (base names)
+  param_bounds <- list(
+    sigma = c(0, Inf),
+    ar1 = c(-1, 1)
+  )
+  
+  # Process parameters and bounds with trend suffix
+  processed_params <- process_trend_params(param_bounds)
+  
   out <- structure(
     list(
       trend = 'CAR',
@@ -1694,12 +1805,24 @@ CAR = function(time = NA, series = NA, p = 1, n_lv = NULL) {
       unit = 'time',
       gr = 'NA',
       subgr = 'series',
-      label = match.call()
+      label = match.call(),
+      tpars = processed_params$tpars,
+      forecast_fun = 'forecast_car_rcpp',
+      stancode_fun = 'car_stan_code',
+      standata_fun = 'car_stan_data',
+      bounds = processed_params$bounds,
+      characteristics = list(
+        supports_predictors = TRUE,
+        supports_correlation = FALSE,
+        supports_factors = FALSE,
+        max_order = 1,
+        requires_sorting = TRUE
+      )
     ),
     class = 'mvgam_trend',
     param_info = list(
-      param_names = c('trend', 'tau', 'sigma', 'ar1', 'Sigma'),
-      labels = c('trend_estimates', 'precision_parameter', 'standard_deviation', 'autoregressive_coef', 'covariance_matrix')
+      param_names = c('trend', 'tau', 'sigma_trend', 'ar1_trend'),
+      labels = c('trend_estimates', 'precision_parameter', 'standard_deviation', 'autoregressive_coef')
     )
   )
 }
@@ -1738,16 +1861,16 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, 
   # Validate and adjust correlation requirements
   cor <- validate_correlation_requirements(gr, cor)
 
-  # Create parameter names for VAR(p)
-  A_params <- paste0('A', 1:p)
-  A_params_bracketed <- paste0('A[', 1:p, ']')
-  param_names <- c('trend', A_params, 'Sigma', 'P_real', 'sigma',
-                   if(ma) 'theta', 'error', 'drift')
-  param_labels <- c('trend_estimates',
-                   paste0('var_coefficient_matrix_lag_', 1:p),
-                   'covariance_matrix', 'stationary_precision', 'standard_deviation',
-                   if(ma) 'moving_average_matrix' else NULL,
-                   'process_errors', 'drift_parameter')
+  # Define parameters with their bounds (base names - A will be array in Stan)
+  param_bounds <- list(
+    sigma = c(0, Inf),
+    A = c(-1, 1),
+    Sigma = c(-1, 1),
+    theta = if(ma) c(-1, 1) else NULL
+  )
+  
+  # Process parameters and bounds with trend suffix
+  processed_params <- process_trend_params(param_bounds)
 
   # Create trend object with dispatcher integration
   out <- structure(
@@ -1762,18 +1885,11 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, 
       subgr = subgr,
       n_lv = n_lv,
       label = build_trend_label('VAR', cor = cor, ma = ma, gr = gr, n_lv = n_lv, p = p),
-      tpars = c('sigma', A_params, 'Sigma', if(ma) 'theta'),
-      monitor_pars = c('trend', 'sigma', A_params_bracketed, 'Sigma', if(ma) 'theta'),
-      extract_pars = c('sigma', A_params_bracketed, 'Sigma', if(ma) 'theta'),
+      tpars = processed_params$tpars,
       forecast_fun = 'forecast_var_rcpp',
       stancode_fun = 'var_stan_code',
       standata_fun = 'var_stan_data',
-      bounds = Filter(Negate(is.null), list(
-        sigma = c(0, Inf),
-        A1 = c(-1, 1),
-        Sigma = c(-1, 1),
-        theta = if(ma) c(-1, 1) else NULL
-      )),
+      bounds = processed_params$bounds,
       characteristics = list(
         supports_predictors = TRUE,
         supports_correlation = TRUE,

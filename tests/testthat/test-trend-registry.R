@@ -251,3 +251,125 @@ test_that("Factor validation error messages are informative", {
   expect_error(validate_factor_compatibility(pw_spec),
                "changepoint modeling")
 })
+
+# Tests for parameter processing function
+test_that("process_trend_params handles simple parameters correctly", {
+  # Test basic parameter processing
+  param_bounds <- list(
+    sigma = c(0, Inf),
+    theta = c(-1, 1),
+    alpha = c(0, 1)
+  )
+  
+  result <- mvgam:::process_trend_params(param_bounds)
+  
+  # Check tpars
+  expect_equal(length(result$tpars), 3)
+  expect_true("sigma_trend" %in% result$tpars)
+  expect_true("theta_trend" %in% result$tpars)
+  expect_true("alpha_trend" %in% result$tpars)
+  
+  # Check bounds
+  expect_equal(length(result$bounds), 3)
+  expect_equal(result$bounds$sigma_trend, c(0, Inf))
+  expect_equal(result$bounds$theta_trend, c(-1, 1))
+  expect_equal(result$bounds$alpha_trend, c(0, 1))
+})
+
+test_that("process_trend_params handles NULL parameters correctly", {
+  # Test with NULL values (conditional parameters)
+  param_bounds <- list(
+    sigma = c(0, Inf),
+    theta = NULL,  # Not included when ma = FALSE
+    Sigma = c(-1, 1)
+  )
+  
+  result <- mvgam:::process_trend_params(param_bounds)
+  
+  # Check tpars (should exclude NULL entries)
+  expect_equal(length(result$tpars), 2)
+  expect_true("sigma_trend" %in% result$tpars)
+  expect_true("Sigma_trend" %in% result$tpars)
+  expect_false("theta_trend" %in% result$tpars)
+  
+  # Check bounds (should exclude NULL entries)
+  expect_equal(length(result$bounds), 2)
+  expect_true("sigma_trend" %in% names(result$bounds))
+  expect_true("Sigma_trend" %in% names(result$bounds))
+  expect_false("theta_trend" %in% names(result$bounds))
+})
+
+test_that("process_trend_params handles empty input correctly", {
+  # Test empty parameter list
+  param_bounds <- list()
+  result <- mvgam:::process_trend_params(param_bounds)
+  
+  expect_equal(length(result$tpars), 0)
+  expect_equal(length(result$bounds), 0)
+})
+
+test_that("process_trend_params preserves existing _trend suffix", {
+  # Test parameters that already have _trend suffix
+  param_bounds <- list(
+    sigma_trend = c(0, Inf),  # Already has suffix
+    theta = c(-1, 1)          # Needs suffix
+  )
+  
+  result <- mvgam:::process_trend_params(param_bounds)
+  
+  expect_equal(length(result$tpars), 2)
+  expect_true("sigma_trend" %in% result$tpars)
+  expect_true("theta_trend" %in% result$tpars)
+  
+  # Should not have sigma_trend_trend
+  expect_false("sigma_trend_trend" %in% result$tpars)
+})
+
+test_that("trend constructors use process_trend_params correctly", {
+  # Test that actual trend constructors produce correct parameter names
+  suppressWarnings({
+    # Test RW constructor
+    rw_trend <- RW()
+    expect_true("sigma_trend" %in% rw_trend$tpars)
+    expect_true("sigma_trend" %in% names(rw_trend$bounds))
+    expect_equal(rw_trend$bounds$sigma_trend, c(0, Inf))
+    
+    # Test RW with ma = TRUE
+    rw_ma_trend <- RW(ma = TRUE)
+    expect_true("sigma_trend" %in% rw_ma_trend$tpars)
+    expect_true("theta_trend" %in% rw_ma_trend$tpars)
+    expect_equal(rw_ma_trend$bounds$theta_trend, c(-1, 1))
+    
+    # Test AR constructor
+    ar_trend <- AR(p = 2)
+    expect_true("sigma_trend" %in% ar_trend$tpars)
+    expect_true("ar_trend" %in% ar_trend$tpars)
+    expect_equal(ar_trend$bounds$ar_trend, c(-1, 1))
+    
+    # Test VAR constructor
+    var_trend <- VAR(p = 1)
+    expect_true("sigma_trend" %in% var_trend$tpars)
+    expect_true("A_trend" %in% var_trend$tpars)
+    expect_true("Sigma_trend" %in% var_trend$tpars)
+    
+    # Test CAR constructor
+    car_trend <- CAR()
+    expect_true("sigma_trend" %in% car_trend$tpars)
+    expect_true("ar1_trend" %in% car_trend$tpars)
+    expect_equal(car_trend$bounds$ar1_trend, c(-1, 1))
+  })
+})
+
+test_that("parameter suffix validation is robust", {
+  # Test validation of parameter bounds input
+  expect_error(
+    mvgam:::process_trend_params(c("sigma", "theta")),
+    "Assertion on 'param_bounds' failed"
+  )
+  
+  # Test that function handles unnamed lists gracefully
+  expect_error(
+    mvgam:::process_trend_params(list(c(0, 1), c(-1, 1))),
+    "Assertion on 'param_bounds' failed.*names"
+  )
+})
