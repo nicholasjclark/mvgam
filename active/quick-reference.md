@@ -95,7 +95,7 @@ custom_trend(trend, tpars, ...)         # Create custom trend objects
 - `PW(n_lv = 2)` → Error: "Piecewise trends require series-specific changepoint modeling"
 - `CAR(n_lv = 2)` → Error: "Continuous-time AR requires series-specific irregular time intervals"
 
-## Two-Stage Stan Assembly System ✅ **OPERATIONAL**
+## Two-Stage Stan Assembly System
 
 ### Stage 1: Registry-Based Stanvar Generation (R/trend_injection_generators.R)
 ```r
@@ -112,46 +112,15 @@ trend_stanvars <- generate_trend_injection_stanvars(trend_spec, data_info)
 
 ### Stage 2: brms Integration with Stan Assembly (R/stan_code_generation.R)
 ```r
-# Generate base brms Stan code with trend stanvars
-base_stancode <- generate_base_brms_stancode(
-  formula = obs_formula, 
-  data = data,
-  family = family,
-  stanvars = trend_stanvars,
-  backend = "rstan"
-)
-base_standata <- generate_base_brms_standata(
-  formula = obs_formula,
-  data = data,
-  family = family, 
-  stanvars = trend_stanvars
-)
+# The injection system modifies brms-generated Stan code by:
+# 1. Finding/creating transformed parameters block
+# 2. Adding trend effects to mu parameters (linear predictors)
+# 3. Preserving all brms optimizations and structure
 
-# Inject trend dynamics into linear predictors with Stan code modification
-final_stancode <- inject_trend_into_linear_predictor(
-  base_stancode, 
-  trend_stanvars, 
-  trend_spec
-)
-
-# Complete assembly with validation
-complete_model <- assemble_mvgam_stan_code(
-  obs_formula = obs_formula,
-  trend_stanvars = trend_stanvars,
-  data = data,
-  family = family,
-  backend = "rstan",
-  validate = TRUE  # Uses rstan::stanc() validation
-)
-complete_data <- assemble_mvgam_stan_data(
-  obs_formula = obs_formula,
-  trend_stanvars = trend_stanvars,
-  data = data,
-  family = family
-)
+inject_trend_into_linear_predictor(base_stancode, trend_stanvars, trend_spec)
 ```
 
-### Stan Code Validation Framework (R/stan_validation.R)
+## Stan Code Validation Framework (R/stan_validation.R)
 ```r
 # Unified comprehensive validation using rstan::stanc()
 validate_stan_code(stan_code, backend = "rstan", silent = FALSE)  # Primary validation function
@@ -161,145 +130,9 @@ validate_stan_code_structure(stan_code)    # Check required blocks exist
 are_braces_balanced(stan_code)             # Check brace matching
 ```
 
-## Trend Injection Patterns ✅ **OPERATIONAL**
+## Stan Assembly Integration with mvgam_enhanced()
 
-### Stan Code Modification Strategy (inject_trend_into_linear_predictor)
-```r
-# The injection system modifies brms-generated Stan code by:
-# 1. Finding/creating transformed parameters block
-# 2. Adding trend effects to mu (linear predictor)
-# 3. Preserving all brms optimizations and structure
-
-inject_trend_into_linear_predictor(base_stancode, trend_stanvars, trend_spec)
-```
-
-### Pattern 1: Transformed Parameters Block Creation
-```stan
-// Original brms code (observation model only)
-model {
-  target += normal_lpdf(y | mu, sigma);
-}
-
-// After injection (trend effects added)
-transformed parameters {
-  // Combined linear predictor with trend effects
-  vector[N] mu_combined = mu;
-  
-  // Add trend effects if available  
-  if (size(trend) > 0) {
-    mu_combined += trend[obs_ind];
-  }
-}
-model {
-  target += normal_lpdf(y | mu_combined, sigma);
-}
-```
-
-### Pattern 2: Missing Data Likelihood with Trend Evolution
-```stan
-// Combined linear predictor for all timepoints
-mu_combined = mu + mu_trend;
-
-// Likelihood only for observed data
-{
-  vector[n_nonmissing] selected_mu = mu_combined[obs_ind];
-  flat_ys ~ family_distribution(selected_mu, ...);
-}
-
-// Trends evolve over ALL timesteps (including missing observations)
-trend[2:T] ~ normal(trend[1:(T-1)], sigma_trend);
-```
-
-### Pattern 3: Multivariate Response-Specific Trends
-```stan
-// Response-specific linear predictors with trends
-vector[N_count] mu_count = X_count * b_count;
-vector[N_biomass] mu_biomass = X_biomass * b_biomass;
-
-// Add response-specific trends
-mu_count += trend_count[obs_ind_count];
-mu_biomass += trend_biomass[obs_ind_biomass];
-
-// Response-specific likelihoods
-count ~ poisson_log(mu_count);
-biomass ~ normal(mu_biomass, sigma_biomass);
-```
-
-## Stan Assembly Integration with mvgam_enhanced() ✅ **OPERATIONAL**
-
-### Complete Pipeline Integration (R/mvgam_enhanced.R)
-```r
-# Enhanced mvgam with full Stan assembly system
-mvgam_enhanced <- function(formula, trend_formula = NULL, data, family = gaussian(), 
-                          backend = c("rstan", "cmdstanr"), ...) {
-  
-  # Stage 1: Setup lightweight brms components
-  obs_setup <- setup_brms_lightweight(
-    formula = formula,
-    data = data, 
-    family = family,
-    backend = backend
-  )
-  
-  trend_setup <- if (!is.null(trend_formula)) {
-    setup_brms_lightweight(
-      formula = trend_formula,
-      data = data,
-      family = family,  
-      backend = backend
-    )
-  } else NULL
-  
-  # Stage 2: Parse multivariate trend specifications
-  mv_spec <- parse_multivariate_trends(
-    trend_formula = trend_formula,
-    obs_formula = formula,
-    data = data
-  )
-  
-  # Stage 3: Extract and generate trend stanvars
-  trend_stanvars <- if (!is.null(trend_setup)) {
-    extract_trend_stanvars_from_setup(trend_setup, mv_spec)
-  } else NULL
-  
-  # Stage 4: Assemble complete Stan code and data
-  stan_code <- assemble_mvgam_stan_code(
-    obs_formula = formula,
-    trend_stanvars = trend_stanvars,
-    data = data,
-    family = family,
-    backend = backend,
-    validate = TRUE  # rstan::stanc() validation
-  )
-  
-  stan_data <- assemble_mvgam_stan_data(
-    obs_formula = formula,
-    trend_stanvars = trend_stanvars,
-    data = data,
-    family = family
-  )
-  
-  # Stage 5: Fit combined model and create dual objects
-  combined_fit <- fit_mvgam_model(
-    stancode = stan_code,
-    standata = stan_data,
-    backend = backend,
-    ...
-  )
-  
-  # Stage 6: Create dual brmsfit-like objects
-  mvgam_object <- create_mvgam_from_combined_fit(
-    combined_fit = combined_fit,
-    obs_setup = obs_setup,
-    trend_setup = trend_setup,
-    mv_spec = mv_spec
-  )
-  
-  return(mvgam_object)
-}
-```
-
-### Key Integration Points ✅ **VALIDATED**
+### Key Integration Points
 
 **Trend Stanvar Generation**:
 - `extract_trend_stanvars_from_setup()` automatically calls `generate_trend_injection_stanvars()`
