@@ -5,8 +5,7 @@
 \alias{AR}
 \alias{CAR}
 \alias{VAR}
-\title{terms, and cannot be anything other than \code{1} for continuous time AR
-(\code{CAR}) terms.}
+\title{Specify autoregressive dynamic processes in \pkg{mvgam}}
 \usage{
 RW(
   time = NA,
@@ -36,7 +35,6 @@ VAR(
   series = NA,
   p = 1,
   ma = FALSE,
-  cor = FALSE,
   gr = NA,
   subgr = NA,
   n_lv = NULL
@@ -54,6 +52,16 @@ identifier in the supplied \code{data}. This variable should be either a
 \code{character} or \code{factor} variable. Defaults to \code{series} following mvgam
 conventions, allowing flexible series variable naming. When using the
 default, a one-time warning will be issued.}
+
+\item{ma}{\code{Logical}. Include moving average terms of order \code{1}?
+Default is \code{FALSE}.}
+
+\item{cor}{\code{Logical}. Include correlated process errors as part of a
+multivariate normal process model? If \code{TRUE} and if
+\code{n_series > 1} in the supplied data, a fully structured covariance
+matrix will be estimated for the process errors. Default is \code{FALSE}.
+Note: For \code{VAR()} models, correlation is always enabled (\code{cor = TRUE})
+as this is essential for optimal performance.}
 
 \item{gr}{An optional grouping variable, which must be a \code{factor} in the
 supplied \code{data}, for setting up hierarchical residual correlation
@@ -92,14 +100,20 @@ correlated within regions, then you should specify \code{gr = region} and
 for the data using:
 
 \code{series = interaction(group, subgroup, drop = TRUE)}}
+
+\item{p}{A non-negative integer specifying the autoregressive (AR) order.
+Default is \code{1}. Cannot currently be larger than \code{3} for \code{AR}
+terms, and cannot be anything other than \code{1} for continuous time AR
+(\code{CAR}) terms.}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of
 arguments to be interpreted by the parsing functions in \pkg{mvgam}.
 }
 \description{
-terms, and cannot be anything other than \code{1} for continuous time AR
-(\code{CAR}) terms.
+Set up autoregressive or autoregressive moving average trend models in
+\pkg{mvgam}. These functions do not evaluate their arguments – they exist
+purely to help set up a model with particular autoregressive trend models.
 }
 \details{
 \strong{Important}: Only ONE trend constructor is allowed per \code{trend_formula}.
@@ -115,6 +129,56 @@ available stochastic trend types in \pkg{mvgam}, or view the rendered
 version on the package website at:
 https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html
 }
+\section{Parameter Naming Convention}{
+
+All trend model parameters automatically receive a "_trend" suffix to prevent
+naming conflicts with observation model parameters. For example:
+\itemize{
+\item \code{sigma} becomes \code{sigma_trend}
+\item \code{theta} becomes \code{theta_trend} (when \code{ma = TRUE})
+\item \code{Sigma} becomes \code{Sigma_trend} (when \code{cor = TRUE})
+\item \code{ar[p]} becomes \code{ar_trend[p]} (for AR trends)
+\item \code{A[p]} becomes \code{A_trend[p]} (for VAR trends)
+}
+
+This naming convention is applied consistently across all trend types and must
+be considered when:
+\itemize{
+\item Specifying priors (use \code{prior(normal(0, 1), class = sigma_trend)})
+\item Extracting parameters from fitted models
+\item Creating custom trend types
+}
+}
+
+\section{Custom Trend Development}{
+
+When creating custom trend types, define parameters and bounds using their
+base names (e.g., "sigma", "alpha"). The \code{process_trend_params()} function
+will automatically add the "_trend" suffix and handle bounds consistently.
+
+Example custom trend constructor pattern:
+\preformatted{
+custom_trend <- function(...) {
+  # Define parameters with bounds using base names
+  param_bounds <- list(
+    decay = c(0, 1),
+    amplitude = c(0, Inf),
+    phase = NULL  # NULL means no bounds needed
+  )
+  
+  # Process automatically
+  processed <- process_trend_params(param_bounds)
+  
+  # Use in trend object
+  structure(list(
+    trend = "Custom",
+    tpars = processed$tpars,  # c("decay_trend", "amplitude_trend")
+    bounds = processed$bounds # list(decay_trend = c(0, 1), ...)
+  ), class = "mvgam_trend")
+}
+}
+}
+
 \examples{
 \donttest{
 # Basic trend model usage with defaults (will issue warnings)
@@ -305,19 +369,19 @@ set.seed(123)
 
 # Simulate three species monitored in three different regions
 simdat1 <- sim_mvgam(
-  trend_model = VAR(cor = TRUE),
+  trend_model = VAR(),  # cor = TRUE is now automatic for VAR models
   prop_trend = 0.95,
   n_series = 3,
   mu = c(1, 2, 3)
 )
 simdat2 <- sim_mvgam(
-  trend_model = VAR(cor = TRUE),
+  trend_model = VAR(),  # cor = TRUE is now automatic for VAR models
   prop_trend = 0.95,
   n_series = 3,
   mu = c(1, 2, 3)
 )
 simdat3 <- sim_mvgam(
-  trend_model = VAR(cor = TRUE),
+  trend_model = VAR(),  # cor = TRUE is now automatic for VAR models
   prop_trend = 0.95,
   n_series = 3,
   mu = c(1, 2, 3)

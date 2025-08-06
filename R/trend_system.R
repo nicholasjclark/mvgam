@@ -276,68 +276,242 @@ ensure_registry_initialized <- function() {
 }
 
 # =============================================================================
-# SECTION 2: TREND VALIDATION AND PARSING
+# SECTION 2: TREND PARAMETER SYSTEM (brms-inspired)
+# =============================================================================
+# WHY: Following brms design patterns for prior() objects, we create a flexible
+# parameter specification system that allows easy combination with `+` operator
+# and standardized conditional parameter handling.
+
+#' Create trend parameter specifications
+#'
+#' Creates parameter specifications for trend constructors following brms design
+#'   patterns. Parameters can be combined using the `+` operator and support
+#'   conditional inclusion, bounds, monitoring flags, and labels.
+#'
+#' @param name Character string specifying the parameter name
+#' @param bounds Numeric vector of length 2 specifying lower and upper bounds
+#' @param monitor Logical indicating if parameter should be monitored post-fit
+#' @param label Character string describing the parameter for documentation
+#' @param condition Logical or expression that determines if parameter is included
+#'
+#' @return Object of class `trend_param` containing parameter specification
+#' @export
+#'
+#' @examples
+#' # Basic parameter
+#' sigma_param <- trend_param("sigma", bounds = c(0, Inf), label = "innovation_sd")
+#' 
+#' # Conditional parameter  
+#' theta_param <- trend_param("theta", bounds = c(-1, 1), 
+#'                           condition = ma, label = "ma_coefficient")
+#' 
+#' # Combine parameters
+#' all_params <- sigma_param + theta_param
+trend_param <- function(name, bounds = NULL, monitor = TRUE, 
+                       label = NULL, condition = TRUE) {
+  checkmate::assert_string(name, min.chars = 1)
+  checkmate::assert_numeric(bounds, len = 2, null.ok = TRUE)
+  checkmate::assert_logical(monitor, len = 1)
+  checkmate::assert_string(label, null.ok = TRUE)
+  
+  # Create data frame following brms pattern
+  out <- data.frame(
+    name = name,
+    bounds_lower = if(!is.null(bounds)) bounds[1] else NA_real_,
+    bounds_upper = if(!is.null(bounds)) bounds[2] else NA_real_,
+    monitor = monitor,
+    label = label %||% name,
+    condition = deparse(substitute(condition)),  # Store condition as string
+    stringsAsFactors = FALSE
+  )
+  
+  class(out) <- c("trend_param", "data.frame")
+  return(out)
+}
+
+#' Combine trend parameters
+#' @export
+`+.trend_param` <- function(e1, e2) {
+  if (is.null(e2)) return(e1)
+  if (!is.trend_param(e2)) {
+    stop(insight::format_error("Cannot add '{class(e2)[1]}' objects to trend parameters."))
+  }
+  c(e1, e2)
+}
+
+#' @export
+c.trend_param <- function(x, ..., replace = FALSE) {
+  dots <- list(...)
+  if (all(sapply(dots, is.trend_param))) {
+    out <- do.call(rbind, list(x, ...))
+    if (replace) {
+      # Handle duplicates by keeping last occurrence
+      out <- out[!duplicated(out$name, fromLast = TRUE), ]
+    }
+    class(out) <- c("trend_param", "data.frame")
+  } else {
+    stop(insight::format_error("All objects must be 'trend_param' class."))
+  }
+  out
+}
+
+#' @export
+is.trend_param <- function(x) {
+  inherits(x, "trend_param")
+}
+
+#' @export  
+print.trend_param <- function(x, ...) {
+  cat("Trend parameter specification:\n")
+  for (i in seq_len(nrow(x))) {
+    row <- x[i, ]
+    cat(sprintf("  %s", row$name))
+    if (!is.na(row$bounds_lower) && !is.na(row$bounds_upper)) {
+      cat(sprintf(" [%.2f, %.2f]", row$bounds_lower, row$bounds_upper))
+    }
+    if (!row$monitor) cat(" (not monitored)")
+    if (!is.na(row$label) && row$label != row$name) {
+      cat(sprintf(" (%s)", row$label))
+    }
+    cat("\n")
+  }
+  invisible(x)
+}
+
+#' Evaluate trend parameter conditions
+#'
+#' Internal function that evaluates conditional expressions in trend parameters
+#'   to determine which parameters should be included in the current context.
+#'
+#' @param param_spec A trend_param object 
+#' @param envir Environment for evaluating conditions
+#'
+#' @return Filtered trend_param object with only active parameters
+#' @noRd
+evaluate_param_conditions <- function(param_spec, envir = parent.frame()) {
+  if (!is.trend_param(param_spec)) {
+    stop(insight::format_error("Input must be a 'trend_param' object."))
+  }
+  
+  # Evaluate conditions for each parameter
+  keep_rows <- logical(nrow(param_spec))
+  for (i in seq_len(nrow(param_spec))) {
+    condition_str <- param_spec$condition[i]
+    if (is.na(condition_str) || condition_str == "TRUE") {
+      keep_rows[i] <- TRUE
+    } else if (condition_str == "FALSE") {
+      keep_rows[i] <- FALSE
+    } else {
+      tryCatch({
+        condition_expr <- parse(text = condition_str)[[1]]
+        keep_rows[i] <- eval(condition_expr, envir = envir)
+      }, error = function(e) {
+        # If condition can't be evaluated, default to TRUE
+        keep_rows[i] <- TRUE
+      })
+    }
+  }
+  
+  # Filter to active parameters
+  active_params <- param_spec[keep_rows, ]
+  class(active_params) <- c("trend_param", "data.frame")
+  return(active_params)
+}
+
+# =============================================================================
+# SECTION 3: TREND VALIDATION AND PARSING
 # =============================================================================
 # WHY: Trend validation ensures data integrity and prevents runtime errors
 # during Stan model compilation. Formula parsing enables complex multivariate
 # trend specifications while maintaining compatibility with brms syntax.
 # This layer bridges user-friendly R formulas to internal trend objects.
 
-#' Process trend parameters and bounds
+#' Process trend parameters with bounds and monitoring flags
 #'
 #' @description
 #' This function processes trend model parameters by adding a "_trend" suffix to
-#' avoid naming conflicts with brms observation model parameters. It handles both
-#' parameter names and their associated bounds in a single operation.
+#' avoid naming conflicts with brms observation model parameters. It handles
+#' parameter names, bounds, and monitoring flags in a single operation.
 #'
 #' @details
 #' All trend parameters are defined as arrays in Stan for consistency, even
 #' when n_series = 1. This simplifies forecasting functions and ensures uniform
 #' parameter handling across all trend types.
 #'
-#' When creating custom trend types, define parameters and bounds using their
-#' base names. This function will automatically add the "_trend" suffix and
-#' update the bounds accordingly.
+#' When creating custom trend types, define parameters using their base names.
+#' This function will automatically add the "_trend" suffix and handle bounds
+#' and monitoring flags consistently.
 #'
-#' @param param_bounds Named list of parameter bounds, where names are parameter
-#'   names and values are numeric vectors of length 2 (lower, upper bounds) or NULL
-#' @return List with two elements:
-#'   - tpars: Character vector of parameter names with _trend suffix
+#' @param param_specs Named list where each element is either:
+#'   - A numeric vector of length 2 (bounds): c(lower, upper) - monitored by default
+#'   - A list with 'bounds', 'monitor', and 'label' elements: 
+#'     list(bounds = c(0, 1), monitor = FALSE, label = "description")
+#'   - NULL (parameter not included when conditional)
+#' @return List with three elements:
+#'   - tpars: Character vector of all parameter names with _trend suffix
+#'   - monitor_pars: Character vector of parameters to monitor (subset of tpars)
 #'   - bounds: Named list of bounds with updated parameter names
 #' @examples
-#' # Define parameters with bounds
-#' params <- list(sigma = c(0, Inf), ar = c(-1, 1), theta = NULL)
-#' result <- process_trend_params(params)
-#' # result$tpars: c("sigma_trend", "ar_trend")
+#' # Define parameters with bounds and monitoring
+#' param_specs <- list(
+#'   sigma = c(0, Inf),  # Monitored by default
+#'   ar = c(-1, 1),      # Monitored by default
+#'   LV_innovations = list(bounds = NULL, monitor = FALSE),  # Not monitored
+#'   theta = NULL        # Conditional parameter
+#' )
+#' result <- process_trend_params(param_specs)
+#' # result$tpars: c("sigma_trend", "ar_trend", "LV_innovations_trend")
+#' # result$monitor_pars: c("sigma_trend", "ar_trend")  # LV_innovations excluded
 #' # result$bounds: list(sigma_trend = c(0, Inf), ar_trend = c(-1, 1))
 #'
 #' @noRd
-process_trend_params <- function(param_bounds) {
-  checkmate::assert_list(param_bounds, names = "unique")
+process_trend_params <- function(param_specs, envir = parent.frame()) {
+  # Handle case where no trend-specific parameters are defined
+  if (is.null(param_specs) || (is.trend_param(param_specs) && nrow(param_specs) == 0)) {
+    return(list(tpars = character(0), monitor_pars = character(0), bounds = list()))
+  }
   
-  # Extract parameter names (excluding NULL entries)
-  params <- names(param_bounds)
-  non_null_params <- params[!sapply(param_bounds, is.null)]
+  checkmate::assert_class(param_specs, "trend_param")
   
-  # Add suffix to parameter names
-  params_with_suffix <- character(length(non_null_params))
-  for (i in seq_along(non_null_params)) {
-    if (!grepl("_trend", non_null_params[i])) {
-      params_with_suffix[i] <- paste0(non_null_params[i], "_trend")
+  # Evaluate conditions to get active parameters
+  active_params <- evaluate_param_conditions(param_specs, envir)
+  
+  if (nrow(active_params) == 0) {
+    return(list(tpars = character(0), monitor_pars = character(0), bounds = list()))
+  }
+  
+  # Process parameter names with _trend suffix
+  processed_names <- character(nrow(active_params))
+  bounds_list <- list()
+  monitor_params <- character(0)
+  
+  for (i in seq_len(nrow(active_params))) {
+    row <- active_params[i, ]
+    
+    # Add _trend suffix if not already present
+    param_name <- if (!grepl("_trend$", row$name)) {
+      paste0(row$name, "_trend")
     } else {
-      params_with_suffix[i] <- non_null_params[i]
+      row$name
+    }
+    
+    processed_names[i] <- param_name
+    
+    # Store bounds if specified
+    if (!is.na(row$bounds_lower) && !is.na(row$bounds_upper)) {
+      bounds_list[[param_name]] <- c(row$bounds_lower, row$bounds_upper)
+    }
+    
+    # Track monitored parameters
+    if (row$monitor) {
+      monitor_params <- c(monitor_params, param_name)
     }
   }
   
-  # Create new bounds list with updated names
-  bounds_with_suffix <- list()
-  for (i in seq_along(non_null_params)) {
-    bounds_with_suffix[[params_with_suffix[i]]] <- param_bounds[[non_null_params[i]]]
-  }
-  
   return(list(
-    tpars = params_with_suffix,
-    bounds = bounds_with_suffix
+    tpars = processed_names,
+    monitor_pars = monitor_params,
+    bounds = bounds_list
   ))
 }
 
@@ -350,7 +524,7 @@ validate_trend <- function(trend_obj, ...) {
   
   # Optional components validation (only if present)
   if (!is.null(trend_obj$tpars)) {
-    checkmate::assert_character(trend_obj$tpars, min.len = 1)
+    checkmate::assert_character(trend_obj$tpars)  # Allow empty tpars for trends with no trend-specific parameters
   }
   
   if (!is.null(trend_obj$forecast_fun)) {
@@ -426,7 +600,10 @@ validate_dynamic_factor_constraints <- function(trend_obj) {
     }
     
     # Constraint 3: Trend type must support factors
-    if (!trend_obj$characteristics$supports_factors) {
+    supports_factors <- trend_obj$param_info$characteristics$supports_factors %||% 
+                       trend_obj$characteristics$supports_factors %||% 
+                       FALSE
+    if (!supports_factors) {
       insight::format_error(
         "Trend type {.field {trend_obj$trend}} does not support dynamic factor models.",
         "You specified {.field n_lv = {n_lv}} with an incompatible trend type.",
@@ -464,13 +641,8 @@ validate_dynamic_factor_constraints <- function(trend_obj) {
 #' @return Character vector of trend type names
 #' @noRd
 mvgam_trend_registry <- function() {
-  # Built-in trend types
-  builtin_trends <- c("RW", "AR", "VAR", "GP", "CAR", "PW", "ZMVN")
-  
-  # Custom trend types (can be extended by users)
-  custom_trends <- names(.mvgam_custom_trends)
-  
-  return(c(builtin_trends, custom_trends))
+  # All trend types from the single registry environment
+  ls(trend_registry)
 }
 
 #' Get available trend type choices
@@ -496,31 +668,6 @@ mvgam_trend_pattern <- function() {
   paste0("\\b(", paste(trend_types, collapse = "|"), ")\\s*\\([^)]*(?:\\([^)]*\\)[^)]*)*\\)")
 }
 
-#' Environment to store custom trend types
-#'
-#' Internal environment for storing user-registered custom trend types.
-#' @noRd
-.mvgam_custom_trends <- new.env(parent = emptyenv())
-
-#' Register a custom trend type
-#'
-#' Adds a custom trend type to the registry, making it available for
-#'   formula parsing and dispatch.
-#'
-#' @param trend_name Character string naming the trend type
-#' @param constructor_fun Function that creates the trend object
-#'
-#' @return Invisible NULL
-#' @noRd
-register_custom_trend <- function(trend_name, constructor_fun) {
-  checkmate::assert_string(trend_name, min.chars = 1)
-  checkmate::assert_function(constructor_fun)
-  
-  # Store in custom trends registry
-  .mvgam_custom_trends[[trend_name]] <- constructor_fun
-  
-  invisible(NULL)
-}
 
 #' Check if object is a mvgam trend
 #'
@@ -1207,9 +1354,32 @@ print.mvgam_trend <- function(x, ...) {
 # WHY: Trend constructors provide the user-facing API for creating trend
 # specifications. They must handle parameter validation, set appropriate
 # defaults, and create properly structured trend objects that integrate
-# seamlessly with the brms ecosystem. This layer abstracts Stan complexity.#'   Default is \code{1}. Cannot currently be larger than \code{3} for `AR`
-#'   terms, and cannot be anything other than `1` for continuous time AR
-#'   (`CAR`) terms.
+# seamlessly with the brms ecosystem. This layer abstracts Stan complexity.
+
+#' Trend Model Constructors for \pkg{mvgam}
+#'
+#' Specify trend models for multivariate State-Space models in \pkg{mvgam}.
+#' These constructor functions create trend specifications for various temporal
+#' dynamics including random walks (RW), autoregressive models (AR, VAR, CAR),
+#' Gaussian processes (GP), and piecewise trends (PW). These functions do not 
+#' evaluate their arguments – they exist purely to help set up models with 
+#' particular trend structures.
+#'
+#' @param ma \code{Logical}. Include moving average terms of order \code{1}?
+#'   Default is \code{FALSE}.
+#'
+#' @param cor \code{Logical}. Include correlated process errors as part of a
+#'   multivariate normal process model? If \code{TRUE} and if
+#'   \code{n_series > 1} in the supplied data, a fully structured covariance
+#'   matrix will be estimated for the process errors. Default is \code{FALSE}.
+#'   Note: For \code{VAR()} models, correlation is always enabled (\code{cor = TRUE})
+#'   as this is essential for optimal performance.
+#'
+#' @param p For `AR()` models: A positive integer or vector of positive integers 
+#'   specifying the autoregressive lag(s). Can be a single value like \code{p = 1} 
+#'   for AR(1), or a vector like \code{p = c(1, 12, 24)} for seasonal models with 
+#'   multiple lags. For `VAR()` models: A positive integer specifying the VAR order.
+#'   For `CAR()` models: Must be \code{1} (continuous time AR(1) process).
 #'
 #' @param time The unquoted name of the variable that represents time in the
 #'   supplied `data`. This variable should be either a `numeric` or `integer`
@@ -1273,7 +1443,7 @@ print.mvgam_trend <- function(x, ...) {
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #'   arguments to be interpreted by the parsing functions in \pkg{mvgam}.
 #'
-#' @rdname RW
+#' @rdname trend_constructors
 #'
 #' @details Use `vignette("mvgam_overview")` to see the full details of
 #'   available stochastic trend types in \pkg{mvgam}, or view the rendered
@@ -1518,19 +1688,19 @@ print.mvgam_trend <- function(x, ...) {
 #'
 #' # Simulate three species monitored in three different regions
 #' simdat1 <- sim_mvgam(
-#'   trend_model = VAR(cor = TRUE),
+#'   trend_model = VAR(),  # cor = TRUE is now automatic for VAR models
 #'   prop_trend = 0.95,
 #'   n_series = 3,
 #'   mu = c(1, 2, 3)
 #' )
 #' simdat2 <- sim_mvgam(
-#'   trend_model = VAR(cor = TRUE),
+#'   trend_model = VAR(),  # cor = TRUE is now automatic for VAR models
 #'   prop_trend = 0.95,
 #'   n_series = 3,
 #'   mu = c(1, 2, 3)
 #' )
 #' simdat3 <- sim_mvgam(
-#'   trend_model = VAR(cor = TRUE),
+#'   trend_model = VAR(),  # cor = TRUE is now automatic for VAR models
 #'   prop_trend = 0.95,
 #'   n_series = 3,
 #'   mu = c(1, 2, 3)
@@ -1613,15 +1783,37 @@ RW = function(
   # Validate and adjust correlation requirements
   cor <- validate_correlation_requirements(gr, cor)
 
-  # Define parameters with their bounds (base names)
-  param_bounds <- list(
-    sigma = c(0, Inf),
-    theta = if(ma) c(-1, 1) else NULL,
-    Sigma = if(cor || gr != 'NA') c(-1, 1) else NULL
+  # Define ONLY trend-specific parameters (Gaussian innovation infrastructure is automatic)
+  # RW only has MA coefficient when ma = TRUE, otherwise no trend-specific parameters
+  param_specs <- if (ma) {
+    trend_param("theta1", bounds = c(-1, 1), label = "moving_average_coefficient_lag_1")
+  } else {
+    NULL  # No trend-specific parameters for basic RW
+  }
+  
+  # Define trend characteristics and Gaussian innovation settings
+  characteristics <- list(
+    supports_predictors = TRUE,
+    supports_correlation = TRUE,
+    supports_factors = TRUE,
+    supports_hierarchical = TRUE,  # RW supports gr/subgr
+    innovation_type = "gaussian_shared",  # Uses shared Gaussian innovation system
+    max_order = 1,
+    requires_sorting = TRUE,
+    # Gaussian innovation settings (automatic parameters)
+    uses_sigma_trend = TRUE,          # Always has sigma_trend (innovation SD)
+    uses_correlation = cor || gr != 'NA',  # Uses Sigma_trend/L_Omega_trend when needed
+    monitor_innovations = ma          # Monitor LV_innovations only for MA models
   )
   
-  # Process parameters and bounds with trend suffix
-  processed_params <- process_trend_params(param_bounds)
+  # Process trend-specific parameters only
+  processed_params <- process_trend_params(param_specs, envir = environment())
+  
+  # Create complete parameter info for storage
+  param_info <- list(
+    parameters = param_specs,  # Original trend_param specifications
+    characteristics = characteristics
+  )
   
   # Create trend object with dispatcher integration
   out <- structure(
@@ -1640,19 +1832,9 @@ RW = function(
       stancode_fun = 'rw_stan_code',
       standata_fun = 'rw_stan_data',
       bounds = processed_params$bounds,
-      characteristics = list(
-        supports_predictors = TRUE,
-        supports_correlation = TRUE,
-        supports_factors = TRUE,
-        max_order = 1,
-        requires_sorting = TRUE
-      )
+      param_info = param_info  # Complete trend specification (parameters + characteristics)
     ),
-    class = 'mvgam_trend',
-    param_info = list(
-      param_names = c('trend', 'tau', 'sigma', 'theta', 'Sigma', 'error', 'drift'),
-      labels = c('trend_estimates', 'precision_parameter', 'standard_deviation', 'moving_average_coef', 'covariance_matrix', 'process_errors', 'drift_parameter')
-    )
+    class = 'mvgam_trend'
   )
 
   # Validate using dispatcher system
@@ -1661,7 +1843,7 @@ RW = function(
   return(out)
 }
 
-#' @rdname RW
+#' @rdname trend_constructors
 #' @export
 AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
   # Process time argument
@@ -1703,17 +1885,48 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
   # Validate and adjust correlation requirements
   cor <- validate_correlation_requirements(gr, cor)
 
-  # Define parameters with their bounds (base names - ar will be array in Stan)
-  param_bounds <- list(
-    sigma = c(0, Inf),
-    ar = c(-1, 1),
-    theta = if(ma) c(-1, 1) else NULL,
-    Sigma = if(cor || gr != 'NA') c(-1, 1) else NULL
+  # Define ONLY trend-specific parameters (Gaussian innovation infrastructure is automatic)
+  # Always use ar{lag}_trend naming for absolute consistency (ar1_trend, ar12_trend, etc.)
+  param_specs <- NULL
+  for (lag in ar_lags) {
+    ar_param <- trend_param(paste0("ar", lag), bounds = c(-1, 1), 
+                           label = paste0("ar_coefficient_lag_", lag))
+    if (is.null(param_specs)) {
+      param_specs <- ar_param
+    } else {
+      param_specs <- param_specs + ar_param
+    }
+  }
+  
+  # Add MA coefficient if specified (future: could support multiple MA lags)
+  if (ma) {
+    param_specs <- param_specs + trend_param("theta1", bounds = c(-1, 1), label = "moving_average_coefficient_lag_1")
+  }
+  
+  # Define trend characteristics and Gaussian innovation settings
+  characteristics <- list(
+    supports_predictors = TRUE,
+    supports_correlation = TRUE,
+    supports_factors = TRUE,
+    supports_hierarchical = TRUE,  # AR supports gr/subgr
+    innovation_type = "gaussian_shared",  # Uses shared Gaussian innovation system
+    max_order = max_lag,
+    requires_sorting = TRUE,
+    # Gaussian innovation settings (automatic parameters)
+    uses_sigma_trend = TRUE,          # Always has sigma_trend (innovation SD)
+    uses_correlation = cor || gr != 'NA',  # Uses Sigma_trend/L_Omega_trend when needed
+    monitor_innovations = ma          # Monitor LV_innovations only for MA models
   )
   
-  # Process parameters and bounds with trend suffix
-  processed_params <- process_trend_params(param_bounds)
+  # Process trend-specific parameters only
+  processed_params <- process_trend_params(param_specs, envir = environment())
 
+  # Create complete parameter info for storage
+  param_info <- list(
+    parameters = param_specs,  # Trend-specific parameters only
+    characteristics = characteristics
+  )
+  
   # Create trend object with dispatcher integration
   out <- structure(
     list(
@@ -1729,24 +1942,14 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
       subgr = subgr,
       n_lv = n_lv,
       label = build_trend_label('AR', cor = cor, ma = ma, gr = gr, n_lv = n_lv, p = max_lag),
-      tpars = processed_params$tpars,
+      tpars = processed_params$tpars,  # Only trend-specific parameters
       forecast_fun = 'forecast_ar_rcpp',
       stancode_fun = 'ar_stan_code',
       standata_fun = 'ar_stan_data',
       bounds = processed_params$bounds,
-      characteristics = list(
-        supports_predictors = TRUE,
-        supports_correlation = TRUE,
-        supports_factors = TRUE,
-        max_order = max_lag,
-        requires_sorting = TRUE
-      )
+      param_info = param_info  # Complete specification (trend params + characteristics)
     ),
-    class = 'mvgam_trend',
-    param_info = list(
-      param_names = param_names,
-      labels = param_labels
-    )
+    class = 'mvgam_trend'
   )
 
   # Validate using dispatcher system
@@ -1755,7 +1958,7 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
   return(out)
 }
 
-#' @rdname RW
+#' @rdname trend_constructors
 #' @export
 CAR = function(time = NA, series = NA, p = 1, n_lv = NULL) {
   # Factor model validation - CAR trends don't support factor models
@@ -1786,14 +1989,32 @@ CAR = function(time = NA, series = NA, p = 1, n_lv = NULL) {
     stop("Argument 'p' must be = 1", call. = FALSE)
   }
   
-  # Define parameters with their bounds (base names)
-  param_bounds <- list(
-    sigma = c(0, Inf),
-    ar1 = c(-1, 1)
+  # Define ONLY trend-specific parameters (Gaussian innovation infrastructure is automatic)
+  param_specs <- trend_param("ar1", bounds = c(-1, 1), label = "autoregressive_coefficient")
+  
+  # Define trend characteristics and Gaussian innovation settings
+  characteristics <- list(
+    supports_predictors = TRUE,
+    supports_correlation = FALSE,  # CAR doesn't support correlation
+    supports_factors = FALSE,      # CAR doesn't support factor models
+    supports_hierarchical = FALSE, # CAR doesn't support gr/subgr
+    innovation_type = "gaussian_shared",  # Uses shared Gaussian innovation system
+    max_order = 1,
+    requires_sorting = TRUE,
+    # Gaussian innovation settings (automatic parameters)
+    uses_sigma_trend = TRUE,       # Always has sigma_trend (innovation SD)
+    uses_correlation = FALSE,      # Never uses correlation for CAR
+    monitor_innovations = FALSE    # CAR never monitors innovations (no MA support)
   )
   
-  # Process parameters and bounds with trend suffix
-  processed_params <- process_trend_params(param_bounds)
+  # Process trend-specific parameters only
+  processed_params <- process_trend_params(param_specs, envir = environment())
+  
+  # Create complete parameter info for storage
+  param_info <- list(
+    parameters = param_specs,  # Trend-specific parameters only
+    characteristics = characteristics
+  )
   
   out <- structure(
     list(
@@ -1805,31 +2026,21 @@ CAR = function(time = NA, series = NA, p = 1, n_lv = NULL) {
       unit = 'time',
       gr = 'NA',
       subgr = 'series',
-      label = match.call(),
-      tpars = processed_params$tpars,
+      label = build_trend_label('CAR'),
+      tpars = processed_params$tpars,  # Only trend-specific parameters
       forecast_fun = 'forecast_car_rcpp',
       stancode_fun = 'car_stan_code',
       standata_fun = 'car_stan_data',
       bounds = processed_params$bounds,
-      characteristics = list(
-        supports_predictors = TRUE,
-        supports_correlation = FALSE,
-        supports_factors = FALSE,
-        max_order = 1,
-        requires_sorting = TRUE
-      )
+      param_info = param_info  # Complete specification (trend params + characteristics)
     ),
-    class = 'mvgam_trend',
-    param_info = list(
-      param_names = c('trend', 'tau', 'sigma_trend', 'ar1_trend'),
-      labels = c('trend_estimates', 'precision_parameter', 'standard_deviation', 'autoregressive_coef')
-    )
+    class = 'mvgam_trend'
   )
 }
 
-#' @rdname RW
+#' @rdname trend_constructors
 #' @export
-VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
+VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
   # Process time argument
   time <- deparse0(substitute(time))
   time_was_default <- (time == "NA")
@@ -1849,7 +2060,6 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, 
 
   # Input validation using checkmate
   checkmate::assert_logical(ma, len = 1)
-  checkmate::assert_logical(cor, len = 1)
 
   # Process and validate grouping arguments
   gr <- deparse0(substitute(gr))
@@ -1858,20 +2068,50 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, 
   gr <- groupings$gr
   subgr <- groupings$subgr
 
-  # Validate and adjust correlation requirements
-  cor <- validate_correlation_requirements(gr, cor)
+  # VAR models always use correlation (cor = TRUE) for optimal performance
+  cor <- TRUE
 
-  # Define parameters with their bounds (base names - A will be array in Stan)
-  param_bounds <- list(
-    sigma = c(0, Inf),
-    A = c(-1, 1),
-    Sigma = c(-1, 1),
-    theta = if(ma) c(-1, 1) else NULL
+  # Define ONLY trend-specific parameters (Gaussian innovation infrastructure is automatic)
+  # VAR uses A{lag}_trend naming for transition matrices and theta{lag}_trend for MA
+  param_specs <- trend_param("A1", bounds = c(-1, 1), label = "var_transition_matrix_lag_1")
+  
+  # Add additional lag parameters for p > 1
+  if (p > 1) {
+    for (lag in 2:p) {
+      param_specs <- param_specs + trend_param(paste0("A", lag), bounds = c(-1, 1), 
+                                               label = paste0("var_transition_matrix_lag_", lag))
+    }
+  }
+  
+  # Add MA coefficient if specified (future: could support multiple MA lags)  
+  if (ma) {
+    param_specs <- param_specs + trend_param("theta1", bounds = c(-1, 1), label = "moving_average_coefficient_lag_1")
+  }
+  
+  # Define trend characteristics and Gaussian innovation settings
+  characteristics <- list(
+    supports_predictors = TRUE,
+    supports_correlation = TRUE,
+    supports_factors = TRUE,
+    supports_hierarchical = TRUE,  # VAR supports gr/subgr
+    innovation_type = "gaussian_var",  # VAR uses special covariance estimation
+    max_order = p,
+    requires_sorting = TRUE,
+    # Gaussian innovation settings (automatic parameters) 
+    uses_sigma_trend = FALSE,        # VAR estimates full Sigma matrix instead
+    uses_correlation = TRUE,         # VAR always estimates correlation structure
+    monitor_innovations = ma         # Monitor LV_innovations only for MA models
   )
   
-  # Process parameters and bounds with trend suffix
-  processed_params <- process_trend_params(param_bounds)
+  # Process trend-specific parameters only
+  processed_params <- process_trend_params(param_specs, envir = environment())
 
+  # Create complete parameter info for storage
+  param_info <- list(
+    parameters = param_specs,  # Trend-specific parameters only
+    characteristics = characteristics
+  )
+  
   # Create trend object with dispatcher integration
   out <- structure(
     list(
@@ -1885,24 +2125,14 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, 
       subgr = subgr,
       n_lv = n_lv,
       label = build_trend_label('VAR', cor = cor, ma = ma, gr = gr, n_lv = n_lv, p = p),
-      tpars = processed_params$tpars,
+      tpars = processed_params$tpars,  # Only trend-specific parameters
       forecast_fun = 'forecast_var_rcpp',
       stancode_fun = 'var_stan_code',
       standata_fun = 'var_stan_data',
       bounds = processed_params$bounds,
-      characteristics = list(
-        supports_predictors = TRUE,
-        supports_correlation = TRUE,
-        supports_factors = TRUE,
-        max_order = p,
-        requires_sorting = TRUE
-      )
+      param_info = param_info  # Complete specification (trend params + characteristics)
     ),
-    class = 'mvgam_trend',
-    param_info = list(
-      param_names = param_names,
-      labels = param_labels
-    )
+    class = 'mvgam_trend'
   )
 
   # Validate using dispatcher system

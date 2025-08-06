@@ -4,7 +4,12 @@
 \alias{register_custom_trend}
 \title{Register Custom Trend Type}
 \usage{
-register_custom_trend(trend_name, constructor_fun)
+register_custom_trend(
+  name,
+  supports_factors = FALSE,
+  generator_func,
+  incompatibility_reason = NULL
+)
 }
 \arguments{
 \item{name}{Character string name for the custom trend type}

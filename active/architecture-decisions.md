@@ -421,11 +421,10 @@ matrix[n_lv, n_lv] Sigma;              // CONFLICTS with multivariate families
 ```
 
 **Standardized Parameter Names**:
-- **Trend variances**: `sigma_trend` (univariate) or `sigma_lv` (latent variables)
-- **Trend covariances**: `Sigma_trend` (full covariance) or `L_Omega` (Cholesky factor)
-- **AR coefficients**: `ar_coefs` (never just `ar` which conflicts with brms)
-- **VAR coefficients**: `lv_coefs` or `var_coefs`
-- **CAR parameters**: `car_rho`, `car_sigma`
+- **Trend variances**: `sigma_trend`
+- **Trend covariances**: `Sigma_trend` (full covariance) and `L_Omega_trend` (Cholesky factor)
+- **AR coefficients**: `ar{lag}_trend` (never just `ar` which conflicts with brms)
+- **VAR coefficients**: `A{lag}_trend`
 - **Factor loadings**: `Z` (matrix), `z_loading` (vectors)
 
 **Benefits**:
