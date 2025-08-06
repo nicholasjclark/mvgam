@@ -200,7 +200,7 @@ test_that("trend generators handle edge cases", {
 # Tests for piecewise trend generators
 test_that("piecewise trend generators produce valid Stan components", {
   data_info <- list(n_obs = 50, n_series = 2, series_var = "series")
-  
+
   # Test PWlinear generator
   pw_linear_spec <- list(
     trend_type = "PW",
@@ -208,11 +208,11 @@ test_that("piecewise trend generators produce valid Stan components", {
     n_changepoints = 8,
     changepoint_scale = 0.1
   )
-  
+
   pw_linear_stanvars <- mvgam:::generate_trend_injection_stanvars(pw_linear_spec, data_info)
   expect_type(pw_linear_stanvars, "list")
   expect_gt(length(pw_linear_stanvars), 0)
-  
+
   # Check for required components
   stanvar_names <- names(pw_linear_stanvars)
   expect_true("pw_functions" %in% stanvar_names)  # Prophet functions
@@ -222,29 +222,29 @@ test_that("piecewise trend generators produce valid Stan components", {
   expect_true("pw_transformed_parameters" %in% stanvar_names)  # LV computation
   expect_true("pw_model" %in% stanvar_names)     # Model block priors
   expect_true("trend" %in% stanvar_names)        # Shared trend computation
-  
+
   # Verify functions block contains Prophet functions
   functions_stanvar <- pw_linear_stanvars$pw_functions
   expect_true(grepl("get_changepoint_matrix", functions_stanvar$scode))
   expect_true(grepl("linear_trend", functions_stanvar$scode))
   expect_true(grepl("logistic_trend", functions_stanvar$scode))
   expect_true(grepl("logistic_gamma", functions_stanvar$scode))
-  
+
   # Test PWlogistic generator
   pw_logistic_spec <- list(
-    trend_type = "PW", 
+    trend_type = "PW",
     type = "logistic",
     n_changepoints = 12,
     changepoint_scale = 0.05
   )
-  
+
   pw_logistic_stanvars <- mvgam:::generate_trend_injection_stanvars(pw_logistic_spec, data_info)
   expect_type(pw_logistic_stanvars, "list")
   expect_gt(length(pw_logistic_stanvars), 0)
-  
+
   # Logistic should have additional carrying capacity data
   expect_true("pw_logistic_data" %in% names(pw_logistic_stanvars))
-  
+
   # Verify transformed parameters uses logistic function
   tparams_stanvar <- pw_logistic_stanvars$pw_transformed_parameters
   expect_true(grepl("logistic_trend", tparams_stanvar$scode))
@@ -253,67 +253,67 @@ test_that("piecewise trend generators produce valid Stan components", {
 
 test_that("piecewise trend generators handle different specifications", {
   data_info <- list(n_obs = 30, n_series = 1, series_var = "series")
-  
+
   # Test PWlinear specific generator
   pwlinear_spec <- list(
     trend_type = "PWlinear",
     n_changepoints = 15,
     changepoint_scale = 0.2
   )
-  
+
   pwlinear_stanvars <- mvgam:::generate_trend_injection_stanvars(pwlinear_spec, data_info)
-  expect_type(pwlinear_stanvars, "list") 
+  expect_type(pwlinear_stanvars, "list")
   expect_gt(length(pwlinear_stanvars), 0)
-  
+
   # Should use linear computation in transformed parameters
   tparams_stanvar <- pwlinear_stanvars$pw_transformed_parameters
   expect_true(grepl("linear_trend", tparams_stanvar$scode))
   expect_false(grepl("logistic_trend", tparams_stanvar$scode))
-  
+
   # Should NOT include carrying capacity data
   expect_false("pw_logistic_data" %in% names(pwlinear_stanvars))
-  
-  # Test PWlogistic specific generator  
+
+  # Test PWlogistic specific generator
   pwlogistic_spec <- list(
     trend_type = "PWlogistic",
     n_changepoints = 20,
     changepoint_scale = 0.03
   )
-  
+
   pwlogistic_stanvars <- mvgam:::generate_trend_injection_stanvars(pwlogistic_spec, data_info)
   expect_type(pwlogistic_stanvars, "list")
   expect_gt(length(pwlogistic_stanvars), 0)
-  
+
   # Should use logistic computation
   tparams_stanvar <- pwlogistic_stanvars$pw_transformed_parameters
   expect_true(grepl("logistic_trend", tparams_stanvar$scode))
   expect_true(grepl("cap", tparams_stanvar$scode))
-  
+
   # Should include carrying capacity data
   expect_true("pw_logistic_data" %in% names(pwlogistic_stanvars))
 })
 
 test_that("piecewise trend generators validate input correctly", {
   data_info <- list(n_obs = 25, n_series = 1, series_var = "series")
-  
-  # Test invalid trend type in PW spec  
+
+  # Test invalid trend type in PW spec
   invalid_type_spec <- list(
     trend_type = "PW",
     type = "exponential"  # Invalid type
   )
-  
+
   expect_error(
     mvgam:::generate_trend_injection_stanvars(invalid_type_spec, data_info),
     "Piecewise trend type must be 'linear' or 'logistic'"
   )
-  
+
   # Test PW trends reject factor models
   factor_spec <- list(
     trend_type = "PW",
-    type = "linear", 
+    type = "linear",
     n_lv = 2
   )
-  
+
   # Note: This should be caught by validate_factor_compatibility
   expect_error(
     mvgam:::generate_trend_injection_stanvars(factor_spec, data_info),
@@ -323,36 +323,36 @@ test_that("piecewise trend generators validate input correctly", {
 
 test_that("piecewise trends produce valid Stan code structure", {
   data_info <- list(n_obs = 40, n_series = 3, series_var = "series")
-  
+
   # Test complete linear piecewise structure
   pw_spec <- list(
     trend_type = "PWlinear",
     n_changepoints = 10,
     changepoint_scale = 0.08
   )
-  
+
   stanvars <- mvgam:::generate_trend_injection_stanvars(pw_spec, data_info)
-  
+
   # Verify all stanvars have proper block assignments
   expect_equal(stanvars$pw_functions$block, "functions")
-  expect_equal(stanvars$pw_data$block, "data") 
+  expect_equal(stanvars$pw_data$block, "data")
   expect_equal(stanvars$pw_transformed_data$block, "tdata")
   expect_equal(stanvars$pw_parameters$block, "parameters")
   expect_equal(stanvars$pw_transformed_parameters$block, "tparameters")
   expect_equal(stanvars$pw_model$block, "model")
-  
+
   # Verify data components include required elements
   data_stanvar <- stanvars$pw_data
   expect_true(grepl("n_changepoints", data_stanvar$scode))
   expect_true(grepl("t_change", data_stanvar$scode))
   expect_true(grepl("changepoint_scale", data_stanvar$scode))
-  
+
   # Verify parameters include trend parameters
-  params_stanvar <- stanvars$pw_parameters  
+  params_stanvar <- stanvars$pw_parameters
   expect_true(grepl("k_trend", params_stanvar$scode))
   expect_true(grepl("m_trend", params_stanvar$scode))
   expect_true(grepl("delta_trend", params_stanvar$scode))
-  
+
   # Verify model block includes priors
   model_stanvar <- stanvars$pw_model
   expect_true(grepl("m_trend ~ student_t", model_stanvar$scode))
@@ -363,43 +363,43 @@ test_that("piecewise trends produce valid Stan code structure", {
 # Tests for piecewise trends in complete Stan assembly
 test_that("piecewise trends integrate with complete Stan assembly", {
   data <- setup_test_data()$multivariate
-  
+
   # Test PWlinear integration with observation model
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ x,
     data = data,
     family = gaussian()
   )
-  
+
   # Create PWlinear trend spec
   pw_trend_spec <- list(
     trend_type = "PWlinear",
     n_changepoints = 6,
     changepoint_scale = 0.15
   )
-  
+
   # Extract trend stanvars
   trend_stanvars <- mvgam:::extract_trend_stanvars_from_setup(
     trend_setup = obs_setup,  # Mock trend setup
     trend_spec = pw_trend_spec
   )
-  
+
   expect_type(trend_stanvars, "list")
   expect_gt(length(trend_stanvars), 0)
-  
+
   # Test combination with observation model
   combined_result <- mvgam:::combine_stan_components(
     obs_stancode = obs_setup$stancode,
     obs_standata = obs_setup$standata,
     trend_stanvars = trend_stanvars
   )
-  
+
   expect_type(combined_result, "list")
   expect_true("stancode" %in% names(combined_result))
   expect_true("standata" %in% names(combined_result))
   expect_true("has_trends" %in% names(combined_result))
   expect_true(combined_result$has_trends)
-  
+
   # Verify combined code includes piecewise functions
   expect_true(grepl("get_changepoint_matrix", combined_result$stancode))
   expect_true(grepl("linear_trend", combined_result$stancode))
@@ -409,16 +409,16 @@ test_that("piecewise trends integrate with complete Stan assembly", {
 
 test_that("piecewise Stan code validates and compiles correctly", {
   data_info <- list(n_obs = 30, n_series = 2, series_var = "series")
-  
+
   # Test linear piecewise generates valid Stan code
   pw_linear_spec <- list(
     trend_type = "PWlinear",
     n_changepoints = 5,
     changepoint_scale = 0.1
   )
-  
+
   stanvars <- mvgam:::generate_trend_injection_stanvars(pw_linear_spec, data_info)
-  
+
   # Create minimal Stan code with piecewise components for validation
   minimal_stancode <- "
   functions {
@@ -430,7 +430,7 @@ test_that("piecewise Stan code validates and compiles correctly", {
     // Data will be injected here
   }
   parameters {
-    // Piecewise parameters will be injected here  
+    // Piecewise parameters will be injected here
   }
   transformed parameters {
     // Piecewise computations will be injected here
@@ -439,20 +439,20 @@ test_that("piecewise Stan code validates and compiles correctly", {
     // Piecewise priors will be injected here
   }
   "
-  
+
   # Test that individual stanvar components have valid Stan syntax
   functions_code <- stanvars$pw_functions$scode
   expect_invisible(mvgam:::validate_stan_code_structure(functions_code))
-  
-  data_code <- stanvars$pw_data$scode  
+
+  data_code <- stanvars$pw_data$scode
   expect_invisible(mvgam:::validate_stan_code_structure(data_code))
-  
+
   params_code <- stanvars$pw_parameters$scode
   expect_invisible(mvgam:::validate_stan_code_structure(params_code))
-  
+
   tparams_code <- stanvars$pw_transformed_parameters$scode
   expect_invisible(mvgam:::validate_stan_code_structure(tparams_code))
-  
+
   model_code <- stanvars$pw_model$scode
   expect_invisible(mvgam:::validate_stan_code_structure(model_code))
 })
@@ -903,7 +903,7 @@ test_that("system handles complex trend specifications", {
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ x,
     data = data,
-    family = poisson()  # Different family
+    family = student()  # Different family
   )
 
   trend_setup <- mvgam:::setup_brms_lightweight(
@@ -915,7 +915,7 @@ test_that("system handles complex trend specifications", {
   # Complex trend specification
   complex_trend_spec <- list(
     trend_type = "RW",
-    n_lv = 3,
+    n_lv = 2,
     correlation = TRUE,  # Correlated random walk
     time_var = "time",
     series_var = "series"
@@ -941,12 +941,12 @@ test_that("system handles complex trend specifications", {
 test_that("CAR trend generator works correctly", {
   # Create mock data with time variable for time distance calculation
   mock_data <- data.frame(
-    time = c(1, 2.5, 4.2, 5, 7.3), 
+    time = c(1, 2.5, 4.2, 5, 7.3),
     series = rep(1, 5)
   )
   data_info <- list(
-    n_obs = 50, 
-    n_series = 3, 
+    n_obs = 50,
+    n_series = 3,
     series_var = "series",
     time_var = "time",
     data = mock_data
@@ -980,7 +980,7 @@ test_that("CAR trend generator works correctly", {
     trend_type = "CAR",
     gr = "group"
   )
-  expect_warning(
+  expect_error(
     mvgam:::generate_car_trend_stanvars(car_hierarchical_spec, data_info),
     "CAR trends do not support hierarchical correlations"
   )
@@ -995,24 +995,24 @@ test_that("CAR time distance calculation works correctly", {
   data_info <- list(
     n_obs = 10,
     n_series = 2,
-    series_var = "series", 
+    series_var = "series",
     time_var = "time",
     data = irregular_data
   )
-  
+
   time_dis <- mvgam:::calculate_car_time_distances(data_info)
   expect_type(time_dis, "double")
   expect_true(is.matrix(time_dis))
   expect_equal(nrow(time_dis), 5)  # n_time points per series
   expect_equal(ncol(time_dis), 2)  # n_series
-  
+
   # Check that first time point defaults to 1
   expect_equal(time_dis[1, 1], 1)
   expect_equal(time_dis[1, 2], 1)
-  
+
   # Check that minimum threshold is applied (pmax(1e-3, dis_time))
   expect_true(all(time_dis >= 1e-3, na.rm = TRUE))
-  
+
   # Test with regular intervals
   regular_data <- data.frame(
     time = rep(1:5, 2),
@@ -1022,10 +1022,10 @@ test_that("CAR time distance calculation works correctly", {
     n_obs = 10,
     n_series = 2,
     series_var = "series",
-    time_var = "time", 
+    time_var = "time",
     data = regular_data
   )
-  
+
   time_dis_regular <- mvgam:::calculate_car_time_distances(data_info_regular)
   expect_equal(time_dis_regular[2:5, 1], rep(1, 4))  # Regular intervals of 1
   expect_equal(time_dis_regular[2:5, 2], rep(1, 4))
@@ -1064,7 +1064,6 @@ test_that("PW trend generator works correctly", {
   # Test simple PW
   pw_spec <- list(
     trend_type = "PW",
-    n_lv = 2,
     n_changepoints = 2
   )
   pw_stanvars <- mvgam:::generate_trend_injection_stanvars(pw_spec, data_info)
@@ -1086,7 +1085,7 @@ test_that("Factor model support works for all compatible trends", {
   ar_factor_stanvars <- mvgam:::generate_trend_injection_stanvars(ar_factor_spec, data_info)
   expect_type(ar_factor_stanvars, "list")
   expect_gt(length(ar_factor_stanvars), 0)
-  expect_true(any(grepl("z_matrix", names(ar_factor_stanvars), ignore.case = TRUE)))
+  expect_true(any(grepl("^Z$", names(ar_factor_stanvars))))
 
   # Test RW with factor model
   rw_factor_spec <- list(
@@ -1097,7 +1096,7 @@ test_that("Factor model support works for all compatible trends", {
   rw_factor_stanvars <- mvgam:::generate_trend_injection_stanvars(rw_factor_spec, data_info)
   expect_type(rw_factor_stanvars, "list")
   expect_gt(length(rw_factor_stanvars), 0)
-  expect_true(any(grepl("z_matrix", names(rw_factor_stanvars), ignore.case = TRUE)))
+  expect_true(any(grepl("^Z$", names(rw_factor_stanvars))))
 
   # Test VAR with factor model
   var_factor_spec <- list(
@@ -1108,7 +1107,7 @@ test_that("Factor model support works for all compatible trends", {
   var_factor_stanvars <- mvgam:::generate_trend_injection_stanvars(var_factor_spec, data_info)
   expect_type(var_factor_stanvars, "list")
   expect_gt(length(var_factor_stanvars), 0)
-  expect_true(any(grepl("z_matrix", names(var_factor_stanvars), ignore.case = TRUE)))
+  expect_true(any(grepl("^Z$", names(var_factor_stanvars))))
 
   # Test ZMVN with factor model
   zmvn_factor_spec <- list(
@@ -1118,7 +1117,7 @@ test_that("Factor model support works for all compatible trends", {
   zmvn_factor_stanvars <- mvgam:::generate_trend_injection_stanvars(zmvn_factor_spec, data_info)
   expect_type(zmvn_factor_stanvars, "list")
   expect_gt(length(zmvn_factor_stanvars), 0)
-  expect_true(any(grepl("z_matrix", names(zmvn_factor_stanvars), ignore.case = TRUE)))
+  expect_true(any(grepl("^Z$", names(zmvn_factor_stanvars))))
 })
 
 test_that("Hierarchical correlation support works for all trends", {
@@ -1190,11 +1189,11 @@ test_that("Shared utility functions work correctly", {
   expect_gt(length(factor_priors), 0)
 
   # Test hierarchical functions
-  hier_funcs <- mvgam:::generate_hierarchical_functions()
+  hier_funcs <- mvgam:::generate_hierarchical_functions_injectors()
   expect_type(hier_funcs, "list")
   expect_gt(length(hier_funcs), 0)
 
-  hier_params <- mvgam:::generate_hierarchical_correlation_params(2, 3)
+  hier_params <- mvgam:::generate_hierarchical_correlation_parameter_injectors(2, 3)
   expect_type(hier_params, "list")
   expect_gt(length(hier_params), 0)
 
@@ -1222,7 +1221,7 @@ create_realistic_trend_stanvars <- function() {
       block = "parameters"
     ),
     rw_model = brms::stanvar(
-      name = "rw_model", 
+      name = "rw_model",
       scode = "model { sigma_rw ~ inv_gamma(1, 1); }",
       block = "model"
     ),
@@ -1420,14 +1419,17 @@ test_that("is_valid_stanvar correctly identifies valid and invalid stanvars", {
   valid_stanvars <- create_realistic_trend_stanvars()
   invalid_stanvars <- create_invalid_stanvars()
 
-  # Test valid stanvars
-  for (stanvar in valid_stanvars) {
-    expect_true(is_valid_stanvar(stanvar))
+  # Test valid stanvars (each element is a stanvars collection)
+  for (stanvar_collection in valid_stanvars) {
+    # Each brms::stanvar() returns a stanvars collection, test individual elements
+    for (i in seq_along(stanvar_collection)) {
+      expect_true(is_valid_stanvar(stanvar_collection[[i]]))
+    }
   }
 
-  # Test invalid stanvars
-  for (stanvar in invalid_stanvars) {
-    expect_false(is_valid_stanvar(stanvar))
+  # Test invalid stanvars (these are raw list objects, not stanvar collections)
+  for (invalid_stanvar in invalid_stanvars) {
+    expect_false(is_valid_stanvar(invalid_stanvar))
   }
 
   # Test edge cases
@@ -1467,4 +1469,205 @@ test_that("helper functions work correctly", {
   expect_false(are_braces_balanced("{ "))
   expect_false(are_braces_balanced(" }"))
   expect_false(are_braces_balanced("{ { }"))
+})
+
+# Tests for Shared Gaussian Innovation System
+# ==========================================
+
+test_that("shared innovation system generates correct parameters", {
+  # Test simple uncorrelated case
+  simple_stanvars <- mvgam:::generate_shared_innovation_stanvars(
+    n_lv = 2, n_series = 3, cor = FALSE, factor_model = FALSE, hierarchical_info = NULL
+  )
+
+  expect_type(simple_stanvars, "list")
+  expect_true("sigma_trend" %in% names(simple_stanvars))
+  expect_true("raw_innovations" %in% names(simple_stanvars))
+  expect_true("final_innovations" %in% names(simple_stanvars))
+
+  # Check parameter block content
+  sigma_stanvar <- simple_stanvars$sigma_trend
+  expect_equal(sigma_stanvar$block, "parameters")
+  expect_true(grepl("vector<lower=0>\\[3\\]", sigma_stanvar$scode))  # n_series = 3
+
+  # Check raw innovations
+  raw_stanvar <- simple_stanvars$raw_innovations
+  expect_equal(raw_stanvar$block, "parameters")
+  expect_true(grepl("matrix\\[n, 3\\]", raw_stanvar$scode))
+})
+
+test_that("shared innovation system handles correlated case", {
+  # Test correlated multivariate case
+  corr_stanvars <- mvgam:::generate_shared_innovation_stanvars(
+    n_lv = 3, n_series = 3, cor = TRUE, factor_model = FALSE, hierarchical_info = NULL
+  )
+
+  expect_type(corr_stanvars, "list")
+  expect_true("sigma_trend" %in% names(corr_stanvars))
+  expect_true("L_Omega_trend" %in% names(corr_stanvars))
+  expect_true("Sigma_trend" %in% names(corr_stanvars))
+  expect_true("final_innovations" %in% names(corr_stanvars))
+
+  # Check correlation parameters
+  l_omega_stanvar <- corr_stanvars$L_Omega_trend
+  expect_equal(l_omega_stanvar$block, "parameters")
+  expect_true(grepl("cholesky_factor_corr\\[3\\]", l_omega_stanvar$scode))
+
+  # Check derived covariance matrix
+  sigma_stanvar <- corr_stanvars$Sigma_trend
+  expect_equal(sigma_stanvar$block, "tparameters")
+  expect_true(grepl("diag_pre_multiply", sigma_stanvar$scode))
+})
+
+test_that("shared innovation system handles factor models", {
+  # Test factor model case (n_lv < n_series)
+  factor_stanvars <- mvgam:::generate_shared_innovation_stanvars(
+    n_lv = 2, n_series = 4, cor = TRUE, factor_model = TRUE, hierarchical_info = NULL
+  )
+
+  expect_type(factor_stanvars, "list")
+
+  # Should use n_lv (2) as effective dimension, not n_series (4)
+  sigma_stanvar <- factor_stanvars$sigma_trend
+  expect_true(grepl("vector<lower=0>\\[2\\]", sigma_stanvar$scode))
+
+  raw_stanvar <- factor_stanvars$raw_innovations
+  expect_true(grepl("matrix\\[n, 2\\]", raw_stanvar$scode))
+})
+
+test_that("shared innovation system handles hierarchical structure", {
+  # Test hierarchical case
+  hierarchical_info <- list(
+    has_groups = TRUE,
+    n_groups = 3,
+    n_subgroups = 2,
+    gr_var = "group",
+    subgr_var = "species"
+  )
+
+  hier_stanvars <- mvgam:::generate_shared_innovation_stanvars(
+    n_lv = 2, n_series = 2, cor = FALSE, factor_model = FALSE,
+    hierarchical_info = hierarchical_info
+  )
+
+  expect_type(hier_stanvars, "list")
+
+  # Should include hierarchical correlation infrastructure
+  stanvar_names <- names(hier_stanvars)
+  expect_true(any(grepl("L_Omega_global", stanvar_names)))
+  expect_true(any(grepl("L_deviation_group", stanvar_names)))
+  expect_true(any(grepl("alpha_cor", stanvar_names)))
+  expect_true("sigma_trend" %in% stanvar_names)
+})
+
+test_that("extract_hierarchical_info works correctly", {
+  # Test with grouping variables
+  data_info <- list(n_groups = 3, n_subgroups = 2, n_lv = 2, n_series = 4)
+  trend_spec <- list(gr = "group", subgr = "species")
+
+  hier_info <- mvgam:::extract_hierarchical_info(data_info, trend_spec)
+
+  expect_type(hier_info, "list")
+  expect_true(hier_info$has_groups)
+  expect_equal(hier_info$n_groups, 3)
+  expect_equal(hier_info$gr_var, "group")
+  expect_equal(hier_info$subgr_var, "species")
+
+  # Test without grouping variables
+  trend_spec_simple <- list(gr = 'NA')
+  hier_info_simple <- mvgam:::extract_hierarchical_info(data_info, trend_spec_simple)
+
+  expect_null(hier_info_simple)
+
+  # Test NULL gr
+  trend_spec_null <- list()
+  hier_info_null <- mvgam:::extract_hierarchical_info(data_info, trend_spec_null)
+
+  expect_null(hier_info_null)
+})
+
+test_that("innovation priors generate correctly", {
+  # Test simple priors
+  simple_priors <- mvgam:::generate_innovation_priors(
+    effective_dim = 2, cor = FALSE, is_hierarchical = FALSE
+  )
+
+  expect_s3_class(simple_priors, "stanvars")
+  expect_equal(simple_priors[[1]]$block, "model")
+  expect_true(grepl("sigma_trend.*exponential", simple_priors[[1]]$scode))
+  expect_true(grepl("raw_innovations.*std_normal", simple_priors[[1]]$scode))
+
+  # Test correlated priors
+  corr_priors <- mvgam:::generate_innovation_priors(
+    effective_dim = 3, cor = TRUE, is_hierarchical = FALSE
+  )
+
+  expect_true(grepl("L_Omega_trend.*lkj_corr_cholesky", corr_priors[[1]]$scode))
+
+  # Test hierarchical priors
+  hier_priors <- mvgam:::generate_innovation_priors(
+    effective_dim = 2, cor = FALSE, is_hierarchical = TRUE
+  )
+
+  expect_true(grepl("raw_innovations.*std_normal", hier_priors[[1]]$scode))
+  expect_false(grepl("sigma_trend.*exponential", hier_priors[[1]]$scode))  # Handled by hierarchical functions
+})
+
+test_that("shared innovation system integrates with main dispatcher", {
+  # Test integration through main dispatcher
+  data_info <- list(n_obs = 50, n_series = 2, series_var = "series")
+
+  # RW should use shared innovations
+  rw_spec <- list(
+    trend = "RW",
+    cor = TRUE,
+    shared_innovations = TRUE  # Explicit flag
+  )
+
+  rw_stanvars <- mvgam:::generate_trend_injection_stanvars(rw_spec, data_info)
+
+  expect_type(rw_stanvars, "list")
+  expect_gt(length(rw_stanvars), 0)
+
+  # Should contain shared innovation components
+  stanvar_names <- names(rw_stanvars)
+  expect_true(any(grepl("sigma_trend", stanvar_names)))
+  expect_true(any(grepl("raw_innovations", stanvar_names)))
+
+  # PW should not use shared innovations
+  pw_spec <- list(
+    trend = "PW",
+    type = "linear",
+    shared_innovations = FALSE  # Explicit opt-out
+  )
+
+  pw_stanvars <- mvgam:::generate_trend_injection_stanvars(pw_spec, data_info)
+
+  expect_type(pw_stanvars, "list")
+
+  # Should NOT contain shared innovation components
+  pw_stanvar_names <- names(pw_stanvars)
+  expect_false(any(grepl("sigma_trend", pw_stanvar_names)))
+  expect_false(any(grepl("raw_innovations", pw_stanvar_names)))
+})
+
+test_that("shared innovation system handles edge cases", {
+  # Test univariate case
+  univar_stanvars <- mvgam:::generate_shared_innovation_stanvars(
+    n_lv = 1, n_series = 1, cor = FALSE, factor_model = FALSE, hierarchical_info = NULL
+  )
+
+  expect_type(univar_stanvars, "list")
+
+  # Should handle vector[1] correctly
+  sigma_stanvar <- univar_stanvars$sigma_trend
+  expect_true(grepl("vector<lower=0>\\[1\\]", sigma_stanvar$scode))
+
+  # Test correlated univariate (should not create correlation parameters)
+  univar_corr_stanvars <- mvgam:::generate_shared_innovation_stanvars(
+    n_lv = 1, n_series = 1, cor = TRUE, factor_model = FALSE, hierarchical_info = NULL
+  )
+
+  expect_false("L_Omega_trend" %in% names(univar_corr_stanvars))
+  expect_false("Sigma_trend" %in% names(univar_corr_stanvars))
 })

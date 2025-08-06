@@ -1,14 +1,19 @@
 # Implementation Plan: Shared Gaussian Innovation System
 
+## Context: mvgam Stan Compilation Pipeline Refactoring
+
+You are an expert R package developer working on the mvgam R package which is undergoing a major refactoring to integrate with the brms ecosystem. The package generates Bayesian state-space models by combining brms observation models with custom trend specifications using Stan.
+
 ## Overview
-Create a unified system for handling Gaussian innovation parameters (sigma_trend, Sigma_trend, LV_innovations) that are common across most trend types, separating them from trend-specific parameters handled by individual constructors.
+Please read the context files in the "active/" directory. Your task is to create a unified system for handling Gaussian innovation parameters (sigma_trend, Sigma_trend, LV_innovations) that are common across most trend types, separating them from trend-specific parameters handled by individual constructors.
 
 ## Current State Analysis
 
 ### **Trend Types and Their Innovation Requirements:**
-- **RW, AR, VAR, CAR, ZMVN**: Use Gaussian innovations (need shared system)  
+- **RW, AR, CAR, ZMVN**: Use Gaussian innovations (need shared system)  
+- **VAR**: Innovations handled differently to maintain stationarity
 - **PW**: Uses changepoint_scale (does NOT use shared system)
-- **GP**: Uses specialized covariance functions (may need separate handling)
+- **GP**: needs to be fully deprecated
 
 ### **Shared Parameters Needed:**
 1. **`sigma_trend`**: Univariate innovation standard deviations
@@ -18,7 +23,7 @@ Create a unified system for handling Gaussian innovation parameters (sigma_trend
 
 ## Implementation Plan
 
-### **Phase 1: Core Infrastructure (30 min)**
+### **Phase 1: Core Infrastructure**
 
 #### **1.1 Create Shared Innovation Functions**
 **File**: `R/stan_assembly.R` - Add in dedicated section for shared innovation functions
@@ -170,7 +175,7 @@ generate_trend_injection_stanvars <- function(trend_spec, data_info) {
 }
 ```
 
-### **Phase 2: Integration with Existing Constructors (45 min)**
+### **Phase 2: Integration with Existing Constructors**
 
 #### **2.1 Update Constructor Pattern**
 **File**: `R/trend_system.R` - Update constructors to use shared innovation flag
@@ -247,7 +252,7 @@ generate_rw_stanvars <- function(trend_spec, data_info) {
 }
 ```
 
-### **Phase 3: PW Exception Handling (15 min)**
+### **Phase 3: PW Exception Handling**
 
 #### **3.1 PW Constructor Flag**
 **File**: `R/trend_system.R` - Update PW constructor to explicitly opt out
@@ -277,6 +282,9 @@ generate_pw_stanvars <- function(trend_spec, data_info) {
   # ... existing PW implementation ...
 }
 ```
+
+#### **3.2 VAR Constructors and Generators**
+Similar to PW above, should opt out of share innovations
 
 ### **Phase 4: Testing Integration (30 min)**
 
@@ -341,24 +349,24 @@ test_that("constructors set shared_innovations flag correctly", {
 
 ## Implementation Order
 
-### **Priority 1: Core Functions (Day 1)**
+### **Priority 1: Core Functions**
 1. Add shared innovation functions to `R/stan_assembly.R`
 2. Update main dispatcher in `R/stan_assembly.R`
 3. Add basic tests in `tests/testthat/test-stan-assembly.R`
 
-### **Priority 2: Constructor Integration (Day 1-2)**
+### **Priority 2: Constructor Integration**
 1. Update RW constructor as prototype in `R/trend_system.R`
 2. Update AR constructor in `R/trend_system.R`
 3. Update VAR constructor in `R/trend_system.R`  
 4. Update CAR constructor in `R/trend_system.R`
 5. Add shared_innovations flag tests
 
-### **Priority 3: Generator Updates (Day 2)**
+### **Priority 3: Generator Updates**
 1. Update individual generators in `R/trend_injection_generators.R`
 2. Remove duplicate innovation code from existing generators
 3. Add PW exception handling
 
-### **Priority 4: Testing & Validation (Day 2)**
+### **Priority 4: Testing & Validation**
 1. Run comprehensive tests
 2. Verify parameter naming consistency  
 3. Check Stan code compilation

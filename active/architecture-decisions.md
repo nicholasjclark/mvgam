@@ -439,6 +439,44 @@ matrix[n_lv, n_lv] Sigma;              // CONFLICTS with multivariate families
 3. Update tests to verify no naming conflicts
 4. Document in trend development guide
 
+### 7. brms Stanvar Block Naming Conventions
+
+**Critical Implementation Detail**: brms uses abbreviated block names internally that differ from full Stan block names
+
+**brms Abbreviated Names** (used in stanvar objects):
+- `"data"` → `data`
+- `"tdata"` → `transformed data`  
+- `"parameters"` → `parameters`
+- `"tparameters"` → `transformed parameters`
+- `"model"` → `model`
+- `"genquant"` → `generated quantities`
+
+**Key Points**:
+1. **stanvar creation**: Use abbreviated names (`"tparameters"`, `"tdata"`)
+2. **Validation functions**: Must accept both abbreviated and full names
+3. **Test expectations**: Should expect abbreviated names in stanvar objects
+4. **Stan compilation**: brms automatically converts abbreviated to full names
+5. **Don't manually convert**: Let brms handle the name conversion internally
+
+**Example**:
+```r
+# ✅ Correct - use abbreviated name
+stanvar(name = "test", scode = "real x;", block = "tparameters")
+
+# ❌ Wrong - don't use full name  
+stanvar(name = "test", scode = "real x;", block = "transformed parameters")
+
+# ✅ Validation functions should accept both
+valid_blocks <- c("tparameters", "transformed_parameters", "tdata", "transformed_data", ...)
+```
+
+**Why This Matters**:
+- **Test failures**: Tests expecting full names fail when stanvars contain abbreviated names
+- **Validation errors**: Functions rejecting valid stanvars due to block name mismatch  
+- **Integration issues**: Inconsistent expectations between brms and mvgam validation
+
+**Implementation**: All validation functions, tests, and documentation must be aware of this brms convention and handle both naming forms appropriately.
+
 ## Developer Onboarding Guide
 
 **Consolidated Architecture Files (4 Core Files):**
