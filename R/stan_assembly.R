@@ -844,6 +844,58 @@ prepare_stanvars_for_brms <- function(stanvars) {
 # Missing Integration Functions
 # ============================
 
+#' Generate Trend Injection Stanvars
+#'
+#' @description
+#' Central dispatcher function that routes trend specifications to appropriate
+#' trend-specific stanvar generators. This function bridges the gap between
+#' the Stan assembly system and individual trend generators.
+#'
+#' @param trend_spec List containing trend specification with trend_type or trend_model
+#' @param data_info List containing data dimensions and structure information
+#' @return List of stanvars for trend implementation, or empty list for None trends
+#' @noRd
+generate_trend_injection_stanvars <- function(trend_spec, data_info) {
+  checkmate::assert_list(trend_spec, names = "named")
+  checkmate::assert_list(data_info, names = "named")
+
+  # Extract trend type from spec (handle both trend_type and trend_model for compatibility)
+  trend_type <- trend_spec$trend_type %||% trend_spec$trend_model
+  
+  if (is.null(trend_type)) {
+    insight::format_warning(
+      "No trend type specified in trend_spec.",
+      "Returning empty stanvars list."
+    )
+    return(list())
+  }
+  
+  # Handle None trend case
+  if (trend_type == "None") {
+    return(list())
+  }
+  
+  # Construct generator function name following existing naming convention
+  generator_name <- paste0("generate_", tolower(trend_type), "_trend_stanvars")
+  
+  # Check if generator function exists
+  if (!exists(generator_name, mode = "function", envir = asNamespace("mvgam"))) {
+    available_generators <- ls(
+      pattern = "generate_.*_trend_stanvars", 
+      envir = asNamespace("mvgam")
+    )
+    
+    stop(insight::format_error(
+      paste("Trend generator function", generator_name, "not found."),
+      paste("Available generators:", paste(available_generators, collapse = ", ")),
+      paste("Trend type specified:", trend_type)
+    ))
+  }
+  
+  # Dispatch to appropriate generator
+  do.call(generator_name, list(trend_spec, data_info))
+}
+
 #' Extract Trend Stanvars from Setup
 #'
 #' @description
@@ -2377,9 +2429,8 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
     n_groups <- data_info$n_groups %||% 1
     n_subgroups <- data_info$n_subgroups %||% n_lv
 
-    # Add shared hierarchical correlation utilities
-    hierarchical_functions <- generate_hierarchical_functions_injectors()
-    hierarchical_params <- generate_hierarchical_correlation_parameter_injectors(n_groups, n_subgroups)
+    # Note: Hierarchical correlation utilities are now handled centrally
+    # to avoid stanvar name duplication across trend generators
 
     # VAR-specific parameters for hierarchical case
     var_hierarchical_params_stanvar <- brms::stanvar(
@@ -2426,13 +2477,12 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
       block = "model"
     )
 
-    # Use shared hierarchical priors
-    hierarchical_priors <- generate_hierarchical_correlation_model_injectors(n_groups)
+    # Note: Hierarchical priors are now handled centrally
 
-    # Combine stanvars for hierarchical case
-    result_stanvars <- combine_stanvars(result_stanvars, var_data_stanvar, hierarchical_functions,
-                                      hierarchical_params, var_hierarchical_params_stanvar,
-                                      var_hierarchical_model_stanvar, hierarchical_priors)
+    # Combine stanvars for hierarchical case (without hierarchical utilities)
+    result_stanvars <- combine_stanvars(result_stanvars, var_data_stanvar, 
+                                      var_hierarchical_params_stanvar,
+                                      var_hierarchical_model_stanvar)
 
   } else {
     # Simple VAR case (no grouping)
@@ -2568,9 +2618,8 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
     n_groups <- data_info$n_groups %||% 1
     n_subgroups <- data_info$n_subgroups %||% n_lv
 
-    # Add shared hierarchical correlation utilities
-    hierarchical_functions <- generate_hierarchical_functions_injectors()
-    hierarchical_params <- generate_hierarchical_correlation_parameter_injectors(n_groups, n_subgroups)
+    # Note: Hierarchical correlation utilities are now handled centrally
+    # to avoid stanvar name duplication across trend generators
 
     # AR-specific parameters for hierarchical case
     ar_hierarchical_params_stanvar <- brms::stanvar(
@@ -2617,13 +2666,11 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
       block = "model"
     )
 
-    # Use shared hierarchical priors
-    hierarchical_priors <- generate_hierarchical_correlation_model_injectors(n_groups)
+    # Note: Hierarchical priors are now handled centrally
 
-    # Combine stanvars for hierarchical case
-    result_stanvars <- combine_stanvars(result_stanvars, hierarchical_functions,
-                                      hierarchical_params, ar_hierarchical_params_stanvar,
-                                      ar_hierarchical_model_stanvar, hierarchical_priors)
+    # Combine stanvars for hierarchical case (without hierarchical utilities)
+    result_stanvars <- combine_stanvars(result_stanvars, ar_hierarchical_params_stanvar,
+                                      ar_hierarchical_model_stanvar)
 
   } else {
     # Simple AR case (no grouping)
@@ -2935,9 +2982,8 @@ generate_zmvn_trend_stanvars <- function(trend_spec, data_info) {
     n_groups <- data_info$n_groups %||% 1
     n_subgroups <- data_info$n_subgroups %||% n_lv
 
-    # Add shared hierarchical correlation utilities
-    hierarchical_functions <- generate_hierarchical_functions_injectors()
-    hierarchical_params <- generate_hierarchical_correlation_parameter_injectors(n_groups, n_subgroups)
+    # Note: Hierarchical correlation utilities are now handled centrally
+    # to avoid stanvar name duplication across trend generators
 
     # ZMVN-specific parameters for hierarchical case
     zmvn_hierarchical_params_stanvar <- brms::stanvar(
@@ -2971,13 +3017,11 @@ generate_zmvn_trend_stanvars <- function(trend_spec, data_info) {
       block = "model"
     )
 
-    # Use shared hierarchical priors
-    hierarchical_priors <- generate_hierarchical_correlation_model_injectors(n_groups)
+    # Note: Hierarchical priors are now handled centrally
 
-    # Combine stanvars for hierarchical case
-    result_stanvars <- combine_stanvars(result_stanvars, hierarchical_functions,
-                                      hierarchical_params, zmvn_hierarchical_params_stanvar,
-                                      zmvn_hierarchical_model_stanvar, hierarchical_priors)
+    # Combine stanvars for hierarchical case (without hierarchical utilities)
+    result_stanvars <- combine_stanvars(result_stanvars, zmvn_hierarchical_params_stanvar,
+                                      zmvn_hierarchical_model_stanvar)
 
   } else {
     # Simple ZMVN case: ZMVN(unit = site, subgr = species)

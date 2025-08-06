@@ -372,33 +372,6 @@ ZMVN()            # trend = 'ZMVN'
 
 **Critical Design Decision**: All trend generators must return proper brms "stanvars" class objects
 
-**Standard Pattern for All Trend Generators**:
-```r
-# Helper function with full validation
-combine_stanvars <- function(base_stanvars = NULL, ...) {
-  # Validates all inputs have proper class ("stanvar" or "stanvars")
-  # Safely combines using brms's native c() method
-  # Validates output has "stanvars" class
-  # Throws clear errors if validation fails
-}
-
-generate_trend_stanvars <- function(trend_spec, data_info) {
-  # 1. Generate base stanvars (e.g., matrix Z)
-  matrix_z_stanvars <- generate_matrix_z_stanvars(...)
-  result_stanvars <- matrix_z_stanvars
-  
-  # 2. Create individual stanvar objects (NOT list assignments)
-  param_stanvar <- brms::stanvar(name = "param", scode = "...", block = "parameters")
-  model_stanvar <- brms::stanvar(name = "model", scode = "...", block = "model")
-  
-  # 3. Combine using validated helper
-  result_stanvars <- combine_stanvars(result_stanvars, param_stanvar, model_stanvar)
-  
-  # 4. Return proper "stanvars" object
-  return(result_stanvars)
-}
-```
-
 **Key Requirements**:
 1. **Never use** `stanvars$name <- brms::stanvar(...)` pattern
 2. **Always create** individual stanvar variables

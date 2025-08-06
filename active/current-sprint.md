@@ -28,7 +28,7 @@
 - ✅ `generate_zmvn_trend_stanvars()`
 - ✅ `generate_pw_trend_stanvars()`
 
-## ✅ RESOLVED: Parameter Naming System (January 2025)
+## ✅ RESOLVED: Parameter Naming System 
 
 ### Issue Resolution Summary
 **Status**: FIXED - Parameter naming conflicts resolved  
@@ -68,16 +68,9 @@
   - Function type assertions (closure vs function)
 - **Result**: 98%+ test pass rate with only minor default argument warnings
 
-#### 5. **Documentation Enhancements** ✅ **RESOLVED**
-- **Updated p parameter documentation**: Now accurately describes AR flexibility for discontinuous/seasonal lags
-- **Improved @rdname tags**: Changed from confusing "RW" to intuitive "trend_constructors"
-- **Enhanced main documentation**: Updated title and description to cover all trend types
+## Week 7 Objectives
 
-## Week 7 Status: Parameter Naming System COMPLETED ✅
-
-### Refactoring Achievements  
-**Objective**: Fix parameter naming conflicts and improve trend constructor architecture  
-**Status**: COMPLETED with 98%+ test pass rate
+### Phase 1: Testing Simple Models
 
 **1.1 Univariate Model Testing**
 - [ ] Simple intercept models: `y ~ 1, trend_formula = ~ [TREND]()`
@@ -147,33 +140,6 @@
 - [ ] **brms Integration**: Complex brms features work with trend injection
 - [ ] **Performance Targets**: Registry <1ms, compilation efficiency maintained
 - [ ] **Edge Case Handling**: Missing data and irregular timing supported
-
-## ⚠️ DISCOVERED: Parameter Naming Conflict Issue (January 2025)
-
-### Issue Summary
-**Status**: IDENTIFIED - Requires fixing in all trend generators  
-**Priority**: HIGH - Causes Stan compilation failures  
-**Discovery**: Found during Stan compilation validation testing
-
-### Problem Description
-Trend generators are declaring variance parameters (e.g., `sigma`) that conflict with brms family parameters, causing Stan compilation errors: "Identifier 'sigma' is already in use."
-
-### Required Fix
-**Naming Convention** - All trend variance parameters must use descriptive suffixes:
-- `sigma` → `sigma_trend` or `sigma_lv`
-- `Sigma` → `Sigma_trend`
-- Existing good patterns: `sigma_lv`, `car_sigma`, `L_Omega`
-
-**Action Items**:
-1. Update RW generator: `sigma` → `sigma_trend`
-2. Review all trend generators for parameter naming conflicts
-3. Update tests to catch naming conflicts early
-4. Document standard parameter naming in developer guide
-
-### Impact
-- Tests currently failing for RW trend with gaussian family
-- Similar conflicts likely exist in other trend/family combinations
-- Easy fix but requires systematic review of all generators
 
 ## Core Architecture (Operational ✅)
 

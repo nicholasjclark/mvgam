@@ -70,8 +70,8 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     data = data,
     family = family,
     stanvars = stanvars,
-    stancode = extract_stancode_from_setup(mock_setup),
-    standata = extract_standata_from_setup(mock_setup),
+    stancode = brms::stancode(mock_setup),
+    standata = brms::standata(mock_setup),
     prior = extract_prior_from_setup(mock_setup),
     brmsterms = extract_brmsterms_from_setup(mock_setup),
     brmsfit = mock_setup,  # Keep the mock brmsfit for prediction
@@ -85,37 +85,6 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
 }
 
 
-#' Extract Stan Code from brms Setup
-#' @param setup_object brms setup object
-#' @return Character string of Stan code
-#' @noRd
-extract_stancode_from_setup <- function(setup_object) {
-  if (methods::hasMethod("stancode", class(setup_object))) {
-    return(brms::stancode(setup_object))
-  } else if (!is.null(setup_object$model)) {
-    return(setup_object$model)
-  } else {
-    # Extract from internal structure - let errors bubble up
-    code <- setup_object@stancode
-    return(code)
-  }
-}
-
-#' Extract Stan Data from brms Setup
-#' @param setup_object brms setup object
-#' @return List of Stan data components
-#' @noRd
-extract_standata_from_setup <- function(setup_object) {
-  if (methods::hasMethod("standata", class(setup_object))) {
-    return(brms::standata(setup_object))
-  } else if (!is.null(setup_object$data)) {
-    return(setup_object$data)
-  } else {
-    # Extract from internal structure - let errors bubble up
-    data <- setup_object@standata
-    return(data)
-  }
-}
 
 #' Extract Prior Information from brms Setup
 #' @param setup_object brms setup object
