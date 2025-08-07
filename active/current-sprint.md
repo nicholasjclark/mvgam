@@ -28,11 +28,11 @@
 
 ### Phase 1: Testing Simple Models
 
-**0.1 Fix AR() parameter names and validations**
-- [ ] Ensure autoregressive coefficients follow the `ar{lag}_trend[]` convention
-- [ ] `ar` coefficients should be declared as arrays for all `AR()` and `CAR()` models for consistent extraction
-- [ ] Ensure `sigma` is changed to `sigma_trend`
-- [ ] Ensure discontinuous lag coefficients are properly supported (i.e. `AR(p = c(1, 12, 24))`
+**Pre-Extension Function Cleaning**
+- [ ] Consolidate `generate_factor_model_priors()` and `generate_factor_model_model_injectors()`
+- [ ] Ensure all generators explicitly state the name of the block they are injecting into, unless they inject into multiple blocks (`generate_innovation_priors` should be `generate_innovation_model`, for example)
+- [ ] Consolidate `generate_rw_trend_stanvars()` and `generate_rw_dynamics()`
+- [ ] Standardize names for hierarchical injectors (some use `generate_hierarchical_correlation_*`, others use `generate_hierarchical_*`)
 
 **1.1 Univariate Model Testing**
 - [ ] Simple intercept models: `y ~ 1, trend_formula = ~ [TREND]()`
