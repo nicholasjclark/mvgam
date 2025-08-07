@@ -1,3 +1,8 @@
+#' Check if x is a try-error resulting from try()
+is_try_error <- function(x) {
+  inherits(x, "try-error")
+}
+
 #' Validate trend components for conflicts
 #'
 #' Checks for conflicting trend specifications like multiple dynamic factor models
