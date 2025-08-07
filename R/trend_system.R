@@ -850,26 +850,20 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
   validate_trend_components(trend_components)
 
   # Create base formula without trend constructors (brms pattern)
-  # Handle offset terms like in interpret_mvgam()
+  # offsets not allowed in trend_formula
   offset_attr <- attr(tf_safe, 'offset')
 
+  if (!is.null(offset_attr)) {
+    insight::format_error(
+      "Offsets not allowed in trend_formula.",
+      "Check for invalid syntax in {.field trend_formula}."
+    )
+  }
+
   base_formula <- if (length(regular_terms) > 0) {
-    if (!is.null(offset_attr)) {
-      # Include offset in formula reconstruction
-      offset_terms <- rownames(attr(tf_safe, 'factors'))[offset_attr]
-      all_terms <- c(regular_terms, offset_terms)
-      try(reformulate(all_terms, response = NULL), silent = TRUE)
-    } else {
       try(reformulate(regular_terms, response = NULL), silent = TRUE)
-    }
   } else {
-    if (!is.null(offset_attr)) {
-      # Offset only formula
-      offset_terms <- rownames(attr(tf_safe, 'factors'))[offset_attr]
-      try(reformulate(offset_terms, response = NULL), silent = TRUE)
-    } else {
       ~ 1  # Intercept only
-    }
   }
 
   # Ensure formula reconstruction succeeded
@@ -890,7 +884,7 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
     trend_model = trend_model,
     trend_terms = trend_terms,
     regular_terms = regular_terms,
-    offset_terms = if (!is.null(offset_attr)) rownames(attr(tf_safe, 'factors'))[offset_attr] else character(0),
+    offset_terms = character(0),
     original_formula = trend_formula
   ))
 }
