@@ -1169,20 +1169,3 @@ extract_pooling_diagnostics <- function(pooled_estimates) {
   
   return(diagnostics)
 }
-
-# ------------------------------------------------------------------------------
-# PLACEHOLDER FUNCTIONS
-# ------------------------------------------------------------------------------
-# Development placeholders for trend stanvar generation - these would be
-# implemented with specific Stan code snippets for each trend type.
-
-generate_rw_stanvars <- function(pars, resp_name) { list() }
-generate_ar_stanvars <- function(pars, resp_name) { list() }
-generate_var_stanvars <- function(pars, resp_name) { list() }
-generate_gp_stanvars <- function(pars, resp_name) { list() }
-generate_car_stanvars <- function(pars, resp_name) { list() }
-
-# Development placeholder for posterior sample extraction
-extract_posterior_samples <- function(fit) { 
-  matrix(rnorm(100), ncol = 1) 
-}
