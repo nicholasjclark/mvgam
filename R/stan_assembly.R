@@ -534,67 +534,6 @@ find_matching_brace <- function(code_lines, start_line) {
   return(integer(0))
 }
 
-# Feature Detection Utilities
-# ===========================
-
-#' Check if Stanvars Have Time Component
-#'
-#' @description
-#' Checks if stanvars contain time-related components.
-#'
-#' @param stanvars List of stanvar objects
-#' @return Logical indicating presence of time components
-#' @noRd
-has_time_component <- function(stanvars) {
-  checkmate::assert_list(stanvars)
-
-  # Look for time-related patterns in stanvar code
-  time_patterns <- c("n_time", "time_vals", "time_data", "\\btime\\b")
-
-  for (stanvar in stanvars) {
-    if (is_valid_stanvar(stanvar)) {
-      scode <- stanvar$scode
-
-      for (pattern in time_patterns) {
-        if (grepl(pattern, scode)) {
-          return(TRUE)
-        }
-      }
-    }
-  }
-
-  return(FALSE)
-}
-
-#' Check if Stanvars Have Series Component
-#'
-#' @description
-#' Checks if stanvars contain series-related components.
-#'
-#' @param stanvars List of stanvar objects
-#' @return Logical indicating presence of series components
-#' @noRd
-has_series_component <- function(stanvars) {
-  checkmate::assert_list(stanvars)
-
-  # Look for series-related patterns in stanvar code
-  series_patterns <- c("n_series", "series_data", "\\bseries\\b")
-
-  for (stanvar in stanvars) {
-    if (is_valid_stanvar(stanvar)) {
-      scode <- stanvar$scode
-
-      for (pattern in series_patterns) {
-        if (grepl(pattern, scode)) {
-          return(TRUE)
-        }
-      }
-    }
-  }
-
-  return(FALSE)
-}
-
 # Integration Support Utilities
 # =============================
 
