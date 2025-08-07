@@ -336,10 +336,11 @@ valid_blocks <- c("tparameters", "transformed_parameters", "tdata", "transformed
 ## Developer Onboarding Guide
 
 **Consolidated Architecture Files (4 Core Files):**
-- `R/trend_system.R` - Complete trend infrastructure (registry, validation, parsing, constructors)
-- `R/stan_assembly.R` - Two-stage Stan assembly orchestration and validation  
+- `R/trend_system.R` - Complete trend infrastructure (registry, parsing, constructors)
+- `R/stan_assembly.R` - Two-stage Stan assembly orchestration
 - `R/brms_integration.R` - Enhanced brms setup and ecosystem integration
 - `R/mvgam_core.R` - Enhanced fitting, dual-object system, multiple imputation
+- `R/validations.R` - Type checks and argument validations
 
 **Test Infrastructure:**
 - `tests/testthat/test-trend-dispatcher.R` - Trend system validation
