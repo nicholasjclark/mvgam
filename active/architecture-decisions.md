@@ -23,6 +23,24 @@ mvgam(
 )
 ```
 
+**Trend Formula Logic**:
+- **Missing or NULL `trend_formula`**: Pure brms model (no trend components added)
+- **Present `trend_formula`**: mvgam State-Space model with trend dynamics
+
+**Default Trend Behavior**:
+```r
+# Pure brms - no trend components
+mvgam(y ~ x1 + x2, data = data)
+mvgam(y ~ x1 + x2, trend_formula = NULL, data = data)
+
+# mvgam with default ZMVN() independent Gaussian latent states
+mvgam(y ~ x1 + x2, trend_formula = ~ -1, data = data)
+mvgam(y ~ x1 + x2, trend_formula = ~ 1, data = data)
+
+# mvgam with explicit trend specification
+mvgam(y ~ x1 + x2, trend_formula = ~ AR(), data = data)
+```
+
 ### 3. Stan Integration Strategy: Two-Stage Assembly
 **Decision**: Leverage brms stanvars system rather than modifying brms internals  
 **Stage 1**: Generate trend stanvars and trend Stan data  
@@ -120,22 +138,7 @@ transformed parameters {
 
 **Design Principle**: Eliminate redundant code to simplify custom trend development
 
-**Shared Utility Functions** (`R/trend_injection_generators.R`):
-```r
-# Matrix Z generation based on factor model status
-generate_matrix_z_stanvars(is_factor_model, n_lv, n_series)
-
-# Universal trend computation pattern 
-generate_trend_computation_code(n_lv, n_series)
-
-# Factor model priors with variance constraints
-generate_factor_model_priors(is_factor_model, n_lv)
-
-# Hierarchical correlation support
-generate_hierarchical_functions()
-generate_hierarchical_correlation_params(n_groups, n_subgroups)
-generate_hierarchical_correlation_priors(n_groups)
-```
+**Shared Utility Functions** (`R/trend_injection_generators.R`)
 
 ### 6. Hierarchical Correlation Architecture
 
@@ -153,12 +156,6 @@ generate_hierarchical_correlation_priors(n_groups)
 3. **Flexible Grouping**: Works with any unit variable (time, site, etc.) and grouping structure
 4. **Factor Compatibility**: Hierarchical correlations work with both factor and non-factor models
 5. **Partial Pooling**: Alpha parameter controls mixing between global and group-specific correlations
-
-**Benefits for Custom Trend Development**:
-- **Consistency**: All factor-compatible trends use identical matrix Z patterns
-- **Simplicity**: Custom trends call utility functions rather than duplicating Stan code
-- **Maintainability**: Bug fixes and improvements apply to all trend types automatically
-- **Documentation**: Utility functions contain detailed comments explaining WHY patterns exist
 
 **Custom Trend Template**:
 ```r
@@ -254,19 +251,73 @@ PW(growth = 'logistic') # trend = 'PWlogistic'
 ZMVN()            # trend = 'ZMVN'
 ```
 
-**Benefits**:
-- **Consistency**: Single source of truth for trend type identification
-- **Simplicity**: Registry and validation systems only need to check one field
-- **Maintainability**: Eliminates duplicate information and potential inconsistencies
-- **Clean Interface**: Removes confusion between `trend` and `trend_model` fields
-
 **Implementation**: Registry compatibility layer handles both `trend` and legacy `trend_type` field names for backward compatibility during transition.
 
-### 4. Backward Compatibility
+### 4. Variable Name Management Architecture
+
+**Critical Design Decision**: Store variable names in final mvgam object for clean downstream processing
+
+**Problem with Previous Approach**:
+- `implicit_vars` attributes were tracked through complex processing pipelines
+- Difficult to debug and maintain across validation, fitting, and post-processing
+- Made plotting and prediction functions complex to implement
+
+**New Clean Architecture**:
+```r
+# Stored in final mvgam object
+variable_info = list(
+  trend = list(
+    series = "actual_series_col",    # from trend constructor
+    time = "actual_time_col",        # from trend constructor  
+    gr = "group_col",                # NULL if not specified
+    subgr = "subgroup_col"           # NULL if not specified
+  ),
+  response = list(
+    y = c("count", "biomass"),       # response variable names
+    # any other observation-specific variables
+  )
+)
+```
+
+**Implementation Strategy**:
+- Validation functions use variable names from trend constructors
+- Final mvgam object stores complete variable mapping
+- Post-processing methods reference `variable_info` instead of hardcoded names
+- Eliminates need for `implicit_vars` attribute management entirely
+
+### 5. Data Ordering Architecture
+
+**Critical Design Decision**: Explicit data ordering for Stan without data pollution
+
+**Problem with Previous Approach**:
+- Added index columns polluted the data structure
+- Ordering logic scattered across validation functions
+- Difficult to track data transformations through the pipeline
+
+**Clean Ordering Strategy**:
+- **Separation of Concerns**: Keep validation logic separate from ordering logic
+- **No Data Pollution**: Never add tracking columns to the user's data
+- **Explicit Stan Requirements**: Data must be ordered by series then time for efficient Stan computation
+- **Metadata Preservation**: Store ordering information separately for post-processing restoration
+- **Single Point of Truth**: One function responsible for Stan data ordering
+
+**Benefits**:
+- Clean data structures throughout the pipeline
+- Easy to trace and debug data transformations
+- Post-processing can restore original order using metadata
+- Works with any variable names from trend constructors
+
+### 6. Data Validation System for Trends
+**Entry Point**: `validate_time_series_for_trends()` calls `validate_series_time()` using variable names from trend constructors  
+**Core Validation**: `validate_series_time()` ensures time/series exist as factors, then calls `validate_grouping_structure()` for gr/subgr  
+**Factor Management**: `validate_factor_levels()` checks for unused levels; `validate_complete_grouping()` ensures hierarchical consistency  
+**Stan Preparation**: `prepare_stan_data()` auto-drops unused levels and orders data (series-first, time-within-series) for efficient computation
+
+### 7. Backward Compatibility
 **Policy**: Maintain compatibility with existing mvgam interfaces where possible
 **Exception**: Breaking changes allowed only when essential for brms integration
 
-### 5. Stanvars Combination Architecture
+### 7. Stanvars Combination Architecture
 
 **Critical Design Decision**: All trend generators must return proper brms "stanvars" class objects
 
@@ -276,7 +327,7 @@ ZMVN()            # trend = 'ZMVN'
 3. **Always use** `combine_stanvars()` for combining
 4. **Always validate** that returned object has class "stanvars"
 
-### 6. Trend Parameter Naming Convention
+### 8. Trend Parameter Naming Convention
 
 **Critical Design Decision**: Trend parameters (variances, ar parameters, etc..) must avoid naming conflicts with brms observation model parameters
 
@@ -298,19 +349,7 @@ matrix[n_lv, n_lv] Sigma;              // CONFLICTS with multivariate families
 - **VAR coefficients**: `A{lag}_trend`
 - **Factor loadings**: `Z` (matrix), `z_loading` (vectors)
 
-**Benefits**:
-- **Prevents compilation errors** from parameter name conflicts
-- **Clear separation** between observation and trend parameters
-- **Easier debugging** when parameters have descriptive names
-- **Consistent pattern** across all trend types
-
-**Implementation Requirements**:
-1. All trend generators must use `_trend` suffix for estimated parameters
-2. Review existing generators for compliance
-3. Update tests to verify no naming conflicts
-4. Document in trend development guide
-
-### 7. brms Stanvar Block Naming Conventions
+### 9. brms Stanvar Block Naming Conventions
 
 **Critical Implementation Detail**: brms uses abbreviated block names internally that differ from full Stan block names
 
@@ -340,13 +379,6 @@ stanvar(name = "test", scode = "real x;", block = "transformed parameters")
 # ✅ Validation functions should accept both
 valid_blocks <- c("tparameters", "transformed_parameters", "tdata", "transformed_data", ...)
 ```
-
-**Why This Matters**:
-- **Test failures**: Tests expecting full names fail when stanvars contain abbreviated names
-- **Validation errors**: Functions rejecting valid stanvars due to block name mismatch  
-- **Integration issues**: Inconsistent expectations between brms and mvgam validation
-
-**Implementation**: All validation functions, tests, and documentation must be aware of this brms convention and handle both naming forms appropriately.
 
 ## Developer Onboarding Guide
 

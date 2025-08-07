@@ -674,7 +674,7 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
   }
   
   # Validate trend formula structure
-  trend_validation <- mvgam:::validate_bf_trend_formula(trend_formula)
+  trend_validation <- validate_trend_formula_brms(trend_formula)
   
   # Check if main formula is multivariate
   is_mv_main <- is_multivariate_formula(formula)
@@ -687,11 +687,12 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
   }
   
   # Handle response-specific trend formulas
-  if (inherits(trend_formula, "brmsterms") || 
+  if (inherits(trend_formula, "brmsformula") ||
+      inherits(trend_formula, "brmsterms") || 
       inherits(trend_formula, "mvbrmsterms")) {
     
     # Extract response-specific trend specifications
-    trend_specs <- extract_response_trends(trend_formula, response_names)
+    trend_specs <- extract_response_trends(trend_formula, response_names, validate_separate = TRUE)
     
     # Create base formula for brms setup
     base_formula <- create_trend_base_formula(trend_specs)
@@ -768,8 +769,9 @@ extract_response_names <- function(formula) {
 #' @param response_names Character vector of response names
 #' @return Named list of trend specifications per response
 #' @noRd
-extract_response_trends <- function(trend_formula, response_names) {
+extract_response_trends <- function(trend_formula, response_names, validate_separate = FALSE) {
   checkmate::assert_character(response_names, null.ok = TRUE)
+  checkmate::assert_logical(validate_separate, len = 1)
   
   # Check if trend_formula is already processed brms terms
   if (inherits(trend_formula, c("brmsterms", "mvbrmsterms"))) {
@@ -798,7 +800,12 @@ extract_response_trends <- function(trend_formula, response_names) {
       }
       
       if (!is.null(resp_name)) {
-        trend_specs[[resp_name]] <- trend_terms$terms[[i]]$formula
+        resp_formula <- trend_terms$terms[[i]]$formula
+        # Validate multivariate trends don't use advanced features (only for separate response trends)
+        if (validate_separate) {
+          validate_multivariate_trend_constraints(resp_formula, resp_name)
+        }
+        trend_specs[[resp_name]] <- resp_formula
       }
     }
   } else {
@@ -828,6 +835,65 @@ create_trend_base_formula <- function(trend_specs) {
     # Fallback: create minimal trend formula
     return(~ 1)
   }
+}
+
+#' Validate Multivariate Trend Constraints
+#'
+#' Ensures that multivariate models with separate trends per response only use
+#' basic temporal dynamics without advanced features (factors, correlations, groupings).
+#'
+#' @param trend_formula Formula for a single response trend
+#' @param response_name Name of the response variable
+#' @noRd
+validate_multivariate_trend_constraints <- function(trend_formula, response_name) {
+  checkmate::assert_formula(trend_formula)
+  checkmate::assert_string(response_name)
+  
+  # Parse the trend formula to extract trend constructors
+  parsed <- try(mvgam:::parse_trend_formula(trend_formula), silent = TRUE)
+  if (inherits(parsed, "try-error")) {
+    return(invisible(NULL))  # Let parse_trend_formula handle the error
+  }
+  
+  # Check each trend component for advanced features
+  for (trend_component in parsed$trend_components) {
+    # Check for factor models (n_lv parameter)
+    if (!is.null(trend_component$n_lv) && trend_component$n_lv > 0) {
+      stop(insight::format_error(
+        "Factor models not allowed in multivariate response trends.",
+        "Response '{response_name}' has n_lv = {trend_component$n_lv}.",
+        "Remove n_lv parameter for basic temporal dynamics only."
+      ))
+    }
+    
+    # Check for correlations (cor parameter)  
+    if (!is.null(trend_component$cor) && trend_component$cor) {
+      stop(insight::format_error(
+        "Correlation structures not allowed in multivariate response trends.",
+        "Response '{response_name}' has cor = TRUE.",
+        "Remove cor parameter for basic temporal dynamics only."
+      ))
+    }
+    
+    # Check for hierarchical grouping (gr, subgr parameters)
+    if (!is.null(trend_component$gr)) {
+      stop(insight::format_error(
+        "Hierarchical grouping not allowed in multivariate response trends.",
+        "Response '{response_name}' has gr = '{trend_component$gr}'.",
+        "Remove gr parameter for basic temporal dynamics only."
+      ))
+    }
+    
+    if (!is.null(trend_component$subgr)) {
+      stop(insight::format_error(
+        "Hierarchical grouping not allowed in multivariate response trends.", 
+        "Response '{response_name}' has subgr = '{trend_component$subgr}'.",
+        "Remove subgr parameter for basic temporal dynamics only."
+      ))
+    }
+  }
+  
+  invisible(NULL)
 }
 
 # =============================================================================

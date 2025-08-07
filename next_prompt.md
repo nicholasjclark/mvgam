@@ -1,13 +1,10 @@
 ## Context: mvgam Stan Compilation Pipeline Refactoring
 
-You are an expert R package developer working on the mvgam R package which is undergoing a major refactoring to integrate with the brms ecosystem. The package generates Bayesian state-space models by combining brms observation models with custom trend specifications using Stan.
+You are an AI assistant helping me to refactor an existing R package called mvgam. This package will build custom Bayesian state-space models that combine sub-models: a latent state model and an observation model. Both of these sub-models will leverage the brms R package to build initial Stan code, data objects and to accept custom prior specifications, and my package will then integrate the two sub-models into a single Stan file that may also incorporate custom dynamic trends. My package will then pass the full Stan file and data objects to rstan or cmdstanr for fitting the model in Stan. 
 
 ## Current Situation
 
-We have just completed fixing a critical stanvars class structure issue where trend generators were creating corrupted list objects instead of proper brms stanvars collections. However, comprehensive testing has revealed 21 test failures concentrated in different areas:
-  - Data structure validation (the next logical issue to address)
-  - Possibly missing utility functions (easily fixable)
-  - Stan code structure validation (needs refinement)
+We have just completed fixing a critical stanvars class structure issue where our custom trend generators were creating corrupted list objects instead of proper brms stanvars collections. This will help us to inject appropriate Stan code snippets into the brms-generated observation Stan model, as well as any necessary data that needs to be added to the brms-generated Stan data objects. Now we are moving into testing of the full Stan model and Stan code constructions, as well as testing if models compile properly.
 
 ## Your Task
 
@@ -17,12 +14,14 @@ We have just completed fixing a critical stanvars class structure issue where tr
    - `active/current-sprint.md` - Contains the critical issues section with test results
    - `active/architecture-decisions.md` - Contains design principles and naming conventions
    - `R/stan_assembly.R` - The main Stan code assembly pipeline
-   - Search for and examine all `generate_*_trend_stanvars` functions
 
-2. **Use the r-test-runner agent to run tests in tests/testthat/test-stan-assembly-system.R**
-
-3. **Use thinking/reasoning to analyze:**
+2. **Use thinking/reasoning to analyze:**
+   - The formula interface and how trend constructors are called and validated
    - The flow of stanvar objects through the combination pipeline
 
-4. **Create a focused implementation plan that addresses any immediate action points highlighted by the test runner agent**
-  
+3. **Create a focused implementation plan that addresses any immediate action points highlighted in `active/current-sprint.md`**
+
+If any of these tasks are ambiguous or unclear to you, please ask me targeted questions so that we can come up with a robust plan together.
+
+
+What else do you need to know before you can implement this?

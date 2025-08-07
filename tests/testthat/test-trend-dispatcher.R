@@ -249,35 +249,24 @@ test_that("formula parsing is order-independent", {
   })
 })
 
-# Test formula parsing - multiple trends
-test_that("multiple trend components are handled correctly", {
-  suppressWarnings({
-
-    # Test formula with multiple trends in different orders
-    f1 <- ~ s(season) + RW() + AR(p = 2) + cov1
-    f2 <- ~ AR(p = 2) + cov1 + RW() + s(season)
-
-    parsed1 <- mvgam:::parse_trend_formula(f1)
-    parsed2 <- mvgam:::parse_trend_formula(f2)
-
-  # Should have two trend components
-  expect_equal(length(parsed1$trend_components), 2)
-  expect_equal(length(parsed2$trend_components), 2)
-
-  # Multiple trends should be handled correctly
-  expect_equal(length(parsed1$trend_components), 2)
-  expect_equal(length(parsed2$trend_components), 2)
-
-  # Should have same trend terms (order may differ)
-  expect_setequal(parsed1$trend_terms, parsed2$trend_terms)
-  expect_true("RW()" %in% parsed1$trend_terms)
-  expect_true("AR(p = 2)" %in% parsed1$trend_terms)
-
-  # Regular terms should be the same
-  expect_setequal(parsed1$regular_terms, parsed2$regular_terms)
-  expect_true("s(season)" %in% parsed1$regular_terms)
-  expect_true("cov1" %in% parsed1$regular_terms)
-  })
+# Test formula parsing - multiple trends should fail
+test_that("multiple trend components are properly rejected", {
+  
+  # Test formula with multiple trends should throw error
+  f1 <- ~ s(season) + RW() + AR(p = 2) + cov1
+  
+  expect_error(
+    mvgam:::parse_trend_formula(f1),
+    "Multiple trend constructors detected"
+  )
+  
+  # Test in different order should also fail  
+  f2 <- ~ AR(p = 2) + cov1 + RW() + s(season)
+  
+  expect_error(
+    mvgam:::parse_trend_formula(f2),
+    "Multiple trend constructors detected"
+  )
 })
 
 # Test edge cases inspired by brms testing
@@ -379,11 +368,12 @@ test_that("boundary conditions are handled correctly", {
     expect_equal(length(parsed2$trend_components), 1)
     expect_equal(length(parsed2$regular_terms), 50)
 
-    # Test formula with repeated trend constructors
+    # Test formula with repeated trend constructors should fail
     f3 <- ~ RW() + s(time) + RW(ma = TRUE)
-    parsed3 <- mvgam:::parse_trend_formula(f3)
-    expect_equal(length(parsed3$trend_components), 2)
-    expect_setequal(parsed3$trend_terms, c("RW()", "RW(ma = TRUE)"))
+    expect_error(
+      mvgam:::parse_trend_formula(f3),
+      "Multiple trend constructors detected"
+    )
   })
 })
 
@@ -901,27 +891,14 @@ test_that("grouping variables are properly validated and passed to dispatchers",
     expect_true(trend_comp$cor)
 
     # Test complex formula with multiple trends having different grouping
+    # Multiple trend constructors should fail
     f2 <- ~ AR(time = day, series = unit, gr = block, subgr = plot, p = 1, cor = TRUE) +
            s(temperature) +
            RW(time = week, series = transect, gr = site, subgr = quadrat, cor = TRUE)
-    parsed2 <- mvgam:::parse_trend_formula(f2)
-    expect_equal(length(parsed2$trend_components), 2)
-
-    # Check first trend (AR)
-    ar_comp <- parsed2$trend_components[[1]]
-    expect_equal(ar_comp$trend, "AR1")
-    expect_equal(ar_comp$gr, "block")
-    expect_equal(ar_comp$subgr, "plot")
-    expect_equal(ar_comp$time, "day")
-    expect_equal(ar_comp$series, "unit")
-
-    # Check second trend (RW)
-    rw_comp <- parsed2$trend_components[[2]]
-    expect_equal(rw_comp$trend, "RW")
-    expect_equal(rw_comp$gr, "site")
-    expect_equal(rw_comp$subgr, "quadrat")
-    expect_equal(rw_comp$time, "week")
-    expect_equal(rw_comp$series, "transect")
+    expect_error(
+      mvgam:::parse_trend_formula(f2),
+      "Multiple trend constructors detected"
+    )
   })
 })
 
@@ -988,21 +965,14 @@ test_that("PW cap argument is properly validated for logistic growth", {
     expect_equal(pw_comp$trend, "PWlogistic")
 
     # Test complex PW specification in formula
-    f2 <- ~ AR(p = 1) + s(temp) +
+    f2 <- ~ s(temp) +
            PW(time = daily, series = population, cap = environment_capacity,
               growth = 'logistic', n_changepoints = 15, changepoint_scale = 0.1)
     parsed2 <- mvgam:::parse_trend_formula(f2)
-    expect_equal(length(parsed2$trend_components), 2)
+    expect_equal(length(parsed2$trend_components), 1)
 
-    # Find the PW component (could be in either position)
-    pw_comp2 <- NULL
-    for (comp in parsed2$trend_components) {
-      if (comp$trend %in% c("PWlinear", "PWlogistic")) {
-        pw_comp2 <- comp
-        break
-      }
-    }
-    expect_false(is.null(pw_comp2))
+    # Check the PW component
+    pw_comp2 <- parsed2$trend_components[[1]]
     expect_equal(pw_comp2$cap, "environment_capacity")
     expect_equal(pw_comp2$growth, "logistic")
     expect_equal(pw_comp2$n_changepoints, 15)

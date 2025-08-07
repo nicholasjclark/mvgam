@@ -98,7 +98,7 @@ test_that("validate_trend_formula_brms handles response variables correctly", {
 
   # bf() objects SHOULD allow response variables for multivariate identification
   expect_silent(mvgam:::validate_trend_formula_brms(
-    bf(count ~ AR(p = 1), biomass ~ RW(cor = TRUE))
+    bf(count ~ AR(p = 1), biomass ~ RW())
   ))
 
   # Mixed bf() with and without response variables
@@ -130,7 +130,7 @@ test_that("validate_trend_formula_brms handles named lists", {
   # Valid named list
   trend_list <- list(
     count = ~ AR(p = 1),
-    biomass = ~ RW(cor = TRUE),
+    biomass = ~ RW(),
     presence = NULL
   )
   expect_silent(mvgam:::validate_trend_formula_brms(trend_list))
@@ -245,7 +245,7 @@ test_that("validation supports expected mvgam-brms usage patterns", {
       obs_formula = cbind(y1, y2) ~ x + s(time),
       trend_formula = list(
         y1 = ~ AR(p = 1),
-        y2 = ~ RW(cor = TRUE)
+        y2 = ~ RW()
       )
     )
   })
@@ -264,7 +264,7 @@ test_that("validation supports expected mvgam-brms usage patterns", {
       obs_formula = cbind(count, biomass, presence) ~ temp + precip,
       trend_formula = list(
         count = ~ AR(p = 1),        # Population dynamics
-        biomass = ~ RW(cor = TRUE), # Correlated biomass trends
+        biomass = ~ RW(), # Correlated biomass trends
         presence = ~ 1              # Static occupancy
       )
     )
@@ -471,7 +471,7 @@ test_that("validation handles edge cases in advanced formulas", {
 test_that("validate_trend_formula_brms supports multivariate response identification", {
   # bf() with response variables for multivariate identification
   expect_silent(mvgam:::validate_trend_formula_brms(
-    bf(count ~ AR(p = 1), biomass ~ RW(cor = TRUE))
+    bf(count ~ AR(p = 1), biomass ~ RW())
   ))
 
   # Complex multivariate trends with different patterns
@@ -510,14 +510,14 @@ test_that("validation handles mixed multivariate trend specifications", {
   expect_silent({
     mvgam:::validate_autocor_separation(
       obs_formula = bf(mvbind(count, biomass) ~ temp + precip),
-      trend_formula = bf(count ~ AR(p = 1), biomass ~ RW(cor = TRUE))
+      trend_formula = bf(count ~ AR(p = 1), biomass ~ RW())
     )
   })
 
   # Named list vs bf() consistency check
   named_list_trends <- list(
     count = ~ AR(p = 1),
-    biomass = ~ RW(cor = TRUE)
+    biomass = ~ RW()
   )
 
   expect_silent(mvgam:::validate_trend_formula_brms(named_list_trends))
@@ -537,7 +537,7 @@ test_that("validation handles mixed multivariate trend specifications", {
                       sigma1 ~ habitat,
                       sigma2 ~ elevation),
       trend_formula = bf(count ~ AR(p = 1),
-                        biomass ~ RW(cor = TRUE))
+                        biomass ~ RW())
     )
   })
 })

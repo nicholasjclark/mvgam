@@ -27,14 +27,24 @@ mvgam(
 )
 ```
 
-### Multivariate with Response-Specific Trends
+### Multivariate with Multivariate Trends
+```r
+mvgam(
+  bf(count ~ temp, biomass ~ precip) + set_rescor(FALSE),
+  trend_formula = ~ AR(p = 1, cor = TRUE),
+  family = c(poisson(), gaussian(), bernoulli()),
+  data = data
+)
+```
+
+### Multivariate with Response-Specific Trends (no factors, correlations or groupings allowed)
 ```r
 mvgam(
   bf(count ~ temp, biomass ~ precip) + set_rescor(FALSE),
   trend_formula = bf(
     count = ~ AR(p = 1),        # Population dynamics
-    biomass = ~ RW(cor = TRUE), # Correlated biomass trends
-    presence = NULL             # No trend (static occupancy)
+    biomass = ~ RW(),           # Correlated biomass trends
+    presence = NULL             # No trend (static occupancy, defaults to ZMVN())
   ),
   family = c(poisson(), gaussian(), bernoulli()),
   data = data

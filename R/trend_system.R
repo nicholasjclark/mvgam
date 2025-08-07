@@ -196,7 +196,6 @@ register_core_trends <- function() {
   register_trend_type("RW", supports_factors = TRUE, generate_rw_trend_stanvars)
   register_trend_type("VAR", supports_factors = TRUE, generate_var_trend_stanvars)
   register_trend_type("ZMVN", supports_factors = TRUE, generate_zmvn_trend_stanvars)
-  register_trend_type("None", supports_factors = FALSE, generate_none_trend_stanvars)
 
   # Factor-incompatible trends (series-specific dynamics)
   register_trend_type("CAR", supports_factors = FALSE, generate_car_trend_stanvars)
@@ -256,7 +255,7 @@ register_custom_trend <- function(name, supports_factors = FALSE, generator_func
 #' @return Logical indicating if registry is initialized
 #' @noRd
 is_registry_initialized <- function() {
-  core_trends <- c("AR", "RW", "VAR", "ZMVN", "None", "CAR", "PW")
+  core_trends <- c("AR", "RW", "VAR", "ZMVN", "CAR", "PW")
   all(core_trends %in% ls(trend_registry))
 }
 
@@ -1179,11 +1178,21 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
   # Validate we have at least one trend model (brms-style error)
   if (length(trend_terms) == 0) {
     available_trends <- paste(mvgam_trend_choices(), collapse = "(), ")
-    insight::format_error(
+    stop(insight::format_error(
       "No trend model specified in trend_formula.",
       "At least one trend constructor is required.",
       "Available constructors: {.field {available_trends}()}."
-    )
+    ))
+  }
+  
+  # Validate we have exactly one trend type per response - only one allowed per formula
+  if (length(trend_terms) > 1) {
+    stop(insight::format_error(
+      "Multiple trend constructors detected in single response formula.",
+      paste("Found:", paste(trend_terms, collapse = ", ")),
+      "Only one trend constructor is allowed per response variable.",
+      "For multivariate models, use separate trend formulas per response."
+    ))
   }
 
   # Parse trend constructor calls with error handling (brms pattern)
@@ -1194,7 +1203,7 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
     trend_components[[i]] <- eval_trend_constructor(trend_terms[i])
   }
 
-  # Validate trend components don't conflict (brms pattern)
+  # Validate trend components for any remaining conflicts
   validate_trend_components(trend_components)
 
   # Create base formula without trend constructors (brms pattern)
@@ -1229,12 +1238,8 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
     )
   }
 
-  # Determine primary trend model
-  trend_model <- if (length(trend_components) == 1) {
-    trend_components[[1]]
-  } else {
-    NULL  # Multiple trends handled separately
-  }
+  # Since we enforce single trend type, trend_model is always the first component
+  trend_model <- trend_components[[1]]
 
   return(list(
     base_formula = base_formula,
@@ -1291,15 +1296,26 @@ eval_trend_constructor <- function(trend_call) {
 #'
 #' @noRd
 validate_trend_components <- function(trend_components) {
+  
+  # Check for multiple trend types - only one trend type allowed per formula
+  if (length(trend_components) > 1) {
+    trend_types <- sapply(trend_components, function(x) x$trend_type)
+    stop(insight::format_error(
+      "Multiple trend types detected in single formula.",
+      paste("Found:", paste(trend_types, collapse = ", ")),
+      "Only one trend constructor is allowed per trend_formula.",
+      "Use separate models or combine into a single trend type."
+    ))
+  }
 
   # Check for multiple dynamic factor models
   n_lv_models <- sum(sapply(trend_components, function(x) !is.null(x$n_lv) && x$n_lv > 0))
   if (n_lv_models > 1) {
-    insight::format_error(
+    stop(insight::format_error(
       "Multiple dynamic factor models specified.",
       "Only one trend component can have {.field n_lv > 0}.",
       "Consider combining factor structures or removing one factor model."
-    )
+    ))
   }
 
   # Check for conflicting correlation structures

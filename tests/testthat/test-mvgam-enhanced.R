@@ -421,9 +421,8 @@ test_that("generate_combined_stancode_and_data handles trend injection", {
   trend_stanvars <- list(ar_implementation = "AR code")
   
   with_mocked_bindings(
-    inject_trend_into_linear_predictor = function(base_stancode, trend_spec, trend_stanvars) {
+    inject_trend_into_linear_predictor = function(base_stancode, trend_stanvars) {
       expect_equal(base_stancode, obs_setup$stancode)
-      expect_equal(trend_spec, mv_spec)
       expect_equal(trend_stanvars$ar_implementation, "AR code")
       "modified stan code with trends"
     },

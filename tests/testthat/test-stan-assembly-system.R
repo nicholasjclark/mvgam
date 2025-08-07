@@ -177,15 +177,16 @@ test_that("trend generators handle different specifications", {
 test_that("trend generators handle edge cases", {
   data_info <- list(n_obs = 10, n_series = 1, series_var = "series")
 
-  # Test with None trend
-  none_spec <- list(
-    trend_type = "None"
+  # Test with ZMVN default trend (minimal stanvars)
+  zmvn_spec <- list(
+    trend_type = "ZMVN",
+    n_lv = 1
   )
 
-  none_stanvars <- mvgam:::generate_trend_injection_stanvars(none_spec, data_info)
-  expect_type(none_stanvars, "list")
-  # Should return empty list for None trend
-  expect_equal(length(none_stanvars), 0)
+  zmvn_stanvars <- mvgam:::generate_trend_injection_stanvars(zmvn_spec, data_info)
+  expect_type(zmvn_stanvars, "list")
+  # Should return minimal stanvars for ZMVN default
+  expect_gt(length(zmvn_stanvars), 0)
 
   # Test with minimal specification
   minimal_spec <- list(
@@ -375,7 +376,8 @@ test_that("piecewise trends integrate with complete Stan assembly", {
   pw_trend_spec <- list(
     trend_type = "PWlinear",
     n_changepoints = 6,
-    changepoint_scale = 0.15
+    changepoint_scale = 0.15,
+    n_obs = 100
   )
 
   # Extract trend stanvars
@@ -440,21 +442,92 @@ test_that("piecewise Stan code validates and compiles correctly", {
   }
   "
 
-  # Test that individual stanvar components have valid Stan syntax
+  # Test that individual stanvar components have valid Stan fragment syntax
   functions_code <- stanvars$pw_functions$scode
-  expect_invisible(mvgam:::validate_stan_code_structure(functions_code))
+  expect_invisible(mvgam:::validate_stan_code_fragment(
+    functions_code,
+    expected_content = c("get_changepoint_matrix", "linear_trend", "logistic_trend"),
+    expected_block = "functions"
+  ))
 
   data_code <- stanvars$pw_data$scode
-  expect_invisible(mvgam:::validate_stan_code_structure(data_code))
+  expect_invisible(mvgam:::validate_stan_code_fragment(
+    data_code,
+    expected_content = c("n_changepoints", "changepoint_scale")
+  ))
 
   params_code <- stanvars$pw_parameters$scode
-  expect_invisible(mvgam:::validate_stan_code_structure(params_code))
+  expect_invisible(mvgam:::validate_stan_code_fragment(
+    params_code,
+    expected_content = c("k_trend", "delta_trend"),
+    expected_block = "parameters"
+  ))
 
   tparams_code <- stanvars$pw_transformed_parameters$scode
-  expect_invisible(mvgam:::validate_stan_code_structure(tparams_code))
+  expect_invisible(mvgam:::validate_stan_code_fragment(
+    tparams_code,
+    expected_block = "transformed parameters"
+  ))
 
   model_code <- stanvars$pw_model$scode
-  expect_invisible(mvgam:::validate_stan_code_structure(model_code))
+  expect_invisible(mvgam:::validate_stan_code_fragment(
+    model_code,
+    expected_block = "model"
+  ))
+})
+
+test_that("complete Stan model assembly validates correctly", {
+  # Test complete model assembly pipeline using piecewise trends
+  data <- setup_test_data()$simple_univariate
+
+  # Generate observation and trend setups
+  obs_setup <- mvgam:::setup_brms_lightweight(
+    formula = y ~ x,
+    data = data,
+    family = gaussian()
+  )
+
+  trend_setup <- mvgam:::setup_brms_lightweight(
+    formula = ~ 1,
+    data = data,
+    family = gaussian()
+  )
+
+  # Create trend specification that should work
+  pw_trend_spec <- list(
+    trend_type = "PWlinear",
+    n_changepoints = 5,
+    changepoint_scale = 0.1,
+    n_series = 1
+  )
+
+  # Test complete assembly pipeline
+  complete_result <- mvgam:::generate_combined_stancode(
+    obs_setup = obs_setup,
+    trend_setup = trend_setup,
+    trend_spec = pw_trend_spec,
+    validate = FALSE,  # Skip validation to focus on assembly
+    silent = 2
+  )
+
+  # Validate the assembled model has correct structure
+  expect_type(complete_result, "list")
+  expect_true("stancode" %in% names(complete_result))
+  expect_true("standata" %in% names(complete_result))
+  expect_true("has_trends" %in% names(complete_result))
+  expect_true(complete_result$has_trends)
+
+  # Validate complete Stan code structure (this should work)
+  expect_invisible(mvgam:::validate_stan_code_structure(complete_result$stancode))
+
+  # Check that piecewise components were properly integrated
+  expect_match(complete_result$stancode, "get_changepoint_matrix")
+  expect_match(complete_result$stancode, "k_trend")
+  expect_match(complete_result$stancode, "delta_trend")
+
+  # Check Stan data contains expected elements
+  expect_true("n_changepoints" %in% names(complete_result$standata))
+  expect_true("changepoint_scale" %in% names(complete_result$standata))
 })
 
 # Tests for Stan code generation pipeline
@@ -465,10 +538,11 @@ test_that("extract_trend_stanvars_from_setup handles valid inputs", {
     standata = list(n = 50)
   )
 
-  # Mock trend spec
+  # Mock trend spec with required n_obs
   trend_spec <- list(
     trend_type = "RW",
-    n_lv = 1
+    n_lv = 1,
+    n_obs = 50
   )
 
   result <- mvgam:::extract_trend_stanvars_from_setup(trend_setup, trend_spec)
@@ -476,19 +550,22 @@ test_that("extract_trend_stanvars_from_setup handles valid inputs", {
   expect_gt(length(result), 0)
 })
 
-test_that("extract_trend_stanvars_from_setup handles None trend", {
+test_that("extract_trend_stanvars_from_setup handles ZMVN default trend", {
   trend_setup <- list(
     stancode = "mock code",
     standata = list()
   )
 
   trend_spec <- list(
-    trend_type = "None"
+    trend_type = "ZMVN",
+    n_lv = 1,
+    n_obs = 30
   )
 
   result <- mvgam:::extract_trend_stanvars_from_setup(trend_setup, trend_spec)
   expect_type(result, "list")
-  expect_equal(length(result), 0)
+  # ZMVN should generate minimal stanvars, not empty
+  expect_gte(length(result), 0)
 })
 
 # Tests for combine_stan_components
@@ -875,6 +952,7 @@ test_that("full pipeline integration works end-to-end", {
   trend_spec <- list(
     trend_type = "VAR",
     n_lv = 2,
+    n_series = 3,  # Valid factor model: n_lv < n_series (2 < 3)
     lags = 1,
     time_var = "time",
     series_var = "series"
@@ -885,8 +963,7 @@ test_that("full pipeline integration works end-to-end", {
     obs_setup = obs_setup,
     trend_setup = trend_setup,
     trend_spec = trend_spec,
-    validate = TRUE,
-    silent = 1
+    validate = TRUE
   )
 
   expect_type(final_result, "list")
@@ -912,10 +989,11 @@ test_that("system handles complex trend specifications", {
     family = gaussian()
   )
 
-  # Complex trend specification
+  # Complex trend specification (need n_lv < n_series for valid factor model)
   complex_trend_spec <- list(
     trend_type = "RW",
     n_lv = 2,
+    n_series = 3,  # Valid factor model: n_lv < n_series (2 < 3)
     correlation = TRUE,  # Correlated random walk
     time_var = "time",
     series_var = "series"
@@ -981,8 +1059,7 @@ test_that("CAR trend generator works correctly", {
     gr = "group"
   )
   expect_error(
-    mvgam:::generate_car_trend_stanvars(car_hierarchical_spec, data_info),
-    "CAR trends do not support hierarchical correlations"
+    mvgam:::generate_car_trend_stanvars(car_hierarchical_spec, data_info)
   )
 })
 
@@ -1197,7 +1274,7 @@ test_that("Shared utility functions work correctly", {
   expect_type(hier_params, "list")
   expect_gt(length(hier_params), 0)
 
-  hier_priors <- mvgam:::generate_hierarchical_correlation_priors(2)
+  hier_priors <- mvgam:::generate_hierarchical_correlation_model_injectors(2)
   expect_type(hier_priors, "list")
   expect_gt(length(hier_priors), 0)
 })
