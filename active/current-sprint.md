@@ -28,6 +28,12 @@
 
 ### Phase 1: Testing Simple Models
 
+**0.1 Fix AR() parameter names and validations**
+- [ ] Ensure autoregressive coefficients follow the `ar{lag}_trend[]` convention
+- [ ] `ar` coefficients should be declared as arrays for all `AR()` and `CAR()` models for consistent extraction
+- [ ] Ensure `sigma` is changed to `sigma_trend`
+- [ ] Ensure discontinuous lag coefficients are properly supported (i.e. `AR(p = c(1, 12, 24))`
+
 **1.1 Univariate Model Testing**
 - [ ] Simple intercept models: `y ~ 1, trend_formula = ~ [TREND]()`
 - [ ] Covariate integration: `y ~ s(x1) + x2, trend_formula = ~ [TREND]()`
@@ -108,6 +114,7 @@
 - `R/stan_assembly.R` - Two-stage Stan assembly orchestration  
 - `R/brms_integration.R` - Enhanced brms setup and integration
 - `R/mvgam_core.R` - Fitting, dual-object system, multiple imputation
+- `R/validations.R` - Type checks and argument validations
 
 ## Next Phase Preview (Week 8+)
 **Post-Validation Priorities**:
