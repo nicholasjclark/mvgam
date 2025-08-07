@@ -1,3 +1,42 @@
+#' Evaluate an expression without printing output or messages
+#' @param expr expression to be evaluated
+#' @param type type of output to be suppressed (see ?sink)
+#' @param try wrap evaluation of expr in 'try' and
+#'   not suppress outputs if evaluation fails?
+#' @param silent actually evaluate silently?
+#' @noRd
+eval_silent <- function(
+  expr,
+  type = "output",
+  try = FALSE,
+  silent = TRUE,
+  ...
+) {
+  try <- as_one_logical(try)
+  silent <- as_one_logical(silent)
+  type <- match.arg(type, c("output", "message"))
+  expr <- substitute(expr)
+  envir <- parent.frame()
+  if (silent) {
+    if (try && type == "message") {
+      try_out <- try(utils::capture.output(
+        out <- eval(expr, envir),
+        type = type,
+        ...
+      ))
+      if (is_try_error(try_out)) {
+        # try again without suppressing error messages
+        out <- eval(expr, envir)
+      }
+    } else {
+      utils::capture.output(out <- eval(expr, envir), type = type, ...)
+    }
+  } else {
+    out <- eval(expr, envir)
+  }
+  out
+}
+
 #' Check if x is a try-error resulting from try()
 is_try_error <- function(x) {
   inherits(x, "try-error")
