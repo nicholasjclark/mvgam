@@ -284,20 +284,7 @@ generate_combined_stancode_and_data <- function(obs_setup, trend_setup,
 #' @noRd
 inject_trend_into_linear_predictor <- function(base_stancode, trend_spec, 
                                               trend_stanvars = NULL) {
-  
-  # This is a placeholder for the actual Stan code modification
-  # The real implementation would parse the Stan code and inject
-  # trend components at appropriate locations
-  
-  # For now, return base code with a comment indicating injection point
-  modified_code <- paste(
-    base_stancode,
-    "\n// TREND INJECTION POINT - TO BE IMPLEMENTED\n",
-    "// This is where trend components will be injected into the linear predictor\n",
-    sep = ""
-  )
-  
-  return(modified_code)
+ stop("This function is not yet operational")
 }
 
 #' Combine Stan Data from Observation and Trend Models
@@ -347,24 +334,7 @@ fit_mvgam_model <- function(stancode, standata, backend = "cmdstanr", ...) {
   
   # This is a placeholder for actual Stan fitting
   # Real implementation would use rstan or cmdstanr to fit the model
-  
-  # For now, create a mock fit object for development
-  mock_fit <- structure(
-    list(
-      stancode = stancode,
-      standata = standata,
-      backend = backend,
-      fit_time = Sys.time(),
-      # Add minimal stanfit structure for compatibility
-      sim = list(
-        pars_oi = c("b_Intercept", "sigma"),
-        algorithm = "sampling"
-      )
-    ),
-    class = "stanfit"
-  )
-  
-  return(mock_fit)
+  stop("This function is not yet operational")
 }
 
 # ==============================================================================
@@ -640,12 +610,7 @@ extract_trend_parameters <- function(combined_fit, mv_spec) {
 subset_stanfit_parameters <- function(stanfit, param_names) {
   # This is a placeholder - actual implementation would require
   # creating a new stanfit object with subset of parameters
-  # For now, return the original fit with metadata about subset
-  
-  subset_fit <- stanfit
-  attr(subset_fit, "mvgam_subset") <- param_names
-  
-  return(subset_fit)
+  stop("This function is not yet operational")
 }
 
 # ------------------------------------------------------------------------------
