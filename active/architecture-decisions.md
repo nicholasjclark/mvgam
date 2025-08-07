@@ -33,7 +33,7 @@ mvgam(
 mvgam(y ~ x1 + x2, data = data)
 mvgam(y ~ x1 + x2, trend_formula = NULL, data = data)
 
-# mvgam with default ZMVN() independent Gaussian latent states
+# mvgam with default ZMVN() multivariate Gaussian latent states
 mvgam(y ~ x1 + x2, trend_formula = ~ -1, data = data)
 mvgam(y ~ x1 + x2, trend_formula = ~ 1, data = data)
 
@@ -123,13 +123,13 @@ transformed parameters {
 - **Validation**: Only factor-compatible trend types can accept `n_lv` parameter
 - **Requirement**: `n_lv < n_series` (fewer latent variables than observed series)
 - **Compatible Trends**: AR, RW, VAR, ZMVN (including correlated and grouped variants)
-- **Incompatible Trends**: CAR (continuous time), PW (piecewise), None (no dynamics)
+- **Incompatible Trends**: CAR (continuous time), PW (piecewise)
 
 **Key Factor Model Requirements**:
 1. **Detection**: Factor models triggered by `n_lv < n_series` on compatible trend types
 2. **Validation**: Registry-based compatibility checking prevents invalid factor models
 3. **Variance Constraint**: Dynamic factor variances must be fixed to 1 for identifiability
-4. **Matrix Z Location**: Estimated in `parameters` block (factor model) vs `transformed data` (non-factor)
+4. **Matrix Z Location**: Estimated in `parameters` block (factor model) vs `transformed data` (non-factor), or supplied in 'data' block when trend mapping
 5. **Universal Computation**: All factor models use `trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[ytimes[i, s]]`; non-factor models use `trend[i, s] = dot_product(Z[s, :], LV[i, :]);`
 6. **Code Deduplication**: Shared utility functions ensure consistent patterns across trend types
 7. **Registration**: New trend types must explicitly declare factor compatibility in registry
@@ -147,40 +147,14 @@ transformed parameters {
 **Hierarchical Correlation Detection Logic**:
 - **Trigger**: Presence of `gr` parameter in trend specification (`trend_spec$gr != 'NA'`)
 - **Structure**: Global correlation + group-specific deviations with partial pooling
-- **Compatibility**: Works with both factor and non-factor models
+- **Compatibility**: Works with factor and non-factor models
 - **Universal Support**: AR, VAR, CAR, and ZMVN all use identical hierarchical patterns
 
 **Key Hierarchical Requirements**:
 1. **Support**: Some trends (AR, VAR, CAR, ZMVN) support hierarchical correlations
 2. **Code Deduplication**: Shared utility functions ensure consistent hierarchical patterns
 3. **Flexible Grouping**: Works with any unit variable (time, site, etc.) and grouping structure
-4. **Factor Compatibility**: Hierarchical correlations work with both factor and non-factor models
-5. **Partial Pooling**: Alpha parameter controls mixing between global and group-specific correlations
-
-**Custom Trend Template**:
-```r
-generate_custom_trend_stanvars <- function(trend_spec, data_info) {
-  # Extract parameters
-  n_lv <- trend_spec$n_lv %||% 1
-  n_series <- data_info$n_series %||% 1
-  is_factor_model <- !is.null(trend_spec$n_lv) && n_lv < n_series
-  
-  # Use shared utilities for consistent patterns
-  stanvars <- list()
-  stanvars <- c(stanvars, generate_matrix_z_stanvars(is_factor_model, n_lv, n_series))
-  
-  # Add custom trend-specific dynamics here
-  stanvars$custom_dynamics <- stanvar(...)
-  
-  # Use shared trend computation and priors
-  stanvars <- c(stanvars, generate_trend_computation_code(n_lv, n_series))
-  if (is_factor_model) {
-    stanvars <- c(stanvars, generate_factor_model_priors(is_factor_model, n_lv))
-  }
-  
-  return(stanvars)
-}
-```
+4. **Partial Pooling**: Alpha parameter controls mixing between global and group-specific correlations
 
 ## Validation Framework Principles
 
@@ -198,7 +172,7 @@ generate_custom_trend_stanvars <- function(trend_spec, data_info) {
 ## Performance Requirements
 
 ### 1. brms Setup Optimization
-**Decision**: Use `backend = "mock"` for lightweight brms setup (10-50x speedup)
+**Decision**: Use `backend = "mock"` for lightweight brms setup
 **Application**: All internal brms calls for stancode/standata generation
 
 ### 2. Registry Lookup Performance
@@ -251,18 +225,9 @@ PW(growth = 'logistic') # trend = 'PWlogistic'
 ZMVN()            # trend = 'ZMVN'
 ```
 
-**Implementation**: Registry compatibility layer handles both `trend` and legacy `trend_type` field names for backward compatibility during transition.
-
 ### 4. Variable Name Management Architecture
 
 **Critical Design Decision**: Store variable names in final mvgam object for clean downstream processing
-
-**Problem with Previous Approach**:
-- `implicit_vars` attributes were tracked through complex processing pipelines
-- Difficult to debug and maintain across validation, fitting, and post-processing
-- Made plotting and prediction functions complex to implement
-
-**New Clean Architecture**:
 ```r
 # Stored in final mvgam object
 variable_info = list(
@@ -282,17 +247,11 @@ variable_info = list(
 **Implementation Strategy**:
 - Validation functions use variable names from trend constructors
 - Final mvgam object stores complete variable mapping
-- Post-processing methods reference `variable_info` instead of hardcoded names
-- Eliminates need for `implicit_vars` attribute management entirely
+- Post-processing methods reference `variable_info`
 
 ### 5. Data Ordering Architecture
 
 **Critical Design Decision**: Explicit data ordering for Stan without data pollution
-
-**Problem with Previous Approach**:
-- Added index columns polluted the data structure
-- Ordering logic scattered across validation functions
-- Difficult to track data transformations through the pipeline
 
 **Clean Ordering Strategy**:
 - **Separation of Concerns**: Keep validation logic separate from ordering logic
@@ -300,12 +259,6 @@ variable_info = list(
 - **Explicit Stan Requirements**: Data must be ordered by series then time for efficient Stan computation
 - **Metadata Preservation**: Store ordering information separately for post-processing restoration
 - **Single Point of Truth**: One function responsible for Stan data ordering
-
-**Benefits**:
-- Clean data structures throughout the pipeline
-- Easy to trace and debug data transformations
-- Post-processing can restore original order using metadata
-- Works with any variable names from trend constructors
 
 ### 6. Data Validation System for Trends
 **Entry Point**: `validate_time_series_for_trends()` calls `validate_series_time()` using variable names from trend constructors  
