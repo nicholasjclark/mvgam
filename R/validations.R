@@ -1,42 +1,821 @@
+# Stan Code Structure and Syntax Validation Utilities
+# ===================================================
 
-#'@noRd
-validate_var_exists = function(
-  data,
-  variable,
-  type = 'factor',
-  name = 'data',
-  trend_char
-) {
-  if (trend_char != 'None') {
-    if (!exists(variable, data)) {
-      stop(
-        paste0('Variable "', variable, '" not found in ', name),
-        call. = FALSE
-      )
+#' Validate Stan Code Structure
+#'
+#' @description
+#' Validates that Stan code contains required blocks (data, parameters, model).
+#'
+#' @param stan_code Character string containing Stan model code
+#' @return Invisible TRUE if valid, stops with error if invalid
+#' @noRd
+validate_stan_code_structure <- function(stan_code) {
+  checkmate::assert_string(stan_code, min.chars = 1)
+
+  # Required Stan blocks
+  required_blocks <- c("data", "parameters", "model")
+
+  # Check for each required block
+  missing_blocks <- character(0)
+
+  for (block in required_blocks) {
+    # Pattern to match block declaration
+    block_pattern <- paste0("\\b", block, "\\s*\\{")
+
+    if (!grepl(block_pattern, stan_code, ignore.case = FALSE)) {
+      missing_blocks <- c(missing_blocks, block)
     }
+  }
 
-    if (type == 'num/int') {
-      if (!is.numeric(data[[variable]])) {
-        stop(
-          paste0(
-            'Variable "',
-            variable,
-            '" must be either numeric or integer type'
-          ),
-          call. = FALSE
-        )
-      }
-    }
+  if (length(missing_blocks) > 0) {
+    stop(insight::format_error(
+      "Missing required Stan block{?s}: {.field {missing_blocks}}",
+      "Stan models must contain data, parameters, and model blocks."
+    ))
+  }
 
-    if (type == 'factor') {
-      if (!is.factor(data[[variable]])) {
-        stop(
-          paste0('Variable "', variable, '" must be a factor type'),
-          call. = FALSE
-        )
+  invisible(TRUE)
+}
+
+#' Check if Braces are Balanced
+#'
+#' @description
+#' Checks if opening and closing braces are properly balanced in Stan code.
+#'
+#' @param stan_code Character string containing Stan model code
+#' @return Logical indicating whether braces are balanced
+#' @noRd
+are_braces_balanced <- function(stan_code) {
+  checkmate::assert_string(stan_code)
+
+  # Split into individual characters
+  chars <- unlist(strsplit(stan_code, "", fixed = TRUE))
+
+  # Track brace depth
+  depth <- 0
+
+  for (char in chars) {
+    if (char == "{") {
+      depth <- depth + 1
+    } else if (char == "}") {
+      depth <- depth - 1
+
+      # If depth goes negative, we have unmatched closing brace
+      if (depth < 0) {
+        return(FALSE)
       }
     }
   }
+
+  # Return TRUE only if depth is exactly 0 (all braces matched)
+  return(depth == 0)
+}
+
+#' Validate Stan Code Fragment
+#'
+#' @description
+#' Validates individual Stan code fragments (from stanvars) without requiring
+#' complete model structure. Checks syntax, braces, and basic content without
+#' enforcing the presence of all Stan blocks.
+#'
+#' @param fragment Character string containing Stan code fragment
+#' @param expected_content Optional character vector of strings expected in fragment
+#' @param expected_block Optional character string of expected block type ("functions", "data", etc.)
+#' @return Invisible TRUE if valid, stops with error if invalid
+#' @noRd
+validate_stan_code_fragment <- function(fragment, expected_content = NULL, expected_block = NULL) {
+  checkmate::assert_string(fragment, min.chars = 1)
+
+  # Basic syntax validation: check for balanced braces
+  if (!are_braces_balanced(fragment)) {
+    stop(insight::format_error(
+      "Stan code fragment has unbalanced braces.",
+      "Check for missing opening or closing braces in fragment."
+    ))
+  }
+
+  # Check for expected content if provided
+  if (!is.null(expected_content)) {
+    missing_content <- character(0)
+    for (content in expected_content) {
+      if (!grepl(content, fragment, fixed = TRUE)) {
+        missing_content <- c(missing_content, content)
+      }
+    }
+
+    if (length(missing_content) > 0) {
+      stop(insight::format_error(
+        "Stan code fragment missing expected content:",
+        paste(missing_content, collapse = ", "),
+        "Fragment may be incomplete or incorrectly generated."
+      ))
+    }
+  }
+
+  # Check for expected block declaration if provided
+  if (!is.null(expected_block)) {
+    block_pattern <- paste0(expected_block, "\\s*\\{")
+    if (!grepl(block_pattern, fragment)) {
+      stop(insight::format_error(
+        "Stan code fragment missing expected block: {.field {expected_block}}",
+        "Fragment should contain '{expected_block} {{' declaration."
+      ))
+    }
+  }
+
+  # Basic content validation: should not be just whitespace
+  if (nchar(trimws(fragment)) == 0) {
+    stop(insight::format_error(
+      "Stan code fragment is empty or contains only whitespace."
+    ))
+  }
+
+  invisible(TRUE)
+}
+
+# Comprehensive Stan Code Validation
+# ==================================
+
+#' Validate Combined Stan Code Result
+#'
+#' @description
+#' Performs comprehensive validation of a combined Stan code result including
+#' syntax checking, data-code compatibility, and structure validation.
+#'
+#' @param result List containing stancode, standata, and has_trends fields
+#' @param silent Logical indicating whether to suppress validation messages
+#' @return List with validation results (valid, syntax_valid, data_valid)
+#' @noRd
+validate_combined_stancode <- function(result, silent = FALSE) {
+  checkmate::assert_list(result, names = "named")
+  checkmate::assert_flag(silent)
+
+  # Initialize validation results
+  validation <- list(
+    valid = FALSE,
+    syntax_valid = FALSE,
+    data_valid = FALSE,
+    errors = character(0)
+  )
+
+  # Check required fields
+  required_fields <- c("stancode", "standata", "has_trends")
+  missing_fields <- setdiff(required_fields, names(result))
+
+  if (length(missing_fields) > 0) {
+    validation$errors <- c(validation$errors,
+                          paste("Missing required fields:",
+                                paste(missing_fields, collapse = ", ")))
+    return(validation)
+  }
+
+  # Validate Stan code syntax - let errors bubble up naturally
+  validate_stan_code_structure(result$stancode)
+  validate_stan_code(result$stancode)  # Use unified validation function
+  validation$syntax_valid <- TRUE
+
+  # Validate data-code compatibility - let errors bubble up naturally
+  validate_data_code_compatibility(result$stancode, result$standata)
+  validation$data_valid <- TRUE
+
+  # Overall validation status
+  validation$valid <- validation$syntax_valid && validation$data_valid
+
+  return(validation)
+}
+
+#' Validate Data-Code Compatibility
+#'
+#' @description
+#' Checks that all data variables declared in Stan code are present in standata
+#' and that data types are compatible.
+#'
+#' @param stan_code Character string containing Stan model code
+#' @param stan_data List containing Stan data
+#' @return Invisible TRUE if valid, stops with error if invalid
+#' @noRd
+validate_data_code_compatibility <- function(stan_code, stan_data) {
+  checkmate::assert_string(stan_code, min.chars = 1)
+  checkmate::assert_list(stan_data, names = "named")
+
+  # Extract data block from Stan code (split into lines first)
+  code_lines <- strsplit(stan_code, "\n")[[1]]
+  data_block <- extract_code_block(code_lines, "data")
+
+  # Parse variable declarations from data block
+  required_vars <- parse_data_declarations(data_block)
+
+  # Check that all required variables are present in stan_data
+  missing_vars <- setdiff(required_vars, names(stan_data))
+
+  if (length(missing_vars) > 0) {
+    stop(insight::format_error(
+      "Missing required data variables: {.field {missing_vars}}",
+      "Stan data block declares variables not provided in standata.",
+      "Add missing variables to standata or remove from Stan data block."
+    ))
+  }
+
+  invisible(TRUE)
+}
+
+#' Check Basic Semicolon Syntax in Stan Code
+#'
+#' @description
+#' Performs basic checks for missing semicolons in Stan variable declarations.
+#' This is a simplified check focusing on obvious syntax errors.
+#'
+#' @param stan_code Character string containing Stan model code
+#' @return Logical indicating whether semicolon syntax appears correct
+#' @noRd
+check_semicolon_syntax <- function(stan_code) {
+  checkmate::assert_string(stan_code)
+
+  # Extract code blocks that should have semicolon-terminated statements (split into lines first)
+  code_lines <- strsplit(stan_code, "\n")[[1]]
+  data_block <- extract_code_block(code_lines, "data")
+  param_block <- extract_code_block(code_lines, "parameters")
+
+  # Check each block for syntax issues
+  blocks_to_check <- list(
+    data = data_block,
+    parameters = param_block
+  )
+
+  for (block_name in names(blocks_to_check)) {
+    block_content <- blocks_to_check[[block_name]]
+
+    if (nchar(block_content) > 0) {
+      if (!check_block_semicolons(block_content)) {
+        return(FALSE)
+      }
+    }
+  }
+
+  return(TRUE)
+}
+
+#' Check Semicolons in a Stan Code Block
+#'
+#' @description
+#' Checks for missing semicolons in variable declarations within a Stan block.
+#'
+#' @param block_content Character string containing Stan block content
+#' @return Logical indicating whether semicolon syntax is correct
+#' @noRd
+check_block_semicolons <- function(block_content) {
+  checkmate::assert_string(block_content)
+
+  if (nchar(block_content) == 0) {
+    return(TRUE)
+  }
+
+  # Split into lines and clean up
+  lines <- strsplit(block_content, "\n")[[1]]
+  lines <- trimws(lines)
+  lines <- lines[nchar(lines) > 0]  # Remove empty lines
+  lines <- lines[!grepl("^//", lines)]  # Remove comment-only lines
+
+  for (line in lines) {
+    # Remove inline comments
+    line <- sub("//.*$", "", line)
+    line <- trimws(line)
+
+    if (nchar(line) == 0) next
+
+    # Skip lines that are just braces or control structures
+    if (grepl("^[{}]\\s*$", line)) next
+
+    # Check if line looks like a variable declaration or statement
+    # Basic pattern: looks like a type declaration or assignment
+    if (grepl("\\b(int|real|vector|matrix|array)\\b", line, ignore.case = FALSE) ||
+        grepl("\\w+\\s*[~=]", line)) {
+
+      # This line should end with a semicolon
+      if (!grepl(";\\s*$", line)) {
+        return(FALSE)
+      }
+    }
+  }
+
+  return(TRUE)
+}
+
+#' @noRd
+validate_stan_code <- function(stan_code, backend = "rstan", ...) {
+  checkmate::assert_string(stan_code)
+  checkmate::assert_choice(backend, c("rstan", "cmdstanr"))
+
+  # Handle empty string case - always error for empty code
+  if (nchar(stan_code) == 0) {
+    stop(insight::format_error(
+      "Empty Stan code provided.",
+      "Stan code must contain at least one character."
+    ))
+  }
+
+  # Primary validation using rstan::stanc() (most comprehensive and up-to-date)
+  if (backend == "rstan") {
+    if (!requireNamespace("rstan", quietly = TRUE)) {
+      stop(insight::format_error(
+        "Package {.pkg rstan} is required for Stan code validation.",
+        "Install rstan or use cmdstanr backend."
+      ))
+    }
+
+    # Always let rstan::stanc() errors show directly - no masking
+    rstan::stanc(model_code = stan_code, verbose = FALSE, ...)
+    invisible(TRUE)
+  } else {
+    # cmdstanr backend (fallback)
+    return(parse_model_cmdstanr(stan_code, ...))
+  }
+}
+
+
+#' Validate Stan Data Structure
+#'
+#' @description
+#' Validates that Stan data has proper structure and types.
+#'
+#' @param stan_data List containing Stan data
+#' @return Invisible TRUE if valid, stops/warns for issues
+#' @noRd
+validate_stan_data_structure <- function(stan_data) {
+  checkmate::assert_list(stan_data)
+
+  # Check for empty data
+  if (length(stan_data) == 0) {
+    stop(insight::format_error(
+      "Empty Stan data provided.",
+      "Stan models require at least some data elements."
+    ))
+  }
+
+  # Check data types (Stan expects numeric, integer, or array types)
+  valid_types <- c("numeric", "integer", "logical", "matrix", "array")
+
+  for (name in names(stan_data)) {
+    data_type <- class(stan_data[[name]])[1]
+
+    if (!data_type %in% valid_types && !is.numeric(stan_data[[name]])) {
+      insight::format_warning(
+        "Unexpected data type for Stan element '{name}': {data_type}",
+        "Stan typically expects numeric, integer, or matrix types."
+      )
+    }
+  }
+
+  invisible(TRUE)
+}
+
+#' Check if Object is Valid Stanvar
+#'
+#' @description
+#' Validates that an object has the structure expected for a brms stanvar.
+#'
+#' @param stanvar Object to validate
+#' @return Logical indicating whether object is a valid stanvar
+#' @noRd
+is_valid_stanvar <- function(stanvar) {
+  # Handle NULL input
+  if (is.null(stanvar)) {
+    return(FALSE)
+  }
+
+  # Must be a list
+  if (!is.list(stanvar)) {
+    return(FALSE)
+  }
+
+  # Check if it's a brms stanvar object (has required brms components)
+  required_components <- c("scode", "block")
+  if (!all(required_components %in% names(stanvar))) {
+    return(FALSE)
+  }
+
+  # scode must be character string (can be empty for data block stanvars)
+  if (!is.character(stanvar$scode) || length(stanvar$scode) != 1) {
+    return(FALSE)
+  }
+
+  # block must be valid Stan block name (brms uses abbreviated forms)
+  valid_blocks <- c("data", "tdata", "parameters", "tparameters",
+                   "model", "genquant",
+                   "transformed_data", "transformed_parameters", "generated_quantities")
+  if (!is.character(stanvar$block) || length(stanvar$block) != 1 ||
+      !stanvar$block %in% valid_blocks) {
+    return(FALSE)
+  }
+
+  return(TRUE)
+}
+
+#' Validate Trend Specification
+#'
+#' Checks if a trend specification is valid for code generation.
+#'
+#' @param trend_spec Trend specification object
+#' @return Logical indicating validity
+#' @noRd
+validate_trend_spec <- function(trend_spec) {
+  if (!is.list(trend_spec)) return(FALSE)
+  if (is.null(trend_spec$trend_type)) return(FALSE)
+  if (!trend_spec$trend_type %in% list_trend_types()$trend_type) return(FALSE)
+
+  TRUE
+}
+
+#' Validate Time Series Structure for Trends
+#'
+#' @description
+#' Ensures time series data is compatible with specified trend models.
+#' Leverages existing mvgam validation functions.
+#'
+#' @param data Data to validate (data.frame or list)
+#' @param trend_spec Trend specification containing trend model info
+#' @param silent Verbosity level
+#' @return Invisible TRUE if valid, stops with error if invalid
+#' @noRd
+validate_time_series_for_trends <- function(data, trend_spec, silent = 1) {
+  checkmate::assert_data_frame(data, min.rows = 1)
+  checkmate::assert_list(trend_spec)
+
+  # Use existing mvgam validation function
+  # Pass the complete trend_spec (mvgam_trend object) for variable names
+  validated_data <- validate_series_time(
+      data = data,
+      name = "data",
+      trend_model = trend_spec,
+      check_levels = TRUE,
+      check_times = TRUE
+    )
+  
+  # Additional brms-specific validations for time series
+  # Only validate temporal structure for trends that require it
+  if (trend_model %in% c("RW", "AR", "VAR")) {
+    check_regular_time_intervals(data, silent = silent)
+  }
+
+  if (silent < 2) {
+    message("Time series structure validated for trend model: ", trend_model)
+  }
+
+  invisible(TRUE)
+}
+
+#'Argument validation functions
+#'@param data Data to be validated (list or data.frame)
+#'@noRd
+validate_series_time = function(
+    data,
+    name = 'data',
+    trend_model,
+    check_levels = TRUE,
+    check_times = TRUE
+) {
+  # Extract variable names from the mvgam_trend object
+  time_var <- trend_model$time
+  series_var <- trend_model$series
+
+  # Now we only need the character trend_model string
+  trend_model_type <- trend_model$trend_model
+
+  # Validate any grouping structure
+  data <- validate_grouping_structure(
+    data = data,
+    trend_model = trend_model,
+    name = name
+  )
+
+  # brms only accepts data.frames, so validate that first
+  checkmate::assert_data_frame(data, .var.name = name)
+
+  # Ungroup any grouped data
+  data %>%
+    dplyr::ungroup() -> data
+
+  # Check that series variable exists and is a factor
+  if (!series_var %in% colnames(data)) {
+    stop(glue::glue("{name} does not contain a '{series_var}' variable"), call. = FALSE)
+  }
+
+  if (!is.factor(data[[series_var]])) {
+    stop(insight::format_error(
+      "Variable '{series_var}' must be a factor.",
+      "Convert to factor using: data${series_var} <- factor(data${series_var})"
+    ), call. = FALSE)
+  }
+
+  # Check for unused factor levels in series variable
+  data <- validate_factor_levels(data, series_var, name, auto_drop = FALSE)
+
+  # Check that time variable exists
+  if (!time_var %in% colnames(data)) {
+    stop(glue::glue("{name} does not contain a '{time_var}' variable"), call. = FALSE)
+  }
+
+  # Series factor must have all unique levels present if this is a
+  # forecast check
+  if (check_levels) {
+    if (!all(levels(data[[series_var]]) %in% unique(data[[series_var]]))) {
+      stop(
+        glue::glue(
+          'Mismatch between factor levels of "{series_var}" and unique values of "{series_var}"\n',
+          'Use\n  `setdiff(levels(data${series_var}), unique(data${series_var}))` \nand\n',
+          '  `intersect(levels(data${series_var}), unique(data${series_var}))`\nfor guidance'
+        ),
+        call. = FALSE
+      )
+    }
+  }
+
+  # Ensure each series has an observation, even if NA, for each
+  # unique timepoint (only for trend models that require discrete time with
+  # regularly spaced sampling intervals)
+  if (check_times) {
+    all_times_avail = function(time, min_time, max_time) {
+      identical(
+        as.numeric(sort(time)),
+        as.numeric(seq.int(from = min_time, to = max_time))
+      )
+    }
+    min_time <- as.numeric(min(data[[time_var]]))
+    max_time <- as.numeric(max(data[[time_var]]))
+    data.frame(series = data[[series_var]], time = data[[time_var]]) %>%
+      dplyr::group_by(series) %>%
+      dplyr::summarise(
+        all_there = all_times_avail(time, min_time, max_time)
+      ) -> checked_times
+    if (any(checked_times$all_there == FALSE)) {
+      stop(
+        "One or more series in ",
+        name,
+        " is missing observations for one or more timepoints",
+        call. = FALSE
+      )
+    }
+  }
+
+  return(data)
+}
+
+#' Validate Grouping Structure
+#'
+#' @description
+#' Validates that grouping variables (gr, subgr) exist, are factors, and have
+#' proper hierarchical structure for trend models that use grouping.
+#'
+#' @param data Data frame to validate
+#' @param trend_model mvgam_trend object with grouping specifications
+#' @param name Name of data object for error messages
+#' @return Original data (validation only, no transformation)
+#' @noRd
+validate_grouping_structure = function(data, trend_model, name = 'data') {
+  checkmate::assert_data_frame(data)
+
+  # Extract variable names from trend_model
+  gr_var <- if (!is.null(trend_model$gr) && trend_model$gr != 'NA') trend_model$gr else NULL
+  subgr_var <- if (!is.null(trend_model$subgr) && trend_model$subgr != 'NA') trend_model$subgr else NULL
+
+  # If no grouping is used, return early
+  if (is.null(gr_var) && is.null(subgr_var)) {
+    return(data)
+  }
+
+  # Validate grouping variables if they exist
+  if (!is.null(gr_var)) {
+    # Check gr variable exists and is factor
+    if (!gr_var %in% names(data)) {
+      stop(insight::format_error(
+        "{name} does not contain grouping variable '{gr_var}'.",
+        "The grouping variable '{gr_var}' was specified in the trend constructor but is missing from the data."
+      ), call. = FALSE)
+    }
+
+    if (!is.factor(data[[gr_var]])) {
+      stop(insight::format_error(
+        "Grouping variable '{gr_var}' must be a factor.",
+        "Convert to factor using: data${gr_var} <- factor(data${gr_var})"
+      ), call. = FALSE)
+    }
+
+    # Check for unused factor levels in gr variable
+    data <- validate_factor_levels(data, gr_var, name, auto_drop = FALSE)
+  }
+
+  if (!is.null(subgr_var)) {
+    # Check subgr variable exists and is factor
+    if (!subgr_var %in% names(data)) {
+      stop(insight::format_error(
+        "{name} does not contain subgrouping variable '{subgr_var}'.",
+        "The subgrouping variable '{subgr_var}' was specified in the trend constructor but is missing from the data."
+      ), call. = FALSE)
+    }
+
+    if (!is.factor(data[[subgr_var]])) {
+      stop(insight::format_error(
+        "Subgrouping variable '{subgr_var}' must be a factor.",
+        "Convert to factor using: data${subgr_var} <- factor(data${subgr_var})"
+      ), call. = FALSE)
+    }
+
+    # Check for unused factor levels in subgr variable
+    data <- validate_factor_levels(data, subgr_var, name, auto_drop = FALSE)
+  }
+
+  # If both gr and subgr are specified, validate hierarchical structure
+  if (!is.null(gr_var) && !is.null(subgr_var)) {
+    validate_complete_grouping(data, gr_var, subgr_var, name)
+  }
+
+  return(data)
+}
+
+#' Validate Factor Levels
+#'
+#' @description
+#' Checks for unused factor levels that could cause Stan indexing issues.
+#' Issues warnings for validation phase, allows auto-dropping in preparation phase.
+#'
+#' @param data Data frame containing the factor variable
+#' @param var_name Name of the factor variable to check
+#' @param data_name Name of the data object (for error messages)
+#' @param auto_drop Whether to automatically drop unused levels
+#' @return Modified data if auto_drop=TRUE, otherwise original data
+#' @noRd
+validate_factor_levels <- function(data, var_name, data_name = "data", auto_drop = FALSE) {
+  checkmate::assert_data_frame(data)
+  checkmate::assert_string(var_name)
+  checkmate::assert_flag(auto_drop)
+
+  if (!var_name %in% names(data)) {
+    return(data)  # Variable doesn't exist, will be caught elsewhere
+  }
+
+  if (!is.factor(data[[var_name]])) {
+    return(data)  # Not a factor, will be caught elsewhere
+  }
+
+  var_data <- data[[var_name]]
+  used_levels <- unique(var_data)
+  all_levels <- levels(var_data)
+  unused_levels <- setdiff(all_levels, used_levels)
+
+  if (length(unused_levels) > 0) {
+    if (auto_drop) {
+      # Auto-drop unused levels
+      data[[var_name]] <- droplevels(var_data)
+    } else {
+      # Warn about unused levels
+      rlang::warn(
+        message = insight::format_warning(
+          "Factor variable '{var_name}' in {data_name} has unused levels: {paste(unused_levels, collapse = ', ')}.",
+          "Consider using droplevels() to remove unused factor levels.",
+          "This may cause indexing issues in Stan model compilation."
+        ),
+        .frequency = "once"
+      )
+    }
+  }
+
+  return(data)
+}
+
+#' Validate Complete Grouping Structure
+#'
+#' @description
+#' For hierarchical models, checks that each level of the grouping variable
+#' contains observations for all levels of the subgrouping variable.
+#'
+#' @param data Data frame
+#' @param gr_var Name of the grouping variable
+#' @param subgr_var Name of the subgrouping variable
+#' @param data_name Name of the data object (for error messages)
+#' @return Invisible TRUE if valid, stops with error if invalid
+#' @noRd
+validate_complete_grouping <- function(data, gr_var, subgr_var, data_name = "data") {
+  checkmate::assert_data_frame(data)
+  checkmate::assert_string(gr_var)
+  checkmate::assert_string(subgr_var)
+
+  # Check that each level of gr contains all possible levels of subgr
+  grouping_summary <- data %>%
+    dplyr::group_by(!!rlang::sym(gr_var)) %>%
+    dplyr::summarise(
+      n_subgroups = dplyr::n_distinct(!!rlang::sym(subgr_var)),
+      .groups = "drop"
+    )
+
+  total_subgroups <- dplyr::n_distinct(data[[subgr_var]])
+
+  if (any(grouping_summary$n_subgroups != total_subgroups)) {
+    stop(insight::format_error(
+      "Incomplete grouping structure in {data_name}.",
+      "Some levels of '{gr_var}' do not contain all levels of '{subgr_var}'.",
+      "Each group must contain observations for all subgroups."
+    ), call. = FALSE)
+  }
+
+  invisible(TRUE)
+}
+
+#' Check Regular Time Intervals
+#'
+#' @description
+#' Ensures time series has regular sampling intervals for State-Space models.
+#'
+#' @param data Data to check
+#' @param silent Verbosity level
+#' @return Invisible TRUE if valid, stops with error if invalid
+#' @noRd
+check_regular_time_intervals <- function(data, silent = 1) {
+  if (!"time" %in% names(data)) {
+    return(invisible(TRUE))  # Will be caught by main validation
+  }
+
+  # Check for regular intervals within each series
+  if ("series" %in% names(data)) {
+    data %>%
+      dplyr::group_by(series) %>%
+      dplyr::summarise(
+        time_diffs = list(diff(sort(unique(time)))),
+        regular = length(unique(diff(sort(unique(time))))) <= 1,
+        .groups = "drop"
+      ) -> time_checks
+
+    irregular_series <- time_checks$series[!time_checks$regular]
+
+    if (length(irregular_series) > 0) {
+      stop(insight::format_error(
+        "Irregular time intervals detected in series: {paste(irregular_series, collapse = ', ')}",
+        "State-Space models require regular sampling intervals.",
+        "Consider using CAR models for irregular time series."
+      ))
+    }
+  } else {
+    # Single series case
+    time_diffs <- diff(sort(unique(data$time)))
+    if (length(unique(time_diffs)) > 1) {
+      stop(insight::format_error(
+        "Irregular time intervals detected in time series.",
+        "State-Space models require regular sampling intervals.",
+        "Time differences: {paste(unique(time_diffs), collapse = ', ')}"
+      ))
+    }
+  }
+
+  invisible(TRUE)
+}
+
+#' Validate Combined Stan Data
+#'
+#' @description
+#' Validates that combined Stan data is consistent and contains required elements.
+#'
+#' @param combined_data List of combined Stan data
+#' @param obs_data List of observation Stan data
+#' @param trend_data List of trend Stan data
+#' @return Invisible TRUE if valid, stops with error if invalid
+#' @noRd
+validate_combined_standata <- function(combined_data, obs_data, trend_data) {
+  checkmate::assert_list(combined_data, names = "named")
+  checkmate::assert_list(obs_data, names = "named")
+  checkmate::assert_list(trend_data, names = "named")
+
+  # Check that essential observation data elements are preserved
+  essential_obs <- c("N", "K", "y", "X")
+  missing_obs <- setdiff(essential_obs, names(combined_data))
+  missing_obs <- missing_obs[missing_obs %in% names(obs_data)]
+
+  if (length(missing_obs) > 0) {
+    stop(insight::format_error(
+      "Essential observation data elements missing from combined data:",
+      paste(missing_obs, collapse = ", ")
+    ))
+  }
+
+  # Check for dimensional consistency
+  if ("N" %in% names(combined_data) && "n" %in% names(combined_data)) {
+    if (combined_data$N != combined_data$n) {
+      insight::format_warning(
+        "Potential dimension mismatch between N ({combined_data$N}) and n ({combined_data$n}).",
+        "Check observation and trend data compatibility."
+      )
+    }
+  }
+
+  # Check that trend data makes sense
+  if ("n_series" %in% names(combined_data)) {
+    if (combined_data$n_series < 1) {
+      stop(insight::format_error(
+        "Invalid number of series: {combined_data$n_series}",
+        "Must be at least 1 for mvgam models."
+      ))
+    }
+  }
+
+  invisible(TRUE)
 }
 
 #'@noRd
@@ -87,264 +866,6 @@ validate_silent <- function(silent) {
     stop("'silent' must be between 0 and 2.", call. = FALSE)
   }
   silent
-}
-
-#'@importFrom rlang warn
-#'@noRd
-validate_family = function(family, use_stan = TRUE) {
-  if (is.character(family)) {
-    if (family == 'beta') {
-      family <- betar()
-    }
-
-    family <- try(eval(parse(text = family)), silent = TRUE)
-
-    if (inherits(family, 'try-error')) {
-      stop("family not recognized", call. = FALSE)
-    }
-  }
-
-  if (is.function(family)) {
-    family <- family()
-  }
-
-  if (is.null(family$family)) {
-    stop("family not recognized", call. = FALSE)
-  }
-
-  if (!inherits(family, 'family')) {
-    stop('family not recognized', call. = FALSE)
-  }
-
-  if (family$family == 'Beta regression') {
-    family$family <- 'beta'
-  }
-
-  if (family$family == 'tweedie') {
-    insight::check_if_installed(
-      "tweedie",
-      reason = 'to simulate from Tweedie distributions'
-    )
-  }
-
-  if (
-    !family$family %in% c('poisson', 'negative binomial', 'tweedie') & !use_stan
-  ) {
-    stop(
-      'JAGS only supports poisson(), nb() or tweedie() families',
-      call. = FALSE
-    )
-  }
-
-  # Stan cannot support Tweedie
-  if (use_stan & family$family == 'tweedie') {
-    stop('Tweedie family not supported for stan', call. = FALSE)
-  }
-
-  if (family$family %in% c('binomial', 'beta_binomial')) {
-    rlang::warn(
-      paste0(
-        "Binomial and Beta-binomial families require cbind(n_successes, n_trials)\n",
-        "in the formula left-hand side. Do not use cbind(n_successes, n_failures)!"
-      ),
-      .frequency = "once",
-      .frequency_id = 'cbind_binomials'
-    )
-  }
-  return(family)
-}
-
-#'@noRd
-validate_family_restrictions = function(response, family) {
-  response <- response[!is.na(response)]
-
-  # 0s and 1s only for Bernoulli
-  if (family$family == 'bernoulli') {
-    y <- response
-    nobs <- length(response)
-    weights <- rep(1, length(response))
-    eval(binomial()$initialize)
-  }
-
-  # 0s and 1s not allowed for Beta
-  if (family$family == 'beta') {
-    if (any(response <= 0)) {
-      stop('Values <= 0 not allowed for beta responses', call. = FALSE)
-    }
-    if (any(response >= 1)) {
-      stop('Values >= 1 not allowed for beta responses', call. = FALSE)
-    }
-  }
-
-  # negatives not allowed for several families
-  if (
-    family$family %in%
-      c('poisson', 'negative binomial', 'tweedie', 'binomial', 'beta_binomial')
-  ) {
-    if (any(response < 0)) {
-      stop(
-        paste0('Values < 0 not allowed for count family responses'),
-        call. = FALSE
-      )
-    }
-  }
-
-  # negatives and/or zeros not allowed for several families
-  if (family$family %in% c('lognormal', 'Gamma')) {
-    if (any(response <= 0)) {
-      stop(
-        paste0('Values <= 0 not allowed for ', family$family, ' responses'),
-        call. = FALSE
-      )
-    }
-  }
-}
-
-#'@noRd
-validate_trend_model = function(
-  trend_model,
-  drift = FALSE,
-  noncentred = FALSE,
-  warn = TRUE
-) {
-  if (inherits(trend_model, 'mvgam_trend')) {
-    ma_term <- if (trend_model$ma) {
-      'MA'
-    } else {
-      NULL
-    }
-    cor_term <- if (trend_model$cor) {
-      'cor'
-    } else {
-      NULL
-    }
-    if (is.null(trend_model$gr)) {
-      trend_model$gr <- 'NA'
-    }
-    if (trend_model$gr != 'NA') {
-      gr_term <- 'hier'
-    } else {
-      gr_term <- NULL
-    }
-    trend_model <- paste0(
-      trend_model$trend_model,
-      trend_model$p,
-      ma_term,
-      gr_term,
-      cor_term
-    )
-  } else {
-    if (trend_model != 'None' & warn) {
-      rlang::warn(
-        paste0(
-          "Supplying trend_model as a character string is deprecated\n",
-          "Please use the dedicated functions (i.e. RW() or ZMVN()) instead"
-        ),
-        .frequency = "once",
-        .frequency_id = 'trend_characters'
-      )
-    }
-  }
-
-  trend_model <- match.arg(arg = trend_model, choices = mvgam_trend_choices())
-
-  if (trend_model == 'VAR') {
-    trend_model <- 'VAR1'
-  }
-  if (trend_model == 'VARcor') {
-    trend_model <- 'VAR1cor'
-  }
-  if (trend_model == 'VARhiercor') {
-    trend_model <- 'VAR1hiercor'
-  }
-  if (trend_model %in% c('VARMA', 'VARMAcor')) {
-    trend_model <- 'VARMA1,1cor'
-  }
-
-  if (
-    !trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'CAR1') & noncentred
-  ) {
-    message('Non-centering of trends currently not available for this model')
-  }
-
-  if (trend_model %in% c('PWlinear', 'PWlogistic')) {
-    insight::check_if_installed(
-      "extraDistr",
-      reason = 'to simulate from piecewise trends'
-    )
-  }
-  return(trend_model)
-}
-
-#'@noRd
-validate_obs_formula = function(formula, data, refit = FALSE) {
-  if (attr(terms(formula), "response") == 0L) {
-    stop('response variable is missing from formula', call. = FALSE)
-  }
-
-  # Check that response terms are in the data; account for possible
-  # 'cbind' in there if this is a binomial model
-  resp_terms <- as.character(terms(formula(formula))[[2]])
-  if (length(resp_terms) == 1) {
-    out_name <- as.character(terms(formula(formula))[[2]])
-    if (!as.character(terms(formula(formula))[[2]]) %in% names(data)) {
-      stop(
-        paste0('variable ', terms(formula(formula))[[2]], ' not found in data'),
-        call. = FALSE
-      )
-    }
-  } else {
-    if (any(grepl('cbind', resp_terms))) {
-      resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
-      out_name <- resp_terms[1]
-      for (i in 1:length(resp_terms)) {
-        if (!resp_terms[i] %in% names(data)) {
-          stop(
-            paste0('variable ', resp_terms[i], ' not found in data'),
-            call. = FALSE
-          )
-        }
-      }
-    } else {
-      stop(
-        'Not sure how to deal with this response variable specification',
-        call. = FALSE
-      )
-    }
-  }
-
-  if (any(attr(terms(formula), 'term.labels') %in% 'y')) {
-    stop(
-      'due to internal data processing, "y" should not be used as the name of a predictor in mvgam',
-      call. = FALSE
-    )
-  }
-
-  # Add a y outcome for sending to the modelling backend
-  data$y <- data[[out_name]]
-
-  return(data)
-}
-
-#'@noRd
-validate_trend_formula = function(formula) {
-  if (!is.null(rlang::f_lhs(formula))) {
-    stop(
-      'Argument "trend_formula" should not have a left-hand side',
-      call. = FALSE
-    )
-  }
-
-  if (any(grepl('series', as.character(formula)))) {
-    stop(
-      'Argument "trend_formula" should not have the identifier "series" in it.\nUse "trend" instead for varying effects',
-      call. = FALSE
-    )
-  }
-
-  if (!is.null(attr(terms(formula(formula)), 'offset'))) {
-    stop('Offsets not allowed in argument "trend_formula"', call. = FALSE)
-  }
 }
 
 #'@noRd
@@ -456,79 +977,6 @@ validate_pos_integers = function(x) {
 }
 
 #'@noRd
-validate_predictors = function(object, newdata) {
-  # Check names of supplied variables against those required
-  # for prediction
-  required_vars <- insight::find_predictors(
-    object,
-    component = "all"
-  )$conditional
-  required_vars <- setdiff(
-    required_vars,
-    attr(object$obs_data, 'implicit_vars')
-  )
-
-  # If time and / or series were in original data but not used,
-  # there is no need for them in the newdata for models with
-  # no trend_model
-  if (!inherits(object$trend_model, 'mvgam_trend')) {
-    if (object$trend_model == 'None') {
-      # Find all predictor terms that were used by the model
-      obs_preds <- insight::find_predictors(
-        object$mgcv_model,
-        effects = 'all',
-        component = 'all',
-        flatten = TRUE
-      )
-
-      trend_preds <- vector()
-      if (!is.null(object$trend_call)) {
-        trend_preds <- insight::find_predictors(
-          object$trend_mgcv_model,
-          effects = 'all',
-          component = 'all',
-          flatten = TRUE
-        )
-
-        preds <- unique(c(obs_preds, trend_preds))
-      } else {
-        preds <- obs_preds
-      }
-
-      # If time and series not used as predictors, no need for them
-      # to be in required_vars
-      if ('time' %in% required_vars & !'time' %in% preds) {
-        required_vars <- setdiff(required_vars, 'time')
-      }
-
-      if (
-        'series' %in%
-          required_vars &
-          !'series' %in% preds &
-          (!object$use_lv | is.null(object$trend_call))
-      ) {
-        required_vars <- setdiff(required_vars, 'series')
-      }
-    }
-  }
-
-  if (length(required_vars)) {
-    if (any(required_vars %in% names(newdata) == FALSE)) {
-      stop(
-        paste0(
-          'the following required variables are missing from newdata:\n ',
-          paste(
-            required_vars[which(!required_vars %in% names(newdata))],
-            collapse = ', '
-          )
-        ),
-        call. = FALSE
-      )
-    }
-  }
-}
-
-#'@noRd
 validate_even <- function(x) {
   s <- substitute(x)
   x <- base::suppressWarnings(as.numeric(x))
@@ -547,488 +995,6 @@ validate_pos_real = function(x) {
 
   if (sign(x) != 1) {
     stop("Argument '", s, "' must be a positive real value", call. = FALSE)
-  }
-}
-
-#'@noRd
-validate_trendmap = function(trend_map, data_train, trend_model, use_stan) {
-  # Trend mapping not supported by JAGS
-  if (!use_stan) {
-    stop('trend mapping not available for JAGS', call. = FALSE)
-  }
-
-  # trend_map must have an entry for each unique time series
-  if (!all(sort(trend_map$series) == sort(unique(data_train$series)))) {
-    stop(
-      'Argument "trend_map" must have an entry for every unique time series in "data"',
-      call. = FALSE
-    )
-  }
-
-  # trend_map must not specify a greater number of trends than there are series
-  if (max(trend_map$trend) > length(unique(data_train$series))) {
-    stop(
-      'Argument "trend_map" specifies more latent trends than there are series in "data"',
-      call. = FALSE
-    )
-  }
-
-  # trend_map must not skip any trends, but can have zeros for some entries
-  drop_zero = function(x) {
-    x[x != 0]
-  }
-
-  if (
-    !all(
-      drop_zero(sort(unique(trend_map$trend))) == seq(1:max(trend_map$trend))
-    )
-  ) {
-    stop(
-      'Argument "trend_map" must link at least one series to each latent trend',
-      call. = FALSE
-    )
-  }
-
-  # series variable must be a factor with same levels as the series variable
-  # in the data
-  if (!is.factor(trend_map$series)) {
-    stop(
-      'trend_map$series must be a factor with levels matching levels of data$series',
-      call. = FALSE
-    )
-  }
-
-  if (!all(levels(trend_map$series) == levels(data_train$series))) {
-    stop(
-      'trend_map$series must be a factor with levels matching levels of data$series',
-      call. = FALSE
-    )
-  }
-}
-
-#'@noRd
-validate_trend_restrictions = function(
-  trend_model,
-  formula,
-  trend_formula,
-  trend_map,
-  drift = FALSE,
-  drop_obs_intercept = FALSE,
-  use_lv = FALSE,
-  n_lv,
-  data_train,
-  use_stan = TRUE,
-  priors = FALSE
-) {
-  # Assess whether additional moving average or correlated errors are needed
-  ma_cor_adds <- ma_cor_additions(trend_model)
-  list2env(ma_cor_adds, envir = environment())
-
-  if (length(unique(data_train$series)) == 1 & add_cor) {
-    warning(
-      'Correlated process errors not possible with only 1 series',
-      call. = FALSE
-    )
-    add_cor <- FALSE
-  }
-
-  # Some checks on general trend setup restrictions
-  if (!priors) {
-    if (trend_model %in% c('PWlinear', 'PWlogistic')) {
-      if (attr(terms(formula), 'intercept') == 1 & !drop_obs_intercept) {
-        warning(
-          paste0(
-            'It is difficult / impossible to estimate intercepts\n',
-            'and piecewise trend offset parameters. You may want to\n',
-            'consider dropping the intercept from the formula'
-          ),
-          call. = FALSE
-        )
-      }
-
-      if (use_lv) {
-        stop(
-          'Cannot estimate piecewise trends using dynamic factors',
-          call. = FALSE
-        )
-      }
-    }
-  }
-
-  if (use_lv & (add_ma | add_cor) & missing(trend_formula)) {
-    stop(
-      'Cannot estimate moving averages or correlated errors for dynamic factors',
-      call. = FALSE
-    )
-  }
-
-  if (use_lv & drift) {
-    warning(
-      'Cannot identify drift terms for this model\ninclude "time" as a fixed effect instead',
-      call. = FALSE
-    )
-    drift <- FALSE
-  }
-
-  if (drift && trend_model == 'CAR1') {
-    warning(
-      'Cannot identify drift terms for CAR models; setting "drift = FALSE"',
-      call. = FALSE
-    )
-    drift <- FALSE
-  }
-
-  if (
-    trend_model %in% c('VAR', 'VAR1', 'VAR1cor', 'VARMA1,1cor', 'GP') & drift
-  ) {
-    warning(
-      'Cannot identify drift terms for VAR or GP models; setting "drift = FALSE"',
-      call. = FALSE
-    )
-    drift <- FALSE
-  }
-
-  if (use_lv & trend_model == 'VAR1' & missing(trend_formula)) {
-    stop(
-      'Cannot identify dynamic factor models that evolve as VAR processes',
-      call. = FALSE
-    )
-  }
-
-  if (!use_stan & trend_model %in% c('GP', 'VAR1', 'PWlinear', 'PWlogistic')) {
-    stop(
-      'Gaussian Process, VAR and piecewise trends not supported for JAGS',
-      call. = FALSE
-    )
-  }
-
-  # Check trend formula and create the trend_map if missing
-  if (!missing(trend_formula)) {
-    validate_trend_formula(trend_formula)
-    if (missing(trend_map)) {
-      trend_map <- data.frame(
-        series = factor(
-          levels(data_train$series),
-          levels = levels(data_train$series)
-        ),
-        trend = 1:length(unique(data_train$series))
-      )
-    }
-
-    if (
-      !trend_model %in%
-        c('None', 'RW', 'AR1', 'AR2', 'AR3', 'VAR1', 'CAR1', 'ZMVN')
-    ) {
-      stop(
-        'only None, ZMVN, RW, AR1, AR2, AR3, CAR1 and VAR trends currently supported for trend predictor models',
-        call. = FALSE
-      )
-    }
-  }
-
-  # Check trend_map is correctly specified
-  if (!missing(trend_map)) {
-    validate_trendmap(
-      trend_map = trend_map,
-      data_train = data_train,
-      trend_model = trend_model,
-      use_stan = use_stan
-    )
-
-    # If trend_map correctly specified, set use_lv to TRUE for
-    # most models (but not yet for VAR models, which require additional
-    # modifications)
-    if (trend_model == 'VAR1') {
-      use_lv <- FALSE
-    } else {
-      use_lv <- TRUE
-    }
-    n_lv <- max(trend_map$trend)
-  }
-
-  # Number of latent variables cannot be greater than number of series
-  if (use_lv) {
-    if (missing(n_lv)) {
-      n_lv <- min(2, floor(length(unique(data_train$series)) / 2))
-    }
-    if (n_lv > length(unique(data_train$series))) {
-      stop('number of latent variables cannot be greater than number of series')
-    }
-  }
-
-  if (missing(trend_map)) {
-    trend_map <- NULL
-  }
-
-  if (missing(n_lv)) {
-    n_lv <- NULL
-  }
-
-  return(list(
-    trend_model = trend_model,
-    add_cor = add_cor,
-    add_ma = add_ma,
-    use_var1 = use_var1,
-    use_var1cor = use_var1cor,
-    use_lv = use_lv,
-    n_lv = n_lv,
-    trend_map = trend_map,
-    drift = drift
-  ))
-}
-
-#'@noRd
-check_priorsim = function(prior_simulation, data_train, orig_y, formula) {
-  # Fill y with NAs if this is a simulation from the priors
-  if (prior_simulation) {
-    data_train$y <- rep(NA, length(data_train$y))
-  } else {
-    data_train$y <- orig_y
-  }
-
-  # Fill response variable with original supplied values
-  resp_terms <- as.character(terms(formula(formula))[[2]])
-  if (length(resp_terms) == 1) {
-    out_name <- as.character(terms(formula(formula))[[2]])
-  } else {
-    if (any(grepl('cbind', resp_terms))) {
-      resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
-      out_name <- resp_terms[1]
-    }
-  }
-  data_train[[out_name]] <- orig_y
-
-  return(data_train)
-}
-
-#'@noRd
-check_gp_terms = function(formula, data_train, family) {
-  # Check for proper binomial specification
-  if (!missing(family)) {
-    if (is.character(family)) {
-      if (family == 'beta') {
-        family <- betar()
-      }
-
-      family <- try(eval(parse(text = family)), silent = TRUE)
-
-      if (inherits(family, 'try-error')) {
-        stop("family not recognized", call. = FALSE)
-      }
-    }
-
-    if (is.function(family)) {
-      family <- family()
-    }
-
-    if (family$family %in% c('binomial', 'beta_binomial')) {
-      # Check that response terms use the cbind() syntax
-      resp_terms <- as.character(terms(formula(formula))[[2]])
-      if (length(resp_terms) == 1) {
-        stop(
-          'Binomial family requires cbind() syntax in the formula left-hand side',
-          call. = FALSE
-        )
-      } else {
-        if (any(grepl('cbind', resp_terms))) {} else {
-          stop(
-            'Binomial family requires cbind() syntax in the formula left-hand side',
-            call. = FALSE
-          )
-        }
-      }
-    }
-  }
-
-  # Check for gp terms in the validated formula
-  orig_formula <- gp_terms <- gp_details <- NULL
-  if (any(grepl('gp(', attr(terms(formula), 'term.labels'), fixed = TRUE))) {
-    formula <- interpret_mvgam(
-      formula,
-      N = max(data_train$time),
-      family = family
-    )
-    orig_formula <- formula
-
-    # Keep intercept?
-    keep_intercept <- attr(terms(formula), 'intercept') == 1
-
-    # Indices of gp() terms in formula
-    gp_terms <- which_are_gp(formula)
-
-    # Extract attributes
-    gp_details <- get_gp_attributes(formula, data_train, family)
-
-    # Replace with s() terms so the correct terms are included
-    # in the model.frame
-    formula <- gp_to_s(formula, data_train, family)
-    if (!keep_intercept) formula <- update(formula, . ~ . - 1)
-  }
-
-  return(list(
-    orig_formula = orig_formula,
-    gp_terms = gp_terms,
-    formula = formula,
-    gp_details = gp_details
-  ))
-}
-
-#'@noRd
-check_obs_intercept = function(formula, orig_formula) {
-  # Check for missing rhs in formula
-  # If there are no terms in the observation formula (i.e. y ~ -1),
-  # we will use an intercept-only observation formula and fix
-  # the intercept coefficient at zero
-  drop_obs_intercept <- FALSE
-  if (
-    length(attr(terms(formula), 'term.labels')) == 0 &
-      !attr(terms(formula), 'intercept') == 1
-  ) {
-    formula_envir <- attr(formula, '.Environment')
-
-    if (length(attr(terms(formula), 'factors')) == 0) {
-      resp <- as.character(attr(terms(formula), 'variables'))[2]
-    } else {
-      resp <- dimnames(attr(terms(formula), 'factors'))[[1]][1]
-    }
-
-    if (!is.null(attr(terms(formula(formula)), 'offset'))) {
-      formula <- formula(paste0(
-        resp,
-        ' ~ ',
-        paste(gsub(' - 1', ' + 1', rlang::f_text(formula)))
-      ))
-    } else {
-      formula <- formula(paste(resp, '~ 1'))
-    }
-    attr(formula, '.Environment') <- formula_envir
-    drop_obs_intercept <- TRUE
-  }
-
-  if (is.null(orig_formula)) {
-    orig_formula <- formula
-  }
-
-  return(list(
-    orig_formula = orig_formula,
-    formula = formula,
-    drop_obs_intercept = drop_obs_intercept
-  ))
-}
-
-#'@noRd
-check_nmix = function(
-  family,
-  family_char,
-  trend_formula,
-  trend_model,
-  trend_map,
-  data_train,
-  priors = FALSE
-) {
-  # Check for N-mixture modifications
-  add_nmix <- FALSE
-  nmix_trendmap <- TRUE
-  if (family_char == 'nmix') {
-    if (!(exists('cap', where = data_train))) {
-      stop(
-        'Max abundances must be supplied as a variable named "cap" for N-mixture models',
-        call. = FALSE
-      )
-    }
-
-    add_nmix <- TRUE
-    if (!priors) {
-      family <- poisson()
-      family_char <- 'poisson'
-      if (missing(trend_formula)) {
-        stop('Argument "trend_formula" required for nmix models', call. = FALSE)
-      }
-    }
-
-    if (!missing(trend_map)) {
-      nmix_trendmap <- TRUE
-    }
-    use_lv <- TRUE
-    if (trend_model == 'None') {
-      trend_model <- 'RW'
-    }
-  }
-
-  return(list(
-    trend_model = trend_model,
-    add_nmix = add_nmix,
-    nmix_trendmap = nmix_trendmap,
-    family = family,
-    family_char = family_char
-  ))
-}
-
-#'@noRd
-validate_threads = function(family_char, threads) {
-  if (
-    threads > 1 &
-      !family_char %in%
-        c(
-          'poisson',
-          'negative binomial',
-          'gaussian',
-          'lognormal',
-          'beta',
-          'student',
-          'Gamma'
-        )
-  ) {
-    warning(
-      'multithreading not yet supported for this family; setting threads = 1'
-    )
-    threads <- 1
-  }
-  return(threads)
-}
-
-#'@noRd
-find_jags = function(jags_path) {
-  if (!requireNamespace('runjags', quietly = TRUE)) {
-    stop('runjags library is required but not found', call. = FALSE)
-  }
-
-  if (missing(jags_path)) {
-    requireNamespace('runjags', quietly = TRUE)
-    jags_path <- runjags::findjags()
-  }
-
-  # Code borrowed from the runjags package
-  jags_status <- runjags::testjags(jags_path, silent = TRUE)
-  if (!jags_status$JAGS.available) {
-    if (jags_status$os == "windows") {
-      Sys.sleep(0.2)
-      jags_status <- runjags::testjags(jags_path, silent = TRUE)
-    }
-
-    if (!jags_status$JAGS.available) {
-      cat(
-        "Unable to call JAGS using '",
-        jags_path,
-        "'\nTry specifying the path to the JAGS binary as jags_path argument, or re-installing the rjags package.\nUse the runjags::testjags() function for more detailed diagnostics.\n",
-        sep = ""
-      )
-      stop(
-        "Unable to call JAGS.\nEither use the Stan backend or follow examples in ?mvgam to generate data / model files and run outside of mvgam",
-        call. = FALSE
-      )
-    }
-  }
-}
-
-#'@noRd
-find_stan = function() {
-  if (!requireNamespace('rstan', quietly = TRUE)) {
-    warning('rstan library not found; checking for cmdstanr library')
-
-    if (!requireNamespace('cmdstanr', quietly = TRUE)) {
-      stop('cmdstanr library not found', call. = FALSE)
-    }
   }
 }
 
