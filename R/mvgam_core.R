@@ -601,7 +601,9 @@ extract_trend_parameters <- function(combined_fit, mv_spec) {
   trend_patterns <- c(
     "^trend",        # Trend states
     "^sigma_trend",  # Trend innovations
-    "^phi_trend",    # AR/VAR coefficients
+    "^ar_trend",     # AR coefficients
+    "^A_trend",      # VAR coefficients
+    "^theta_trend",  # MA coefficients
     "^mu_trend",     # Trend linear predictors
     "^L_trend",      # Cholesky factors for correlations
     "^rho_trend"     # Correlation parameters
