@@ -1,3 +1,403 @@
+#' Validate trend components for conflicts
+#'
+#' Checks for conflicting trend specifications like multiple dynamic factor models
+#' or incompatible correlation structures using brms-inspired validation patterns.
+#'
+#' @param trend_components List of trend components to validate
+#'
+#' @noRd
+validate_trend_components <- function(trend_components) {
+  
+  # Check for multiple trend types - only one trend type allowed per formula
+  if (length(trend_components) > 1) {
+    trend_types <- sapply(trend_components, function(x) x$trend_type)
+    stop(insight::format_error(
+      "Multiple trend types detected in single formula.",
+      paste("Found:", paste(trend_types, collapse = ", ")),
+      "Only one trend constructor is allowed per trend_formula.",
+      "Use separate models or combine into a single trend type."
+    ))
+  }
+
+  # Check for multiple dynamic factor models
+  n_lv_models <- sum(sapply(trend_components, function(x) !is.null(x$n_lv) && x$n_lv > 0))
+  if (n_lv_models > 1) {
+    stop(insight::format_error(
+      "Multiple dynamic factor models specified.",
+      "Only one trend component can have {.field n_lv > 0}.",
+      "Consider combining factor structures or removing one factor model."
+    ))
+  }
+
+  # Check for conflicting correlation structures
+  cor_settings <- sapply(trend_components, function(x) x$cor %||% FALSE)
+  if (any(cor_settings) && !all(cor_settings)) {
+    insight::format_warning(
+      "Mixed correlation settings detected.",
+      "Some trend components have correlation enabled while others don't.",
+      "This may lead to unexpected interactions."
+    )
+  }
+
+  invisible(NULL)
+}
+                         
+#' Validate trend order parameter
+#'
+#' Standardized validation for trend order parameters (p). Provides consistent
+#'   error messages across trend types.
+#'
+#' @param p Order parameter to validate
+#' @param max_order Maximum allowed order for this trend type
+#' @param trend_type Name of trend type for error messages
+#'
+#' @noRd
+validate_trend_order <- function(p, max_order, trend_type) {
+  checkmate::assert_int(p, lower = 1, upper = max_order)
+
+  if (p > max_order) {
+    insight::format_error(
+      "{.field {trend_type}} order too high.",
+      "You specified {.field p = {p}} but maximum allowed is {.field {max_order}}.",
+      "Please reduce the order or consider a different trend type."
+    )
+  }
+}
+
+#' Validate grouping arguments for trend constructors
+#'
+#' Validates and processes gr and subgr arguments with consistent error handling.
+#'   Handles the logic for hierarchical groupings and series creation.
+#'
+#' @param gr Grouping variable (as character from deparse0)
+#' @param subgr Subgrouping variable (as character from deparse0)
+#'
+#' @return List with validated gr and subgr values
+#' @noRd
+validate_time_variable <- function(time, data = NULL) {
+  # Default to 'time' if NA specified (like brms)
+  if (time == 'NA') {
+    time <- 'time'
+  }
+
+  # If data is provided, validate that time variable exists and is appropriate
+  if (!is.null(data)) {
+    checkmate::assert_data_frame(data)
+
+    if (!time %in% names(data)) {
+      stop(insight::format_error(
+        "Time variable {.field {time}} not found in data.",
+        "Available variables: {.field {paste(names(data), collapse = ', ')}}.",
+        "Please specify a valid time variable or ensure your data contains a 'time' column."
+      ), call. = FALSE)
+    }
+
+    time_var <- data[[time]]
+    if (!is.numeric(time_var) && !is.integer(time_var)) {
+      stop(insight::format_error(
+        "Time variable {.field {time}} must be numeric or integer.",
+        "Found type: {.field {class(time_var)[1]}}.",
+        "Time series models require ordered numeric time indices."
+      ), call. = FALSE)
+    }
+
+    # Warning for non-standard time variable names
+    if (time != 'time') {
+      rlang::warn(
+        insight::format_warning(
+          "Using {.field {time}} as time variable instead of 'time'.",
+          "This follows brms conventions for flexible time variable naming."
+        ),
+        .frequency = "once",
+        .frequency_id = paste0("mvgam_custom_time_var_", time)
+      )
+    }
+  }
+
+  return(time)
+}
+
+warn_default_time_variable <- function() {
+  rlang::warn(
+    insight::format_warning(
+      "Using default time variable 'time'.",
+      "Specify {.field time = your_time_var} if your time variable has a different name."
+    ),
+    .frequency = "once",
+    .frequency_id = "mvgam_default_time_var"
+  )
+}
+
+warn_default_series_variable <- function() {
+  rlang::warn(
+    insight::format_warning(
+      "Using default series variable 'series'.",
+      "Specify {.field series = your_series_var} if your series variable has a different name."
+    ),
+    .frequency = "once",
+    .frequency_id = "mvgam_default_series_var"
+  )
+}
+
+validate_series_variable <- function(series, data = NULL) {
+  # Default to 'series' if NA specified (like mvgam convention)
+  if (series == 'NA') {
+    series <- 'series'
+  }
+
+  # If data is provided, validate that series variable exists and is appropriate
+  if (!is.null(data)) {
+    checkmate::assert_data_frame(data)
+
+    if (!series %in% names(data)) {
+      stop(insight::format_error(
+        "Series variable {.field {series}} not found in data.",
+        "Available variables: {.field {paste(names(data), collapse = ', ')}}.",
+        "Please specify a valid series variable or ensure your data contains a 'series' column."
+      ), call. = FALSE)
+    }
+
+    series_var <- data[[series]]
+    if (!is.character(series_var) && !is.factor(series_var)) {
+      stop(insight::format_error(
+        "Series variable {.field {series}} must be character or factor.",
+        "Found type: {.field {class(series_var)[1]}}.",
+        "Series identifiers should be categorical variables."
+      ), call. = FALSE)
+    }
+
+    # Warning for non-standard series variable names
+    if (series != 'series') {
+      rlang::warn(
+        insight::format_warning(
+          "Using {.field {series}} as series variable instead of 'series'.",
+          "This follows mvgam conventions for flexible series variable naming."
+        ),
+        .frequency = "once",
+        .frequency_id = paste0("mvgam_custom_series_var_", series)
+      )
+    }
+  }
+
+  return(series)
+}
+
+validate_grouping_arguments <- function(gr, subgr) {
+
+  # Set default subgr if no grouping specified
+  if (gr == 'NA') {
+    subgr <- 'series'
+  }
+
+  # Validate hierarchical grouping requirements
+  if (gr != 'NA') {
+    if (subgr == 'NA') {
+      insight::format_error(
+        'Hierarchical grouping requires subgrouping specification.',
+        'You specified {.field gr = "{gr}"} but {.field subgr = NA}.',
+        'Please provide a valid subgrouping variable.'
+      )
+    } else if (subgr == 'series') {
+      insight::format_error(
+        'Invalid subgrouping for hierarchical models.',
+        'You cannot use {.field subgr = "series"} with {.field gr = "{gr}"}.',
+        'The series variable is created internally from gr and subgr.'
+      )
+    }
+  }
+
+  return(list(gr = gr, subgr = subgr))
+}
+
+#' Validate correlation requirements
+#'
+#' Checks and auto-corrects correlation settings for hierarchical models.
+#'   Issues one-time warnings when auto-correction occurs.
+#'
+#' @param gr Grouping variable
+#' @param cor Correlation setting
+#'
+#' @return Corrected correlation setting (logical)
+#' @noRd
+validate_correlation_requirements <- function(gr, cor) {
+  if (gr != 'NA' && !cor) {
+    rlang::warn(
+      insight::format_warning(
+        "Hierarchical grouping specified without correlation.",
+        "Setting {.field cor = TRUE} automatically for {.field gr = '{gr}'}."
+      ),
+      .frequency = "once",
+      .frequency_id = "mvgam_hierarchical_correlation"
+    )
+    return(TRUE)  # Force cor = TRUE
+  }
+  return(cor)
+}
+
+#' Check if object is a mvgam trend
+#'
+#' Tests whether an object is a valid mvgam trend specification.
+#'
+#' @param x Object to test
+#' @return Logical indicating if x is a mvgam trend
+#' @export
+is.mvgam_trend <- function(x) {
+  inherits(x, "mvgam_trend")
+}
+
+#' @noRd
+validate_trend <- function(trend_obj, ...) {
+
+  # Basic validation
+  checkmate::assert_class(trend_obj, "mvgam_trend")
+  checkmate::assert_string(trend_obj$trend, min.chars = 1)
+
+  # Optional components validation (only if present)
+  if (!is.null(trend_obj$tpars)) {
+    checkmate::assert_character(trend_obj$tpars)  # Allow empty tpars for trends with no trend-specific parameters
+  }
+
+  if (!is.null(trend_obj$forecast_fun)) {
+    checkmate::assert_string(trend_obj$forecast_fun, min.chars = 1)
+  }
+
+  if (!is.null(trend_obj$stancode_fun)) {
+    checkmate::assert_string(trend_obj$stancode_fun, min.chars = 1)
+  }
+
+  if (!is.null(trend_obj$bounds)) {
+    checkmate::assert_list(trend_obj$bounds)
+  }
+
+  if (!is.null(trend_obj$characteristics)) {
+    checkmate::assert_list(trend_obj$characteristics)
+  }
+
+  # Dynamic factor model constraints (only if n_lv is present)
+  if (!is.null(trend_obj$n_lv)) {
+    validate_dynamic_factor_constraints(trend_obj)
+  }
+
+  return(trend_obj)
+}
+
+#' Validate dynamic factor model constraints
+#'
+#' Checks identifiability constraints for dynamic factor models (n_lv > 0).
+#'   Uses insight for user-friendly error messages and rlang for session
+#'   warnings.
+#'
+#' @param trend_obj A trend object to validate
+#'
+#' @noRd
+validate_dynamic_factor_constraints <- function(trend_obj) {
+
+  n_lv <- trend_obj$n_lv
+
+  # Check if this is a dynamic factor model
+  if (!is.null(n_lv) && n_lv > 0) {
+
+    # Validate n_lv parameter
+    checkmate::assert_int(n_lv, lower = 1, upper = 20)
+
+    # Constraint 1: No groupings allowed with dynamic factors
+    if (trend_obj$gr != 'NA') {
+      insight::format_error(
+        "Dynamic factor models cannot use hierarchical groupings.",
+        "You specified {.field n_lv = {n_lv}} and {.field gr = '{trend_obj$gr}'}.",
+        "The factor structure provides the grouping mechanism.",
+        "Please set {.field gr = 'NA'} or remove {.field n_lv}."
+      )
+    }
+
+    if (trend_obj$subgr != 'series') {
+      insight::format_error(
+        "Dynamic factor models cannot use custom subgroupings.",
+        "You specified {.field n_lv = {n_lv}} and {.field subgr = '{trend_obj$subgr}'}.",
+        "The factor structure handles series relationships.",
+        "Please use {.field subgr = 'series'} or remove {.field n_lv}."
+      )
+    }
+
+    # Constraint 2: No moving average terms allowed
+    if (trend_obj$ma) {
+      insight::format_error(
+        "Dynamic factor models cannot include moving average terms.",
+        "You specified {.field n_lv = {n_lv}} and {.field ma = TRUE}.",
+        "MA terms create identifiability issues with factor structures.",
+        "Please set {.field ma = FALSE} or remove {.field n_lv}."
+      )
+    }
+
+    # Constraint 3: Trend type must support factors
+    supports_factors <- trend_obj$param_info$characteristics$supports_factors %||%
+                       trend_obj$characteristics$supports_factors %||%
+                       FALSE
+    if (!supports_factors) {
+      insight::format_error(
+        "Trend type {.field {trend_obj$trend}} does not support dynamic factor models.",
+        "You specified {.field n_lv = {n_lv}} with an incompatible trend type.",
+        "Supported trend types: {.field RW}, {.field AR}, {.field VAR}."
+      )
+    }
+
+    # One-time warning about variance constraints
+    rlang::warn(
+      insight::format_warning(
+        "Dynamic factor model detected ({.field n_lv = {n_lv}}).",
+        "Trend variance will be fixed for identifiability.",
+        "Factor loadings provide the primary source of variation."
+      ),
+      .frequency = "once",
+      .frequency_id = "mvgam_dynamic_factor_variance"
+    )
+  }
+
+  # Additional constraint: Groupings require correlation
+  if (trend_obj$gr != 'NA' && !trend_obj$cor) {
+    insight::format_error(
+      "Hierarchical groupings require correlation structure.",
+      "You specified {.field gr = '{trend_obj$gr}'} but {.field cor = FALSE}.",
+      "Please set {.field cor = TRUE} when using groupings."
+    )
+  }
+}
+
+#' Validate Factor Model Compatibility
+#'
+#' @description
+#' Check if a trend specification is compatible with factor models.
+#'
+#' @param trend_spec Trend specification object
+#' @return Invisibly returns TRUE if compatible, stops with error if not
+#' @noRd
+validate_factor_compatibility <- function(trend_spec) {
+  # Only validate if n_lv is specified (indicating factor model intent)
+  if (is.null(trend_spec$n_lv)) {
+    return(invisible(TRUE))
+  }
+
+  # Check if trend type supports factor models
+  # Handle both trend_type and trend field names for compatibility
+  trend_type <- trend_spec$trend_type %||% trend_spec$trend
+  if (is.null(trend_type)) {
+    stop(insight::format_error(
+      "trend_spec must contain {.field trend_type} or {.field trend} field"
+    ))
+  }
+  trend_info <- get_trend_info(trend_type)
+
+  if (!trend_info$supports_factors) {
+    stop(insight::format_error(
+      paste0("Factor models ({.field n_lv}) not supported for {.field ", trend_type, "} trends."),
+      trend_info$incompatibility_reason,
+      paste0("Remove {.field n_lv} parameter or use factor-compatible trends: {.val ", paste(get_factor_compatible_trends(), collapse = ", "), "}")
+    ))
+  }
+
+  invisible(TRUE)
+}
+
 # Stan Code Structure and Syntax Validation Utilities
 # ===================================================
 
