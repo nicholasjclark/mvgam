@@ -595,35 +595,6 @@ has_series_component <- function(stanvars) {
   return(FALSE)
 }
 
-#' Check if Stanvars Have Correlation Component
-#'
-#' @description
-#' Checks if stanvars contain correlation/covariance components.
-#'
-#' @param stanvars List of stanvar objects
-#' @return Logical indicating presence of correlation components
-#' @noRd
-has_correlation_component <- function(stanvars) {
-  checkmate::assert_list(stanvars)
-
-  # Look for correlation-related patterns in stanvar code
-  corr_patterns <- c("cov_matrix", "corr_matrix", "Sigma", "correlation", "covariance")
-
-  for (stanvar in stanvars) {
-    if (is_valid_stanvar(stanvar)) {
-      scode <- stanvar$scode
-
-      for (pattern in corr_patterns) {
-        if (grepl(pattern, scode)) {
-          return(TRUE)
-        }
-      }
-    }
-  }
-
-  return(FALSE)
-}
-
 # Integration Support Utilities
 # =============================
 
