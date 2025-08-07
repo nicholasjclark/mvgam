@@ -34,6 +34,7 @@
 - [ ] Consolidate `generate_rw_trend_stanvars()` and `generate_rw_dynamics()`
 - [ ] Standardize names for hierarchical injectors (some use `generate_hierarchical_correlation_*`, others use `generate_hierarchical_*`)
 - [ ] `combine_stn_components()` is never called, only in out-dated tests. Consider removing
+- [ ] Update trend pattern checks in `validate_obs_formula_brms()` to avoid using hard-coded trend patterns (these should respect whatever trend types are available)
 
 **1.1 Univariate Model Testing**
 - [ ] Simple intercept models: `y ~ 1, trend_formula = ~ [TREND]()`
