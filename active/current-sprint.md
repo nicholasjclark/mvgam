@@ -123,4 +123,4 @@
 - User extension system documentation and examples
 - Performance optimization based on benchmarking results
 - Advanced edge case handling (complex missing data patterns)
-- Real-world model fitting validation with large datasets
+- Real-world model fitting validation with large datasets: update `fit_mvgam_model()` to actually fit models
