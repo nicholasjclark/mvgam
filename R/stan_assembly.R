@@ -2275,7 +2275,7 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
       name = "var_hierarchical_params",
       scode = glue::glue("
         // VAR coefficient matrices for each lag
-        array[{lags}] matrix[n_lv_trend, n_lv_trend] A;
+        array[{lags}] matrix[n_lv_trend, n_lv_trend] A_trend;
         // Latent states
         matrix[n_trend, n_lv_trend] LV;
       "),
@@ -2300,7 +2300,7 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
             for (t in ({lags}+1):n_trend) {{
               vector[{n_subgroups}] mu = rep_vector(0, {n_subgroups});
               for (lag in 1:{lags}) {{
-                mu += A[lag] * LV[t-lag, :]';
+                mu += A_trend[lag] * LV[t-lag, :]';
               }}
               to_vector(LV[group_unit_indices[i, g], t]) ~ multi_normal_cholesky(mu, L_Omega_group[g]);
             }}
@@ -2309,7 +2309,7 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
 
         // VAR coefficient priors
         for (lag in 1:{lags}) {{
-          to_vector(A[lag]) ~ normal(0, 0.5);
+          to_vector(A_trend[lag]) ~ normal(0, 0.5);
         }}
       "),
       block = "model"
@@ -2350,14 +2350,14 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
           for (t in ({lags}+1):n_trend) {{
             vector[n_lv_trend] mu = rep_vector(0, n_lv_trend);
             for (lag in 1:{lags}) {{
-              mu += A[lag] * LV[t-lag, :]';
+              mu += A_trend[lag] * LV[t-lag, :]';
             }}
             LV[t, :] ~ multi_normal(mu', Omega);
           }}
 
           // Priors for factor model
           for (lag in 1:{lags}) {{
-            to_vector(A[lag]) ~ normal(0, 0.5);
+            to_vector(A_trend[lag]) ~ normal(0, 0.5);
           }}
           Omega ~ lkj_corr(2);
         }}
@@ -2373,7 +2373,7 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
           // VAR coefficient matrices for each lag
           array[{lags}] matrix[n_lv_trend, n_lv_trend] A;
           // Innovation covariance matrix
-          cov_matrix[n_lv_trend] Sigma;
+          cov_matrix[n_lv_trend] Sigma_trend;
           // Latent states
           matrix[n_trend, n_lv_trend] LV;
         }}
@@ -2390,16 +2390,16 @@ generate_var_trend_stanvars <- function(trend_spec, data_info) {
           for (t in ({lags}+1):n_trend) {{
             vector[n_lv_trend] mu = rep_vector(0, n_lv_trend);
             for (lag in 1:{lags}) {{
-              mu += A[lag] * LV[t-lag, :]';
+              mu += A_trend[lag] * LV[t-lag, :]';
             }}
-            LV[t, :] ~ multi_normal(mu', Sigma);
+            LV[t, :] ~ multi_normal(mu', Sigma_trend);
           }}
 
           // Priors for non-factor model
           for (lag in 1:{lags}) {{
-            to_vector(A[lag]) ~ normal(0, 0.5);
+            to_vector(A_trend[lag]) ~ normal(0, 0.5);
           }}
-          Sigma ~ inv_wishart(n_lv_trend + 1, diag_matrix(rep_vector(1, n_lv_trend)));
+          Sigma_trend ~ inv_wishart(n_lv_trend + 1, diag_matrix(rep_vector(1, n_lv_trend)));
         }}
         "),
         block = "model"
@@ -2560,7 +2560,7 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
           // AR coefficients for each latent variable
           matrix[n_lv_trend, {lags}] phi;
           // Innovation standard deviations
-          vector<lower=0>[n_lv_trend] sigma;
+          vector<lower=0>[n_lv_trend] sigma_trend;
           // Latent states
           matrix[n_trend, n_lv_trend] LV;
         }}
@@ -2580,13 +2580,13 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
               for (lag in 1:{lags}) {{
                 mu += phi[j, lag] * LV[t-lag, j];
               }}
-              LV[t, j] ~ normal(mu, sigma[j]);
+              LV[t, j] ~ normal(mu, sigma_trend[j]);
             }}
           }}
 
           // Priors for non-factor model
           to_vector(phi) ~ normal(0, 0.5);
-          sigma ~ student_t(3, 0, 2.5);
+          sigma_trend ~ student_t(3, 0, 2.5);
         }}
         "),
         block = "model"
@@ -2727,7 +2727,7 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
   vector<lower=-1,upper=1>[n_lv_trend] ar1;
 
   // latent state SD terms
-  vector<lower=0>[n_lv_trend] sigma;
+  vector<lower=0>[n_lv_trend] sigma_trend;
 
   // raw latent states
   matrix[n_trend, n_lv_trend] LV_raw;"),
@@ -2742,7 +2742,7 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
   matrix[n_trend, n_lv_trend] LV;
 
   // Apply continuous-time AR evolution
-  LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
+  LV = LV_raw .* rep_matrix(sigma_trend', rows(LV_raw));
 
   for (j in 1 : n_lv_trend) {{
     LV[1, j] += mu_trend[ytimes_trend[1, j]];
@@ -2764,7 +2764,7 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
     scode = "
   // CAR priors
   ar1 ~ std_normal();
-  sigma ~ exponential(3);
+  sigma_trend ~ exponential(3);
   to_vector(LV_raw) ~ std_normal();",
     block = "model"
   )
