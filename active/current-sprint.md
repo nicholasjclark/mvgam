@@ -33,6 +33,7 @@
 - [ ] Ensure all generators explicitly state the name of the block they are injecting into, unless they inject into multiple blocks (`generate_innovation_priors` should be `generate_innovation_model`, for example)
 - [ ] Consolidate `generate_rw_trend_stanvars()` and `generate_rw_dynamics()`
 - [ ] Standardize names for hierarchical injectors (some use `generate_hierarchical_correlation_*`, others use `generate_hierarchical_*`)
+- [ ] `combine_stn_components()` is never called, only in out-dated tests. Consider removing
 
 **1.1 Univariate Model Testing**
 - [ ] Simple intercept models: `y ~ 1, trend_formula = ~ [TREND]()`
