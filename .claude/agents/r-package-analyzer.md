@@ -1,6 +1,6 @@
 ---
 name: r-package-analyzer
-description: Invoked for deep analysis of R package internals during refactoring/wrapper development. Triggers: "how does [package] handle", "internal API structure", "extension points", "implementation patterns", "wrapper opportunities", "package evolution". NOT invoked for general R help, package selection, installation issues, or new code development. Agent examines GitHub repositories and maintains analysis continuity via context storage.
+description: Use proactively to carry out deep analysis of R package internals during refactoring/wrapper development. Triggers: "how does [package] handle", "internal API structure", "extension points", "implementation patterns", "wrapper opportunities", "package evolution". NOT invoked for general R help, package selection, installation issues, or new code development. Agent examines GitHub repositories and maintains analysis continuity via context storage.
 tools: gh, mcp__context7, web_search
 color: purple
 ---
