@@ -11,6 +11,7 @@
 - brms generates linear predictors (`mu`, `mu_trend`) from two formulae
 - Stan models from two brmsfit objects (using `backend = "mock"`) are combined to contain observation + trend components
 - Combined Stan model passed to Stan for joint estimation
+- IMPORTANT: This is a complete overhaul. Avoid backward compatibility unless specifically requested by the user
 
 ### 2. Formula-Centric Interface Design
 **Decision**: Extend brms formula syntax with `trend_formula` parameter  
