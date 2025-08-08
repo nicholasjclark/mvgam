@@ -33,8 +33,8 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 **S3 Type System**: Uses S3 for structured objects to support method inheritance and specialization
 
 **Layered Architecture Pattern**:
-- Interface Layer: User-facing functions (`mvgam()`, `forecast()`, `predict()`, `plot()`) provide clean APIs
-- Model Specification Layer: Formula processing with special trend model constructors (`RW()`, `VAR()`, `CAR()`), family definitions
+- Interface Layer: User-facing functions provide clean APIs
+- Model Specification Layer: Formula processing with special trend model constructors
 - Code Generation Layer: Translates R specifications into brms code to build initial Stan models and data, then extends these with custom trend and factor additions
 - Computational Backend Layer: Interfaces with Stan for sampling
 - Post-processing Layer: S3 methods for analysis, diagnostics, and visualization
@@ -46,45 +46,8 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - Inference: Parameter summarization, uncertainty quantification
 - Prediction: Forecasting with proper uncertainty propagation
 - Evaluation: Cross-validation, scoring rules, model comparison
-
-## Key Files
-
-### Core Model Functions
-- `R/mvgam.R` - Main model fitting function:
-  - Validates and processes brms-compatible formulas for observation and trend processes
-  - Sets up Stan model code generation
-  - Runs MCMC sampling and returns fitted model objects
-
-- Trend model constructors in `R/mvgam_trend_types.R`:
-  - Define temporal dynamics and point to forecasting cpp functions
-  - Provide user support to add new trend types with higher dispatch
   
-- Trend Stan code injection generators in `R/trend_injection_generators.R`:
-  - Dispatch functions that generate Stan code for specified trend types
-  
-- Full Stan code generation in `R/stan_assembly.R`:
-  - Two-stage Stan code assembly system with validation
-
-### Prediction & Forecasting
-- `R/forecast.mvgam.R` - Generates in-sample and out-of-sample forecasts
-  - Returns structured forecast objects with uncertainty quantification
-
-- `R/predict.mvgam.R` - General prediction treating trends as random effects
-
-- `src/trend_funs.cpp` - Rcpp source code for trend forecasting
-  
-### Visualization Suite
-- `R/plot.mvgam.R` - Main plotting method with multiple types:
-  - Series plots, residual diagnostics, smooth functions, forecasts
-  - Calls specialized plotting functions
-
-### Model Analysis
-- `R/summary.mvgam.R` - Parameter estimates and convergence diagnostics
-- `R/ppc.mvgam.R` - Posterior predictive checks using bayesplot
-- `R/residuals.mvgam.R` - Dunn-Smyth residuals for model checking
-- `R/loo.mvgam.R` - Approximate leave-one-out cross-validation
-  
-### Continuous Integration
+## Continuous Integration
 - `.github/workflows/` - CI/CD with R CMD check, pkgdown building and valgrind memory check
 
 ## Development Notes
@@ -94,7 +57,7 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - **Test File Organization**: Always add new tests to existing test files rather than creating separate files, unless absolutely necessary for clarity
 - When proposing new tests, first check existing test file names and add to the most appropriate existing file
 - Prioritize internal objects (i.e. `mvgam:::mvgam_example1`) for testing, where appropriate
-- DO NOT write replacement functions just so that tests can pass. Please update existing functions appropriately in light of any test warnings or failures
+- DO NOT write replacement functions just so tests can pass. Please update existing functions appropriately in light of any test warnings or failures
 - DO NOT use `try()` or `tryCatch()` and `skip()` within tests
 - DO NOT insert placeholder functions or use `try()` / `tryCatch()` within functions to mask errors or warnings
 
