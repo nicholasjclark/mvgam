@@ -1,6 +1,6 @@
 ---
 name: r-test-runner
-description: Invoked when specific test files need to be executed and analyzed. Triggers: "run tests", "execute testthat", "check test file", "test results", "run test suite". NOT invoked for writing tests, debugging code, or suggesting fixes. Agent runs `Rscript -e "devtools::load_all();testthat::test_file(path/to/test)"`, parses outputs, and provides structured summaries of results, errors, and warnings without overwhelming context windows.
+description: Use proactively when specific test files need to be executed and analyzed. Triggers: "run tests", "execute testthat", "check test file", "test results", "run test suite". NOT invoked for writing tests, debugging code, or suggesting fixes. Agent runs `Rscript -e "devtools::load_all();testthat::test_file(path/to/test)"`, parses outputs, and provides structured summaries of results, errors, and warnings without overwhelming context windows.
 tools: Read, Write, Bash
 color: green
 ---
