@@ -1,6 +1,6 @@
 ---
 name: r-docs-reviewer
-description: Invoked for R code documentation review on specific files during git commits. Triggers: "review docs for [file.R]", "check documentation [specific files]", "roxygen audit [file list]", "docs compliance [changed files]". NOT invoked for project-wide documentation audits, writing new documentation, or general R help. Agent audits specified R files against Tidyverse style standards.
+description: Always call this agent to initiate R code documentation review when instructed to make git commits. Triggers: "review docs for [file.R]", "check documentation [specific files]", "roxygen audit [file list]", "docs compliance [changed files]". NOT invoked for project-wide documentation audits, writing new documentation, or general R help. Agent audits specified R files against Tidyverse style and documentation completeness standards.
 tools: Read, Grep, mcp__context7
 color: green
 ---
