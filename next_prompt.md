@@ -8,18 +8,20 @@ We have just completed fixing a critical stanvars class structure issue where ou
 
 ## Your Task
 
-**IMPORTANT: This is a PLANNING ONLY task. Do NOT write any code. Focus on analysis and planning.**
+Please follow these steps sequentially:
 
 1. **Read and analyze these files in order:**
    - `active/current-sprint.md` - Contains the critical issues section with test results
    - `active/architecture-decisions.md` - Contains design principles and naming conventions
    - `R/stan_assembly.R` - The main Stan code assembly pipeline
+   - `R/mvgam_core.R` - The main user-facing function for defining models
 
 2. **Use thinking/reasoning to analyze:**
    - The formula interface and how trend constructors are called and validated
    - The flow of stanvar objects through the combination pipeline
+   - The merging of trend and observation data and model objects
 
-3. **Create a focused implementation plan that addresses any immediate action points highlighted in `active/current-sprint.md`**
+3. **Create a five-step implementation plan to address any immediate action points highlighted in `active/current-sprint.md`**. Use natural language to describe the plan, not code examples.
 
 If any of these tasks are ambiguous or unclear to you, please ask me targeted questions so that we can come up with a robust plan together.
 
