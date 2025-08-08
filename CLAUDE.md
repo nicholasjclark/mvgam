@@ -1,7 +1,3 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Package Overview
 
 mvgam is an R package for fitting, plotting and interpreting Bayesian Multivariate State-Space Models.
@@ -53,20 +49,15 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 ## Development Notes
 
 ### Testing Strategy
-- Please prioritize test-driven development
+- After updating any logic, check whether existing unit tests need to be updated. If so, update them
 - **Test File Organization**: Always add new tests to existing test files rather than creating separate files, unless absolutely necessary for clarity
 - When proposing new tests, first check existing test file names and add to the most appropriate existing file
-- Prioritize internal objects (i.e. `mvgam:::mvgam_example1`) for testing, where appropriate
-- DO NOT write replacement functions just so tests can pass. Please update existing functions appropriately in light of any test warnings or failures
-- DO NOT use `try()` or `tryCatch()` and `skip()` within tests
-- DO NOT insert placeholder functions or use `try()` / `tryCatch()` within functions to mask errors or warnings
-
-### Code Organization
-- Provider files should follow consistent naming patterns
-- Utility functions should be grouped by purpose (`utils-*.R`)
+- DO NOT write wrapper functions to fix failing tests
+- DO NOT use `try()`, `tryCatch()` or `skip()` within tests
+- DO NOT insert placeholder functions or use `try()` / `tryCatch()` within functions to address test errors or warnings
 
 ### Documentation
-- Roxygen2 comments for all functions
+- Use roxygen2 tags for all functions
 - Vignettes demonstrate in-depth use cases
 - pkgdown site provides comprehensive documentation
 - README provides a high level overview of package goals and major functions
@@ -74,8 +65,9 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 
 ### Code Style and Formatting
 - Apply tidyverse styling (https://style.tidyverse.org/) for all R and roxygen code
-- **Line Length**: Maximum 80 characters per line for readability
+- **Line Length**: Maximum 80 characters per line
 - **Roxygen Documentation**: Use 2-space indentation for continuation lines
+- When commenting complex logic, add above line `# Reason` comment explaining the why, not just the what
 - **Comment Style**: Use sentence case, avoid ALL CAPS in comments
 - **Function Names**: Use snake_case
 
@@ -92,12 +84,10 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - Use `{.field parameter_name}` for parameter highlighting
 - Include suggested solutions in error messages
 - Provide context about why constraints exist
-- Use consistent terminology
 
 ### Export Guidelines
 - Only export functions that users directly need
 - Keep validation and utility functions internal (`@noRd`)
-- Use clear, simple descriptions without excessive technical references
 
 ### .Rbuildignore Management
 - Update `.Rbuildignore` immediately when creating new spec files:
@@ -123,9 +113,13 @@ Brief description of changes (50 chars max)
 - Why the change was necessary  
 - Any important implementation notes
 ```
-- Please do not mention Claude as a co-author or include links to Claude Code in messages
+- Do not mention Claude as a co-author or include links to Claude Code in messages
 
 ### Pre-commit Workflow
 1. Check git status to understand current changes
 2. Stage appropriate files with clear understanding of what's being committed
 3. Write commit messages explaining changes
+
+### AI Behavior Rules
+- **Never assume missing context. Ask questions if uncertain**
+- **Never hallucinate libraries or functions** – only use known, verified R packages
