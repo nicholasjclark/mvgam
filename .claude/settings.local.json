@@ -12,7 +12,8 @@
       "Bash(find:*)",
       "Bash(grep:*)",
       "Bash(mv:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(tree:*)"
     ],
     "deny": []
   }
