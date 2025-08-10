@@ -139,8 +139,6 @@ transformed parameters {
 
 **Design Principle**: Eliminate redundant code to simplify custom trend development
 
-**Shared Utility Functions** (`R/stan_assembly.R`)
-
 ### 6. Hierarchical Correlation Architecture
 
 **Design Principle**: Some trends (AR, VAR, CAR, ZMVN) support hierarchical correlations with groups and subgroups
