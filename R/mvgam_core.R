@@ -1,9 +1,9 @@
 # ==============================================================================
 # MVGAM CORE: Enhanced Model Fitting and Multiple Imputation Support
 # ==============================================================================
-# This file consolidates the core mvgam fitting architecture, dual-object 
-# system, and multiple imputation capabilities. The single-fit dual-object 
-# architecture enables seamless brms ecosystem integration while preserving 
+# This file consolidates the core mvgam fitting architecture, dual-object
+# system, and multiple imputation capabilities. The single-fit dual-object
+# architecture enables seamless brms ecosystem integration while preserving
 # mvgam-specific State-Space modeling functionality.
 
 # ------------------------------------------------------------------------------
@@ -28,10 +28,10 @@
 #' @param ... Additional arguments passed to Stan fitting
 #' @return mvgam object with dual brmsfit-like structure
 #' @export
-mvgam_enhanced <- function(formula, trend_formula = NULL, data = NULL, 
+mvgam_enhanced <- function(formula, trend_formula = NULL, data = NULL,
                            backend = getOption("brms.backend", "cmdstanr"),
                            combine = TRUE, family = poisson(), ...) {
-  
+
   # Input validation
   checkmate::assert_formula(formula)
   checkmate::assert(
@@ -41,18 +41,18 @@ mvgam_enhanced <- function(formula, trend_formula = NULL, data = NULL,
   )
   checkmate::assert_character(backend, len = 1)
   checkmate::assert_logical(combine, len = 1)
-  
+
   # Handle multiple imputation input
   if (is.list(data) && !is.data.frame(data)) {
     if (combine) {
-      return(mvgam_multiple(formula, trend_formula, data, backend, 
+      return(mvgam_multiple(formula, trend_formula, data, backend,
                            combine = TRUE, ...))
     } else {
-      return(mvgam_multiple(formula, trend_formula, data, backend, 
+      return(mvgam_multiple(formula, trend_formula, data, backend,
                            combine = FALSE, ...))
     }
   }
-  
+
   # Single dataset processing
   mvgam_object <- mvgam_single_dataset(
     formula = formula,
@@ -62,7 +62,7 @@ mvgam_enhanced <- function(formula, trend_formula = NULL, data = NULL,
     family = family,
     ...
   )
-  
+
   return(mvgam_object)
 }
 
@@ -81,17 +81,17 @@ mvgam_enhanced <- function(formula, trend_formula = NULL, data = NULL,
 #' @param ... Additional arguments
 #' @return mvgam object
 #' @noRd
-mvgam_single_dataset <- function(formula, trend_formula, data, backend, 
+mvgam_single_dataset <- function(formula, trend_formula, data, backend,
                                 family, ...) {
-  
+
   # Parse multivariate trends and validate
   mv_spec <- parse_multivariate_trends(formula, trend_formula)
-  
+
   # Validate formula compatibility with brms
   if (!is.null(trend_formula)) {
     validate_autocor_separation(formula, trend_formula)
   }
-  
+
   # Setup observation model using lightweight brms
   obs_setup <- setup_brms_lightweight(
     formula = formula,
@@ -99,7 +99,7 @@ mvgam_single_dataset <- function(formula, trend_formula, data, backend,
     family = family,
     ...
   )
-  
+
   # Setup trend model if trends are specified
   trend_setup <- if (mv_spec$has_trends) {
     setup_brms_lightweight(
@@ -111,22 +111,16 @@ mvgam_single_dataset <- function(formula, trend_formula, data, backend,
   } else {
     NULL
   }
-  
-  # Extract trend stanvars from trend setup
-  trend_stanvars <- if (!is.null(trend_setup)) {
-    extract_trend_stanvars_from_setup(trend_setup, mv_spec)
-  } else {
-    NULL
-  }
-  
-  # Generate combined Stan code and data
+
+  # Note: Legacy trend stanvar extraction removed - modern system handles this automatically in generate_combined_stancode()
+
+  # Generate combined Stan code and data using modern system
   combined_components <- generate_combined_stancode_and_data(
     obs_setup = obs_setup,
     trend_setup = trend_setup,
-    mv_spec = mv_spec,
-    trend_stanvars = trend_stanvars
+    mv_spec = mv_spec
   )
-  
+
   # Fit the combined model
   combined_fit <- fit_mvgam_model(
     stancode = combined_components$stancode,
@@ -134,7 +128,7 @@ mvgam_single_dataset <- function(formula, trend_formula, data, backend,
     backend = backend,
     ...
   )
-  
+
   # Create mvgam object from combined fit
   mvgam_object <- create_mvgam_from_combined_fit(
     combined_fit = combined_fit,
@@ -142,7 +136,7 @@ mvgam_single_dataset <- function(formula, trend_formula, data, backend,
     trend_setup = trend_setup,
     mv_spec = mv_spec
   )
-  
+
   return(mvgam_object)
 }
 
@@ -152,79 +146,9 @@ mvgam_single_dataset <- function(formula, trend_formula, data, backend,
 # Extracts and generates trend-specific stanvars to enable proper injection
 # into the combined Stan model while maintaining compatibility with brms.
 
-#' Extract Trend Stanvars from Setup
-#' @param trend_setup brms setup for trends
-#' @param mv_spec Multivariate specification
-#' @return List of stanvars for trend components
-#' @noRd
-extract_trend_stanvars_from_setup <- function(trend_setup, mv_spec) {
-  checkmate::assert_list(trend_setup, names = "named")
-  checkmate::assert_list(mv_spec, names = "named")
-  
-  # Extract stanvars from trend setup
-  base_stanvars <- trend_setup$stanvars %||% list()
-  
-  # Add trend-specific stanvars based on specifications
-  trend_stanvars <- generate_trend_stanvars(mv_spec)
-  
-  # Combine base and trend-specific stanvars
-  combined_stanvars <- c(base_stanvars, trend_stanvars)
-  
-  return(combined_stanvars)
-}
-
-#' Generate Trend-Specific Stanvars
-#' @param mv_spec Multivariate specification
-#' @return List of stanvars for trend implementations
-#' @noRd
-generate_trend_stanvars <- function(mv_spec) {
-  if (!mv_spec$has_trends || is.null(mv_spec$trend_specs)) {
-    return(list())
-  }
-  
-  trend_stanvars <- list()
-  
-  # Generate stanvars for each trend specification
-  for (resp_name in names(mv_spec$trend_specs)) {
-    trend_spec <- mv_spec$trend_specs[[resp_name]]
-    
-    if (inherits(trend_spec, "mvgam_trend")) {
-      # Generate stanvars based on trend type
-      trend_type_stanvars <- generate_trend_type_stanvars(trend_spec, 
-                                                         resp_name)
-      trend_stanvars <- c(trend_stanvars, trend_type_stanvars)
-    }
-  }
-  
-  return(trend_stanvars)
-}
-
-#' Generate Stanvars for Specific Trend Type
-#' @param trend_spec Single trend specification
-#' @param resp_name Response name for this trend
-#' @return List of stanvars
-#' @noRd
-generate_trend_type_stanvars <- function(trend_spec, resp_name) {
-  trend_type <- trend_spec$trend_type
-  trend_pars <- trend_spec$pars
-  
-  stanvars <- list()
-  
-  # Generate stanvars based on trend type
-  if (trend_type == "RW") {
-    stanvars <- generate_rw_stanvars(trend_pars, resp_name)
-  } else if (trend_type == "AR") {
-    stanvars <- generate_ar_stanvars(trend_pars, resp_name)
-  } else if (trend_type == "VAR") {
-    stanvars <- generate_var_stanvars(trend_pars, resp_name)
-  } else if (trend_type == "GP") {
-    stanvars <- generate_gp_stanvars(trend_pars, resp_name)
-  } else if (trend_type == "CAR") {
-    stanvars <- generate_car_stanvars(trend_pars, resp_name)
-  }
-  
-  return(stanvars)
-}
+# Note: Legacy trend stanvar generation functions have been removed.
+# The modern system in stan_assembly.R using generate_trend_injection_stanvars()
+# provides the same functionality with better integration.
 
 # ------------------------------------------------------------------------------
 # COMBINED STAN CODE GENERATION
@@ -233,88 +157,32 @@ generate_trend_type_stanvars <- function(trend_spec, resp_name) {
 # Stan program while maintaining separate parameterizations for ecosystem
 # compatibility.
 
-#' Generate Combined Stan Code and Data
+#' Generate Combined Stan Code and Data Using Modern System
 #' @param obs_setup Observation model setup
 #' @param trend_setup Trend model setup
 #' @param mv_spec Multivariate specification
-#' @param trend_stanvars Trend stanvars
 #' @return List with combined stancode and standata
 #' @noRd
-generate_combined_stancode_and_data <- function(obs_setup, trend_setup, 
-                                               mv_spec, trend_stanvars = NULL) {
-  
-  # Start with observation model Stan code
-  base_stancode <- obs_setup$stancode
-  base_standata <- obs_setup$standata
-  
-  # Inject trend components if trends exist
-  if (mv_spec$has_trends && !is.null(trend_setup)) {
-    
-    # Modify observation linear predictor with trend components
-    combined_stancode <- inject_trend_into_linear_predictor(
-      base_stancode = base_stancode,
-      trend_spec = mv_spec,
-      trend_stanvars = trend_stanvars
-    )
-    
-    # Combine Stan data from both models
-    combined_standata <- combine_standata(
-      obs_standata = base_standata,
-      trend_standata = trend_setup$standata,
-      mv_spec = mv_spec
-    )
-    
-  } else {
-    # No trends - use observation model as-is
-    combined_stancode <- base_stancode
-    combined_standata <- base_standata
-  }
-  
-  return(list(
-    stancode = combined_stancode,
-    standata = combined_standata
-  ))
-}
+generate_combined_stancode_and_data <- function(obs_setup, trend_setup, mv_spec) {
 
-#' Inject Trend Components into Linear Predictor
-#' @param base_stancode Base Stan code from observation model
-#' @param trend_spec Trend specification
-#' @param trend_stanvars Trend stanvars
-#' @return Modified Stan code with trend components
-#' @noRd
-inject_trend_into_linear_predictor <- function(base_stancode, trend_spec, 
-                                              trend_stanvars = NULL) {
- stop("This function is not yet operational")
-}
-
-#' Combine Stan Data from Observation and Trend Models
-#' @param obs_standata Stan data from observation model
-#' @param trend_standata Stan data from trend model
-#' @param mv_spec Multivariate specification
-#' @return Combined Stan data list
-#' @noRd
-combine_standata <- function(obs_standata, trend_standata, mv_spec) {
-  
-  # Start with observation data
-  combined_data <- obs_standata
-  
-  # Add trend-specific data components
-  if (!is.null(trend_standata)) {
-    
-    # Add trend data, avoiding name conflicts
-    trend_specific <- trend_standata[!names(trend_standata) %in% 
-                                   names(obs_standata)]
-    combined_data <- c(combined_data, trend_specific)
-    
-    # Add trend dimensions and indicators
-    combined_data$has_trends <- 1L
-    combined_data$n_trends <- length(mv_spec$trend_specs)
+  # Convert mv_spec to trend_spec format expected by modern system
+  trend_spec <- if (mv_spec$has_trends && !is.null(mv_spec$trend_specs)) {
+    # Use the first trend spec as representative (modern system handles multivariate)
+    mv_spec$trend_specs[[1]]
   } else {
-    combined_data$has_trends <- 0L
-    combined_data$n_trends <- 0L
+    NULL
   }
-  
-  return(combined_data)
+
+  # Use the two-stage assembly system from stan_assembly.R
+  result <- generate_combined_stancode(
+    obs_setup = obs_setup,
+    trend_setup = trend_setup,
+    trend_spec = trend_spec,
+    validate = TRUE,
+    silent = 1
+  )
+
+  return(result)
 }
 
 # ------------------------------------------------------------------------------
@@ -331,7 +199,7 @@ combine_standata <- function(obs_standata, trend_standata, mv_spec) {
 #' @return Stan fit object
 #' @noRd
 fit_mvgam_model <- function(stancode, standata, backend = "cmdstanr", ...) {
-  
+
   # This is a placeholder for actual Stan fitting
   # Real implementation would use rstan or cmdstanr to fit the model
   stop("This function is not yet operational")
@@ -354,33 +222,33 @@ fit_mvgam_model <- function(stancode, standata, backend = "cmdstanr", ...) {
 #' @param combined_fit Stan fit object from combined model
 #' @param obs_setup brms setup components for observation model
 #' @param trend_setup brms setup components for trend model
-#' @param mv_spec Multivariate trend specification from 
+#' @param mv_spec Multivariate trend specification from
 #'   parse_multivariate_trends()
 #' @return mvgam object with dual brmsfit-like structure
 #' @noRd
-create_mvgam_from_combined_fit <- function(combined_fit, obs_setup, 
-                                          trend_setup = NULL, 
+create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
+                                          trend_setup = NULL,
                                           mv_spec = NULL) {
   checkmate::assert_class(combined_fit, "stanfit")
   checkmate::assert_list(obs_setup, names = "named")
   checkmate::assert_list(trend_setup, names = "named", null.ok = TRUE)
   checkmate::assert_list(mv_spec, names = "named", null.ok = TRUE)
-  
+
   # Create observation brmsfit-like object
   obs_fit <- create_observation_brmsfit(combined_fit, obs_setup, mv_spec)
-  
+
   # Create trend brmsfit-like object (if trends exist)
-  trend_fit <- if (!is.null(trend_setup) && !is.null(mv_spec$has_trends) && 
+  trend_fit <- if (!is.null(trend_setup) && !is.null(mv_spec$has_trends) &&
                   mv_spec$has_trends) {
     create_trend_brmsfit(combined_fit, trend_setup, mv_spec)
   } else {
     NULL
   }
-  
+
   # Extract mvgam-specific components
-  mvgam_components <- extract_mvgam_components(combined_fit, obs_setup, 
+  mvgam_components <- extract_mvgam_components(combined_fit, obs_setup,
                                               trend_setup, mv_spec)
-  
+
   # Create main mvgam object
   mvgam_object <- structure(
     list(
@@ -388,26 +256,26 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       obs_fit = obs_fit,
       trend_fit = trend_fit,
       combined_fit = combined_fit,
-      
+
       # Model specifications
       formula = obs_setup$formula,
       trend_formula = if (!is.null(trend_setup)) trend_setup$formula else NULL,
       family = obs_setup$family,
-      
+
       # Data and setup
       data = obs_setup$data,
       stancode = obs_setup$stancode,
       standata = obs_setup$standata,
-      
+
       # Multivariate specifications
       mv_spec = mv_spec,
       response_names = mv_spec$response_names %||% NULL,
-      
+
       # mvgam-specific components
       trend_components = mvgam_components$trend_components,
       series_info = mvgam_components$series_info,
       time_info = mvgam_components$time_info,
-      
+
       # Compatibility metadata
       brms_version = utils::packageVersion("brms"),
       mvgam_version = utils::packageVersion("mvgam"),
@@ -415,14 +283,14 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
     ),
     class = c("mvgam", "brmsfit")
   )
-  
+
   # Add model comparison methods compatibility
   mvgam_object$criteria <- list()
-  
+
   # Store call information
-  mvgam_object$call <- match.call(sys.function(sys.parent()), 
+  mvgam_object$call <- match.call(sys.function(sys.parent()),
                                  sys.call(sys.parent()))
-  
+
   return(mvgam_object)
 }
 
@@ -441,23 +309,23 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
 create_observation_brmsfit <- function(combined_fit, obs_setup, mv_spec) {
   # Extract observation-specific parameters from combined fit
   obs_params <- extract_observation_parameters(combined_fit)
-  
+
   # Create brmsfit structure
   obs_brmsfit <- structure(
     list(
       # Stan fit with observation parameters only
       fit = subset_stanfit_parameters(combined_fit, obs_params$names),
-      
+
       # Model components
       formula = obs_setup$formula,
       data = obs_setup$data,
       family = obs_setup$family,
       prior = obs_setup$prior,
-      
+
       # Stan components (observation-focused)
       stancode = obs_setup$stancode,
       standata = obs_setup$standata,
-      
+
       # Metadata
       algorithm = combined_fit@sim$algorithm %||% "sampling",
       backend = "cmdstanr", # Will be updated based on actual backend
@@ -465,7 +333,7 @@ create_observation_brmsfit <- function(combined_fit, obs_setup, mv_spec) {
     ),
     class = c("brmsfit")
   )
-  
+
   return(obs_brmsfit)
 }
 
@@ -484,27 +352,27 @@ create_observation_brmsfit <- function(combined_fit, obs_setup, mv_spec) {
 create_trend_brmsfit <- function(combined_fit, trend_setup, mv_spec) {
   # Extract trend-specific parameters from combined fit
   trend_params <- extract_trend_parameters(combined_fit, mv_spec)
-  
+
   # Create brmsfit structure for trends
   trend_brmsfit <- structure(
     list(
       # Stan fit with trend parameters only
       fit = subset_stanfit_parameters(combined_fit, trend_params$names),
-      
+
       # Model components
       formula = trend_setup$formula,
       data = trend_setup$data,
       family = gaussian(), # Trends are typically gaussian processes
       prior = trend_setup$prior,
-      
+
       # Stan components (trend-focused)
       stancode = trend_setup$stancode,
       standata = trend_setup$standata,
-      
+
       # Trend-specific metadata
       trend_specs = mv_spec$trend_specs,
       trend_types = trend_params$types,
-      
+
       # Standard metadata
       algorithm = combined_fit@sim$algorithm %||% "sampling",
       backend = "cmdstanr",
@@ -512,7 +380,7 @@ create_trend_brmsfit <- function(combined_fit, trend_setup, mv_spec) {
     ),
     class = c("brmsfit")
   )
-  
+
   return(trend_brmsfit)
 }
 
@@ -528,12 +396,12 @@ create_trend_brmsfit <- function(combined_fit, trend_setup, mv_spec) {
 #' @noRd
 extract_observation_parameters <- function(combined_fit) {
   all_params <- combined_fit@sim$pars_oi
-  
+
   # Identify observation parameters (brms conventions)
   # NOTE: These parameter naming patterns are based on brms 2.x conventions.
-  # brms 3.0 may introduce naming changes 
+  # brms 3.0 may introduce naming changes
   # (see: https://github.com/paul-buerkner/brms/milestone/20)
-  # This extraction logic should be reviewed and updated when brms 3.0 is 
+  # This extraction logic should be reviewed and updated when brms 3.0 is
   # released to ensure compatibility with any new parameter naming schemes.
   obs_patterns <- c(
     "^b_",          # Fixed effects
@@ -549,10 +417,10 @@ extract_observation_parameters <- function(combined_fit) {
     "lp__",         # Log posterior
     "lprior"        # Log prior
   )
-  
-  obs_params <- all_params[grepl(paste(obs_patterns, collapse = "|"), 
+
+  obs_params <- all_params[grepl(paste(obs_patterns, collapse = "|"),
                                 all_params)]
-  
+
   return(list(
     names = obs_params,
     count = length(obs_params)
@@ -566,7 +434,7 @@ extract_observation_parameters <- function(combined_fit) {
 #' @noRd
 extract_trend_parameters <- function(combined_fit, mv_spec) {
   all_params <- combined_fit@sim$pars_oi
-  
+
   # Identify trend parameters (mvgam conventions)
   trend_patterns <- c(
     "^trend",        # Trend states
@@ -578,10 +446,10 @@ extract_trend_parameters <- function(combined_fit, mv_spec) {
     "^L_trend",      # Cholesky factors for correlations
     "^rho_trend"     # Correlation parameters
   )
-  
-  trend_params <- all_params[grepl(paste(trend_patterns, collapse = "|"), 
+
+  trend_params <- all_params[grepl(paste(trend_patterns, collapse = "|"),
                                   all_params)]
-  
+
   # Identify trend types from specifications
   trend_types <- if (!is.null(mv_spec$trend_specs)) {
     sapply(mv_spec$trend_specs, function(spec) {
@@ -594,7 +462,7 @@ extract_trend_parameters <- function(combined_fit, mv_spec) {
   } else {
     NULL
   }
-  
+
   return(list(
     names = trend_params,
     count = length(trend_params),
@@ -626,22 +494,22 @@ subset_stanfit_parameters <- function(stanfit, param_names) {
 #' @param mv_spec Multivariate specification
 #' @return List of mvgam-specific components
 #' @noRd
-extract_mvgam_components <- function(combined_fit, obs_setup, trend_setup, 
+extract_mvgam_components <- function(combined_fit, obs_setup, trend_setup,
                                     mv_spec) {
   # Extract time series information
   time_info <- extract_time_information(obs_setup$data)
-  
+
   # Extract series information
   series_info <- extract_series_information(obs_setup$data, mv_spec)
-  
+
   # Extract trend components if available
-  trend_components <- if (!is.null(mv_spec$has_trends) && 
+  trend_components <- if (!is.null(mv_spec$has_trends) &&
                          mv_spec$has_trends) {
     extract_trend_component_info(combined_fit, mv_spec)
   } else {
     NULL
   }
-  
+
   return(list(
     time_info = time_info,
     series_info = series_info,
@@ -673,7 +541,7 @@ extract_time_information <- function(data) {
 #' @noRd
 extract_series_information <- function(data, mv_spec) {
   series_info <- list()
-  
+
   if ("series" %in% names(data)) {
     series_info$n_series <- length(unique(data$series))
     series_info$series_names <- unique(data$series)
@@ -681,7 +549,7 @@ extract_series_information <- function(data, mv_spec) {
   } else {
     series_info$has_series <- FALSE
   }
-  
+
   # Add multivariate response information
   if (!is.null(mv_spec$response_names)) {
     series_info$response_names <- mv_spec$response_names
@@ -690,7 +558,7 @@ extract_series_information <- function(data, mv_spec) {
   } else {
     series_info$is_multivariate <- FALSE
   }
-  
+
   return(series_info)
 }
 
@@ -701,11 +569,11 @@ extract_series_information <- function(data, mv_spec) {
 #' @noRd
 extract_trend_component_info <- function(combined_fit, mv_spec) {
   trend_info <- list()
-  
+
   if (!is.null(mv_spec$trend_specs)) {
     trend_info$specifications <- mv_spec$trend_specs
     trend_info$n_trends <- length(mv_spec$trend_specs)
-    
+
     # Extract trend types
     trend_info$types <- sapply(mv_spec$trend_specs, function(spec) {
       if (inherits(spec, "mvgam_trend")) {
@@ -715,7 +583,7 @@ extract_trend_component_info <- function(combined_fit, mv_spec) {
       }
     })
   }
-  
+
   return(trend_info)
 }
 
@@ -740,15 +608,15 @@ extract_trend_component_info <- function(combined_fit, mv_spec) {
 #' @param ... Additional arguments passed to mvgam()
 #' @return mvgam_pooled object or list of individual fits
 #' @noRd
-mvgam_multiple <- function(formula, trend_formula = NULL, data_list, 
+mvgam_multiple <- function(formula, trend_formula = NULL, data_list,
                           backend = NULL, combine = TRUE, ...) {
   checkmate::assert_formula(formula)
   checkmate::assert_list(data_list, min.len = 2, types = "data.frame")
   checkmate::assert_logical(combine, len = 1)
-  
+
   # Validate multiple imputation datasets
   validate_multiple_imputation_datasets(data_list)
-  
+
   # Fit individual models to each imputed dataset
   individual_fits <- fit_multiple_imputation_models(
     formula = formula,
@@ -757,7 +625,7 @@ mvgam_multiple <- function(formula, trend_formula = NULL, data_list,
     backend = backend,
     ...
   )
-  
+
   # Return combined or individual results
   if (combine) {
     pooled_fit <- pool_mvgam_fits(individual_fits)
@@ -780,7 +648,7 @@ mvgam_multiple <- function(formula, trend_formula = NULL, data_list,
 #' @noRd
 validate_multiple_imputation_datasets <- function(data_list) {
   checkmate::assert_list(data_list, min.len = 2)
-  
+
   # Check all elements are data frames
   if (!all(sapply(data_list, is.data.frame))) {
     stop(insight::format_error(
@@ -788,16 +656,16 @@ validate_multiple_imputation_datasets <- function(data_list) {
       "Found non-data.frame elements in imputation list."
     ))
   }
-  
+
   # Get reference structure from first dataset
   ref_data <- data_list[[1]]
   ref_names <- names(ref_data)
   ref_nrow <- nrow(ref_data)
-  
+
   # Validate consistency across datasets
   for (i in seq_along(data_list)[-1]) {
     current_data <- data_list[[i]]
-    
+
     # Check column names match
     if (!identical(names(current_data), ref_names)) {
       stop(insight::format_error(
@@ -805,16 +673,16 @@ validate_multiple_imputation_datasets <- function(data_list) {
         "All imputed datasets must have identical structure."
       ))
     }
-    
+
     # Check number of rows match
     if (nrow(current_data) != ref_nrow) {
       stop(insight::format_error(
-        paste("Dataset", i, "has", nrow(current_data), "rows, expected", 
+        paste("Dataset", i, "has", nrow(current_data), "rows, expected",
              ref_nrow),
         "All imputed datasets must have same number of observations."
       ))
     }
-    
+
     # Check essential columns (time, series) are identical
     essential_cols <- intersect(c("time", "series"), ref_names)
     for (col in essential_cols) {
@@ -826,10 +694,10 @@ validate_multiple_imputation_datasets <- function(data_list) {
       }
     }
   }
-  
+
   # Validate missing data patterns
   validate_missing_patterns(data_list)
-  
+
   invisible(TRUE)
 }
 
@@ -840,14 +708,14 @@ validate_multiple_imputation_datasets <- function(data_list) {
 validate_missing_patterns <- function(data_list) {
   n_datasets <- length(data_list)
   dataset_names <- names(data_list[[1]])
-  
+
   # Check for variables that should not be imputed
   non_imputable <- c("time", "series", "weights", "trials")
   present_non_imputable <- intersect(non_imputable, dataset_names)
-  
+
   for (col in present_non_imputable) {
     values_list <- lapply(data_list, function(d) d[[col]])
-    
+
     # Check if any differences exist
     reference_values <- values_list[[1]]
     for (i in 2:n_datasets) {
@@ -860,7 +728,7 @@ validate_missing_patterns <- function(data_list) {
       }
     }
   }
-  
+
   invisible(TRUE)
 }
 
@@ -878,24 +746,24 @@ validate_missing_patterns <- function(data_list) {
 #' @param ... Additional arguments
 #' @return List of fitted mvgam objects
 #' @noRd
-fit_multiple_imputation_models <- function(formula, trend_formula, data_list, 
+fit_multiple_imputation_models <- function(formula, trend_formula, data_list,
                                           backend, ...) {
   n_datasets <- length(data_list)
-  
+
   insight::format_message(
     paste("Fitting mvgam models to", n_datasets, "imputed datasets..."),
     "This may take some time depending on model complexity."
   )
-  
+
   # Fit individual models
   fits <- vector("list", n_datasets)
   names(fits) <- paste0("imputation_", seq_len(n_datasets))
-  
+
   for (i in seq_len(n_datasets)) {
     insight::format_message(
       paste("Fitting imputation", i, "of", n_datasets, "...")
     )
-    
+
     # Fit model to current imputed dataset
     fits[[i]] <- mvgam_single_imputation(
       formula = formula,
@@ -905,12 +773,12 @@ fit_multiple_imputation_models <- function(formula, trend_formula, data_list,
       imputation_id = i,
       ...
     )
-    
+
     # Add imputation metadata
     fits[[i]]$imputation_id <- i
     fits[[i]]$n_imputations <- n_datasets
   }
-  
+
   return(fits)
 }
 
@@ -923,26 +791,26 @@ fit_multiple_imputation_models <- function(formula, trend_formula, data_list,
 #' @param ... Additional arguments
 #' @return Single mvgam fit object
 #' @noRd
-mvgam_single_imputation <- function(formula, trend_formula, data, backend, 
+mvgam_single_imputation <- function(formula, trend_formula, data, backend,
                                    imputation_id, ...) {
   # Parse multivariate trends
   mv_spec <- parse_multivariate_trends(formula, trend_formula)
-  
+
   # Setup observation and trend models using lightweight brms
   obs_setup <- setup_brms_lightweight(formula, data, ...)
-  
+
   trend_setup <- if (mv_spec$has_trends) {
-    setup_brms_lightweight(mv_spec$base_formula, data, 
+    setup_brms_lightweight(mv_spec$base_formula, data,
                           family = gaussian(), ...)
   } else {
     NULL
   }
-  
+
   # Generate combined Stan code and data
-  combined_components <- generate_combined_stancode_and_data(obs_setup, 
-                                                           trend_setup, 
+  combined_components <- generate_combined_stancode_and_data(obs_setup,
+                                                           trend_setup,
                                                            mv_spec)
-  
+
   # Fit the combined model
   combined_fit <- fit_mvgam_model(
     stancode = combined_components$stancode,
@@ -950,7 +818,7 @@ mvgam_single_imputation <- function(formula, trend_formula, data, backend,
     backend = backend,
     ...
   )
-  
+
   # Create mvgam object from combined fit
   mvgam_object <- create_mvgam_from_combined_fit(
     combined_fit = combined_fit,
@@ -958,7 +826,7 @@ mvgam_single_imputation <- function(formula, trend_formula, data, backend,
     trend_setup = trend_setup,
     mv_spec = mv_spec
   )
-  
+
   return(mvgam_object)
 }
 
@@ -975,7 +843,7 @@ mvgam_single_imputation <- function(formula, trend_formula, data, backend,
 #' @noRd
 pool_mvgam_fits <- function(fits) {
   checkmate::assert_list(fits, min.len = 2)
-  
+
   # Validate all fits are mvgam objects
   if (!all(sapply(fits, function(x) inherits(x, "mvgam")))) {
     stop(insight::format_error(
@@ -983,27 +851,27 @@ pool_mvgam_fits <- function(fits) {
       "Cannot pool fits of different types."
     ))
   }
-  
+
   insight::format_message("Pooling results using Rubin's rules...")
-  
+
   # Extract parameter estimates from each fit
   estimates_list <- lapply(fits, extract_fit_estimates)
-  
+
   # Apply Rubin's rules pooling
   pooled_estimates <- apply_rubins_rules(estimates_list)
-  
+
   # Create pooled mvgam object
   pooled_fit <- create_pooled_mvgam(fits[[1]], pooled_estimates)
-  
+
   # Store individual fits and metadata
   attr(pooled_fit, "individual_fits") <- fits
   attr(pooled_fit, "n_imputations") <- length(fits)
   attr(pooled_fit, "pooling_method") <- "rubins_rules"
   attr(pooled_fit, "pooled_time") <- Sys.time()
-  
+
   # Set appropriate class
   class(pooled_fit) <- c("mvgam_pooled", "mvgam", "brmsfit")
-  
+
   return(pooled_fit)
 }
 
@@ -1014,13 +882,13 @@ pool_mvgam_fits <- function(fits) {
 extract_fit_estimates <- function(fit) {
   # Extract posterior samples for key parameters
   obs_params <- extract_posterior_samples(fit$obs_fit)
-  
+
   trend_params <- if (!is.null(fit$trend_fit)) {
     extract_posterior_samples(fit$trend_fit)
   } else {
     NULL
   }
-  
+
   return(list(
     observation = obs_params,
     trend = trend_params,
@@ -1034,12 +902,12 @@ extract_fit_estimates <- function(fit) {
 #' @noRd
 apply_rubins_rules <- function(estimates_list) {
   n_imputations <- length(estimates_list)
-  
+
   # Get parameter names from first estimation
   param_structure <- estimates_list[[1]]
-  
+
   pooled_results <- list()
-  
+
   # Pool each parameter type
   for (param_type in names(param_structure)) {
     if (!is.null(param_structure[[param_type]])) {
@@ -1047,7 +915,7 @@ apply_rubins_rules <- function(estimates_list) {
       pooled_results[[param_type]] <- pool_parameter_estimates(param_estimates)
     }
   }
-  
+
   return(pooled_results)
 }
 
@@ -1057,29 +925,29 @@ apply_rubins_rules <- function(estimates_list) {
 #' @noRd
 pool_parameter_estimates <- function(param_list) {
   n_imputations <- length(param_list)
-  
+
   # Calculate means across imputations
   means <- lapply(param_list, function(x) apply(x, 2, mean))
   pooled_mean <- Reduce("+", means) / n_imputations
-  
+
   # Calculate within-imputation variance
   within_var <- lapply(param_list, function(x) apply(x, 2, var))
   within_variance <- Reduce("+", within_var) / n_imputations
-  
+
   # Calculate between-imputation variance
   mean_diffs <- lapply(means, function(m) m - pooled_mean)
-  between_variance <- Reduce("+", lapply(mean_diffs, function(d) d^2)) / 
+  between_variance <- Reduce("+", lapply(mean_diffs, function(d) d^2)) /
     (n_imputations - 1)
-  
+
   # Total variance using Rubin's rules
   total_variance <- within_variance + (1 + 1/n_imputations) * between_variance
-  
+
   # Calculate degrees of freedom and other diagnostics
-  relative_increase <- (1 + 1/n_imputations) * between_variance / 
+  relative_increase <- (1 + 1/n_imputations) * between_variance /
     within_variance
-  degrees_freedom <- (n_imputations - 1) * 
+  degrees_freedom <- (n_imputations - 1) *
     (1 + within_variance / ((1 + 1/n_imputations) * between_variance))^2
-  
+
   return(list(
     mean = pooled_mean,
     variance = total_variance,
@@ -1100,14 +968,14 @@ pool_parameter_estimates <- function(param_list) {
 create_pooled_mvgam <- function(template_fit, pooled_estimates) {
   # Start with template structure
   pooled_fit <- template_fit
-  
+
   # Replace parameter estimates with pooled versions
   pooled_fit$pooled_estimates <- pooled_estimates
-  
+
   # Update metadata
   pooled_fit$pooled <- TRUE
   pooled_fit$pooling_diagnostics <- extract_pooling_diagnostics(pooled_estimates)
-  
+
   return(pooled_fit)
 }
 
@@ -1117,20 +985,20 @@ create_pooled_mvgam <- function(template_fit, pooled_estimates) {
 #' @noRd
 extract_pooling_diagnostics <- function(pooled_estimates) {
   diagnostics <- list()
-  
+
   for (param_type in names(pooled_estimates)) {
     if (!is.null(pooled_estimates[[param_type]])) {
       est <- pooled_estimates[[param_type]]
-      
+
       diagnostics[[param_type]] <- list(
         n_imputations = est$n_imputations,
         avg_relative_increase = mean(est$relative_increase, na.rm = TRUE),
         avg_degrees_freedom = mean(est$degrees_freedom, na.rm = TRUE),
-        fraction_missing_info = est$relative_increase / 
+        fraction_missing_info = est$relative_increase /
           (1 + est$relative_increase)
       )
     }
   }
-  
+
   return(diagnostics)
 }

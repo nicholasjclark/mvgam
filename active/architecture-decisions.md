@@ -139,7 +139,7 @@ transformed parameters {
 
 **Design Principle**: Eliminate redundant code to simplify custom trend development
 
-**Shared Utility Functions** (`R/trend_injection_generators.R`)
+**Shared Utility Functions** (`R/stan_assembly.R`)
 
 ### 6. Hierarchical Correlation Architecture
 
@@ -334,6 +334,35 @@ stanvar(name = "test", scode = "real x;", block = "transformed parameters")
 valid_blocks <- c("tparameters", "transformed_parameters", "tdata", "transformed_data", ...)
 ```
 
+## Critical Integration Points
+
+### Data Flow Overview
+```
+User Input → mvgam_enhanced() → parse_multivariate_trends() → setup_brms_lightweight() 
+→ generate_combined_stancode() → fit_mvgam_model() → create_mvgam_from_combined_fit()
+```
+
+### Key Data Structures
+```r
+# Single trend
+trend_spec = list(trend = "AR1", p = 1, cor = TRUE, n_lv = 2, time = "time", series = "series")
+
+# Multivariate trends (THE CRITICAL CHALLENGE)
+mv_spec$trend_specs = list(
+  count = list(trend = "AR1", p = 1),
+  biomass = list(trend = "RW")
+)
+```
+
+### Current Implementation Status
+- ✅ **Working**: Registry system, validation, Stan assembly framework
+- ❌ **Placeholder**: `fit_mvgam_model()`, `subset_stanfit_parameters()`, `extract_posterior_samples()`  
+- ⚠️ **Partial**: `generate_combined_stancode()` works for univariate, needs multivariate extension
+
+### Critical Gap: Multivariate Trend Assembly
+**Problem**: `generate_combined_stancode(trend_spec)` expects single trend but multivariate has multiple in `mv_spec$trend_specs`
+**Location**: `R/mvgam_core.R:169` - Currently uses inadequate `mv_spec$trend_specs[[1]]` workaround
+
 ## Developer Onboarding Guide
 
 **Consolidated Architecture Files (4 Core Files):**
@@ -345,7 +374,6 @@ valid_blocks <- c("tparameters", "transformed_parameters", "tdata", "transformed
 
 **Test Infrastructure:**
 - `tests/testthat/test-trend-dispatcher.R` - Trend system validation
-- `tests/testthat/test-brms-setup.R` - brms integration testing
 - `tests/testthat/test-stan-assembly-system.R` - Stan assembly validation
 
 **Architecture Documentation:**

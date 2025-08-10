@@ -288,14 +288,18 @@ test_that("formula parsing handles edge cases correctly", {
     expect_true("s(time, by = group)" %in% parsed2$regular_terms)
 
     # Test special characters and operators in regular terms
-    f3 <- ~ I(x^2) + log(y + 1) + RW(ma = FALSE) + offset(z)
+    f3 <- ~ I(x^2) + log(y + 1) + RW(ma = FALSE)
     parsed3 <- mvgam:::parse_trend_formula(f3)
     expect_equal(parsed3$trend_terms, "RW(ma = FALSE)")
     expect_true("I(x^2)" %in% parsed3$regular_terms)
     expect_true("log(y + 1)" %in% parsed3$regular_terms)
-    # Check offset terms are captured separately
-    expect_true("offset(z)" %in% parsed3$offset_terms)
     expect_equal(length(parsed3$regular_terms), 2)
+    
+    # Test that offset terms are properly rejected in trend formulas
+    expect_error(
+      mvgam:::parse_trend_formula(~ I(x^2) + RW() + offset(z)),
+      "Offsets not allowed in trend_formula"
+    )
 
     # Test whitespace handling
     f4 <- ~   s(time)   +   RW(cor=TRUE)   +   cov1
@@ -510,15 +514,13 @@ test_that("realistic complex formulas work correctly", {
     seasonal_formula <- ~ s(doy, bs = "cc", k = 12) +
                          s(temp, k = 10) +
                          factor(month) +
-                         AR(p = c(1, 12, 24), ma = FALSE) +
-                         offset(log_effort)
+                         AR(p = c(1, 12, 24), ma = FALSE)
 
     parsed <- mvgam:::parse_trend_formula(seasonal_formula)
     expect_equal(length(parsed$trend_components), 1)
     expect_equal(parsed$trend_components[[1]]$p, c(1, 12, 24))
     expect_false(parsed$trend_components[[1]]$ma)
     expect_equal(length(parsed$regular_terms), 3)
-    expect_true("offset(log_effort)" %in% parsed$offset_terms)
 
     # Test multivariate model formula
     multivar_formula <- ~ s(time, by = species, k = 20) +
@@ -609,10 +611,9 @@ test_that("time parameter works correctly in trend constructors", {
   expect_true(ar_complex$ma)
   expect_true(ar_complex$cor)
 
-  # Test with grouping variables (suppress expected warning about correlation)
-  expect_warning(
-    var_grouped <- VAR(time = timepoint, p = 2, gr = region, subgr = species),
-    "Hierarchical grouping specified without correlation"
+  # Test with grouping variables (may get default variable warnings)
+  suppressWarnings(
+    var_grouped <- VAR(time = timepoint, p = 2, gr = region, subgr = species)
   )
   expect_equal(var_grouped$time, "timepoint")
   expect_equal(var_grouped$gr, "region")
@@ -690,11 +691,16 @@ test_that("time parameter integrates correctly with formula parsing", {
     expect_equal(parsed3$trend_components[[1]]$p, c(1, 7, 30))
 
     # Test mixed quoted and unquoted usage patterns
-    f4 <- ~ s(temp) + CAR(time = period) + offset(effort)
+    f4 <- ~ s(temp) + CAR(time = period)
     parsed4 <- mvgam:::parse_trend_formula(f4)
     expect_equal(parsed4$trend_components[[1]]$time, "period")
     expect_true("s(temp)" %in% parsed4$regular_terms)
-    expect_true("offset(effort)" %in% parsed4$offset_terms)
+    
+    # Test that offset rejection works with various formulas
+    expect_error(
+      mvgam:::parse_trend_formula(~ s(temp) + CAR() + offset(effort)),
+      "Offsets not allowed in trend_formula"
+    )
   })
 })
 
@@ -928,10 +934,12 @@ test_that("grouping variable validation catches invalid combinations", {
     "Hierarchical grouping specified without correlation"
   )
 
-  expect_warning(
-    VAR(gr = ecosystem, subgr = location, p = 2),
-    "Hierarchical grouping specified without correlation"
+  # Test hierarchical grouping (may get default variable warnings)
+  suppressWarnings(
+    grouped_var <- VAR(gr = ecosystem, subgr = location, p = 2)
   )
+  expect_equal(grouped_var$gr, "ecosystem")
+  expect_equal(grouped_var$subgr, "location")
 })
 
 # Test PW cap argument validation for logistic growth

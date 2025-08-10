@@ -28,13 +28,11 @@
 
 ### Phase 1: Testing Simple Models
 
-**Pre-Extension Function Cleaning**
-- [ ] Consolidate `generate_factor_model_priors()` and `generate_factor_model_model_injectors()`
-- [ ] Ensure all generators explicitly state the name of the block they are injecting into, unless they inject into multiple blocks (`generate_innovation_priors` should be `generate_innovation_model`, for example)
-- [ ] Consolidate `generate_rw_trend_stanvars()` and `generate_rw_dynamics()`
-- [ ] Standardize names for hierarchical injectors (some use `generate_hierarchical_correlation_*`, others use `generate_hierarchical_*`)
-- [ ] `combine_stn_components()` is never called, only in out-dated tests. Consider removing
-- [ ] Update trend pattern checks in `validate_obs_formula_brms()` to avoid using hard-coded trend patterns (these should respect whatever trend types are available)
+**Pre-Extension Function Updates**
+- [ ] **PRIORITY**: Extend `generate_combined_stancode()` to handle multivariate cases natively (currently only handles single trend_spec but multivariate models have multiple trend_specs)
+- [ ] **PRIORITY**: Implement `fit_mvgam_model()` - currently placeholder with `stop("This function is not yet operational")`
+- [ ] **PRIORITY**: Implement `subset_stanfit_parameters()` - currently placeholder, needed for dual object system
+- [ ] **PRIORITY**: Implement `extract_posterior_samples()` - missing function called by multiple imputation system
 
 **1.1 Univariate Model Testing**
 - [ ] Simple intercept models: `y ~ 1, trend_formula = ~ [TREND]()`

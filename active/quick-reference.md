@@ -73,7 +73,7 @@ mvgam(
 
 ## Trend Registry System ✅ **COMPLETE**
 
-### Registry Architecture (R/trend_registry.R)
+### Registry Architecture (R/trend_system.R)
 
 **Core Functions:**
 ```r
@@ -107,20 +107,21 @@ custom_trend(trend, tpars, ...)         # Create custom trend objects
 
 ## Two-Stage Stan Assembly System
 
-### Stage 1: Registry-Based Stanvar Generation (R/trend_injection_generators.R)
+### Stage 1: Registry-Based Stanvar Generation (R/stan_assembly.R)
 ```r
 # Registry dispatch to trend-specific generators
 trend_stanvars <- generate_trend_injection_stanvars(trend_spec, data_info)
 
 # Registry automatically selects appropriate generator:
-# - generate_rw_injection_stanvars()
-# - generate_ar_injection_stanvars() 
-# - generate_var_injection_stanvars()
-# - generate_zmvn_injection_stanvars()
-# - etc.
+# - generate_rw_trend_stanvars()
+# - generate_ar_trend_stanvars() 
+# - generate_var_trend_stanvars()
+# - generate_zmvn_trend_stanvars()
+# - generate_car_trend_stanvars()
+# - generate_pw_trend_stanvars()
 ```
 
-### Stage 2: brms Integration with Stan Assembly (R/stan_code_generation.R)
+### Stage 2: brms Integration with Stan Assembly (R/stan_assembly.R)
 ```r
 # The injection system modifies brms-generated Stan code by:
 # 1. Finding/creating transformed parameters block
@@ -130,7 +131,7 @@ trend_stanvars <- generate_trend_injection_stanvars(trend_spec, data_info)
 inject_trend_into_linear_predictor(base_stancode, trend_stanvars, trend_spec)
 ```
 
-## Stan Code Validation Framework (R/stan_validation.R)
+## Stan Code Validation Framework (R/validations.R)
 ```r
 # Unified comprehensive validation using rstan::stanc()
 validate_stan_code(stan_code, backend = "rstan", silent = FALSE)  # Primary validation function
@@ -146,7 +147,7 @@ are_braces_balanced(stan_code)             # Check brace matching
 
 **Trend Stanvar Generation**:
 - `extract_trend_stanvars_from_setup()` automatically calls `generate_trend_injection_stanvars()`
-- Registry system dispatches to appropriate generator (`generate_rw_injection_stanvars()`, etc.)
+- Registry system dispatches to appropriate generator (`generate_rw_trend_stanvars()`, etc.)
 - Factor model compatibility validated via `validate_factor_compatibility()`
 
 **Stan Code Assembly**:
@@ -155,9 +156,9 @@ are_braces_balanced(stan_code)             # Check brace matching
 - `validate_stan_code()` provides comprehensive validation using `rstan::stanc()` directly
 
 **Data Integration**:
-- `extract_trend_data_from_stanvars()` extracts time/series components 
-- `merge_stan_data()` combines observation and trend data with conflict resolution
-- `validate_stan_data_structure()` ensures proper Stan data types
+- `prepare_stan_data()` prepares and orders time/series data for Stan
+- `combine_stan_data()` combines observation and trend data with conflict resolution
+- `validate_combined_standata()` ensures proper Stan data structure and types
 
 ## Validation Framework
 
@@ -175,6 +176,54 @@ are_braces_balanced(stan_code)             # Check brace matching
 - Consistent variable structure across imputations
 - Time series alignment preserved
 - Pooling compatibility validated
+
+## Development Workflow
+
+### Testing with mvgam Data
+```r
+# Use consistent test data
+data("portal_data", package = "mvgam")
+# OR
+test_data <- mvgam:::example_data  # Internal test dataset
+```
+
+### Stan Backend Integration
+```r
+# cmdstanr (preferred)
+model <- cmdstanr::cmdstan_model(write_stan_file(stancode))
+fit <- model$sample(data = standata)
+
+# rstan (fallback) 
+fit <- rstan::stan(model_code = stancode, data = standata)
+```
+
+### Development Testing Pattern
+```r
+# 1. Start simple
+mvgam(y ~ 1, trend_formula = ~ RW(), data = test_data)
+
+# 2. Add complexity incrementally  
+mvgam(y ~ s(x), trend_formula = ~ AR(p = 1), data = test_data)
+
+# 3. Validate Stan code during development
+validate_stan_code(stancode, silent = FALSE)  # Full output for debugging
+```
+
+## Current Implementation Gaps
+
+### Critical Blockers for Testing
+- **`fit_mvgam_model()`**: Placeholder - needs Stan backend implementation
+- **`extract_posterior_samples()`**: Missing - needed for multiple imputation  
+- **Multivariate trends**: `generate_combined_stancode()` only handles single trend_spec
+
+### Multivariate Challenge
+```r
+# Problem: This structure...
+mv_spec$trend_specs = list(count = AR(), biomass = RW())
+
+# ...can't be passed to this function:
+generate_combined_stancode(obs_setup, trend_setup, trend_spec)  # Expects single trend_spec
+```
 
 ## Common Error Patterns
 

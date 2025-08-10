@@ -169,6 +169,45 @@ formula2str_mvgam <- function(formula, space = "trim") {
   return(x)
 }
 
+#' Get Dynamic Trend Validation Patterns
+#'
+#' @description
+#' Dynamically generates regex patterns for detecting trend constructors
+#' based on the current trend registry. This ensures validation works
+#' with custom trend types without hard-coding patterns.
+#'
+#' @return Named character vector of regex patterns
+#' @noRd
+get_trend_validation_patterns <- function() {
+  # Get all registered trend types from the registry
+  if (!exists("trend_registry", envir = asNamespace("mvgam"))) {
+    # Fallback to original patterns if registry not available
+    return(c(
+      "\\bRW\\s*\\(" = "RW()",
+      "\\bAR\\s*\\(" = "AR()",
+      "\\bVAR\\s*\\(" = "VAR()",
+      "\\bGP\\s*\\(" = "GP()",
+      "\\bCAR\\s*\\(" = "CAR()",
+      "\\bZMVN\\s*\\(" = "ZMVN()"
+    ))
+  }
+  
+  # Access trend registry from mvgam namespace
+  trend_registry <- get("trend_registry", envir = asNamespace("mvgam"))
+  trend_types <- ls(trend_registry)
+  
+  # Generate patterns dynamically
+  patterns <- character(length(trend_types))
+  names(patterns) <- paste0("\\b", trend_types, "\\s*\\(")
+  
+  # Create the values (display names)
+  for (i in seq_along(trend_types)) {
+    patterns[i] <- paste0(trend_types[i], "()")
+  }
+  
+  return(patterns)
+}
+
 #' Validate observation formula excludes mvgam trend constructors
 #'
 #' Main validation for observation formulas - ensures they're clean for brms
@@ -191,15 +230,8 @@ validate_obs_formula_brms <- function(formula) {
   # Extract string representation for pattern matching
   formula_str <- formula2str_mvgam(formula)
   
-  # Check for mvgam trend constructors
-  trend_patterns <- c(
-    "\\bRW\\s*\\(" = "RW()",
-    "\\bAR\\s*\\(" = "AR()",
-    "\\bVAR\\s*\\(" = "VAR()",
-    "\\bGP\\s*\\(" = "GP()",
-    "\\bCAR\\s*\\(" = "CAR()",
-    "\\bZMVN\\s*\\(" = "ZMVN()"
-  )
+  # Check for mvgam trend constructors using dynamic registry lookup
+  trend_patterns <- get_trend_validation_patterns()
   
   detected_trends <- character(0)
   for (pattern in names(trend_patterns)) {
