@@ -4,26 +4,25 @@ You are an AI assistant helping me to refactor an existing R package called mvga
 
 ## Current Situation
 
-We have just completed fixing a critical stanvars class structure issue where our custom trend generators were creating corrupted list objects instead of proper brms stanvars collections. This will help us to inject appropriate Stan code snippets into the brms-generated observation Stan model, as well as any necessary data that needs to be added to the brms-generated Stan data objects. Now we are moving into testing of the full Stan model and Stan code constructions, as well as testing if models compile properly.
+We have just completed building our stanvars class structure to allow custom trend generators to create valid brms stanvars collections. This will help us to inject appropriate Stan code snippets into the brms-generated observation Stan model, as well as any necessary data that needs to be added to the brms-generated Stan data objects.
 
 ## Your Task
 
 Please follow these steps sequentially:
 
 1. **Read and analyze these files in order:**
-   - `active/current-sprint.md` - Contains the critical issues section with test results
-   - `active/architecture-decisions.md` - Contains design principles and naming conventions
-   - `R/stan_assembly.R` - The main Stan code assembly pipeline
-   - `R/mvgam_core.R` - The main user-facing function for defining models
+   - `active/quick-reference.md`
+   - `active/architecture-decisions.md`
+   - `active/current-sprint.md`
 
-2. **Use thinking/reasoning to analyze:**
+3. **Gather refactoring function context**:
+   - Use the architecture-analyzer agent to provide a systematic overview of the following R files: `R/stan_assembly.R`, `R/mvgam_core.R`, `R/brms_integration.R`, `R/trend_system.R`, `R/validations.R`
+
+4. **Use thinking/reasoning to analyze:**
    - The formula interface and how trend constructors are called and validated
    - The flow of stanvar objects through the combination pipeline
    - The merging of trend and observation data and model objects
 
-3. **Create a five-step implementation plan to address any immediate action points highlighted in `active/current-sprint.md`**. Use natural language to describe the plan, not code examples.
+5. **Create a five-step implementation plan to address any immediate action points highlighted in `active/current-sprint.md`**. Use natural language to describe the plan, not code examples.
 
 If any of these tasks are ambiguous or unclear to you, please ask me targeted questions so that we can come up with a robust plan together.
-
-
-What else do you need to know before you can implement this?
