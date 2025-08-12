@@ -18,8 +18,8 @@
 **Pattern**:
 ```r
 mvgam(
-  formula,              # Observation model (standard brms)
-  trend_formula,        # State-Space dynamics (mvgam extension)
+  formula,              # Observation model
+  trend_formula,        # State-Space dynamics
   data, family, ...
 )
 ```
@@ -43,7 +43,7 @@ mvgam(y ~ x1 + x2, trend_formula = ~ AR(), data = data)
 ```
 
 ### 3. Stan Integration Strategy: Two-Stage Assembly
-**Decision**: Leverage brms stanvars system rather than modifying brms internals  
+**Decision**: Leverage brms stanvars system
 **Stage 1**: Generate trend stanvars and trend Stan data  
 **Stage 2**: Post-process observation model Stan code to inject trend effects and create the combined model
 
@@ -74,16 +74,6 @@ mvgam(
 
 ### 1. Non-Vectorized Likelihood with Missing Data
 **Pattern**: Follow brms non-vectorized likelihood handling for missing observations
-```stan
-// Trends evolve over ALL timesteps (including missing)
-trend[2:T] ~ normal(trend[1:(T-1)], sigma_trend);
-
-// Likelihood only for non-missing observations
-{
-  vector[n_nonmissing] selected_mu = mu_combined[obs_ind];
-  flat_ys ~ family_distribution(selected_mu, ...);
-}
-```
 
 ### 2. Response-Specific Parameter Naming
 **Pattern**: Follow brms multivariate naming conventions
@@ -101,23 +91,8 @@ mu_count += mu_trend_count;
 mu_biomass += mu_trend_biomass;
 ```
 
-### 3. Non-Centered Parameterization Standard
-**Decision**: Always use non-centered parameterization for trends
-```stan
-parameters {
-  matrix[n, n_lv] LV_raw;          // Raw innovations
-  vector<lower=0>[n_lv] sigma;     // Scaling parameters
-}
-
-transformed parameters {
-  matrix[n, n_lv] LV;
-  LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));
-  // Apply State-Space evolution...
-}
-```
-
-### 4. Factor Model Architecture: Matrix Z Patterns
-**Critical Design**: Factor models are a capability of compatible trend types, not a separate trend type
+### 3. Factor Model Architecture: Matrix Z Patterns
+**Design Principle**: Factor models are a capability of compatible trend types
 
 **Factor Model Detection Logic**:
 - **Trigger**: Presence of `n_lv` parameter in trend specification
@@ -130,16 +105,16 @@ transformed parameters {
 1. **Detection**: Factor models triggered by `n_lv < n_series` on compatible trend types
 2. **Validation**: Registry-based compatibility checking prevents invalid factor models
 3. **Variance Constraint**: Dynamic factor variances must be fixed to 1 for identifiability
-4. **Matrix Z Location**: Estimated in `parameters` block (factor model) vs `transformed data` (non-factor), or supplied in 'data' block when trend mapping
+4. **Matrix Z Location**: Estimated in `parameters` block (factor model) vs `transformed data` (non-factor), or supplied in `data` block when trend mapping
 5. **Universal Computation**: All factor models use `trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[ytimes[i, s]]`; non-factor models use `trend[i, s] = dot_product(Z[s, :], LV[i, :]);`
 6. **Code Deduplication**: Shared utility functions ensure consistent patterns across trend types
 7. **Registration**: New trend types must explicitly declare factor compatibility in registry
 
-### 5. Code Deduplication for User Extensibility
+### 4. Code Deduplication for User Extensibility
 
 **Design Principle**: Eliminate redundant code to simplify custom trend development
 
-### 6. Hierarchical Correlation Architecture
+### 5. Hierarchical Correlation Architecture
 
 **Design Principle**: Some trends (AR, VAR, CAR, ZMVN) support hierarchical correlations with groups and subgroups
 
@@ -174,12 +149,7 @@ transformed parameters {
 **Decision**: Use `backend = "mock"` for lightweight brms setup
 **Application**: All internal brms calls for stancode/standata generation
 
-### 2. Registry Lookup Performance
-**Target**: <1ms overhead for trend type dispatch
-**Fallback**: Direct function calls if registry becomes bottleneck
-
-### 3. Memory Optimization Targets
-- 30-50% reduction in object sizes through compressed storage
+### 2. Memory Optimization Targets
 - Efficient missing data handling without redundant copies
 - Shared parameter storage across dual objects
 
@@ -299,9 +269,7 @@ matrix[n_lv, n_lv] Sigma;              // CONFLICTS with multivariate families
 
 ### 9. brms Stanvar Block Naming Conventions
 
-**Critical Implementation Detail**: brms uses abbreviated block names internally that differ from full Stan block names
-
-**brms Abbreviated Names** (used in stanvar objects):
+**brms Uses Abbreviated Names** (used in stanvar objects):
 - `"data"` → `data`
 - `"tdata"` → `transformed data`  
 - `"parameters"` → `parameters`
@@ -312,9 +280,7 @@ matrix[n_lv, n_lv] Sigma;              // CONFLICTS with multivariate families
 **Key Points**:
 1. **stanvar creation**: Use abbreviated names (`"tparameters"`, `"tdata"`)
 2. **Validation functions**: Must accept both abbreviated and full names
-3. **Test expectations**: Should expect abbreviated names in stanvar objects
-4. **Stan compilation**: brms automatically converts abbreviated to full names
-5. **Don't manually convert**: Let brms handle the name conversion internally
+3. **Stan compilation**: brms automatically converts abbreviated to full names
 
 **Example**:
 ```r
