@@ -6,17 +6,14 @@
 # architecture enables seamless brms ecosystem integration while preserving
 # mvgam-specific State-Space modeling functionality.
 
-# ------------------------------------------------------------------------------
-# ENHANCED MVGAM FITTING ARCHITECTURE
-# ------------------------------------------------------------------------------
-# The enhanced mvgam function provides unified entry point that handles both
+# The mvgam function provides unified entry point that handles both
 # single datasets and multiple imputation scenarios transparently, ensuring
 # consistent behavior across different input types.
 
-#' Enhanced mvgam Function with Single-Fit Architecture
+#' mvgam Function with Single-Fit Architecture
 #'
 #' @description
-#' Enhanced mvgam implementation using single-fit dual-object architecture
+#' mvgam implementation using single-fit dual-object architecture
 #' with native multiple imputation support and brms ecosystem integration.
 #'
 #' @param formula Main observation model formula (supports brms syntax)
@@ -28,7 +25,7 @@
 #' @param ... Additional arguments passed to Stan fitting
 #' @return mvgam object with dual brmsfit-like structure
 #' @export
-mvgam_enhanced <- function(formula, trend_formula = NULL, data = NULL,
+mvgam <- function(formula, trend_formula = NULL, data = NULL,
                            backend = getOption("brms.backend", "cmdstanr"),
                            combine = TRUE, family = poisson(), ...) {
 
