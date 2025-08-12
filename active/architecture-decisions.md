@@ -359,7 +359,7 @@ mv_spec$trend_specs = list(
 
 ## Developer Onboarding Guide
 
-**Consolidated Architecture Files (4 Core Files):**
+**Core R Files:**
 - `R/trend_system.R` - Complete trend infrastructure (registry, parsing, constructors)
 - `R/stan_assembly.R` - Two-stage Stan assembly orchestration
 - `R/brms_integration.R` - Enhanced brms setup and ecosystem integration
