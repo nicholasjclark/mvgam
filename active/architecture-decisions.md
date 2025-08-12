@@ -265,10 +265,6 @@ variable_info = list(
 **Factor Management**: `validate_factor_levels()` checks for unused levels; `validate_complete_grouping()` ensures hierarchical consistency  
 **Stan Preparation**: `prepare_stan_data()` auto-drops unused levels and orders data (series-first, time-within-series) for efficient computation
 
-### 7. Backward Compatibility
-**Policy**: Maintain compatibility with existing mvgam interfaces where possible
-**Exception**: Breaking changes allowed only when essential for brms integration
-
 ### 7. Stanvars Combination Architecture
 
 **Critical Design Decision**: All trend generators must return proper brms "stanvars" class objects
@@ -336,7 +332,7 @@ valid_blocks <- c("tparameters", "transformed_parameters", "tdata", "transformed
 
 ### Data Flow Overview
 ```
-User Input → mvgam_enhanced() → parse_multivariate_trends() → setup_brms_lightweight() 
+User Input → mvgam() → parse_multivariate_trends() → setup_brms_lightweight() 
 → generate_combined_stancode() → fit_mvgam_model() → create_mvgam_from_combined_fit()
 ```
 
