@@ -1,7 +1,8 @@
 ---
-name: r-package-architecture-analyzer
+name: architecture-analyzer
 description: Deploy when you need to understand function dependencies and data flow within specific R files during refactoring. Use before major refactoring tasks, when investigating function relationships, or when integrating new code with existing functions. Always specify exact file paths - this agent does not search directories.
 tools: repl
+color: cyan
 ---
 
 # R Package Architecture Analyzer
