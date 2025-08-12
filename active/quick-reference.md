@@ -141,7 +141,7 @@ validate_stan_code_structure(stan_code)    # Check required blocks exist
 are_braces_balanced(stan_code)             # Check brace matching
 ```
 
-## Stan Assembly Integration with mvgam_enhanced()
+## Stan Assembly Integration with mvgam()
 
 ### Key Integration Points
 
