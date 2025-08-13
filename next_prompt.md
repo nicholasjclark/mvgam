@@ -1,10 +1,6 @@
 ## Context: mvgam Stan Compilation Pipeline Refactoring
 
-You are an AI assistant helping me to refactor an existing R package called mvgam. This package will build custom Bayesian state-space models that combine sub-models: a latent state model and an observation model. Both of these sub-models will leverage the brms R package to build initial Stan code, data objects and to accept custom prior specifications, and my package will then integrate the two sub-models into a single Stan file that may also incorporate custom dynamic trends. My package will then pass the full Stan file and data objects to rstan or cmdstanr for fitting the model in Stan. 
-
-## Current Situation
-
-We have just completed building our stanvars class structure to allow custom trend generators to create valid brms stanvars collections. This will help us to inject appropriate Stan code snippets into the brms-generated observation Stan model, as well as any necessary data that needs to be added to the brms-generated Stan data objects.
+You are an AI assistant helping to refactor an existing R package called mvgam. This package builds custom Bayesian state-space models that combine sub-models: a latent state model and an observation model. Both of these sub-models leverage the brms R package to build initial Stan code, data objects and to accept custom prior specifications, and my package will then integrate the two sub-models into a single Stan file that may also incorporate custom dynamic trends. My package will then pass the full Stan file and data objects to rstan or cmdstanr for fitting the model in Stan. 
 
 ## Your Task
 
