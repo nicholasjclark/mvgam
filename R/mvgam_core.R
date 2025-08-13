@@ -162,19 +162,19 @@ mvgam_single_dataset <- function(formula, trend_formula, data, backend,
 #' @noRd
 generate_combined_stancode_and_data <- function(obs_setup, trend_setup, mv_spec) {
 
-  # Convert mv_spec to trend_spec format expected by modern system
-  trend_spec <- if (mv_spec$has_trends && !is.null(mv_spec$trend_specs)) {
-    # Use the first trend spec as representative (modern system handles multivariate)
-    mv_spec$trend_specs[[1]]
+  # Extract trend_specs from mv_spec for the new system
+  trend_specs <- if (mv_spec$has_trends && !is.null(mv_spec$trend_specs)) {
+    # Pass the complete trend_specs (handles both univariate and multivariate)
+    mv_spec$trend_specs
   } else {
     NULL
   }
 
-  # Use the two-stage assembly system from stan_assembly.R
+  # Use the enhanced two-stage assembly system from stan_assembly.R
   result <- generate_combined_stancode(
     obs_setup = obs_setup,
     trend_setup = trend_setup,
-    trend_spec = trend_spec,
+    trend_specs = trend_specs,  # Updated parameter name
     validate = TRUE,
     silent = 1
   )

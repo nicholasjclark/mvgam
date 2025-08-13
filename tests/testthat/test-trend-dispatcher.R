@@ -456,7 +456,7 @@ test_that("custom trend registration works correctly", {
   }
 
   # Create a simple generator function for the custom trend
-  custom_generator <- function(trend_spec, data_info) {
+  custom_generator <- function(trend_specs, data_info) {
     # Simple generator that returns basic stanvars
     list(
       custom_param = brms::stanvar(

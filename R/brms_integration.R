@@ -309,9 +309,9 @@ create_trend_base_formula <- function(trend_specs) {
 # effects should be injected into the parameter structure. This system enables
 # mvgam trends to work with brms nonlinear modeling capabilities while
 # maintaining proper identifiability and parameter interpretation.#' @noRd
-handle_nonlinear_model <- function(formula, trend_spec = NULL) {
+handle_nonlinear_model <- function(formula, trend_specs = NULL) {
   checkmate::assert_formula(formula)
-  checkmate::assert_list(trend_spec, null.ok = TRUE)
+  checkmate::assert_list(trend_specs, null.ok = TRUE)
   
   # Check if this is a nonlinear model
   is_nonlinear <- is_nonlinear_formula(formula)
@@ -330,10 +330,10 @@ handle_nonlinear_model <- function(formula, trend_spec = NULL) {
   nl_components <- extract_nonlinear_components(formula)
   
   # Determine where trends should be injected
-  trend_injection_point <- determine_trend_injection_point(nl_components, trend_spec)
+  trend_injection_point <- determine_trend_injection_point(nl_components, trend_specs)
   
   # Validate trend compatibility with nonlinear structure
-  validate_nonlinear_trend_compatibility(nl_components, trend_spec)
+  validate_nonlinear_trend_compatibility(nl_components, trend_specs)
   
   return(list(
     formula = formula,
@@ -418,14 +418,14 @@ parse_nonlinear_manually <- function(formula) {
 #' Trends typically affect the main response parameter.
 #' 
 #' @param nl_components List of nonlinear components
-#' @param trend_spec Trend specification
+#' @param trend_specs Trend specification
 #' @return Character string indicating injection point
 #' @noRd
-determine_trend_injection_point <- function(nl_components, trend_spec) {
+determine_trend_injection_point <- function(nl_components, trend_specs) {
   checkmate::assert_list(nl_components)
-  checkmate::assert_list(trend_spec, null.ok = TRUE)
+  checkmate::assert_list(trend_specs, null.ok = TRUE)
   
-  if (is.null(trend_spec)) {
+  if (is.null(trend_specs)) {
     return("mu")  # Default injection point
   }
   
@@ -436,12 +436,12 @@ determine_trend_injection_point <- function(nl_components, trend_spec) {
     main_param <- nl_components$nonlinear_params[1]
     
     # Check if trend specification indicates specific parameter
-    if (!is.null(trend_spec$target_parameter)) {
-      if (trend_spec$target_parameter %in% nl_components$nonlinear_params) {
-        return(trend_spec$target_parameter)
+    if (!is.null(trend_specs$target_parameter)) {
+      if (trend_specs$target_parameter %in% nl_components$nonlinear_params) {
+        return(trend_specs$target_parameter)
       } else {
         insight::format_warning(
-          "Specified trend target parameter '{trend_spec$target_parameter}' not found.",
+          "Specified trend target parameter '{trend_specs$target_parameter}' not found.",
           "Using main parameter '{main_param}' instead."
         )
       }
@@ -476,15 +476,15 @@ extract_response_from_formula <- function(formula) {
 #' 
 #' @param stancode Character string of base Stan code
 #' @param nl_info List containing nonlinear model information
-#' @param trend_spec Trend specification
+#' @param trend_specs Trend specification
 #' @return Character string of modified Stan code
 #' @noRd
-modify_stancode_for_nonlinear <- function(stancode, nl_info, trend_spec) {
+modify_stancode_for_nonlinear <- function(stancode, nl_info, trend_specs) {
   checkmate::assert_string(stancode)
   checkmate::assert_list(nl_info)
-  checkmate::assert_list(trend_spec, null.ok = TRUE)
+  checkmate::assert_list(trend_specs, null.ok = TRUE)
   
-  if (!nl_info$is_nonlinear || is.null(trend_spec)) {
+  if (!nl_info$is_nonlinear || is.null(trend_specs)) {
     return(stancode)
   }
   
@@ -529,27 +529,27 @@ modify_stancode_for_nonlinear <- function(stancode, nl_info, trend_spec) {
 #' Integrates nonlinear model support with the main Stan assembly system.
 #' 
 #' @param obs_setup Observation model setup
-#' @param trend_spec Trend specification
+#' @param trend_specs Trend specification
 #' @return Modified setup with nonlinear information
 #' @noRd
-integrate_nonlinear_with_assembly <- function(obs_setup, trend_spec) {
+integrate_nonlinear_with_assembly <- function(obs_setup, trend_specs) {
   checkmate::assert_list(obs_setup)
-  checkmate::assert_list(trend_spec, null.ok = TRUE)
+  checkmate::assert_list(trend_specs, null.ok = TRUE)
   
   # Process formula for nonlinear structure
-  nl_info <- handle_nonlinear_model(obs_setup$formula, trend_spec)
+  nl_info <- handle_nonlinear_model(obs_setup$formula, trend_specs)
   
   # Add nonlinear information to setup
   obs_setup$nonlinear_info <- nl_info
   
   # Modify trend specification if needed for nonlinear models
-  if (nl_info$is_nonlinear && !is.null(trend_spec)) {
-    trend_spec$target_parameter <- nl_info$trend_injection_point
-    trend_spec$is_nonlinear_model <- TRUE
+  if (nl_info$is_nonlinear && !is.null(trend_specs)) {
+    trend_specs$target_parameter <- nl_info$trend_injection_point
+    trend_specs$is_nonlinear_model <- TRUE
   }
   
   return(list(
     obs_setup = obs_setup,
-    trend_spec = trend_spec
+    trend_specs = trend_specs
   ))
 }

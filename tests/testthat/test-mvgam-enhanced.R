@@ -325,10 +325,10 @@ test_that("generate_trend_stanvars processes multiple trend types", {
   var_stanvars <- list(var_code = "VAR implementation")
   
   with_mocked_bindings(
-    generate_trend_type_stanvars = function(trend_spec, resp_name) {
-      if (trend_spec$trend_type == "AR") ar_stanvars
-      else if (trend_spec$trend_type == "RW") rw_stanvars
-      else if (trend_spec$trend_type == "VAR") var_stanvars
+    generate_trend_type_stanvars = function(trend_specs, resp_name) {
+      if (trend_specs$trend_type == "AR") ar_stanvars
+      else if (trend_specs$trend_type == "RW") rw_stanvars
+      else if (trend_specs$trend_type == "VAR") var_stanvars
       else list()
     },
     {

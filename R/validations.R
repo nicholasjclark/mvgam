@@ -4,23 +4,23 @@
 #' Validates that trend specifications are compatible with nonlinear model structure.
 #' 
 #' @param nl_components List of nonlinear components
-#' @param trend_spec Trend specification
+#' @param trend_specs Trend specification
 #' @return Invisible TRUE if valid, stops with error if invalid
 #' @noRd
-validate_nonlinear_trend_compatibility <- function(nl_components, trend_spec) {
+validate_nonlinear_trend_compatibility <- function(nl_components, trend_specs) {
   checkmate::assert_list(nl_components)
-  checkmate::assert_list(trend_spec, null.ok = TRUE)
+  checkmate::assert_list(trend_specs, null.ok = TRUE)
   
-  if (is.null(trend_spec)) {
+  if (is.null(trend_specs)) {
     return(invisible(TRUE))
   }
   
   # Check that trend type is compatible with nonlinear models
   incompatible_trends <- c()  # Currently all trends should work
   
-  if (trend_spec$type %in% incompatible_trends) {
+  if (trend_specs$type %in% incompatible_trends) {
     stop(insight::format_error(
-      "Trend type '{trend_spec$type}' is not compatible with nonlinear models.",
+      "Trend type '{trend_specs$type}' is not compatible with nonlinear models.",
       "Consider using different trend specification."
     ))
   }
@@ -980,6 +980,35 @@ is.mvgam_trend <- function(x) {
   inherits(x, "mvgam_trend")
 }
 
+#' Check if trend_specs represents multivariate trends
+#'
+#' @description
+#' Determines whether trend specifications represent a multivariate model
+#' (named list of trend specifications) or a univariate model (single trend).
+#'
+#' @param trend_specs Trend specifications to check
+#' @return Logical indicating if multivariate
+#' @noRd
+is_multivariate_trend_specs <- function(trend_specs) {
+  if (is.null(trend_specs)) {
+    return(FALSE)
+  }
+  
+  # Multivariate case: named list where each element is a trend specification
+  if (is.list(trend_specs) && !is.null(names(trend_specs))) {
+    # Check if it looks like a named list of trend specs (not a single trend)
+    # Single trend specs have 'trend', 'trend_type', or 'trend_model' field
+    # Multivariate has response names instead
+    has_trend_field <- any(c("trend", "trend_type", "trend_model") %in% names(trend_specs))
+    if (!has_trend_field) {
+      return(TRUE)
+    }
+  }
+  
+  # Univariate case: single trend specification with trend field
+  return(FALSE)
+}
+
 #' @noRd
 validate_trend <- function(trend_obj, ...) {
 
@@ -1103,21 +1132,21 @@ validate_dynamic_factor_constraints <- function(trend_obj) {
 #' @description
 #' Check if a trend specification is compatible with factor models.
 #'
-#' @param trend_spec Trend specification object
+#' @param trend_specs Trend specification object
 #' @return Invisibly returns TRUE if compatible, stops with error if not
 #' @noRd
-validate_factor_compatibility <- function(trend_spec) {
+validate_factor_compatibility <- function(trend_specs) {
   # Only validate if n_lv is specified (indicating factor model intent)
-  if (is.null(trend_spec$n_lv)) {
+  if (is.null(trend_specs$n_lv)) {
     return(invisible(TRUE))
   }
 
   # Check if trend type supports factor models
   # Handle both trend_type and trend field names for compatibility
-  trend_type <- trend_spec$trend_type %||% trend_spec$trend
+  trend_type <- trend_specs$trend_type %||% trend_specs$trend
   if (is.null(trend_type)) {
     stop(insight::format_error(
-      "trend_spec must contain {.field trend_type} or {.field trend} field"
+      "trend_specs must contain {.field trend_type} or {.field trend} field"
     ))
   }
   trend_info <- get_trend_info(trend_type)
@@ -1550,15 +1579,116 @@ is_valid_stanvar <- function(stanvar) {
 #'
 #' Checks if a trend specification is valid for code generation.
 #'
-#' @param trend_spec Trend specification object
+#' @param trend_specs Trend specification object
 #' @return Logical indicating validity
 #' @noRd
-validate_trend_spec <- function(trend_spec) {
-  if (!is.list(trend_spec)) return(FALSE)
-  if (is.null(trend_spec$trend_type)) return(FALSE)
-  if (!trend_spec$trend_type %in% list_trend_types()$trend_type) return(FALSE)
+validate_trend_specs <- function(trend_specs) {
+  if (!is.list(trend_specs)) return(FALSE)
+  if (is.null(trend_specs$trend_type)) return(FALSE)
+  if (!trend_specs$trend_type %in% list_trend_types()$trend_type) return(FALSE)
 
   TRUE
+}
+
+#' Extract Time Series Dimensions from Data
+#'
+#' @description
+#' Extracts core time series dimensions directly from data and validates
+#' structure based on trend type. This is the single source of truth for
+#' all time series dimensions used throughout the system.
+#'
+#' @param data Data frame containing time series
+#' @param time_var Name of time variable (default: "time")
+#' @param series_var Name of series variable (default: "series")
+#' @param trend_type Type of trend model ("CAR" allows irregular intervals)
+#' @return List with time series dimensions and metadata
+#' @noRd
+extract_time_series_dimensions <- function(data, time_var = "time", series_var = "series", trend_type = NULL) {
+  checkmate::assert_data_frame(data, min.rows = 1)
+  checkmate::assert_string(time_var)
+  checkmate::assert_string(series_var)
+  
+  # Validate required variables exist
+  if (!time_var %in% colnames(data)) {
+    stop(insight::format_error(
+      "Time variable '{time_var}' not found in data.",
+      "Available variables: {paste(colnames(data), collapse = ', ')}"
+    ), call. = FALSE)
+  }
+  
+  if (!series_var %in% colnames(data)) {
+    stop(insight::format_error(
+      "Series variable '{series_var}' not found in data.", 
+      "Available variables: {paste(colnames(data), collapse = ', ')}"
+    ), call. = FALSE)
+  }
+  
+  # Calculate core dimensions from data
+  unique_times <- unique(data[[time_var]])
+  unique_series <- unique(data[[series_var]])
+  min_time <- min(data[[time_var]], na.rm = TRUE)
+  max_time <- max(data[[time_var]], na.rm = TRUE)
+  
+  dimensions <- list(
+    n_time = length(unique_times),          # Number of unique time points
+    n_series = length(unique_series),       # Number of series  
+    n_obs = nrow(data),                    # Total observations
+    time_range = c(min_time, max_time),    # Time range
+    time_var = time_var,                   # Variable names for downstream use
+    series_var = series_var,
+    unique_times = sort(unique_times),     # Sorted unique time points
+    unique_series = sort(unique_series)    # Sorted unique series
+  )
+  
+  # Validate regular intervals for non-CAR trends
+  if (!is.null(trend_type) && trend_type != "CAR") {
+    validate_regular_time_intervals(data, time_var, series_var, dimensions)
+  }
+  
+  return(dimensions)
+}
+
+#' Validate Regular Time Intervals
+#' 
+#' @description
+#' Ensures each series has observations for all time points (regular intervals).
+#' This is required for most trend types except CAR.
+#'
+#' @param data Data frame
+#' @param time_var Name of time variable  
+#' @param series_var Name of series variable
+#' @param dimensions Pre-calculated dimensions (for efficiency)
+#' @return Invisible TRUE if valid, stops with error if invalid
+#' @noRd
+validate_regular_time_intervals <- function(data, time_var, series_var, dimensions) {
+  min_time <- dimensions$time_range[1]
+  max_time <- dimensions$time_range[2]
+  
+  all_times_avail <- function(time, min_time, max_time) {
+    identical(
+      as.numeric(sort(time)),
+      as.numeric(seq.int(from = min_time, to = max_time))
+    )
+  }
+  
+  # Check each series has all time points
+  data.frame(series = data[[series_var]], time = data[[time_var]]) %>%
+    dplyr::group_by(series) %>%
+    dplyr::summarise(
+      all_there = all_times_avail(time, min_time, max_time),
+      .groups = "drop"
+    ) -> checked_times
+    
+  if (any(checked_times$all_there == FALSE)) {
+    missing_series <- checked_times$series[!checked_times$all_there]
+    stop(insight::format_error(
+      "Time series validation failed.",
+      "Series {paste(missing_series, collapse = ', ')} missing observations for some time points.",
+      "All series must have observations (even if NA) for each time point from {min_time} to {max_time}."
+    ), call. = FALSE)
+  }
+  
+  invisible(TRUE)
 }
 
 #' Validate Time Series Structure for Trends
@@ -1568,35 +1698,47 @@ validate_trend_spec <- function(trend_spec) {
 #' Leverages existing mvgam validation functions.
 #'
 #' @param data Data to validate (data.frame or list)
-#' @param trend_spec Trend specification containing trend model info
+#' @param trend_specs Trend specification containing trend model info
 #' @param silent Verbosity level
 #' @return Invisible TRUE if valid, stops with error if invalid
 #' @noRd
-validate_time_series_for_trends <- function(data, trend_spec, silent = 1) {
+validate_time_series_for_trends <- function(data, trend_specs, silent = 1) {
   checkmate::assert_data_frame(data, min.rows = 1)
-  checkmate::assert_list(trend_spec)
+  checkmate::assert_list(trend_specs)
 
-  # Use existing mvgam validation function
-  # Pass the complete trend_spec (mvgam_trend object) for variable names
-  validated_data <- validate_series_time(
-      data = data,
-      name = "data",
-      trend_model = trend_spec,
-      check_levels = TRUE,
-      check_times = TRUE
-    )
+  # Extract variable names from trend specification
+  time_var <- trend_specs$time_var %||% trend_specs$time %||% "time"
+  series_var <- trend_specs$series_var %||% trend_specs$series %||% "series"
+  trend_type <- trend_specs$trend_type %||% trend_specs$trend_model
   
-  # Additional brms-specific validations for time series
-  # Only validate temporal structure for trends that require it
-  if (trend_model %in% c("RW", "AR", "VAR")) {
-    check_regular_time_intervals(data, silent = silent)
-  }
+  # Use new dimension extraction function (validates structure + returns dimensions)
+  dimensions <- extract_time_series_dimensions(
+    data = data,
+    time_var = time_var,
+    series_var = series_var, 
+    trend_type = trend_type
+  )
 
+  # Additional validation using existing mvgam infrastructure
+  validated_data <- validate_series_time(
+    data = data,
+    name = "data", 
+    trend_model = trend_specs,
+    check_levels = TRUE,
+    check_times = (trend_type != "CAR")  # CAR doesn't need regular time checks
+  )
+  
   if (silent < 2) {
-    message("Time series structure validated for trend model: ", trend_model)
+    message("Time series structure validated for trend model: ", trend_type)
+    message("Dimensions: n_time=", dimensions$n_time, ", n_series=", dimensions$n_series, 
+            ", n_obs=", dimensions$n_obs)
   }
 
-  invisible(TRUE)
+  # Return both validated data and dimensions for downstream use
+  invisible(list(
+    data = validated_data,
+    dimensions = dimensions
+  ))
 }
 
 #'Argument validation functions

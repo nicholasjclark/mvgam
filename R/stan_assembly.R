@@ -18,29 +18,138 @@
 # WHY: The two-stage assembly system is critical for mvgam-brms integration
 # because it allows mvgam to extend brms models without modifying brms
 # internals. Stage 1 leverages brms' robust model compilation, while Stage 2
-# adds mvgam-specific trend dynamics through stanvars injection.#' @noRd
+# adds mvgam-specific trend dynamics through stanvars injection.
+
+#' Apply Response Suffix to Trend Stanvars
+#' 
+#' @description
+#' Post-processes stanvars to apply response-specific naming for multivariate models.
+#' This systematic approach ensures all trend parameters get proper suffixes without
+#' requiring manual updates to individual trend generators.
+#' 
+#' @param stanvars List of stanvar objects or single stanvar object
+#' @param response_suffix Response suffix (e.g., "_y1", "_y2")
+#' @return Modified stanvars with response-specific parameter names
+#' @noRd
+apply_response_suffix_to_stanvars <- function(stanvars, response_suffix) {
+  if (is.null(stanvars) || response_suffix == "" || is.null(response_suffix)) {
+    return(stanvars)
+  }
+  
+  # Define all trend parameter patterns that need suffixing
+  trend_patterns <- c(
+    "sigma_trend",
+    "mu_trend", 
+    "L_Omega_trend",
+    "Sigma_trend",
+    "raw_innovations",
+    "LV_innovations",
+    "LV",
+    "theta1_trend",
+    "ar\\d*_trend",  # ar1_trend, ar2_trend, etc.
+    "A\\d*_trend",   # A1_trend, A2_trend for VAR
+    "n_lv_trend",
+    "n_trend",
+    "trend_"
+  )
+  
+  # Handle both single stanvar and list of stanvars
+  if (inherits(stanvars, "stanvar")) {
+    stanvars <- list(stanvars)
+    single_stanvar <- TRUE
+  } else {
+    single_stanvar <- FALSE
+  }
+  
+  # Process each stanvar
+  for (i in seq_along(stanvars)) {
+    stanvar <- stanvars[[i]]
+    
+    if (!is.null(stanvar) && inherits(stanvar, "stanvar")) {
+      # Update the stanvar name if it matches a trend pattern
+      original_name <- stanvar$name
+      new_name <- apply_suffix_to_name(original_name, trend_patterns, response_suffix)
+      stanvar$name <- new_name
+      
+      # Update all parameter references in the Stan code
+      if (!is.null(stanvar$scode) && nchar(stanvar$scode) > 0) {
+        stanvar$scode <- apply_suffix_to_stan_code(stanvar$scode, trend_patterns, response_suffix)
+      }
+      
+      stanvars[[i]] <- stanvar
+    }
+  }
+  
+  # Return single stanvar or list as appropriate
+  if (single_stanvar) {
+    return(stanvars[[1]])
+  } else {
+    return(stanvars)
+  }
+}
+
+#' Apply Suffix to Parameter Name
+#' @noRd
+apply_suffix_to_name <- function(name, patterns, suffix) {
+  for (pattern in patterns) {
+    if (grepl(paste0("^", pattern, "$"), name, perl = TRUE)) {
+      return(paste0(name, suffix))
+    }
+  }
+  return(name)
+}
+
+#' Apply Suffix to Stan Code
+#' @noRd
+apply_suffix_to_stan_code <- function(stan_code, patterns, suffix) {
+  for (pattern in patterns) {
+    # Handle word boundaries to avoid partial matches
+    # Match pattern as whole word (not part of another identifier)
+    regex_pattern <- paste0("\\b", pattern, "\\b")
+    replacement <- paste0(pattern, suffix)
+    
+    # Use perl = TRUE for better regex support
+    stan_code <- gsub(regex_pattern, replacement, stan_code, perl = TRUE)
+  }
+  
+  return(stan_code)
+}
+
+#' @noRd
 generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
-                                      trend_spec = NULL, backend = "rstan",
+                                      trend_specs = NULL, backend = "rstan",
                                       validate = TRUE, silent = 1) {
   checkmate::assert_list(obs_setup, names = "named")
   checkmate::assert_list(trend_setup, null.ok = TRUE)
-  checkmate::assert_list(trend_spec, null.ok = TRUE)
+  checkmate::assert_list(trend_specs, null.ok = TRUE)
   checkmate::assert_choice(backend, c("rstan", "cmdstanr"))
   checkmate::assert_flag(validate)
   checkmate::assert_number(silent)
 
   # If no trend specification, return observation model as-is
-  if (is.null(trend_setup) || is.null(trend_spec)) {
-    insight::format_warning(
-      "No trend specification provided.",
-      "Returning observation model without trend components."
-    )
+  if (is.null(trend_setup) || is.null(trend_specs)) {
+    if (silent < 2) {
+      message("No trend specification provided. Returning observation model without trends.")
+    }
 
     return(list(
       stancode = obs_setup$stancode,
       standata = obs_setup$standata,
-      has_trends = FALSE
+      has_trends = FALSE,
+      is_multivariate = FALSE
     ))
+  }
+
+  # Determine if we have multivariate trends
+  is_multivariate <- is_multivariate_trend_specs(trend_specs)
+  responses_with_trends <- c()
+  
+  if (silent < 2) {
+    if (is_multivariate) {
+      message("Processing multivariate model with ", length(trend_specs), " responses")
+    } else {
+      message("Processing univariate model")
+    }
   }
 
   # Stage 1: Extract trend stanvars from brms setup
@@ -48,7 +157,48 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
     message("Stage 1: Extracting trend stanvars from brms setup...")
   }
 
-  trend_stanvars <- extract_trend_stanvars_from_setup(trend_setup, trend_spec)
+  # Handle both univariate and multivariate cases
+  if (is_multivariate) {
+    # Extract response names from the trend_specs
+    response_names <- names(trend_specs)
+    
+    # Generate stanvars for each response
+    trend_stanvars_list <- list()
+    for (resp_name in response_names) {
+      resp_trend_specs <- trend_specs[[resp_name]]
+      
+      # Skip if no trend for this response
+      if (is.null(resp_trend_specs)) {
+        next
+      }
+      
+      # Track this response as having a trend
+      responses_with_trends <- c(responses_with_trends, resp_name)
+      
+      # Extract stanvars for this response with response suffix
+      resp_stanvars <- extract_trend_stanvars_from_setup(
+        trend_setup, 
+        resp_trend_specs,
+        response_suffix = paste0("_", resp_name)
+      )
+      
+      if (!is.null(resp_stanvars)) {
+        trend_stanvars_list[[resp_name]] <- resp_stanvars
+      }
+    }
+    
+    # Combine all response-specific stanvars
+    if (length(trend_stanvars_list) > 0) {
+      trend_stanvars <- do.call(combine_stanvars, trend_stanvars_list)
+    } else {
+      trend_stanvars <- NULL
+    }
+    
+  } else {
+    # Single trend specification - backward compatible
+    trend_stanvars <- extract_trend_stanvars_from_setup(trend_setup, trend_specs)
+    responses_with_trends <- "main"  # Mark univariate model
+  }
 
   # Generate base observation Stan code with trend stanvars
   base_stancode <- generate_base_stancode_with_stanvars(
@@ -63,10 +213,19 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
     message("Stage 2: Injecting trend into observation linear predictor...")
   }
 
-  combined_stancode <- inject_trend_into_linear_predictor(
-    base_stancode,
-    trend_stanvars
-  )
+  # Inject trends into linear predictors
+  if (is_multivariate) {
+    combined_stancode <- inject_multivariate_trends_into_linear_predictors(
+      base_stancode,
+      trend_stanvars,
+      responses_with_trends
+    )
+  } else {
+    combined_stancode <- inject_trend_into_linear_predictor(
+      base_stancode,
+      trend_stanvars
+    )
+  }
 
   # Combine Stan data from both models
   combined_standata <- combine_stan_data(obs_setup$standata, trend_setup$standata)
@@ -99,7 +258,9 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
     stancode = combined_stancode,
     standata = combined_standata,
     has_trends = TRUE,
-    trend_spec = trend_spec,
+    trend_specs = trend_specs,
+    is_multivariate = is_multivariate,
+    responses_with_trends = responses_with_trends,
     backend = backend
   ))
 }
@@ -249,27 +410,27 @@ stanvar <- function(x, name, scode = "data") {
 #'
 #' @param obs_setup Observation model setup from setup_brms_lightweight
 #' @param trend_setup Trend model setup from setup_brms_lightweight
-#' @param trend_spec Parsed trend specification
+#' @param trend_specs Parsed trend specification
 #' @param data Original data for validation
 #' @param backend Stan backend to use
 #' @param validate Whether to validate Stan code
 #' @param silent Verbosity level
 #' @return List ready for mvgam model fitting
 #' @noRd
-prepare_mvgam_stancode <- function(obs_setup, trend_setup, trend_spec,
+prepare_mvgam_stancode <- function(obs_setup, trend_setup, trend_specs,
                                   data = NULL, backend = "rstan",
                                   validate = TRUE, silent = 1) {
 
   # Validate time series structure if data provided and trends specified
-  if (!is.null(data) && !is.null(trend_spec)) {
-    validate_time_series_for_trends(data, trend_spec, silent = silent)
+  if (!is.null(data) && !is.null(trend_specs)) {
+    validate_time_series_for_trends(data, trend_specs, silent = silent)
   }
 
   # Generate combined Stan code and data
   stan_components <- generate_combined_stancode(
     obs_setup = obs_setup,
     trend_setup = trend_setup,
-    trend_spec = trend_spec,
+    trend_specs = trend_specs,
     backend = backend,
     validate = validate,
     silent = silent
@@ -280,7 +441,7 @@ prepare_mvgam_stancode <- function(obs_setup, trend_setup, trend_spec,
     model_code = stan_components$stancode,
     model_data = stan_components$standata,
     has_trends = stan_components$has_trends,
-    trend_specification = trend_spec,
+    trend_specification = trend_specs,
     backend = backend,
     validation_passed = validate
   ))
@@ -493,53 +654,6 @@ prepare_stanvars_for_brms <- function(stanvars) {
 #' @description
 #' Central dispatcher function that routes trend specifications to appropriate
 #' trend-specific stanvar generators. This function bridges the gap between
-#' the Stan assembly system and individual trend generators.
-#'
-#' @param trend_spec List containing trend specification with trend_type or trend_model
-#' @param data_info List containing data dimensions and structure information
-#' @return List of stanvars for trend implementation, or empty list for None trends
-#' @noRd
-generate_trend_injection_stanvars <- function(trend_spec, data_info) {
-  checkmate::assert_list(trend_spec, names = "named")
-  checkmate::assert_list(data_info, names = "named")
-
-  # Extract trend type from spec (handle both trend_type and trend_model for compatibility)
-  trend_type <- trend_spec$trend_type %||% trend_spec$trend_model
-
-  if (is.null(trend_type)) {
-    insight::format_warning(
-      "No trend type specified in trend_spec.",
-      "Returning empty stanvars list."
-    )
-    return(list())
-  }
-
-  # Handle ZMVN default trend case
-  if (trend_type == "ZMVN") {
-    return(list())
-  }
-
-  # Construct generator function name following existing naming convention
-  generator_name <- paste0("generate_", tolower(trend_type), "_trend_stanvars")
-
-  # Check if generator function exists
-  if (!exists(generator_name, mode = "function", envir = asNamespace("mvgam"))) {
-    available_generators <- ls(
-      pattern = "generate_.*_trend_stanvars",
-      envir = asNamespace("mvgam")
-    )
-
-    stop(insight::format_error(
-      paste("Trend generator function", generator_name, "not found."),
-      paste("Available generators:", paste(available_generators, collapse = ", ")),
-      paste("Trend type specified:", trend_type)
-    ))
-  }
-
-  # Dispatch to appropriate generator
-  do.call(generator_name, list(trend_spec, data_info))
-}
-
 #' Extract Trend Stanvars from Setup
 #'
 #' @description
@@ -547,43 +661,57 @@ generate_trend_injection_stanvars <- function(trend_spec, data_info) {
 #' Integrates with the trend injection system.
 #'
 #' @param trend_setup List containing trend model setup
-#' @param trend_spec List containing trend specification
+#' @param trend_specs List containing trend specification with 'dimensions' field
+#' @param response_suffix Response suffix for multivariate models
 #' @return List of trend stanvars
+#' 
+#' @details
+#' trend_specs must contain a 'dimensions' field calculated by 
+#' extract_time_series_dimensions() during data validation. This ensures
+#' reliable timing information without circular dependencies.
+#' 
 #' @noRd
-extract_trend_stanvars_from_setup <- function(trend_setup, trend_spec) {
+extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs, 
+                                              response_suffix = "") {
   checkmate::assert_list(trend_setup, names = "named")
-  checkmate::assert_list(trend_spec, names = "named")
+  checkmate::assert_list(trend_specs, names = "named")
+  checkmate::assert_string(response_suffix)
 
   # Extract base stanvars from trend setup
   base_stanvars <- trend_setup$stanvars %||% NULL
 
   # Generate trend-specific stanvars if trend spec is provided
   # Handle both trend_type and trend_model for compatibility
-  trend_type <- trend_spec$trend_type %||% trend_spec$trend_model
-  trend_stanvars <- if (!is.null(trend_spec) && !is.null(trend_type)) {
-    # Prepare data info for trend stanvar generation
-    # n_obs should be number of time points, not total observations
-    n_obs <- trend_spec$n_time %||% trend_spec$n_obs
-
-    if (is.null(n_obs)) {
+  trend_type <- trend_specs$trend_type %||% trend_specs$trend_model
+  trend_stanvars <- if (!is.null(trend_specs) && !is.null(trend_type)) {
+    # Dimensions should be pre-calculated and included in trend_specs
+    # This eliminates circular dependency and ensures reliable dimension information
+    dimensions <- trend_specs$dimensions
+    
+    if (is.null(dimensions)) {
       stop(insight::format_error(
-        "Missing time dimension information in trend specification.",
-        "trend_spec must contain either 'n_time' or 'n_obs' field.",
-        "This indicates a problem with data processing or trend setup."
+        "Missing dimension information in trend specification.",
+        "trend_specs must contain a 'dimensions' field with time series dimensions.",
+        "This should be calculated using extract_time_series_dimensions() during data validation."
       ), call. = FALSE)
     }
+    
+    # Extract timing information from pre-calculated dimensions
+    n_obs <- dimensions$n_obs
+    n_time <- dimensions$n_time
     data_info <- list(
       n_obs = n_obs,
-      n_series = trend_spec$n_series %||% 1,
-      n_lv = trend_spec$n_lv,
-      n_time = n_obs,  # Ensure consistency
-      n_groups = trend_spec$n_groups,
-      n_subgroups = trend_spec$n_subgroups,
-      series_var = trend_spec$series_var %||% "series"
+      n_series = dimensions$n_series,
+      n_lv = trend_specs$n_lv,
+      n_time = n_time,
+      n_groups = trend_specs$n_groups,
+      n_subgroups = trend_specs$n_subgroups,
+      time_var = dimensions$time_var,
+      series_var = dimensions$series_var
     )
 
-    # Use the existing trend injection system
-    generate_trend_injection_stanvars(trend_spec, data_info)
+    # Use the existing trend injection system with response suffix
+    generate_trend_injection_stanvars(trend_specs, data_info, response_suffix)
   } else {
     NULL
   }
@@ -718,6 +846,77 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
   modified_code <- paste(code_lines, collapse = "\n")
 
   return(modified_code)
+}
+
+#' Inject Multivariate Trends into Linear Predictors
+#'
+#' @description
+#' Injects response-specific trend effects into multivariate Stan model.
+#' Handles brms naming convention with _y1, _y2 suffixes.
+#'
+#' @param base_stancode Character string of base Stan code
+#' @param trend_stanvars List of trend stanvars (may be NULL)
+#' @param responses_with_trends Character vector of response names that have trends
+#' @return Modified Stan code with trend injections
+#' @noRd
+inject_multivariate_trends_into_linear_predictors <- function(
+  base_stancode, 
+  trend_stanvars, 
+  responses_with_trends
+) {
+  checkmate::assert_string(base_stancode)
+  checkmate::assert_character(responses_with_trends, min.len = 1)
+  
+  # If no trends, return unchanged
+  if (is.null(trend_stanvars) || length(trend_stanvars) == 0) {
+    return(base_stancode)
+  }
+  
+  # Split code into lines
+  code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
+  
+  # For each response with a trend, inject the trend addition
+  for (resp_name in responses_with_trends) {
+    # Find where mu_<resp> is computed in model block
+    mu_pattern <- paste0("mu_", resp_name, "\\s*=")
+    mu_lines <- which(grepl(mu_pattern, code_lines))
+    
+    if (length(mu_lines) > 0) {
+      # Find the last line where mu_<resp> is modified
+      last_mu_line <- max(mu_lines)
+      
+      # Look for the end of mu computation (before likelihood)
+      # Usually before target += or before the next mu_ declaration
+      insert_point <- last_mu_line
+      for (i in (last_mu_line + 1):length(code_lines)) {
+        if (grepl("target\\s*\\+=", code_lines[i]) ||
+            grepl("mu_[a-zA-Z0-9]+\\s*=", code_lines[i])) {
+          insert_point <- i - 1
+          break
+        }
+        # Also check if we're still modifying mu_<resp>
+        if (grepl(paste0("mu_", resp_name), code_lines[i])) {
+          insert_point <- i
+        }
+      }
+      
+      # Insert trend addition after mu computation
+      trend_addition <- c(
+        paste0("    // Add trend effects for response ", resp_name),
+        paste0("    if (size(trend_", resp_name, ") > 0) {"),
+        paste0("      mu_", resp_name, " += trend_", resp_name, "[obs_ind_", resp_name, "];"),
+        "    }"
+      )
+      
+      code_lines <- c(
+        code_lines[1:insert_point],
+        trend_addition,
+        code_lines[(insert_point + 1):length(code_lines)]
+      )
+    }
+  }
+  
+  return(paste(code_lines, collapse = "\n"))
 }
 
 # Main Assembly Functions
@@ -1168,12 +1367,12 @@ generate_innovation_model <- function(effective_dim, cor = FALSE, is_hierarchica
 #' Processes data specifications to extract hierarchical grouping structure.
 #'
 #' @param data_info Data information list
-#' @param trend_spec Trend specification list
+#' @param trend_specs Trend specification list
 #' @return List with hierarchical structure information
 #' @noRd
-extract_hierarchical_info <- function(data_info, trend_spec) {
+extract_hierarchical_info <- function(data_info, trend_specs) {
 
-  has_groups <- !is.null(trend_spec$gr) && trend_spec$gr != 'NA'
+  has_groups <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
 
   if (!has_groups) {
     return(NULL)
@@ -1183,8 +1382,8 @@ extract_hierarchical_info <- function(data_info, trend_spec) {
     has_groups = TRUE,
     n_groups = data_info$n_groups %||% 1,
     n_subgroups = data_info$n_subgroups %||% data_info$n_lv %||% data_info$n_series,
-    gr_var = trend_spec$gr,
-    subgr_var = trend_spec$subgr %||% 'NA'
+    gr_var = trend_specs$gr,
+    subgr_var = trend_specs$subgr %||% 'NA'
   )
 }
 
@@ -1512,27 +1711,28 @@ generate_hierarchical_correlation_model <- function(n_groups) {
 
 #' Generate Trend Injection Stanvars
 #'
-#' Dispatches to appropriate trend generator based on trend_spec type.
+#' Dispatches to appropriate trend generator based on trend_specs type.
 #'
-#' @param trend_spec Trend specification object
+#' @param trend_specs Trend specification object
 #' @param data_info Data information list
 #' @return List of stanvars for trend injection
 #' @noRd
-generate_trend_injection_stanvars <- function(trend_spec, data_info) {
+generate_trend_injection_stanvars <- function(trend_specs, data_info, response_suffix = "") {
   # Validate inputs
-  checkmate::assert_list(trend_spec)
+  checkmate::assert_list(trend_specs)
   checkmate::assert_list(data_info)
+  checkmate::assert_string(response_suffix)
 
   # Validate factor model compatibility if n_lv is specified
-  validate_factor_compatibility(trend_spec)
+  validate_factor_compatibility(trend_specs)
 
   # Validate n_lv parameter constraints
-  if (!is.null(trend_spec$n_lv)) {
+  if (!is.null(trend_specs$n_lv)) {
     n_series <- data_info$n_series %||% 1
-    if (trend_spec$n_lv > n_series) {
+    if (trend_specs$n_lv > n_series) {
       stop(insight::format_error(
         "{.field n_lv} cannot exceed {.field n_series}.",
-        paste0("Got n_lv = ", trend_spec$n_lv, " and n_series = ", n_series, "."),
+        paste0("Got n_lv = ", trend_specs$n_lv, " and n_series = ", n_series, "."),
         "Use fewer or equal latent variables than observed series."
       ))
     }
@@ -1542,17 +1742,17 @@ generate_trend_injection_stanvars <- function(trend_spec, data_info) {
   }
 
   # Get trend type - handle both trend_type and trend field names for compatibility
-  trend_type <- trend_spec$trend_type %||% trend_spec$trend
+  trend_type <- trend_specs$trend_type %||% trend_specs$trend
   if (is.null(trend_type)) {
     stop(insight::format_error(
-      "trend_spec must contain {.field trend_type} or {.field trend} field"
+      "trend_specs must contain {.field trend_type} or {.field trend} field"
     ))
   }
 
   # Handle PW variations - PWlinear and PWlogistic both use PW generator
   # Preserve original type information for PW generator
   if (trend_type %in% c("PWlinear", "PWlogistic")) {
-    trend_spec$type <- if (trend_type == "PWlogistic") "logistic" else "linear"
+    trend_specs$type <- if (trend_type == "PWlogistic") "logistic" else "linear"
     trend_type <- "PW"
   }
 
@@ -1565,20 +1765,20 @@ generate_trend_injection_stanvars <- function(trend_spec, data_info) {
   }
 
   # Extract hierarchical information for shared innovation system
-  hierarchical_info <- extract_hierarchical_info(data_info, trend_spec)
+  hierarchical_info <- extract_hierarchical_info(data_info, trend_specs)
 
   # Determine if this trend uses shared Gaussian innovations
-  uses_shared_innovations <- trend_spec$shared_innovations %||%
+  uses_shared_innovations <- trend_specs$shared_innovations %||%
                             (!trend_type %in% c("PW", "VAR"))  # PW and VAR opt out of shared innovations
 
   # Generate shared innovation stanvars if needed
   shared_stanvars <- NULL
   if (uses_shared_innovations) {
     # Extract relevant parameters for shared system
-    n_lv <- trend_spec$n_lv %||% data_info$n_lv %||% data_info$n_series %||% 1
+    n_lv <- trend_specs$n_lv %||% data_info$n_lv %||% data_info$n_series %||% 1
     n_series <- data_info$n_series %||% 1
-    cor <- trend_spec$cor %||% FALSE
-    factor_model <- !is.null(trend_spec$n_lv) && trend_spec$n_lv < n_series
+    cor <- trend_specs$cor %||% FALSE
+    factor_model <- !is.null(trend_specs$n_lv) && trend_specs$n_lv < n_series
 
     # Generate shared innovation stanvars
     shared_stanvars <- generate_shared_innovation_stanvars(
@@ -1600,10 +1800,24 @@ generate_trend_injection_stanvars <- function(trend_spec, data_info) {
     )
 
     shared_stanvars$priors <- shared_priors
+    
+    # Apply response suffix post-processing to shared stanvars for multivariate models
+    if (response_suffix != "") {
+      for (name in names(shared_stanvars)) {
+        if (!is.null(shared_stanvars[[name]])) {
+          shared_stanvars[[name]] <- apply_response_suffix_to_stanvars(shared_stanvars[[name]], response_suffix)
+        }
+      }
+    }
   }
 
   # Generate trend-specific stanvars using the appropriate generator
-  trend_stanvars <- trend_info$generator(trend_spec, data_info)
+  trend_stanvars <- trend_info$generator(trend_specs, data_info)
+  
+  # Apply response suffix post-processing for multivariate models
+  if (response_suffix != "") {
+    trend_stanvars <- apply_response_suffix_to_stanvars(trend_stanvars, response_suffix)
+  }
 
   # Combine shared and trend-specific stanvars
   if (!is.null(shared_stanvars)) {
@@ -1620,15 +1834,15 @@ generate_trend_injection_stanvars <- function(trend_spec, data_info) {
 #'
 #' Generates Stan code components for random walk trends.
 #'
-#' @param trend_spec Trend specification for RW model
+#' @param trend_specs Trend specification for RW model
 #' @param data_info Data information including dimensions
 #' @return List of stanvars for RW trend
 #' @noRd
-generate_rw_trend_stanvars <- function(trend_spec, data_info) {
+generate_rw_trend_stanvars <- function(trend_specs, data_info) {
   # Extract dimensions
-  n_lv <- trend_spec$n_lv %||% 1
+  n_lv <- trend_specs$n_lv %||% 1
   n_series <- data_info$n_series %||% 1
-  is_factor_model <- !is.null(trend_spec$n_lv) && n_lv < n_series
+  is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
 
   # Build components list
   components <- list()
@@ -1640,13 +1854,13 @@ generate_rw_trend_stanvars <- function(trend_spec, data_info) {
   }
 
   # 2. MA parameters if needed
-  if (trend_spec$ma %||% FALSE) {
+  if (trend_specs$ma %||% FALSE) {
     ma_components <- generate_ma_components(n_lv)
     components <- append(components, ma_components)
   }
 
   # 3. RW dynamics (always needed)
-  dynamics <- generate_rw_dynamics(n_lv, has_ma = trend_spec$ma %||% FALSE)
+  dynamics <- generate_rw_dynamics(n_lv, has_ma = trend_specs$ma %||% FALSE)
   if (!is.null(dynamics)) {
     components <- append(components, list(dynamics))
   }
@@ -1740,25 +1954,25 @@ generate_rw_dynamics <- function(n_lv, has_ma = FALSE) {
 #' Supports factor models, hierarchical correlations, and proper ar{lag}_trend naming.
 #' Uses consistent non-centered parameterization throughout.
 #'
-#' @param trend_spec Trend specification for AR model
+#' @param trend_specs Trend specification for AR model
 #' @param data_info Data information including dimensions
 #' @return List of stanvars for AR trend
 #' @noRd
-generate_ar_trend_stanvars <- function(trend_spec, data_info) {
+generate_ar_trend_stanvars <- function(trend_specs, data_info) {
   # Extract key parameters
-  n_lv <- trend_spec$n_lv %||% 1
-  lags <- trend_spec$lags %||% 1
+  n_lv <- trend_specs$n_lv %||% 1
+  lags <- trend_specs$lags %||% 1
   n <- data_info$n_obs
   n_series <- data_info$n_series %||% 1
-  use_grouping <- !is.null(trend_spec$gr) && trend_spec$gr != 'NA'
-  unit_var <- trend_spec$unit %||% "time"
+  use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
+  unit_var <- trend_specs$unit %||% "time"
 
   # Convert lags to ar_lags if needed
-  ar_lags <- if (is.list(trend_spec$ar_lags)) trend_spec$ar_lags else (1:lags)
-  has_ma <- trend_spec$ma %||% FALSE
+  ar_lags <- if (is.list(trend_specs$ar_lags)) trend_specs$ar_lags else (1:lags)
+  has_ma <- trend_specs$ma %||% FALSE
 
   # Determine if this is a factor model (n_lv < n_series)
-  is_factor_model <- !is.null(trend_spec$n_lv) && n_lv < n_series
+  is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
 
   # Generate common trend data variables first
   common_data_stanvars <- generate_common_trend_data(n, n_series, n_lv)
@@ -1931,21 +2145,21 @@ generate_ar_trend_stanvars <- function(trend_spec, data_info) {
 #' Generates Stan code components for vector autoregressive trends.
 #' Supports factor models, hierarchical correlations, and consistent matrix Z patterns.
 #'
-#' @param trend_spec Trend specification for VAR model
+#' @param trend_specs Trend specification for VAR model
 #' @param data_info Data information including dimensions
 #' @return List of stanvars for VAR trend
 #' @noRd
-generate_var_trend_stanvars <- function(trend_spec, data_info) {
+generate_var_trend_stanvars <- function(trend_specs, data_info) {
   # Extract key parameters
-  n_lv <- trend_spec$n_lv %||% 1
-  lags <- trend_spec$lags %||% 1
+  n_lv <- trend_specs$n_lv %||% 1
+  lags <- trend_specs$lags %||% 1
   n <- data_info$n_obs
   n_series <- data_info$n_series %||% 1
-  use_grouping <- !is.null(trend_spec$gr) && trend_spec$gr != 'NA'
-  unit_var <- trend_spec$unit %||% "time"
+  use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
+  unit_var <- trend_specs$unit %||% "time"
 
   # Determine if this is a factor model (n_lv < n_series)
-  is_factor_model <- !is.null(trend_spec$n_lv) && n_lv < n_series
+  is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
 
   # Generate common trend data variables first
   common_data_stanvars <- generate_common_trend_data(n, n_series, n_lv)
@@ -2185,13 +2399,13 @@ calculate_car_time_distances <- function(data_info) {
 #' Generates Stan code components for continuous-time autoregressive trends.
 #' Does NOT support factor models or hierarchical correlations.
 #'
-#' @param trend_spec Trend specification for CAR model
+#' @param trend_specs Trend specification for CAR model
 #' @param data_info Data information including dimensions
 #' @return List of stanvars for CAR trend
 #' @noRd
-generate_car_trend_stanvars <- function(trend_spec, data_info) {
+generate_car_trend_stanvars <- function(trend_specs, data_info) {
   # Extract key parameters
-  n_lv <- trend_spec$n_lv %||% data_info$n_series %||% 1
+  n_lv <- trend_specs$n_lv %||% data_info$n_series %||% 1
   n <- data_info$n_obs
   n_series <- data_info$n_series %||% 1
 
@@ -2200,7 +2414,7 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
 
   # CAR does not support factor models (continuous-time AR requires
   # series-specific temporal evolution)
-  if (!is.null(trend_spec$n_lv) && trend_spec$n_lv < n_series) {
+  if (!is.null(trend_specs$n_lv) && trend_specs$n_lv < n_series) {
     stop(insight::format_error(
       "CAR trends do not support factor models (n_lv < n_series).",
       "Continuous-time AR requires series-specific temporal evolution modeling."
@@ -2208,7 +2422,7 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
   }
 
   # CAR does not support hierarchical correlations
-  if (!is.null(trend_spec$gr) && trend_spec$gr != 'NA') {
+  if (!is.null(trend_specs$gr) && trend_specs$gr != 'NA') {
     rlang::warn(
       "CAR trends do not support hierarchical correlations; ignoring 'gr' parameter",
       .frequency = "once",
@@ -2289,12 +2503,12 @@ generate_car_trend_stanvars <- function(trend_spec, data_info) {
 #'
 #' Generates Stan code components for Gaussian process trends.
 #'
-#' @param trend_spec Trend specification for GP model
+#' @param trend_specs Trend specification for GP model
 #' @param data_info Data information including dimensions
 #' @return List of stanvars for GP trend
 #' @noRd
 # GP trends are handled via trend_formula, not as temporal dynamics
-generate_gp_injection_stanvars <- function(trend_spec, data_info) {
+generate_gp_injection_stanvars <- function(trend_specs, data_info) {
   stop(insight::format_error(
     "GP trends are handled via trend_formula, not as temporal dynamics.",
     "Use: trend_formula = ~ gp(time, k = 10)..."
@@ -2305,20 +2519,20 @@ generate_gp_injection_stanvars <- function(trend_spec, data_info) {
 #'
 #' Generates Stan code components for zero-mean multivariate normal trends.
 #'
-#' @param trend_spec Trend specification for ZMVN model
+#' @param trend_specs Trend specification for ZMVN model
 #' @param data_info Data information including dimensions
 #' @return List of stanvars for ZMVN trend
 #' @noRd
-generate_zmvn_trend_stanvars <- function(trend_spec, data_info) {
+generate_zmvn_trend_stanvars <- function(trend_specs, data_info) {
   # Extract key parameters following original ZMVN pattern
-  n_lv <- trend_spec$n_lv %||% data_info$n_lv %||% data_info$n_series %||% 1
+  n_lv <- trend_specs$n_lv %||% data_info$n_lv %||% data_info$n_series %||% 1
   n <- data_info$n_obs
   n_series <- data_info$n_series %||% 1
-  use_grouping <- !is.null(trend_spec$gr) && trend_spec$gr != 'NA'
-  unit_var <- trend_spec$unit %||% "time"
+  use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
+  unit_var <- trend_specs$unit %||% "time"
 
   # Determine if this is a factor model (n_lv < n_series)
-  is_factor_model <- !is.null(trend_spec$n_lv) && n_lv < n_series
+  is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
 
   # Generate common trend data variables first
   common_data_stanvars <- generate_common_trend_data(n, n_series, n_lv)
@@ -2423,18 +2637,18 @@ generate_zmvn_trend_stanvars <- function(trend_spec, data_info) {
 #' Generates Stan code components for piecewise trends.
 #' Supports both linear and logistic piecewise trends with proper Prophet-style implementations.
 #'
-#' @param trend_spec Trend specification for PW model
+#' @param trend_specs Trend specification for PW model
 #' @param data_info Data information including dimensions
-#' @param growth Growth pattern: "linear" or "logistic" (optional, overrides trend_spec$type)
+#' @param growth Growth pattern: "linear" or "logistic" (optional, overrides trend_specs$type)
 #' @return List of stanvars for PW trend
 #' @noRd
-generate_pw_trend_stanvars <- function(trend_spec, data_info, growth = NULL) {
+generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL) {
   # Extract key parameters
-  n_lv <- trend_spec$n_lv %||% 1
-  n_changepoints <- trend_spec$n_changepoints %||% 5
-  changepoint_scale <- trend_spec$changepoint_scale %||% 0.1
-  # Use growth parameter if provided, otherwise fall back to trend_spec$type or trend_spec$growth
-  trend_type <- growth %||% trend_spec$type %||% trend_spec$growth %||% "linear"
+  n_lv <- trend_specs$n_lv %||% 1
+  n_changepoints <- trend_specs$n_changepoints %||% 5
+  changepoint_scale <- trend_specs$changepoint_scale %||% 0.1
+  # Use growth parameter if provided, otherwise fall back to trend_specs$type or trend_specs$growth
+  trend_type <- growth %||% trend_specs$type %||% trend_specs$growth %||% "linear"
   n <- data_info$n_obs
   n_series <- data_info$n_series %||% 1
 
@@ -2651,8 +2865,8 @@ generate_pw_trend_stanvars <- function(trend_spec, data_info, growth = NULL) {
 }
 
 # Note: PWlinear and PWlogistic wrapper functions have been removed.
-# Use generate_pw_trend_stanvars(trend_spec, data_info, growth = "linear")
-# or generate_pw_trend_stanvars(trend_spec, data_info, growth = "logistic") instead.
+# Use generate_pw_trend_stanvars(trend_specs, data_info, growth = "linear")
+# or generate_pw_trend_stanvars(trend_specs, data_info, growth = "logistic") instead.
 
 
 

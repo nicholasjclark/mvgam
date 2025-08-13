@@ -73,7 +73,7 @@ test_that("AR trend stanvar generation works", {
   data <- setup_compilation_test_data()$univariate
 
   # Generate trend stanvars
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1),
     n_lv = NULL
@@ -88,7 +88,7 @@ test_that("AR trend stanvar generation works", {
   )
 
   # Test stanvar generation
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
 
   # Check that the result has the correct class structure
   expect_true(inherits(stanvars, "stanvars"))
@@ -153,7 +153,7 @@ test_that("RW trend simple intercept model compiles", {
   data <- setup_compilation_test_data()$univariate
 
   # Generate trend stanvars
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "RW",
     trend_formula = ~ RW(),
     n_lv = NULL
@@ -168,7 +168,7 @@ test_that("RW trend simple intercept model compiles", {
   )
 
   # Test stanvar generation
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
   expect_type(stanvars, "list")
   expect_true(length(stanvars) > 0)
 
@@ -204,7 +204,7 @@ test_that("VAR trend simple intercept model compiles", {
   data <- setup_compilation_test_data()$univariate
 
   # Generate trend stanvars
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "VAR",
     trend_formula = ~ VAR(p = 1),
     n_lv = NULL
@@ -219,7 +219,7 @@ test_that("VAR trend simple intercept model compiles", {
   )
 
   # Test stanvar generation
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
   expect_type(stanvars, "list")
   expect_true(length(stanvars) > 0)
 
@@ -255,7 +255,7 @@ test_that("CAR trend simple intercept model compiles", {
   data <- setup_compilation_test_data()$univariate
 
   # Generate trend stanvars
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "CAR",
     trend_formula = ~ CAR(),
     n_lv = NULL
@@ -270,7 +270,7 @@ test_that("CAR trend simple intercept model compiles", {
   )
 
   # Test stanvar generation
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
   expect_type(stanvars, "list")
   expect_true(length(stanvars) > 0)
 
@@ -306,7 +306,7 @@ test_that("ZMVN trend simple intercept model compiles", {
   data <- setup_compilation_test_data()$univariate
 
   # Generate trend stanvars
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "ZMVN",
     trend_formula = ~ ZMVN(),
     n_lv = NULL
@@ -321,7 +321,7 @@ test_that("ZMVN trend simple intercept model compiles", {
   )
 
   # Test stanvar generation
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
   expect_type(stanvars, "list")
   expect_true(length(stanvars) > 0)
 
@@ -357,7 +357,7 @@ test_that("PW trend simple intercept model compiles", {
   data <- setup_compilation_test_data()$univariate
 
   # Generate trend stanvars
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "PW",
     trend_formula = ~ PW(),
     n_lv = NULL
@@ -372,7 +372,7 @@ test_that("PW trend simple intercept model compiles", {
   )
 
   # Test stanvar generation
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
   expect_type(stanvars, "list")
   expect_true(length(stanvars) > 0)
 
@@ -409,7 +409,7 @@ test_that("PW trend simple intercept model compiles", {
 test_that("AR trend with covariates compiles", {
   data <- setup_compilation_test_data()$univariate
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1),
     n_lv = NULL
@@ -424,7 +424,7 @@ test_that("AR trend with covariates compiles", {
   )
 
   # Generate stanvars
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
 
   # Test with covariates in observation model
   obs_setup <- mvgam:::setup_brms_lightweight(
@@ -455,7 +455,7 @@ test_that("AR trend with covariates compiles", {
 test_that("AR trend with poisson family compiles", {
   data <- setup_compilation_test_data()$count
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1),
     n_lv = NULL
@@ -469,7 +469,7 @@ test_that("AR trend with poisson family compiles", {
     series_var = "series"
   )
 
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
 
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ 1,
@@ -498,7 +498,7 @@ test_that("AR trend with poisson family compiles", {
 test_that("AR trend accepts n_lv parameter for factor models", {
   data <- setup_compilation_test_data()$multivariate
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1, n_lv = 2),
     n_lv = 2
@@ -513,7 +513,7 @@ test_that("AR trend accepts n_lv parameter for factor models", {
   )
 
   # Should not throw factor compatibility error
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
   expect_true(inherits(stanvars, "stanvars"))
 
   # Test that stanvars work with brms and contain factor model components
@@ -538,7 +538,7 @@ test_that("AR trend accepts n_lv parameter for factor models", {
 test_that("CAR trend rejects n_lv parameter", {
   data <- setup_compilation_test_data()$multivariate
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "CAR",
     trend_formula = ~ CAR(n_lv = 2),
     n_lv = 2
@@ -546,14 +546,14 @@ test_that("CAR trend rejects n_lv parameter", {
 
   # Should throw factor compatibility error
   expect_error({
-    mvgam:::validate_factor_compatibility(trend_spec)
+    mvgam:::validate_factor_compatibility(trend_specs)
   }, "Factor models.*not supported")
 })
 
 test_that("PW trend rejects n_lv parameter", {
   data <- setup_compilation_test_data()$multivariate
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "PW",
     trend_formula = ~ PW(n_lv = 2),
     n_lv = 2
@@ -561,7 +561,7 @@ test_that("PW trend rejects n_lv parameter", {
 
   # Should throw factor compatibility error
   expect_error({
-    mvgam:::validate_factor_compatibility(trend_spec)
+    mvgam:::validate_factor_compatibility(trend_specs)
   }, "Factor models.*not supported")
 })
 
@@ -573,7 +573,7 @@ test_that("AR trend supports hierarchical correlations", {
   # Add grouping variable for hierarchical correlations
   data$group <- factor(rep(c("A", "B"), length.out = nrow(data)))
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1, gr = group),
     n_lv = NULL,
@@ -592,7 +592,7 @@ test_that("AR trend supports hierarchical correlations", {
     n_subgroups = 3
   )
 
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
   expect_true(inherits(stanvars, "stanvars"))
 
   # Test Stan code compilation
@@ -628,7 +628,7 @@ test_that("RW trend ignores grouping parameter", {
 
   # RW doesn't support hierarchical correlations - should warn
   expect_warning({
-    trend_spec <- list(
+    trend_specs <- list(
       trend = "RW",
       trend_formula = ~ RW(gr = group),
       n_lv = NULL,
@@ -643,7 +643,7 @@ test_that("RW trend ignores grouping parameter", {
       series_var = "series"
     )
 
-    stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+    stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
     expect_true(inherits(stanvars, "stanvars"))
 
     # Generate Stan code to verify no hierarchical components
@@ -672,7 +672,7 @@ test_that("RW trend ignores grouping parameter", {
 test_that("RW trend full Stan assembly pipeline works", {
   data <- setup_compilation_test_data()$univariate
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "RW",
     trend_formula = ~ RW(),
     n_lv = NULL
@@ -687,7 +687,7 @@ test_that("RW trend full Stan assembly pipeline works", {
   )
 
   # 1. Generate trend stanvars
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
   expect_true(inherits(stanvars, "stanvars"))
 
   # 2. Setup brms observation model
@@ -723,7 +723,7 @@ test_that("RW trend full Stan assembly pipeline works", {
 test_that("AR trend full Stan assembly pipeline works", {
   data <- setup_compilation_test_data()$univariate
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1),
     n_lv = NULL
@@ -738,7 +738,7 @@ test_that("AR trend full Stan assembly pipeline works", {
   )
 
   # 1. Generate trend stanvars
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
   expect_true(inherits(stanvars, "stanvars"))
 
   # 2. Assemble full Stan code
@@ -766,7 +766,7 @@ test_that("AR trend full Stan assembly pipeline works", {
 test_that("VAR trend full Stan assembly pipeline works", {
   data <- setup_compilation_test_data()$univariate
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "VAR",
     trend_formula = ~ VAR(p = 1),
     n_lv = NULL
@@ -781,7 +781,7 @@ test_that("VAR trend full Stan assembly pipeline works", {
   )
 
   # Generate and validate
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
   expect_true(inherits(stanvars, "stanvars"))
 
   stan_code <- mvgam:::assemble_mvgam_stan_code(
@@ -807,7 +807,7 @@ test_that("VAR trend full Stan assembly pipeline works", {
 test_that("CAR trend full Stan assembly pipeline works", {
   data <- setup_compilation_test_data()$univariate
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "CAR",
     trend_formula = ~ CAR(),
     n_lv = NULL
@@ -821,7 +821,7 @@ test_that("CAR trend full Stan assembly pipeline works", {
     series_var = "series"
   )
 
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
   expect_true(inherits(stanvars, "stanvars"))
 
   stan_code <- mvgam:::assemble_mvgam_stan_code(
@@ -849,7 +849,7 @@ test_that("CAR trend full Stan assembly pipeline works", {
 test_that("RW factor model compiles correctly", {
   data <- setup_compilation_test_data()$multivariate
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "RW",
     trend_formula = ~ RW(n_lv = 2),
     n_lv = 2
@@ -863,7 +863,7 @@ test_that("RW factor model compiles correctly", {
     series_var = "series"
   )
 
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
   expect_true(inherits(stanvars, "stanvars"))
 
   stan_code <- mvgam:::assemble_mvgam_stan_code(
@@ -890,7 +890,7 @@ test_that("RW factor model compiles correctly", {
 test_that("AR factor model compiles correctly", {
   data <- setup_compilation_test_data()$multivariate
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1, n_lv = 2),
     n_lv = 2
@@ -904,7 +904,7 @@ test_that("AR factor model compiles correctly", {
     series_var = "series"
   )
 
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
   expect_true(inherits(stanvars, "stanvars"))
 
   stan_code <- mvgam:::assemble_mvgam_stan_code(
@@ -933,7 +933,7 @@ test_that("AR factor model compiles correctly", {
 test_that("RW trend with smooth covariates compiles", {
   data <- setup_compilation_test_data()$univariate
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "RW",
     trend_formula = ~ RW(),
     n_lv = NULL
@@ -947,7 +947,7 @@ test_that("RW trend with smooth covariates compiles", {
     series_var = "series"
   )
 
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
 
   # Complex observation formula with smooths
   stan_code <- mvgam:::assemble_mvgam_stan_code(
@@ -977,7 +977,7 @@ test_that("RW trend with smooth covariates compiles", {
 test_that("AR trend with Poisson family compiles", {
   data <- setup_compilation_test_data()$count
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "AR",
     trend_formula = ~ AR(p = 1),
     n_lv = NULL
@@ -991,7 +991,7 @@ test_that("AR trend with Poisson family compiles", {
     series_var = "series"
   )
 
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
 
   stan_code <- mvgam:::assemble_mvgam_stan_code(
     obs_formula = y ~ 1,
@@ -1017,7 +1017,7 @@ test_that("AR trend with Poisson family compiles", {
 test_that("RW trend with binomial family compiles", {
   data <- setup_compilation_test_data()$binary
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend = "RW",
     trend_formula = ~ RW(),
     n_lv = NULL
@@ -1031,7 +1031,7 @@ test_that("RW trend with binomial family compiles", {
     series_var = "series"
   )
 
-  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+  stanvars <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
 
   stan_code <- mvgam:::assemble_mvgam_stan_code(
     obs_formula = y ~ 1,

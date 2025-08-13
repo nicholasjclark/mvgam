@@ -294,30 +294,142 @@ stanvar(name = "test", scode = "real x;", block = "transformed parameters")
 valid_blocks <- c("tparameters", "transformed_parameters", "tdata", "transformed_data", ...)
 ```
 
+### brms multivariate data and code generation
+  1. Response-specific naming: brms uses `mu_y1`, `mu_y2` (not array indexing)
+  2. No `nresp` for mixed families: Only present for multivariate Gaussian with correlations
+  3. Linear predictors in model block: Computed as vectors when needed (random effects, etc.)
+  4. Suffix pattern: All parameters/data get `_y1`, `_y2` suffixes per response
+  5. Independent treatment: Each response can have completely different model structures
+
 ## Critical Integration Points
 
 ### Data Flow Overview
 ```
 User Input → mvgam() → parse_multivariate_trends() → setup_brms_lightweight() 
-→ generate_combined_stancode() → fit_mvgam_model() → create_mvgam_from_combined_fit()
+→ validate_time_series_for_trends() → extract_time_series_dimensions()
+→ trend_specs$dimensions ← dimensions
+→ generate_combined_stancode() → extract_trend_stanvars_from_setup() 
+→ fit_mvgam_model() → create_mvgam_from_combined_fit()
+```
+
+**Critical Validation Flow**:
+```
+data + trend_specs → validate_time_series_for_trends()
+                  → extract_time_series_dimensions() 
+                  → dimensions{n_time, n_series, n_obs, time_var, series_var}
+                  → trend_specs$dimensions = dimensions
+                  → extract_trend_stanvars_from_setup() uses pre-calculated dimensions
 ```
 
 ### Key Data Structures
 ```r
-# Single trend
-trend_spec = list(trend = "AR1", p = 1, cor = TRUE, n_lv = 2, time = "time", series = "series")
+# Single trend with pre-calculated dimensions
+trend_spec = list(
+  trend = "AR1", p = 1, cor = TRUE, n_lv = 2, 
+  time = "time", series = "series",
+  dimensions = list(
+    n_time = 50, n_series = 3, n_obs = 150,
+    time_var = "time", series_var = "series",
+    time_range = c(1, 50), unique_times = 1:50
+  )
+)
 
-# Multivariate trends (THE CRITICAL CHALLENGE)
+# Multivariate trends with dimensions per response
 mv_spec$trend_specs = list(
-  count = list(trend = "AR1", p = 1),
-  biomass = list(trend = "RW")
+  count = list(
+    trend = "AR1", p = 1,
+    dimensions = list(n_time = 50, n_series = 2, n_obs = 100, ...)
+  ),
+  biomass = list(
+    trend = "RW", 
+    dimensions = list(n_time = 50, n_series = 2, n_obs = 100, ...)
+  )
 )
 ```
 
 ### Current Implementation Status
-- ✅ **Working**: Registry system, validation, Stan assembly framework
+- ✅ **Working**: Registry system, validation, Stan assembly framework, multivariate trend detection, time series dimension management
 - ❌ **Placeholder**: `fit_mvgam_model()`, `subset_stanfit_parameters()`, `extract_posterior_samples()`  
 - ⚠️ **Partial**: `generate_combined_stancode()` works for univariate, needs multivariate extension
+
+### Multivariate Trend Detection Logic
+
+**Design Pattern**: Distinguish between univariate trend specifications and multivariate collections
+
+**Detection Algorithm** (in `is_multivariate_trend_specs()`):
+```r
+# Univariate: Has trend field (any of these)
+trend_specs = list(trend = "RW", ...) 
+trend_specs = list(trend_type = "AR", ...)
+trend_specs = list(trend_model = "VAR", ...)
+
+# Multivariate: Named list WITHOUT trend fields
+trend_specs = list(
+  count = list(trend = "RW", ...),
+  biomass = list(trend_type = "AR", ...)
+)
+```
+
+**Key Requirements**:
+1. **Field Compatibility**: Supports `trend`, `trend_type`, and `trend_model` field names for backward compatibility
+2. **Multivariate Recognition**: If a named list lacks any trend-identifying field, it's treated as multivariate
+3. **Response-Specific Processing**: Each response gets processed with appropriate response suffix (`_count`, `_biomass`)
+
+### Time Series Dimension Management System
+
+**Design Principle**: Single source of truth for all time series dimensions, eliminating circular dependencies
+
+**Critical Data Flow**:
+```r
+# Stage 1: Early validation and dimension extraction
+data + trend_specs -> validate_time_series_for_trends() -> dimensions
+                         |
+                         v
+                  extract_time_series_dimensions()
+                         |
+                         v
+                    dimensions = {
+                      n_time, n_series, n_obs,
+                      time_var, series_var,
+                      time_range, unique_times
+                    }
+
+# Stage 2: Dimension injection into trend specifications  
+trend_specs$dimensions <- dimensions
+
+# Stage 3: Trend stanvar generation (no circular dependency)
+extract_trend_stanvars_from_setup() -> uses trend_specs$dimensions
+```
+
+**Key Architecture Decisions**:
+
+1. **Early Dimension Calculation**: `extract_time_series_dimensions()` calculates all timing information directly from data during validation
+2. **No Circular Dependencies**: Eliminates previous pattern where `extract_trend_stanvars_from_setup()` tried to extract `n_obs` from `trend_specs` that didn't have it
+3. **Validation Integration**: `validate_time_series_for_trends()` now returns both validated data AND calculated dimensions
+4. **CAR Exception Handling**: CAR trends skip regular interval validation but still get basic dimensions
+
+**Dimension Validation Rules**:
+- **Non-CAR trends** (RW, AR, VAR, ZMVN, PW): Require regular time intervals using `validate_regular_time_intervals()`
+- **CAR trends**: Allow irregular intervals, can calculate time distances dynamically in `calculate_car_time_distances()`
+- **All trends**: Must have consistent series and time variable identification
+
+**Implementation Functions**:
+```r
+# Core dimension extraction (R/validations.R)
+extract_time_series_dimensions(data, time_var, series_var, trend_type)
+
+# Validation with dimension return (R/validations.R) 
+validate_time_series_for_trends(data, trend_specs) -> list(data, dimensions)
+
+# Trend stanvar generation expecting pre-calculated dimensions (R/stan_assembly.R)
+extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimensions required
+```
+
+**Benefits**:
+1. **Reliability**: All dimensions calculated from actual data, not missing specification fields
+2. **Performance**: Dimensions calculated once during validation, reused everywhere
+3. **Maintainability**: Clear separation between validation logic and trend generation
+4. **Robustness**: Eliminates missing `n_time`/`n_obs` errors in trend generators
 
 ### Critical Gap: Multivariate Trend Assembly
 **Problem**: `generate_combined_stancode(trend_spec)` expects single trend but multivariate has multiple in `mv_spec$trend_specs`
@@ -330,7 +442,13 @@ mv_spec$trend_specs = list(
 - `R/stan_assembly.R` - Two-stage Stan assembly orchestration
 - `R/brms_integration.R` - Enhanced brms setup and ecosystem integration
 - `R/mvgam_core.R` - Enhanced fitting, dual-object system, multiple imputation
-- `R/validations.R` - Type checks and argument validations
+- `R/validations.R` - Type checks, argument validations, **time series dimension extraction**
+
+**Critical Development Requirements:**
+- **Always use `extract_time_series_dimensions()`** to calculate time series dimensions from actual data
+- **Never assume `n_time` or `n_obs` exists in `trend_specs`** - always ensure `trend_specs$dimensions` is populated first
+- **Call `validate_time_series_for_trends()`** before trend stanvar generation to ensure proper dimension calculation
+- **CAR trends exception**: Can skip regular interval validation but still need basic dimensions
 
 **Test Infrastructure:**
 - `tests/testthat/test-trend-dispatcher.R` - Trend system validation

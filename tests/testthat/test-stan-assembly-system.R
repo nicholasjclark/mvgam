@@ -66,7 +66,7 @@ test_that("setup_brms_lightweight handles different families", {
 # Tests for trend registry system
 test_that("trend registry basic functionality works", {
   # Test custom trend registration
-  mock_generator <- function(trend_spec, data_info) {
+  mock_generator <- function(trend_specs, data_info) {
     list(test_stanvar = "mock content")
   }
 
@@ -87,32 +87,32 @@ test_that("trend registry basic functionality works", {
 
 test_that("factor model compatibility validation works", {
   # Test with factor-compatible trends (should be silent)
-  compatible_trend_spec <- list(
+  compatible_trend_specs <- list(
     trend_model = "RW",
     n_lv = 2
   )
 
   expect_silent({
-    mvgam:::validate_factor_compatibility(compatible_trend_spec)
+    mvgam:::validate_factor_compatibility(compatible_trend_specs)
   })
 
   # Test with factor-incompatible trends (should error)
-  incompatible_trend_spec <- list(
+  incompatible_trend_specs <- list(
     trend_model = "CAR",
     n_lv = 2
   )
 
   expect_error({
-    mvgam:::validate_factor_compatibility(incompatible_trend_spec)
+    mvgam:::validate_factor_compatibility(incompatible_trend_specs)
   }, regexp = "Factor models.*not supported")
 
   # Test without n_lv (should be silent)
-  no_factor_trend_spec <- list(
+  no_factor_trend_specs <- list(
     trend_model = "CAR"
   )
 
   expect_silent({
-    mvgam:::validate_factor_compatibility(no_factor_trend_spec)
+    mvgam:::validate_factor_compatibility(no_factor_trend_specs)
   })
 })
 
@@ -373,7 +373,7 @@ test_that("piecewise trends integrate with complete Stan assembly", {
   )
 
   # Create PWlinear trend spec
-  pw_trend_spec <- list(
+  pw_trend_specs <- list(
     trend_type = "PWlinear",
     n_changepoints = 6,
     changepoint_scale = 0.15,
@@ -383,7 +383,7 @@ test_that("piecewise trends integrate with complete Stan assembly", {
   # Extract trend stanvars
   trend_stanvars <- mvgam:::extract_trend_stanvars_from_setup(
     trend_setup = obs_setup,  # Mock trend setup
-    trend_spec = pw_trend_spec
+    trend_specs = pw_trend_specs
   )
 
   expect_type(trend_stanvars, "list")
@@ -483,7 +483,7 @@ test_that("complete Stan model assembly validates correctly", {
   )
 
   # Create trend specification that should work
-  pw_trend_spec <- list(
+  pw_trend_specs <- list(
     trend_type = "PWlinear",
     n_changepoints = 5,
     changepoint_scale = 0.1,
@@ -494,7 +494,7 @@ test_that("complete Stan model assembly validates correctly", {
   complete_result <- mvgam:::generate_combined_stancode(
     obs_setup = obs_setup,
     trend_setup = trend_setup,
-    trend_spec = pw_trend_spec,
+    trend_specs = pw_trend_specs,
     validate = FALSE,  # Skip validation to focus on assembly
     silent = 2
   )
@@ -528,13 +528,13 @@ test_that("extract_trend_stanvars_from_setup handles valid inputs", {
   )
 
   # Mock trend spec with required n_obs
-  trend_spec <- list(
+  trend_specs <- list(
     trend_type = "RW",
     n_lv = 1,
     n_obs = 50
   )
 
-  result <- mvgam:::extract_trend_stanvars_from_setup(trend_setup, trend_spec)
+  result <- mvgam:::extract_trend_stanvars_from_setup(trend_setup, trend_specs)
   expect_type(result, "list")
   expect_gt(length(result), 0)
 })
@@ -545,13 +545,13 @@ test_that("extract_trend_stanvars_from_setup handles ZMVN default trend", {
     standata = list()
   )
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend_type = "ZMVN",
     n_lv = 1,
     n_obs = 30
   )
 
-  result <- mvgam:::extract_trend_stanvars_from_setup(trend_setup, trend_spec)
+  result <- mvgam:::extract_trend_stanvars_from_setup(trend_setup, trend_specs)
   expect_type(result, "list")
   # ZMVN should generate minimal stanvars, not empty
   expect_gte(length(result), 0)
@@ -565,15 +565,15 @@ test_that("modern Stan assembly system works with empty trends", {
     stancode = "data { int N; } parameters { real alpha; } model { alpha ~ normal(0, 1); }",
     standata = list(N = 50)
   )
-  
+
   # Test with NULL trend setup (no trends)
   result <- mvgam:::generate_combined_stancode(
     obs_setup = obs_setup,
     trend_setup = NULL,
-    trend_spec = NULL,
+    trend_specs = NULL,
     validate = FALSE
   )
-  
+
   expect_type(result, "list")
   expect_true("stancode" %in% names(result))
   expect_true("standata" %in% names(result))
@@ -709,7 +709,7 @@ test_that("production generate_combined_stancode works with observation-only mod
   combined_result <- mvgam:::generate_combined_stancode(
     obs_setup = obs_setup,
     trend_setup = NULL,
-    trend_spec = NULL,
+    trend_specs = NULL,
     validate = FALSE,  # Skip validation to focus on generation
     silent = 2
   )
@@ -740,7 +740,7 @@ test_that("production generate_combined_stancode works with trend models", {
   )
 
   # Create basic trend specification
-  trend_spec <- list(
+  trend_specs <- list(
     trend_type = "RW",  # Fixed: was trend_model, now trend_type
     time_var = "time",
     series_var = "series",
@@ -751,7 +751,7 @@ test_that("production generate_combined_stancode works with trend models", {
   combined_result <- mvgam:::generate_combined_stancode(
     obs_setup = obs_setup,
     trend_setup = trend_setup,
-    trend_spec = trend_spec,
+    trend_specs = trend_specs,
     validate = FALSE,  # Skip validation to focus on generation
     silent = 2
   )
@@ -778,7 +778,7 @@ test_that("production Stan code validation works", {
   combined_result <- mvgam:::generate_combined_stancode(
     obs_setup = obs_setup,
     trend_setup = NULL,
-    trend_spec = NULL,
+    trend_specs = NULL,
     validate = FALSE,
     silent = 2
   )
@@ -835,7 +835,7 @@ test_that("system handles missing components gracefully", {
     mvgam:::generate_combined_stancode(
       obs_setup = NULL,
       trend_setup = NULL,
-      trend_spec = NULL
+      trend_specs = NULL
     )
   })
 
@@ -846,7 +846,7 @@ test_that("system handles missing components gracefully", {
     family = gaussian()
   )
 
-  invalid_trend_spec <- list(
+  invalid_trend_specs <- list(
     trend_type = "NONEXISTENT_TREND"
   )
 
@@ -854,7 +854,7 @@ test_that("system handles missing components gracefully", {
     mvgam:::generate_combined_stancode(
       obs_setup = obs_setup,
       trend_setup = NULL,
-      trend_spec = invalid_trend_spec,
+      trend_specs = invalid_trend_specs,
       validate = FALSE
     )
   })
@@ -872,7 +872,7 @@ test_that("system provides informative error messages", {
   expect_error({
     mvgam:::generate_combined_stancode(
       obs_setup = obs_setup,
-      trend_spec = list(trend_type = "FAKE_TREND"),
+      trend_specs = list(trend_type = "FAKE_TREND"),
       validate = FALSE
     )
   }, regexp = "Unknown trend type")
@@ -895,7 +895,7 @@ test_that("full pipeline integration works end-to-end", {
     family = gaussian()
   )
 
-  trend_spec <- list(
+  trend_specs <- list(
     trend_type = "VAR",
     n_lv = 2,
     n_series = 3,  # Valid factor model: n_lv < n_series (2 < 3)
@@ -908,7 +908,7 @@ test_that("full pipeline integration works end-to-end", {
   final_result <- mvgam:::generate_combined_stancode(
     obs_setup = obs_setup,
     trend_setup = trend_setup,
-    trend_spec = trend_spec,
+    trend_specs = trend_specs,
     validate = TRUE
   )
 
@@ -936,7 +936,7 @@ test_that("system handles complex trend specifications", {
   )
 
   # Complex trend specification (need n_lv < n_series for valid factor model)
-  complex_trend_spec <- list(
+  complex_trend_specs <- list(
     trend_type = "RW",
     n_lv = 2,
     n_series = 3,  # Valid factor model: n_lv < n_series (2 < 3)
@@ -948,7 +948,7 @@ test_that("system handles complex trend specifications", {
   complex_result <- mvgam:::generate_combined_stancode(
     obs_setup = obs_setup,
     trend_setup = trend_setup,
-    trend_spec = complex_trend_spec,
+    trend_specs = complex_trend_specs,
     validate = TRUE,
     silent = 2
   )
@@ -1473,12 +1473,12 @@ test_that("helper functions work correctly", {
 
   # Test basic data structure validation
   test_data <- setup_test_data()
-  
+
   # Test time variable presence
   expect_true("time" %in% names(test_data))
   expect_equal(length(unique(test_data$time)), 50)
 
-  # Test series variable presence  
+  # Test series variable presence
   expect_true("series" %in% names(test_data))
   expect_equal(length(unique(test_data$series)), 2)
 
@@ -1584,9 +1584,9 @@ test_that("shared innovation system handles hierarchical structure", {
 test_that("extract_hierarchical_info works correctly", {
   # Test with grouping variables
   data_info <- list(n_groups = 3, n_subgroups = 2, n_lv = 2, n_series = 4)
-  trend_spec <- list(gr = "group", subgr = "species")
+  trend_specs <- list(gr = "group", subgr = "species")
 
-  hier_info <- mvgam:::extract_hierarchical_info(data_info, trend_spec)
+  hier_info <- mvgam:::extract_hierarchical_info(data_info, trend_specs)
 
   expect_type(hier_info, "list")
   expect_true(hier_info$has_groups)
@@ -1691,4 +1691,174 @@ test_that("shared innovation system handles edge cases", {
 
   expect_false("L_Omega_trend" %in% names(univar_corr_stanvars))
   expect_false("Sigma_trend" %in% names(univar_corr_stanvars))
+})
+
+test_that("generate_combined_stancode correctly handles multivariate trend specifications", {
+  # Create mock setups
+  obs_setup <- list(
+    stancode = "data { int N_y1; int N_y2; } parameters { real alpha; } model { alpha ~
+  normal(0,1); }",
+    standata = list(N_y1 = 20, N_y2 = 20)
+  )
+
+  trend_setup <- list(
+    stancode = "parameters { real dummy; } model { dummy ~ normal(0, 1); }",
+    standata = list(n_time = 20, n_series = 1)
+  )
+
+  # Test multivariate trend specifications
+  multi_trend_specs <- list(
+    y1 = list(trend = "RW", n_obs = 20, n_series = 1),
+    y2 = list(trend = "AR1", p = 1, n_obs = 20, n_series = 1),
+    y3 = NULL  # No trend for y3
+  )
+
+  result <- mvgam:::generate_combined_stancode(
+    obs_setup = obs_setup,
+    trend_setup = trend_setup,
+    trend_specs = multi_trend_specs,
+    validate = FALSE,
+    silent = 2
+  )
+
+  # Verify multivariate detection and processing
+  expect_true(result$is_multivariate)
+  expect_equal(sort(result$responses_with_trends), c("y1", "y2"))
+  expect_equal(result$trend_specs, multi_trend_specs)
+  expect_true(result$has_trends)
+
+  # Test univariate for backward compatibility
+  single_trend_specs <- list(trend = "RW", n_obs = 20, n_series = 1)
+
+  result_single <- mvgam:::generate_combined_stancode(
+    obs_setup = obs_setup,
+    trend_setup = trend_setup,
+    trend_specs = single_trend_specs,
+    validate = FALSE,
+    silent = 2
+  )
+
+  expect_false(result_single$is_multivariate)
+  expect_equal(result_single$responses_with_trends, "main")
+})
+
+test_that("multivariate system handles mixed trend types and partial specifications", {
+  obs_setup <- list(
+    stancode = "data { int N_y1; int N_y2; int N_y3; } parameters { real alpha; } model {
+  alpha ~ normal(0,1); }",
+    standata = list(N_y1 = 20, N_y2 = 20, N_y3 = 20)
+  )
+
+  trend_setup <- list(
+    stancode = "parameters { real dummy; } model { dummy ~ normal(0, 1); }",
+    standata = list(n_time = 20)
+  )
+
+  # Test mixed trend types
+  mixed_trend_specs <- list(
+    y1 = list(trend = "AR1", p = 1, n_obs = 20, n_series = 1),
+    y2 = list(trend = "RW", correlation = TRUE, n_obs = 20, n_series = 1),
+    y3 = list(trend = "VAR", p = 1, n_lv = 2, n_obs = 20, n_series = 3)
+  )
+
+  result_mixed <- mvgam:::generate_combined_stancode(
+    obs_setup = obs_setup,
+    trend_setup = trend_setup,
+    trend_specs = mixed_trend_specs,
+    validate = FALSE,
+    silent = 2
+  )
+
+  expect_true(result_mixed$is_multivariate)
+  expect_equal(sort(result_mixed$responses_with_trends), c("y1", "y2", "y3"))
+
+  # Test partial specifications (only some responses have trends)
+  partial_trend_specs <- list(
+    y1 = list(trend = "RW", n_obs = 20, n_series = 1),
+    y2 = NULL,
+    y3 = list(trend = "ZMVN", n_lv = 1, n_obs = 20, n_series = 1)
+  )
+
+  result_partial <- mvgam:::generate_combined_stancode(
+    obs_setup = obs_setup,
+    trend_setup = trend_setup,
+    trend_specs = partial_trend_specs,
+    validate = FALSE,
+    silent = 2
+  )
+
+  expect_true(result_partial$is_multivariate)
+  expect_equal(sort(result_partial$responses_with_trends), c("y1", "y3"))
+  expect_false("y2" %in% result_partial$responses_with_trends)
+})
+
+test_that("multivariate system provides proper error handling and edge cases", {
+  obs_setup <- list(
+    stancode = "data { int N; } parameters { real alpha; } model { alpha ~ normal(0,1); }",
+    standata = list(N = 20)
+  )
+
+  trend_setup <- list(
+    stancode = "parameters { real dummy; } model { dummy ~ normal(0, 1); }",
+    standata = list(n_time = 20)
+  )
+
+  # Test invalid trend type
+  invalid_trend_specs <- list(
+    y1 = list(trend = "INVALID_TREND"),
+    y2 = list(trend = "RW")
+  )
+
+  expect_error({
+    mvgam:::generate_combined_stancode(
+      obs_setup = obs_setup,
+      trend_setup = trend_setup,
+      trend_specs = invalid_trend_specs,
+      validate = FALSE,
+      silent = 2
+    )
+  }, "Unknown trend type")
+
+  # Test no trends case
+  result_no_trends <- mvgam:::generate_combined_stancode(
+    obs_setup = obs_setup,
+    trend_setup = NULL,
+    trend_specs = NULL,
+    validate = FALSE,
+    silent = 2
+  )
+
+  expect_false(result_no_trends$has_trends)
+  expect_false(result_no_trends$is_multivariate)
+
+  # Test all NULL trends in multivariate structure
+  all_null_specs <- list(y1 = NULL, y2 = NULL, y3 = NULL)
+
+  result_all_null <- mvgam:::generate_combined_stancode(
+    obs_setup = obs_setup,
+    trend_setup = trend_setup,
+    trend_specs = all_null_specs,
+    validate = FALSE,
+    silent = 2
+  )
+
+  expect_false(result_all_null$has_trends)
+  expect_true(result_all_null$is_multivariate)  # Structure is multivariate
+  expect_equal(length(result_all_null$responses_with_trends), 0)
+
+  # Test factor model incompatibility
+  incompatible_specs <- list(
+    y1 = list(trend = "PW", type = "linear", n_lv = 2),  # PW doesn't support factors
+    y2 = list(trend = "RW")
+  )
+
+  expect_error({
+    mvgam:::generate_combined_stancode(
+      obs_setup = obs_setup,
+      trend_setup = trend_setup,
+      trend_specs = incompatible_specs,
+      validate = FALSE,
+      silent = 2
+    )
+  }, "Factor models.*not supported.*PW")
 })

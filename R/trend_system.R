@@ -41,7 +41,7 @@ register_trend_type <- function(name, supports_factors = FALSE, generator_func,
                                incompatibility_reason = NULL) {
   checkmate::assert_string(name, min.chars = 1)
   checkmate::assert_logical(supports_factors, len = 1)
-  checkmate::assert_function(generator_func, args = c("trend_spec", "data_info"))
+  checkmate::assert_function(generator_func, args = c("trend_specs", "data_info"))
 
   if (!supports_factors && is.null(incompatibility_reason)) {
     incompatibility_reason <- get_default_incompatibility_reason(name)
@@ -177,7 +177,7 @@ register_core_trends <- function() {
 #' @param name Character string name for the custom trend type
 #' @param supports_factors Logical indicating if the trend supports factor models
 #' @param generator_func Function that generates Stan code for this trend type.
-#'   Must accept arguments (trend_spec, data_info) and return list of stanvars.
+#'   Must accept arguments (trend_specs, data_info) and return list of stanvars.
 #' @param incompatibility_reason Optional character string explaining why factor
 #'   models aren't supported (if supports_factors = FALSE)
 #'
@@ -187,7 +187,7 @@ register_core_trends <- function() {
 #' @examples
 #' \dontrun{
 #' # Register a custom trend type
-#' my_trend_generator <- function(trend_spec, data_info) {
+#' my_trend_generator <- function(trend_specs, data_info) {
 #'   # Implementation here
 #'   list(stanvar(...))
 #' }

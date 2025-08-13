@@ -5,7 +5,6 @@
 ### Phase 1: Testing Simple Models
 
 **Pre-Extension Function Updates**
-- [ ] **PRIORITY**: Extend `generate_combined_stancode()` to handle multivariate cases natively (currently only handles single trend_spec but multivariate models have multiple trend_specs)
 - [ ] **PRIORITY**: Implement `fit_mvgam_model()` - currently placeholder with `stop("This function is not yet operational")`
 - [ ] **PRIORITY**: Implement `subset_stanfit_parameters()` - currently placeholder, needed for dual object system
 - [ ] **PRIORITY**: Implement `extract_posterior_samples()` - missing function called by multiple imputation system

@@ -19,7 +19,7 @@ test_that("Trend type registration works correctly", {
   rm(list = ls(envir = trend_registry), envir = trend_registry)
 
   # Mock generator function
-  mock_generator <- function(trend_spec, data_info) {
+  mock_generator <- function(trend_specs, data_info) {
     list(mock_stanvar = "test")
   }
 
@@ -41,7 +41,7 @@ test_that("Factor incompatible trend registration works", {
   # Clear registry
   rm(list = ls(envir = trend_registry), envir = trend_registry)
 
-  mock_generator <- function(trend_spec, data_info) {
+  mock_generator <- function(trend_specs, data_info) {
     list(mock_stanvar = "test")
   }
 
@@ -154,7 +154,7 @@ test_that("Custom trend registration works", {
   rm(list = ls(envir = trend_registry), envir = trend_registry)
 
   # Mock generator
-  custom_generator <- function(trend_spec, data_info) {
+  custom_generator <- function(trend_specs, data_info) {
     list(custom_stanvar = "custom_test")
   }
 
@@ -176,7 +176,7 @@ test_that("Overwriting existing trend types gives warning", {
   register_core_trends()
 
   # Mock generator
-  new_generator <- function(trend_spec, data_info) {
+  new_generator <- function(trend_specs, data_info) {
     list(new_stanvar = "new_test")
   }
 
@@ -211,7 +211,7 @@ test_that("Main dispatcher uses registry correctly", {
   register_core_trends()
 
   # Mock data structures
-  trend_spec <- list(trend_model = "AR", n_lv = NULL, p = 1)
+  trend_specs <- list(trend_model = "AR", n_lv = NULL, p = 1)
   data_info <- list(n_series = 3, n_lv = 3)
 
   # This should work without error (assuming AR generator exists)
@@ -221,7 +221,7 @@ test_that("Main dispatcher uses registry correctly", {
     # This will call ensure_registry_initialized, get_trend_info,
     # validate_factor_compatibility, and the generator
     tryCatch(
-      generate_trend_injection_stanvars(trend_spec, data_info),
+      generate_trend_injection_stanvars(trend_specs, data_info),
       error = function(e) {
         # Expected to fail because we don't have complete generator functions
         # but it should get past the registry parts
