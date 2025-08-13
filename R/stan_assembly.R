@@ -245,15 +245,6 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
     combined_stancode <- validated_code
   }
 
-  # Apply any necessary autoformatting
-  if (exists(".autoformat", envir = asNamespace("mvgam"))) {
-    combined_stancode <- mvgam:::.autoformat(
-      combined_stancode,
-      backend = backend,
-      silent = silent >= 1
-    )
-  }
-
   return(list(
     stancode = combined_stancode,
     standata = combined_standata,
@@ -313,24 +304,13 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
   # Return NULL for empty stanvars (brms expectation)
 
   # Generate Stan code using brms with combined stanvars
-  base_code <- try({
-    brms::make_stancode(
+  base_code <- brms::make_stancode(
       formula = obs_setup$formula,
       data = obs_setup$data,
       family = obs_setup$family,
       stanvars = all_stanvars,
       prior = obs_setup$prior
     )
-  }, silent = TRUE)
-
-  if (inherits(base_code, "try-error")) {
-    error_msg <- attr(base_code, 'condition')$message
-    stop(insight::format_error(
-      "Failed to generate base Stan code with trend stanvars.",
-      "Check observation formula and trend stanvar compatibility.",
-      paste("Error:", error_msg)
-    ))
-  }
 
   return(base_code)
 }
@@ -355,51 +335,10 @@ combine_stan_data <- function(obs_data, trend_data) {
   trend_only_names <- setdiff(names(trend_data), names(obs_data))
   combined_data[trend_only_names] <- trend_data[trend_only_names]
 
-  # Handle conflicts by preferring trend data for trend-related elements
-  trend_priority_patterns <- c("^trend_", "^n_trend", "^ar_", "^var_", "^rw_")
-
-  for (pattern in trend_priority_patterns) {
-    matching_names <- grep(pattern, names(trend_data), value = TRUE)
-    combined_data[matching_names] <- trend_data[matching_names]
-  }
-
   # Validate combined data consistency
   validate_combined_standata(combined_data, obs_data, trend_data)
 
   return(combined_data)
-}
-
-#' Create Stanvar Objects
-#'
-#' @description
-#' Helper function to create brms stanvar objects for trend injection.
-#'
-#' @param x Data object to include in Stan model
-#' @param name Character string name for the object in Stan
-#' @param scode Character string Stan code type declaration
-#' @return brms stanvar object
-#' @noRd
-stanvar <- function(x, name, scode = "data") {
-  if (!requireNamespace("brms", quietly = TRUE)) {
-    stop(insight::format_error(
-      "Package {.pkg brms} is required for stanvar creation."
-    ))
-  }
-
-  # Use brms::stanvar if available
-  if (exists("stanvar", where = asNamespace("brms"))) {
-    return(brms::stanvar(x = x, name = name, scode = scode))
-  } else {
-    # Fallback structure if brms::stanvar not available
-    structure(
-      list(
-        name = name,
-        sdata = x,
-        scode = scode
-      ),
-      class = "stanvar"
-    )
-  }
 }
 
 #' Integration with Enhanced mvgam Function
@@ -624,17 +563,17 @@ prepare_stanvars_for_brms <- function(stanvars) {
   valid_stanvars <- list()
 
   for (name in names(stanvars)) {
-    stanvar <- stanvars[[name]]
+    .stanvar <- stanvars[[name]]
 
     # brms stanvars are containers - validate the actual stanvar element
-    stanvar_element <- if (inherits(stanvar, "stanvars") && length(stanvar) == 1) {
-      stanvar[[1]]
+    stanvar_element <- if (inherits(.stanvar, "stanvars") && length(.stanvar) == 1) {
+      .stanvar[[1]]
     } else {
-      stanvar
+      .stanvar
     }
 
     if (is_valid_stanvar(stanvar_element)) {
-      valid_stanvars[[name]] <- stanvar
+      valid_stanvars[[name]] <- .stanvar
     } else {
       insight::format_warning(
         "Skipping invalid stanvar: {.field {name}}",
