@@ -109,6 +109,23 @@ mvgam_single_dataset <- function(formula, trend_formula, data, backend,
     NULL
   }
 
+  # Validate time series structure and inject dimensions if trends are specified
+  if (mv_spec$has_trends) {
+    validation_result <- validate_time_series_for_trends(data, mv_spec$trend_specs)
+    
+    # Inject dimensions back into trend specifications for stanvar generation
+    # Standardized structure: univariate=direct, multivariate=named list
+    if (is_multivariate_trend_specs(mv_spec$trend_specs)) {
+      # Multivariate: inject dimensions into each response-specific trend spec
+      for (response_name in names(mv_spec$trend_specs)) {
+        mv_spec$trend_specs[[response_name]]$dimensions <- validation_result$dimensions
+      }
+    } else {
+      # Univariate: inject dimensions directly into trend object
+      mv_spec$trend_specs$dimensions <- validation_result$dimensions
+    }
+  }
+
   # Note: Legacy trend stanvar extraction removed - modern system handles this automatically in generate_combined_stancode()
 
   # Generate combined Stan code and data using modern system

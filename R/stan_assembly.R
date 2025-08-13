@@ -1749,9 +1749,17 @@ generate_trend_injection_stanvars <- function(trend_specs, data_info, response_s
     ))
   }
 
-  # Handle PW variations - PWlinear and PWlogistic both use PW generator
-  # Preserve original type information for PW generator
-  if (trend_type %in% c("PWlinear", "PWlogistic")) {
+  # Normalize trend types to registry base types
+  # AR1, AR(1,12), etc. → AR
+  # VAR2, VAR3, etc. → VAR  
+  # PWlinear, PWlogistic → PW
+  if (grepl("^AR\\d*$|^AR\\(", trend_type)) {
+    trend_type <- "AR"
+  } else if (grepl("^VAR\\d+$", trend_type)) {
+    trend_type <- "VAR"
+  } else if (trend_type %in% c("PWlinear", "PWlogistic")) {
+    # Handle PW variations - PWlinear and PWlogistic both use PW generator
+    # Preserve original type information for PW generator
     trend_specs$type <- if (trend_type == "PWlogistic") "logistic" else "linear"
     trend_type <- "PW"
   }

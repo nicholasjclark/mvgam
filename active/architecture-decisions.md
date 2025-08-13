@@ -180,18 +180,20 @@ mu_biomass += mu_trend_biomass;
 **Decision**: All trend constructors output only a `trend` field, removing redundant `trend_model` field
 **Rationale**: Eliminates interface inconsistencies and simplifies trend type identification
 
-**Standardized Output Pattern**:
+**Standardized Output Pattern with Trend Type Normalization**:
 ```r
-# All constructors now return consistent trend field
+# Constructor outputs (specific labels for parameter tracking)
 RW()              # trend = 'RW'
 AR(p = 1)         # trend = 'AR1' 
 AR(p = c(1, 12))  # trend = 'AR(1,12)'
 VAR(p = 2)        # trend = 'VAR2'
 CAR()             # trend = 'CAR'
-GP()              # trend = 'GP'
 PW(growth = 'linear')   # trend = 'PWlinear'
 PW(growth = 'logistic') # trend = 'PWlogistic'
 ZMVN()            # trend = 'ZMVN'
+
+# Registry normalization (for stanvar generation)
+# AR1, AR(1,12) → 'AR' | VAR2, VAR3 → 'VAR' | PWlinear → 'PW'
 ```
 
 ### 4. Variable Name Management Architecture
@@ -348,9 +350,9 @@ mv_spec$trend_specs = list(
 ```
 
 ### Current Implementation Status
-- ✅ **Working**: Registry system, validation, Stan assembly framework, multivariate trend detection, time series dimension management
+- ✅ **Working**: Registry system, standardized trend_specs structure, dimension validation pipeline, Stan assembly framework, multivariate trend detection, time series dimension management, trend type normalization
 - ❌ **Placeholder**: `fit_mvgam_model()`, `subset_stanfit_parameters()`, `extract_posterior_samples()`  
-- ⚠️ **Partial**: `generate_combined_stancode()` works for univariate, needs multivariate extension
+- ⚠️ **Implementation Issues**: Stan template syntax errors, variable scoping in generated code, remaining assembly pipeline integration gaps
 
 ### Multivariate Trend Detection Logic
 
@@ -431,9 +433,10 @@ extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimens
 3. **Maintainability**: Clear separation between validation logic and trend generation
 4. **Robustness**: Eliminates missing `n_time`/`n_obs` errors in trend generators
 
-### Critical Gap: Multivariate Trend Assembly
-**Problem**: `generate_combined_stancode(trend_spec)` expects single trend but multivariate has multiple in `mv_spec$trend_specs`
-**Location**: `R/mvgam_core.R:169` - Currently uses inadequate `mv_spec$trend_specs[[1]]` workaround
+### RESOLVED: Formula-to-Trend Pipeline
+**Resolution**: Formula parsing now correctly transforms raw formulas into proper `mvgam_trend` objects
+**Implementation**: `parse_multivariate_trends()` calls `parse_trend_formula()` to return structured objects with `time`, `series`, `trend` fields
+**Status**: Complete end-to-end pipeline from formula validation through dimension tracking working
 
 ## Developer Onboarding Guide
 

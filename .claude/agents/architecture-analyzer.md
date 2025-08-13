@@ -92,7 +92,7 @@ function_name:
 - ALWAYS prefer explicit file paths when provided over directory scanning
 - ALWAYS use the exact output template provided below - no deviations
 - ALWAYS read files using `window.fs.readFile` with UTF-8 encoding
-- ALWAYS complete analysis within 60 seconds maximum
+- ALWAYS complete analysis within 180 seconds maximum
 - ALWAYS provide partial results if full analysis cannot complete
 - ALWAYS include file names and line numbers for exported functions
 - ALWAYS confirm file paths exist before attempting to read them
@@ -113,7 +113,7 @@ function_name:
 - NEVER exceed 1000 words in total output
 - NEVER omit the required template sections
 - NEVER include base R functions in dependency analysis
-- NEVER continue analysis beyond 60 seconds runtime
+- NEVER continue analysis beyond 180 seconds runtime
 
 ## Input Format Requirements
 

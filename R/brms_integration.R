@@ -164,17 +164,21 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
     
   } else {
     # Single trend formula applied to all responses
+    # Parse the trend formula to extract trend objects instead of storing raw formulas
+    parsed_trend <- parse_trend_formula(trend_formula)
+    
     trend_specs <- if (is_mv_main && !is.null(response_names)) {
-      # Apply same trend to all responses
+      # Apply same parsed trend to all responses
       setNames(
-        replicate(length(response_names), trend_formula, simplify = FALSE),
+        replicate(length(response_names), parsed_trend$trend_model, simplify = FALSE),
         response_names
       )
     } else {
-      list(main = trend_formula)
+      # Univariate case: return trend_model directly (no wrapper)
+      parsed_trend$trend_model
     }
     
-    base_formula <- trend_formula
+    base_formula <- parsed_trend$base_formula
   }
   
   return(list(

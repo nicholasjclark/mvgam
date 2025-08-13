@@ -430,14 +430,6 @@ validate_single_trend_formula <- function(formula, context = NULL, allow_respons
   # Extract string for validation
   formula_str <- formula2str_mvgam(formula)
   
-  # Check for 'series' identifier (should use 'trend' instead)
-  if (grepl('\\bseries\\b', formula_str)) {
-    stop(insight::format_error(
-      "Trend formulas should use {.field trend} instead of {.field series}.",
-      "For varying effects, use: {.code s(time, by = trend)} not {.code s(time, by = series)}"
-    ))
-  }
-  
   # Check for offset terms (not allowed in trend formulas)
   validate_no_offsets_in_trends(formula)
   
@@ -994,18 +986,16 @@ is_multivariate_trend_specs <- function(trend_specs) {
     return(FALSE)
   }
   
-  # Multivariate case: named list where each element is a trend specification
+  # Standardized structure check:
+  # Multivariate: named list without trend fields (response names as keys)
+  # Univariate: direct trend object with trend field
   if (is.list(trend_specs) && !is.null(names(trend_specs))) {
-    # Check if it looks like a named list of trend specs (not a single trend)
-    # Single trend specs have 'trend', 'trend_type', or 'trend_model' field
-    # Multivariate has response names instead
+    # Check if this is a direct trend object (has trend field) or multivariate (response names)
     has_trend_field <- any(c("trend", "trend_type", "trend_model") %in% names(trend_specs))
-    if (!has_trend_field) {
-      return(TRUE)
-    }
+    return(!has_trend_field)  # Multivariate if no trend field at top level
   }
   
-  # Univariate case: single trend specification with trend field
+  # Univariate case: direct trend specification object
   return(FALSE)
 }
 
@@ -1466,7 +1456,7 @@ check_block_semicolons <- function(block_content) {
 }
 
 #' @noRd
-validate_stan_code <- function(stan_code, backend = "rstan", ...) {
+validate_stan_code <- function(stan_code, backend = "rstan", silent = TRUE, ...) {
   checkmate::assert_string(stan_code)
   checkmate::assert_choice(backend, c("rstan", "cmdstanr"))
 
@@ -1487,12 +1477,13 @@ validate_stan_code <- function(stan_code, backend = "rstan", ...) {
       ))
     }
 
+    # rstan::stanc() doesn't accept silent parameter, so filter it out
     # Always let rstan::stanc() errors show directly - no masking
     rstan::stanc(model_code = stan_code, verbose = FALSE, ...)
     invisible(TRUE)
   } else {
-    # cmdstanr backend (fallback)
-    return(parse_model_cmdstanr(stan_code, ...))
+    # cmdstanr backend (fallback) - pass silent through
+    return(parse_model_cmdstanr(stan_code, silent = silent, ...))
   }
 }
 
@@ -1707,9 +1698,19 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1) {
   checkmate::assert_list(trend_specs)
 
   # Extract variable names from trend specification
-  time_var <- trend_specs$time_var %||% trend_specs$time %||% "time"
-  series_var <- trend_specs$series_var %||% trend_specs$series %||% "series"
-  trend_type <- trend_specs$trend_type %||% trend_specs$trend_model
+  # Standardized structure: univariate=direct, multivariate=named list
+  if (is_multivariate_trend_specs(trend_specs)) {
+    # Multivariate: extract from first response spec
+    first_spec <- trend_specs[[1]]
+    time_var <- first_spec$time_var %||% first_spec$time %||% "time"
+    series_var <- first_spec$series_var %||% first_spec$series %||% "series"
+    trend_type <- first_spec$trend_type %||% first_spec$trend_model %||% first_spec$trend
+  } else {
+    # Univariate: extract directly from trend object
+    time_var <- trend_specs$time_var %||% trend_specs$time %||% "time"
+    series_var <- trend_specs$series_var %||% trend_specs$series %||% "series"
+    trend_type <- trend_specs$trend_type %||% trend_specs$trend_model %||% trend_specs$trend
+  }
   
   # Use new dimension extraction function (validates structure + returns dimensions)
   dimensions <- extract_time_series_dimensions(
@@ -1755,8 +1756,8 @@ validate_series_time = function(
   time_var <- trend_model$time
   series_var <- trend_model$series
 
-  # Now we only need the character trend_model string
-  trend_model_type <- trend_model$trend_model
+  # Now we only need the character trend type string
+  trend_model_type <- trend_model$trend
 
   # Validate any grouping structure
   data <- validate_grouping_structure(

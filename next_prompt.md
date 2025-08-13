@@ -20,7 +20,7 @@ Please follow these steps sequentially:
 
 4. **Use thinking/reasoning to analyze:**
    - The formula interface and how trend constructors are called and validated
-   - The flow of stanvar objects through the combination pipeline
+   - The flow of data and formulae to stanvar objects and then through the combination pipeline
    - The merging of trend and observation data and model objects
 
 5. **Create a five-step implementation plan to address any immediate action points highlighted in `active/current-sprint.md`**. Use natural language to describe the plan, not code examples.
