@@ -209,22 +209,6 @@ mvgam(y ~ s(x), trend_formula = ~ AR(p = 1), data = test_data)
 validate_stan_code(stancode, silent = FALSE)  # Full output for debugging
 ```
 
-## Current Implementation Gaps
-
-### Critical Blockers for Testing
-- **`fit_mvgam_model()`**: Placeholder - needs Stan backend implementation
-- **`extract_posterior_samples()`**: Missing - needed for multiple imputation  
-- **Multivariate trends**: `generate_combined_stancode()` only handles single trend_spec
-
-### Multivariate Challenge
-```r
-# Problem: This structure...
-mv_spec$trend_specs = list(count = AR(), biomass = RW())
-
-# ...can't be passed to this function:
-generate_combined_stancode(obs_setup, trend_setup, trend_spec)  # Expects single trend_spec
-```
-
 ## Common Error Patterns
 
 ### Trend Formula Conflicts
