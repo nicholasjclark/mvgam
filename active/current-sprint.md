@@ -5,7 +5,11 @@
 ### Phase 1: Testing Simple Models
 
 **Pre-Extension Function Updates**
-- [x] **COMPLETED**: Pipeline testing infrastructure - standardized trend_specs structure, dimension validation integration, test pipeline updates
+- [ ] **PRIORITY**: Trend pipeline infrastructure dispatch simplification - trend constructors should return ALL necessary information for pointing to the correct trend stanvar functions. This should trigger:
+    1. The correct time, series, gr and subgr validation to use
+    2. Whether to use hierarchical trend components, factors and shared gaussian innovations
+    3. Whether to add response suffixes (if for example the constructor is called in a named list of formulae)
+    4. Storage that can be used by the final `mvgam` model to determine what parameters to monitor, what forecasting function to use, what labels to use in summaries and any other post-processing steps
 - [ ] **PRIORITY**: Implement `fit_mvgam_model()` - currently placeholder with `stop("This function is not yet operational")`
 - [ ] **PRIORITY**: Implement `subset_stanfit_parameters()` - currently placeholder, needed for dual object system  
 - [ ] **PRIORITY**: Implement `extract_posterior_samples()` - missing function called by multiple imputation system
@@ -78,24 +82,6 @@
 ## ✅ RESOLVED: Formula Parsing Pipeline Break
 
 **Solution**: `parse_multivariate_trends()` now calls `parse_trend_formula()` to return proper `mvgam_trend` objects instead of raw formulas
-
-**Fixes Applied**:
-- ✅ `parse_multivariate_trends()` integration with `parse_trend_formula()`
-- ✅ `validate_series_time()` parameter mapping (`trend_model$trend` vs `trend_model$trend_model`)  
-- ✅ `validate_time_series_for_trends()` trend field extraction (`trend_specs$trend`)
-- ✅ Formula validation removal of outdated `series` vs `trend` restriction
-
-**Status**: ✅ COMPLETE - End-to-end pipeline operational from formula parsing through dimension tracking
-
-## ✅ RESOLVED: Architectural Standardization and Test Infrastructure
-
-**Major Achievements**:
-- ✅ Standardized trend_specs structure (eliminated "main" wrapper inconsistencies)
-- ✅ Integrated dimension validation pipeline throughout test suite
-- ✅ Added trend type normalization (AR1→AR, VAR2→VAR, PWlinear→PW)
-- ✅ Updated test infrastructure to use proper validation pipeline instead of bypassing critical steps
-- ✅ Eliminated "Missing dimension information" errors from compilation tests
-- ✅ Achieved 67% pass rate in compilation validation tests, 89% in assembly system tests
 
 **Current Focus**: Stan template syntax errors and variable scoping issues in generated code
 
