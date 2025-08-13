@@ -349,11 +349,6 @@ mv_spec$trend_specs = list(
 )
 ```
 
-### Current Implementation Status
-- ✅ **Working**: Registry system, standardized trend_specs structure, dimension validation pipeline, Stan assembly framework, multivariate trend detection, time series dimension management, trend type normalization
-- ❌ **Placeholder**: `fit_mvgam_model()`, `subset_stanfit_parameters()`, `extract_posterior_samples()`  
-- ⚠️ **Implementation Issues**: Stan template syntax errors, variable scoping in generated code, remaining assembly pipeline integration gaps
-
 ### Multivariate Trend Detection Logic
 
 **Design Pattern**: Distinguish between univariate trend specifications and multivariate collections
@@ -373,7 +368,7 @@ trend_specs = list(
 ```
 
 **Key Requirements**:
-1. **Field Compatibility**: Supports `trend`, `trend_type`, and `trend_model` field names for backward compatibility
+1. **Field Compatibility**: Supports `trend`, `trend_type`, and `trend_model` field names, but this needs to be streamlined and simplified as we do not need to maintain backward compatibility
 2. **Multivariate Recognition**: If a named list lacks any trend-identifying field, it's treated as multivariate
 3. **Response-Specific Processing**: Each response gets processed with appropriate response suffix (`_count`, `_biomass`)
 
@@ -432,11 +427,6 @@ extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimens
 2. **Performance**: Dimensions calculated once during validation, reused everywhere
 3. **Maintainability**: Clear separation between validation logic and trend generation
 4. **Robustness**: Eliminates missing `n_time`/`n_obs` errors in trend generators
-
-### RESOLVED: Formula-to-Trend Pipeline
-**Resolution**: Formula parsing now correctly transforms raw formulas into proper `mvgam_trend` objects
-**Implementation**: `parse_multivariate_trends()` calls `parse_trend_formula()` to return structured objects with `time`, `series`, `trend` fields
-**Status**: Complete end-to-end pipeline from formula validation through dimension tracking working
 
 ## Developer Onboarding Guide
 
