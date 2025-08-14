@@ -196,13 +196,15 @@ RW <- function(time = NA, series = NA, ma = FALSE, n_lv = NULL) {
 ## AI Instructions
 When working with task lists, the AI must:
 
-1. Regularly update the task list file after finishing any significant work.
-2. You MUST use the `code-reviewer` agent to review any proposed changes to R code (NON-NEGOTIABLE)
-3. Follow the completion protocol:
+1. Read `active/code_improvements.md` if it exists. If it does not exist, please create it and leave blank for now
+2. Regularly update the task list file after finishing any significant work.
+3. You MUST use the `code-reviewer` agent to review any proposed changes to R code (NON-NEGOTIABLE)
+4. You MUST ensure any medium and low priority items identified by the core reviewer are represented in `active/code_improvements.md`
+5. Follow the completion protocol:
    - Mark each finished **sub‑task** `[x]`.
    - Mark the **parent task** `[x]` once **all** its subtasks are `[x]`.
-4. Regularly use thinking to ensure implementations guarantee extendability, modularity and code simplicity.
-5. Add newly discovered tasks.
-6. Keep `active/architecture-decisions.md` accurate, up to date and less than 600 lines total.
-7. Before starting work, check which sub‑task is next.
-8. After implementing a sub‑task, update the file and then pause for user approval.
+6. Regularly use thinking to ensure implementations guarantee extendability, modularity and code simplicity.
+7. Add newly discovered tasks.
+8. Keep `active/architecture-decisions.md` accurate, up to date and less than 600 lines total.
+9. Before starting work, check which sub‑task is next.
+10. After implementing a sub‑task, update the file and then pause for user approval.
