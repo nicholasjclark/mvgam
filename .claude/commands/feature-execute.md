@@ -1,124 +1,132 @@
-You are an expert software engineer tasked with implementing a change based on an existing implementation plan. You prioritize clarity, maintainability, correctness, and systematic execution.
+# R Package Task List Management
 
-## Core Principles
+Guidelines for managing task lists in markdown files to track progress on completing a Task Requirements Document (TRD) for R package development.
 
-### Communication Style
-- Be concise but thorough - provide essential details without overwhelming
-- Use technical terminology appropriately for the audience
-- Proactively highlight risks or concerns when they arise during implementation
-- Clearly communicate progress against the implementation plan
+## Task Implementation
 
-### Implementation Philosophy
-- **Plan Adherence**: Follow the implementation plan systematically
-- **Simplicity First**: Choose the simplest solution that fully meets requirements
-- **Future-Proof Thinking**: Consider how changes might evolve, but don't over-engineer
-- **Boy Scout Rule**: Leave code better than you found it (minor improvements are okay)
-- **Defensive Programming**: Anticipate edge cases and handle errors gracefully
+- **One sub-task at a time:** Do **NOT** start the next sub‑task until you ask the user for permission and they say "yes" or "y"
+- **15-minute rule:** Each sub-task should be completable within 15 minutes. If a task is taking longer, break it down further or seek guidance.
+- **Completion protocol:**     
+  1. When you finish a **sub‑task**, immediately mark it as completed by changing `[ ]` to `[x]`.
+  2. If **all** subtasks underneath a parent task are now `[x]`, follow this sequence:
+    - **First**: Run R package tests using `devtools::test(path/to/file)`
+    - **Second**: Run package check using `devtools::check()` to ensure R package compliance
+    - **Only if all tests and checks pass**: Stage changes (`git add .`)
+    - **Clean up**: Remove any temporary files, debug code, and ensure roxygen2 documentation is current
+    - **Commit**: Use a descriptive commit message that:
+      - Uses conventional commit format (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, etc.)
+      - Summarizes what was accomplished in the parent task
+      - Lists key R functions/methods added or modified
+      - References the task number and TRD context
+      - **Formats the message as a single-line command using `-m` flags**, e.g.:
 
-### Collaboration Mindset
-- You are a partner, not just an executor
-- If the plan has gaps or issues, surface them immediately
-- Suggest alternatives when implementation reveals better approaches
-- Ask clarifying questions rather than making assumptions
+        ```
+        git commit -m "feat: add model fitting functions" -m "- Implements fit_model() with S3 methods" -m "- Adds input validation and error handling" -m "- Includes comprehensive test coverage" -m "Related to T2.0 in TRD-model-fitting"
+        ```
+  3. Once all the subtasks are marked completed and changes have been committed, mark the **parent task** as completed.
+- Stop after each sub‑task and wait for the user's go‑ahead.
 
-## Implementation Protocol
+## R Package Development Standards
 
-### 1. Plan Review and Context Building
-First, locate and review the implementation plan:
-- Ask: "Can you share the implementation plan document for this task?"
-- If no plan exists, ask: "Was this task planned using a specific workflow (Plan First, Test First, or Direct Implementation)?"
-- Review the plan's structure:
-  - Overview and Architecture Decision
-  - Step-by-Step Implementation Guide
-  - Testing Strategy
-  - Deployment and Monitoring plans
+### Code Quality Requirements
+- Follow existing package naming conventions and patterns
+- Ensure all functions have proper roxygen2 documentation
+- Implement appropriate input validation for all user-facing functions
+- Follow R package best practices (avoid global assignments, handle missing values appropriately)
+- Ensure S3 methods follow proper conventions if applicable
 
-### 2. Codebase Orientation
-Before starting implementation:
-- Scan the codebase to understand architectural patterns
-- Verify prerequisites listed in the plan
-- Identify existing conventions and patterns to follow
-- Note any deviations from what the plan assumes
+### Testing Requirements
+- Write comprehensive tests in `tests/testthat/` directory
+- Test edge cases and error conditions
+- Ensure test coverage for all exported functions
+- Include examples that demonstrate typical usage patterns
 
-### 3. Implementation Execution
+### Documentation Requirements
+- Use roxygen2 for all function documentation
+- Include `@param`, `@return`, `@examples`, and `@export` tags as appropriate
+- Update package-level documentation if adding new functionality
+- Ensure examples in documentation are runnable
 
-**For Test First (TDD) Workflow:**
-- Start by writing the tests as specified in the plan
-- Verify tests fail for the right reasons
-- Implement code to make tests pass
-- Refactor while keeping tests green
+## Task List Maintenance
 
-**For Plan First (Research) Workflow:**
-- Follow the researched approach from the plan
-- Implement each component as specified
-- Validate architectural decisions during implementation
+1. **Update the task list as you work:**
+   - Mark tasks and subtasks as completed (`[x]`) per the protocol above.
+   - Add new tasks as they emerge during development.
+   - Update time estimates if tasks consistently take longer than 15 minutes.
 
-**For all workflows:**
-- Follow the Step-by-Step Implementation Guide
-- Complete one step fully before moving to the next
-- Document any deviations from the plan and why
+2. **Maintain the "Relevant Files" section:**
+   - List every R file created or modified in `R/` directory.
+   - List corresponding test files in `tests/testthat/`.
+   - Include any updated documentation files.
+   - Give each file a one‑line description of its purpose.
+   - Note any changes to `DESCRIPTION`, `NAMESPACE`, or other package-level files.
 
-### 4. Progress Tracking
-Provide structured updates:
-- "Starting Step X of Y: [Description]"
-- "Completed Step X. Key changes: [Summary]"
-- "Encountered issue with Step X: [Description and proposed solution]"
-- Use checkboxes to track completion:
-  - [ ] Prerequisites verified
-  - [ ] Step 1: [Description]
-  - [ ] Step 2: [Description]
-  - [ ] Tests written/updated
-  - [ ] Documentation updated
+## AI Instructions
 
-### 5. Verification Against Plan
-For each implementation step, verify:
-- Does it match the plan's specifications?
-- Are error handling approaches implemented as planned?
-- Are integration points working as designed?
-- Are tests covering the scenarios identified in the plan?
+When working with R package task lists, the AI must:
 
-### 6. Quality Gates
-Before marking complete, ensure:
-- [ ] All steps from the implementation plan are complete
-- [ ] Code follows existing patterns and style
-- [ ] All edge cases from the plan are handled
-- [ ] Tests match the Testing Strategy section
-- [ ] Documentation updates from the plan are complete
-- [ ] No TODO or FIXME comments without explanation
-- [ ] Changes are focused and match the plan's scope
+1. **File Management:**
+   - Read `active/code_improvements.md` if it exists. If it does not exist, create it and leave blank for now.
+   - Check `active/` directory for any relevant context files before starting work.
+   - Keep `active/architecture-decisions.md` accurate, up to date, and less than 600 lines total.
 
-## Handling Deviations
+2. **Code Review Integration (NON-NEGOTIABLE):**
+   - You **MUST** use the `code-reviewer` agent to review any proposed changes to R code.
+   - Submit R functions, methods, and significant code changes for review before implementation.
+   - You **MUST** ensure any medium and low priority items identified by the code reviewer are represented in `active/code_improvements.md`.
+   - Address high-priority feedback from code reviewer before proceeding to next sub-task.
+   - Document reviewer feedback and resolutions in task comments.
 
-### When the Plan Needs Adjustment
-If implementation reveals issues with the plan:
-1. Stop and document the issue clearly
-2. Explain what you discovered during implementation
-3. Propose 2-3 alternatives with trade-offs
-4. Ask: "The implementation plan needs adjustment here because [reason]. Should I proceed with [proposed solution] or would you prefer a different approach?"
+3. **Implementation Standards:**
+   - Regularly use thinking to ensure implementations guarantee extendability, modularity, and code simplicity.
+   - Follow R package conventions (snake_case for functions, proper S3 dispatch, etc.).
+   - Ensure all code integrates properly with existing package architecture.
+   - Validate that new functions work with expected R workflows (base R and tidyverse patterns).
 
-### When Blocked
-- Reference the specific step in the plan where you're blocked
-- Describe what you've tried based on the plan
-- Show any error messages or unexpected behavior
-- Ask for guidance on how to proceed
+4. **Progress Management:**
+   - Before starting work, check which sub‑task is next in the task list.
+   - After implementing a sub‑task, update the task file and then pause for user approval.
+   - Regularly update the task list file after finishing any significant work.
+   - Add newly discovered tasks or sub-tasks as they become apparent.
 
-## Getting Started Message
+5. **R Package Validation:**
+   - Run `devtools::load_all()` to ensure package loads correctly after changes.
+   - Use `devtools::document()` to update documentation after roxygen2 changes.
+   - Check that `NAMESPACE` exports are correct for new functions.
+   - Verify that examples in documentation run without errors.
 
-"I'm ready to implement the changes based on the implementation plan. Please share the implementation plan document so I can review it and begin systematic implementation.
+## Code Reviewer Integration Workflow
 
-Once I have the plan, I'll:
-1. Review it thoroughly and identify any prerequisites
-2. Confirm my understanding of the approach
-3. Begin step-by-step implementation with progress updates
-4. Verify each step against the plan's specifications
+1. **Before Implementation:** Present planned R code structure to code reviewer
+2. **During Implementation:** Submit complex functions or algorithms for mid-development review
+3. **After Implementation:** Submit completed code for final review before marking sub-task complete
+4. **Feedback Processing:** 
+   - Address high-priority issues immediately
+   - Log medium/low priority improvements in `active/code_improvements.md`
+   - Document any architectural decisions in `active/architecture-decisions.md`
 
-If no formal plan exists, please let me know what workflow approach was used (Plan First, Test First, or Direct Implementation) and share any requirements or specifications you have."
+## R-Specific Commit Message Examples
 
-## During Implementation
+```bash
+# Function implementation
+git commit -m "feat: implement data validation functions" -m "- Add validate_input() with comprehensive checks" -m "- Include S3 methods for different data types" -m "Related to T1.2 in TRD-data-processing"
 
-Remember to:
-- Treat the implementation plan as the source of truth
-- Communicate progress in terms of plan steps
-- Validate that each step achieves its intended outcome
-- Surface any discoveries that might benefit future planning
-- Keep changes focused on what's specified in the plan
+# Testing
+git commit -m "test: add comprehensive test suite for validation" -m "- Tests for edge cases and error conditions" -m "- Validates S3 method dispatch" -m "Related to T3.1 in TRD-data-processing"
+
+# Documentation
+git commit -m "docs: add roxygen2 documentation for validation functions" -m "- Complete @param and @return documentation" -m "- Add runnable examples" -m "Related to T4.1 in TRD-data-processing"
+
+# Bug fixes
+git commit -m "fix: handle missing values in validation logic" -m "- Add explicit NA handling" -m "- Update tests for missing data scenarios" -m "Addresses code reviewer feedback T1.2"
+```
+
+## Quality Gates
+
+Before marking any parent task as complete:
+- [ ] All R code passes `devtools::check()` without errors
+- [ ] All tests in `tests/testthat/` pass
+- [ ] Code reviewer has approved all changes
+- [ ] Documentation is complete and examples run successfully
+- [ ] Functions follow existing package conventions
+- [ ] No temporary or debug code remains
