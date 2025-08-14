@@ -73,60 +73,86 @@ Generate a structured markdown report using this EXACT template:
 **Reviewer**: R Code Reviewer Agent
 **Review Date**: [Current Date]
 
-## Critical Issues (Non-Negotiable)
-[Only include sections where issues are found]
+## 🚨 HIGH PRIORITY - Critical Issues (Non-Negotiable)
+[Only include sections where issues are found - these MUST be fixed before approval]
 
 ### ❌ Argument Validation Failures
 - **Missing validation in `function_name()`**: Parameter `param_name` lacks type/range checking
 - **Recommendation**: Add `assertthat::assert_that(is.numeric(param_name))` at function start
+- **Priority**: HIGH - Non-negotiable requirement
 
 ### ❌ Code Duplication Detected
 - **Duplicate functionality**: `new_function()` replicates behavior of existing `existing_function()`
 - **Recommendation**: Use `existing_function()` or extend it if additional behavior needed
+- **Priority**: HIGH - Non-negotiable requirement
 - **Note**: [Request architecture analysis if broader context needed]
 
 ### ❌ Prohibited Code Patterns
 - **Placeholder function detected**: `function_name()` contains "Not implemented"
 - **Simple wrapper identified**: `wrapper_function()` is unnecessary wrapper around `base_function()`
 - **Error masking**: `tryCatch` used without proper error handling in `function_name()`
+- **Priority**: HIGH - Non-negotiable requirement
 
-## Quality & Standards Assessment
+## ⚠️ MEDIUM PRIORITY - Standards & Quality Issues
+[Issues that should be addressed soon but don't block approval]
 
-### 🔍 Logic and Correctness
-- **Positive**: Clear logic flow in main processing functions
+### 🔍 Logic and Correctness Issues
 - **Issue**: Potential edge case in `function_name()` when input is empty vector
 - **Recommendation**: Add explicit handling for `length(input) == 0`
+- **Priority**: MEDIUM - Logic robustness improvement
 
-### 🔒 Security & Performance
+### 🔒 Security & Performance Concerns
 - **Issue**: Potential security risk in file path handling
-- **Performance**: Inefficient loop could be vectorized
+- **Recommendation**: Use `fs::path_sanitize()` or validate paths
+- **Priority**: MEDIUM - Security best practice
 
-### 📋 Standards Compliance
-- **CLAUDE.md Adherence**: [Specific standard violations or confirmations]
-- **Naming Conventions**: [Issues or confirmations]
-- **Documentation**: [Missing or adequate roxygen2 documentation]
+### 📋 Standards Compliance Gaps
+- **Issue**: Function naming inconsistent with project conventions
+- **Recommendation**: Rename `camelCase_function()` to `snake_case_function()`
+- **Priority**: MEDIUM - Consistency improvement
 
-### 🧪 Testing Considerations
-- **Missing tests for**: [Specific functions or edge cases]
-- **Test quality**: [Assessment of existing test coverage]
+### 🧪 Testing Gaps
+- **Issue**: Missing tests for edge cases in `function_name()`
+- **Recommendation**: Add tests for empty inputs and boundary conditions
+- **Priority**: MEDIUM - Test coverage improvement
 
-## Positive Aspects
+## 💡 LOW PRIORITY - Enhancements & Style
+[Suggestions for future improvement - can be deferred]
+
+### Documentation Enhancements
+- **Suggestion**: Add more detailed examples in roxygen2 documentation
+- **Priority**: LOW - Documentation improvement
+
+### Performance Optimizations
+- **Suggestion**: Vectorize loop in `process_data()` for better performance
+- **Priority**: LOW - Performance optimization
+
+### Code Style Refinements
+- **Suggestion**: Consider extracting magic numbers to named constants
+- **Priority**: LOW - Readability enhancement
+
+## ✅ Positive Aspects
 - Clear function documentation with appropriate examples
 - Consistent naming following project conventions
 - Appropriate use of assertthat for parameter validation
 
-## Action Required
-**Before approval**:
+## 🎯 Action Required for Approval
+**HIGH PRIORITY items MUST be addressed**:
 1. Add missing parameter validation to `function_name()`
 2. Remove duplicate `duplicate_function()` and use existing `existing_function()`
 3. Replace placeholder in `incomplete_function()` with actual implementation
+
+## 📊 Priority Summary
+- **HIGH PRIORITY**: [X] issues (must fix before approval)
+- **MEDIUM PRIORITY**: [Y] issues (address soon, can be tracked in improvements.md)
+- **LOW PRIORITY**: [Z] suggestions (defer to improvements.md for future consideration)
 
 ## Architecture Analysis Request
 [Only include if needed]
 **Request**: Please run architecture-analyzer on [specific files/directory] to verify no duplication with existing codebase functionality in `proposed_function()`.
 
 ## Final Recommendation
-[Detailed explanation of why code is approved, needs revision, or is rejected]
+[Detailed explanation of why code is approved, needs revision, or is rejected, with clear indication of what priority levels need attention]
 ```
 
 ## Input Processing Requirements
