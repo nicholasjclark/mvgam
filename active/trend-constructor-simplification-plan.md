@@ -197,7 +197,7 @@ RW <- function(time = NA, series = NA, ma = FALSE, n_lv = NULL) {
 When working with task lists, the AI must:
 
 1. Regularly update the task list file after finishing any significant work.
-2. Use the `code-reviewer` agent to review any proposed changes to R code (NON-NEGOTIABLE)
+2. You MUST use the `code-reviewer` agent to review any proposed changes to R code (NON-NEGOTIABLE)
 3. Follow the completion protocol:
    - Mark each finished **sub‑task** `[x]`.
    - Mark the **parent task** `[x]` once **all** its subtasks are `[x]`.
