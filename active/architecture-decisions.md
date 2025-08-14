@@ -43,9 +43,15 @@ mvgam(y ~ x1 + x2, trend_formula = ~ AR(), data = data)
 ```
 
 ### 3. Stan Integration Strategy: Two-Stage Assembly
-**Decision**: Leverage brms stanvars system
-**Stage 1**: Generate trend stanvars and trend Stan data  
+**Decision**: Leverage brms stanvars system with enhanced processing layer
+**Stage 1**: Generate trend stanvars and trend Stan data in `generate_trend_stanvars()`
 **Stage 2**: Post-process observation model Stan code to inject trend effects and create the combined model
+
+**Critical Enhancement**: Stan assembly layer now handles complex logic moved from constructors:
+- **Parameter Processing**: `process_trend_params()` called during stanvar generation, not construction
+- **Dynamic Characteristics**: Correlation requirements, factor compatibility determined with data context
+- **Environment-Dependent Logic**: Grouping variables processed with actual data structure
+- **Dispatch Resolution**: Convention-based function lookup replaces hardcoded dispatch fields
 
 ### 4. Autocorrelation Separation Principle
 **Critical Innovation**: Distinguish observation-level correlation from State-Space dynamics
@@ -176,24 +182,61 @@ mu_biomass += mu_trend_biomass;
 **Principle**: Preserve all brms Stan optimizations (GLM primitives, threading, etc.)
 **Implementation**: Let brms handle observation model complexity entirely
 
-### 3. Trend Constructor Interface Standardization
-**Decision**: All trend constructors output only a `trend` field, removing redundant `trend_model` field
-**Rationale**: Eliminates interface inconsistencies and simplifies trend type identification
+### 3. Simplified Constructor Architecture (2024 Enhancement)
+**Decision**: Trend constructors become minimal object creators using `create_mvgam_trend()`
+**Rationale**: Separation of concerns - constructors create, other layers process
 
-**Standardized Output Pattern with Trend Type Normalization**:
+**Constructor Pattern**:
 ```r
-# Constructor outputs (specific labels for parameter tracking)
+# All constructors now follow this pattern:
+AR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
+  # Basic parameter validation only
+  checkmate::assert_int(p, lower = 1)
+  checkmate::assert_logical(ma, len = 1)
+  checkmate::assert_logical(cor, len = 1)
+  
+  # Create object with base type
+  create_mvgam_trend(
+    "AR",  # Base type used for ALL dispatch
+    .time = substitute(time),
+    .series = substitute(series),
+    .gr = substitute(gr),
+    .subgr = substitute(subgr),
+    p = p,
+    ma = ma,
+    cor = cor,
+    n_lv = n_lv
+  )
+}
+```
+
+**Key Changes**:
+- **Base type dispatch**: Always use "AR", "RW", "VAR", "PW" (never "AR1", "VAR2", "PWlinear", etc.)
+- **Exported helper**: `create_mvgam_trend()` with consistent dot-prefix parameters (.time, .series, .gr, .subgr)
+- **Rule-based validation**: Validation dispatch based on `validation_rules` field automatically assigned
+- **Automatic metadata**: Dispatch function names generated via convention (generate_ar_trend_stanvars, forecast_ar_rcpp)
+- **No complex logic**: All processing moved to validation/Stan assembly layers
+
+**Complex Logic Migration**:
+- **Grouping Processing** → `apply_validation_rules()` in R/validations.R (has data context)
+- **Parameter Processing** → `generate_trend_injection_stanvars()` in R/stan_assembly.R (has full context)
+- **Correlation Requirements** → validation layer rule-based dispatch
+- **Dynamic Characteristics** → Stan assembly layer (has validated data)
+- **Dispatch Functions** → convention-based naming eliminates hardcoding
+
+**Standardized Output Pattern**:
+```r
+# Constructor outputs (always base types for dispatch)
 RW()              # trend = 'RW'
-AR(p = 1)         # trend = 'AR1' 
-AR(p = c(1, 12))  # trend = 'AR(1,12)'
-VAR(p = 2)        # trend = 'VAR2'
+AR(p = 1)         # trend = 'AR' (not 'AR1')
+AR(p = c(1, 12))  # trend = 'AR' (not 'AR(1,12)')
+VAR(p = 2)        # trend = 'VAR' (not 'VAR2')
 CAR()             # trend = 'CAR'
-PW(growth = 'linear')   # trend = 'PWlinear'
-PW(growth = 'logistic') # trend = 'PWlogistic'
+PW(growth = 'linear')   # trend = 'PW' (not 'PWlinear')
+PW(growth = 'logistic') # trend = 'PW' (not 'PWlogistic')
 ZMVN()            # trend = 'ZMVN'
 
-# Registry normalization (for stanvar generation)
-# AR1, AR(1,12) → 'AR' | VAR2, VAR3 → 'VAR' | PWlinear → 'PW'
+# Base type used for ALL dispatch throughout system
 ```
 
 ### 4. Variable Name Management Architecture
@@ -269,7 +312,86 @@ matrix[n_lv, n_lv] Sigma;              // CONFLICTS with multivariate families
 - **VAR coefficients**: `A{lag}_trend`
 - **Factor loadings**: `Z` (matrix), `z_loading` (vectors)
 
-### 9. brms Stanvar Block Naming Conventions
+### 9. Automatic Parameter Monitoring System
+
+**Critical Design Decision**: Trend objects automatically discover their own monitoring requirements using convention-based parameter generation
+
+**Architecture Pattern**:
+```r
+# Simple character vector field in trend objects
+trend_obj$monitor_params <- c("sigma_trend", "ar1_trend", "ar12_trend", "L_Omega_trend", "Z")
+
+# Automatic discovery function
+monitor_params <- generate_monitor_params(trend_spec)
+```
+
+**Key Features**:
+- **Convention-Based**: Leverages existing "_trend" suffix pattern
+- **Type-Specific Generators**: Each trend type has dedicated discovery function
+- **Automatic Enhancement**: `add_monitor_params()` enriches trend objects
+- **Smart Normalization**: AR1→AR, VAR2→VAR for consistent dispatch
+- **Standalone Design**: Clean separation from brms observation parameters
+
+**Implementation (R/trend_system.R)**:
+- `generate_monitor_params(trend_spec)` - Core discovery function
+- `generate_ar_monitor_params()`, `generate_var_monitor_params()`, etc. - Type-specific generators  
+- `normalize_trend_type()` - Handles trend type variations
+- `add_monitor_params(trend_obj)` - Enhancement function
+
+**Benefits**:
+1. **Zero Manual Specification**: No manual monitor_params maintenance required
+2. **Future-Proof**: New trends just add their generator function
+3. **Complex Lag Support**: Handles AR(p = c(1,12)) → ar1_trend, ar12_trend automatically
+4. **Factor Model Integration**: Automatically includes "Z" when n_lv specified
+5. **Correlation Awareness**: Adds L_Omega_trend, Sigma_trend when cor = TRUE
+
+### 10. Ultra-Efficient Forecasting System
+
+**Critical Design Decision**: Forecasting system optimized for maximum runtime speed with minimal storage overhead
+
+**Architecture Pattern**:
+```r
+# Minimal metadata stored in final mvgam object
+mvgam_fit$forecast_dispatch <- list(
+  function_name = "forecast_ar_rcpp",               # Convention-based
+  required_params = c("ar1_trend", "sigma_trend"), # For lazy extraction
+  time_info = list(                                 # For validation/horizon calculation
+    last_time = 50,
+    time_variable = "month", 
+    regular_intervals = TRUE
+  )
+)
+```
+
+**Speed Optimizations**:
+- **Lazy Parameter Extraction**: Extract only when forecast() called using pre-stored parameter names
+- **Zero Time Overhead**: Pre-computed time structure enables fast newdata validation and horizon calculation
+- **Direct Function Dispatch**: Convention-based function names enable immediate calls without registry lookups
+- **Memory Efficient**: Store only dispatch metadata, not actual parameter values or duplicate states
+
+**Implementation (R/trend_system.R)**:
+- `generate_forecast_metadata(trend_spec)` - Creates dispatch information
+- `filter_*_forecast_params()` - Trend-specific parameter filtering for minimal extraction
+- Convention: `"AR" → forecast_ar_rcpp()` for consistent naming
+
+**Forecasting Workflow**:
+```r
+# Ultra-fast forecast execution
+forecast.mvgam <- function(object, newdata) {
+  params <- extract_parameters_fast(object$fit, object$forecast_dispatch$required_params)
+  horizon <- calculate_horizon(newdata, object$forecast_dispatch$time_info)
+  do.call(object$forecast_dispatch$function_name, list(params, object$states, horizon))
+}
+```
+
+**Benefits**:
+1. **Near-Zero Runtime Overhead**: Forecast calls are direct function dispatches
+2. **Minimal Memory Usage**: No duplicate parameter or state storage
+3. **Fast Validation**: Pre-computed time structures for newdata validation
+4. **Stan Integration**: Leverages existing monitor_params system for state tracking
+5. **Extensible**: New trends just specify function name + required parameters
+
+### 11. brms Stanvar Block Naming Conventions
 
 **brms Uses Abbreviated Names** (used in stanvar objects):
 - `"data"` → `data`
@@ -428,26 +550,14 @@ extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimens
 3. **Maintainability**: Clear separation between validation logic and trend generation
 4. **Robustness**: Eliminates missing `n_time`/`n_obs` errors in trend generators
 
-## Developer Onboarding Guide
+## Critical Integration Requirements
 
-**Core R Files:**
-- `R/trend_system.R` - Complete trend infrastructure (registry, parsing, constructors)
-- `R/stan_assembly.R` - Two-stage Stan assembly orchestration
-- `R/brms_integration.R` - Enhanced brms setup and ecosystem integration
-- `R/mvgam_core.R` - Enhanced fitting, dual-object system, multiple imputation
-- `R/validations.R` - Type checks, argument validations, **time series dimension extraction**
+**Stan Assembly Layer Enhancement**:
+- `generate_trend_stanvars()` must handle parameter processing moved from constructors
+- `validate_time_series_for_trends()` must handle grouping/correlation logic moved from constructors  
+- Convention-based dispatch: `"AR" → generate_ar_trend_stanvars()` replaces hardcoded function fields
 
-**Critical Development Requirements:**
-- **Always use `extract_time_series_dimensions()`** to calculate time series dimensions from actual data
-- **Never assume `n_time` or `n_obs` exists in `trend_specs`** - always ensure `trend_specs$dimensions` is populated first
-- **Call `validate_time_series_for_trends()`** before trend stanvar generation to ensure proper dimension calculation
-- **CAR trends exception**: Can skip regular interval validation but still need basic dimensions
-
-**Test Infrastructure:**
-- `tests/testthat/test-trend-dispatcher.R` - Trend system validation
-- `tests/testthat/test-stan-assembly-system.R` - Stan assembly validation
-
-**Architecture Documentation:**
-- `active/current-sprint.md` - Current status and achievements  
-- `active/architecture-decisions.md` - Core design principles
-- `active/quick-reference.md` - Developer quick start guide
+**Development Requirements**:
+- **Simplified Constructors**: Use `create_mvgam_trend()` helper for all new trend types
+- **Enhanced Validation**: Process grouping variables with data context in validation layer
+- **Enhanced Stan Assembly**: Handle dynamic characteristics and parameter processing with full context

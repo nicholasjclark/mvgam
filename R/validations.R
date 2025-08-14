@@ -1,8 +1,8 @@
 #' Validate Nonlinear Trend Compatibility
-#' 
+#'
 #' @description
 #' Validates that trend specifications are compatible with nonlinear model structure.
-#' 
+#'
 #' @param nl_components List of nonlinear components
 #' @param trend_specs Trend specification
 #' @return Invisible TRUE if valid, stops with error if invalid
@@ -10,21 +10,21 @@
 validate_nonlinear_trend_compatibility <- function(nl_components, trend_specs) {
   checkmate::assert_list(nl_components)
   checkmate::assert_list(trend_specs, null.ok = TRUE)
-  
+
   if (is.null(trend_specs)) {
     return(invisible(TRUE))
   }
-  
+
   # Check that trend type is compatible with nonlinear models
   incompatible_trends <- c()  # Currently all trends should work
-  
+
   if (trend_specs$type %in% incompatible_trends) {
     stop(insight::format_error(
       "Trend type '{trend_specs$type}' is not compatible with nonlinear models.",
       "Consider using different trend specification."
     ))
   }
-  
+
   # Warn about potential complexity
   if (length(nl_components$nonlinear_params) > 2) {
     insight::format_warning(
@@ -33,52 +33,509 @@ validate_nonlinear_trend_compatibility <- function(nl_components, trend_specs) {
       "Consider model simplification if convergence issues occur."
     )
   }
-  
+
   invisible(TRUE)
 }
 
+#' Apply Rule-Based Validation Dispatch
+#'
+#' @description
+#' Applies validation rules specified in trend objects to automatically
+#' dispatch to appropriate validation functions. Makes adding new trends
+#' trivial - just specify validation rules in constructor.
+#'
+#' @param trend_specs Trend specification(s)
+#' @param data Data frame with time series data
+#' @return Enhanced trend specs with processed validation
+#' @noRd
+apply_validation_rules <- function(trend_specs, data) {
+
+  # Handle univariate vs multivariate specs
+  if (is_multivariate_trend_specs(trend_specs)) {
+    # Process each response specification
+    for (response_name in names(trend_specs)) {
+      trend_specs[[response_name]] <- process_trend_validation_rules(
+        trend_specs[[response_name]], data
+      )
+    }
+  } else {
+    # Process single trend specification
+    trend_specs <- process_trend_validation_rules(trend_specs, data)
+  }
+
+  return(trend_specs)
+}
+
+#' Process Validation Rules for Single Trend
+#'
+#' @description
+#' Processes validation rules for a single trend specification using
+#' rule-based dispatch.
+#'
+#' @param trend_spec Single trend specification
+#' @param data Data frame with time series data
+#' @return Enhanced trend specification
+#' @noRd
+process_trend_validation_rules <- function(trend_spec, data) {
+
+  # Get validation rules from trend object
+  validation_rules <- trend_spec$validation_rules %||% character(0)
+
+  # Apply each validation rule
+  for (rule in validation_rules) {
+    trend_spec <- dispatch_validation_rule(rule, trend_spec, data)
+  }
+
+  return(trend_spec)
+}
+
+#' Dispatch Single Validation Rule
+#'
+#' @description
+#' Dispatches a single validation rule to the appropriate validation function.
+#' Uses rule-to-function mapping for clean, extensible architecture.
+#'
+#' @param rule Validation rule name
+#' @param trend_spec Trend specification
+#' @param data Data frame with time series data
+#' @return Enhanced trend specification
+#' @noRd
+dispatch_validation_rule <- function(rule, trend_spec, data) {
+
+  # Rule-to-function mapping
+  rule_functions <- get_validation_rule_dispatch_table()
+
+  if (!rule %in% names(rule_functions)) {
+    warning(paste("Unknown validation rule:", rule), call. = FALSE)
+    return(trend_spec)
+  }
+
+  # Call the appropriate validation function
+  validation_function <- rule_functions[[rule]]
+  result <- validation_function(trend_spec, data)
+
+  return(result)
+}
+
+#' Get Validation Rule Dispatch Table
+#'
+#' @description
+#' Returns mapping from validation rule names to validation functions.
+#' Central dispatch table for rule-based validation.
+#'
+#' @return Named list mapping rules to functions
+#' @noRd
+get_validation_rule_dispatch_table <- function() {
+  list(
+    "requires_grouping_validation" = validate_trend_grouping,
+    "supports_correlation" = validate_trend_correlation,
+    "requires_regular_intervals" = validate_trend_time_intervals,
+    "supports_factors" = validate_trend_factor_compatibility,
+    "supports_hierarchical" = validate_trend_hierarchical_structure
+  )
+}
+
+#' Validate Trend Grouping
+#'
+#' @description
+#' Validates and processes grouping arguments for trends that support them.
+#'
+#' @param trend_spec Trend specification
+#' @param data Data frame with time series data
+#' @return Enhanced trend specification
+#' @noRd
+validate_trend_grouping <- function(trend_spec, data) {
+
+  # Process grouping arguments if present
+  if (!is.null(trend_spec$gr) && trend_spec$gr != 'NA') {
+    groupings <- validate_grouping_arguments(trend_spec$gr, trend_spec$subgr)
+    trend_spec$gr <- groupings$gr
+    trend_spec$subgr <- groupings$subgr
+
+    # Validate grouping variables exist in data
+    if (!trend_spec$gr %in% colnames(data)) {
+      stop(insight::format_error(
+        "Grouping variable '{.field {trend_spec$gr}}' not found in data.",
+        "Available variables: {.field {paste(colnames(data), collapse = ', ')}}"
+      ))
+    }
+
+    if (!is.null(trend_spec$subgr) && trend_spec$subgr != 'NA' &&
+        !trend_spec$subgr %in% colnames(data)) {
+      stop(insight::format_error(
+        "Subgrouping variable '{.field {trend_spec$subgr}}' not found in data.",
+        "Available variables: {.field {paste(colnames(data), collapse = ', ')}}"
+      ))
+    }
+  }
+
+  return(trend_spec)
+}
+
+#' Validate Trend Correlation
+#'
+#' @description
+#' Validates and processes correlation requirements for trends that support them.
+#'
+#' @param trend_spec Trend specification
+#' @param data Data frame with time series data
+#' @return Enhanced trend specification
+#' @noRd
+validate_trend_correlation <- function(trend_spec, data) {
+
+  # Process correlation requirements based on grouping
+  if (!is.null(trend_spec$cor)) {
+    trend_spec$cor <- validate_correlation_requirements(trend_spec$gr, trend_spec$cor)
+  }
+
+  return(trend_spec)
+}
+
+#' Validate Trend Time Intervals
+#'
+#' @description
+#' Validates regular time intervals for trends that require them.
+#'
+#' @param trend_spec Trend specification
+#' @param data Data frame with time series data
+#' @return Enhanced trend specification
+#' @noRd
+validate_trend_time_intervals <- function(trend_spec, data) {
+
+  # Extract time variable
+  time_var <- trend_spec$time %||% "time"
+
+  if (time_var %in% colnames(data)) {
+    # Use existing validation function
+    validate_regular_time_intervals(data[[time_var]], time_var)
+  }
+
+  return(trend_spec)
+}
+
+#' Validate Trend Factor Compatibility
+#'
+#' @description
+#' Validates factor model requirements for trends that support them.
+#'
+#' @param trend_spec Trend specification
+#' @param data Data frame with time series data
+#' @return Enhanced trend specification
+#' @noRd
+validate_trend_factor_compatibility <- function(trend_spec, data) {
+
+  # Validate factor model requirements
+  if (!is.null(trend_spec$n_lv)) {
+    # Get series count from data
+    series_var <- trend_spec$series %||% "series"
+    if (series_var %in% colnames(data)) {
+      n_series <- length(unique(data[[series_var]]))
+
+      if (trend_spec$n_lv >= n_series) {
+        stop(insight::format_error(
+          "Factor model requires {.field n_lv < n_series}.",
+          "You specified {.field n_lv = {trend_spec$n_lv}} but data has {n_series} series.",
+          "Reduce n_lv or increase number of series."
+        ))
+      }
+    }
+  }
+
+  return(trend_spec)
+}
+
+#' Validate Trend Hierarchical Structure
+#'
+#' @description
+#' Validates hierarchical grouping structure for trends that support it.
+#'
+#' @param trend_spec Trend specification
+#' @param data Data frame with time series data
+#' @return Enhanced trend specification
+#' @noRd
+validate_trend_hierarchical_structure <- function(trend_spec, data) {
+
+  # Additional hierarchical structure validation can be added here
+  # For now, this is handled by validate_trend_grouping
+
+  return(trend_spec)
+}
+
+#' Validate Factor Compatibility
+#'
+#' @description
+#' Validates that a trend specification is compatible with factor models.
+#' Uses the trend registry to check factor support.
+#'
+#' @param trend_spec List with trend specification including trend_model name
+#' @return Invisible TRUE if valid, stops with error if invalid
+#' @noRd
+validate_factor_compatibility <- function(trend_spec) {
+  checkmate::assert_list(trend_spec)
+
+  if (is.null(trend_spec$n_lv) || trend_spec$n_lv == 0) {
+    return(invisible(TRUE))  # No factor model requested
+  }
+
+  trend_name <- trend_spec$trend_model %||% "Unknown"
+
+  # Check if trend type is registered
+  if (!exists(trend_name, envir = trend_registry)) {
+    stop(insight::format_error(
+      "Unknown trend type: '{trend_name}'",
+      "Available types: {paste(ls(trend_registry), collapse = ', ')}"
+    ))
+  }
+
+  # Get trend info from registry
+  trend_info <- get(trend_name, envir = trend_registry)
+
+  # Check factor support
+  if (!trend_info$supports_factors) {
+    stop(insight::format_error(
+      "Factor models (n_lv > 0) not supported for {trend_name} trends.",
+      trend_info$incompatibility_reason
+    ))
+  }
+
+  invisible(TRUE)
+}
+
+#' Validate Grouping Arguments
+#'
+#' @description
+#' Validates hierarchical grouping structure and returns processed arguments.
+#'
+#' @param gr Grouping variable name or NULL/'NA'
+#' @param subgr Subgrouping variable name or NULL/'NA'
+#' @return List with processed gr and subgr values
+#' @noRd
+validate_grouping_arguments <- function(gr, subgr) {
+  # Process gr argument
+  if (is.null(gr) || is.na(gr) || gr == "NA") {
+    gr <- NULL
+  } else {
+    checkmate::assert_string(gr, min.chars = 1)
+  }
+
+  # Process subgr argument
+  if (is.null(subgr) || is.na(subgr) || subgr == "NA") {
+    subgr <- NULL
+  } else {
+    checkmate::assert_string(subgr, min.chars = 1)
+  }
+
+  # Validation logic
+  if (!is.null(gr) && is.null(subgr)) {
+    stop(insight::format_error(
+      "Hierarchical grouping requires subgrouping variable.",
+      "If you specify {.field gr = '{gr}'}, you must also specify {.field subgr}.",
+      "For simple grouping, use {.field series} parameter instead."
+    ))
+  }
+
+  if (!is.null(subgr) && is.null(gr)) {
+    stop(insight::format_error(
+      "Subgrouping requires main grouping variable.",
+      "Cannot specify {.field subgr = '{subgr}'} without {.field gr}."
+    ))
+  }
+
+  if (!is.null(gr) && !is.null(subgr) && subgr == "series") {
+    stop(insight::format_error(
+      "Invalid subgrouping for hierarchical models.",
+      "Cannot use 'series' as {.field subgr} when {.field gr = '{gr}'}.",
+      "Use a different subgrouping variable that nests within '{gr}'."
+    ))
+  }
+
+  return(list(gr = gr, subgr = subgr))
+}
+
+#' Validate Correlation Requirements
+#'
+#' @description
+#' Validates correlation settings based on grouping structure.
+#'
+#' @param gr Grouping variable name
+#' @param cor Correlation setting
+#' @return Processed correlation setting
+#' @noRd
+validate_correlation_requirements <- function(gr, cor) {
+  if (is.null(cor)) {
+    return(FALSE)  # Default to no correlation
+  }
+
+  # If grouping is specified, correlation should generally be FALSE
+  # unless explicitly requested for cross-group correlation
+  if (!is.null(gr) && cor) {
+    rlang::warn(
+      insight::format_warning(
+        "Correlation enabled with grouping variable '{gr}'.",
+        "This models cross-group correlations which may be computationally intensive.",
+        "Consider {.field cor = FALSE} for within-group correlations only."
+      ),
+      .frequency = "once",
+      .frequency_id = "correlation_with_grouping"
+    )
+  }
+
+  return(cor)
+}
+
+#' Validate Time Variable
+#'
+#' @description
+#' Validates and processes time variable specification.
+#'
+#' @param time_var Time variable name or expression
+#' @return Processed time variable name
+#' @noRd
+validate_time_variable <- function(time_var) {
+  if (is.null(time_var)) {
+    rlang::warn(
+      "Using default 'time' variable. Specify time parameter explicitly for clarity.",
+      .frequency = "once",
+      .frequency_id = "default_time_variable"
+    )
+    return("time")
+  }
+
+  # Convert symbol/expression to string
+  if (is.name(time_var) || is.call(time_var)) {
+    time_var <- deparse(time_var)
+  }
+
+  checkmate::assert_string(time_var, min.chars = 1)
+  return(time_var)
+}
+
+#' Validate Series Variable
+#'
+#' @description
+#' Validates and processes series variable specification.
+#'
+#' @param series_var Series variable name or expression
+#' @return Processed series variable name
+#' @noRd
+validate_series_variable <- function(series_var) {
+  if (is.null(series_var)) {
+    rlang::warn(
+      "Using default 'series' variable. Specify series parameter explicitly for clarity.",
+      .frequency = "once",
+      .frequency_id = "default_series_variable"
+    )
+    return("series")
+  }
+
+  # Convert symbol/expression to string
+  if (is.name(series_var) || is.call(series_var)) {
+    series_var <- deparse(series_var)
+  }
+
+  checkmate::assert_string(series_var, min.chars = 1)
+  return(series_var)
+}
+
+#' Validate Regular Time Intervals
+#'
+#' @description
+#' Validates that time series has regular intervals for trends that require it.
+#'
+#' @param time_values Vector of time values
+#' @param time_var Name of time variable (for error messages)
+#' @return Invisible TRUE if valid, stops with error if invalid
+#' @noRd
+validate_regular_time_intervals <- function(time_values, time_var = "time") {
+  checkmate::assert_numeric(time_values, min.len = 2)
+
+  # Calculate intervals between consecutive time points
+  intervals <- diff(sort(unique(time_values)))
+
+  # Check for regular intervals (allowing small numerical tolerance)
+  tolerance <- 1e-10
+  interval_range <- range(intervals)
+  is_regular <- abs(interval_range[2] - interval_range[1]) < tolerance
+
+  if (!is_regular) {
+    stop(insight::format_error(
+      "Irregular time intervals detected in '{time_var}'.",
+      "Some trends require regular time spacing.",
+      "Interval range: {min(intervals)} to {max(intervals)}",
+      "Consider using CAR() for irregular intervals or interpolate data."
+    ))
+  }
+
+  # Check for series-specific irregular intervals
+  # This would need series information to implement fully
+  rlang::warn(
+    insight::format_warning(
+      "Time interval validation performed on combined data.",
+      "Ensure each series has regular intervals individually.",
+      "Some trends may not support series-specific irregular time intervals."
+    ),
+    .frequency = "once",
+    .frequency_id = "series_interval_warning"
+  )
+
+  invisible(TRUE)
+}
+
+#' Utility function equivalent to base::deparse0
+#'
+#' @description
+#' Provides deparse0 functionality for compatibility with older R versions.
+#'
+#' @param expr Expression to deparse
+#' @param ... Additional arguments passed to deparse
+#' @return Character string representation of the expression
+#' @noRd
+deparse0 <- function(expr, ...) {
+  paste(deparse(expr, ...), collapse = "")
+}
+
 #' Check if Formula is Nonlinear
-#' 
+#'
 #' @description
 #' Determines if a brms formula specifies a nonlinear model.
-#' 
+#'
 #' @param formula brms formula object
 #' @return Logical indicating if formula is nonlinear
 #' @noRd
 is_nonlinear_formula <- function(formula) {
   checkmate::assert_formula(formula)
-  
+
   # Check for brms bf() structure with nl = TRUE
   if (inherits(formula, "brmsterms")) {
     return(formula$nl)
   }
-  
+
   if (inherits(formula, "brmsformula")) {
     return(attr(formula, "nl") %||% FALSE)
   }
-  
+
   # Check formula structure for nonlinear indicators
   formula_str <- deparse(formula)
-  
+
   # Look for bf() with nl = TRUE
   has_nl_true <- grepl("nl\\s*=\\s*TRUE", formula_str, ignore.case = TRUE)
-  
+
   # Look for nonlinear parameter specifications
-  has_nl_params <- grepl("\\b[a-zA-Z]+\\s*~", formula_str) && 
+  has_nl_params <- grepl("\\b[a-zA-Z]+\\s*~", formula_str) &&
                    grepl("\\bnl\\s*=", formula_str)
-  
+
   return(has_nl_true || has_nl_params)
 }
 
 #' @noRd
 validate_brms_formula <- function(formula) {
   issues <- character(0)
-  
+
   # Check if formula is NULL
   if (is.null(formula)) {
     return(list(valid = FALSE, issues = "Formula cannot be NULL"))
   }
-  
+
   # Check formula class
   valid_classes <- c("formula", "brmsformula", "bform")
   if (!any(sapply(valid_classes, function(cls) inherits(formula, cls)))) {
@@ -87,18 +544,18 @@ validate_brms_formula <- function(formula) {
       "but got:", class(formula)[1]
     ))
   }
-  
+
   # Try to validate with existing brms validation function
   validation_result <- try({
     validate_obs_formula_brms(formula)
     NULL  # No issues if validation succeeds
   }, silent = TRUE)
-  
+
   if (inherits(validation_result, "try-error")) {
     error_msg <- attr(validation_result, "condition")$message
     issues <- c(issues, paste("brms validation failed:", error_msg))
   }
-  
+
   return(list(
     valid = length(issues) == 0,
     issues = issues
@@ -110,18 +567,18 @@ formula2str_mvgam <- function(formula, space = "trim") {
   if (is.null(formula)) {
     return(NULL)
   }
-  
+
   # Handle complex brms formula objects (bf, distributional, nonlinear)
   if (inherits(formula, c("brmsformula", "bform"))) {
     # Extract all formula components for comprehensive string representation
     formula_strings <- character(0)
-    
+
     # Main formula
     if (!is.null(formula$formula)) {
       main_str <- deparse(formula$formula)
       formula_strings <- c(formula_strings, main_str)
     }
-    
+
     # Distributional parameter formulas (sigma, nu, phi, etc.)
     if (!is.null(formula$pforms)) {
       pform_strings <- sapply(formula$pforms, function(pf) {
@@ -133,7 +590,7 @@ formula2str_mvgam <- function(formula, space = "trim") {
       })
       formula_strings <- c(formula_strings, pform_strings)
     }
-    
+
     # Nonlinear parameter formulas
     if (!is.null(formula$nlpars)) {
       nlpar_strings <- sapply(formula$nlpars, function(nlp) {
@@ -145,12 +602,12 @@ formula2str_mvgam <- function(formula, space = "trim") {
       })
       formula_strings <- c(formula_strings, nlpar_strings)
     }
-    
+
     # If we couldn't extract components, use the whole object
     if (length(formula_strings) == 0) {
       formula_strings <- deparse(formula)
     }
-    
+
     # Combine all components
     x <- paste(formula_strings, collapse = " ")
   } else {
@@ -158,14 +615,14 @@ formula2str_mvgam <- function(formula, space = "trim") {
     formula <- as.formula(formula)
     x <- Reduce(paste, deparse(formula))
   }
-  
+
   # Clean up whitespace
   x <- gsub("[\t\r\n]+", " ", x, perl = TRUE)
-  
+
   if (space == "trim") {
     x <- trimws(x)  # Use base R trimws for simplicity
   }
-  
+
   return(x)
 }
 
@@ -191,20 +648,20 @@ get_trend_validation_patterns <- function() {
       "\\bZMVN\\s*\\(" = "ZMVN()"
     ))
   }
-  
+
   # Access trend registry from mvgam namespace
   trend_registry <- get("trend_registry", envir = asNamespace("mvgam"))
   trend_types <- ls(trend_registry)
-  
+
   # Generate patterns dynamically
   patterns <- character(length(trend_types))
   names(patterns) <- paste0("\\b", trend_types, "\\s*\\(")
-  
+
   # Create the values (display names)
   for (i in seq_along(trend_types)) {
     patterns[i] <- paste0(trend_types[i], "()")
   }
-  
+
   return(patterns)
 }
 
@@ -218,28 +675,28 @@ get_trend_validation_patterns <- function() {
 #' @noRd
 validate_obs_formula_brms <- function(formula) {
   if (is.null(formula)) return(NULL)
-  
+
   # Accept any brms-compatible formula class
   checkmate::assert(
-    inherits(formula, "formula") || 
-    inherits(formula, "brmsformula") || 
+    inherits(formula, "formula") ||
+    inherits(formula, "brmsformula") ||
     inherits(formula, "bform"),
     .var.name = "formula"
   )
-  
+
   # Extract string representation for pattern matching
   formula_str <- formula2str_mvgam(formula)
-  
+
   # Check for mvgam trend constructors using dynamic registry lookup
   trend_patterns <- get_trend_validation_patterns()
-  
+
   detected_trends <- character(0)
   for (pattern in names(trend_patterns)) {
     if (grepl(pattern, formula_str, perl = TRUE)) {
       detected_trends <- c(detected_trends, trend_patterns[[pattern]])
     }
   }
-  
+
   if (length(detected_trends) > 0) {
     stop(insight::format_error(
       "mvgam trend constructors found in observation {.field formula}:",
@@ -248,13 +705,13 @@ validate_obs_formula_brms <- function(formula) {
       "Use: {.code mvgam(y ~ x, trend_formula = ~ RW())}"
     ))
   }
-  
+
   # Issue informational warning about brms autocorrelation if present
   check_brms_autocor_usage(formula_str)
-  
+
   # Check offset usage (informational - offsets are allowed in observation formulas)
   validate_offsets_in_obs(formula)
-  
+
   # Return original formula unchanged - brms handles all other validation
   return(formula)
 }
@@ -269,22 +726,22 @@ validate_obs_formula_brms <- function(formula) {
 #' @noRd
 validate_trend_formula_brms <- function(trend_formula) {
   if (is.null(trend_formula)) return(NULL)
-  
+
   # Handle bf() objects for multivariate trend specifications
   if (inherits(trend_formula, c("brmsformula", "bform"))) {
     return(validate_bf_trend_formula(trend_formula))
   }
-  
+
   # Handle named list for multivariate (alternative to bf())
   if (is.list(trend_formula) && !inherits(trend_formula, "formula")) {
     return(validate_list_trend_formula(trend_formula))
   }
-  
+
   # Single trend formula validation
   if (inherits(trend_formula, "formula")) {
     return(validate_single_trend_formula(trend_formula))
   }
-  
+
   # Invalid type
   stop(insight::format_error(
     "Invalid {.field trend_formula} type: {class(trend_formula)}",
@@ -298,27 +755,27 @@ validate_trend_formula_brms <- function(trend_formula) {
 #' @noRd
 validate_bf_trend_formula <- function(bf_obj) {
   checkmate::assert_class(bf_obj, c("brmsformula", "bform"))
-  
+
   # For bf() objects in trend context, response variables are allowed
   # because they identify which trend belongs to which response
-  
+
   # Extract and validate all formula components from bf() object
   all_formulas <- extract_all_bf_formulas(bf_obj)
-  
+
   # Validate each formula component
   for (i in seq_along(all_formulas)) {
     formula_component <- all_formulas[[i]]
     context_name <- names(all_formulas)[i] %||% paste("bf() component", i)
-    
+
     if (inherits(formula_component, "formula")) {
       validate_single_trend_formula(
-        formula_component, 
-        context = context_name, 
+        formula_component,
+        context = context_name,
         allow_response = TRUE
       )
     }
   }
-  
+
   return(bf_obj)
 }
 
@@ -332,18 +789,18 @@ validate_bf_trend_formula <- function(bf_obj) {
 #' @noRd
 extract_all_bf_formulas <- function(bf_obj) {
   formulas <- list()
-  
+
   # Main formula
   if (!is.null(bf_obj$formula)) {
     formulas[["main"]] <- bf_obj$formula
   }
-  
+
   # Distributional parameter formulas (pforms)
   if (!is.null(bf_obj$pforms)) {
     for (i in seq_along(bf_obj$pforms)) {
       pform <- bf_obj$pforms[[i]]
       param_name <- names(bf_obj$pforms)[i] %||% paste("pform", i)
-      
+
       if (!is.null(pform$formula)) {
         formulas[[paste("pform", param_name)]] <- pform$formula
       } else if (inherits(pform, "formula")) {
@@ -351,13 +808,13 @@ extract_all_bf_formulas <- function(bf_obj) {
       }
     }
   }
-  
+
   # Nonlinear parameter formulas (nlpars)
   if (!is.null(bf_obj$nlpars)) {
     for (i in seq_along(bf_obj$nlpars)) {
       nlpar <- bf_obj$nlpars[[i]]
       param_name <- names(bf_obj$nlpars)[i] %||% paste("nlpar", i)
-      
+
       if (!is.null(nlpar$formula)) {
         formulas[[paste("nlpar", param_name)]] <- nlpar$formula
       } else if (inherits(nlpar, "formula")) {
@@ -365,7 +822,7 @@ extract_all_bf_formulas <- function(bf_obj) {
       }
     }
   }
-  
+
   # Additional formulas (if any other slots exist)
   # This is a fallback for any other formula-containing slots
   other_slots <- setdiff(names(bf_obj), c("formula", "pforms", "nlpars", "family", "autocor", "loop"))
@@ -375,7 +832,7 @@ extract_all_bf_formulas <- function(bf_obj) {
       formulas[[paste("other", slot_name)]] <- slot_content
     }
   }
-  
+
   return(formulas)
 }
 
@@ -390,7 +847,7 @@ validate_list_trend_formula <- function(formula_list) {
       "Use: {.code trend_formula = list(resp1 = ~ AR(), resp2 = ~ RW())}"
     ))
   }
-  
+
   # Validate each component formula
   validated_list <- lapply(names(formula_list), function(name) {
     if (is.null(formula_list[[name]])) {
@@ -399,7 +856,7 @@ validate_list_trend_formula <- function(formula_list) {
     validate_single_trend_formula(formula_list[[name]], context = paste("response", name))
   })
   names(validated_list) <- names(formula_list)
-  
+
   return(validated_list)
 }
 
@@ -411,9 +868,9 @@ validate_list_trend_formula <- function(formula_list) {
 #' @noRd
 validate_single_trend_formula <- function(formula, context = NULL, allow_response = FALSE) {
   if (is.null(formula)) return(NULL)
-  
+
   checkmate::assert_class(formula, "formula")
-  
+
   # Check for response variable handling
   if (length(formula) == 3) {
     if (!allow_response) {
@@ -426,16 +883,16 @@ validate_single_trend_formula <- function(formula, context = NULL, allow_respons
     }
     # If response variables are allowed, continue with validation but note it's for multivariate
   }
-  
+
   # Extract string for validation
   formula_str <- formula2str_mvgam(formula)
-  
+
   # Check for offset terms (not allowed in trend formulas)
   validate_no_offsets_in_trends(formula)
-  
+
   # Forbid brms autocorrelation in trend formulas (conflicts with State-Space)
   validate_no_brms_autocor_in_trends(formula_str)
-  
+
   return(formula)
 }
 
@@ -445,12 +902,12 @@ validate_single_trend_formula <- function(formula, context = NULL, allow_respons
 #' @noRd
 check_brms_autocor_usage <- function(formula_str) {
   autocor_patterns <- c(
-    "\\bar\\s*\\(", "\\bma\\s*\\(", "\\barma\\s*\\(", 
+    "\\bar\\s*\\(", "\\bma\\s*\\(", "\\barma\\s*\\(",
     "\\bcosy\\s*\\(", "\\bunstr\\s*\\("
   )
-  
+
   has_autocor <- any(sapply(autocor_patterns, function(p) grepl(p, formula_str, perl = TRUE)))
-  
+
   if (has_autocor) {
     rlang::warn(
       insight::format_warning(
@@ -462,7 +919,7 @@ check_brms_autocor_usage <- function(formula_str) {
       .frequency_id = "brms_autocor_obs"
     )
   }
-  
+
   return(invisible(NULL))
 }
 
@@ -478,14 +935,14 @@ validate_no_brms_autocor_in_trends <- function(formula_str) {
     "\\bcosy\\s*\\(" = "cosy()",
     "\\bunstr\\s*\\(" = "unstr()"
   )
-  
+
   detected_autocor <- character(0)
   for (pattern in names(autocor_patterns)) {
     if (grepl(pattern, formula_str, perl = TRUE)) {
       detected_autocor <- c(detected_autocor, autocor_patterns[[pattern]])
     }
   }
-  
+
   if (length(detected_autocor) > 0) {
     stop(insight::format_error(
       "brms autocorrelation terms not allowed in {.field trend_formula}:",
@@ -494,7 +951,7 @@ validate_no_brms_autocor_in_trends <- function(formula_str) {
       "Use mvgam trend types instead: {.code ar(p = 1)} → {.code AR(p = 1)}"
     ))
   }
-  
+
   return(invisible(NULL))
 }
 
@@ -507,18 +964,18 @@ validate_no_brms_autocor_in_trends <- function(formula_str) {
 #' @noRd
 validate_no_offsets_in_trends <- function(formula) {
   if (is.null(formula)) return(invisible(NULL))
-  
+
   # Check for offset() function calls in formula string
   formula_str <- formula2str_mvgam(formula)
   has_offset_function <- grepl("\\boffset\\s*\\(", formula_str, perl = TRUE)
-  
+
   # Check for offset attribute in terms
   has_offset_attr <- FALSE
   if (inherits(formula, "formula")) {
     terms_obj <- terms(formula)
     has_offset_attr <- !is.null(attr(terms_obj, 'offset'))
   }
-  
+
   if (has_offset_function || has_offset_attr) {
     stop(insight::format_error(
       "Offset terms not allowed in {.field trend_formula}.",
@@ -527,7 +984,7 @@ validate_no_offsets_in_trends <- function(formula) {
       "Use {.code formula = y ~ x + offset(log_exposure)} not {.code trend_formula = ~ RW() + offset(z)}"
     ))
   }
-  
+
   return(invisible(NULL))
 }
 
@@ -540,13 +997,13 @@ validate_no_offsets_in_trends <- function(formula) {
 #' @noRd
 validate_offsets_in_obs <- function(formula) {
   if (is.null(formula)) return(invisible(NULL))
-  
+
   # Extract formula string for pattern matching
   formula_str <- formula2str_mvgam(formula)
-  
+
   # Check for offset usage patterns
   has_offset <- grepl("\\boffset\\s*\\(", formula_str, perl = TRUE)
-  
+
   if (has_offset) {
     # Provide informational message about offset handling
     rlang::warn(
@@ -559,7 +1016,7 @@ validate_offsets_in_obs <- function(formula) {
       .frequency_id = "offset_obs_usage"
     )
   }
-  
+
   return(invisible(NULL))
 }
 
@@ -574,13 +1031,13 @@ validate_offsets_in_obs <- function(formula) {
 validate_multivariate_trend_constraints <- function(trend_formula, response_name) {
   checkmate::assert_formula(trend_formula)
   checkmate::assert_string(response_name)
-  
+
   # Parse the trend formula to extract trend constructors
   parsed <- try(mvgam:::parse_trend_formula(trend_formula), silent = TRUE)
   if (inherits(parsed, "try-error")) {
     return(invisible(NULL))  # Let parse_trend_formula handle the error
   }
-  
+
   # Check each trend component for advanced features
   for (trend_component in parsed$trend_components) {
     # Check for factor models (n_lv parameter)
@@ -591,8 +1048,8 @@ validate_multivariate_trend_constraints <- function(trend_formula, response_name
         "Remove n_lv parameter for basic temporal dynamics only."
       ))
     }
-    
-    # Check for correlations (cor parameter)  
+
+    # Check for correlations (cor parameter)
     if (!is.null(trend_component$cor) && trend_component$cor) {
       stop(insight::format_error(
         "Correlation structures not allowed in multivariate response trends.",
@@ -600,7 +1057,7 @@ validate_multivariate_trend_constraints <- function(trend_formula, response_name
         "Remove cor parameter for basic temporal dynamics only."
       ))
     }
-    
+
     # Check for hierarchical grouping (gr, subgr parameters)
     if (!is.null(trend_component$gr)) {
       stop(insight::format_error(
@@ -609,19 +1066,19 @@ validate_multivariate_trend_constraints <- function(trend_formula, response_name
         "Remove gr parameter for basic temporal dynamics only."
       ))
     }
-    
+
     if (!is.null(trend_component$subgr)) {
       stop(insight::format_error(
-        "Hierarchical grouping not allowed in multivariate response trends.", 
+        "Hierarchical grouping not allowed in multivariate response trends.",
         "Response '{response_name}' has subgr = '{trend_component$subgr}'.",
         "Remove subgr parameter for basic temporal dynamics only."
       ))
     }
   }
-  
+
   invisible(NULL)
 }
-                            
+
 #' Main validation function for autocorrelation separation
 #'
 #' Validates proper separation between observation-level (brms) and trend-level
@@ -634,10 +1091,10 @@ validate_multivariate_trend_constraints <- function(trend_formula, response_name
 validate_autocor_separation <- function(obs_formula, trend_formula = NULL) {
   # Validate observation formula (minimal - let brms handle most validation)
   validated_obs <- validate_obs_formula_brms(obs_formula)
-  
+
   # Validate trend formula (comprehensive - mvgam State-Space requirements)
   validated_trend <- validate_trend_formula_brms(trend_formula)
-  
+
   return(list(
     obs_formula = validated_obs,
     trend_formula = validated_trend
@@ -681,6 +1138,197 @@ validate_setup_components <- function(components) {
   invisible(TRUE)
 }
 
+#' Validate Time Series Structure for Trends
+#'
+#' @description
+#' Ensures time series data is compatible with specified trend models.
+#' Leverages existing mvgam validation functions.
+#'
+#' @param data Data to validate (data.frame or list)
+#' @param trend_specs Trend specification containing trend model info
+#' @param silent Verbosity level
+#' @return Invisible TRUE if valid, stops with error if invalid
+#' @noRd
+validate_time_series_for_trends <- function(data, trend_specs, silent = 1) {
+  checkmate::assert_data_frame(data, min.rows = 1)
+  checkmate::assert_list(trend_specs)
+
+  # Extract variable names from trend specification
+  # Standardized structure: univariate=direct, multivariate=named list
+  if (is_multivariate_trend_specs(trend_specs)) {
+    # Multivariate: extract from first response spec
+    first_spec <- trend_specs[[1]]
+    time_var <- first_spec$time_var %||% first_spec$time %||% "time"
+    series_var <- first_spec$series_var %||% first_spec$series %||% "series"
+    trend_type <- first_spec$trend_type %||% first_spec$trend_model %||% first_spec$trend
+  } else {
+    # Univariate: extract directly from trend object
+    time_var <- trend_specs$time_var %||% trend_specs$time %||% "time"
+    series_var <- trend_specs$series_var %||% trend_specs$series %||% "series"
+    trend_type <- trend_specs$trend_type %||% trend_specs$trend_model %||% trend_specs$trend
+  }
+
+  # Use new dimension extraction function (validates structure + returns dimensions)
+  dimensions <- extract_time_series_dimensions(
+    data = data,
+    time_var = time_var,
+    series_var = series_var,
+    trend_type = trend_type
+  )
+
+  # Additional validation using existing mvgam infrastructure
+  validated_data <- validate_series_time(
+    data = data,
+    name = "data",
+    trend_model = trend_specs,
+    check_levels = TRUE,
+    check_times = (trend_type != "CAR")  # CAR doesn't need regular time checks
+  )
+
+  if (silent < 2) {
+    message("Time series structure validated for trend model: ", trend_type)
+    message("Dimensions: n_time=", dimensions$n_time, ", n_series=", dimensions$n_series,
+            ", n_obs=", dimensions$n_obs)
+  }
+
+  # Return both validated data and dimensions for downstream use
+  invisible(list(
+    data = validated_data,
+    dimensions = dimensions
+  ))
+}
+
+#' Extract Time Series Dimensions from Data
+#'
+#' @description
+#' Extracts core time series dimensions directly from data and validates
+#' structure based on trend type. This is the single source of truth for
+#' all time series dimensions used throughout the system.
+#'
+#' @param data Data frame containing time series
+#' @param time_var Name of time variable (default: "time")
+#' @param series_var Name of series variable (default: "series")
+#' @param trend_type Type of trend model ("CAR" allows irregular intervals)
+#' @return List with time series dimensions and metadata
+#' @noRd
+extract_time_series_dimensions <- function(data, time_var = "time", series_var = "series", trend_type = NULL) {
+  checkmate::assert_data_frame(data, min.rows = 1)
+  checkmate::assert_string(time_var)
+  checkmate::assert_string(series_var)
+
+  # Validate required variables exist
+  if (!time_var %in% colnames(data)) {
+    stop(insight::format_error(
+      "Time variable '{time_var}' not found in data.",
+      "Available variables: {paste(colnames(data), collapse = ', ')}"
+    ), call. = FALSE)
+  }
+
+  if (!series_var %in% colnames(data)) {
+    stop(insight::format_error(
+      "Series variable '{series_var}' not found in data.",
+      "Available variables: {paste(colnames(data), collapse = ', ')}"
+    ), call. = FALSE)
+  }
+
+  # Calculate core dimensions from data
+  unique_times <- unique(data[[time_var]])
+  unique_series <- unique(data[[series_var]])
+  min_time <- min(data[[time_var]], na.rm = TRUE)
+  max_time <- max(data[[time_var]], na.rm = TRUE)
+
+  dimensions <- list(
+    n_time = length(unique_times),          # Number of unique time points
+    n_series = length(unique_series),       # Number of series
+    n_obs = nrow(data),                    # Total observations
+    time_range = c(min_time, max_time),    # Time range
+    time_var = time_var,                   # Variable names for downstream use
+    series_var = series_var,
+    unique_times = sort(unique_times),     # Sorted unique time points
+    unique_series = sort(unique_series)    # Sorted unique series
+  )
+
+  # Validate regular intervals for non-CAR trends
+  if (!is.null(trend_type) && trend_type != "CAR") {
+    validate_regular_time_intervals(data, time_var, series_var, dimensions)
+  }
+
+  return(dimensions)
+}
+
+warn_default_time_variable <- function() {
+  rlang::warn(
+    insight::format_warning(
+      "Using default time variable 'time'.",
+      "Specify {.field time = your_time_var} if your time variable has a different name."
+    ),
+    .frequency = "once",
+    .frequency_id = "mvgam_default_time_var"
+  )
+}
+
+warn_default_series_variable <- function() {
+  rlang::warn(
+    insight::format_warning(
+      "Using default series variable 'series'.",
+      "Specify {.field series = your_series_var} if your series variable has a different name."
+    ),
+    .frequency = "once",
+    .frequency_id = "mvgam_default_series_var"
+  )
+}
+
+#' Validate mvgam_trend object structure
+#' @param trend_obj mvgam_trend object to validate
+#' @return Logical TRUE if valid, stops with error if not
+#' @noRd
+validate_mvgam_trend <- function(trend_obj) {
+  checkmate::assert_class(trend_obj, "mvgam_trend")
+  checkmate::assert_list(trend_obj, min.len = 1)
+  checkmate::assert_string(trend_obj$trend, min.chars = 1)
+  
+  # Validate required fields exist
+  required_fields <- c("trend", "time", "series")
+  missing_fields <- setdiff(required_fields, names(trend_obj))
+  if (length(missing_fields) > 0) {
+    stop(insight::format_error(
+      "Missing required fields in mvgam_trend object: {.field {missing_fields}}"
+    ), call. = FALSE)
+  }
+  
+  invisible(TRUE)
+}
+
+#' Validate proportional values (0-1 range)
+#' @param x Numeric value to validate
+#' @param name Parameter name for error messages
+#' @return Logical TRUE if valid, stops with error if not
+#' @noRd
+validate_proportional <- function(x, name = deparse(substitute(x))) {
+  checkmate::assert_number(x, lower = 0, upper = 1, .var.name = name)
+  invisible(TRUE)
+}
+
+#' Validate positive integers
+#' @param x Integer value to validate
+#' @param name Parameter name for error messages
+#' @return Logical TRUE if valid, stops with error if not
+#' @noRd
+validate_pos_integer <- function(x, name = deparse(substitute(x))) {
+  checkmate::assert_int(x, lower = 1, .var.name = name)
+  invisible(TRUE)
+}
+
+#' Validate positive real numbers
+#' @param x Numeric value to validate
+#' @param name Parameter name for error messages
+#' @return Logical TRUE if valid, stops with error if not
+#' @noRd
+validate_pos_real <- function(x, name = deparse(substitute(x))) {
+  checkmate::assert_number(x, lower = 0, finite = TRUE, .var.name = name)
+  invisible(TRUE)
+}
+
 #' Evaluate an expression without printing output or messages
 #' @param expr expression to be evaluated
 #' @param type type of output to be suppressed (see ?sink)
@@ -689,11 +1337,11 @@ validate_setup_components <- function(components) {
 #' @param silent actually evaluate silently?
 #' @noRd
 eval_silent <- function(
-  expr,
-  type = "output",
-  try = FALSE,
-  silent = TRUE,
-  ...
+    expr,
+    type = "output",
+    try = FALSE,
+    silent = TRUE,
+    ...
 ) {
   try <- as_one_logical(try)
   silent <- as_one_logical(silent)
@@ -725,253 +1373,6 @@ is_try_error <- function(x) {
   inherits(x, "try-error")
 }
 
-#' Validate trend components for conflicts
-#'
-#' Checks for conflicting trend specifications like multiple dynamic factor models
-#' or incompatible correlation structures using brms-inspired validation patterns.
-#'
-#' @param trend_components List of trend components to validate
-#'
-#' @noRd
-validate_trend_components <- function(trend_components) {
-  
-  # Check for multiple trend types - only one trend type allowed per formula
-  if (length(trend_components) > 1) {
-    trend_types <- sapply(trend_components, function(x) x$trend_type)
-    stop(insight::format_error(
-      "Multiple trend types detected in single formula.",
-      paste("Found:", paste(trend_types, collapse = ", ")),
-      "Only one trend constructor is allowed per trend_formula.",
-      "Use separate models or combine into a single trend type."
-    ))
-  }
-
-  # Check for multiple dynamic factor models
-  n_lv_models <- sum(sapply(trend_components, function(x) !is.null(x$n_lv) && x$n_lv > 0))
-  if (n_lv_models > 1) {
-    stop(insight::format_error(
-      "Multiple dynamic factor models specified.",
-      "Only one trend component can have {.field n_lv > 0}.",
-      "Consider combining factor structures or removing one factor model."
-    ))
-  }
-
-  # Check for conflicting correlation structures
-  cor_settings <- sapply(trend_components, function(x) x$cor %||% FALSE)
-  if (any(cor_settings) && !all(cor_settings)) {
-    insight::format_warning(
-      "Mixed correlation settings detected.",
-      "Some trend components have correlation enabled while others don't.",
-      "This may lead to unexpected interactions."
-    )
-  }
-
-  invisible(NULL)
-}
-                         
-#' Validate trend order parameter
-#'
-#' Standardized validation for trend order parameters (p). Provides consistent
-#'   error messages across trend types.
-#'
-#' @param p Order parameter to validate
-#' @param max_order Maximum allowed order for this trend type
-#' @param trend_type Name of trend type for error messages
-#'
-#' @noRd
-validate_trend_order <- function(p, max_order, trend_type) {
-  checkmate::assert_int(p, lower = 1, upper = max_order)
-
-  if (p > max_order) {
-    insight::format_error(
-      "{.field {trend_type}} order too high.",
-      "You specified {.field p = {p}} but maximum allowed is {.field {max_order}}.",
-      "Please reduce the order or consider a different trend type."
-    )
-  }
-}
-
-#' Validate grouping arguments for trend constructors
-#'
-#' Validates and processes gr and subgr arguments with consistent error handling.
-#'   Handles the logic for hierarchical groupings and series creation.
-#'
-#' @param gr Grouping variable (as character from deparse0)
-#' @param subgr Subgrouping variable (as character from deparse0)
-#'
-#' @return List with validated gr and subgr values
-#' @noRd
-validate_time_variable <- function(time, data = NULL) {
-  # Default to 'time' if NA specified (like brms)
-  if (time == 'NA') {
-    time <- 'time'
-  }
-
-  # If data is provided, validate that time variable exists and is appropriate
-  if (!is.null(data)) {
-    checkmate::assert_data_frame(data)
-
-    if (!time %in% names(data)) {
-      stop(insight::format_error(
-        "Time variable {.field {time}} not found in data.",
-        "Available variables: {.field {paste(names(data), collapse = ', ')}}.",
-        "Please specify a valid time variable or ensure your data contains a 'time' column."
-      ), call. = FALSE)
-    }
-
-    time_var <- data[[time]]
-    if (!is.numeric(time_var) && !is.integer(time_var)) {
-      stop(insight::format_error(
-        "Time variable {.field {time}} must be numeric or integer.",
-        "Found type: {.field {class(time_var)[1]}}.",
-        "Time series models require ordered numeric time indices."
-      ), call. = FALSE)
-    }
-
-    # Warning for non-standard time variable names
-    if (time != 'time') {
-      rlang::warn(
-        insight::format_warning(
-          "Using {.field {time}} as time variable instead of 'time'.",
-          "This follows brms conventions for flexible time variable naming."
-        ),
-        .frequency = "once",
-        .frequency_id = paste0("mvgam_custom_time_var_", time)
-      )
-    }
-  }
-
-  return(time)
-}
-
-warn_default_time_variable <- function() {
-  rlang::warn(
-    insight::format_warning(
-      "Using default time variable 'time'.",
-      "Specify {.field time = your_time_var} if your time variable has a different name."
-    ),
-    .frequency = "once",
-    .frequency_id = "mvgam_default_time_var"
-  )
-}
-
-warn_default_series_variable <- function() {
-  rlang::warn(
-    insight::format_warning(
-      "Using default series variable 'series'.",
-      "Specify {.field series = your_series_var} if your series variable has a different name."
-    ),
-    .frequency = "once",
-    .frequency_id = "mvgam_default_series_var"
-  )
-}
-
-validate_series_variable <- function(series, data = NULL) {
-  # Default to 'series' if NA specified (like mvgam convention)
-  if (series == 'NA') {
-    series <- 'series'
-  }
-
-  # If data is provided, validate that series variable exists and is appropriate
-  if (!is.null(data)) {
-    checkmate::assert_data_frame(data)
-
-    if (!series %in% names(data)) {
-      stop(insight::format_error(
-        "Series variable {.field {series}} not found in data.",
-        "Available variables: {.field {paste(names(data), collapse = ', ')}}.",
-        "Please specify a valid series variable or ensure your data contains a 'series' column."
-      ), call. = FALSE)
-    }
-
-    series_var <- data[[series]]
-    if (!is.character(series_var) && !is.factor(series_var)) {
-      stop(insight::format_error(
-        "Series variable {.field {series}} must be character or factor.",
-        "Found type: {.field {class(series_var)[1]}}.",
-        "Series identifiers should be categorical variables."
-      ), call. = FALSE)
-    }
-
-    # Warning for non-standard series variable names
-    if (series != 'series') {
-      rlang::warn(
-        insight::format_warning(
-          "Using {.field {series}} as series variable instead of 'series'.",
-          "This follows mvgam conventions for flexible series variable naming."
-        ),
-        .frequency = "once",
-        .frequency_id = paste0("mvgam_custom_series_var_", series)
-      )
-    }
-  }
-
-  return(series)
-}
-
-validate_grouping_arguments <- function(gr, subgr) {
-
-  # Set default subgr if no grouping specified
-  if (gr == 'NA') {
-    subgr <- 'series'
-  }
-
-  # Validate hierarchical grouping requirements
-  if (gr != 'NA') {
-    if (subgr == 'NA') {
-      insight::format_error(
-        'Hierarchical grouping requires subgrouping specification.',
-        'You specified {.field gr = "{gr}"} but {.field subgr = NA}.',
-        'Please provide a valid subgrouping variable.'
-      )
-    } else if (subgr == 'series') {
-      insight::format_error(
-        'Invalid subgrouping for hierarchical models.',
-        'You cannot use {.field subgr = "series"} with {.field gr = "{gr}"}.',
-        'The series variable is created internally from gr and subgr.'
-      )
-    }
-  }
-
-  return(list(gr = gr, subgr = subgr))
-}
-
-#' Validate correlation requirements
-#'
-#' Checks and auto-corrects correlation settings for hierarchical models.
-#'   Issues one-time warnings when auto-correction occurs.
-#'
-#' @param gr Grouping variable
-#' @param cor Correlation setting
-#'
-#' @return Corrected correlation setting (logical)
-#' @noRd
-validate_correlation_requirements <- function(gr, cor) {
-  if (gr != 'NA' && !cor) {
-    rlang::warn(
-      insight::format_warning(
-        "Hierarchical grouping specified without correlation.",
-        "Setting {.field cor = TRUE} automatically for {.field gr = '{gr}'}."
-      ),
-      .frequency = "once",
-      .frequency_id = "mvgam_hierarchical_correlation"
-    )
-    return(TRUE)  # Force cor = TRUE
-  }
-  return(cor)
-}
-
-#' Check if object is a mvgam trend
-#'
-#' Tests whether an object is a valid mvgam trend specification.
-#'
-#' @param x Object to test
-#' @return Logical indicating if x is a mvgam trend
-#' @export
-is.mvgam_trend <- function(x) {
-  inherits(x, "mvgam_trend")
-}
-
 #' Check if trend_specs represents multivariate trends
 #'
 #' @description
@@ -985,7 +1386,7 @@ is_multivariate_trend_specs <- function(trend_specs) {
   if (is.null(trend_specs)) {
     return(FALSE)
   }
-  
+
   # Standardized structure check:
   # Multivariate: named list without trend fields (response names as keys)
   # Univariate: direct trend object with trend field
@@ -994,162 +1395,59 @@ is_multivariate_trend_specs <- function(trend_specs) {
     has_trend_field <- any(c("trend", "trend_type", "trend_model") %in% names(trend_specs))
     return(!has_trend_field)  # Multivariate if no trend field at top level
   }
-  
+
   # Univariate case: direct trend specification object
   return(FALSE)
 }
 
-#' @noRd
-validate_trend <- function(trend_obj, ...) {
-
-  # Basic validation
-  checkmate::assert_class(trend_obj, "mvgam_trend")
-  checkmate::assert_string(trend_obj$trend, min.chars = 1)
-
-  # Optional components validation (only if present)
-  if (!is.null(trend_obj$tpars)) {
-    checkmate::assert_character(trend_obj$tpars)  # Allow empty tpars for trends with no trend-specific parameters
-  }
-
-  if (!is.null(trend_obj$forecast_fun)) {
-    checkmate::assert_string(trend_obj$forecast_fun, min.chars = 1)
-  }
-
-  if (!is.null(trend_obj$stancode_fun)) {
-    checkmate::assert_string(trend_obj$stancode_fun, min.chars = 1)
-  }
-
-  if (!is.null(trend_obj$bounds)) {
-    checkmate::assert_list(trend_obj$bounds)
-  }
-
-  if (!is.null(trend_obj$characteristics)) {
-    checkmate::assert_list(trend_obj$characteristics)
-  }
-
-  # Dynamic factor model constraints (only if n_lv is present)
-  if (!is.null(trend_obj$n_lv)) {
-    validate_dynamic_factor_constraints(trend_obj)
-  }
-
-  return(trend_obj)
-}
-
-#' Validate dynamic factor model constraints
-#'
-#' Checks identifiability constraints for dynamic factor models (n_lv > 0).
-#'   Uses insight for user-friendly error messages and rlang for session
-#'   warnings.
-#'
-#' @param trend_obj A trend object to validate
-#'
-#' @noRd
-validate_dynamic_factor_constraints <- function(trend_obj) {
-
-  n_lv <- trend_obj$n_lv
-
-  # Check if this is a dynamic factor model
-  if (!is.null(n_lv) && n_lv > 0) {
-
-    # Validate n_lv parameter
-    checkmate::assert_int(n_lv, lower = 1, upper = 20)
-
-    # Constraint 1: No groupings allowed with dynamic factors
-    if (trend_obj$gr != 'NA') {
-      insight::format_error(
-        "Dynamic factor models cannot use hierarchical groupings.",
-        "You specified {.field n_lv = {n_lv}} and {.field gr = '{trend_obj$gr}'}.",
-        "The factor structure provides the grouping mechanism.",
-        "Please set {.field gr = 'NA'} or remove {.field n_lv}."
-      )
-    }
-
-    if (trend_obj$subgr != 'series') {
-      insight::format_error(
-        "Dynamic factor models cannot use custom subgroupings.",
-        "You specified {.field n_lv = {n_lv}} and {.field subgr = '{trend_obj$subgr}'}.",
-        "The factor structure handles series relationships.",
-        "Please use {.field subgr = 'series'} or remove {.field n_lv}."
-      )
-    }
-
-    # Constraint 2: No moving average terms allowed
-    if (trend_obj$ma) {
-      insight::format_error(
-        "Dynamic factor models cannot include moving average terms.",
-        "You specified {.field n_lv = {n_lv}} and {.field ma = TRUE}.",
-        "MA terms create identifiability issues with factor structures.",
-        "Please set {.field ma = FALSE} or remove {.field n_lv}."
-      )
-    }
-
-    # Constraint 3: Trend type must support factors
-    supports_factors <- trend_obj$param_info$characteristics$supports_factors %||%
-                       trend_obj$characteristics$supports_factors %||%
-                       FALSE
-    if (!supports_factors) {
-      insight::format_error(
-        "Trend type {.field {trend_obj$trend}} does not support dynamic factor models.",
-        "You specified {.field n_lv = {n_lv}} with an incompatible trend type.",
-        "Supported trend types: {.field RW}, {.field AR}, {.field VAR}."
-      )
-    }
-
-    # One-time warning about variance constraints
-    rlang::warn(
-      insight::format_warning(
-        "Dynamic factor model detected ({.field n_lv = {n_lv}}).",
-        "Trend variance will be fixed for identifiability.",
-        "Factor loadings provide the primary source of variation."
-      ),
-      .frequency = "once",
-      .frequency_id = "mvgam_dynamic_factor_variance"
-    )
-  }
-
-  # Additional constraint: Groupings require correlation
-  if (trend_obj$gr != 'NA' && !trend_obj$cor) {
-    insight::format_error(
-      "Hierarchical groupings require correlation structure.",
-      "You specified {.field gr = '{trend_obj$gr}'} but {.field cor = FALSE}.",
-      "Please set {.field cor = TRUE} when using groupings."
-    )
-  }
-}
-
-#' Validate Factor Model Compatibility
+#' Validate Factor Levels
 #'
 #' @description
-#' Check if a trend specification is compatible with factor models.
+#' Checks for unused factor levels that could cause Stan indexing issues.
+#' Issues warnings for validation phase, allows auto-dropping in preparation phase.
 #'
-#' @param trend_specs Trend specification object
-#' @return Invisibly returns TRUE if compatible, stops with error if not
+#' @param data Data frame containing the factor variable
+#' @param var_name Name of the factor variable to check
+#' @param data_name Name of the data object (for error messages)
+#' @param auto_drop Whether to automatically drop unused levels
+#' @return Modified data if auto_drop=TRUE, otherwise original data
 #' @noRd
-validate_factor_compatibility <- function(trend_specs) {
-  # Only validate if n_lv is specified (indicating factor model intent)
-  if (is.null(trend_specs$n_lv)) {
-    return(invisible(TRUE))
+validate_factor_levels <- function(data, var_name, data_name = "data", auto_drop = FALSE) {
+  checkmate::assert_data_frame(data)
+  checkmate::assert_string(var_name)
+  checkmate::assert_flag(auto_drop)
+
+  if (!var_name %in% names(data)) {
+    return(data)  # Variable doesn't exist, will be caught elsewhere
   }
 
-  # Check if trend type supports factor models
-  # Handle both trend_type and trend field names for compatibility
-  trend_type <- trend_specs$trend_type %||% trend_specs$trend
-  if (is.null(trend_type)) {
-    stop(insight::format_error(
-      "trend_specs must contain {.field trend_type} or {.field trend} field"
-    ))
-  }
-  trend_info <- get_trend_info(trend_type)
-
-  if (!trend_info$supports_factors) {
-    stop(insight::format_error(
-      paste0("Factor models ({.field n_lv}) not supported for {.field ", trend_type, "} trends."),
-      trend_info$incompatibility_reason,
-      paste0("Remove {.field n_lv} parameter or use factor-compatible trends: {.val ", paste(get_factor_compatible_trends(), collapse = ", "), "}")
-    ))
+  if (!is.factor(data[[var_name]])) {
+    return(data)  # Not a factor, will be caught elsewhere
   }
 
-  invisible(TRUE)
+  var_data <- data[[var_name]]
+  used_levels <- unique(var_data)
+  all_levels <- levels(var_data)
+  unused_levels <- setdiff(all_levels, used_levels)
+
+  if (length(unused_levels) > 0) {
+    if (auto_drop) {
+      # Auto-drop unused levels
+      data[[var_name]] <- droplevels(var_data)
+    } else {
+      # Warn about unused levels
+      rlang::warn(
+        message = insight::format_warning(
+          "Factor variable '{var_name}' in {data_name} has unused levels: {paste(unused_levels, collapse = ', ')}.",
+          "Consider using droplevels() to remove unused factor levels.",
+          "This may cause indexing issues in Stan model compilation."
+        ),
+        .frequency = "once"
+      )
+    }
+  }
+
+  return(data)
 }
 
 # Stan Code Structure and Syntax Validation Utilities
@@ -1318,8 +1616,8 @@ validate_combined_stancode <- function(result, silent = FALSE) {
 
   if (length(missing_fields) > 0) {
     validation$errors <- c(validation$errors,
-                          paste("Missing required fields:",
-                                paste(missing_fields, collapse = ", ")))
+                           paste("Missing required fields:",
+                                 paste(missing_fields, collapse = ", ")))
     return(validation)
   }
 
@@ -1336,6 +1634,56 @@ validate_combined_stancode <- function(result, silent = FALSE) {
   validation$valid <- validation$syntax_valid && validation$data_valid
 
   return(validation)
+}
+
+#' Validate Combined Stan Data
+#'
+#' @description
+#' Validates that combined Stan data is consistent and contains required elements.
+#'
+#' @param combined_data List of combined Stan data
+#' @param obs_data List of observation Stan data
+#' @param trend_data List of trend Stan data
+#' @return Invisible TRUE if valid, stops with error if invalid
+#' @noRd
+validate_combined_standata <- function(combined_data, obs_data, trend_data) {
+  checkmate::assert_list(combined_data, names = "named")
+  checkmate::assert_list(obs_data, names = "named")
+  checkmate::assert_list(trend_data, names = "named")
+
+  # Check that essential observation data elements are preserved
+  essential_obs <- c("N", "K", "y", "X")
+  missing_obs <- setdiff(essential_obs, names(combined_data))
+  missing_obs <- missing_obs[missing_obs %in% names(obs_data)]
+
+  if (length(missing_obs) > 0) {
+    stop(insight::format_error(
+      "Essential observation data elements missing from combined data:",
+      paste(missing_obs, collapse = ", ")
+    ))
+  }
+
+  # Check for dimensional consistency
+  if ("N" %in% names(combined_data) && "n" %in% names(combined_data)) {
+    if (combined_data$N != combined_data$n) {
+      insight::format_warning(
+        "Potential dimension mismatch between N ({combined_data$N}) and n ({combined_data$n}).",
+        "Check observation and trend data compatibility."
+      )
+    }
+  }
+
+  # Check that trend data makes sense
+  if ("n_series" %in% names(combined_data)) {
+    if (combined_data$n_series < 1) {
+      stop(insight::format_error(
+        "Invalid number of series: {combined_data$n_series}",
+        "Must be at least 1 for mvgam models."
+      ))
+    }
+  }
+
+  invisible(TRUE)
 }
 
 #' Validate Data-Code Compatibility
@@ -1556,8 +1904,8 @@ is_valid_stanvar <- function(stanvar) {
 
   # block must be valid Stan block name (brms uses abbreviated forms)
   valid_blocks <- c("data", "tdata", "parameters", "tparameters",
-                   "model", "genquant",
-                   "transformed_data", "transformed_parameters", "generated_quantities")
+                    "model", "genquant",
+                    "transformed_data", "transformed_parameters", "generated_quantities")
   if (!is.character(stanvar$block) || length(stanvar$block) != 1 ||
       !stanvar$block %in% valid_blocks) {
     return(FALSE)
@@ -1579,167 +1927,6 @@ validate_trend_specs <- function(trend_specs) {
   if (!trend_specs$trend_type %in% list_trend_types()$trend_type) return(FALSE)
 
   TRUE
-}
-
-#' Extract Time Series Dimensions from Data
-#'
-#' @description
-#' Extracts core time series dimensions directly from data and validates
-#' structure based on trend type. This is the single source of truth for
-#' all time series dimensions used throughout the system.
-#'
-#' @param data Data frame containing time series
-#' @param time_var Name of time variable (default: "time")
-#' @param series_var Name of series variable (default: "series")
-#' @param trend_type Type of trend model ("CAR" allows irregular intervals)
-#' @return List with time series dimensions and metadata
-#' @noRd
-extract_time_series_dimensions <- function(data, time_var = "time", series_var = "series", trend_type = NULL) {
-  checkmate::assert_data_frame(data, min.rows = 1)
-  checkmate::assert_string(time_var)
-  checkmate::assert_string(series_var)
-  
-  # Validate required variables exist
-  if (!time_var %in% colnames(data)) {
-    stop(insight::format_error(
-      "Time variable '{time_var}' not found in data.",
-      "Available variables: {paste(colnames(data), collapse = ', ')}"
-    ), call. = FALSE)
-  }
-  
-  if (!series_var %in% colnames(data)) {
-    stop(insight::format_error(
-      "Series variable '{series_var}' not found in data.", 
-      "Available variables: {paste(colnames(data), collapse = ', ')}"
-    ), call. = FALSE)
-  }
-  
-  # Calculate core dimensions from data
-  unique_times <- unique(data[[time_var]])
-  unique_series <- unique(data[[series_var]])
-  min_time <- min(data[[time_var]], na.rm = TRUE)
-  max_time <- max(data[[time_var]], na.rm = TRUE)
-  
-  dimensions <- list(
-    n_time = length(unique_times),          # Number of unique time points
-    n_series = length(unique_series),       # Number of series  
-    n_obs = nrow(data),                    # Total observations
-    time_range = c(min_time, max_time),    # Time range
-    time_var = time_var,                   # Variable names for downstream use
-    series_var = series_var,
-    unique_times = sort(unique_times),     # Sorted unique time points
-    unique_series = sort(unique_series)    # Sorted unique series
-  )
-  
-  # Validate regular intervals for non-CAR trends
-  if (!is.null(trend_type) && trend_type != "CAR") {
-    validate_regular_time_intervals(data, time_var, series_var, dimensions)
-  }
-  
-  return(dimensions)
-}
-
-#' Validate Regular Time Intervals
-#' 
-#' @description
-#' Ensures each series has observations for all time points (regular intervals).
-#' This is required for most trend types except CAR.
-#'
-#' @param data Data frame
-#' @param time_var Name of time variable  
-#' @param series_var Name of series variable
-#' @param dimensions Pre-calculated dimensions (for efficiency)
-#' @return Invisible TRUE if valid, stops with error if invalid
-#' @noRd
-validate_regular_time_intervals <- function(data, time_var, series_var, dimensions) {
-  min_time <- dimensions$time_range[1]
-  max_time <- dimensions$time_range[2]
-  
-  all_times_avail <- function(time, min_time, max_time) {
-    identical(
-      as.numeric(sort(time)),
-      as.numeric(seq.int(from = min_time, to = max_time))
-    )
-  }
-  
-  # Check each series has all time points
-  data.frame(series = data[[series_var]], time = data[[time_var]]) %>%
-    dplyr::group_by(series) %>%
-    dplyr::summarise(
-      all_there = all_times_avail(time, min_time, max_time),
-      .groups = "drop"
-    ) -> checked_times
-    
-  if (any(checked_times$all_there == FALSE)) {
-    missing_series <- checked_times$series[!checked_times$all_there]
-    stop(insight::format_error(
-      "Time series validation failed.",
-      "Series {paste(missing_series, collapse = ', ')} missing observations for some time points.",
-      "All series must have observations (even if NA) for each time point from {min_time} to {max_time}."
-    ), call. = FALSE)
-  }
-  
-  invisible(TRUE)
-}
-
-#' Validate Time Series Structure for Trends
-#'
-#' @description
-#' Ensures time series data is compatible with specified trend models.
-#' Leverages existing mvgam validation functions.
-#'
-#' @param data Data to validate (data.frame or list)
-#' @param trend_specs Trend specification containing trend model info
-#' @param silent Verbosity level
-#' @return Invisible TRUE if valid, stops with error if invalid
-#' @noRd
-validate_time_series_for_trends <- function(data, trend_specs, silent = 1) {
-  checkmate::assert_data_frame(data, min.rows = 1)
-  checkmate::assert_list(trend_specs)
-
-  # Extract variable names from trend specification
-  # Standardized structure: univariate=direct, multivariate=named list
-  if (is_multivariate_trend_specs(trend_specs)) {
-    # Multivariate: extract from first response spec
-    first_spec <- trend_specs[[1]]
-    time_var <- first_spec$time_var %||% first_spec$time %||% "time"
-    series_var <- first_spec$series_var %||% first_spec$series %||% "series"
-    trend_type <- first_spec$trend_type %||% first_spec$trend_model %||% first_spec$trend
-  } else {
-    # Univariate: extract directly from trend object
-    time_var <- trend_specs$time_var %||% trend_specs$time %||% "time"
-    series_var <- trend_specs$series_var %||% trend_specs$series %||% "series"
-    trend_type <- trend_specs$trend_type %||% trend_specs$trend_model %||% trend_specs$trend
-  }
-  
-  # Use new dimension extraction function (validates structure + returns dimensions)
-  dimensions <- extract_time_series_dimensions(
-    data = data,
-    time_var = time_var,
-    series_var = series_var, 
-    trend_type = trend_type
-  )
-
-  # Additional validation using existing mvgam infrastructure
-  validated_data <- validate_series_time(
-    data = data,
-    name = "data", 
-    trend_model = trend_specs,
-    check_levels = TRUE,
-    check_times = (trend_type != "CAR")  # CAR doesn't need regular time checks
-  )
-  
-  if (silent < 2) {
-    message("Time series structure validated for trend model: ", trend_type)
-    message("Dimensions: n_time=", dimensions$n_time, ", n_series=", dimensions$n_series, 
-            ", n_obs=", dimensions$n_obs)
-  }
-
-  # Return both validated data and dimensions for downstream use
-  invisible(list(
-    data = validated_data,
-    dimensions = dimensions
-  ))
 }
 
 #'Argument validation functions
@@ -1838,6 +2025,17 @@ validate_series_time = function(
   return(data)
 }
 
+#'@noRd
+as_one_logical = function(x, allow_na = FALSE) {
+  s <- substitute(x)
+  x <- as.logical(x)
+  if (length(x) != 1L || anyNA(x) && !allow_na) {
+    s <- deparse0(s, max_char = 100L)
+    stop("Cannot coerce '", s, "' to a single logical value.", call. = FALSE)
+  }
+  x
+}
+
 #' Validate Grouping Structure
 #'
 #' @description
@@ -1908,381 +2106,4 @@ validate_grouping_structure = function(data, trend_model, name = 'data') {
   }
 
   return(data)
-}
-
-#' Validate Factor Levels
-#'
-#' @description
-#' Checks for unused factor levels that could cause Stan indexing issues.
-#' Issues warnings for validation phase, allows auto-dropping in preparation phase.
-#'
-#' @param data Data frame containing the factor variable
-#' @param var_name Name of the factor variable to check
-#' @param data_name Name of the data object (for error messages)
-#' @param auto_drop Whether to automatically drop unused levels
-#' @return Modified data if auto_drop=TRUE, otherwise original data
-#' @noRd
-validate_factor_levels <- function(data, var_name, data_name = "data", auto_drop = FALSE) {
-  checkmate::assert_data_frame(data)
-  checkmate::assert_string(var_name)
-  checkmate::assert_flag(auto_drop)
-
-  if (!var_name %in% names(data)) {
-    return(data)  # Variable doesn't exist, will be caught elsewhere
-  }
-
-  if (!is.factor(data[[var_name]])) {
-    return(data)  # Not a factor, will be caught elsewhere
-  }
-
-  var_data <- data[[var_name]]
-  used_levels <- unique(var_data)
-  all_levels <- levels(var_data)
-  unused_levels <- setdiff(all_levels, used_levels)
-
-  if (length(unused_levels) > 0) {
-    if (auto_drop) {
-      # Auto-drop unused levels
-      data[[var_name]] <- droplevels(var_data)
-    } else {
-      # Warn about unused levels
-      rlang::warn(
-        message = insight::format_warning(
-          "Factor variable '{var_name}' in {data_name} has unused levels: {paste(unused_levels, collapse = ', ')}.",
-          "Consider using droplevels() to remove unused factor levels.",
-          "This may cause indexing issues in Stan model compilation."
-        ),
-        .frequency = "once"
-      )
-    }
-  }
-
-  return(data)
-}
-
-#' Validate Complete Grouping Structure
-#'
-#' @description
-#' For hierarchical models, checks that each level of the grouping variable
-#' contains observations for all levels of the subgrouping variable.
-#'
-#' @param data Data frame
-#' @param gr_var Name of the grouping variable
-#' @param subgr_var Name of the subgrouping variable
-#' @param data_name Name of the data object (for error messages)
-#' @return Invisible TRUE if valid, stops with error if invalid
-#' @noRd
-validate_complete_grouping <- function(data, gr_var, subgr_var, data_name = "data") {
-  checkmate::assert_data_frame(data)
-  checkmate::assert_string(gr_var)
-  checkmate::assert_string(subgr_var)
-
-  # Check that each level of gr contains all possible levels of subgr
-  grouping_summary <- data %>%
-    dplyr::group_by(!!rlang::sym(gr_var)) %>%
-    dplyr::summarise(
-      n_subgroups = dplyr::n_distinct(!!rlang::sym(subgr_var)),
-      .groups = "drop"
-    )
-
-  total_subgroups <- dplyr::n_distinct(data[[subgr_var]])
-
-  if (any(grouping_summary$n_subgroups != total_subgroups)) {
-    stop(insight::format_error(
-      "Incomplete grouping structure in {data_name}.",
-      "Some levels of '{gr_var}' do not contain all levels of '{subgr_var}'.",
-      "Each group must contain observations for all subgroups."
-    ), call. = FALSE)
-  }
-
-  invisible(TRUE)
-}
-
-#' Check Regular Time Intervals
-#'
-#' @description
-#' Ensures time series has regular sampling intervals for State-Space models.
-#'
-#' @param data Data to check
-#' @param silent Verbosity level
-#' @return Invisible TRUE if valid, stops with error if invalid
-#' @noRd
-check_regular_time_intervals <- function(data, silent = 1) {
-  if (!"time" %in% names(data)) {
-    return(invisible(TRUE))  # Will be caught by main validation
-  }
-
-  # Check for regular intervals within each series
-  if ("series" %in% names(data)) {
-    data %>%
-      dplyr::group_by(series) %>%
-      dplyr::summarise(
-        time_diffs = list(diff(sort(unique(time)))),
-        regular = length(unique(diff(sort(unique(time))))) <= 1,
-        .groups = "drop"
-      ) -> time_checks
-
-    irregular_series <- time_checks$series[!time_checks$regular]
-
-    if (length(irregular_series) > 0) {
-      stop(insight::format_error(
-        "Irregular time intervals detected in series: {paste(irregular_series, collapse = ', ')}",
-        "State-Space models require regular sampling intervals.",
-        "Consider using CAR models for irregular time series."
-      ))
-    }
-  } else {
-    # Single series case
-    time_diffs <- diff(sort(unique(data$time)))
-    if (length(unique(time_diffs)) > 1) {
-      stop(insight::format_error(
-        "Irregular time intervals detected in time series.",
-        "State-Space models require regular sampling intervals.",
-        "Time differences: {paste(unique(time_diffs), collapse = ', ')}"
-      ))
-    }
-  }
-
-  invisible(TRUE)
-}
-
-#' Validate Combined Stan Data
-#'
-#' @description
-#' Validates that combined Stan data is consistent and contains required elements.
-#'
-#' @param combined_data List of combined Stan data
-#' @param obs_data List of observation Stan data
-#' @param trend_data List of trend Stan data
-#' @return Invisible TRUE if valid, stops with error if invalid
-#' @noRd
-validate_combined_standata <- function(combined_data, obs_data, trend_data) {
-  checkmate::assert_list(combined_data, names = "named")
-  checkmate::assert_list(obs_data, names = "named")
-  checkmate::assert_list(trend_data, names = "named")
-
-  # Check that essential observation data elements are preserved
-  essential_obs <- c("N", "K", "y", "X")
-  missing_obs <- setdiff(essential_obs, names(combined_data))
-  missing_obs <- missing_obs[missing_obs %in% names(obs_data)]
-
-  if (length(missing_obs) > 0) {
-    stop(insight::format_error(
-      "Essential observation data elements missing from combined data:",
-      paste(missing_obs, collapse = ", ")
-    ))
-  }
-
-  # Check for dimensional consistency
-  if ("N" %in% names(combined_data) && "n" %in% names(combined_data)) {
-    if (combined_data$N != combined_data$n) {
-      insight::format_warning(
-        "Potential dimension mismatch between N ({combined_data$N}) and n ({combined_data$n}).",
-        "Check observation and trend data compatibility."
-      )
-    }
-  }
-
-  # Check that trend data makes sense
-  if ("n_series" %in% names(combined_data)) {
-    if (combined_data$n_series < 1) {
-      stop(insight::format_error(
-        "Invalid number of series: {combined_data$n_series}",
-        "Must be at least 1 for mvgam models."
-      ))
-    }
-  }
-
-  invisible(TRUE)
-}
-
-#'@noRd
-deparse_variable = function(...) {
-  deparse0(substitute(...))
-}
-
-#'@noRd
-as_one_logical = function(x, allow_na = FALSE) {
-  s <- substitute(x)
-  x <- as.logical(x)
-  if (length(x) != 1L || anyNA(x) && !allow_na) {
-    s <- deparse0(s, max_char = 100L)
-    stop("Cannot coerce '", s, "' to a single logical value.", call. = FALSE)
-  }
-  x
-}
-
-#'@noRd
-as_one_integer <- function(x, allow_na = FALSE) {
-  s <- substitute(x)
-  x <- suppressWarnings(as.integer(x))
-  if (length(x) != 1L || anyNA(x) && !allow_na) {
-    s <- deparse0(s, max_char = 100L)
-    stop("Cannot coerce '", s, "' to a single integer value.", call. = FALSE)
-  }
-  x
-}
-
-#'@noRd
-deparse0 <- function(x, max_char = NULL, ...) {
-  out <- collapse(deparse(x, ...))
-  if (isTRUE(max_char > 0)) {
-    out <- substr(out, 1L, max_char)
-  }
-  out
-}
-
-#'@noRd
-collapse <- function(..., sep = "") {
-  paste(..., sep = sep, collapse = "")
-}
-
-#'@noRd
-validate_silent <- function(silent) {
-  silent <- as_one_integer(silent)
-  if (silent < 0 || silent > 2) {
-    stop("'silent' must be between 0 and 2.", call. = FALSE)
-  }
-  silent
-}
-
-#'@noRd
-validate_gr_subgr = function(gr, subgr, cor) {
-  gr <- deparse0(substitute(gr))
-  subgr <- deparse0(substitute(subgr))
-
-  if (gr != 'NA') {
-    if (subgr == 'NA') {
-      stop(
-        'argument "subgr" must be supplied if "gr" is also supplied',
-        call. = FALSE
-      )
-    }
-  }
-
-  if (subgr != 'NA') {
-    if (gr == 'NA') {
-      stop(
-        'argument "gr" must be supplied if "subgr" is also supplied',
-        call. = FALSE
-      )
-    } else {
-      cor <- TRUE
-    }
-  }
-
-  list(.group = gr, .subgroup = subgr, .cor = cor)
-}
-
-#'@noRd
-validate_proportional = function(x) {
-  s <- substitute(x)
-  x <- base::suppressWarnings(as.numeric(x))
-  if (length(x) != 1L || anyNA(x)) {
-    stop("Argument '", s, "' must be a single numeric value", call. = FALSE)
-  }
-
-  if (x < 0 || x > 1) {
-    stop(
-      "Argument '",
-      s,
-      "' must be a proportion ranging from 0 to 1, inclusive",
-      call. = FALSE
-    )
-  }
-}
-
-#'@noRd
-validate_equaldims = function(x, y) {
-  s <- substitute(x)
-  q <- substitute(y)
-
-  if (NCOL(x) != NCOL(y)) {
-    stop(
-      "Argument '",
-      s,
-      "' and argument '",
-      q,
-      "' must have equal dimensions",
-      call. = FALSE
-    )
-  }
-
-  if (NROW(x) != NROW(y)) {
-    stop(
-      "Argument '",
-      s,
-      "' and argument '",
-      q,
-      "' must have equal dimensions",
-      call. = FALSE
-    )
-  }
-}
-
-#'@noRd
-validate_pos_integer = function(x) {
-  s <- substitute(x)
-  x <- base::suppressWarnings(as.numeric(x))
-  if (length(x) != 1L || anyNA(x)) {
-    stop("Argument '", s, "' must be a single numeric value", call. = FALSE)
-  }
-
-  if (sign(x) != 1) {
-    stop("Argument '", s, "' must be a positive integer", call. = FALSE)
-  } else {
-    if (x %% 1 != 0) {
-      stop("Argument '", s, "' must be a positive integer", call. = FALSE)
-    }
-  }
-}
-
-#'@noRd
-validate_pos_integers = function(x) {
-  s <- substitute(x)
-
-  val_pos = function(y, s) {
-    y <- base::suppressWarnings(as.numeric(y))
-    if (sign(y) != 1) {
-      stop("Negative values in ", s, " detected", call. = FALSE)
-    } else {
-      if (y %% 1 != 0) {
-        stop("Non-integer values in ", s, " detected", call. = FALSE)
-      }
-    }
-  }
-  res <- lapply(seq_along(x), function(i) val_pos(x[i], s))
-}
-
-#'@noRd
-validate_even <- function(x) {
-  s <- substitute(x)
-  x <- base::suppressWarnings(as.numeric(x))
-  if (x %% 2 != 0) {
-    stop("Argument '", s, "'  must be an even integer", call. = FALSE)
-  }
-}
-
-#'@noRd
-validate_pos_real = function(x) {
-  s <- substitute(x)
-  x <- base::suppressWarnings(as.numeric(x))
-  if (length(x) != 1L || anyNA(x)) {
-    stop("Argument '", s, "' must be a single numeric value", call. = FALSE)
-  }
-
-  if (sign(x) != 1) {
-    stop("Argument '", s, "' must be a positive real value", call. = FALSE)
-  }
-}
-
-#'@noRd
-as_one_character <- function(x, allow_na = FALSE) {
-  s <- substitute(x)
-  x <- as.character(x)
-  if (length(x) != 1L || anyNA(x) && !allow_na) {
-    s <- deparse0(s, max_char = 100L)
-    stop("Cannot coerce '", s, "' to a single character value.", call. = FALSE)
-  }
-  x
 }

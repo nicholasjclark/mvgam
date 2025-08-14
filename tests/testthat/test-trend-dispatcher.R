@@ -30,7 +30,7 @@ test_that("PW constructor rejects factor models correctly", {
   suppressWarnings({
     pw_trend <- PW()
     expect_is(pw_trend, "mvgam_trend")
-    expect_true(pw_trend$trend %in% c("PWlinear", "PWlogistic"))
+    expect_equal(pw_trend$trend, "PW")  # Base type for dispatch
   })
 })
 
@@ -40,7 +40,7 @@ test_that("AR constructor accepts factor models", {
     ar_trend <- AR(n_lv = 2)
     expect_is(ar_trend, "mvgam_trend")
     expect_equal(ar_trend$n_lv, 2)
-    expect_equal(ar_trend$trend, "AR1")
+    expect_equal(ar_trend$trend, "AR")  # Base type for dispatch
   })
 
   # AR without n_lv should work
@@ -55,15 +55,25 @@ test_that("RW constructor accepts factor models", {
   # RW with n_lv should work
   suppressWarnings({
     rw_trend <- RW(n_lv = 3)
-    expect_is(rw_trend, "mvgam_trend")
+    expect_s3_class(rw_trend, "mvgam_trend")
     expect_equal(rw_trend$n_lv, 3)
+    expect_equal(rw_trend$trend, "RW")
+    
+    # Test validation rules are automatically assigned
+    expect_true("supports_factors" %in% rw_trend$validation_rules)
   })
 
   # RW without n_lv should work
   suppressWarnings({
     rw_trend_no_lv <- RW()
-    expect_is(rw_trend_no_lv, "mvgam_trend")
+    expect_s3_class(rw_trend_no_lv, "mvgam_trend")
     expect_null(rw_trend_no_lv$n_lv)
+    expect_equal(rw_trend_no_lv$trend, "RW")
+    
+    # Test validation rules are automatically assigned
+    expect_true("requires_regular_intervals" %in% rw_trend_no_lv$validation_rules)
+    expect_true("supports_factors" %in% rw_trend_no_lv$validation_rules)
+    expect_true("supports_hierarchical" %in% rw_trend_no_lv$validation_rules)
   })
 })
 
@@ -135,30 +145,25 @@ test_that("trend constructors work with dispatcher integration", {
     # Test AR constructor with single lag
     ar1_trend <- AR(p = 1, ma = FALSE)
     expect_s3_class(ar1_trend, "mvgam_trend")
-    expect_equal(ar1_trend$trend, "AR1")
+    expect_equal(ar1_trend$trend, "AR")  # Base type for dispatch
     expect_equal(ar1_trend$p, 1)
-    expect_equal(ar1_trend$ar_lags, 1)
-    expect_equal(ar1_trend$max_lag, 1)
+    # ar_lags and max_lag now computed in Stan assembly layer
 
     # Test AR constructor with multiple lags
     ar_seasonal <- AR(p = c(1, 12, 24))
     expect_s3_class(ar_seasonal, "mvgam_trend")
-    expect_equal(ar_seasonal$trend, "AR(1,12,24)")
+    expect_equal(ar_seasonal$trend, "AR")  # Base type for dispatch
     expect_equal(ar_seasonal$p, c(1, 12, 24))
-    expect_equal(ar_seasonal$ar_lags, c(1, 12, 24))
-    expect_equal(ar_seasonal$max_lag, 24)
-    expect_true("ar1_trend" %in% ar_seasonal$tpars)
-    expect_true("ar12_trend" %in% ar_seasonal$tpars)
-    expect_true("ar24_trend" %in% ar_seasonal$tpars)
+    # Parameter processing moved to Stan assembly layer
+    # tpars field no longer exists in simplified constructors
 
     # Test VAR constructor with order
     var2_trend <- VAR(p = 2)
     expect_s3_class(var2_trend, "mvgam_trend")
-    expect_equal(var2_trend$trend, "VAR2")
+    expect_equal(var2_trend$trend, "VAR")  # Base type for dispatch
     expect_equal(var2_trend$p, 2)
     expect_true(var2_trend$cor)
-    expect_true("A1_trend" %in% var2_trend$tpars)
-    expect_true("A2_trend" %in% var2_trend$tpars)
+    # Parameter names now generated in Stan assembly layer
   })
 })
 
@@ -202,7 +207,7 @@ test_that("basic formula parsing works", {
     parsed2 <- mvgam:::parse_trend_formula(f2)
 
     expect_equal(length(parsed2$trend_components), 1)
-    expect_equal(parsed2$trend_components[[1]]$trend, "AR1")
+    expect_equal(parsed2$trend_components[[1]]$trend, "AR")  # Base type
     expect_equal(parsed2$trend_terms, "AR(p = 1)")
     expect_true("s(time)" %in% parsed2$regular_terms)
     expect_true("cov1" %in% parsed2$regular_terms)
@@ -529,7 +534,7 @@ test_that("realistic complex formulas work correctly", {
                           s(temperature, species, bs = "fs")
 
     parsed2 <- mvgam:::parse_trend_formula(multivar_formula)
-    expect_equal(parsed2$trend_components[[1]]$trend, "VAR2")
+    expect_equal(parsed2$trend_components[[1]]$trend, "VAR")  # Base type
     expect_true(parsed2$trend_components[[1]]$cor)
     expect_true("s(time, by = species, k = 20)" %in% parsed2$regular_terms)
     expect_true("s(temperature, species, bs = \"fs\")" %in% parsed2$regular_terms)
@@ -949,7 +954,7 @@ test_that("PW cap argument is properly validated for logistic growth", {
     # Test linear growth doesn't require cap (should work)
     pw_linear1 <- PW(time = week, series = species, growth = 'linear', n_changepoints = 5)
     expect_equal(pw_linear1$growth, "linear")
-    expect_equal(pw_linear1$trend, "PWlinear")
+    expect_equal(pw_linear1$trend, "PW")  # Base type
     expect_equal(pw_linear1$cap, "cap")  # Default cap still set but not required
     expect_equal(pw_linear1$n_changepoints, 5)
 
@@ -961,7 +966,7 @@ test_that("PW cap argument is properly validated for logistic growth", {
     # Test logistic growth with explicit cap (should work)
     pw_logistic1 <- PW(time = day, series = cells, cap = carrying_capacity, growth = 'logistic')
     expect_equal(pw_logistic1$growth, "logistic")
-    expect_equal(pw_logistic1$trend, "PWlogistic")
+    expect_equal(pw_logistic1$trend, "PW")  # Base type
     expect_equal(pw_logistic1$cap, "carrying_capacity")
 
     # Test that cap argument is preserved in formula parsing
@@ -970,7 +975,7 @@ test_that("PW cap argument is properly validated for logistic growth", {
     pw_comp <- parsed1$trend_components[[1]]
     expect_equal(pw_comp$cap, "max_biomass")
     expect_equal(pw_comp$growth, "logistic")
-    expect_equal(pw_comp$trend, "PWlogistic")
+    expect_equal(pw_comp$trend, "PW")  # Base type
 
     # Test complex PW specification in formula
     f2 <- ~ s(temp) +
@@ -1090,7 +1095,7 @@ test_that("PW cap argument integrates with stanvar generation", {
   # Check that cap info is available for stanvar generation
   expect_equal(pw_logistic$cap, "max_capacity")
   expect_equal(pw_logistic$growth, "logistic")
-  expect_equal(pw_logistic$trend, "PWlogistic")
+  expect_equal(pw_logistic$trend, "PW")  # Base type
   expect_equal(pw_logistic$n_changepoints, 12)
 
   # Test that trend spec structure includes all PW parameters needed for Stan generation
@@ -1119,7 +1124,7 @@ test_that("piecewise trend types work correctly with dispatcher", {
     # Test PW constructor with linear growth
     pw_linear <- PW(time = week, series = species, growth = 'linear', n_changepoints = 8)
     expect_s3_class(pw_linear, "mvgam_trend")
-    expect_equal(pw_linear$trend, "PWlinear")
+    expect_equal(pw_linear$trend, "PW")  # Base type
     expect_equal(pw_linear$growth, "linear")
     expect_equal(pw_linear$n_changepoints, 8)
     expect_true(is.mvgam_trend(pw_linear))
@@ -1128,7 +1133,7 @@ test_that("piecewise trend types work correctly with dispatcher", {
     pw_logistic <- PW(time = month, series = population, cap = carrying_cap,
                       growth = 'logistic', n_changepoints = 15, changepoint_scale = 0.05)
     expect_s3_class(pw_logistic, "mvgam_trend")
-    expect_equal(pw_logistic$trend, "PWlogistic")
+    expect_equal(pw_logistic$trend, "PW")  # Base type
     expect_equal(pw_logistic$growth, "logistic")
     expect_equal(pw_logistic$cap, "carrying_cap")
     expect_equal(pw_logistic$n_changepoints, 15)
@@ -1137,7 +1142,7 @@ test_that("piecewise trend types work correctly with dispatcher", {
     # Test PW constructor with linear growth
     pwlin <- PW(growth = "linear", time = daily, series = biomass, n_changepoints = 10)
     expect_s3_class(pwlin, "mvgam_trend")
-    expect_equal(pwlin$trend, "PWlinear")
+    expect_equal(pwlin$trend, "PW")  # Base type
     expect_equal(pwlin$growth, "linear")
     expect_equal(pwlin$time, "daily")
     expect_equal(pwlin$series, "biomass")
@@ -1147,7 +1152,7 @@ test_that("piecewise trend types work correctly with dispatcher", {
     pwlog <- PW(growth = "logistic", time = yearly, series = cells, cap = max_size,
                 n_changepoints = 20, changepoint_range = 0.8)
     expect_s3_class(pwlog, "mvgam_trend")
-    expect_equal(pwlog$trend, "PWlogistic")
+    expect_equal(pwlog$trend, "PW")  # Base type
     expect_equal(pwlog$growth, "logistic")
     expect_equal(pwlog$cap, "max_size")
     expect_equal(pwlog$time, "yearly")
@@ -1166,7 +1171,7 @@ test_that("piecewise trends work correctly in formula parsing", {
     parsed1 <- mvgam:::parse_trend_formula(f1)
     expect_equal(length(parsed1$trend_components), 1)
     trend_comp1 <- parsed1$trend_components[[1]]
-    expect_equal(trend_comp1$trend, "PWlinear")
+    expect_equal(trend_comp1$trend, "PW")  # Base type
     expect_equal(trend_comp1$time, "week")
     expect_equal(trend_comp1$series, "species")
     expect_equal(trend_comp1$n_changepoints, 12)
@@ -1177,8 +1182,8 @@ test_that("piecewise trends work correctly in formula parsing", {
     parsed2 <- mvgam:::parse_trend_formula(f2)
     expect_equal(length(parsed2$trend_components), 1)
     trend_comp2 <- parsed2$trend_components[[1]]
-    expect_equal(trend_comp2$trend, "PWlogistic")
-    expect_equal(trend_comp2$trend, "PWlogistic")
+    expect_equal(trend_comp2$trend, "PW")  # Base type
+    expect_equal(trend_comp2$trend, "PW")  # Base type
     expect_equal(trend_comp2$cap, "max_capacity")
     expect_equal(trend_comp2$n_changepoints, 25)
     expect_equal(trend_comp2$changepoint_scale, 0.02)
@@ -1189,7 +1194,7 @@ test_that("piecewise trends work correctly in formula parsing", {
     parsed3 <- mvgam:::parse_trend_formula(f3)
     expect_equal(length(parsed3$trend_components), 1)
     trend_comp3 <- parsed3$trend_components[[1]]
-    expect_equal(trend_comp3$trend, "PWlinear")
+    expect_equal(trend_comp3$trend, "PW")  # Base type
     expect_equal(trend_comp3$growth, "linear")
     expect_equal(trend_comp3$changepoint_range, 0.75)
 

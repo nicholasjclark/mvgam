@@ -382,8 +382,824 @@ evaluate_param_conditions <- function(param_spec, envir = parent.frame()) {
   return(active_params)
 }
 
+# -----------------------------------------------------------------------------
+# Monitor Parameter Generation for Trend Objects
+# -----------------------------------------------------------------------------
+
+#' Generate Monitor Parameters for Trend Objects
+#'
+#' Automatically discovers which parameters should be monitored for a given
+#' trend specification based on the trend type and configuration.
+#' This implements the metadata storage design from Step 1.3.
+#'
+#' @param trend_spec An mvgam_trend object
+#' @return Character vector of parameter names to monitor
+#' @noRd
+generate_monitor_params <- function(trend_spec) {
+  checkmate::assert_list(trend_spec, min.len = 1)
+
+  # Extract trend type (normalize for registry lookup)
+  trend_type <- normalize_trend_type(trend_spec$trend %||% trend_spec$trend_type)
+
+  # Base parameters that most trends share
+  base_params <- c("sigma_trend")
+
+  # Trend-specific parameters
+  trend_specific <- switch(trend_type,
+    "RW" = generate_rw_monitor_params(trend_spec),
+    "AR" = generate_ar_monitor_params(trend_spec),
+    "VAR" = generate_var_monitor_params(trend_spec),
+    "CAR" = generate_car_monitor_params(trend_spec),
+    "ZMVN" = generate_zmvn_monitor_params(trend_spec),
+    "PW" = generate_pw_monitor_params(trend_spec),
+    stop(insight::format_error(
+      "Unknown trend type: {.field {trend_type}}",
+      "Supported types: RW, AR, VAR, CAR, ZMVN, PW"
+    ))
+  )
+
+  # Add correlation parameters if enabled
+  correlation_params <- if (trend_spec$cor %||% FALSE) {
+    c("L_Omega_trend", "Sigma_trend")
+  } else {
+    character(0)
+  }
+
+  # Add factor model parameters if enabled
+  factor_params <- if (!is.null(trend_spec$n_lv)) {
+    c("Z")
+  } else {
+    character(0)
+  }
+
+  # Combine all parameters
+  all_params <- unique(c(base_params, trend_specific, correlation_params, factor_params))
+
+  return(all_params)
+}
+
+#' Generate RW-specific monitor parameters
+#' @param trend_spec RW trend specification
+#' @return Character vector of RW-specific parameters
+#' @noRd
+generate_rw_monitor_params <- function(trend_spec) {
+  params <- character(0)
+
+  # MA parameters if enabled
+  if (trend_spec$ma %||% FALSE) {
+    params <- c(params, "theta1_trend")
+  }
+
+  return(params)
+}
+
+#' Generate AR-specific monitor parameters
+#' @param trend_spec AR trend specification
+#' @return Character vector of AR-specific parameters
+#' @noRd
+generate_ar_monitor_params <- function(trend_spec) {
+  # AR coefficients for each lag
+  lags <- trend_spec$p %||% trend_spec$lags %||% 1
+  if (is.list(lags)) lags <- unlist(lags)
+
+  ar_params <- paste0("ar", lags, "_trend")
+
+  return(ar_params)
+}
+
+#' Generate VAR-specific monitor parameters
+#' @param trend_spec VAR trend specification
+#' @return Character vector of VAR-specific parameters
+#' @noRd
+generate_var_monitor_params <- function(trend_spec) {
+  # VAR coefficient matrices
+  lags <- trend_spec$p %||% trend_spec$lags %||% 1
+  if (is.list(lags)) lags <- unlist(lags)
+
+  # VAR uses matrix parameters A_trend[1], A_trend[2], etc.
+  var_params <- paste0("A_trend[", seq_along(lags), "]")
+
+  # VAR always needs covariance matrix (multivariate)
+  var_params <- c(var_params, "Sigma_trend")
+
+  return(var_params)
+}
+
+#' Generate CAR-specific monitor parameters
+#' @param trend_spec CAR trend specification
+#' @return Character vector of CAR-specific parameters
+#' @noRd
+generate_car_monitor_params <- function(trend_spec) {
+  # CAR uses ar1 without _trend suffix (legacy naming)
+  return(c("ar1"))
+}
+
+#' Generate ZMVN-specific monitor parameters
+#' @param trend_spec ZMVN trend specification
+#' @return Character vector of ZMVN-specific parameters
+#' @noRd
+generate_zmvn_monitor_params <- function(trend_spec) {
+  # ZMVN only needs base variance/correlation parameters
+  return(character(0))
+}
+
+#' Generate PW-specific monitor parameters
+#' @param trend_spec PW trend specification
+#' @return Character vector of PW-specific parameters
+#' @noRd
+generate_pw_monitor_params <- function(trend_spec) {
+  # Piecewise trend parameters
+  return(c("k_trend", "m_trend", "delta_trend"))
+}
+
+#' Normalize trend type for consistent lookup
+#' @param trend_type Raw trend type from constructor
+#' @return Normalized trend type for registry lookup
+#' @noRd
+normalize_trend_type <- function(trend_type) {
+  # Remove lag specifications: AR1 -> AR, VAR2 -> VAR
+  gsub("\\d+|\\(.*\\)", "", trend_type)
+}
+
+#' Add Monitor Parameters to Trend Object
+#'
+#' Enhances an existing trend object with auto-discovered monitor parameters.
+#' This implements the metadata storage design from Step 1.3.
+#'
+#' @param trend_obj An mvgam_trend object
+#' @return Enhanced trend object with monitor_params field
+#' @noRd
+add_monitor_params <- function(trend_obj) {
+  checkmate::assert_list(trend_obj)
+
+  # Generate monitor parameters
+  monitor_params <- generate_monitor_params(trend_obj)
+
+  # Add to trend object
+  trend_obj$monitor_params <- monitor_params
+
+  return(trend_obj)
+}
+
+# -----------------------------------------------------------------------------
+# Ultra-Efficient Forecast Metadata Generation
+# -----------------------------------------------------------------------------
+
+#' Generate Forecast Metadata for Ultra-Fast Dispatch
+#'
+#' Creates minimal forecast metadata optimized for maximum runtime speed.
+#' Stores only function name and required parameter list for lazy extraction
+#' and zero-overhead forecasting calls.
+#'
+#' @param trend_spec An mvgam_trend object
+#' @return List with function_name and required_params for efficient dispatch
+#' @noRd
+generate_forecast_metadata <- function(trend_spec) {
+  checkmate::assert_list(trend_spec, min.len = 1)
+
+  # Extract and normalize trend type
+  trend_type <- normalize_trend_type(trend_spec$trend %||% trend_spec$trend_type)
+
+  # Convention-based function naming: "AR" → forecast_ar_rcpp
+  function_name <- paste0("forecast_", tolower(trend_type), "_rcpp")
+
+  # Get minimal required parameters for lazy extraction
+  required_params <- generate_forecast_required_params(trend_spec, trend_type)
+
+  return(list(
+    function_name = function_name,
+    required_params = required_params
+  ))
+}
+
+#' Generate Required Parameters for Ultra-Fast Forecasting
+#'
+#' Determines minimal set of parameters needed for forecasting dispatch.
+#' Always a subset of monitor_params optimized for fast extraction.
+#'
+#' @param trend_spec An mvgam_trend object
+#' @param trend_type Normalized trend type
+#' @return Character vector of minimal required parameter names
+#' @noRd
+generate_forecast_required_params <- function(trend_spec, trend_type) {
+  # Get all monitor parameters
+  all_monitor_params <- generate_monitor_params(trend_spec)
+
+  # Filter to minimal required set for each trend type
+  switch(trend_type,
+    "RW" = filter_rw_forecast_params(all_monitor_params, trend_spec),
+    "AR" = filter_ar_forecast_params(all_monitor_params, trend_spec),
+    "VAR" = filter_var_forecast_params(all_monitor_params, trend_spec),
+    "CAR" = filter_car_forecast_params(all_monitor_params, trend_spec),
+    "ZMVN" = filter_zmvn_forecast_params(all_monitor_params, trend_spec),
+    "PW" = filter_pw_forecast_params(all_monitor_params, trend_spec),
+    stop(insight::format_error(
+      "Unknown trend type for forecasting: {.field {trend_type}}",
+      "Supported types: RW, AR, VAR, CAR, ZMVN, PW"
+    ))
+  )
+}
+
+#' Filter RW parameters for minimal forecasting requirements
+#' @param monitor_params All monitor parameters for RW
+#' @param trend_spec RW trend specification
+#' @return Minimal required parameters for fast RW forecasting
+#' @noRd
+filter_rw_forecast_params <- function(monitor_params, trend_spec) {
+  # RW minimally needs: variance + optional MA + correlation
+  required <- "sigma_trend"
+
+  # Add essential extras present in monitor_params
+  extras <- intersect(monitor_params, c("theta1_trend", "L_Omega_trend", "Sigma_trend"))
+  c(required, extras)
+}
+
+#' Filter AR parameters for minimal forecasting requirements
+#' @param monitor_params All monitor parameters for AR
+#' @param trend_spec AR trend specification
+#' @return Minimal required parameters for fast AR forecasting
+#' @noRd
+filter_ar_forecast_params <- function(monitor_params, trend_spec) {
+  # AR minimally needs: coefficients + variance
+  ar_coeffs <- monitor_params[grepl("^ar\\d+_trend$", monitor_params)]
+  required <- c(ar_coeffs, "sigma_trend")
+
+  # Add correlation if present
+  correlation_params <- intersect(monitor_params, c("L_Omega_trend", "Sigma_trend"))
+  c(required, correlation_params)
+}
+
+#' Filter VAR parameters for minimal forecasting requirements
+#' @param monitor_params All monitor parameters for VAR
+#' @param trend_spec VAR trend specification
+#' @return Minimal required parameters for fast VAR forecasting
+#' @noRd
+filter_var_forecast_params <- function(monitor_params, trend_spec) {
+  # VAR minimally needs: coefficient matrices + covariance
+  var_matrices <- monitor_params[grepl("^A_trend\\[", monitor_params)]
+  c(var_matrices, "Sigma_trend")
+}
+
+#' Filter CAR parameters for minimal forecasting requirements
+#' @param monitor_params All monitor parameters for CAR
+#' @param trend_spec CAR trend specification
+#' @return Minimal required parameters for fast CAR forecasting
+#' @noRd
+filter_car_forecast_params <- function(monitor_params, trend_spec) {
+  # CAR minimally needs: AR coefficient + variance
+  c("ar1", "sigma_trend")
+}
+
+#' Filter ZMVN parameters for minimal forecasting requirements
+#' @param monitor_params All monitor parameters for ZMVN
+#' @param trend_spec ZMVN trend specification
+#' @return Minimal required parameters for fast ZMVN forecasting
+#' @noRd
+filter_zmvn_forecast_params <- function(monitor_params, trend_spec) {
+  # ZMVN minimally needs: variance + optional correlation
+  required <- "sigma_trend"
+  correlation_params <- intersect(monitor_params, c("L_Omega_trend", "Sigma_trend"))
+  c(required, correlation_params)
+}
+
+#' Filter PW parameters for minimal forecasting requirements
+#' @param monitor_params All monitor parameters for PW
+#' @param trend_spec PW trend specification
+#' @return Minimal required parameters for fast PW forecasting
+#' @noRd
+filter_pw_forecast_params <- function(monitor_params, trend_spec) {
+  # PW minimally needs: all growth parameters
+  c("k_trend", "m_trend", "delta_trend")
+}
+
+#' Add Forecast Metadata to Trend Object
+#'
+#' Enhances trend object with ultra-efficient forecast dispatch metadata.
+#' Optimized for maximum runtime speed with minimal storage overhead.
+#'
+#' @param trend_obj An mvgam_trend object
+#' @return Enhanced trend object with forecast_metadata field
+#' @noRd
+add_forecast_metadata <- function(trend_obj) {
+  checkmate::assert_list(trend_obj)
+
+  # Generate minimal forecast metadata for fast dispatch
+  forecast_metadata <- generate_forecast_metadata(trend_obj)
+
+  # Add to trend object
+  trend_obj$forecast_metadata <- forecast_metadata
+
+  return(trend_obj)
+}
+
+# -----------------------------------------------------------------------------
+# Summary Labels Generation for User-Friendly Parameter Display
+# -----------------------------------------------------------------------------
+
+#' Generate Summary Labels for Trend Parameters
+#'
+#' Creates user-friendly display labels for trend parameters in summaries.
+#' Maps technical parameter names to descriptive labels for better readability.
+#'
+#' @param trend_spec An mvgam_trend object
+#' @return Named character vector mapping parameter names to display labels
+#' @noRd
+generate_summary_labels <- function(trend_spec) {
+  checkmate::assert_list(trend_spec, min.len = 1)
+
+  # Get monitor parameters to create labels for
+  monitor_params <- generate_monitor_params(trend_spec)
+
+  # Extract trend type for context
+  trend_type <- normalize_trend_type(trend_spec$trend %||% trend_spec$trend_type)
+
+  # Generate labels for each monitor parameter
+  labels <- character(length(monitor_params))
+  names(labels) <- monitor_params
+
+  for (param in monitor_params) {
+    labels[param] <- generate_parameter_label(param, trend_type, trend_spec)
+  }
+
+  return(labels)
+}
+
+#' Generate User-Friendly Label for Individual Parameter
+#'
+#' Creates descriptive label for a single parameter based on its name and context.
+#'
+#' @param param_name Technical parameter name (e.g., "ar1_trend", "sigma_trend")
+#' @param trend_type Normalized trend type
+#' @param trend_spec Complete trend specification for context
+#' @return Character string with user-friendly label
+#' @noRd
+generate_parameter_label <- function(param_name, trend_type, trend_spec) {
+  # Handle common parameter patterns using if-else for proper character assignment
+  if (param_name == "sigma_trend") {
+    return("Trend innovation standard deviation")
+  } else if (param_name == "Sigma_trend") {
+    return("Trend innovation covariance matrix")
+  } else if (param_name == "L_Omega_trend") {
+    return("Trend correlation matrix (Cholesky factor)")
+  } else if (grepl("^ar\\d+_trend$", param_name)) {
+    lag <- gsub("ar(\\d+)_trend", "\\1", param_name)
+    return(paste0("AR(", lag, ") coefficient"))
+  } else if (grepl("^A_trend\\[", param_name)) {
+    lag <- gsub("A_trend\\[(\\d+)\\]", "\\1", param_name)
+    return(paste0("VAR coefficient matrix (lag ", lag, ")"))
+  } else if (grepl("^theta\\d+_trend$", param_name)) {
+    lag <- gsub("theta(\\d+)_trend", "\\1", param_name)
+    return(paste0("MA(", lag, ") coefficient"))
+  } else if (param_name == "k_trend") {
+    return("Piecewise growth rate")
+  } else if (param_name == "m_trend") {
+    return("Piecewise offset parameter")
+  } else if (param_name == "delta_trend") {
+    return("Piecewise changepoint adjustments")
+  } else if (param_name == "ar1") {
+    return("CAR(1) coefficient")
+  } else if (param_name == "Z") {
+    return("Factor loadings matrix")
+  } else if (grepl("_group", param_name)) {
+    return(gsub("_", " ", gsub("_trend", "", param_name)))
+  } else {
+    # Default: clean up technical name
+    clean_name <- gsub("_trend$", "", param_name)
+    clean_name <- gsub("_", " ", clean_name)
+    # Capitalize first letter
+    return(paste0(toupper(substring(clean_name, 1, 1)), substring(clean_name, 2)))
+  }
+}
+
+#' Add Summary Labels to Trend Object
+#'
+#' Enhances trend object with user-friendly parameter display labels.
+#' Enables clean parameter presentation in summaries and print methods.
+#'
+#' @param trend_obj An mvgam_trend object
+#' @return Enhanced trend object with summary_labels field
+#' @noRd
+add_summary_labels <- function(trend_obj) {
+  checkmate::assert_list(trend_obj)
+
+  # Generate summary labels
+  summary_labels <- generate_summary_labels(trend_obj)
+
+  # Add to trend object
+  trend_obj$summary_labels <- summary_labels
+
+  return(trend_obj)
+}
+
+#' Add Complete Metadata to Trend Object
+#'
+#' Convenience function that adds all metadata components:
+#' monitor_params, forecast_metadata, and summary_labels.
+#'
+#' @param trend_obj An mvgam_trend object
+#' @return Fully enhanced trend object with all metadata
+#' @noRd
+add_complete_metadata <- function(trend_obj) {
+  # Add all metadata components sequentially
+  trend_obj <- add_monitor_params(trend_obj)
+  trend_obj <- add_forecast_metadata(trend_obj)
+  trend_obj <- add_summary_labels(trend_obj)
+  return(trend_obj)
+}
+
 # =============================================================================
-# SECTION 3: TREND VALIDATION AND PARSING
+# SECTION 3: ENHANCED MVGAM_TREND OBJECT SPECIFICATION
+# =============================================================================
+
+#' Enhanced mvgam_trend Object Field Specification
+#'
+#' @description
+#' Comprehensive documentation of required and optional fields for the enhanced
+#' mvgam_trend S3 class structure. This specification enables self-contained
+#' trend objects that provide all necessary information for validation,
+#' Stan code generation, and post-processing without external lookups.
+#'
+#' @section Core Required Fields:
+#' \describe{
+#'   \item{trend}{Character string. Normalized trend type name for stanvar
+#'     generation dispatch. Examples: "AR", "VAR", "RW", "CAR", "PW", "ZMVN".
+#'     Used in convention-based lookup: "AR" → generate_ar_trend_stanvars()}
+#'   \item{time}{Character string. Name of time variable in user's data.
+#'     Default "time" with warning when not explicitly specified.}
+#'   \item{series}{Character string. Name of series identifier variable in data.
+#'     Default "series" with warning when not explicitly specified.}
+#'   \item{class}{Must include "mvgam_trend" for method dispatch.}
+#' }
+#'
+#' @section Self-Contained Validation Fields:
+#' \describe{
+#'   \item{validation_rules}{Character vector. Validation rules this trend requires.
+#'     Replaces hard-coded conditionals throughout validation functions.
+#'     Must use approved strings from validation_rule_vocabulary.
+#'     Examples: c("requires_regular_intervals", "supports_factors", "supports_hierarchical")}
+#' }
+#'
+#' @section Self-Contained Parameter Monitoring Fields:
+#' \describe{
+#'   \item{monitor_params}{Character vector. Stan parameters to track post-fit.
+#'     Automatically includes response suffixes in multivariate contexts.
+#'     Examples: c("ar1_trend", "sigma_trend", "L_Omega_trend")}
+#'   \item{tpars}{Character vector. All trend-specific parameter names with
+#'     "_trend" suffix for Stan compatibility. Generated from param_info.}
+#'   \item{bounds}{Named list. Parameter bounds for prior specification.
+#'     Format: list(ar1_trend = c(-1, 1), sigma_trend = c(0, Inf))}
+#' }
+#'
+#' @section Self-Contained Forecasting Metadata Fields:
+#' \describe{
+#'   \item{forecast_metadata}{List. Complete forecasting function information:
+#'     \itemize{
+#'       \item{function_name}{Character. Forecasting function name (e.g., "forecast_ar_rcpp")}
+#'       \item{required_args}{Character vector. Required arguments from fitted model}
+#'       \item{max_horizon}{Integer. Maximum forecasting steps supported}
+#'       \item{dependencies}{Character vector. Requirements like "needs_last_state"}
+#'     }}
+#' }
+#'
+#' @section Configuration Parameters (Trend-Specific):
+#' \describe{
+#'   \item{p}{Integer or vector. Order parameter for AR/VAR models.
+#'     Examples: 1 (AR1), c(1,12) (seasonal AR), 2 (VAR2)}
+#'   \item{ma}{Logical. Whether moving average terms are included.}
+#'   \item{cor}{Logical. Whether correlation structure is enabled.
+#'     VAR models always set this to TRUE for optimal performance.}
+#'   \item{gr}{Character string. Grouping variable name for hierarchical models.
+#'     "NA" indicates no grouping.}
+#'   \item{subgr}{Character string. Subgrouping variable name.
+#'     Default "series" but can be customized for hierarchical models.}
+#'   \item{n_lv}{Integer. Number of latent variables for factor models.
+#'     Only allowed when validation_rules includes "supports_factors".}
+#'   \item{cap}{Character string. Carrying capacity variable for logistic growth.
+#'     Required for PW models with growth = "logistic".}
+#'   \item{growth}{Character string. Growth type for piecewise models:
+#'     "linear" or "logistic".}
+#'   \item{n_changepoints}{Integer. Number of changepoints for piecewise models.}
+#'   \item{changepoint_range}{Numeric. Proportion of history for changepoints.}
+#'   \item{changepoint_scale}{Numeric. Scale parameter for changepoint priors.}
+#' }
+#'
+#' @section Display and Documentation Fields:
+#' \describe{
+#'   \item{label}{Character string. Human-readable description for printing.
+#'     Auto-generated from trend type and parameters if not provided.}
+#'   \item{summary_labels}{List. Naming patterns for parameter summaries:
+#'     \itemize{
+#'       \item{parameter_labels}{List mapping parameter names to display labels}
+#'       \item{factor_labels}{List for factor loading label patterns}
+#'       \item{group_labels}{List for hierarchical parameter labels}
+#'     }}
+#' }
+#'
+#' @section Internal Processing Fields:
+#' \describe{
+#'   \item{param_info}{List containing:
+#'     \itemize{
+#'       \item{parameters}{trend_param object with complete specifications}
+#'       \item{characteristics}{List of trend capabilities and settings}
+#'     }}
+#'   \item{shared_innovations}{Logical. Whether trend uses shared Gaussian
+#'     innovation system (TRUE) or handles own innovations (FALSE).
+#'     Most trends use shared system; exceptions: CAR, VAR, PW.}
+#'   \item{dimensions}{List. Pre-calculated time series dimensions (populated during validation):
+#'     \itemize{
+#'       \item{n_time}{Integer. Number of time points}
+#'       \item{n_series}{Integer. Number of series}
+#'       \item{n_obs}{Integer. Total observations}
+#'       \item{time_var}{Character. Time variable name}
+#'       \item{series_var}{Character. Series variable name}
+#'       \item{time_range}{Numeric vector. c(min_time, max_time)}
+#'       \item{unique_times}{Vector. All unique time values}
+#'     }}
+#'   \item{response_context}{Character string. Response name for multivariate models.
+#'     NULL for univariate models, populated during multivariate parsing.}
+#' }
+#'
+#' @section Field Relationships and Validation Rules:
+#' The validation_rules field determines which other fields are valid:
+#' \itemize{
+#'   \item{"supports_factors" + n_lv}: Factor models allowed
+#'   \item{"incompatible_with_factors" + n_lv}: Error thrown
+#'   \item{"supports_hierarchical" + gr/subgr}: Hierarchical models allowed
+#'   \item{"requires_regular_intervals"}: Regular time validation triggered
+#'   \item{"allows_irregular_intervals"}: CAR-style irregular time handling
+#' }
+#'
+#' @section Convention-Based Function Dispatch:
+#' The trend field enables automatic function lookup:
+#' \itemize{
+#'   \item{Stan generation}: "AR" → generate_ar_trend_stanvars()
+#'   \item{Forecasting}: forecast_metadata$function_name → that function
+#'   \item{No manual registry entries needed}
+#' }
+#'
+#' @section Response Suffix Handling (Multivariate):
+#' In multivariate contexts, certain fields are automatically modified:
+#' \itemize{
+#'   \item{monitor_params}: "_count", "_biomass" suffixes added to parameter names
+#'   \item{summary_labels}: Response-specific labels generated automatically
+#'   \item{response_context}: Set to response name for tracking
+#' }
+#'
+#' @section Backward Compatibility:
+#' During transition period, old fields may still be present:
+#' \itemize{
+#'   \item{trend_model}: Legacy field, use trend instead
+#'   \item{trend_type}: Legacy field, use trend instead
+#'   \item{forecast_fun}: Legacy field, use forecast_metadata$function_name
+#'   \item{stancode_fun}: Legacy field, replaced by convention-based lookup
+#'   \item{standata_fun}: Legacy field, replaced by convention-based lookup
+#' }
+#'
+#' @section Class Structure Requirements:
+#' Objects must:
+#' \itemize{
+#'   \item{Have class c("mvgam_trend")}
+#'   \item{Pass validate_mvgam_trend() checks}
+#'   \item{Include all required core fields}
+#'   \item{Use approved validation_rules vocabulary}
+#'   \item{Have consistent field types and relationships}
+#' }
+#'
+#' @section Example Complete Object:
+#' \preformatted{
+#' ar_trend <- structure(list(
+#'   # Core required fields
+#'   trend = "AR",
+#'   time = "time",
+#'   series = "series",
+#'
+#'   # Self-contained validation
+#'   validation_rules = c(
+#'     "requires_regular_intervals",
+#'     "supports_factors",
+#'     "supports_hierarchical"
+#'   ),
+#'
+#'   # Self-contained monitoring
+#'   monitor_params = c("ar1_trend", "sigma_trend"),
+#'   tpars = c("ar1_trend"),
+#'   bounds = list(ar1_trend = c(-1, 1)),
+#'
+#'   # Self-contained forecasting
+#'   forecast_metadata = list(
+#'     function_name = "forecast_ar_rcpp",
+#'     required_args = c("ar_coefficients", "last_state"),
+#'     max_horizon = Inf,
+#'     dependencies = c("needs_ar_coeffs")
+#'   ),
+#'
+#'   # Configuration
+#'   p = 1, ma = FALSE, cor = FALSE, n_lv = NULL,
+#'
+#'   # Auto-generated during processing
+#'   label = "AR1",
+#'   shared_innovations = TRUE,
+#'   param_info = list(...)
+#' ), class = "mvgam_trend")
+#' }
+#'
+#' @section Design Principles:
+#' \itemize{
+#'   \item{Self-contained}: Each object contains all needed metadata}
+#'   \item{Convention-based}: Minimal configuration, maximum automation}
+#'   \item{Extensible}: New fields can be added without breaking existing trends}
+#'   \item{Validated}: Structure enforced through validate_mvgam_trend()}
+#'   \item{Consistent}: All trends follow identical patterns}
+#' }
+#'
+#' @name mvgam_trend_specification
+#' @author Nicholas J Clark
+NULL
+
+#' Validation Rules Vocabulary
+#'
+#' @description
+#' Central vocabulary of approved validation rule strings. These constants
+#' prevent typos and provide clear documentation of available validation
+#' behaviors. All validation_rules fields in mvgam_trend objects must use
+#' strings from this vocabulary.
+#'
+#' @section Time Series Validation Rules:
+#' \describe{
+#'   \item{rule_requires_regular_intervals}{"requires_regular_intervals" - Trend
+#'     requires evenly spaced time points. Used by: AR, VAR, RW, ZMVN, PW.
+#'     Triggers: validate_regular_time_intervals()}
+#'   \item{rule_allows_irregular_intervals}{"allows_irregular_intervals" - Trend
+#'     can handle irregular time spacing. Used by: CAR only.
+#'     Triggers: calculate_car_time_distances(), skips regular interval validation}
+#' }
+#'
+#' @section Factor Model Validation Rules:
+#' \describe{
+#'   \item{rule_supports_factors}{"supports_factors" - Trend compatible with
+#'     factor models (n_lv parameter allowed). Used by: AR, VAR, RW, ZMVN.
+#'     Triggers: validate_factor_compatibility(), allows n_lv specification}
+#'   \item{rule_incompatible_with_factors}{"incompatible_with_factors" - Trend
+#'     cannot be used with factor models. Used by: CAR, PW.
+#'     Triggers: Error when n_lv is specified}
+#' }
+#'
+#' @section Hierarchical Model Validation Rules:
+#' \describe{
+#'   \item{rule_supports_hierarchical}{"supports_hierarchical" - Trend supports
+#'     gr/subgr grouping parameters. Used by: AR, VAR, RW, ZMVN.
+#'     Triggers: validate_grouping_structure(), allows gr/subgr specification}
+#'   \item{rule_requires_hierarchical}{"requires_hierarchical" - Trend requires
+#'     grouping structure. Currently unused, reserved for future trends.}
+#' }
+#'
+#' @section Seasonal Model Validation Rules:
+#' \describe{
+#'   \item{rule_requires_seasonal_period}{"requires_seasonal_period" - Trend
+#'     requires specification of seasonal period parameter. Used by: seasonal AR models.
+#'     Triggers: validate_seasonal_period_specification()}
+#'   \item{rule_supports_multiple_seasonality}{"supports_multiple_seasonality" - Trend
+#'     can handle multiple seasonal periods simultaneously. Used by: flexible seasonal models.
+#'     Triggers: validate_multiple_seasonal_periods()}
+#'   \item{rule_incompatible_with_seasonal_smooths}{"incompatible_with_seasonal_smooths" - Trend
+#'     conflicts with seasonal smooth terms in observation formula. Used by: trends with built-in seasonality.
+#'     Triggers: Error when seasonal smooths detected in observation formula}
+#' }
+#'
+#' @section Data Structure Validation Rules:
+#' \describe{
+#'   \item{rule_requires_balanced_panels}{"requires_balanced_panels" - All series
+#'     must have observations at all time points. Used by: some multivariate models.
+#'     Triggers: validate_balanced_panel_structure()}
+#'   \item{rule_requires_minimum_series_count}{"requires_minimum_series_count" - Trend
+#'     requires minimum number of series for identification. Used by: factor models, some VAR specifications.
+#'     Triggers: validate_minimum_series_count()}
+#' }
+#'
+#' @section Usage in Trend Constructors:
+#' Use these constants when creating validation_rules vectors:
+#' \preformatted{
+#' # Example: Standard AR trend supports regular intervals, factors, and hierarchical models
+#' validation_rules <- c(
+#'   rule_requires_regular_intervals,
+#'   rule_supports_factors,
+#'   rule_supports_hierarchical
+#' )
+#'
+#' # Example: Seasonal AR trend with multiple periods
+#' validation_rules <- c(
+#'   rule_requires_regular_intervals,
+#'   rule_supports_factors,
+#'   rule_supports_hierarchical,
+#'   rule_supports_multiple_seasonality
+#' )
+#'
+#' # Example: CAR trend allows irregular intervals but no factors/hierarchy
+#' validation_rules <- c(
+#'   rule_allows_irregular_intervals,
+#'   rule_incompatible_with_factors
+#' )
+#'
+#' # Example: Factor model requiring minimum series count
+#' validation_rules <- c(
+#'   rule_requires_regular_intervals,
+#'   rule_supports_factors,
+#'   rule_requires_minimum_series_count
+#' )
+#'
+#' # Or use pre-built combinations:
+#' validation_rules <- stationary_trend_rules
+#' validation_rules <- seasonal_trend_rules
+#' }
+#'
+#' @section Rule Interpreter Integration:
+#' These constants map to validation functions in the rule interpreter:
+#' \itemize{
+#'   \item{rule_requires_regular_intervals → validate_regular_time_intervals()}
+#'   \item{rule_supports_factors → validate_factor_compatibility()}
+#'   \item{rule_supports_hierarchical → validate_grouping_structure()}
+#'   \item{rule_incompatible_with_factors → error when n_lv specified}
+#' }
+#'
+#' @name validation_rules_vocabulary
+#' @author Nicholas J Clark
+NULL
+
+# Validation Rules Constants (grouped by category)
+# Time Series Rules
+rule_requires_regular_intervals <- "requires_regular_intervals"
+rule_allows_irregular_intervals <- "allows_irregular_intervals"
+
+# Factor Model Rules
+rule_supports_factors <- "supports_factors"
+rule_incompatible_with_factors <- "incompatible_with_factors"
+
+# Hierarchical Model Rules
+rule_supports_hierarchical <- "supports_hierarchical"
+rule_requires_hierarchical <- "requires_hierarchical"
+rule_incompatible_with_hierarchical <- "incompatible_with_hierarchical"
+
+# Seasonal Model Rules
+rule_requires_seasonal_period <- "requires_seasonal_period"
+rule_supports_multiple_seasonality <- "supports_multiple_seasonality"
+rule_incompatible_with_seasonal_smooths <- "incompatible_with_seasonal_smooths"
+
+# Data Structure Rules
+rule_requires_balanced_panels <- "requires_balanced_panels"
+rule_requires_minimum_series_count <- "requires_minimum_series_count"
+
+# Complete validation rules vocabulary for validation
+validation_rule_vocabulary <- c(
+  # Time rules
+  rule_requires_regular_intervals,
+  rule_allows_irregular_intervals,
+  # Factor rules
+  rule_supports_factors,
+  rule_incompatible_with_factors,
+  # Hierarchy rules
+  rule_supports_hierarchical,
+  rule_requires_hierarchical,
+  # Seasonal rules
+  rule_requires_seasonal_period,
+  rule_supports_multiple_seasonality,
+  rule_incompatible_with_seasonal_smooths,
+  # Data structure rules
+  rule_requires_balanced_panels,
+  rule_requires_minimum_series_count
+)
+
+# Pre-built rule combinations for common trend patterns
+stationary_trend_rules <- c(
+  rule_requires_regular_intervals,
+  rule_supports_factors,
+  rule_supports_hierarchical
+)
+
+irregular_trend_rules <- c(
+  rule_allows_irregular_intervals,
+  rule_incompatible_with_factors
+)
+
+changepoint_trend_rules <- c(
+  rule_requires_regular_intervals,
+  rule_incompatible_with_factors
+)
+
+seasonal_trend_rules <- c(
+  rule_requires_regular_intervals,
+  rule_supports_factors,
+  rule_supports_hierarchical,
+  rule_requires_seasonal_period
+)
+
+factor_model_trend_rules <- c(
+  rule_requires_regular_intervals,
+  rule_supports_factors,
+  rule_requires_minimum_series_count
+)
+
+# =============================================================================
+# SECTION 4: TREND VALIDATION AND PARSING
 # =============================================================================
 # WHY: Trend validation ensures data integrity and prevents runtime errors
 # during Stan model compilation. Formula parsing enables complex multivariate
@@ -827,7 +1643,7 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
       "Available constructors: {.field {available_trends}()}."
     ))
   }
-  
+
   # Validate we have exactly one trend type per response - only one allowed per formula
   if (length(trend_terms) > 1) {
     stop(insight::format_error(
@@ -1364,209 +2180,62 @@ RW = function(
     gr = NA,
     subgr = NA,
     n_lv = NULL) {
-  # Process time argument
-  time <- deparse0(substitute(time))
-  time_was_default <- (time == "NA")
-  if (time == "NA") time <- "time"  # Default to 'time' when NA
 
-  # Process series argument
-  series <- deparse0(substitute(series))
-  series_was_default <- (series == "NA")
-  if (series == "NA") series <- "series"  # Default to 'series' when NA
-
-  # Issue warnings for default usage using modular functions
-  if (time_was_default) warn_default_time_variable()
-  if (series_was_default) warn_default_series_variable()
-
-  # Input validation using checkmate
+  # Basic input validation for trend-specific parameters
   checkmate::assert_logical(ma, len = 1)
   checkmate::assert_logical(cor, len = 1)
 
-  # Process and validate grouping arguments
-  gr <- deparse0(substitute(gr))
-  subgr <- deparse0(substitute(subgr))
-  groupings <- validate_grouping_arguments(gr, subgr)
-  gr <- groupings$gr
-  subgr <- groupings$subgr
-
-  # Validate and adjust correlation requirements
-  cor <- validate_correlation_requirements(gr, cor)
-
-  # Define ONLY trend-specific parameters (Gaussian innovation infrastructure is automatic)
-  # RW only has MA coefficient when ma = TRUE, otherwise no trend-specific parameters
-  param_specs <- if (ma) {
-    trend_param("theta1", bounds = c(-1, 1), label = "moving_average_coefficient_lag_1")
-  } else {
-    NULL  # No trend-specific parameters for basic RW
-  }
-
-  # Define trend characteristics and Gaussian innovation settings
-  characteristics <- list(
-    supports_predictors = TRUE,
-    supports_correlation = TRUE,
-    supports_factors = TRUE,
-    supports_hierarchical = TRUE,  # RW supports gr/subgr
-    innovation_type = "gaussian_shared",  # Uses shared Gaussian innovation system
-    max_order = 1,
-    requires_sorting = TRUE,
-    # Gaussian innovation settings (automatic parameters)
-    uses_sigma_trend = TRUE,          # Always has sigma_trend (innovation SD)
-    uses_correlation = cor || gr != 'NA',  # Uses Sigma_trend/L_Omega_trend when needed
-    monitor_innovations = ma          # Monitor LV_innovations only for MA models
+  # Use helper function for clean object creation
+  # Complex logic (grouping, correlation requirements, parameter processing)
+  # moved to validation and Stan assembly layers
+  trend_obj <- create_mvgam_trend(
+    "RW",  # Base trend type used for ALL dispatch
+    .time = substitute(time),
+    .series = substitute(series),
+    .gr = substitute(gr),
+    .subgr = substitute(subgr),
+    # Store parameters as-is (processing moved to Stan assembly)
+    ma = ma,
+    cor = cor,
+    n_lv = n_lv
   )
 
-  # Process trend-specific parameters only
-  processed_params <- process_trend_params(param_specs, envir = environment())
+  # Legacy validation (will be replaced by enhanced validation layer)
+  validate_trend(trend_obj)
 
-  # Create complete parameter info for storage
-  param_info <- list(
-    parameters = param_specs,  # Original trend_param specifications
-    characteristics = characteristics
-  )
-
-  # Create trend object with dispatcher integration
-  out <- structure(
-    list(
-      trend = 'RW',
-      ma = ma,
-      cor = cor,
-      time = time,
-      series = series,
-      gr = gr,
-      subgr = subgr,
-      n_lv = n_lv,
-      label = build_trend_label('RW', cor = cor, ma = ma, gr = gr, n_lv = n_lv),
-      tpars = processed_params$tpars,
-      forecast_fun = 'forecast_rw_rcpp',
-      stancode_fun = 'rw_stan_code',
-      standata_fun = 'rw_stan_data',
-      bounds = processed_params$bounds,
-      param_info = param_info,  # Complete trend specification (parameters + characteristics)
-      shared_innovations = TRUE  # RW uses shared Gaussian innovation system
-    ),
-    class = 'mvgam_trend'
-  )
-
-  # Validate using dispatcher system
-  validate_trend(out)
-
-  return(out)
+  return(trend_obj)
 }
 
 #' @rdname trend_constructors
 #' @export
 AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
-  # Process time argument
-  time <- deparse0(substitute(time))
-  time_was_default <- (time == "NA")
-  if (time == "NA") time <- "time"  # Default to 'time' when NA
-
-  # Process series argument
-  series <- deparse0(substitute(series))
-  series_was_default <- (series == "NA")
-  if (series == "NA") series <- "series"  # Default to 'series' when NA
-
-  # Issue warnings for default usage using modular functions
-  if (time_was_default) warn_default_time_variable()
-  if (series_was_default) warn_default_series_variable()
-
-  # Validate AR order parameter - can be integer or vector of integers
+  # Validate AR order parameter
   if (length(p) == 1) {
     checkmate::assert_int(p, lower = 1)
-    ar_lags <- 1:p
-    max_lag <- p
   } else {
     checkmate::assert_integerish(p, lower = 1, unique = TRUE, sorted = TRUE)
-    ar_lags <- p
-    max_lag <- max(p)
   }
-
-  # Input validation using checkmate
+  
+  # Basic input validation
   checkmate::assert_logical(ma, len = 1)
   checkmate::assert_logical(cor, len = 1)
-
-  # Process and validate grouping arguments
-  gr <- deparse0(substitute(gr))
-  subgr <- deparse0(substitute(subgr))
-  groupings <- validate_grouping_arguments(gr, subgr)
-  gr <- groupings$gr
-  subgr <- groupings$subgr
-
-  # Validate and adjust correlation requirements
-  cor <- validate_correlation_requirements(gr, cor)
-
-  # Define ONLY trend-specific parameters (Gaussian innovation infrastructure is automatic)
-  # Always use ar{lag}_trend naming for absolute consistency (ar1_trend, ar12_trend, etc.)
-  param_specs <- NULL
-  for (lag in ar_lags) {
-    ar_param <- trend_param(paste0("ar", lag), bounds = c(-1, 1),
-                           label = paste0("ar_coefficient_lag_", lag))
-    if (is.null(param_specs)) {
-      param_specs <- ar_param
-    } else {
-      param_specs <- param_specs + ar_param
-    }
-  }
-
-  # Add MA coefficient if specified (future: could support multiple MA lags)
-  if (ma) {
-    param_specs <- param_specs + trend_param("theta1", bounds = c(-1, 1), label = "moving_average_coefficient_lag_1")
-  }
-
-  # Define trend characteristics and Gaussian innovation settings
-  characteristics <- list(
-    supports_predictors = TRUE,
-    supports_correlation = TRUE,
-    supports_factors = TRUE,
-    supports_hierarchical = TRUE,  # AR supports gr/subgr
-    innovation_type = "gaussian_shared",  # Uses shared Gaussian innovation system
-    max_order = max_lag,
-    requires_sorting = TRUE,
-    # Gaussian innovation settings (automatic parameters)
-    uses_sigma_trend = TRUE,          # Always has sigma_trend (innovation SD)
-    uses_correlation = cor || gr != 'NA',  # Uses Sigma_trend/L_Omega_trend when needed
-    monitor_innovations = ma          # Monitor LV_innovations only for MA models
+  
+  # Use helper function for clean object creation
+  # Complex logic moved to validation and Stan assembly layers
+  trend_obj <- create_mvgam_trend(
+    "AR",  # Base trend type used for ALL dispatch
+    .time = substitute(time),
+    .series = substitute(series),
+    .gr = substitute(gr),
+    .subgr = substitute(subgr),
+    # Store parameters as-is (processing happens in validation/Stan assembly)
+    p = p,
+    ma = ma,
+    cor = cor,
+    n_lv = n_lv
   )
-
-  # Process trend-specific parameters only
-  processed_params <- process_trend_params(param_specs, envir = environment())
-
-  # Create complete parameter info for storage
-  param_info <- list(
-    parameters = param_specs,  # Trend-specific parameters only
-    characteristics = characteristics
-  )
-
-  # Create trend object with dispatcher integration
-  out <- structure(
-    list(
-      trend = if(length(p) == 1) paste0('AR', p) else paste0('AR(', paste(p, collapse = ','), ')'),
-      p = p,
-      ar_lags = ar_lags,
-      max_lag = max_lag,
-      ma = ma,
-      cor = cor,
-      time = time,
-      series = series,
-      gr = gr,
-      subgr = subgr,
-      n_lv = n_lv,
-      label = build_trend_label('AR', cor = cor, ma = ma, gr = gr, n_lv = n_lv, p = max_lag),
-      tpars = processed_params$tpars,  # Only trend-specific parameters
-      forecast_fun = 'forecast_ar_rcpp',
-      stancode_fun = 'ar_stan_code',
-      standata_fun = 'ar_stan_data',
-      bounds = processed_params$bounds,
-      param_info = param_info,  # Complete specification (trend params + characteristics)
-      shared_innovations = TRUE  # AR uses shared Gaussian innovation system
-    ),
-    class = 'mvgam_trend'
-  )
-
-  # Validate using dispatcher system
-  validate_trend(out)
-
-  return(out)
+  
+  return(trend_obj)
 }
 
 #' @rdname trend_constructors
@@ -1653,105 +2322,28 @@ CAR = function(time = NA, series = NA, p = 1, n_lv = NULL) {
 #' @rdname trend_constructors
 #' @export
 VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
-  # Process time argument
-  time <- deparse0(substitute(time))
-  time_was_default <- (time == "NA")
-  if (time == "NA") time <- "time"  # Default to 'time' when NA
-
-  # Process series argument
-  series <- deparse0(substitute(series))
-  series_was_default <- (series == "NA")
-  if (series == "NA") series <- "series"  # Default to 'series' when NA
-
-  # Issue warnings for default usage using modular functions
-  if (time_was_default) warn_default_time_variable()
-  if (series_was_default) warn_default_series_variable()
-
-  # Validate VAR order parameter - any positive integer
+  # Validate VAR order parameter
   checkmate::assert_int(p, lower = 1)
-
-  # Input validation using checkmate
+  
+  # Basic input validation
   checkmate::assert_logical(ma, len = 1)
-
-  # Process and validate grouping arguments
-  gr <- deparse0(substitute(gr))
-  subgr <- deparse0(substitute(subgr))
-  groupings <- validate_grouping_arguments(gr, subgr)
-  gr <- groupings$gr
-  subgr <- groupings$subgr
-
-  # VAR models always use correlation (cor = TRUE) for optimal performance
-  cor <- TRUE
-
-  # Define ONLY trend-specific parameters (Gaussian innovation infrastructure is automatic)
-  # VAR uses A{lag}_trend naming for transition matrices and theta{lag}_trend for MA
-  param_specs <- trend_param("A1", bounds = c(-1, 1), label = "var_transition_matrix_lag_1")
-
-  # Add additional lag parameters for p > 1
-  if (p > 1) {
-    for (lag in 2:p) {
-      param_specs <- param_specs + trend_param(paste0("A", lag), bounds = c(-1, 1),
-                                               label = paste0("var_transition_matrix_lag_", lag))
-    }
-  }
-
-  # Add MA coefficient if specified (future: could support multiple MA lags)
-  if (ma) {
-    param_specs <- param_specs + trend_param("theta1", bounds = c(-1, 1), label = "moving_average_coefficient_lag_1")
-  }
-
-  # Define trend characteristics and Gaussian innovation settings
-  characteristics <- list(
-    supports_predictors = TRUE,
-    supports_correlation = TRUE,
-    supports_factors = TRUE,
-    supports_hierarchical = TRUE,  # VAR supports gr/subgr
-    innovation_type = "gaussian_var",  # VAR uses special covariance estimation
-    max_order = p,
-    requires_sorting = TRUE,
-    # Gaussian innovation settings (automatic parameters)
-    uses_sigma_trend = FALSE,        # VAR estimates full Sigma matrix instead
-    uses_correlation = TRUE,         # VAR always estimates correlation structure
-    monitor_innovations = ma         # Monitor LV_innovations only for MA models
+  
+  # Use helper function for clean object creation
+  # Complex logic moved to validation and Stan assembly layers
+  trend_obj <- create_mvgam_trend(
+    "VAR",  # Base trend type used for ALL dispatch
+    .time = substitute(time),
+    .series = substitute(series),
+    .gr = substitute(gr),
+    .subgr = substitute(subgr),
+    # Store parameters as-is (processing happens in validation/Stan assembly)
+    p = p,
+    ma = ma,
+    cor = TRUE,  # VAR models always use correlation for optimal performance
+    n_lv = n_lv
   )
-
-  # Process trend-specific parameters only
-  processed_params <- process_trend_params(param_specs, envir = environment())
-
-  # Create complete parameter info for storage
-  param_info <- list(
-    parameters = param_specs,  # Trend-specific parameters only
-    characteristics = characteristics
-  )
-
-  # Create trend object with dispatcher integration
-  out <- structure(
-    list(
-      trend = paste0('VAR', p),
-      p = p,
-      ma = ma,
-      cor = cor,
-      time = time,
-      series = series,
-      gr = gr,
-      subgr = subgr,
-      n_lv = n_lv,
-      label = build_trend_label('VAR', cor = cor, ma = ma, gr = gr, n_lv = n_lv, p = p),
-      tpars = processed_params$tpars,  # Only trend-specific parameters
-      forecast_fun = 'forecast_var_rcpp',
-      stancode_fun = 'var_stan_code',
-      standata_fun = 'var_stan_data',
-      bounds = processed_params$bounds,
-      param_info = param_info,  # Complete specification (trend params + characteristics)
-      shared_innovations = FALSE  # VAR handles its own covariance structure for stationarity
-    ),
-    class = 'mvgam_trend'
-  )
-
-  # Validate using dispatcher system
-  validate_trend(out)
-
-  return(out)
+  
+  return(trend_obj)
 }
 
 #' Specify dynamic Gaussian process trends in \pkg{mvgam} models
@@ -2015,97 +2607,37 @@ GP = function(time = NA, series = NA, ...) {
 #' }
 #'
 #' @export
-PW = function(
-  time = NA,
-  series = NA,
-  cap = NA,
-  n_changepoints = 10,
-  changepoint_range = 0.8,
-  changepoint_scale = 0.05,
-  growth = 'linear',
-  n_lv = NULL
-) {
-  # Factor model validation - PW trends don't support factor models
-  if (!is.null(n_lv)) {
-    stop(insight::format_error(
-      "Factor models ({.field n_lv}) not supported for PW trends.",
-      "Piecewise trends require series-specific changepoint modeling.",
-      "Remove {.field n_lv} parameter or use factor-compatible trends: AR, RW, VAR, ZMVN"
-    ), call. = FALSE)
-  }
-  # Process time argument
-  time <- deparse0(substitute(time))
-  time_was_default <- (time == "NA")
-  if (time == "NA") time <- "time"  # Default to 'time' when NA
-
-  # Process series argument
-  series <- deparse0(substitute(series))
-  series_was_default <- (series == "NA")
-  if (series == "NA") series <- "series"  # Default to 'series' when NA
-
-  # Process cap argument
-  cap <- deparse0(substitute(cap))
-  cap_was_default <- (cap == "NA")
-  if (cap == "NA") cap <- "cap"  # Default to 'cap' when NA
-
-  # Issue warnings for default usage using modular functions
-  if (time_was_default) warn_default_time_variable()
-  if (series_was_default) warn_default_series_variable()
-  if (cap_was_default && growth == 'logistic') {
-    rlang::warn(
-      paste0(
-        "Using default variable name 'cap' for logistic growth carrying capacity.\n",
-        "Specify explicitly with: PW(cap = your_cap_variable, growth = 'logistic')"
-      ),
-      class = "mvgam_default_variable_warning",
-      .frequency = "once",
-      .frequency_id = "pw_cap_default"
-    )
-  }
-
+PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10, 
+              changepoint_range = 0.8, changepoint_scale = 0.05, 
+              growth = 'linear', n_lv = NULL) {
   # Validate arguments
   growth <- match.arg(growth, choices = c('linear', 'logistic'))
-  validate_proportional(changepoint_range)
-  validate_pos_integer(n_changepoints)
-  validate_pos_real(changepoint_scale)
-
+  checkmate::assert_number(changepoint_range, lower = 0, upper = 1)
+  checkmate::assert_int(n_changepoints, lower = 1)
+  checkmate::assert_number(changepoint_scale, lower = 0)
+  
   # Check for required cap variable in logistic models
-  if (growth == 'logistic' && cap == "NA") {
+  cap_expr <- substitute(cap)
+  if (growth == 'logistic' && identical(cap_expr, quote(NA))) {
     stop(insight::format_error(
       "Logistic growth models require a {.field cap} variable.",
       "Either provide {.field cap} argument or ensure 'cap' column exists in data.",
       "Example: PW(cap = carrying_capacity, growth = 'logistic')"
-    ))
+    ), call. = FALSE)
   }
-
-  trend_value <- 'PWlinear'
-  if (growth == 'logistic') {
-    trend_value = 'PWlogistic'
-  }
-  out <- structure(
-    list(
-      trend = trend_value,
-      n_changepoints = n_changepoints,
-      changepoint_range = changepoint_range,
-      changepoint_scale = changepoint_scale,
-      growth = growth,
-      time = time,
-      series = series,
-      cap = cap,
-      ma = FALSE,
-      cor = FALSE,
-      unit = 'time',
-      gr = 'NA',
-      subgr = 'series',
-      label = match.call(),
-      shared_innovations = FALSE  # PW uses changepoint_scale instead of Gaussian innovations
-    ),
-    class = 'mvgam_trend',
-    param_info = list(
-      param_names = c('trend', 'delta_trend', 'k_trend', 'm_trend'),
-      labels = c('trend_estimates', 'rate_changes', 'growth_rate', 'offset_parameter')
-    )
+  
+  trend_obj <- create_mvgam_trend(
+    "PW",  # Base trend type used for ALL dispatch
+    .time = substitute(time),
+    .series = substitute(series),
+    .cap = cap_expr,
+    n_changepoints = n_changepoints,
+    changepoint_range = changepoint_range,
+    changepoint_scale = changepoint_scale,
+    growth = growth,
+    n_lv = n_lv
   )
+  return(trend_obj)
 }
 
 #' Specify correlated residual processes in \pkg{mvgam}
@@ -2265,4 +2797,319 @@ ZMVN = function(unit = time, gr = NA, subgr = series) {
       labels = c('trend_estimates', 'precision_parameter', 'standard_deviation', 'correlation_parameter', 'covariance_matrix', 'process_errors')
     )
   )
+}
+
+# =============================================================================
+# SECTION 6: TREND CONSTRUCTOR HELPER FUNCTIONS
+# =============================================================================
+# WHY: These helper functions simplify trend constructor development and
+# ensure consistency across all trend types. They provide universal defaults,
+# automatic validation rule assignment, and standardized creation patterns.
+
+#' Get Universal mvgam Trend Defaults
+#'
+#' @description
+#' Returns universal default values that apply to all trend types.
+#' Trend-specific defaults should be handled within individual constructors.
+#'
+#' @return Named list of universal default values
+#' @noRd
+get_mvgam_trend_defaults <- function() {
+  list(
+    # Universal variable defaults
+    time = "time",
+    series = "series",
+    gr = "NA",
+    subgr = "NA",
+
+    # Universal behavior defaults
+    ma = FALSE,
+    cor = FALSE,
+    n_lv = NULL,
+
+    # Universal metadata defaults
+    shared_innovations = TRUE,
+
+    # Placeholder validation rules (to be auto-assigned by trend type)
+    validation_rules = character(0),
+
+    # Placeholder metadata (to be auto-generated)
+    monitor_params = character(0),
+    forecast_metadata = list(),
+    summary_labels = character(0)
+  )
+}
+
+#' Apply mvgam Trend Defaults
+#'
+#' @description
+#' Fills in missing fields in a trend object with appropriate defaults.
+#' Applies universal defaults first, then auto-generates metadata fields.
+#'
+#' @param trend_obj Partial trend object (list)
+#' @return Complete trend object with all fields filled
+#' @noRd
+apply_mvgam_trend_defaults <- function(trend_obj) {
+  checkmate::assert_list(trend_obj)
+  checkmate::assert_character(trend_obj$trend, len = 1, min.chars = 1,
+                             null.ok = FALSE, .var.name = "trend_obj$trend")
+
+  # Get universal defaults
+  defaults <- get_mvgam_trend_defaults()
+
+  # Apply universal defaults for missing fields
+  for (field in names(defaults)) {
+    if (!field %in% names(trend_obj)) {
+      trend_obj[[field]] <- defaults[[field]]
+    }
+  }
+
+  # Auto-assign validation rules based on trend type
+  if (length(trend_obj$validation_rules) == 0) {
+    trend_obj$validation_rules <- get_default_validation_rules(trend_obj$trend)
+  }
+
+  # Auto-generate metadata if missing
+  if (length(trend_obj$monitor_params) == 0) {
+    trend_obj$monitor_params <- generate_monitor_params(trend_obj)
+  }
+
+  if (length(trend_obj$forecast_metadata) == 0) {
+    trend_obj$forecast_metadata <- generate_forecast_metadata(trend_obj)
+  }
+
+  if (length(trend_obj$summary_labels) == 0) {
+    trend_obj$summary_labels <- generate_summary_labels(trend_obj)
+  }
+
+  return(trend_obj)
+}
+
+#' Get Default Validation Rules by Trend Type
+#'
+#' @description
+#' Automatically assigns appropriate validation rules based on trend type.
+#' This makes adding new trends easier - just specify the trend type and
+#' get sensible rule defaults.
+#'
+#' @param trend_type Character string, the trend type
+#' @return Character vector of validation rule strings
+#' @noRd
+get_default_validation_rules <- function(trend_type) {
+  checkmate::assert_string(trend_type, min.chars = 1)
+
+  # Define rule sets for easy extension
+  stationary_trend_rules <- c(
+    rule_requires_regular_intervals,
+    rule_supports_factors,
+    rule_supports_hierarchical
+  )
+
+  irregular_trend_rules <- c(
+    rule_allows_irregular_intervals,
+    rule_incompatible_with_factors,
+    rule_incompatible_with_hierarchical
+  )
+
+  changepoint_trend_rules <- c(
+    rule_requires_regular_intervals,
+    rule_incompatible_with_factors,
+    rule_supports_hierarchical
+  )
+
+  multivariate_trend_rules <- c(
+    rule_requires_regular_intervals,
+    rule_supports_factors,
+    rule_supports_hierarchical,
+    rule_requires_minimum_series_count
+  )
+
+  # Assign rules based on trend type
+  rules <- switch(trend_type,
+    "RW" = stationary_trend_rules,
+    "AR" = stationary_trend_rules,
+    "VAR" = multivariate_trend_rules,
+    "CAR" = irregular_trend_rules,
+    "PW" = changepoint_trend_rules,
+    "ZMVN" = multivariate_trend_rules,
+
+    # Default for unknown trend types (extensible)
+    stationary_trend_rules
+  )
+
+  return(rules)
+}
+
+#' Create mvgam Trend Object
+#'
+#' @description
+#' Helper function to create consistent mvgam_trend objects with automatic
+#' defaults and validation. Used by all trend constructors.
+#'
+#' @param trend_type Base trend type (e.g., "AR", "RW", "VAR")
+#' @param ... Additional trend-specific parameters
+#' @param .time Time variable (quoted or unquoted)
+#' @param .series Series variable (quoted or unquoted)
+#' @param .gr Grouping variable (quoted or unquoted)
+#' @param .subgr Subgrouping variable (quoted or unquoted)
+#' @param .validation_rules Optional override for validation rules
+#' @return mvgam_trend object
+#' @export
+create_mvgam_trend <- function(trend_type, ...,
+                               .time = substitute(time),
+                               .series = substitute(series),
+                               .gr = substitute(gr),
+                               .subgr = substitute(subgr),
+                               .cap = substitute(cap),
+                               .validation_rules = NULL) {
+  checkmate::assert_string(trend_type, min.chars = 1)
+
+  # Process all variables consistently
+  time_var <- deparse0(.time)
+  series_var <- deparse0(.series)
+  gr_var <- deparse0(.gr)
+  subgr_var <- deparse0(.subgr)
+  cap_var <- deparse0(.cap)
+
+  # Handle default variable names
+  time_was_default <- (time_var == "NA")
+  if (time_var == "NA") time_var <- "time"
+
+  series_was_default <- (series_var == "NA")
+  if (series_var == "NA") series_var <- "series"
+  
+  # Handle grouping defaults
+  if (gr_var == "NA") gr_var <- "NA"
+  if (subgr_var == "NA") subgr_var <- "NA"
+  
+  # Handle cap default
+  if (cap_var == "NA") cap_var <- "cap"
+
+  # Issue warnings for defaults (following existing pattern)
+  if (time_was_default) warn_default_time_variable()
+  if (series_was_default) warn_default_series_variable()
+
+  # Create base trend object
+  trend_obj <- list(
+    trend = trend_type,
+    time = time_var,
+    series = series_var,
+    gr = gr_var,
+    subgr = subgr_var,
+    cap = cap_var,
+    ...
+  )
+
+  # Override validation rules if provided
+  if (!is.null(.validation_rules)) {
+    trend_obj$validation_rules <- .validation_rules
+  }
+
+  # Apply defaults and auto-generate metadata
+  trend_obj <- apply_mvgam_trend_defaults(trend_obj)
+
+  # Set class
+  class(trend_obj) <- "mvgam_trend"
+
+  # Validate the complete object
+  validate_mvgam_trend(trend_obj)
+
+  # Add consistent dispatch metadata
+  trend_obj <- add_consistent_dispatch_metadata(trend_obj)
+
+  return(trend_obj)
+}
+
+#' Validate Trend Dispatch Consistency
+#'
+#' @description
+#' Ensures all trend-related dispatch functions use consistent naming.
+#' This function checks that Stan generation, forecasting, and other
+#' dispatch functions follow the convention: trend_type + function_suffix.
+#'
+#' @param trend_obj mvgam_trend object
+#' @return Logical TRUE if consistent, stops with error if not
+#' @noRd
+validate_trend_dispatch_consistency <- function(trend_obj) {
+  checkmate::assert_class(trend_obj, "mvgam_trend")
+
+  trend_type <- trend_obj$trend
+  if (is.null(trend_type)) {
+    stop("Trend object must have 'trend' field")
+  }
+
+  # Define expected function naming patterns
+  expected_patterns <- list(
+    stanvar_generator = paste0("generate_", tolower(trend_type), "_trend_stanvars"),
+    forecast_function = paste0("forecast_", tolower(trend_type), "_rcpp"),
+    monitor_generator = paste0("generate_", tolower(trend_type), "_monitor_params")
+  )
+
+  # Check forecast metadata if present
+  if (!is.null(trend_obj$forecast_metadata)) {
+    expected_forecast <- expected_patterns$forecast_function
+    actual_forecast <- trend_obj$forecast_metadata$function_name
+
+    if (!is.null(actual_forecast) && actual_forecast != expected_forecast) {
+      stop(insight::format_error(
+        "Inconsistent forecast function naming",
+        "Expected: {.field {expected_forecast}}",
+        "Got: {.field {actual_forecast}}",
+        "All dispatch functions must follow pattern: trend_type + function_suffix"
+      ))
+    }
+  }
+
+  invisible(TRUE)
+}
+
+#' Get Trend Dispatch Function Name
+#'
+#' @description
+#' Generates consistent function names for trend dispatch based on convention.
+#' Ensures absolute consistency throughout the system.
+#'
+#' @param trend_type Base trend type (e.g., "AR", "RW", "VAR")
+#' @param function_type Type of function ("stanvar", "forecast", "monitor")
+#' @return String with properly formatted function name
+#' @noRd
+get_trend_dispatch_function <- function(trend_type, function_type) {
+  checkmate::assert_string(trend_type)
+  checkmate::assert_choice(function_type, c("stanvar", "forecast", "monitor"))
+
+  trend_lower <- tolower(trend_type)
+
+  switch(function_type,
+    stanvar = paste0("generate_", trend_lower, "_trend_stanvars"),
+    forecast = paste0("forecast_", trend_lower, "_rcpp"),
+    monitor = paste0("generate_", trend_lower, "_monitor_params")
+  )
+}
+
+#' Enhance Trend Object with Consistent Dispatch
+#'
+#' @description
+#' Automatically adds consistent dispatch function names to trend object.
+#' Ensures all dispatch follows the same convention.
+#'
+#' @param trend_obj mvgam_trend object
+#' @return Enhanced trend object with consistent dispatch metadata
+#' @noRd
+add_consistent_dispatch_metadata <- function(trend_obj) {
+  trend_type <- trend_obj$trend
+
+  # Add forecast metadata with consistent naming
+  if (is.null(trend_obj$forecast_metadata)) {
+    trend_obj$forecast_metadata <- list(
+      function_name = get_trend_dispatch_function(trend_type, "forecast")
+    )
+  }
+
+  # Add monitor params generator name
+  trend_obj$monitor_generator <- get_trend_dispatch_function(trend_type, "monitor")
+
+  # Add stanvar generator name
+  trend_obj$stanvar_generator <- get_trend_dispatch_function(trend_type, "stanvar")
+
+  return(trend_obj)
 }

@@ -1662,54 +1662,26 @@ generate_trend_injection_stanvars <- function(trend_specs, data_info, response_s
   checkmate::assert_list(data_info)
   checkmate::assert_string(response_suffix)
 
-  # Validate factor model compatibility if n_lv is specified
-  validate_factor_compatibility(trend_specs)
-
-  # Validate n_lv parameter constraints
-  if (!is.null(trend_specs$n_lv)) {
-    n_series <- data_info$n_series %||% 1
-    if (trend_specs$n_lv > n_series) {
-      stop(insight::format_error(
-        "{.field n_lv} cannot exceed {.field n_series}.",
-        paste0("Got n_lv = ", trend_specs$n_lv, " and n_series = ", n_series, "."),
-        "Use fewer or equal latent variables than observed series."
-      ))
-    }
-    # n_lv < n_series → Factor model (estimated matrix Z)
-    # n_lv = n_series → Non-factor model (diagonal matrix Z)
-    # Both cases are valid after factor compatibility check above
-  }
-
-  # Get trend type - handle both trend_type and trend field names for compatibility
-  trend_type <- trend_specs$trend_type %||% trend_specs$trend
+  # Get trend type directly from trend object (no parsing needed!)
+  trend_type <- trend_specs$trend
   if (is.null(trend_type)) {
     stop(insight::format_error(
-      "trend_specs must contain {.field trend_type} or {.field trend} field"
+      "trend_specs must contain {.field trend} field"
     ))
   }
 
-  # Normalize trend types to registry base types
-  # AR1, AR(1,12), etc. → AR
-  # VAR2, VAR3, etc. → VAR  
-  # PWlinear, PWlogistic → PW
-  if (grepl("^AR\\d*$|^AR\\(", trend_type)) {
-    trend_type <- "AR"
-  } else if (grepl("^VAR\\d+$", trend_type)) {
-    trend_type <- "VAR"
-  } else if (trend_type %in% c("PWlinear", "PWlogistic")) {
-    # Handle PW variations - PWlinear and PWlogistic both use PW generator
-    # Preserve original type information for PW generator
-    trend_specs$type <- if (trend_type == "PWlogistic") "logistic" else "linear"
-    trend_type <- "PW"
-  }
-
-  # Get trend info from registry
-  trend_info <- get_trend_info(trend_type)
-  if (is.null(trend_info)) {
+  # Use consistent dispatch function naming
+  generator_function_name <- paste0("generate_", tolower(trend_type), "_trend_stanvars")
+  
+  # Check if the generator function exists
+  if (!exists(generator_function_name, mode = "function")) {
     stop(insight::format_error(
-      "Unknown trend type: {.field {trend_type}}"
+      "No Stan generator found for trend type: {.field {trend_type}}",
+      "Expected function: {.field {generator_function_name}}"
     ))
   }
+  
+  generator_function <- get(generator_function_name, mode = "function")
 
   # Extract hierarchical information for shared innovation system
   hierarchical_info <- extract_hierarchical_info(data_info, trend_specs)
@@ -1758,8 +1730,8 @@ generate_trend_injection_stanvars <- function(trend_specs, data_info, response_s
     }
   }
 
-  # Generate trend-specific stanvars using the appropriate generator
-  trend_stanvars <- trend_info$generator(trend_specs, data_info)
+  # Generate trend-specific stanvars using consistent naming convention
+  trend_stanvars <- generator_function(trend_specs, data_info)
   
   # Apply response suffix post-processing for multivariate models
   if (response_suffix != "") {

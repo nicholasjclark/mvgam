@@ -15,6 +15,7 @@
       "Bash(ls:*)",
       "Bash(tree:*)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "acceptEdits"
   }
 }
