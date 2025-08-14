@@ -116,7 +116,7 @@ Brief description of changes (50 chars max)
 - Do not mention Claude as a co-author or include links to Claude Code in messages
 
 ### Pre-commit Workflow
-1. Use the `code-reviewer` agent to review any proposed changes (NON-NEGOTIABLE)
+1. You MUST use the `code-reviewer` agent to review any proposed changes (NON-NEGOTIABLE)
 2. Check git status to understand current changes
 3. Stage appropriate files with clear understanding of what's being committed
 4. Write commit messages explaining changes
