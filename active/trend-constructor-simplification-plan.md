@@ -197,9 +197,9 @@ RW <- function(time = NA, series = NA, ma = FALSE, n_lv = NULL) {
 When working with task lists, the AI must:
 
 1. Read `active/code_improvements.md` if it exists. If it does not exist, please create it and leave blank for now
-2. Regularly update the task list file after finishing any significant work.
-3. You MUST use the `code-reviewer` agent to review any proposed changes to R code (NON-NEGOTIABLE)
-4. You MUST ensure any medium and low priority items identified by the core reviewer are represented in `active/code_improvements.md`
+2. You MUST use the `code-reviewer` agent to review any proposed changes to R code (NON-NEGOTIABLE)
+3. You MUST ensure any medium and low priority items identified by the core reviewer are represented in `active/code_improvements.md`
+4. Regularly update the task list file after finishing any significant work.
 5. Follow the completion protocol:
    - Mark each finished **sub‑task** `[x]`.
    - Mark the **parent task** `[x]` once **all** its subtasks are `[x]`.
