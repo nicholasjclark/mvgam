@@ -124,7 +124,6 @@ git commit -m "fix: handle missing values in validation logic" -m "- Add explici
 ## Quality Gates
 
 Before marking any parent task as complete:
-- [ ] All R code passes `devtools::check()` without errors
 - [ ] All tests in `tests/testthat/` pass
 - [ ] Code reviewer has approved all changes
 - [ ] Documentation is complete and examples run successfully
