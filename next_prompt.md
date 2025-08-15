@@ -4,5 +4,5 @@ You are an AI assistant helping to refactor an existing R package called mvgam. 
 
 ## PRIORITY before planning
 - Use the architecture-analyzer agent to provide a systematic overview of the following R files: `R/stan_assembly.R`, `R/mvgam_core.R`, `R/brms_integration.R`, `R/trend_system.R`, `R/validations.R`
-- Read `active/architecture-decisions.md`, `active/quick-refernece.md` and `active/trend-constructor-simplifcation-plan.md`
+- Read `active/architecture-decisions.md`, `active/quick-reference.md` and `active/trend-constructor-simplifcation-plan.md`
 - Ask me three questions about how to get started on the next task in the trend-constructor-simplification-plan

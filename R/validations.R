@@ -636,18 +636,6 @@ formula2str_mvgam <- function(formula, space = "trim") {
 #' @return Named character vector of regex patterns
 #' @noRd
 get_trend_validation_patterns <- function() {
-  # Get all registered trend types from the registry
-  if (!exists("trend_registry", envir = asNamespace("mvgam"))) {
-    # Fallback to original patterns if registry not available
-    return(c(
-      "\\bRW\\s*\\(" = "RW()",
-      "\\bAR\\s*\\(" = "AR()",
-      "\\bVAR\\s*\\(" = "VAR()",
-      "\\bGP\\s*\\(" = "GP()",
-      "\\bCAR\\s*\\(" = "CAR()",
-      "\\bZMVN\\s*\\(" = "ZMVN()"
-    ))
-  }
 
   # Access trend registry from mvgam namespace
   trend_registry <- get("trend_registry", envir = asNamespace("mvgam"))
@@ -1198,6 +1186,61 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1) {
   ))
 }
 
+#' Check if object is a mvgam trend
+#'
+#' Tests whether an object is a valid mvgam trend specification.
+#'
+#' @param x Object to test
+#' @return Logical indicating if x is a mvgam trend
+#' @export
+is.mvgam_trend <- function(x) {
+  inherits(x, "mvgam_trend")
+}
+
+#' Validate trend components for conflicts
+#'
+#' Checks for conflicting trend specifications like multiple dynamic factor models
+#' or incompatible correlation structures using brms-inspired validation patterns.
+#'
+#' @param trend_components List of trend components to validate
+#'
+#' @noRd
+validate_trend_components <- function(trend_components) {
+
+  # Check for multiple trend types - only one trend type allowed per formula
+  if (length(trend_components) > 1) {
+    trend_types <- sapply(trend_components, function(x) x$trend_type)
+    stop(insight::format_error(
+      "Multiple trend types detected in single formula.",
+      paste("Found:", paste(trend_types, collapse = ", ")),
+      "Only one trend constructor is allowed per trend_formula.",
+      "Use separate models or combine into a single trend type."
+    ))
+  }
+
+  # Check for multiple dynamic factor models
+  n_lv_models <- sum(sapply(trend_components, function(x) !is.null(x$n_lv) && x$n_lv > 0))
+  if (n_lv_models > 1) {
+    stop(insight::format_error(
+      "Multiple dynamic factor models specified.",
+      "Only one trend component can have {.field n_lv > 0}.",
+      "Consider combining factor structures or removing one factor model."
+    ))
+  }
+
+  # Check for conflicting correlation structures
+  cor_settings <- sapply(trend_components, function(x) x$cor %||% FALSE)
+  if (any(cor_settings) && !all(cor_settings)) {
+    insight::format_warning(
+      "Mixed correlation settings detected.",
+      "Some trend components have correlation enabled while others don't.",
+      "This may lead to unexpected interactions."
+    )
+  }
+
+  invisible(NULL)
+}
+
 #' Extract Time Series Dimensions from Data
 #'
 #' @description
@@ -1286,7 +1329,7 @@ validate_mvgam_trend <- function(trend_obj) {
   checkmate::assert_class(trend_obj, "mvgam_trend")
   checkmate::assert_list(trend_obj, min.len = 1)
   checkmate::assert_string(trend_obj$trend, min.chars = 1)
-  
+
   # Validate required fields exist
   required_fields <- c("trend", "time", "series")
   missing_fields <- setdiff(required_fields, names(trend_obj))
@@ -1295,7 +1338,7 @@ validate_mvgam_trend <- function(trend_obj) {
       "Missing required fields in mvgam_trend object: {.field {missing_fields}}"
     ), call. = FALSE)
   }
-  
+
   invisible(TRUE)
 }
 

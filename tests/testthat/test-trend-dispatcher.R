@@ -5,16 +5,62 @@
 
 test_that("CAR constructor works for continuous-time AR", {
   # CAR should work without n_lv parameter (continuous-time AR)
-  car_trend <- CAR()
+  # Suppress expected default warnings
+  suppressWarnings({
+    car_trend <- CAR()
+  })
   expect_s3_class(car_trend, "mvgam_trend")
   expect_equal(car_trend$trend, "CAR")
   expect_false(car_trend$cor)
   expect_false(car_trend$ma)
-  expect_equal(car_trend$gr, "NA")
-  expect_equal(car_trend$subgr, "series")
+  expect_equal(car_trend$p, 1)  # CAR always has p = 1
+  
+  # CAR doesn't accept p parameter anymore (simplified constructor)
+  # CAR doesn't accept gr, subgr, or n_lv parameters
+  expect_error(CAR(p = 2), "unused argument")
+  expect_error(CAR(n_lv = 2), "unused argument")
+  expect_error(CAR(gr = "group"), "unused argument")
+  expect_error(CAR(subgr = "subgroup"), "unused argument")
+  
+  # CAR accepts time and series parameters
+  car_custom <- CAR(time = "month", series = "species")
+  expect_equal(car_custom$time, "month")
+  expect_equal(car_custom$series, "species")
+})
 
-  # CAR only supports p = 1 (continuous-time AR1)
-  expect_error(CAR(p = 2), "Argument 'p' must be = 1")
+test_that("ZMVN constructor works for zero-mean multivariate normal", {
+  # Basic ZMVN creation
+  # Suppress expected default warnings
+  suppressWarnings({
+    zmvn_trend <- ZMVN()
+  })
+  expect_s3_class(zmvn_trend, "mvgam_trend")
+  expect_equal(zmvn_trend$trend, "ZMVN")
+  expect_true(zmvn_trend$cor)  # ZMVN always has correlation
+  expect_false(zmvn_trend$ma)  # ZMVN doesn't support MA
+  
+  # ZMVN with factor model
+  suppressWarnings({
+    zmvn_factor <- ZMVN(n_lv = 3)
+  })
+  expect_equal(zmvn_factor$n_lv, 3)
+  
+  # ZMVN with hierarchical structure  
+  suppressWarnings({
+    zmvn_hier <- ZMVN(gr = "group", subgr = "subgroup")
+  })
+  expect_equal(zmvn_hier$gr, "group")
+  expect_equal(zmvn_hier$subgr, "subgroup")
+  
+  # ZMVN with custom time and series
+  zmvn_custom <- ZMVN(time = "week", series = "location")
+  expect_equal(zmvn_custom$time, "week")
+  expect_equal(zmvn_custom$series, "location")
+  
+  # Parameter validation
+  expect_error(ZMVN(n_lv = 0), "Assertion on 'n_lv' failed")
+  expect_error(ZMVN(n_lv = -1), "Assertion on 'n_lv' failed")
+  expect_error(ZMVN(n_lv = 1.5), "Assertion on 'n_lv' failed")
 })
 
 test_that("PW constructor rejects factor models correctly", {
@@ -172,8 +218,8 @@ test_that("grouping validation helper works correctly", {
 
   # Test default case
   result1 <- mvgam:::validate_grouping_arguments("NA", "NA")
-  expect_equal(result1$gr, "NA")
-  expect_equal(result1$subgr, "series")
+  expect_null(result1$gr)
+  expect_null(result1$subgr)
 
   # Test valid hierarchical case would work (but we test error cases)
   expect_error(
@@ -564,7 +610,7 @@ test_that("time parameter works correctly in trend constructors", {
   expect_equal(var_default$time, "time")
 
   expect_warning(
-    car_default <- CAR(p = 1),
+    car_default <- CAR(),
     "Using default.*time.*variable"
   )
   expect_equal(car_default$time, "time")
@@ -732,7 +778,7 @@ test_that("series parameter works correctly in trend constructors", {
   expect_equal(var_default$series, "series")
 
   expect_warning(
-    car_default <- CAR(p = 1),
+    car_default <- CAR(),
     "Using default.*series.*variable"
   )
   expect_equal(car_default$series, "series")

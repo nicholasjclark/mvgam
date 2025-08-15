@@ -1453,7 +1453,7 @@ custom_trend <- function(trend, tpars, forecast_fun, stancode_fun,
   ), class = c("mvgam_trend", "custom"))
 
   # Validate the custom trend
-  validate_trend(trend_obj)
+  validate_mvgam_trend(trend_obj)
 
   return(trend_obj)
 }
@@ -2201,7 +2201,7 @@ RW = function(
   )
 
   # Legacy validation (will be replaced by enhanced validation layer)
-  validate_trend(trend_obj)
+  validate_mvgam_trend(trend_obj)
 
   return(trend_obj)
 }
@@ -2240,82 +2240,19 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
 
 #' @rdname trend_constructors
 #' @export
-CAR = function(time = NA, series = NA, p = 1, n_lv = NULL) {
-  # Factor model validation - CAR trends don't support factor models
-  if (!is.null(n_lv)) {
-    stop(insight::format_error(
-      "Factor models ({.field n_lv}) not supported for CAR trends.",
-      "Continuous-time AR requires series-specific irregular time intervals.",
-      "Remove {.field n_lv} parameter or use factor-compatible trends: AR, RW, VAR, ZMVN"
-    ), call. = FALSE)
-  }
-
-  # Process time argument
-  time <- deparse0(substitute(time))
-  time_was_default <- (time == "NA")
-  if (time == "NA") time <- "time"  # Default to 'time' when NA
-
-  # Process series argument
-  series <- deparse0(substitute(series))
-  series_was_default <- (series == "NA")
-  if (series == "NA") series <- "series"  # Default to 'series' when NA
-
-  # Issue warnings for default usage using modular functions
-  if (time_was_default) warn_default_time_variable()
-  if (series_was_default) warn_default_series_variable()
-
-  validate_pos_integer(p)
-  if (p > 1) {
-    stop("Argument 'p' must be = 1", call. = FALSE)
-  }
-
-  # Define ONLY trend-specific parameters (Gaussian innovation infrastructure is automatic)
-  param_specs <- trend_param("ar1", bounds = c(-1, 1), label = "autoregressive_coefficient")
-
-  # Define trend characteristics and Gaussian innovation settings
-  characteristics <- list(
-    supports_predictors = TRUE,
-    supports_correlation = FALSE,  # CAR doesn't support correlation
-    supports_factors = FALSE,      # CAR doesn't support factor models
-    supports_hierarchical = FALSE, # CAR doesn't support gr/subgr
-    innovation_type = "gaussian_shared",  # Uses shared Gaussian innovation system
-    max_order = 1,
-    requires_sorting = TRUE,
-    # Gaussian innovation settings (automatic parameters)
-    uses_sigma_trend = TRUE,       # Always has sigma_trend (innovation SD)
-    uses_correlation = FALSE,      # Never uses correlation for CAR
-    monitor_innovations = FALSE    # CAR never monitors innovations (no MA support)
-  )
-
-  # Process trend-specific parameters only
-  processed_params <- process_trend_params(param_specs, envir = environment())
-
-  # Create complete parameter info for storage
-  param_info <- list(
-    parameters = param_specs,  # Trend-specific parameters only
-    characteristics = characteristics
-  )
-
-  out <- structure(
-    list(
-      trend = 'CAR',
-      ma = FALSE,
-      cor = FALSE,
-      time = time,
-      series = series,
-      unit = 'time',
-      gr = 'NA',
-      subgr = 'series',
-      label = build_trend_label('CAR'),
-      tpars = processed_params$tpars,  # Only trend-specific parameters
-      forecast_fun = 'forecast_car_rcpp',
-      stancode_fun = 'car_stan_code',
-      standata_fun = 'car_stan_data',
-      bounds = processed_params$bounds,
-      param_info = param_info,  # Complete specification (trend params + characteristics)
-      shared_innovations = FALSE  # CAR handles its own innovations due to irregular time sampling
-    ),
-    class = 'mvgam_trend'
+CAR = function(time = NA, series = NA) {
+  # CAR only supports first-order continuous autoregression (p=1)
+  # Use helper function for clean object creation
+  # All validation logic moved to validation layer (handles irregular time intervals, etc.)
+  create_mvgam_trend(
+    "CAR",  # Base trend type used for ALL dispatch
+    .time = substitute(time),
+    .series = substitute(series),
+    # CAR doesn't support gr, subgr, or n_lv - omitting them from function signature
+    # Store parameters as-is
+    p = 1,        # CAR is always first-order
+    ma = FALSE,   # CAR doesn't support MA
+    cor = FALSE   # CAR doesn't support correlation
   )
 }
 
@@ -2616,6 +2553,15 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
   checkmate::assert_int(n_changepoints, lower = 1)
   checkmate::assert_number(changepoint_scale, lower = 0)
   
+  # PW doesn't support factor models - validate n_lv
+  if (!is.null(n_lv)) {
+    stop(insight::format_error(
+      "Factor models ({.field n_lv}) not supported for PW trends.",
+      "Piecewise trends require series-specific changepoint modeling.",
+      "Remove {.field n_lv} parameter or use factor-compatible trends: AR, RW, VAR, ZMVN"
+    ), call. = FALSE)
+  }
+  
   # Check for required cap variable in logistic models
   cap_expr <- substitute(cap)
   if (growth == 'logistic' && identical(cap_expr, quote(NA))) {
@@ -2767,35 +2713,24 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #' }
 #'
 #' @export
-ZMVN = function(unit = time, gr = NA, subgr = series) {
-  # Validate the supplied groupings and correlation argument
-  unit <- deparse0(substitute(unit))
-  gr <- deparse0(substitute(gr))
-  subgr <- deparse0(substitute(subgr))
-  if (subgr == 'NA') {
-    stop('argument "subgr" cannot be NA', call. = FALSE)
+ZMVN = function(time = NA, series = NA, gr = NA, subgr = NA, n_lv = NULL) {
+  # Basic parameter validation for n_lv if provided
+  if (!is.null(n_lv)) {
+    checkmate::assert_int(n_lv, lower = 1, null.ok = TRUE)
   }
-
-  if (unit == 'NA') {
-    stop('argument "unit" cannot be NA', call. = FALSE)
-  }
-
-  out <- structure(
-    list(
-      trend = 'ZMVN',
-      ma = FALSE,
-      cor = TRUE,
-      unit = unit,
-      gr = gr,
-      subgr = subgr,
-      label = match.call(),
-      shared_innovations = TRUE  # ZMVN uses shared Gaussian innovation system
-    ),
-    class = 'mvgam_trend',
-    param_info = list(
-      param_names = c('trend', 'tau', 'sigma', 'theta', 'Sigma', 'error'),
-      labels = c('trend_estimates', 'precision_parameter', 'standard_deviation', 'correlation_parameter', 'covariance_matrix', 'process_errors')
-    )
+  
+  # Use helper function for clean object creation
+  # All validation logic moved to validation layer
+  create_mvgam_trend(
+    "ZMVN",  # Base trend type used for ALL dispatch
+    .time = substitute(time),
+    .series = substitute(series),
+    .gr = substitute(gr),
+    .subgr = substitute(subgr),
+    # Store parameters as-is
+    n_lv = n_lv,
+    ma = FALSE,   # ZMVN doesn't support MA
+    cor = TRUE    # ZMVN always has correlation structure
   )
 }
 
@@ -2964,12 +2899,23 @@ create_mvgam_trend <- function(trend_type, ...,
                                .validation_rules = NULL) {
   checkmate::assert_string(trend_type, min.chars = 1)
 
+  # Helper to process substituted arguments - handles both quoted and unquoted
+  process_arg <- function(x) {
+    if (is.character(x)) return(x)
+    deparsed <- deparse0(x)
+    # Remove surrounding quotes if present (from quoted strings)
+    if (grepl('^".*"$', deparsed)) {
+      return(substr(deparsed, 2, nchar(deparsed) - 1))
+    }
+    deparsed
+  }
+  
   # Process all variables consistently
-  time_var <- deparse0(.time)
-  series_var <- deparse0(.series)
-  gr_var <- deparse0(.gr)
-  subgr_var <- deparse0(.subgr)
-  cap_var <- deparse0(.cap)
+  time_var <- process_arg(.time)
+  series_var <- process_arg(.series)
+  gr_var <- process_arg(.gr)
+  subgr_var <- process_arg(.subgr)
+  cap_var <- process_arg(.cap)
 
   # Handle default variable names
   time_was_default <- (time_var == "NA")
