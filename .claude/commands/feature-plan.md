@@ -6,7 +6,7 @@ To guide an AI assistant in creating a detailed Task Requirements Document (TRD)
 ## Process
 1. **Receive Initial Prompt:** The user describes a task that may involve multiple functions across the R package workflow.
 2. **Ask Clarifying Questions:** Gather details about scope, workflow, and technical requirements. Provide lettered/numbered options for easy selection.
-3. **Generate TRD:** Create a comprehensive requirements document using the structure below.
+3. **Generate TRD:** Think hard to create a comprehensive requirements document using the structure below.
 4. **Save TRD:** Save as `trd-[task-name].md` in `/tasks` directory.
 
 ## Task-Focused Clarifying Questions
