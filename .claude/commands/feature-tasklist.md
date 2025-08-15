@@ -19,7 +19,7 @@ To guide an AI assistant in creating a detailed, step-by-step task list in Markd
    - Documentation standards (roxygen2 style)
    - Testing patterns in `tests/testthat/`
    - Files in the `/active` directory for relevant context
-4. **Phase 1: Generate Parent Tasks:** Based on TRD analysis and current state assessment, create high-level tasks (typically 4-6) required to implement the feature. Present these to the user without sub-tasks. Inform the user: "I have generated the high-level tasks based on the TRD. Ready to generate the sub-tasks? Respond with 'Go' to proceed."
+4. **Phase 1: Generate Parent Tasks:** Based on TRD analysis and current state assessment, think hard to create high-level tasks (typically 4-6) required to implement the feature. Present these to the user without sub-tasks. Inform the user: "I have generated the high-level tasks based on the TRD. Ready to generate the sub-tasks? Respond with 'Go' to proceed."
 5. **Wait for Confirmation:** Pause and wait for the user to respond with "Go"
 6. **Phase 2: Generate Sub-Tasks:** Break down each parent task into 15-minute sub-tasks that:
    - Follow logical implementation order
