@@ -15,7 +15,7 @@ Guidelines for managing task lists in markdown files to track progress on comple
 When **all** subtasks under a parent task are `[x]`:
 
 1. **Test & Validate:**
-   - Run `devtools::test()` - all tests must pass
+   - Run `devtools::load_all(); devtools::test()` - all tests must pass
 
 2. **Stage & Clean:**
    - Stage changes: `git add .`
@@ -99,7 +99,7 @@ When **ALL** tasks are `[x]`:
 
 ### Quality Gates
 Before marking any parent task complete:
-- [ ] All tests pass (`devtools::test()`)
+- [ ] All tests pass (`devtools::load_all(); devtools::test()`)
 - [ ] Code reviewer approval received
 - [ ] Documentation complete with working examples
 - [ ] No temporary or debug code remains
