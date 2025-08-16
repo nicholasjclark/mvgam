@@ -8,6 +8,7 @@ Guidelines for managing task lists in markdown files to track progress on comple
 - **MANDATORY STOP:** After completing each sub-task, you **MUST** stop and ask user permission before proceeding
 - **One sub-task at a time:** Do **NOT** start the next sub‑task until you ask the user for permission and they say "yes" or "y"
 - **15-minute rule:** Each sub-task must be completable within 15 minutes
+- **Code review:** ALWAYS use the code-reviewer agent to verify any proposed R code changes
 - **Mark completed:** Change `[ ]` to `[x]` immediately upon sub-task completion
 - **Always pause:** Never proceed to the next sub-task without explicit user approval
 
@@ -43,7 +44,7 @@ When **ALL** tasks are `[x]`:
 3. **Final Code Review:**
    - Submit complete implementation to `code-reviewer` agent (check the actual file contents first using Read tool before sending to code-reviewer)
    - Address high-priority feedback
-   - Update `active/code_improvements.md` with medium/low priority items
+   - Update `active/code_improvements.md` with medium/low priority items to ensure future agents can learn from any failures
 
 4. **Final Commit & Tag:**
    ```bash
