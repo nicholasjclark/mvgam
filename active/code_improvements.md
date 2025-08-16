@@ -25,6 +25,11 @@ Track medium and low priority improvements identified during code review that sh
 ## Low Priority Items  
 *Style improvements and minor optimizations*
 
+### Prior System Enhancements (2025-08-16)
+1. **Consider caching default priors**: Cache commonly used default prior specifications to avoid repeated computation for same trend types.
+2. **Add internal bounds validation helper**: Create reusable function for validating prior parameter bounds across all prior specification functions.
+3. **Improve variable naming**: Use more descriptive names in internal functions. Consider renaming generic variables like 'spec' to be more specific.
+
 ### Trend Constructor Enhancements (2025-08-15)
 1. **Extract hardcoded values**: Consider extracting hardcoded `ma = FALSE`, `cor = FALSE/TRUE` to named constants if these patterns repeat across constructors.
 2. **Inline documentation**: Add comments explaining why certain parameters are hardcoded (e.g., why CAR has `cor = FALSE`).
@@ -37,6 +42,12 @@ Track medium and low priority improvements identified during code review that sh
 1. **Line length compliance**: Multiple lines in registry functions exceed 80-character limit per project standards.
 2. **Documentation enhancement**: Registry functions need complete roxygen2 documentation with @param, @return, and @examples.
 3. **Performance optimization**: Consider caching registry results to avoid repeated file system scans during auto-discovery.
+
+### Prior System Improvements (2025-08-16)
+1. **Add conflict validation in combine_obs_trend_priors()**: Check for duplicate class/coef combinations when combining priors. Warn or error if conflicts detected.
+2. **Add bounds checking for prior parameters**: Validate distribution parameters (e.g., sigma > 0) when implementing set_prior().
+3. **Expand roxygen2 documentation**: Add @examples sections to user-facing functions when implemented. Provide more detailed @param descriptions with types and constraints.
+4. **Create comprehensive unit tests**: Test all helper functions with valid/invalid inputs, trend-specific prior generators, and prior combination logic.
 
 ## Completed Improvements
 *Archive of addressed items for reference*

@@ -550,6 +550,30 @@ extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimens
 3. **Maintainability**: Clear separation between validation logic and trend generation
 4. **Robustness**: Eliminates missing `n_time`/`n_obs` errors in trend generators
 
+### 14. Prior Specification Using Native brms Classes
+
+**Critical Design Decision**: Use `brmsprior` class throughout rather than creating custom mvgamprior class
+
+**Rationale**:
+1. **Direct Compatibility**: Seamless integration with all brms prior functions (`set_prior()`, `prior()`, `prior_summary()`)
+2. **Zero Conversion Overhead**: No translation layer between mvgam and brms prior systems
+3. **Automatic Updates**: Benefits from brms bug fixes and enhancements
+4. **User Familiarity**: Leverages existing brms knowledge and documentation
+5. **Ecosystem Integration**: Works with all packages that extend brms
+
+**Implementation Strategy**:
+- Use existing `brmsprior` data frame structure with standard columns
+- Distinguish trend vs observation parameters via `class` column naming (`"ar1_trend"`, `"sigma_trend"`)
+- Apply `_trend` suffix convention consistently for all trend parameters
+- Optionally use attributes on brmsprior objects for mvgam-specific metadata if needed
+- Leverage brms `get_prior()` for observation model priors directly
+
+**Key Benefits**:
+- No custom S3 methods to maintain
+- Direct pass-through to brms for observation model prior handling
+- Simplified codebase with fewer conversion points
+- Better long-term maintainability
+
 ## Enhanced Architecture (2025-08-16)
 
 ### 12. Automated Registry System with Convention-Based Dispatch

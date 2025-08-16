@@ -40,22 +40,22 @@
 ## Tasks
 
 - [ ] 1.0 Build Foundation Components and Infrastructure
-  - [ ] 1.1 Create mvgamprior class with S3 methods in `R/priors.R` - define data.frame subclass with columns: prior, class, coef, group, resp, dpar, nlpar, lb, ub, source, trend_component. Include print.mvgamprior() and summary.mvgamprior() methods following brms patterns
+  - [ ] 1.1 Create prior helper functions using brmsprior class in `R/priors.R` - implement helper functions for working with brmsprior objects, adding trend-specific metadata via attributes if needed, ensuring _trend suffix convention for trend parameters
   - [ ] 1.2 Build validation utility functions in `R/validations.R` - create validate_brms_formula(), validate_trend_formula_brms(), and validate_setup_components() with checkmate assertions and insight error formatting
   - [ ] 1.3 Enhance setup_brms_lightweight() in `R/brms_integration.R` - add trend_formula parameter, improve error handling, and ensure mock backend setup works correctly for inspection functions
   - [ ] 1.4 Create Stan assembly helper functions in `R/stancode.R` - implement combine_observation_trend_stancode(), validate_stancode_structure(), and format_stan_compilation_errors() with proper error messaging
-  - [ ] 1.5 Write unit tests in `tests/testthat/test-foundation-components.R` - test mvgamprior class creation, validation functions, and Stan helper utilities with valid/invalid inputs
+  - [ ] 1.5 Write unit tests in `tests/testthat/test-foundation-components.R` - test brmsprior helper functions, validation functions, and Stan helper utilities with valid/invalid inputs
   
 - [ ] 2.0 Implement Core Prior and Stan Generation Systems
   - [ ] 2.1 Create prior extraction system in `R/priors.R` - implement extract_observation_priors() using brms::get_prior() and extract_trend_priors() using trend registry with parameter naming conventions
-  - [ ] 2.2 Build prior combination logic in `R/priors.R` - create combine_obs_trend_priors() to merge observation and trend priors into single mvgamprior object with trend_component field population
+  - [ ] 2.2 Build prior combination logic in `R/priors.R` - create combine_obs_trend_priors() to merge observation and trend priors into single brmsprior object, optionally using attributes for trend distinction
   - [ ] 2.3 Implement Stan data generation in `R/standata.R` - create generate_combined_standata() that combines brms::standata() output with trend-specific data using existing trend system
   - [ ] 2.4 Create Stan code generation pipeline in `R/stancode.R` - implement generate_combined_stancode() that integrates observation model stancode with trend stanvars using enhanced assembly system
   - [ ] 2.5 Build trend-specific prior generators in `R/priors.R` - create get_ar_priors(), get_rw_priors(), get_var_priors() etc. following convention-based dispatch with _trend suffix naming
   - [ ] 2.6 Write core system tests in `tests/testthat/test-core-systems.R` - test prior extraction, combination logic, and Stan generation with various trend types and multivariate scenarios
   
 - [ ] 3.0 Create User-Facing Inspection Functions
-  - [ ] 3.1 Implement get_prior() function in `R/priors.R` - accept same parameters as mvgam(), use setup_brms_lightweight() and prior extraction system, return mvgamprior object with proper validation
+  - [ ] 3.1 Implement get_prior() function in `R/priors.R` - accept same parameters as mvgam(), use setup_brms_lightweight() and prior extraction system, return brmsprior object with proper validation
   - [ ] 3.2 Implement make_stancode() function in `R/stancode.R` - accept same parameters plus prior argument, use Stan code generation pipeline, return character string with complete Stan model code
   - [ ] 3.3 Implement make_standata() function in `R/standata.R` - accept same parameters as make_stancode(), use Stan data generation system, return named list compatible with Stan
   - [ ] 3.4 Create set_prior() and prior() extensions in `R/priors.R` - enhance brms functions to handle trend-specific parameters with proper class validation and parameter bounds
