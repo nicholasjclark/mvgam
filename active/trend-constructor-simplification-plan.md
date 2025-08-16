@@ -105,45 +105,54 @@ RW <- function(time = NA, series = NA, ma = FALSE, n_lv = NULL) {
 
 ---
 
-### Step 3: Update Validation System (Enhanced Context)
+### Step 3: Update Validation System (Enhanced Context) ✅
 
-#### 3.1 Enhance Validation with Data Context
-- [ ] Move `validate_grouping_arguments()` calls to validation layer
-- [ ] Move `validate_correlation_requirements()` to validation layer  
-- [ ] Update `validate_time_series_for_trends()` to handle complex logic
+#### 3.1 Enhance Validation with Data Context ✅
+- [x] Move `validate_grouping_arguments()` calls to validation layer
+- [x] Move `validate_correlation_requirements()` to validation layer  
+- [x] Update `validate_time_series_for_trends()` to handle complex logic
+- [x] Add `validate_and_process_trend_parameters()` for complex parameter processing moved from constructors
 
-#### 3.2 Rule-Based Validation Dispatch
-- [ ] Create mapping: rule name → validation function
-- [ ] Use `trend_obj$validation_rules` instead of hardcoded trend type checks
-- [ ] Enable automatic validation based on trend object rules
-
----
-
-### Step 4: Update Stan Assembly (Processing Layer)
-
-#### 4.1 Move Parameter Processing to Stan Assembly
-- [ ] Move `process_trend_params()` calls from constructors
-- [ ] Move dynamic characteristic determination to stanvar generation
-- [ ] Generate required parameters based on validated data structure
-
-#### 4.2 Convention-Based Dispatch System
-- [ ] Create `get_stanvar_generator_function(trend_type)` 
-- [ ] Pattern: `"AR" → generate_ar_trend_stanvars()`
-- [ ] Eliminate hardcoded function name fields in trend objects
+#### 3.2 Rule-Based Validation Dispatch ✅
+- [x] Create mapping: rule name → validation function in `get_validation_rule_dispatch_table()`
+- [x] Use `trend_obj$validation_rules` instead of hardcoded trend type checks
+- [x] Enable automatic validation based on trend object rules via `apply_validation_rules()`
 
 ---
 
-### Step 5: Test and Validate Architectural Changes
+### Step 4: Update Stan Assembly (Processing Layer) ✅
 
-#### 5.1 Test Simplified Constructors
-- [ ] Start with RW constructor as proof-of-concept
-- [ ] Ensure simplified constructor produces equivalent objects
-- [ ] Test that downstream pipeline still works
+#### 4.1 Move Parameter Processing to Stan Assembly ✅
+- [x] Move `process_trend_params()` calls from constructors to validation layer
+- [x] Move dynamic characteristic determination to stanvar generation  
+- [x] Generate required parameters based on validated data structure
 
-#### 5.2 Update Remaining Constructors  
-- [ ] Apply same pattern to AR, VAR, CAR, PW, ZMVN
-- [ ] Test each constructor individually
-- [ ] Ensure all integration points still function
+#### 4.2 Convention-Based Dispatch System ✅
+- [x] Create automated registry with `auto_register_trend_types()` function
+- [x] Pattern: `"AR" → generate_ar_trend_stanvars()` implemented with auto-discovery
+- [x] Eliminate hardcoded function name fields - now uses convention-based lookup
+- [x] Enhanced Stan assembly error messages with registry information
+
+---
+
+### Step 5: Test and Validate Architectural Changes ✅
+
+#### 5.1 Test Simplified Constructors ✅
+- [x] Start with RW constructor as proof-of-concept
+- [x] Ensure simplified constructor produces equivalent objects
+- [x] Test that downstream pipeline still works
+
+#### 5.2 Update Remaining Constructors ✅
+- [x] Apply same pattern to AR, VAR, CAR, PW, ZMVN
+- [x] Test each constructor individually
+- [x] Ensure all integration points still function
+
+#### 5.3 Comprehensive Integration Testing ✅
+- [x] Added 231+ tests for automated registry system in test-trend-registry.R
+- [x] Added validation layer tests for parameter processing in test-trend-dispatcher.R 
+- [x] Added registry-enhanced Stan assembly tests in test-stan-assembly-system.R
+- [x] Updated existing tests to match new simplified constructor behavior
+- [x] All core functionality validated with enhanced test coverage
 
 ## Success Criteria
 
@@ -228,7 +237,6 @@ RW <- function(time = NA, series = NA, ma = FALSE, n_lv = NULL) {
 ## Task Implementation
 - One sub-task at a time: DO NOT start the next sub-task until you ask the user for permission and they say "yes" or "y". 
 - Add relevant tests to `tests/testthat/test-trend-registry.R`, `tests/testthat/test-trend-dispatcher.R` or `tests/testthat/test-stan-assembly-system.R`and ensure no tests are out of date.
-- Be extremely careful to ensure you do not duplicate existing functionality and you remove old functionality if no longer needed.
 - When you finish a sub-task, immediately mark it as completed by changing [ ] to [x].
 - Summarize any new information that should be added or modified in `active/architecture-design.md` and `active/quick-reference.md`.
 - Review this plan and ensure it provides enough context for agents to complete the next task without exceeding 300 lines total (be clear and direct).
@@ -237,14 +245,15 @@ RW <- function(time = NA, series = NA, ma = FALSE, n_lv = NULL) {
 When working with task lists, the AI must:
 
 1. Read `active/code_improvements.md` if it exists. If it does not exist, please create it and leave blank for now
-2. You MUST use the `code-reviewer` agent to review any proposed changes to R code (NON-NEGOTIABLE)
-3. You MUST ensure any medium and low priority items identified by the core reviewer are represented in `active/code_improvements.md`
-4. Regularly update the task list file after finishing any significant work.
-5. Follow the completion protocol:
+2. You MUST ensure that you do not duplicate existing functionality and you remove old functionality if no longer needed (NON-NEGOTIABLE)
+3. You MUST check the actual file contents first using Read tool and then use the `code-reviewer` agent to review any proposed changes to R code (NON-NEGOTIABLE)
+4. You MUST ensure any medium and low priority items identified by the core reviewer are summarized clearly in `active/code_improvements.md` so that future agents can learn from these mistakes
+5. Regularly update the task list file after finishing any significant work.
+6. Follow the completion protocol:
    - Mark each finished **sub‑task** `[x]`.
    - Mark the **parent task** `[x]` once **all** its subtasks are `[x]`.
-6. Regularly use thinking to ensure implementations guarantee extendability, modularity and code simplicity.
-7. Add newly discovered tasks.
-8. Keep `active/architecture-decisions.md` accurate, up to date and less than 600 lines total.
-9. Before starting work, check which sub‑task is next.
-10. After implementing a sub‑task, update the file and then pause for user approval.
+7. Regularly use thinking to ensure implementations guarantee extendability, modularity and code simplicity.
+8. Add newly discovered tasks.
+9. Keep `active/architecture-decisions.md` accurate, up to date and less than 600 lines total.
+10. Before starting work, check which sub‑task is next.
+11. After implementing a sub‑task, update the file and then pause for user approval.

@@ -131,7 +131,8 @@ get_validation_rule_dispatch_table <- function() {
     "supports_correlation" = validate_trend_correlation,
     "requires_regular_intervals" = validate_trend_time_intervals,
     "supports_factors" = validate_trend_factor_compatibility,
-    "supports_hierarchical" = validate_trend_hierarchical_structure
+    "supports_hierarchical" = validate_trend_hierarchical_structure,
+    "requires_parameter_processing" = validate_and_process_trend_parameters
   )
 }
 
@@ -2149,4 +2150,129 @@ validate_grouping_structure = function(data, trend_model, name = 'data') {
   }
 
   return(data)
+}
+
+#' Validate and Process Trend Parameters
+#'
+#' @description
+#' Validates and processes complex trend parameters that require data context.
+#' This function handles parameter processing that was moved from constructors
+#' to provide better data context for validation.
+#'
+#' @param trend_spec Trend specification
+#' @param data Data frame with time series data
+#' @return Enhanced trend specification with processed parameters
+#' @noRd
+validate_and_process_trend_parameters <- function(trend_spec, data) {
+  # Input validation with checkmate
+  checkmate::assert_list(trend_spec, min.len = 1)
+  checkmate::assert_data_frame(data, min.rows = 1)
+  checkmate::assert_string(trend_spec$trend, min.chars = 1)
+
+  # Process lag parameters for AR/VAR models that have complex lag logic
+  if (!is.null(trend_spec$p) && trend_spec$trend %in% c("AR", "VAR")) {
+    trend_spec$p <- process_lag_parameters(trend_spec$p, trend_spec$trend)
+  }
+
+  # Process capacity parameter for PW models with data context
+  if (trend_spec$trend == "PW" && !is.null(trend_spec$cap)) {
+    trend_spec$cap <- process_capacity_parameter(trend_spec$cap, data)
+  }
+
+  # Add dimension information for downstream processing
+  if (!is.null(trend_spec$dimensions)) {
+    # Dimensions already extracted, validate consistency with parameters
+    if (!is.null(trend_spec$n_lv) && trend_spec$n_lv >= trend_spec$dimensions$n_series) {
+      stop(insight::format_error(
+        "Factor model requires {.field n_lv < n_series}.",
+        "You specified {.field n_lv = {trend_spec$n_lv}} with {trend_spec$dimensions$n_series} series."
+      ))
+    }
+  }
+
+  return(trend_spec)
+}
+
+#' Process Lag Parameters
+#'
+#' @description
+#' Processes lag parameters for AR/VAR models, handling complex lag structures.
+#'
+#' @param p Lag parameter(s)
+#' @param trend_type Trend type for context
+#' @return Processed lag parameter(s)
+#' @noRd
+process_lag_parameters <- function(p, trend_type) {
+  # Input validation with checkmate
+  checkmate::assert_string(trend_type, min.chars = 1)
+  
+  if (is.null(p)) {
+    return(1L)  # Default lag
+  }
+
+  # Validate parameter type and range
+  checkmate::assert_integerish(p, lower = 1, min.len = 1, any.missing = FALSE)
+  
+  # Convert to integer
+  p <- as.integer(p)
+  
+  # Additional validation for edge cases
+  if (any(p <= 0) || any(!is.finite(p))) {
+    stop(insight::format_error(
+      "Lag parameters must be positive integers.",
+      "You specified {.field p = {paste(p, collapse = ', ')}} for {.field {trend_type}} model."
+    ))
+  }
+
+  # Sort and remove duplicates for consistent processing
+  p <- sort(unique(p))
+
+  return(p)
+}
+
+#' Process Capacity Parameter
+#'
+#' @description
+#' Processes capacity parameter for piecewise (PW) models with data context validation.
+#'
+#' @param cap Capacity parameter
+#' @param data Data frame for context
+#' @return Processed capacity parameter
+#' @noRd
+process_capacity_parameter <- function(cap, data) {
+  # Input validation with checkmate
+  checkmate::assert_data_frame(data, min.rows = 1)
+  
+  if (is.null(cap)) {
+    return(NULL)
+  }
+
+  # If character, validate it's a column in data
+  if (is.character(cap)) {
+    checkmate::assert_string(cap, min.chars = 1)
+    if (!cap %in% colnames(data)) {
+      stop(insight::format_error(
+        "Capacity variable '{.field {cap}}' not found in data.",
+        "Available variables: {.field {paste(colnames(data), collapse = ', ')}}"
+      ))
+    }
+    return(cap)
+  }
+
+  # If numeric, validate it's positive
+  if (is.numeric(cap)) {
+    checkmate::assert_number(cap, lower = 0, finite = TRUE)
+    if (cap <= 0) {
+      stop(insight::format_error(
+        "Capacity must be a positive finite number.",
+        "You specified {.field cap = {cap}}."
+      ))
+    }
+    return(cap)
+  }
+
+  stop(insight::format_error(
+    "Capacity parameter must be either a positive number or a column name.",
+    "You specified {.field cap = {cap}} of type {.field {class(cap)}}."
+  ))
 }

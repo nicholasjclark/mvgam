@@ -1862,3 +1862,96 @@ test_that("multivariate system provides proper error handling and edge cases", {
     )
   }, "Factor models.*not supported.*PW")
 })
+
+# Tests for Registry-Enhanced Stan Assembly
+test_that("Stan assembly uses registry for enhanced error messages", {
+  data <- setup_test_data()$simple_univariate
+  
+  # Mock an invalid trend type that doesn't exist
+  invalid_trend_spec <- list(trend = "NONEXISTENT")
+  
+  # Should get registry-enhanced error message
+  expect_error({
+    mvgam:::generate_trend_injection_stanvars(
+      invalid_trend_spec,
+      list(n_series = 1, n_obs = nrow(data))
+    )
+  }, "No Stan generator found.*NONEXISTENT")
+})
+
+test_that("Convention-based dispatch works in Stan assembly", {
+  data <- setup_test_data()$simple_univariate
+  
+  # Test that AR trend uses generate_ar_trend_stanvars function
+  ar_spec <- list(trend = "AR", p = 1)
+  data_info <- list(n_series = 1, n_obs = nrow(data), n_time = nrow(data))
+  
+  # Should successfully call generator function via convention
+  result <- mvgam:::generate_trend_injection_stanvars(ar_spec, data_info)
+  
+  expect_type(result, "list")
+  expect_s3_class(result, "stanvars")
+})
+
+test_that("Registry integration with Stan assembly provides helpful errors", {
+  # Clear registry to test error handling
+  orig_registry <- as.list(trend_registry)
+  rm(list = ls(envir = trend_registry), envir = trend_registry)
+  
+  # Try to generate stanvars with empty registry
+  expect_error({
+    mvgam:::generate_trend_injection_stanvars(
+      list(trend = "AR"),
+      list(n_series = 1, n_obs = 10)
+    )
+  }, "Registry appears empty")
+  
+  # Restore registry
+  for (name in names(orig_registry)) {
+    trend_registry[[name]] <- orig_registry[[name]]
+  }
+})
+
+test_that("Auto-registration integrates with Stan assembly workflow", {
+  # Clear and re-register to test integration
+  rm(list = ls(envir = trend_registry), envir = trend_registry)
+  auto_register_trend_types()
+  
+  data <- setup_test_data()$simple_univariate
+  
+  # Test that all auto-registered trends work with Stan assembly
+  core_trends <- c("AR", "RW", "VAR", "ZMVN", "CAR", "PW")
+  
+  for (trend_type in core_trends) {
+    trend_spec <- list(trend = trend_type)
+    data_info <- list(n_series = 1, n_obs = nrow(data), n_time = nrow(data))
+    
+    # Should successfully generate stanvars for all registered trends
+    result <- mvgam:::generate_trend_injection_stanvars(trend_spec, data_info)
+    expect_type(result, "list")
+    expect_s3_class(result, "stanvars")
+  }
+})
+
+test_that("Enhanced validation integrates with Stan assembly", {
+  data <- setup_test_data()$multivariate
+  
+  # Test that validation-enhanced parameters work in Stan assembly
+  trend_spec <- list(
+    trend = "AR",
+    p = c(3, 1, 2),  # Should be sorted by validation
+    validation_rules = c("requires_parameter_processing")
+  )
+  
+  # Apply validation first
+  validated_spec <- apply_validation_rules(trend_spec, data)
+  
+  # Generate stanvars with validated spec
+  data_info <- list(n_series = 2, n_obs = nrow(data), n_time = 25)
+  result <- mvgam:::generate_trend_injection_stanvars(validated_spec, data_info)
+  
+  expect_type(result, "list")
+  expect_s3_class(result, "stanvars")
+  # Lag parameters should have been processed (sorted)
+  expect_equal(validated_spec$p, c(1, 2, 3))
+})

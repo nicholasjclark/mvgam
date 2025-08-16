@@ -148,31 +148,214 @@ get_default_incompatibility_reason <- function(name) {
   default_reasons[[name]] %||% "Series-specific dynamics not compatible with factor structure"
 }
 
+#' Auto-Register Trend Types Using Convention-Based Discovery
+#'
+#' @description
+#' Automatically discovers and registers trend types based on naming conventions.
+#' FAILS FAST with clear errors when conventions are not followed.
+#'
+#' **Convention**: For trend type "FOO", you MUST define:
+#' - `generate_foo_trend_stanvars()` function for Stan code generation
+#' - `foo_trend_properties()` function returning list(supports_factors = TRUE/FALSE, incompatibility_reason = "...")
+#'
+#' @return Invisibly returns TRUE, or STOPS with clear error on any failure
+#' @noRd
+auto_register_trend_types <- function() {
+  # No input parameters to validate
+  
+  # Get all generate_*_trend_stanvars functions
+  all_functions <- ls(getNamespace("mvgam"))
+  generator_pattern <- "^generate_(.+)_trend_stanvars$"
+  generator_functions <- grep(generator_pattern, all_functions, value = TRUE)
+  
+  if (length(generator_functions) == 0) {
+    stop(insight::format_error(
+      "No trend generator functions found.",
+      "Expected functions like {.field generate_ar_trend_stanvars}, {.field generate_rw_trend_stanvars}, etc.",
+      "Check that Stan assembly functions follow naming convention."
+    ))
+  }
+  
+  # Extract trend type names from function names
+  trend_types <- gsub(generator_pattern, "\\1", generator_functions)
+  trend_types <- toupper(trend_types)  # Convert to uppercase (AR, RW, VAR, etc.)
+  
+  # Register each discovered trend type
+  for (i in seq_along(trend_types)) {
+    trend_type <- trend_types[i]
+    generator_func_name <- generator_functions[i]
+    
+    # Get the actual generator function
+    generator_func <- get(generator_func_name, envir = getNamespace("mvgam"))
+    
+    # Get trend properties - REQUIRED, no defaults
+    properties_func_name <- paste0(tolower(trend_type), "_trend_properties")
+    
+    if (!exists(properties_func_name, envir = getNamespace("mvgam"))) {
+      stop(insight::format_error(
+        "Missing required properties function for trend type {.field {trend_type}}.",
+        "You must define {.field {properties_func_name}()} that returns list(supports_factors = TRUE/FALSE, incompatibility_reason = '...').",
+        "This ensures explicit declaration of trend capabilities."
+      ))
+    }
+    
+    # Get properties function and call it
+    properties_func <- get(properties_func_name, envir = getNamespace("mvgam"))
+    trend_info <- properties_func()
+    
+    # Validate properties function output
+    validate_trend_properties(trend_info, trend_type, properties_func_name)
+    
+    # Register with validated properties
+    register_trend_type(
+      name = trend_type,
+      supports_factors = trend_info$supports_factors,
+      generator_func = generator_func,
+      incompatibility_reason = trend_info$incompatibility_reason
+    )
+  }
+  
+  invisible(TRUE)
+}
+
 #' Register Core Trend Types
 #'
 #' @description
-#' Register all core mvgam trend types. Called automatically during package load.
+#' Register all core mvgam trend types using auto-discovery.
+#' Called automatically during package load.
 #'
 #' @return Invisibly returns TRUE
 #' @noRd
 register_core_trends <- function() {
-  # Factor-compatible trends (stationary dynamics work with factor structure)
-  register_trend_type("AR", supports_factors = TRUE, generate_ar_trend_stanvars)
-  register_trend_type("RW", supports_factors = TRUE, generate_rw_trend_stanvars)
-  register_trend_type("VAR", supports_factors = TRUE, generate_var_trend_stanvars)
-  register_trend_type("ZMVN", supports_factors = TRUE, generate_zmvn_trend_stanvars)
+  auto_register_trend_types()
+}
 
-  # Factor-incompatible trends (series-specific dynamics)
-  register_trend_type("CAR", supports_factors = FALSE, generate_car_trend_stanvars)
-  register_trend_type("PW", supports_factors = FALSE, generate_pw_trend_stanvars)
-
+#' Validate Trend Properties Function Output
+#'
+#' @description
+#' Validates that a trend properties function returns the required structure.
+#' FAILS FAST with clear errors for missing or invalid properties.
+#'
+#' @param trend_info Output from trend properties function
+#' @param trend_type Trend type name for context
+#' @param func_name Properties function name for context
+#' @return Invisibly returns TRUE, or STOPS with clear error
+#' @noRd
+validate_trend_properties <- function(trend_info, trend_type, func_name) {
+  # Input validation with checkmate
+  checkmate::assert_string(trend_type, min.chars = 1)
+  checkmate::assert_string(func_name, min.chars = 1)
+  
+  if (!is.list(trend_info)) {
+    stop(insight::format_error(
+      "Function {.field {func_name}()} must return a list.",
+      "Got {.field {class(trend_info)}} instead.",
+      "Fix: return list(supports_factors = TRUE/FALSE, incompatibility_reason = '...')"
+    ))
+  }
+  
+  required_fields <- c("supports_factors")
+  missing_fields <- setdiff(required_fields, names(trend_info))
+  
+  if (length(missing_fields) > 0) {
+    stop(insight::format_error(
+      "Function {.field {func_name}()} missing required fields: {.field {paste(missing_fields, collapse = ', ')}}.",
+      "Required structure: list(supports_factors = TRUE/FALSE, incompatibility_reason = '...')",
+      "The supports_factors field is mandatory for trend type {.field {trend_type}}."
+    ))
+  }
+  
+  if (!is.logical(trend_info$supports_factors) || length(trend_info$supports_factors) != 1) {
+    stop(insight::format_error(
+      "Field {.field supports_factors} must be a single logical value (TRUE or FALSE).",
+      "Got {.field {trend_info$supports_factors}} of type {.field {class(trend_info$supports_factors)}}.",
+      "Fix {.field {func_name}()} to return supports_factors = TRUE or FALSE."
+    ))
+  }
+  
+  if (!trend_info$supports_factors && 
+      (is.null(trend_info$incompatibility_reason) || !is.character(trend_info$incompatibility_reason))) {
+    stop(insight::format_error(
+      "Trends with {.field supports_factors = FALSE} must provide {.field incompatibility_reason}.",
+      "Fix {.field {func_name}()} to include incompatibility_reason = 'explanation why factors not supported'.",
+      "This helps users understand why factor models don't work with {.field {trend_type}} trends."
+    ))
+  }
+  
   invisible(TRUE)
+}
+
+# Core Trend Properties Functions
+# These define the capabilities of each built-in trend type
+
+#' AR Trend Properties
+#' @noRd
+ar_trend_properties <- function() {
+  list(
+    supports_factors = TRUE,
+    incompatibility_reason = NULL
+  )
+}
+
+#' RW Trend Properties  
+#' @noRd
+rw_trend_properties <- function() {
+  list(
+    supports_factors = TRUE,
+    incompatibility_reason = NULL
+  )
+}
+
+#' VAR Trend Properties
+#' @noRd
+var_trend_properties <- function() {
+  list(
+    supports_factors = TRUE,
+    incompatibility_reason = NULL
+  )
+}
+
+#' ZMVN Trend Properties
+#' @noRd
+zmvn_trend_properties <- function() {
+  list(
+    supports_factors = TRUE,
+    incompatibility_reason = NULL
+  )
+}
+
+#' CAR Trend Properties
+#' @noRd
+car_trend_properties <- function() {
+  list(
+    supports_factors = FALSE,
+    incompatibility_reason = "Continuous-time AR requires series-specific irregular time intervals, incompatible with factor structure"
+  )
+}
+
+#' PW Trend Properties
+#' @noRd
+pw_trend_properties <- function() {
+  list(
+    supports_factors = FALSE,
+    incompatibility_reason = "Piecewise trends require series-specific changepoint modeling, incompatible with factor structure"
+  )
 }
 
 #' Register Custom Trend Type
 #'
 #' @description
-#' User-facing function to register custom trend types.
+#' User-facing function to register custom trend types. For maximum future-proofing,
+#' consider using the convention-based approach instead (see Details).
+#'
+#' @details
+#' **Recommended Convention-Based Approach**:
+#' 
+#' Instead of calling this function, define these functions and let auto-discovery handle registration:
+#' 1. `generate_mytrend_trend_stanvars(trend_specs, data_info)` - Stan code generator
+#' 2. `mytrend_trend_properties()` - Returns list(supports_factors = TRUE/FALSE, incompatibility_reason = "...")
+#' 
+#' This approach requires zero manual registration calls and is automatically future-proof.
 #'
 #' @param name Character string name for the custom trend type
 #' @param supports_factors Logical indicating if the trend supports factor models
@@ -186,20 +369,46 @@ register_core_trends <- function() {
 #'
 #' @examples
 #' \dontrun{
-#' # Register a custom trend type
-#' my_trend_generator <- function(trend_specs, data_info) {
-#'   # Implementation here
-#'   list(stanvar(...))
+#' # RECOMMENDED: Convention-based approach (auto-discovered)
+#' generate_garch_trend_stanvars <- function(trend_specs, data_info) {
+#'   # GARCH trend implementation
+#'   list(brms::stanvar(...))
 #' }
-#'
-#' register_custom_trend("MyTrend",
+#' 
+#' garch_trend_properties <- function() {
+#'   list(
+#'     supports_factors = TRUE,
+#'     incompatibility_reason = NULL
+#'   )
+#' }
+#' # No registration call needed! Auto-discovered on package load.
+#' 
+#' # ALTERNATIVE: Manual registration (discouraged)
+#' register_custom_trend("GARCH",
 #'                      supports_factors = TRUE,
-#'                      generator_func = my_trend_generator)
+#'                      generator_func = generate_garch_trend_stanvars)
 #' }
 register_custom_trend <- function(name, supports_factors = FALSE, generator_func,
                                  incompatibility_reason = NULL) {
+  # Input validation with checkmate
+  checkmate::assert_string(name, min.chars = 1)
+  checkmate::assert_logical(supports_factors, len = 1)
+  checkmate::assert_function(generator_func)
+  checkmate::assert_string(incompatibility_reason, null.ok = TRUE)
 
-  # Additional validation for user-facing function
+  # Guide users toward convention-based approach
+  rlang::inform(
+    c(
+      paste0("Registering custom trend type: ", name),
+      "i" = "Consider using convention-based approach for future-proofing:",
+      "i" = paste0("Define generate_", tolower(name), "_trend_stanvars() and ", tolower(name), "_trend_properties()"),
+      "i" = "This eliminates the need for manual registration calls."
+    ),
+    .frequency = "once",
+    .frequency_id = paste0("convention_guide_", name)
+  )
+
+  # Check for existing registration
   if (exists(name, envir = trend_registry)) {
     rlang::warn(
       c(paste0("Overwriting existing trend type: ", name),

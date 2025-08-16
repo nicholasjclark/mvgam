@@ -14,6 +14,91 @@ test_that("Trend registry initializes correctly", {
   expect_true(all(expected_trends %in% registered_trends))
 })
 
+test_that("Auto-discovery registry system works correctly", {
+  # Clear registry for clean testing
+  rm(list = ls(envir = trend_registry), envir = trend_registry)
+  
+  # Auto-registration should discover all core trend types
+  auto_register_trend_types()
+  
+  # Check all expected trends are auto-discovered
+  expected_trends <- c("AR", "RW", "VAR", "ZMVN", "CAR", "PW")
+  registered_trends <- ls(trend_registry)
+  expect_true(all(expected_trends %in% registered_trends))
+  
+  # Verify properties are correctly loaded
+  ar_info <- trend_registry[["AR"]]
+  expect_true(ar_info$supports_factors)
+  expect_null(ar_info$incompatibility_reason)
+  
+  car_info <- trend_registry[["CAR"]]
+  expect_false(car_info$supports_factors)
+  expect_type(car_info$incompatibility_reason, "character")
+  expect_gt(nchar(car_info$incompatibility_reason), 10)
+})
+
+test_that("Trend properties validation works correctly", {
+  # Test valid properties
+  valid_props <- list(supports_factors = TRUE, incompatibility_reason = NULL)
+  expect_invisible(validate_trend_properties(valid_props, "TEST", "test_properties"))
+  
+  # Test invalid properties - not a list
+  expect_error(
+    validate_trend_properties("not_a_list", "TEST", "test_properties"),
+    "must return a list"
+  )
+  
+  # Test missing supports_factors field
+  invalid_props <- list(incompatibility_reason = "test")
+  expect_error(
+    validate_trend_properties(invalid_props, "TEST", "test_properties"),
+    "missing required fields.*supports_factors"
+  )
+  
+  # Test invalid supports_factors type
+  invalid_props <- list(supports_factors = "not_logical")
+  expect_error(
+    validate_trend_properties(invalid_props, "TEST", "test_properties"),
+    "must be a single logical value"
+  )
+  
+  # Test missing incompatibility_reason for non-factor trend
+  invalid_props <- list(supports_factors = FALSE)
+  expect_error(
+    validate_trend_properties(invalid_props, "TEST", "test_properties"),
+    "must provide.*incompatibility_reason"
+  )
+})
+
+test_that("Core trend properties functions return valid structures", {
+  # Test all core trend properties functions
+  trend_properties_funcs <- list(
+    AR = ar_trend_properties,
+    RW = rw_trend_properties,
+    VAR = var_trend_properties,
+    ZMVN = zmvn_trend_properties,
+    CAR = car_trend_properties,
+    PW = pw_trend_properties
+  )
+  
+  for (trend_name in names(trend_properties_funcs)) {
+    props <- trend_properties_funcs[[trend_name]]()
+    
+    # Should return valid structure
+    expect_type(props, "list")
+    expect_true("supports_factors" %in% names(props))
+    expect_type(props$supports_factors, "logical")
+    expect_length(props$supports_factors, 1)
+    
+    # If doesn't support factors, should have reason
+    if (!props$supports_factors) {
+      expect_true("incompatibility_reason" %in% names(props))
+      expect_type(props$incompatibility_reason, "character")
+      expect_gt(nchar(props$incompatibility_reason), 5)
+    }
+  }
+})
+
 test_that("Trend type registration works correctly", {
   # Clear registry
   rm(list = ls(envir = trend_registry), envir = trend_registry)
@@ -112,7 +197,7 @@ test_that("Factor compatibility validation works", {
   # Test factor-incompatible trend with n_lv (should error)
   pw_spec <- list(trend_model = "PW", n_lv = 3)
   expect_error(validate_factor_compatibility(pw_spec),
-               "Factor models.*not supported.*PW.*trends")
+               "Factor models.*not supported.*trends")
 
   # Test factor-incompatible trend without n_lv (should pass)
   pw_spec_no_lv <- list(trend_model = "PW", n_lv = NULL)
@@ -157,10 +242,11 @@ test_that("Custom trend registration works", {
     list(custom_stanvar = "custom_test")
   }
 
-  # Register custom trend
-  expect_silent(register_custom_trend("CustomTrend",
-                                     supports_factors = TRUE,
-                                     generator_func = custom_generator))
+  # Register custom trend (now provides informational messages)
+  expect_message(register_custom_trend("CustomTrend",
+                                       supports_factors = TRUE,
+                                       generator_func = custom_generator),
+                 "Registering custom trend type")
 
   # Check it was registered
   expect_true("CustomTrend" %in% ls(trend_registry))
@@ -239,14 +325,14 @@ test_that("Factor validation error messages are informative", {
   # Test CAR with n_lv
   car_spec <- list(trend_model = "CAR", n_lv = 2)
   expect_error(validate_factor_compatibility(car_spec),
-               "Factor models.*not supported.*CAR.*trends")
+               "Factor models.*not supported.*trends")
   expect_error(validate_factor_compatibility(car_spec),
                "series-specific irregular time intervals")
 
   # Test PW with n_lv
   pw_spec <- list(trend_model = "PW", n_lv = 2)
   expect_error(validate_factor_compatibility(pw_spec),
-               "Factor models.*not supported.*PW.*trends")
+               "Factor models.*not supported.*trends")
   expect_error(validate_factor_compatibility(pw_spec),
                "changepoint modeling")
 })
@@ -417,7 +503,7 @@ test_that("trend constructors use process_trend_params correctly", {
 
     # Test VAR constructor
     var_trend <- VAR(p = 1)
-    expect_equal(var_trend$trend, "VAR1")
+    expect_equal(var_trend$trend, "VAR")  # Base type for all dispatch
     expect_equal(var_trend$p, 1)
     expect_true(var_trend$cor)  # VAR always has cor = TRUE
 

@@ -41,7 +41,7 @@ When **ALL** tasks are `[x]`:
    - All documentation examples run successfully
 
 3. **Final Code Review:**
-   - Submit complete implementation to `code-reviewer` agent
+   - Submit complete implementation to `code-reviewer` agent (check the actual file contents first using Read tool before sending to code-reviewer)
    - Address high-priority feedback
    - Update `active/code_improvements.md` with medium/low priority items
 
@@ -88,7 +88,7 @@ When **ALL** tasks are `[x]`:
 3. Implement sub-task following R package best practices
 4. Submit completed code for final review
 5. Address high-priority feedback immediately
-6. Log medium/low priority items in `active/code_improvements.md`
+6. Summarize medium/low priority items in `active/code_improvements.md` for future agents to learn from
 7. **STOP AND WAIT:** Update task list, mark sub-task `[x]`, and ask user "Ready for the next sub-task?" - Wait for "yes" or "y" before proceeding
 
 ### Task List Maintenance

@@ -1320,3 +1320,121 @@ test_that("piecewise parameter validation handles edge cases correctly", {
     "Factor models.*not supported.*PW"
   )
 })
+
+# Tests for Enhanced Validation Layer
+test_that("validate_and_process_trend_parameters works correctly", {
+  # Test AR trend parameter processing
+  ar_spec <- list(trend = "AR", p = c(3, 1, 2), time = "time", series = "series")
+  test_data <- data.frame(time = 1:10, series = factor(rep(1:2, each = 5)))
+  
+  result <- validate_and_process_trend_parameters(ar_spec, test_data)
+  
+  # Lag parameters should be sorted
+  expect_equal(result$p, c(1, 2, 3))
+  expect_equal(result$trend, "AR")
+})
+
+test_that("process_lag_parameters handles complex lag structures", {
+  # Test basic lag processing
+  expect_equal(process_lag_parameters(c(2, 1, 3), "AR"), c(1, 2, 3))
+  expect_equal(process_lag_parameters(NULL, "AR"), 1L)
+  
+  # Test error for invalid lags
+  expect_error(
+    process_lag_parameters(c(-1, 2), "AR"),
+    "Lag parameters must be positive integers"
+  )
+  
+  expect_error(
+    process_lag_parameters(c(1, Inf), "VAR"),
+    "Lag parameters must be positive integers"
+  )
+})
+
+test_that("process_capacity_parameter handles PW capacity validation", {
+  test_data <- data.frame(time = 1:10, series = 1, capacity_col = 100:109)
+  
+  # Test numeric capacity
+  expect_equal(process_capacity_parameter(50, test_data), 50)
+  
+  # Test column name capacity
+  expect_equal(process_capacity_parameter("capacity_col", test_data), "capacity_col")
+  
+  # Test NULL capacity
+  expect_null(process_capacity_parameter(NULL, test_data))
+  
+  # Test invalid column name
+  expect_error(
+    process_capacity_parameter("missing_col", test_data),
+    "Capacity variable.*not found in data"
+  )
+  
+  # Test invalid numeric capacity
+  expect_error(
+    process_capacity_parameter(-10, test_data),
+    "Capacity must be a positive finite number"
+  )
+})
+
+test_that("rule-based validation dispatch works correctly", {
+  # Create test trend spec with validation rules
+  trend_spec <- list(
+    trend = "AR",
+    p = c(2, 1),
+    validation_rules = c("requires_parameter_processing"),
+    time = "time",
+    series = "series"
+  )
+  
+  test_data <- data.frame(time = 1:10, series = factor(rep(1:2, each = 5)))
+  
+  # Test applying validation rules
+  result <- apply_validation_rules(trend_spec, test_data)
+  
+  # Should have processed parameters
+  expect_equal(result$p, c(1, 2))  # Sorted
+  expect_equal(result$trend, "AR")
+})
+
+test_that("validation rule dispatch table contains all expected rules", {
+  dispatch_table <- get_validation_rule_dispatch_table()
+  
+  expected_rules <- c(
+    "requires_grouping_validation",
+    "supports_correlation", 
+    "requires_regular_intervals",
+    "supports_factors",
+    "supports_hierarchical",
+    "requires_parameter_processing"
+  )
+  
+  expect_true(all(expected_rules %in% names(dispatch_table)))
+  
+  # All entries should be functions
+  for (rule in names(dispatch_table)) {
+    expect_type(dispatch_table[[rule]], "closure")
+  }
+})
+
+test_that("validation functions handle edge cases correctly", {
+  # Test trend grouping validation
+  trend_spec <- list(trend = "AR", gr = "group_var", subgr = "subgroup_var")
+  test_data <- data.frame(
+    time = 1:10, 
+    series = 1,
+    group_var = factor(rep(c("A", "B"), each = 5)),
+    subgroup_var = factor(rep(c("X", "Y"), times = 5))
+  )
+  
+  # Should pass validation
+  result <- validate_trend_grouping(trend_spec, test_data)
+  expect_equal(result$gr, "group_var")
+  expect_equal(result$subgr, "subgroup_var")
+  
+  # Test missing grouping variable
+  trend_spec_bad <- list(trend = "AR", gr = "missing_var")
+  expect_error(
+    validate_trend_grouping(trend_spec_bad, test_data),
+    "Grouping variable.*not found in data"
+  )
+})

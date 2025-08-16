@@ -1670,14 +1670,21 @@ generate_trend_injection_stanvars <- function(trend_specs, data_info, response_s
     ))
   }
 
-  # Use consistent dispatch function naming
+  # Use registry-enhanced dispatch with clear error messages
   generator_function_name <- paste0("generate_", tolower(trend_type), "_trend_stanvars")
   
   # Check if the generator function exists
   if (!exists(generator_function_name, mode = "function")) {
+    # Provide helpful guidance using registry information
+    available_trends <- ls(trend_registry)
     stop(insight::format_error(
       "No Stan generator found for trend type: {.field {trend_type}}",
-      "Expected function: {.field {generator_function_name}}"
+      "Expected function: {.field {generator_function_name}}",
+      if (length(available_trends) > 0) {
+        paste0("Available trend types: {.field {paste(available_trends, collapse = ', ')}}")
+      } else {
+        "Registry appears empty. Check that register_core_trends() was called."
+      }
     ))
   }
   
