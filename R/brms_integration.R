@@ -20,9 +20,19 @@
 # assembly system where brms provides the foundation and mvgam adds trends
 # through stanvars injection without modifying brms internals.#' @noRd
 setup_brms_lightweight <- function(formula, data, family = gaussian(),
-                                   stanvars = NULL, ...) {
+                                   trend_formula = NULL, stanvars = NULL, 
+                                   ...) {
   checkmate::assert_formula(formula)
   checkmate::assert_data_frame(data, min.rows = 1)
+  if (!is.null(trend_formula)) {
+    checkmate::assert(
+      inherits(trend_formula, "formula") ||
+      inherits(trend_formula, "brmsformula") || 
+      inherits(trend_formula, "bform") ||
+      is.list(trend_formula),
+      .var.name = "trend_formula"
+    )
+  }
 
   # Handle trend formulas without response variables
   # Check if formula lacks response variable (e.g., ~ 1, ~ x + y) 
@@ -51,6 +61,12 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
       paste(formula_validation$issues, collapse = "\n")
     ))
   }
+  
+  # Parse and validate trend formula if provided
+  trend_specs <- NULL
+  if (!is.null(trend_formula)) {
+    trend_specs <- parse_multivariate_trends(formula, trend_formula)
+  }
 
   # Use mock backend for rapid setup (creates brmsfit object needed for prediction)
   # Let brms errors bubble up naturally - no masking
@@ -67,6 +83,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   # Extract key components for mvgam integration
   setup_components <- list(
     formula = formula,
+    trend_formula = trend_formula,
     data = data,
     family = family,
     stanvars = stanvars,
@@ -75,6 +92,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     prior = extract_prior_from_setup(mock_setup),
     brmsterms = extract_brmsterms_from_setup(mock_setup),
     brmsfit = mock_setup,  # Keep the mock brmsfit for prediction
+    trend_specs = trend_specs,  # Include parsed trend specifications
     setup_time = system.time({})[["elapsed"]] # Track performance
   )
 

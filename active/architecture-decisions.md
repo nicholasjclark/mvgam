@@ -576,53 +576,36 @@ extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimens
 
 ## Enhanced Architecture (2025-08-16)
 
-### 12. Automated Registry System with Convention-Based Dispatch
+### 12. Integrated Prior Generation System
 
-**Critical Design Decision**: Auto-discovery of trend types eliminates manual registry maintenance while preserving explicit capability declaration.
+**Critical Design Decision**: Replace manual prior generators with convention-based dispatch using existing trend infrastructure.
 
-**Convention Pattern**:
-```r
-# For trend type "FOO", developers define:
-generate_foo_trend_stanvars(trend_specs, data_info)  # Stan code generator
-foo_trend_properties() -> list(supports_factors = TRUE/FALSE, incompatibility_reason = "...")
-# Zero registration calls needed - auto-discovered on package load
-```
+**Architecture**: 
+- **Automated Prior Generation**: Uses `trend_obj$monitor_params` as authoritative source
+- **Convention-Based Dispatch**: Optional `get_[trend]_parameter_prior()` for customization
+- **Parameter Type Defaults**: Intelligent defaults based on parameter name patterns
+- **Factor Model Support**: Handles `Z` matrix and `_trend` suffixed parameters correctly
 
-**Key Implementation**:
-- `auto_register_trend_types()` discovers functions using naming conventions
-- `validate_trend_properties()` ensures proper capability declaration with fail-fast validation
-- Registry-enhanced error messages in Stan assembly provide helpful guidance
-- Manual `register_custom_trend()` available but guides users toward conventions
+**Key Benefits**:
+- New trends automatically get prior support without manual work
+- Priors match exactly what parameters are monitored
+- Maintains `_trend` suffix naming convention
+- Supports multivariate, distributional, and factor models
 
-**Benefits**: Adding new trends requires only 2 functions following clear patterns. No manual registry maintenance, immediate error feedback, future-proof extensibility.
+### 13. Registry System with Auto-Discovery
 
-### 13. Enhanced Validation Layer with Rule-Based Dispatch
+**Decision**: Auto-discovery eliminates manual registry maintenance.
+**Pattern**: For trend "FOO", define `generate_foo_trend_stanvars()` + `foo_trend_properties()`
+**Benefits**: Zero registration calls, future-proof extensibility, fail-fast validation
 
-**Critical Design Decision**: Move complex parameter processing from constructors to validation layer where data context is available.
+### 14. Enhanced Validation with Rule-Based Dispatch  
 
-**Rule-Based Architecture**:
-```r
-# Trend objects specify validation rules
-trend_obj$validation_rules <- c("requires_parameter_processing", "supports_factors")
-# Automatic dispatch via apply_validation_rules()
-```
+**Decision**: Move parameter processing to validation layer with data context.
+**Architecture**: `trend_obj$validation_rules` drives automatic dispatch
+**Benefits**: Clean constructors, data-aware validation, extensible rules
 
-**Key Functions**:
-- `validate_and_process_trend_parameters()` handles complex parameter processing with data context
-- `process_lag_parameters()` sorts and validates AR/VAR lag structures
-- `process_capacity_parameter()` validates PW capacity with data column checking
-- Rule dispatch table maps rules to validation functions automatically
+## Critical Requirements
 
-**Benefits**: Clean separation of concerns, data-aware validation, simplified constructors, extensible rule system.
-
-## Critical Integration Requirements
-
-**Stan Assembly Layer Enhancement**:
-- `generate_trend_stanvars()` handles parameter processing moved from constructors
-- `validate_time_series_for_trends()` handles grouping/correlation logic with data context  
-- Convention-based dispatch: `"AR" → generate_ar_trend_stanvars()` replaces hardcoded fields
-
-**Development Requirements**:
-- **Simplified Constructors**: Use `create_mvgam_trend()` helper for all new trend types
-- **Enhanced Validation**: Process grouping variables with data context in validation layer
-- **Enhanced Stan Assembly**: Handle dynamic characteristics and parameter processing with full context
+**Stan Assembly**: Convention-based dispatch replaces hardcoded fields
+**Priors**: Leverage monitor_params infrastructure for all trend types  
+**Development**: Use `create_mvgam_trend()` helper, process parameters in validation layer

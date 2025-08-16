@@ -1,6 +1,6 @@
 # R Package Task List Management
 
-Guidelines for managing task lists in markdown files to track progress on completing Task Requirements Documents (TRDs) for R package development.
+Guidelines for managing task lists in markdown files to track progress on completing Task Requirements Documents (TRDs) for R package development. Run the architecture-analyzer agent first to gain an overview of the package structure.
 
 ## Task Implementation Protocol
 
@@ -75,7 +75,7 @@ When **ALL** tasks are `[x]`:
 2. **File Management:** 
    - Read/create `active/code_improvements.md`
    - Check `active/` directory for context files
-   - Keep `active/architecture-decisions.md` under 600 lines
+   - Keep `active/architecture-decisions.md` under 800 lines
 
 3. **Standards Compliance:**
    - Follow existing package naming conventions
@@ -85,7 +85,7 @@ When **ALL** tasks are `[x]`:
 
 ### Workflow Process
 1. Check which sub-task is next
-2. Present planned code to code reviewer (before implementation)
+2. Present planned code to code-reviewer agent BEFORE implementing
 3. Implement sub-task following R package best practices
 4. Submit completed code for final review
 5. Address high-priority feedback immediately

@@ -49,6 +49,12 @@ Track medium and low priority improvements identified during code review that sh
 3. **Expand roxygen2 documentation**: Add @examples sections to user-facing functions when implemented. Provide more detailed @param descriptions with types and constraints.
 4. **Create comprehensive unit tests**: Test all helper functions with valid/invalid inputs, trend-specific prior generators, and prior combination logic.
 
+### Test File Standards (2025-08-16)
+1. **NEVER use library() calls in test files**: Test files should not include `library(testthat)` or `library(mvgam)` calls. The testthat framework and package under test are automatically available during testing.
+2. **Test isolation**: Each test should be self-contained without relying on package loading statements.
+3. **Setup dependencies**: Use the `tests/testthat/setup.R` file for any necessary test-wide configuration, not individual test files.
+4. **NEVER use skip() in tests**: This is NON-NEGOTIABLE. All tests must run and pass. If functionality doesn't exist, write tests that reflect the current state or fix the underlying code.
+
 ## Completed Improvements
 *Archive of addressed items for reference*
 

@@ -113,8 +113,12 @@ add_trend_component_attr <- function(prior, component = NULL) {
 #' @noRd
 extract_observation_priors <- function(formula, data, 
                                         family = gaussian(), ...) {
-  checkmate::assert_formula(formula)
+  # Accept both formula and brmsformula objects for distributional models
+  if (!inherits(formula, c("formula", "brmsformula", "bform"))) {
+    stop(insight::format_error("Formula must be a formula or brmsformula object"))
+  }
   checkmate::assert_data_frame(data, min.rows = 1)
+  checkmate::assert_class(family, "family")
   
   # Use brms::get_prior directly for observation model
   obs_priors <- brms::get_prior(
@@ -135,6 +139,14 @@ extract_observation_priors <- function(formula, data,
 #' @return A brmsprior object with trend model priors
 #' @noRd
 extract_trend_priors <- function(trend_formula, data, response_names = NULL) {
+  if (!is.null(trend_formula)) {
+    checkmate::assert_formula(trend_formula)
+  }
+  checkmate::assert_data_frame(data, min.rows = 1)
+  if (!is.null(response_names)) {
+    checkmate::assert_character(response_names, min.len = 1)
+  }
+  
   if (is.null(trend_formula)) {
     # No trend model - return empty brmsprior
     empty_prior <- data.frame(
@@ -195,36 +207,12 @@ parse_trend_formula <- function(trend_formula, data) {
 #' @param data Data frame
 #' @return List with trend type and parameters
 #' @noRd
-parse_single_trend_formula <- function(formula, data) {
-  # Extract trend constructor from formula
-  # This is simplified - actual implementation would be more sophisticated
-  
-  formula_str <- deparse(formula)
-  
-  # Default ZMVN for simple formulas
-  if (formula_str %in% c("~1", "~-1", "~ 1", "~ -1")) {
-    return(list(trend = "ZMVN", cor = TRUE))
-  }
-  
-  # Check for trend constructors
-  if (grepl("AR\\(", formula_str)) {
-    # Extract AR parameters
-    return(list(trend = "AR", p = 1, cor = FALSE))
-  } else if (grepl("RW\\(", formula_str)) {
-    return(list(trend = "RW"))
-  } else if (grepl("VAR\\(", formula_str)) {
-    return(list(trend = "VAR", p = 1))
-  } else if (grepl("CAR\\(", formula_str)) {
-    return(list(trend = "CAR", cor = TRUE))
-  } else if (grepl("PW\\(", formula_str)) {
-    return(list(trend = "PW", growth = "linear"))
-  } else {
-    # Default to ZMVN
-    return(list(trend = "ZMVN", cor = TRUE))
-  }
-}
+# NOTE: This function has been removed as it's replaced by the actual
+# mvgam trend parsing system. The parse_trend_formula() function now
+# calls the real trend system in trend_system.R which provides the
+# complete mvgam_trend objects with monitor_params metadata.
 
-#' Generate Trend Priors Based on Trend Type
+#' Generate Trend Priors from Monitor Parameters
 #' 
 #' @param trend_spec Trend specification from parse_trend_formula
 #' @param response_names Character vector of response names for
@@ -232,315 +220,216 @@ parse_single_trend_formula <- function(formula, data) {
 #' @return A brmsprior object with trend priors
 #' @noRd
 generate_trend_priors <- function(trend_spec, response_names = NULL) {
-  # Convention-based dispatch to trend-specific prior generators
+  checkmate::assert_list(trend_spec)
+  if (!is.null(response_names)) {
+    checkmate::assert_character(response_names, min.len = 1)
+  }
   
-  if (is.list(trend_spec) && !is.null(names(trend_spec))) {
-    # Multivariate case - generate priors for each response
-    all_priors <- list()
+  # Handle the actual mvgam trend specification structure
+  if (is.list(trend_spec) && "trend_model" %in% names(trend_spec)) {
+    # Extract the trend model specification
+    trend_model <- trend_spec$trend_model
     
-    for (resp in names(trend_spec)) {
-      spec <- trend_spec[[resp]]
-      generator_name <- paste0("get_", tolower(spec$trend), "_priors")
-      
-      if (exists(generator_name, mode = "function")) {
-        generator <- get(generator_name, mode = "function")
-        resp_priors <- generator(spec)
-        # Add response suffix
-        resp_priors$resp <- resp
-        all_priors[[resp]] <- resp_priors
-      }
-    }
-    
-    # Combine all response-specific priors
-    combined <- do.call(rbind, all_priors)
-    class(combined) <- c("brmsprior", "data.frame")
-    return(combined)
-    
-  } else {
-    # Univariate case
-    generator_name <- paste0("get_", tolower(trend_spec$trend), "_priors")
-    
-    if (exists(generator_name, mode = "function")) {
-      generator <- get(generator_name, mode = "function")
-      return(generator(trend_spec))
-    } else {
-      # Return empty prior if generator not found
-      empty_prior <- data.frame(
-        prior = character(0),
-        class = character(0),
-        coef = character(0),
-        group = character(0),
-        resp = character(0),
-        dpar = character(0),
-        nlpar = character(0),
-        lb = character(0),
-        ub = character(0),
-        source = character(0),
-        stringsAsFactors = FALSE
-      )
-      class(empty_prior) <- c("brmsprior", "data.frame")
-      return(empty_prior)
+    if (inherits(trend_model, "mvgam_trend")) {
+      # Use the new integrated approach: generate priors from monitor_params
+      return(generate_trend_priors_from_monitor_params(trend_model))
     }
   }
+  
+  # Fallback: return empty prior if structure not recognized
+  return(create_empty_brmsprior())
+}
+
+#' Generate Trend Priors from Monitor Parameters
+#' 
+#' @description
+#' Generate priors for trend parameters using the monitor_params metadata
+#' from the trend object. This integrates with the existing trend dispatcher
+#' system and automatically works for all trend types.
+#' 
+#' @param trend_obj A mvgam_trend object with monitor_params metadata
+#' @return A brmsprior object with trend priors
+#' @noRd
+generate_trend_priors_from_monitor_params <- function(trend_obj) {
+  checkmate::assert_class(trend_obj, "mvgam_trend")
+  
+  # Get monitor parameters that need priors
+  monitor_params <- trend_obj$monitor_params
+  
+  if (length(monitor_params) == 0) {
+    return(create_empty_brmsprior())
+  }
+  
+  # Generate prior specifications for each parameter
+  prior_data <- lapply(monitor_params, function(param) {
+    create_trend_parameter_prior(param, trend_obj)
+  })
+  
+  # Combine into data frame
+  combined_priors <- do.call(rbind, prior_data)
+  
+  # Convert to brmsprior object
+  class(combined_priors) <- c("brmsprior", "data.frame")
+  
+  return(combined_priors)
+}
+
+#' Create Prior Specification for Single Trend Parameter
+#' 
+#' @param param_name Character string parameter name (e.g., "ar1_trend")
+#' @param trend_obj mvgam_trend object for context
+#' @return Single-row data frame with prior specification
+#' @noRd
+create_trend_parameter_prior <- function(param_name, trend_obj) {
+  checkmate::assert_string(param_name)
+  checkmate::assert_class(trend_obj, "mvgam_trend")
+  
+  # Get default prior and bounds for this parameter type
+  prior_info <- get_default_trend_parameter_prior(param_name, trend_obj)
+  
+  # Create single row of brmsprior structure
+  data.frame(
+    prior = prior_info$prior,
+    class = param_name,  # Parameter name becomes the class
+    coef = "",
+    group = "",
+    resp = "",
+    dpar = "", 
+    nlpar = "",
+    lb = prior_info$lb,
+    ub = prior_info$ub,
+    source = "default",
+    stringsAsFactors = FALSE
+  )
+}
+
+#' Get Default Prior Information for Trend Parameter
+#' 
+#' @param param_name Character string parameter name
+#' @param trend_obj mvgam_trend object for context
+#' @return List with prior, lb, ub elements
+#' @noRd
+get_default_trend_parameter_prior <- function(param_name, trend_obj) {
+  checkmate::assert_string(param_name)
+  
+  # Check for trend-specific customization first
+  trend_type <- trend_obj$trend
+  custom_function <- paste0("get_", tolower(trend_type), "_parameter_prior")
+  
+  if (exists(custom_function, mode = "function")) {
+    custom_prior <- get(custom_function, mode = "function")
+    result <- custom_prior(param_name, trend_obj)
+    if (!is.null(result)) {
+      return(result)
+    }
+  }
+  
+  # Use parameter-type-based defaults
+  get_parameter_type_default_prior(param_name)
+}
+
+#' Get Default Prior Based on Parameter Type
+#' 
+#' @param param_name Character string parameter name
+#' @return List with prior, lb, ub elements
+#' @noRd
+get_parameter_type_default_prior <- function(param_name) {
+  checkmate::assert_string(param_name)
+  
+  # Pattern matching for common parameter types
+  if (grepl("^ar[0-9]+_trend$", param_name)) {
+    # AR coefficients: typically bounded [-1, 1] for stationarity
+    return(list(prior = "", lb = "", ub = ""))
+  } else if (grepl("sigma.*_trend$", param_name)) {
+    # Variance parameters: positive with lower bound
+    return(list(prior = "", lb = "0", ub = ""))
+  } else if (grepl("L_Omega.*_trend$", param_name)) {
+    # Correlation matrix Cholesky factors
+    return(list(prior = "", lb = "", ub = ""))
+  } else if (grepl("theta.*_trend$", param_name)) {
+    # Theta parameters (e.g., CAR): typically bounded [0, 1]
+    return(list(prior = "", lb = "0", ub = "1"))
+  } else if (grepl("A[0-9]+_trend$", param_name)) {
+    # VAR coefficient matrices
+    return(list(prior = "", lb = "", ub = ""))
+  } else if (grepl(".*_trend$", param_name)) {
+    # Generic trend parameter
+    return(list(prior = "", lb = "", ub = ""))
+  } else if (param_name == "Z") {
+    # Factor loading matrix (factor models)
+    return(list(prior = "", lb = "", ub = ""))
+  } else {
+    # Other parameters (non-trend parameters in mixed contexts)
+    return(list(prior = "", lb = "", ub = ""))
+  }
+}
+
+#' Create Empty brmsprior Object
+#' 
+#' @return Empty brmsprior data frame
+#' @noRd
+create_empty_brmsprior <- function() {
+  empty_prior <- data.frame(
+    prior = character(0),
+    class = character(0),
+    coef = character(0),
+    group = character(0),
+    resp = character(0),
+    dpar = character(0),
+    nlpar = character(0),
+    lb = character(0),
+    ub = character(0),
+    source = character(0),
+    stringsAsFactors = FALSE
+  )
+  class(empty_prior) <- c("brmsprior", "data.frame")
+  return(empty_prior)
 }
 
 # =============================================================================
-# SECTION 3: TREND-SPECIFIC PRIOR GENERATORS
+# SECTION 3: TREND-SPECIFIC PRIOR CUSTOMIZATION (OPTIONAL)
 # =============================================================================
-# WHY: Each trend type has specific parameters that need priors. These
-# generators follow the _trend suffix convention for clear separation from
-# observation model parameters.
+# WHY: While the integrated system handles most cases automatically via
+# monitor_params, some trends may need custom prior logic. These functions
+# provide trend-specific customization when the default parameter-type-based
+# approach isn't sufficient.
 
-#' Generate AR Trend Priors
+# Note: These functions are optional. If they don't exist, the system falls
+# back to parameter-type-based defaults. This provides flexibility while
+# maintaining the convention-based approach.
+
+#' Get AR-Specific Parameter Prior (Optional Customization)
 #' 
-#' @param trend_spec AR trend specification
-#' @return A brmsprior object with AR-specific priors
+#' @param param_name Character string parameter name
+#' @param trend_obj mvgam_trend object
+#' @return List with prior, lb, ub elements, or NULL for default handling
 #' @noRd
-get_ar_priors <- function(trend_spec) {
-  priors <- data.frame(
-    prior = c("", ""),
-    class = c("ar1_trend", "sigma_trend"),
-    coef = c("", ""),
-    group = c("", ""),
-    resp = c("", ""),
-    dpar = c("", ""),
-    nlpar = c("", ""),
-    lb = c("", "0"),
-    ub = c("", ""),
-    source = c("default", "default"),
-    stringsAsFactors = FALSE
-  )
-  
-  # Add correlation priors if needed
-  if (isTRUE(trend_spec$cor)) {
-    cor_priors <- data.frame(
-      prior = "",
-      class = "L_Omega_trend",
-      coef = "",
-      group = "",
-      resp = "",
-      dpar = "",
-      nlpar = "",
-      lb = "",
-      ub = "",
-      source = "default",
-      stringsAsFactors = FALSE
-    )
-    priors <- rbind(priors, cor_priors)
+get_ar_parameter_prior <- function(param_name, trend_obj) {
+  # AR trends can have custom logic for stationarity constraints
+  if (grepl("^ar[0-9]+_trend$", param_name)) {
+    # For AR coefficients, we might want tighter bounds for stability
+    return(list(prior = "", lb = "-0.99", ub = "0.99"))
   }
   
-  class(priors) <- c("brmsprior", "data.frame")
-  return(priors)
+  # Return NULL to use default parameter-type handling
+  return(NULL)
 }
 
-#' Generate RW Trend Priors
+#' Get CAR-Specific Parameter Prior (Optional Customization)
 #' 
-#' @param trend_spec RW trend specification
-#' @return A brmsprior object with RW-specific priors
+#' @param param_name Character string parameter name  
+#' @param trend_obj mvgam_trend object
+#' @return List with prior, lb, ub elements, or NULL for default handling
 #' @noRd
-get_rw_priors <- function(trend_spec) {
-  priors <- data.frame(
-    prior = "",
-    class = "sigma_trend",
-    coef = "",
-    group = "",
-    resp = "",
-    dpar = "",
-    nlpar = "",
-    lb = "0",
-    ub = "",
-    source = "default",
-    stringsAsFactors = FALSE
-  )
-  
-  class(priors) <- c("brmsprior", "data.frame")
-  return(priors)
-}
-
-#' Generate VAR Trend Priors
-#' 
-#' @param trend_spec VAR trend specification
-#' @return A brmsprior object with VAR-specific priors
-#' @noRd
-get_var_priors <- function(trend_spec) {
-  p <- trend_spec$p %||% 1
-  
-  # Create priors for each lag
-  priors <- data.frame(
-    prior = "",
-    class = paste0("A", p, "_trend"),
-    coef = "",
-    group = "",
-    resp = "",
-    dpar = "",
-    nlpar = "",
-    lb = "",
-    ub = "",
-    source = "default",
-    stringsAsFactors = FALSE
-  )
-  
-  # Add covariance priors
-  cov_priors <- data.frame(
-    prior = c("", ""),
-    class = c("L_Omega_trend", "sigma_trend"),
-    coef = c("", ""),
-    group = c("", ""),
-    resp = c("", ""),
-    dpar = c("", ""),
-    nlpar = c("", ""),
-    lb = c("", "0"),
-    ub = c("", ""),
-    source = c("default", "default"),
-    stringsAsFactors = FALSE
-  )
-  
-  priors <- rbind(priors, cov_priors)
-  class(priors) <- c("brmsprior", "data.frame")
-  return(priors)
-}
-
-#' Generate CAR Trend Priors
-#' 
-#' @param trend_spec CAR trend specification
-#' @return A brmsprior object with CAR-specific priors
-#' @noRd
-get_car_priors <- function(trend_spec) {
-  priors <- data.frame(
-    prior = c("", ""),
-    class = c("sigma_trend", "theta1_trend"),
-    coef = c("", ""),
-    group = c("", ""),
-    resp = c("", ""),
-    dpar = c("", ""),
-    nlpar = c("", ""),
-    lb = c("0", "0"),
-    ub = c("", "1"),
-    source = c("default", "default"),
-    stringsAsFactors = FALSE
-  )
-  
-  # Add correlation priors if needed
-  if (isTRUE(trend_spec$cor)) {
-    cor_priors <- data.frame(
-      prior = "",
-      class = "L_Omega_trend",
-      coef = "",
-      group = "",
-      resp = "",
-      dpar = "",
-      nlpar = "",
-      lb = "",
-      ub = "",
-      source = "default",
-      stringsAsFactors = FALSE
-    )
-    priors <- rbind(priors, cor_priors)
+get_car_parameter_prior <- function(param_name, trend_obj) {
+  # CAR has some special parameter handling
+  if (param_name == "ar1") {
+    # Legacy CAR parameter without _trend suffix
+    return(list(prior = "", lb = "0", ub = "1"))
   }
   
-  class(priors) <- c("brmsprior", "data.frame")
-  return(priors)
-}
-
-#' Generate PW Trend Priors
-#' 
-#' @param trend_spec PW trend specification
-#' @return A brmsprior object with PW-specific priors
-#' @noRd
-get_pw_priors <- function(trend_spec) {
-  priors <- data.frame(
-    prior = "",
-    class = "sigma_trend",
-    coef = "",
-    group = "",
-    resp = "",
-    dpar = "",
-    nlpar = "",
-    lb = "0",
-    ub = "",
-    source = "default",
-    stringsAsFactors = FALSE
-  )
-  
-  # Add growth rate priors
-  growth_priors <- data.frame(
-    prior = "",
-    class = "growth_trend",
-    coef = "",
-    group = "",
-    resp = "",
-    dpar = "",
-    nlpar = "",
-    lb = "",
-    ub = "",
-    source = "default",
-    stringsAsFactors = FALSE
-  )
-  
-  priors <- rbind(priors, growth_priors)
-  
-  # Add capacity prior for logistic growth
-  if (trend_spec$growth == "logistic") {
-    cap_priors <- data.frame(
-      prior = "",
-      class = "cap_trend",
-      coef = "",
-      group = "",
-      resp = "",
-      dpar = "",
-      nlpar = "",
-      lb = "0",
-      ub = "",
-      source = "default",
-      stringsAsFactors = FALSE
-    )
-    priors <- rbind(priors, cap_priors)
-  }
-  
-  class(priors) <- c("brmsprior", "data.frame")
-  return(priors)
-}
-
-#' Generate ZMVN Trend Priors
-#' 
-#' @param trend_spec ZMVN trend specification
-#' @return A brmsprior object with ZMVN-specific priors
-#' @noRd
-get_zmvn_priors <- function(trend_spec) {
-  if (isTRUE(trend_spec$cor)) {
-    # Correlated ZMVN
-    priors <- data.frame(
-      prior = c("", ""),
-      class = c("L_Omega_trend", "sigma_trend"),
-      coef = c("", ""),
-      group = c("", ""),
-      resp = c("", ""),
-      dpar = c("", ""),
-      nlpar = c("", ""),
-      lb = c("", "0"),
-      ub = c("", ""),
-      source = c("default", "default"),
-      stringsAsFactors = FALSE
-    )
-  } else {
-    # Independent ZMVN
-    priors <- data.frame(
-      prior = "",
-      class = "sigma_trend",
-      coef = "",
-      group = "",
-      resp = "",
-      dpar = "",
-      nlpar = "",
-      lb = "0",
-      ub = "",
-      source = "default",
-      stringsAsFactors = FALSE
-    )
-  }
-  
-  class(priors) <- c("brmsprior", "data.frame")
-  return(priors)
+  # Return NULL to use default parameter-type handling
+  return(NULL)
 }
 
 # =============================================================================
@@ -559,6 +448,8 @@ get_zmvn_priors <- function(trend_spec) {
 combine_obs_trend_priors <- function(obs_priors, trend_priors) {
   checkmate::assert_class(obs_priors, "brmsprior")
   checkmate::assert_class(trend_priors, "brmsprior")
+  checkmate::assert_data_frame(obs_priors, min.rows = 0)
+  checkmate::assert_data_frame(trend_priors, min.rows = 0)
   
   # Simple row binding maintains brmsprior structure
   combined <- rbind(obs_priors, trend_priors)

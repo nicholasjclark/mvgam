@@ -1813,9 +1813,12 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
 
   # Extract term labels (mvgam pattern)
   tf <- attr(tf_safe, 'term.labels')
+  
+  # Check for intercept-only formula (~ 1) which should default to ZMVN
+  is_intercept_only <- length(tf) == 0 && attr(tf_safe, 'intercept') == 1
 
-  # Validate non-empty formula (brms pattern)
-  if (length(tf) == 0) {
+  # Validate non-empty formula but allow intercept-only (brms pattern)
+  if (length(tf) == 0 && !is_intercept_only) {
     insight::format_error(
       "Empty trend formula provided.",
       "The {.field trend_formula} must contain at least one term.",
@@ -1843,15 +1846,10 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
   regular_indices <- setdiff(seq_along(tf), trend_indices)
   regular_terms <- if (length(regular_indices) > 0) tf[regular_indices] else character(0)
 
-  # Validate we have at least one trend model (brms-style error)
-  if (length(trend_terms) == 0) {
-    available_trends <- paste(mvgam_trend_choices(), collapse = "(), ")
-    stop(insight::format_error(
-      "No trend model specified in trend_formula.",
-      "At least one trend constructor is required.",
-      "Available constructors: {.field {available_trends}()}."
-    ))
-  }
+  # Allow any formula without explicit trend constructors to default to ZMVN
+  # This covers both intercept-only (~ 1) and regular formulas (~ gp(time))
+  has_explicit_trends <- length(trend_terms) > 0
+  should_default_to_zmvn <- !has_explicit_trends
 
   # Validate we have exactly one trend type per response - only one allowed per formula
   if (length(trend_terms) > 1) {
@@ -1863,12 +1861,22 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
     ))
   }
 
-  # Parse trend constructor calls with error handling (brms pattern)
-  trend_components <- vector("list", length(trend_terms))
-  names(trend_components) <- paste0("trend", seq_along(trend_terms))
+  # Handle formulas without explicit trend constructors (default to ZMVN)
+  if (should_default_to_zmvn) {
+    trend_components <- list(trend1 = list(
+      trend = "ZMVN",
+      cor = TRUE,
+      formula = if (is_intercept_only) ~ 1 else trend_formula,
+      constructor = "ZMVN()"
+    ))
+  } else {
+    # Parse trend constructor calls with error handling (brms pattern)
+    trend_components <- vector("list", length(trend_terms))
+    names(trend_components) <- paste0("trend", seq_along(trend_terms))
 
-  for (i in seq_along(trend_terms)) {
-    trend_components[[i]] <- eval_trend_constructor(trend_terms[i])
+    for (i in seq_along(trend_terms)) {
+      trend_components[[i]] <- eval_trend_constructor(trend_terms[i])
+    }
   }
 
   # Validate trend components for any remaining conflicts
