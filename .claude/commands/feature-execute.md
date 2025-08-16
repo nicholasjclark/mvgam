@@ -82,6 +82,7 @@ When **ALL** tasks are `[x]`:
    - Ensure roxygen2 documentation for all functions (`@param`, `@return`, `@examples`, `@export`)
    - Write comprehensive tests in `tests/testthat/`
    - Implement proper input validation
+   - `tryCatch()`, `skip()`, placeholder and fallback functions are FORBIDDEN
 
 ### Workflow Process
 1. Check which sub-task is next
