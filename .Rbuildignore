@@ -34,3 +34,5 @@
 ^CURRENT_STATUS\.md$
 ^brms-stan-integration-patterns\.md$
 ^Stan specs$
+^tasks$
+^active$
