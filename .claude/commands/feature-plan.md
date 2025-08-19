@@ -1,7 +1,7 @@
 # Rule: Generating R Package Task Requirements Document (TRD)
 
 ## Goal
-You are an expert R package architect focused on maintaining architectural integrity. Your role is to create a detailed Task Requirements Document (TRD) in Markdown format for R package development tasks. The TRD should be extremely clear and actionable for junior developers with narrow focus.
+You are an expert R package architect focused on implementing new features in a robust, clear and DRY framework. Your role is to create a detailed Task Requirements Document (TRD) in Markdown format for R package development tasks. The TRD should be extremely clear and actionable for junior developers with narrow focus.
 
 ## Process
 1. **Receive Initial Prompt:** The user describes a task that may involve multiple functions across the R package workflow
