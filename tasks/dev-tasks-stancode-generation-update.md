@@ -8,19 +8,17 @@
 - `man/*.Rd` - Auto-generated documentation (via roxygen2)
 
 ### Test Files
-- `tests/testthat/test-foundation-components.R` - Tests for mvgamprior class and validation utilities
-- `tests/testthat/test-core-systems.R` - Tests for prior extraction, combination, and Stan generation
-- `tests/testthat/test-inspection-functions.R` - Tests for user-facing inspection functions
+- `tests/testthat/test-priors.R` - Tests for mvgamprior class and validation utilities
+- `tests/testthat/test-setup-brms.R` - Tests for prior extraction, combination, and Stan generation
+- `tests/testthat/test-make_stan.R` - Tests for user-facing inspection functions
 - `tests/testthat/test-brms-equivalence.R` - Tests for brms compatibility when trend_formula = NULL
 - `tests/testthat/test-complete-workflows.R` - End-to-end workflow tests
-- `tests/testthat/test-multivariate-inspection.R` - Multivariate model inspection tests
+- `tests/testthat/test-multivariate.R` - Multivariate model inspection tests
 - `tests/testthat/test-statistical-validation.R` - Statistical correctness validation
-- `tests/testthat/test-edge-cases.R` - Edge case and error handling tests
-- `tests/testthat/test-performance.R` - Performance validation tests
 
 ### Context Files
 - `/active/architecture-decisions.md` - Provides implementation context for dual-object architecture
-- `/active/code_improvements.md` - May contain relevant enhancement guidelines
+- `/active/code_improvements.md` - Critical R code style and efficiency guidelines
 - `/active/quick-reference.md` - Quick reference for development patterns
 
 ### Package Structure Files
@@ -51,7 +49,7 @@
   - [x] 2.3 Stan data generation - COMPLETED: combine_stan_data() and generate_base_brms_standata() already exist in stan_assembly.R with comprehensive data combination
   - [x] 2.4 Stan code generation pipeline - COMPLETED: generate_combined_stancode() already exists in stan_assembly.R with comprehensive observation+trend integration
   - [x] 2.5 Integrate prior generation into trend dispatcher system - COMPLETED: replaced manual prior generators with convention-based dispatch using monitor_params metadata, automatic prior generation for all trend types, seamless integration with existing trend system, all 77 tests pass
-  - [ ] 2.6 Write core system tests in `tests/testthat/test-core-systems.R` - test prior extraction, combination logic, and Stan generation with various trend types and multivariate scenarios
+  - [ ] 2.6 Write core system tests in `tests/testthat/test-priors.R` - test prior extraction, combination logic, and Stan generation with various trend types and multivariate scenarios
   - [ ] 2.7 Implement fixed Z matrix support for dimension-reduced factor models - enhance prior system to detect fixed Z matrix specifications, convert Z from stochastic parameter to data object in Stan model, enable shared state models and user-specified factor structures with proper validation and Stan code generation updates
   
 - [ ] 3.0 Create User-Facing Inspection Functions
@@ -61,13 +59,12 @@
   - [ ] 3.4 Create set_prior() and prior() extensions in `R/priors.R` - enhance brms functions to handle trend-specific parameters with proper class validation and parameter bounds
   - [ ] 3.5 Implement prior_summary() function in `R/priors.R` - work with both fitted mvgam objects and model specifications, show actual vs planned priors with all/non-default filtering
   - [ ] 3.6 Add roxygen2 documentation in `R/priors.R` - comprehensive @param, @return, @examples following TRD specifications with cross-references and proper @export tags
-  - [ ] 3.7 Write user interface tests in `tests/testthat/test-inspection-functions.R` - test all user-facing functions with realistic workflows, edge cases, and error conditions matching TRD examples
+  - [ ] 3.7 Write user interface tests in `tests/testthat/test-make_stan.R` - test all user-facing functions with realistic workflows, edge cases, and error conditions matching TRD examples
   
 - [ ] 4.0 Comprehensive Testing and Integration Validation
   - [ ] 4.1 Create brms equivalence tests in `tests/testthat/test-brms-equivalence.R` - verify that when trend_formula = NULL, generated Stan code exactly matches brm() output for various model types
   - [ ] 4.2 Build complete workflow tests in `tests/testthat/test-complete-workflows.R` - test entire get_prior() -> modify -> make_stan*() -> mvgam() -> prior_summary() workflows with validation
   - [ ] 4.3 Test multivariate scenarios in `tests/testthat/test-multivariate-inspection.R` - validate inspection functions work correctly with multivariate models, different trends per response, and factor models
   - [ ] 4.4 Validate statistical correctness in `tests/testthat/test-statistical-validation.R` - ensure modified priors in inspection functions correctly apply in fitted models using small test datasets
-  - [ ] 4.5 Test edge cases and error handling in `tests/testthat/test-edge-cases.R` - invalid formulas, incompatible trends, malformed priors, with verification of helpful error messages
-  - [ ] 4.6 Performance validation in `tests/testthat/test-performance.R` - ensure inspection functions complete in <1 second for typical models and memory usage stays within reasonable bounds
-  - [ ] 4.7 Update package documentation in `README.md` and `vignettes/` - add inspection workflow examples, update package overview to highlight new capabilities following TRD requirements
+  - [ ] 4.5 Test edge cases and error handling in `tests/testthat/complete-workflows.R` - invalid formulas, incompatible trends, malformed priors, with verification of helpful error messages
+  - [ ] 4.6 Update package documentation in `README.md` and `vignettes/` - add inspection workflow examples, update package overview to highlight new capabilities following TRD requirements
