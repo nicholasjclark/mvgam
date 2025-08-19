@@ -712,6 +712,216 @@ build_ar_prior_spec <- function(lags, ar_prior_base = NULL,
   return(result)
 }
 
+#' Convert brmsprior row to Stan distribution string
+#'
+#' Takes a single row from a brmsprior data frame and extracts the prior
+#' specification as a clean Stan distribution string suitable for use in
+#' Stan model code. All brms prior functions include prior strings, so no
+#' fallback is needed.
+#'
+#' @param prior_row Data frame with exactly one row containing brmsprior
+#'   specification. Must have a 'prior' column with valid prior string.
+#'
+#' @return Character string containing Stan distribution syntax like
+#'   "normal(0, 1)" or "exponential(2)".
+#'
+#' @examples
+#' # Create example brmsprior row
+#' prior_row <- data.frame(prior = "normal(0, 0.5)", stringsAsFactors = FALSE)
+#' map_prior_to_stan_string(prior_row)
+#' 
+#' # Handle exponential distribution
+#' exp_row <- data.frame(prior = "exponential(2)", stringsAsFactors = FALSE)
+#' map_prior_to_stan_string(exp_row)
+#' 
+#' @noRd
+map_prior_to_stan_string <- function(prior_row) {
+  # Input validation
+  checkmate::assert_data_frame(prior_row, nrows = 1)
+  
+  # Validate required column exists
+  if (!"prior" %in% names(prior_row)) {
+    stop(insight::format_error(
+      "Input {.field prior_row} must contain a 'prior' column"
+    ))
+  }
+  
+  # Extract prior string
+  extracted_prior <- prior_row$prior
+  
+  # Validate prior string exists and is not empty
+  if (is.null(extracted_prior) || is.na(extracted_prior) || 
+      nchar(trimws(extracted_prior)) == 0) {
+    stop(insight::format_error(
+      "Prior string cannot be empty or missing. All brms priors must specify a distribution."
+    ))
+  }
+  
+  # Clean prior string
+  extracted_prior <- trimws(extracted_prior)
+  
+  # Enhanced Stan distribution syntax validation
+  # Check for distribution name followed by parentheses with parameters
+  stan_pattern <- "^[a-zA-Z_][a-zA-Z0-9_]*\\s*\\([^\\(\\)]*\\)$"
+  if (!grepl(stan_pattern, extracted_prior)) {
+    rlang::warn(
+      paste("Prior string", shQuote(extracted_prior), 
+            "may not be valid Stan syntax.",
+            "Expected format: distribution_name(parameters)"),
+      .frequency = "once"
+    )
+  }
+  
+  return(extracted_prior)
+}
+
+#' Extract Prior String from brmsprior Object by Class and Coefficient
+#'
+#' Finds a matching prior in a brmsprior object based on class and coefficient
+#' names, with special handling for the _trend suffix convention used in mvgam.
+#' Implements hierarchical matching: exact match -> class default -> pattern 
+#' match -> fallback.
+#'
+#' @param prior_frame A brmsprior object containing prior specifications
+#' @param class_name Character string specifying the parameter class to match
+#'   (e.g., "sigma_trend", "ar1_trend", "b")
+#' @param coef_name Character string specifying the coefficient name to match.
+#'   If NULL, matches class-level defaults. Default is NULL.
+#' @param handle_suffix Logical indicating whether to handle _trend suffix
+#'   matching. If TRUE, will attempt to match both with and without suffix.
+#'   Default is TRUE.
+#'
+#' @return Character string containing the matched prior specification, or
+#'   NULL if no match is found.
+#'
+#' @examples
+#' # Create example brmsprior object
+#' library(brms)
+#' prior_frame <- data.frame(
+#'   prior = c("normal(0, 1)", "exponential(1)", ""),
+#'   class = c("b", "sigma_trend", "ar1_trend"),
+#'   coef = c("x1", "", ""),
+#'   stringsAsFactors = FALSE
+#' )
+#' class(prior_frame) <- c("brmsprior", "prior_frame", "data.frame")
+#' 
+#' # Extract specific coefficient prior
+#' extract_prior_string(prior_frame, "b", "x1")
+#' 
+#' # Extract class-level default
+#' extract_prior_string(prior_frame, "sigma_trend")
+#' 
+#' @noRd
+extract_prior_string <- function(prior_frame, class_name, coef_name = NULL, 
+                                 handle_suffix = TRUE) {
+  # Input validation
+  checkmate::assert_class(prior_frame, "brmsprior")
+  checkmate::assert_string(class_name, min.chars = 1)
+  checkmate::assert_string(coef_name, null.ok = TRUE)
+  checkmate::assert_logical(handle_suffix, len = 1)
+  
+  # Validate required columns exist
+  required_cols <- c("prior", "class", "coef")
+  missing_cols <- setdiff(required_cols, names(prior_frame))
+  if (length(missing_cols) > 0) {
+    stop(insight::format_error(
+      "brmsprior object missing required columns: {.field {missing_cols}}"
+    ))
+  }
+  
+  # Strategy 1: Exact class and coef match
+  if (!is.null(coef_name)) {
+    exact_match <- subset(prior_frame, 
+                         class == class_name & coef == coef_name)
+    if (nrow(exact_match) > 0) {
+      return(get_best_prior_match(exact_match))
+    }
+  }
+  
+  # Strategy 2: Class match with empty coef (class-level default)
+  class_default <- subset(prior_frame, 
+                         class == class_name & (coef == "" | is.na(coef)))
+  if (nrow(class_default) > 0) {
+    return(get_best_prior_match(class_default))
+  }
+  
+  # Strategy 3: Handle suffix matching if enabled
+  if (handle_suffix && !is.null(coef_name)) {
+    # Try matching with _trend suffix added
+    if (!grepl("_trend$", coef_name)) {
+      trend_coef <- paste0(coef_name, "_trend")
+      trend_match <- subset(prior_frame,
+                           class == class_name & coef == trend_coef)
+      if (nrow(trend_match) > 0) {
+        return(get_best_prior_match(trend_match))
+      }
+    }
+    
+    # Try matching with _trend suffix removed
+    if (grepl("_trend$", coef_name)) {
+      base_coef <- gsub("_trend$", "", coef_name)
+      base_match <- subset(prior_frame,
+                          class == class_name & coef == base_coef)
+      if (nrow(base_match) > 0) {
+        return(get_best_prior_match(base_match))
+      }
+    }
+  }
+  
+  # Strategy 4: Pattern matching for complex coefficient names
+  if (!is.null(coef_name)) {
+    # Create safe regex pattern from coef_name
+    safe_pattern <- gsub("([.()^${}+*?|\\\\\\[\\]])", "\\\\\\1", coef_name)
+    pattern_match <- subset(prior_frame,
+                           class == class_name & grepl(safe_pattern, coef))
+    if (nrow(pattern_match) > 0) {
+      return(get_best_prior_match(pattern_match))
+    }
+  }
+  
+  # No match found
+  return(NULL)
+}
+
+#' Get Best Prior Match from Multiple Candidates
+#'
+#' When multiple rows match the search criteria, prioritize user-specified
+#' priors over defaults and non-empty priors over empty ones.
+#'
+#' @param matches Data frame subset of brmsprior with matching rows
+#' @return Character string of best prior, or NULL if no valid prior found
+#' @noRd
+get_best_prior_match <- function(matches) {
+  if (nrow(matches) == 0) {
+    return(NULL)
+  }
+  
+  # Priority 1: User-specified priors (source != "default")
+  if ("source" %in% names(matches)) {
+    user_priors <- subset(matches, source != "default")
+    if (nrow(user_priors) > 0) {
+      matches <- user_priors
+    }
+  }
+  
+  # Priority 2: Non-empty prior strings
+  non_empty <- subset(matches, 
+                     !is.na(prior) & nchar(trimws(prior)) > 0)
+  if (nrow(non_empty) > 0) {
+    matches <- non_empty
+  }
+  
+  # Return first (best) match
+  prior_string <- matches$prior[1]
+  
+  # Handle empty/missing priors
+  if (is.na(prior_string) || nchar(trimws(prior_string)) == 0) {
+    return(NULL)
+  }
+  
+  return(trimws(prior_string))
+}
+
 # =============================================================================
 # SECTION 5: UTILITY FUNCTIONS
 # =============================================================================

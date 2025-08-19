@@ -115,13 +115,70 @@ apply_suffix_to_stan_code <- function(stan_code, patterns, suffix) {
   return(stan_code)
 }
 
+#' Generate Combined Stan Code for Observation and Trend Models
+#'
+#' @description
+#' Generates complete Stan model code by combining observation model (from brms)
+#' with trend component specifications. Uses two-stage assembly: Stage 1 extracts
+#' trend stanvars from brms setup, Stage 2 injects trend effects into linear
+#' predictors. Supports both univariate and multivariate models with
+#' response-specific trend configurations.
+#'
+#' @param obs_setup Named list containing observation model setup from
+#'   setup_brms_lightweight(), must include stancode and standata elements
+#' @param trend_setup Named list containing trend model setup, default NULL
+#' @param trend_specs List of trend specifications from parse_multivariate_trends(),
+#'   default NULL
+#' @param prior A brmsprior object containing custom prior specifications for
+#'   both observation and trend parameters. If NULL, uses defaults. Default NULL.
+#' @param backend Character string specifying Stan backend, either "rstan" or
+#'   "cmdstanr". Default "rstan".
+#' @param validate Logical indicating whether to validate generated Stan code
+#'   structure. Default TRUE.
+#' @param silent Numeric controlling message verbosity. 0 = all messages,
+#'   1 = important only, 2 = silent. Default 1.
+#'
+#' @return Named list with elements:
+#'   \itemize{
+#'     \item stancode: Character string containing complete Stan model code
+#'     \item standata: Named list containing all data for Stan model
+#'     \item has_trends: Logical indicating if trends were included
+#'     \item is_multivariate: Logical indicating if model is multivariate
+#'   }
+#'
+#' @details
+#' The two-stage assembly process:
+#' \enumerate{
+#'   \item Extract trend stanvars from brms setup using trend specifications
+#'   \item Inject trend effects into observation model linear predictors
+#' }
+#'
+#' When trend_setup or trend_specs is NULL, returns observation model without
+#' trend components. For multivariate models, processes each response
+#' separately and applies response-specific parameter naming.
+#'
+#' @examples
+#' # Setup observation and trend components
+#' obs_setup <- setup_brms_lightweight(y ~ x, data = dat)
+#' trend_specs <- parse_multivariate_trends(y ~ x, ~ AR(p = 1))
+#' 
+#' # Generate combined Stan code
+#' result <- generate_combined_stancode(obs_setup, NULL, trend_specs)
+#' 
+#' # With custom priors
+#' priors <- get_prior(y ~ x, trend_formula = ~ AR(p = 1), data = dat)
+#' result <- generate_combined_stancode(obs_setup, NULL, trend_specs, 
+#'                                      prior = priors)
+#'
 #' @noRd
 generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
-                                      trend_specs = NULL, backend = "rstan",
-                                      validate = TRUE, silent = 1) {
+                                      trend_specs = NULL, prior = NULL,
+                                      backend = "rstan", validate = TRUE, 
+                                      silent = 1) {
   checkmate::assert_list(obs_setup, names = "named")
   checkmate::assert_list(trend_setup, null.ok = TRUE)
   checkmate::assert_list(trend_specs, null.ok = TRUE)
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
   checkmate::assert_choice(backend, c("rstan", "cmdstanr"))
   checkmate::assert_flag(validate)
   checkmate::assert_number(silent)
@@ -1758,13 +1815,55 @@ generate_trend_injection_stanvars <- function(trend_specs, data_info, response_s
 
 #' Random Walk Trend Generator
 #'
-#' Generates Stan code components for random walk trends.
+#' @description
+#' Generates Stan code components for random walk trends including latent
+#' variables, innovation dynamics, factor model structures, and prior
+#' specifications. Supports both univariate and multivariate models with
+#' optional factor model dimension reduction.
 #'
-#' @param trend_specs Trend specification for RW model
-#' @param data_info Data information including dimensions
-#' @return List of stanvars for RW trend
+#' @param trend_specs Trend specification for RW model containing parameters
+#'   like n_lv (number of latent variables) and ma (moving average flag)
+#' @param data_info Data information including dimensions (n_series, n_time)
+#'   and other model structure details
+#' @param prior A brmsprior object containing custom prior specifications for
+#'   trend parameters. If NULL, uses defaults from trend registry. Default NULL.
+#'
+#' @return Combined stanvars object containing Stan code for:
+#'   \itemize{
+#'     \item Matrix Z for factor models (if applicable)
+#'     \item MA parameters (if specified)
+#'     \item RW innovation dynamics
+#'     \item Trend computation in transformed parameters
+#'     \item Factor model priors (for dimension-reduced models)
+#'   }
+#'
+#' @details
+#' The function generates different components based on model structure:
+#' \enumerate{
+#'   \item Factor models (n_lv < n_series): includes Z matrix and loading priors
+#'   \item MA components: added if trend_specs$ma is TRUE
+#'   \item Innovation priors: sigma_trend parameters with custom or default priors
+#'   \item Computation: transformed parameters for trend extraction
+#' }
+#'
+#' @examples
+#' # Basic RW trend
+#' trend_specs <- list(n_lv = 1, ma = FALSE)
+#' data_info <- list(n_series = 3, n_time = 100)
+#' stanvars <- generate_rw_trend_stanvars(trend_specs, data_info)
+#' 
+#' # Factor model RW with custom priors
+#' trend_specs <- list(n_lv = 2, ma = FALSE)
+#' priors <- get_prior(y ~ x, trend_formula = ~ RW(), data = dat)
+#' stanvars <- generate_rw_trend_stanvars(trend_specs, data_info, prior = priors)
+#'
 #' @noRd
-generate_rw_trend_stanvars <- function(trend_specs, data_info) {
+generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
+  # Input validation
+  checkmate::assert_list(trend_specs, names = "named")
+  checkmate::assert_list(data_info, names = "named")
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
+  
   # Extract dimensions
   n_lv <- trend_specs$n_lv %||% 1
   n_series <- data_info$n_series %||% 1
@@ -1876,15 +1975,64 @@ generate_rw_dynamics <- function(n_lv, has_ma = FALSE) {
 
 #' AR Trend Generator
 #'
-#' Generates Stan code components for autoregressive trends.
-#' Supports factor models, hierarchical correlations, and proper ar{lag}_trend naming.
-#' Uses consistent non-centered parameterization throughout.
+#' @description
+#' Generates Stan code components for autoregressive trends with support for
+#' factor models, hierarchical correlations, and custom lag structures.
+#' Uses consistent non-centered parameterization and proper ar{lag}_trend
+#' parameter naming convention for seamless prior integration.
 #'
-#' @param trend_specs Trend specification for AR model
-#' @param data_info Data information including dimensions
-#' @return List of stanvars for AR trend
+#' @param trend_specs Trend specification for AR model containing parameters
+#'   like lags (AR order), n_lv (latent variables), gr (grouping), ma (moving average)
+#' @param data_info Data information including dimensions (n_obs, n_series, n_time)
+#'   and other model structure details
+#' @param prior A brmsprior object containing custom prior specifications for
+#'   AR trend parameters (ar1_trend, ar2_trend, sigma_trend, etc.). If NULL,
+#'   uses defaults from trend registry. Default NULL.
+#'
+#' @return Combined stanvars object containing Stan code for:
+#'   \itemize{
+#'     \item Common trend data (dimensions and indices)
+#'     \item Matrix Z for factor models (if n_lv < n_series)
+#'     \item AR coefficient parameters with lag-specific naming
+#'     \item Innovation dynamics and variance parameters
+#'     \item MA components (if specified)
+#'     \item Hierarchical correlation structures (if grouping specified)
+#'   }
+#'
+#' @details
+#' The function supports various AR model configurations:
+#' \enumerate{
+#'   \item Standard AR(p): ar1_trend, ar2_trend, ..., ar{p}_trend coefficients
+#'   \item Factor models: dimension reduction with Z matrix when n_lv < n_series
+#'   \item Hierarchical models: group-specific parameters when gr specified
+#'   \item Non-standard lags: supports arbitrary lag structures (e.g., c(1,12,24))
+#'   \item MA components: additional moving average terms if ma = TRUE
+#' }
+#'
+#' Prior specifications use the _trend suffix convention for parameter matching.
+#'
+#' @examples
+#' # Standard AR(2) model
+#' trend_specs <- list(lags = 2, n_lv = 1)
+#' data_info <- list(n_obs = 100, n_series = 3, n_time = 100)
+#' stanvars <- generate_ar_trend_stanvars(trend_specs, data_info)
+#' 
+#' # Factor model AR with custom priors
+#' trend_specs <- list(lags = 1, n_lv = 2, ma = FALSE)
+#' priors <- get_prior(y ~ x, trend_formula = ~ AR(p = 1), data = dat)
+#' stanvars <- generate_ar_trend_stanvars(trend_specs, data_info, prior = priors)
+#' 
+#' # Seasonal AR with non-standard lags
+#' trend_specs <- list(ar_lags = c(1, 12), n_lv = 1)
+#' stanvars <- generate_ar_trend_stanvars(trend_specs, data_info, prior = priors)
+#'
 #' @noRd
-generate_ar_trend_stanvars <- function(trend_specs, data_info) {
+generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
+  # Input validation
+  checkmate::assert_list(trend_specs, names = "named")
+  checkmate::assert_list(data_info, names = "named") 
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
+  
   # Extract key parameters
   n_lv <- trend_specs$n_lv %||% 1
   lags <- trend_specs$lags %||% 1
@@ -2068,14 +2216,65 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info) {
 
 #' VAR Trend Generator
 #'
-#' Generates Stan code components for vector autoregressive trends.
-#' Supports factor models, hierarchical correlations, and consistent matrix Z patterns.
+#' @description
+#' Generates Stan code components for vector autoregressive (VAR) trends with
+#' support for factor models, hierarchical correlations, and stationarity
+#' constraints. Uses efficient matrix formulation for multi-lag VAR models
+#' with proper parameter naming and non-centered parameterization.
 #'
-#' @param trend_specs Trend specification for VAR model
-#' @param data_info Data information including dimensions
-#' @return List of stanvars for VAR trend
+#' @param trend_specs Trend specification for VAR model containing parameters
+#'   like lags (VAR order), n_lv (latent variables), gr (grouping), unit (time units)
+#' @param data_info Data information including dimensions (n_obs, n_series, n_time)
+#'   and other model structure details
+#' @param prior A brmsprior object containing custom prior specifications for
+#'   VAR trend parameters (A_trend matrices, sigma_trend, etc.). If NULL,
+#'   uses defaults from trend registry. Default NULL.
+#'
+#' @return Combined stanvars object containing Stan code for:
+#'   \itemize{
+#'     \item Common trend data (dimensions and indices)
+#'     \item Matrix Z for factor models (if n_lv < n_series)
+#'     \item VAR coefficient matrices (A1_trend, A2_trend, ...) with stationarity constraints
+#'     \item Innovation covariance parameters (sigma_trend)
+#'     \item Hierarchical correlation structures (if grouping specified)
+#'     \item Trend computation in transformed parameters
+#'   }
+#'
+#' @details
+#' The function generates VAR model components with different configurations:
+#' \enumerate{
+#'   \item Standard VAR(p): A1_trend, A2_trend, ..., Ap_trend coefficient matrices
+#'   \item Factor models: dimension reduction with Z matrix when n_lv < n_series
+#'   \item Stationarity: automatic constraint application for stable dynamics
+#'   \item Hierarchical models: group-specific parameters when gr specified
+#'   \item Innovation structure: Wishart or LKJ priors for covariance matrices
+#' }
+#'
+#' VAR models require careful prior specification due to high dimensionality.
+#' The _trend suffix convention applies to all VAR parameters.
+#'
+#' @examples
+#' # Standard VAR(2) model
+#' trend_specs <- list(lags = 2, n_lv = 3)
+#' data_info <- list(n_obs = 100, n_series = 3, n_time = 100)
+#' stanvars <- generate_var_trend_stanvars(trend_specs, data_info)
+#' 
+#' # Factor model VAR with custom priors
+#' trend_specs <- list(lags = 1, n_lv = 2)
+#' priors <- get_prior(cbind(y1, y2, y3) ~ x, trend_formula = ~ VAR(p = 1), data = dat)
+#' stanvars <- generate_var_trend_stanvars(trend_specs, data_info, prior = priors)
+#' 
+#' # Hierarchical VAR with grouping
+#' trend_specs <- list(lags = 1, n_lv = 3, gr = "site")
+#' stanvars <- generate_var_trend_stanvars(trend_specs, data_info, prior = priors)
+#'
 #' @noRd
-generate_var_trend_stanvars <- function(trend_specs, data_info) {
+generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
+  # Input validation
+  checkmate::assert_list(trend_specs, names = "named")
+  checkmate::assert_list(data_info, names = "named")
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
+  
   # Extract key parameters
   n_lv <- trend_specs$n_lv %||% 1
   lags <- trend_specs$lags %||% 1
@@ -2322,14 +2521,60 @@ calculate_car_time_distances <- function(data_info) {
 
 #' CAR Trend Generator
 #'
-#' Generates Stan code components for continuous-time autoregressive trends.
-#' Does NOT support factor models or hierarchical correlations.
+#' @description
+#' Generates Stan code components for continuous-time autoregressive (CAR) trends
+#' which model temporal dynamics using continuous-time damped oscillator formulation.
+#' CAR trends are useful for irregularly spaced time series and automatic
+#' handling of missing observations. Does NOT support factor models or
+#' hierarchical correlations due to continuous-time constraints.
 #'
-#' @param trend_specs Trend specification for CAR model
-#' @param data_info Data information including dimensions
-#' @return List of stanvars for CAR trend
+#' @param trend_specs Trend specification for CAR model containing parameters
+#'   like n_lv (must equal n_series), but NOT supporting factor models or grouping
+#' @param data_info Data information including dimensions (n_obs, n_series, n_time)
+#'   and time spacing details for continuous-time modeling
+#' @param prior A brmsprior object containing custom prior specifications for
+#'   CAR trend parameters (ar1_trend, sigma_trend). If NULL, uses defaults
+#'   from trend registry. Default NULL.
+#'
+#' @return Combined stanvars object containing Stan code for:
+#'   \itemize{
+#'     \item Common trend data (dimensions and indices)
+#'     \item CAR coefficient parameters (ar1_trend for damping)
+#'     \item Innovation variance parameters (sigma_trend)
+#'     \item Continuous-time dynamics formulation
+#'     \item Trend computation in transformed parameters
+#'   }
+#'
+#' @details
+#' CAR trends use continuous-time formulation with specific constraints:
+#' \enumerate{
+#'   \item No factor models: n_lv must equal n_series (series-specific evolution)
+#'   \item No hierarchical correlations: gr parameter not supported
+#'   \item Continuous-time: handles irregular time spacing automatically
+#'   \item Damped oscillator: ar1_trend controls damping rate
+#'   \item Missing data: natural handling of gaps in continuous formulation
+#' }
+#'
+#' The ar1_trend parameter in CAR models represents the damping coefficient
+#' in continuous time, distinct from discrete-time AR(1) coefficients.
+#'
+#' @examples
+#' # Standard CAR trend
+#' trend_specs <- list(n_lv = 3)  # Must equal n_series
+#' data_info <- list(n_obs = 100, n_series = 3, n_time = 100)
+#' stanvars <- generate_car_trend_stanvars(trend_specs, data_info)
+#' 
+#' # CAR with custom priors
+#' priors <- get_prior(cbind(y1, y2, y3) ~ x, trend_formula = ~ CAR(), data = dat)
+#' stanvars <- generate_car_trend_stanvars(trend_specs, data_info, prior = priors)
+#'
 #' @noRd
-generate_car_trend_stanvars <- function(trend_specs, data_info) {
+generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
+  # Input validation
+  checkmate::assert_list(trend_specs, names = "named")
+  checkmate::assert_list(data_info, names = "named")
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
+  
   # Extract key parameters
   n_lv <- trend_specs$n_lv %||% data_info$n_series %||% 1
   n <- data_info$n_obs
@@ -2425,31 +2670,68 @@ generate_car_trend_stanvars <- function(trend_specs, data_info) {
   return(result_stanvars)
 }
 
-#' GP Trend Generator
-#'
-#' Generates Stan code components for Gaussian process trends.
-#'
-#' @param trend_specs Trend specification for GP model
-#' @param data_info Data information including dimensions
-#' @return List of stanvars for GP trend
-#' @noRd
-# GP trends are handled via trend_formula, not as temporal dynamics
-generate_gp_injection_stanvars <- function(trend_specs, data_info) {
-  stop(insight::format_error(
-    "GP trends are handled via trend_formula, not as temporal dynamics.",
-    "Use: trend_formula = ~ gp(time, k = 10)..."
-  ))
-}
-
 #' ZMVN Trend Generator
 #'
-#' Generates Stan code components for zero-mean multivariate normal trends.
+#' @description
+#' Generates Stan code components for zero-mean multivariate normal (ZMVN) trends
+#' which represent unstructured random effects across time. ZMVN trends provide
+#' the simplest multivariate state-space structure with independent Gaussian
+#' innovations and optional factor model dimension reduction. Supports both
+#' hierarchical correlations and factor models.
 #'
-#' @param trend_specs Trend specification for ZMVN model
-#' @param data_info Data information including dimensions
-#' @return List of stanvars for ZMVN trend
+#' @param trend_specs Trend specification for ZMVN model containing parameters
+#'   like n_lv (latent variables), gr (grouping), unit (time units)
+#' @param data_info Data information including dimensions (n_obs, n_series, n_time)
+#'   and grouping structure details for hierarchical models
+#' @param prior A brmsprior object containing custom prior specifications for
+#'   ZMVN trend parameters (sigma_trend, LV, Z matrix). If NULL, uses defaults
+#'   from trend registry. Default NULL.
+#'
+#' @return Combined stanvars object containing Stan code for:
+#'   \itemize{
+#'     \item Common trend data (dimensions and indices)
+#'     \item Matrix Z for factor models (if n_lv < n_series)
+#'     \item Innovation variance parameters (sigma_trend)
+#'     \item Latent variable parameters (LV for states)
+#'     \item Hierarchical correlation structures (if grouping specified)
+#'     \item Trend computation in transformed parameters
+#'   }
+#'
+#' @details
+#' ZMVN trends support various model configurations:
+#' \enumerate{
+#'   \item Standard ZMVN: independent Gaussian innovations for each series
+#'   \item Factor models: dimension reduction with Z matrix when n_lv < n_series
+#'   \item Hierarchical models: group-specific parameters when gr specified
+#'   \item Minimal structure: simplest multivariate state-space specification
+#'   \item Default choice: used when no specific trend dynamics specified
+#' }
+#'
+#' ZMVN trends use minimal prior specifications as they represent unstructured
+#' variation. The _trend suffix convention applies to variance parameters.
+#'
+#' @examples
+#' # Standard ZMVN trend
+#' trend_specs <- list(n_lv = 3)
+#' data_info <- list(n_obs = 100, n_series = 3, n_time = 100)
+#' stanvars <- generate_zmvn_trend_stanvars(trend_specs, data_info)
+#' 
+#' # Factor model ZMVN with custom priors
+#' trend_specs <- list(n_lv = 2)  # n_lv < n_series
+#' priors <- get_prior(cbind(y1, y2, y3) ~ x, trend_formula = ~ ZMVN(), data = dat)
+#' stanvars <- generate_zmvn_trend_stanvars(trend_specs, data_info, prior = priors)
+#' 
+#' # Hierarchical ZMVN with grouping
+#' trend_specs <- list(n_lv = 3, gr = "site")
+#' stanvars <- generate_zmvn_trend_stanvars(trend_specs, data_info, prior = priors)
+#'
 #' @noRd
-generate_zmvn_trend_stanvars <- function(trend_specs, data_info) {
+generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
+  # Input validation
+  checkmate::assert_list(trend_specs, names = "named")
+  checkmate::assert_list(data_info, names = "named")
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
+  
   # Extract key parameters following original ZMVN pattern
   n_lv <- trend_specs$n_lv %||% data_info$n_lv %||% data_info$n_series %||% 1
   n <- data_info$n_obs
@@ -2560,15 +2842,71 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info) {
 
 #' PW Trend Generator
 #'
-#' Generates Stan code components for piecewise trends.
-#' Supports both linear and logistic piecewise trends with proper Prophet-style implementations.
+#' @description
+#' Generates Stan code components for piecewise (PW) trends using Prophet-style
+#' changepoint detection and trend flexibility. Supports both linear and logistic
+#' growth patterns with automatic changepoint identification and series-specific
+#' parameters. Does NOT support factor models due to changepoint complexity
+#' requirements.
 #'
-#' @param trend_specs Trend specification for PW model
-#' @param data_info Data information including dimensions
-#' @param growth Growth pattern: "linear" or "logistic" (optional, overrides trend_specs$type)
-#' @return List of stanvars for PW trend
+#' @param trend_specs Trend specification for PW model containing parameters
+#'   like n_changepoints (number of changepoints), changepoint_scale (prior scale),
+#'   type/growth (trend pattern)
+#' @param data_info Data information including dimensions (n_obs, n_series, n_time)
+#'   and time structure for changepoint placement
+#' @param growth Growth pattern: "linear" or "logistic" (optional, overrides
+#'   trend_specs$type or trend_specs$growth)
+#' @param prior A brmsprior object containing custom prior specifications for
+#'   PW trend parameters (k_trend, m_trend, delta_trend, sigma_trend). If NULL,
+#'   uses defaults from trend registry. Default NULL.
+#'
+#' @return Combined stanvars object containing Stan code for:
+#'   \itemize{
+#'     \item Common trend data (dimensions and indices)
+#'     \item Changepoint specifications (locations and scales)
+#'     \item Growth rate parameters (k_trend for baseline growth)
+#'     \item Offset parameters (m_trend for trend baseline)
+#'     \item Changepoint effects (delta_trend for rate changes)
+#'     \item Innovation variance (sigma_trend if applicable)
+#'     \item Trend computation in transformed parameters
+#'   }
+#'
+#' @details
+#' PW trends implement Prophet-style piecewise trend modeling:
+#' \enumerate{
+#'   \item Linear growth: piecewise linear trends with rate changes at changepoints
+#'   \item Logistic growth: piecewise logistic with carrying capacity constraints
+#'   \item Changepoints: automatic placement with specified number and scale
+#'   \item No factor models: each series requires individual changepoint structure
+#'   \item Prophet compatibility: follows Prophet parameter naming and formulation
+#' }
+#'
+#' The _trend suffix convention applies to all PW parameters for consistency
+#' with other trend types in mvgam.
+#'
+#' @examples
+#' # Linear piecewise trend
+#' trend_specs <- list(n_changepoints = 5, changepoint_scale = 0.1, type = "linear")
+#' data_info <- list(n_obs = 100, n_series = 2, n_time = 100)
+#' stanvars <- generate_pw_trend_stanvars(trend_specs, data_info)
+#' 
+#' # Logistic piecewise with custom priors
+#' priors <- get_prior(y ~ x, trend_formula = ~ PW(n_changepoints = 10), data = dat)
+#' stanvars <- generate_pw_trend_stanvars(trend_specs, data_info, 
+#'                                        growth = "logistic", prior = priors)
+#' 
+#' # Override growth pattern
+#' stanvars <- generate_pw_trend_stanvars(trend_specs, data_info, growth = "linear")
+#'
 #' @noRd
-generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL) {
+generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
+                                       prior = NULL) {
+  # Input validation
+  checkmate::assert_list(trend_specs, names = "named")
+  checkmate::assert_list(data_info, names = "named")
+  checkmate::assert_string(growth, null.ok = TRUE)
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
+  
   # Extract key parameters
   n_lv <- trend_specs$n_lv %||% 1
   n_changepoints <- trend_specs$n_changepoints %||% 5
