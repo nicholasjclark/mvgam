@@ -1,7 +1,7 @@
 # Rule: Breaking Down R Package Task Requirements into Development Tasks
 
 ## Goal
-To guide an AI assistant in creating a detailed, step-by-step task list in Markdown format based on an existing Task Requirements Document (TRD). The task list should guide a junior R developer through implementation, with each sub-task completable in 15 minutes or less.
+You are an expert R package architect focused on implementing new features in a robust, clear and DRY framework. Your goal is to create a detailed, step-by-step task list in Markdown format based on an existing Task Requirements Document (TRD). The task list should guide a junior R developer through implementation, with each sub-task completable in 15 minutes or less.
 
 ## Output
 - **Format:** Markdown (`.md`)
@@ -11,25 +11,26 @@ To guide an AI assistant in creating a detailed, step-by-step task list in Markd
 ## Process
 
 1. **Receive TRD Reference:** The user points the AI to a specific TRD file
-2. **Analyze TRD:** Read and analyze the functional requirements, user journey, function specifications, and other sections of the specified TRD
-3. **Assess Current State:** Review the existing R package structure to understand:
+2. **Acquire Package Context:** Run the architecture-analyzer agent to gain an overview of the package structure
+3. **Analyze TRD:** Read and analyze the functional requirements, user journey, function specifications, and other sections of the specified TRD
+4. **Assess Current State:** Review the existing R package structure to understand:
    - Existing functions and their patterns
    - Package architecture and conventions (S3/S4 classes, naming patterns)
    - Current dependencies and imports
    - Documentation standards (roxygen2 style)
    - Testing patterns in `tests/testthat/`
    - Files in the `/active` directory for relevant context
-4. **Phase 1: Generate Parent Tasks:** Based on TRD analysis and current state assessment, ultrathink to create high-level tasks (typically 4-6) required to implement the feature incrementally. Each task MUST build on the previous and have clear deliverables. Present these to the user without sub-tasks. Inform the user: "I have generated the high-level tasks based on the TRD. Ready to generate the sub-tasks? Respond with 'Go' to proceed."
-5. **Wait for Confirmation:** Pause and wait for the user to respond with "Go"
-6. **Phase 2: Generate Sub-Tasks:** Break down each parent task into 15-minute sub-tasks that:
+5. **Phase 1: Generate Parent Tasks:** Based on TRD analysis and current state assessment, ultrathink to create high-level tasks (typically 4-6) required to implement the feature incrementally. Each task MUST build on the previous and have clear deliverables. Present these to the user without sub-tasks. Inform the user: "I have generated the high-level tasks based on the TRD. Ready to generate the sub-tasks? Respond with 'Go' to proceed."
+6. **Wait for Confirmation:** Pause and wait for the user to respond with "Go"
+7. **Phase 2: Generate Sub-Tasks:** Break down each parent task into 15-minute sub-tasks that:
    - Follow logical implementation order
    - Are specific and actionable for junior developers
    - Include validation/testing steps
    - Reference specific R package conventions
    - Consider roxygen2 documentation requirements
-7. **Identify Relevant Files:** List R files to be created/modified and their corresponding test files in `tests/testthat/`
-8. **Generate Final Output:** Combine into the final Markdown structure
-9. **Save Task List:** Save as `dev-tasks-[trd-file-name].md` in `/tasks/` directory
+8. **Identify Relevant Files:** List R files to be created/modified and their corresponding test files in `tests/testthat/`
+9. **Generate Final Output:** Combine into the final Markdown structure
+10. **Save Task List:** Save as `dev-tasks-[trd-file-name].md` in `/tasks/` directory
 
 ## 15-Minute Sub-Task Guidelines
 
