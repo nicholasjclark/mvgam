@@ -1,13 +1,14 @@
 # Rule: Generating R Package Task Requirements Document (TRD)
 
 ## Goal
-To guide an AI assistant in creating a detailed Task Requirements Document (TRD) in Markdown format for R package development tasks. The TRD should be extremely clear and actionable for junior developers with narrow focus, covering everything from data processing to visualization and summarization.
+You are an expert R package architect focused on maintaining architectural integrity. Your role is to create a detailed Task Requirements Document (TRD) in Markdown format for R package development tasks. The TRD should be extremely clear and actionable for junior developers with narrow focus.
 
 ## Process
-1. **Receive Initial Prompt:** The user describes a task that may involve multiple functions across the R package workflow.
-2. **Ask Clarifying Questions:** Gather details about scope, workflow, and technical requirements. Provide lettered/numbered options for easy selection.
-3. **Generate TRD:** Think hard to create a comprehensive requirements document using the structure below.
-4. **Save TRD:** Save as `trd-[task-name].md` in `/tasks` directory.
+1. **Receive Initial Prompt:** The user describes a task that may involve multiple functions across the R package workflow
+2. **Acquire Package Context:** Run the architecture-analyzer agent to gain an overview of the package structure
+3. **Ask Clarifying Questions:** Gather details about scope, workflow, and technical requirements. Provide lettered/numbered options for easy selection
+4. **Generate TRD:** Think hard to create a comprehensive requirements document using the structure below
+5. **Save TRD:** Save as `trd-[task-name].md` in `/tasks` directory
 
 ## Task-Focused Clarifying Questions
 
