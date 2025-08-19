@@ -11,7 +11,7 @@ You are an expert R package architect focused on implementing new features in a 
 ## Process
 
 1. **Receive TRD Reference:** The user points the AI to a specific TRD file
-2. **Acquire Package Context:** Run the architecture-analyzer agent to gain an overview of the package structure
+2. **Acquire Package Context:** Run the architecture-analyzer agent to gain systematic overview of the following R files: `R/stan_assembly.R`, `R/mvgam_core.R`, `R/brms_integration.R`, `R/trend_system.R`, `R/validations.R`, `R/priors.R`
 3. **Analyze TRD:** Read and analyze the functional requirements, user journey, function specifications, and other sections of the specified TRD
 4. **Assess Current State:** Review the existing R package structure to understand:
    - Existing functions and their patterns
