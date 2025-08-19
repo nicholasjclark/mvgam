@@ -35,13 +35,36 @@ trend_registry <- new.env(parent = emptyenv())
 #' @param supports_factors Logical indicating if trend supports factor models (n_lv parameter)
 #' @param generator_func Function that generates Stan code for this trend type
 #' @param incompatibility_reason Character string explaining why factor models aren't supported (if applicable)
+#' @param prior_spec Named list of prior specifications for trend parameters (optional)
 #' @return Invisibly returns TRUE on successful registration
 #' @export
 register_trend_type <- function(name, supports_factors = FALSE, generator_func,
-                               incompatibility_reason = NULL) {
+                               incompatibility_reason = NULL, prior_spec = NULL) {
   checkmate::assert_string(name, min.chars = 1)
   checkmate::assert_logical(supports_factors, len = 1)
   checkmate::assert_function(generator_func, args = c("trend_specs", "data_info"))
+  checkmate::assert_list(prior_spec, null.ok = TRUE, names = "named")
+  
+  # Validate prior_spec structure if provided
+  if (!is.null(prior_spec)) {
+    for (param_name in names(prior_spec)) {
+      param_spec <- prior_spec[[param_name]]
+      if (!is.list(param_spec)) {
+        stop(insight::format_error(
+          paste0("Invalid prior specification for parameter {.field ", param_name, "}"),
+          "Each prior specification must be a named list with 'default', 'bounds', and 'description' elements."
+        ))
+      }
+      required_fields <- c("default", "bounds", "description")
+      missing_fields <- setdiff(required_fields, names(param_spec))
+      if (length(missing_fields) > 0) {
+        stop(insight::format_error(
+          paste0("Missing required fields in prior specification for {.field ", param_name, "}"),
+          paste0("Missing: {.val ", paste(missing_fields, collapse = ", "), "}")
+        ))
+      }
+    }
+  }
 
   if (!supports_factors && is.null(incompatibility_reason)) {
     incompatibility_reason <- get_default_incompatibility_reason(name)
@@ -50,7 +73,8 @@ register_trend_type <- function(name, supports_factors = FALSE, generator_func,
   trend_registry[[name]] <- list(
     supports_factors = supports_factors,
     generator = generator_func,
-    incompatibility_reason = incompatibility_reason
+    incompatibility_reason = incompatibility_reason,
+    prior_spec = prior_spec
   )
 
   invisible(TRUE)

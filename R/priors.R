@@ -20,7 +20,86 @@
 #' - Direct pass-through to brms for observation model priors
 
 # =============================================================================
-# SECTION 1: PRIOR HELPER FUNCTIONS
+# SECTION 1: COMMON TREND PRIOR SPECIFICATIONS
+# =============================================================================
+# WHY: Shared prior specifications enable DRY principle for parameters used
+# across multiple trend types (e.g., sigma_trend used by RW, AR, CAR trends).
+# Centralized definitions ensure consistency and easier maintenance.
+
+#' Common Prior Specifications for Trend Parameters
+#'
+#' @description
+#' Shared prior specifications for trend parameters that are used across
+#' multiple trend types. This ensures consistent defaults and reduces
+#' duplication in trend registrations. Each specification contains default
+#' Stan distribution strings, parameter bounds, descriptions, and dimension
+#' information.
+#'
+#' @format Named list with parameter specifications. Each element is a list with:
+#' \describe{
+#'   \item{default}{Character string of Stan distribution (e.g., "exponential(2)")}
+#'   \item{bounds}{Numeric vector c(lower, upper) with NA for unbounded}
+#'   \item{description}{Character string describing the parameter}
+#'   \item{dimension}{Character string: "vector", "matrix", or "scalar"}
+#' }
+#' 
+#' Available common parameters:
+#' \describe{
+#'   \item{sigma_trend}{Innovation standard deviation (RW, AR, CAR trends)}
+#'   \item{LV}{Latent variables (all trends with state-space structure)}
+#'   \item{ar1_trend}{AR(1) coefficient (AR, CAR trends)}
+#'   \item{LV_raw}{Raw latent variables for non-centered parameterization}
+#'   \item{Z}{Factor loadings matrix for factor models}
+#' }
+#' 
+#' @examples
+#' # Access default for sigma_trend
+#' common_trend_priors$sigma_trend$default  # "exponential(2)"
+#' 
+#' # Get bounds for ar1_trend  
+#' common_trend_priors$ar1_trend$bounds     # c(-1, 1)
+#' 
+#' @seealso \code{\link{register_trend_type}} for using prior specifications
+#' @noRd
+common_trend_priors <- list(
+  sigma_trend = list(
+    default = "exponential(2)",
+    bounds = c(0, NA),
+    description = "Innovation standard deviation",
+    dimension = "vector"
+  ),
+  
+  LV = list(
+    default = "std_normal()",
+    bounds = c(NA, NA),
+    description = "Latent variables",
+    dimension = "matrix"
+  ),
+  
+  ar1_trend = list(
+    default = "normal(0, 0.5)",
+    bounds = c(-1, 1),
+    description = "AR(1) coefficient",
+    dimension = "vector"
+  ),
+  
+  LV_raw = list(
+    default = "std_normal()",
+    bounds = c(NA, NA),
+    description = "Raw latent variables (non-centered)",
+    dimension = "matrix"
+  ),
+  
+  Z = list(
+    default = "std_normal()",
+    bounds = c(NA, NA),
+    description = "Factor loadings matrix",
+    dimension = "matrix"
+  )
+)
+
+# =============================================================================
+# SECTION 2: PRIOR HELPER FUNCTIONS
 # =============================================================================
 # WHY: Helper functions for working with brmsprior objects enable consistent
 # handling of both observation and trend priors while maintaining full brms
@@ -462,6 +541,175 @@ combine_obs_trend_priors <- function(obs_priors, trend_priors) {
   combined <- add_trend_component_attr(combined)
   
   return(combined)
+}
+
+#' Get Complete Prior Specification for a Trend Type
+#'
+#' @description
+#' Retrieves the complete prior specification for a given trend type by
+#' merging trend-specific priors from the registry with shared defaults
+#' from common_trend_priors. This enables trends to override common defaults
+#' where needed while inheriting shared specifications.
+#'
+#' @param trend_type Character string specifying the trend type (e.g., "AR", "RW")
+#' @return Named list of prior specifications, or NULL if trend type not found
+#' 
+#' @details
+#' The function works by:
+#' 1. Retrieving trend-specific prior_spec from the trend registry
+#' 2. For each parameter, using trend-specific specification if available
+#' 3. Falling back to common_trend_priors for parameters not specified
+#' 4. Returning NULL if the trend type is not registered
+#' 
+#' @examples
+#' # Get prior spec for RW trend (hypothetical)
+#' rw_spec <- get_trend_prior_spec("RW")
+#' rw_spec$sigma_trend$default  # "exponential(2)" from common_trend_priors
+#' 
+#' @seealso \code{\link{register_trend_type}}, \code{common_trend_priors}
+#' @noRd
+get_trend_prior_spec <- function(trend_type) {
+  checkmate::assert_character(trend_type, len = 1, min.chars = 1, 
+                             any.missing = FALSE)
+  
+  # Get trend info from registry
+  if (!exists(trend_type, envir = trend_registry)) {
+    return(NULL)
+  }
+  
+  trend_info <- get(trend_type, envir = trend_registry)
+  trend_specific_priors <- trend_info$prior_spec
+  
+  # Start with empty result
+  result <- list()
+  
+  # If trend has specific prior specifications, use them
+  if (!is.null(trend_specific_priors)) {
+    result <- trend_specific_priors
+  }
+  
+  # For any parameters not specified by trend, check if they exist in common priors
+  # This allows trends to inherit common specifications they don't override
+  if (length(result) > 0) {
+    param_names <- names(result)
+    for (param_name in param_names) {
+      # If parameter references common_trend_priors, resolve it
+      if (is.character(result[[param_name]]) && 
+          length(result[[param_name]]) == 1 && 
+          startsWith(result[[param_name]], "common_trend_priors.")) {
+        common_param <- sub("common_trend_priors\\.", "", result[[param_name]])
+        if (common_param %in% names(common_trend_priors)) {
+          result[[param_name]] <- common_trend_priors[[common_param]]
+        }
+      }
+    }
+  }
+  
+  return(result)
+}
+
+#' Build Dynamic AR Prior Specification for Non-Continuous Lags
+#'
+#' @description
+#' Generates prior specifications for AR models with arbitrary lag structures,
+#' including non-continuous lags like AR(p = c(1, 12, 24)). Creates individual
+#' ar{lag}_trend specifications for each lag while sharing common parameters.
+#'
+#' @param lags Numeric vector of lag values (e.g., c(1, 12, 24))
+#' @param ar_prior_base Named list with AR coefficient prior specification 
+#'   (defaults to common_trend_priors$ar1_trend)
+#' @param include_sigma Logical indicating whether to include sigma_trend 
+#'   (defaults to TRUE)
+#' @param include_common Logical indicating whether to include common parameters
+#'   like LV (defaults to TRUE)
+#'   
+#' @return Named list of prior specifications for all AR parameters
+#' 
+#' @details
+#' For AR(p = c(1, 12, 24)), this creates:
+#' - ar1_trend: AR coefficient for lag 1
+#' - ar12_trend: AR coefficient for lag 12  
+#' - ar24_trend: AR coefficient for lag 24
+#' - sigma_trend: Innovation standard deviation (if include_sigma = TRUE)
+#' - LV, LV_raw: Latent variable specifications (if include_common = TRUE)
+#' 
+#' @examples
+#' # Standard AR(1) specification
+#' ar1_spec <- build_ar_prior_spec(1)
+#' 
+#' # Seasonal AR with lags 1, 12, 24
+#' seasonal_spec <- build_ar_prior_spec(c(1, 12, 24))
+#' 
+#' # Custom AR coefficient prior
+#' custom_spec <- build_ar_prior_spec(
+#'   lags = c(1, 4), 
+#'   ar_prior_base = list(
+#'     default = "normal(0, 0.3)",
+#'     bounds = c(-0.8, 0.8),
+#'     description = "Constrained AR coefficient"
+#'   )
+#' )
+#' 
+#' @seealso \code{\link{get_trend_prior_spec}}, \code{common_trend_priors}
+#' @noRd
+build_ar_prior_spec <- function(lags, ar_prior_base = NULL, 
+                               include_sigma = TRUE, 
+                               include_common = TRUE) {
+  checkmate::assert_numeric(lags, min.len = 1, any.missing = FALSE, 
+                           finite = TRUE)
+  checkmate::assert_list(ar_prior_base, null.ok = TRUE, names = "named")
+  checkmate::assert_logical(include_sigma, len = 1, any.missing = FALSE)
+  checkmate::assert_logical(include_common, len = 1, any.missing = FALSE)
+  
+  # Validate lags are positive integers
+  if (any(lags <= 0) || any(lags != as.integer(lags))) {
+    stop(insight::format_error(
+      "Invalid lag specification",
+      "All lags must be positive integers"
+    ))
+  }
+  
+  # Use default AR prior if not specified
+  if (is.null(ar_prior_base)) {
+    ar_prior_base <- common_trend_priors$ar1_trend
+  }
+  
+  # Validate ar_prior_base structure
+  required_fields <- c("default", "bounds", "description")
+  missing_fields <- setdiff(required_fields, names(ar_prior_base))
+  if (length(missing_fields) > 0) {
+    stop(insight::format_error(
+      "Invalid ar_prior_base specification",
+      paste0("Missing required fields: {.val ", 
+             paste(missing_fields, collapse = ", "), "}")
+    ))
+  }
+  
+  result <- list()
+  
+  # Generate ar{lag}_trend specifications for each lag
+  for (lag in lags) {
+    param_name <- paste0("ar", lag, "_trend")
+    result[[param_name]] <- list(
+      default = ar_prior_base$default,
+      bounds = ar_prior_base$bounds,
+      description = paste0("AR(", lag, ") coefficient"),
+      dimension = ar_prior_base$dimension %||% "vector"
+    )
+  }
+  
+  # Add sigma_trend if requested
+  if (include_sigma) {
+    result$sigma_trend <- common_trend_priors$sigma_trend
+  }
+  
+  # Add common trend parameters if requested
+  if (include_common) {
+    result$LV <- common_trend_priors$LV
+    result$LV_raw <- common_trend_priors$LV_raw
+  }
+  
+  return(result)
 }
 
 # =============================================================================

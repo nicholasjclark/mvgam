@@ -49,8 +49,41 @@
   - [x] 2.3 Stan data generation - COMPLETED: combine_stan_data() and generate_base_brms_standata() already exist in stan_assembly.R with comprehensive data combination
   - [x] 2.4 Stan code generation pipeline - COMPLETED: generate_combined_stancode() already exists in stan_assembly.R with comprehensive observation+trend integration
   - [x] 2.5 Integrate prior generation into trend dispatcher system - COMPLETED: replaced manual prior generators with convention-based dispatch using monitor_params metadata, automatic prior generation for all trend types, seamless integration with existing trend system, all 77 tests pass
-  - [ ] 2.6 Write core system tests in `tests/testthat/test-priors.R` - test prior extraction, combination logic, and Stan generation with various trend types and multivariate scenarios
-  - [ ] 2.7 Implement fixed Z matrix support for dimension-reduced factor models - enhance prior system to detect fixed Z matrix specifications, convert Z from stochastic parameter to data object in Stan model, enable shared state models and user-specified factor structures with proper validation and Stan code generation updates
+  - [ ] 2.6 Implement prior flow to trend stanvar generators
+    - [x] 2.6.1 Create common_trend_priors object - define shared prior specs (sigma_trend, LV, etc.) that multiple trends use - COMPLETED: created common_trend_priors object with sigma_trend, LV, ar1_trend, LV_raw, Z specifications including defaults, bounds, descriptions, and dimensions
+    - [x] 2.6.2 Add prior_spec field to trend registry - modify register_trend_type() to accept optional prior_spec list parameter - COMPLETED: updated register_trend_type() function with prior_spec parameter, added validation, enhanced documentation, addressed code reviewer feedback
+    - [x] 2.6.3 Create get_trend_prior_spec() function - merge trend-specific priors with common_trend_priors based on parameter names - COMPLETED: implemented function to retrieve complete prior specs, resolves common_trend_priors references, includes proper validation and documentation
+    - [x] 2.6.4 Create build_ar_prior_spec() helper - dynamically generate ar{lag}_trend specs for non-continuous lags like c(1,12,24) - COMPLETED: implemented dynamic AR prior generator with support for arbitrary lag structures, custom AR priors, optional sigma/common parameters, comprehensive validation and examples
+    - [ ] 2.6.5 Create map_prior_to_stan_string() function - convert brmsprior row to Stan distribution string - NEXT: This function should accept a single brmsprior row and return a Stan distribution string suitable for Stan model code. It should handle empty/missing priors by using a fallback default, validate the input, and return clean Stan syntax like "normal(0, 1)" or "exponential(2)". Add this function to R/priors.R after the build_ar_prior_spec() function.
+    - [ ] 2.6.6 Create extract_prior_string() helper - find matching prior in brmsprior object by class/coef with suffix handling
+    - [ ] 2.6.7 Update generate_combined_stancode() signature - add prior = NULL parameter, update roxygen2 docs
+    - [ ] 2.6.8 Update generate_rw_trend_stanvars() signature - add prior = NULL parameter, update function docs
+    - [ ] 2.6.9 Update generate_ar_trend_stanvars() signature - add prior = NULL parameter, update function docs
+    - [ ] 2.6.10 Update generate_var_trend_stanvars() signature - add prior = NULL parameter, update function docs
+    - [ ] 2.6.11 Update generate_car_trend_stanvars() signature - add prior = NULL parameter, update function docs
+    - [ ] 2.6.12 Update generate_zmvn_trend_stanvars() signature - add prior = NULL parameter, update function docs
+    - [ ] 2.6.13 Update generate_pw_trend_stanvars() signature - add prior = NULL parameter, update function docs
+    - [ ] 2.6.14 Update generate_gp_injection_stanvars() signature - add prior = NULL parameter if exists
+    - [ ] 2.6.15 Create map_trend_priors() function - extract relevant priors from brmsprior, handle ar{lag}_trend patterns
+    - [ ] 2.6.16 Implement prior usage in generate_rw_trend_stanvars() - use mapped priors or COMMON defaults for sigma_trend
+    - [ ] 2.6.17 Implement AR lag detection in generate_ar_trend_stanvars() - extract ar_lags, map each ar{lag}_trend prior
+    - [ ] 2.6.18 Implement prior usage in generate_ar_trend_stanvars() - apply priors to each ar{lag}_trend coefficient
+    - [ ] 2.6.19 Add prior_spec to RW trend registration - reference common_trend_priors.sigma_trend in .onLoad()
+    - [ ] 2.6.20 Add prior_spec to AR trend registration - use build_ar_prior_spec() for dynamic lag handling in .onLoad()
+    - [ ] 2.6.21 Add prior_spec to VAR trend registration - include only sigma_trend (process variances), A_trend matrix handled by stationarity constraints
+    - [ ] 2.6.22 Add prior_spec to CAR trend registration - reference common_trend_priors.sigma_trend and ar1_trend
+    - [ ] 2.6.23 Add prior_spec to ZMVN trend registration - minimal spec, mostly uses defaults
+    - [ ] 2.6.24 Add prior_spec to PW trend registration - include k_trend, m_trend, delta_trend specs
+    - [ ] 2.6.25 Update trend dispatcher in stan_assembly.R - pass prior argument through dispatch chain to all generators
+    - [ ] 2.6.26 Update tests in test-trend_system.R - add prior = NULL to all generate_*_trend_stanvars() calls
+    - [ ] 2.6.27 Update tests in test-stan_assembly.R - add prior = NULL to generate_combined_stancode() calls
+    - [ ] 2.6.28 Update tests in test-setup-brms.R - verify prior parameter flows through setup_brms_lightweight()
+    - [ ] 2.6.29 Create test for prior flow through generate_combined_stancode() - verify priors reach generators
+    - [ ] 2.6.30 Create test for AR lag-specific priors - test ar1_trend, ar12_trend, ar24_trend prior application
+    - [ ] 2.6.31 Create test for common_trend_priors inheritance - verify sigma_trend shared across RW, AR, CAR
+    - [ ] 2.6.32 Create test for default prior fallback - verify defaults used when no user prior specified
+  - [ ] 2.7 Write core system tests in `tests/testthat/test-priors.R` - test prior extraction, combination logic, and Stan generation with various trend types and multivariate scenarios
+  - [ ] 2.8 Implement fixed Z matrix support for dimension-reduced factor models - enhance prior system to detect fixed Z matrix specifications, convert Z from stochastic parameter to data object in Stan model, enable shared state models and user-specified factor structures with proper validation and Stan code generation updates
   
 - [ ] 3.0 Create User-Facing Inspection Functions
   - [ ] 3.1 Implement get_prior() function in `R/priors.R` - accept same parameters as mvgam(), use setup_brms_lightweight() and prior extraction system, return brmsprior object with proper validation
