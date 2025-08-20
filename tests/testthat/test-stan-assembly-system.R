@@ -255,9 +255,10 @@ test_that("piecewise trend generators produce valid Stan components", {
 test_that("piecewise trend generators handle different specifications", {
   data_info <- list(n_obs = 30, n_series = 1, series_var = "series")
 
-  # Test PWlinear specific generator
+  # Test PW linear specific generator
   pwlinear_spec <- list(
-    trend_type = "PWlinear",
+    trend_type = "PW",
+    growth = "linear",
     n_changepoints = 15,
     changepoint_scale = 0.2
   )
@@ -274,9 +275,10 @@ test_that("piecewise trend generators handle different specifications", {
   # Should NOT include carrying capacity data
   expect_false("pw_logistic_data" %in% names(pwlinear_stanvars))
 
-  # Test PWlogistic specific generator
+  # Test PW logistic specific generator
   pwlogistic_spec <- list(
-    trend_type = "PWlogistic",
+    trend_type = "PW",
+    growth = "logistic",
     n_changepoints = 20,
     changepoint_scale = 0.03
   )
@@ -327,7 +329,8 @@ test_that("piecewise trends produce valid Stan code structure", {
 
   # Test complete linear piecewise structure
   pw_spec <- list(
-    trend_type = "PWlinear",
+    trend_type = "PW",
+    growth = "linear",
     n_changepoints = 10,
     changepoint_scale = 0.08
   )
@@ -365,16 +368,17 @@ test_that("piecewise trends produce valid Stan code structure", {
 test_that("piecewise trends integrate with complete Stan assembly", {
   data <- setup_test_data()$multivariate
 
-  # Test PWlinear integration with observation model
+  # Test PW linear integration with observation model
   obs_setup <- mvgam:::setup_brms_lightweight(
     formula = y ~ x,
     data = data,
     family = gaussian()
   )
 
-  # Create PWlinear trend spec
+  # Create PW linear trend spec
   pw_trend_specs <- list(
-    trend_type = "PWlinear",
+    trend_type = "PW",
+    growth = "linear",
     n_changepoints = 6,
     changepoint_scale = 0.15,
     n_obs = 100
@@ -403,7 +407,8 @@ test_that("piecewise Stan code validates and compiles correctly", {
 
   # Test linear piecewise generates valid Stan code
   pw_linear_spec <- list(
-    trend_type = "PWlinear",
+    trend_type = "PW",
+    growth = "linear",
     n_changepoints = 5,
     changepoint_scale = 0.1
   )
@@ -484,7 +489,8 @@ test_that("complete Stan model assembly validates correctly", {
 
   # Create trend specification that should work
   pw_trend_specs <- list(
-    trend_type = "PWlinear",
+    trend_type = "PW",
+    growth = "linear",
     n_changepoints = 5,
     changepoint_scale = 0.1,
     n_series = 1
@@ -1504,7 +1510,7 @@ test_that("shared innovation system generates correct parameters", {
   expect_type(simple_stanvars, "list")
   expect_true("sigma_trend" %in% names(simple_stanvars))
   expect_true("innovations_trend" %in% names(simple_stanvars))
-  expect_true("scaled_innovations" %in% names(simple_stanvars))
+  expect_true("scaled_innovations_trend" %in% names(simple_stanvars))
 
   # Check parameter block content
   sigma_stanvar <- simple_stanvars$sigma_trend
@@ -1527,7 +1533,7 @@ test_that("shared innovation system handles correlated case", {
   expect_true("sigma_trend" %in% names(corr_stanvars))
   expect_true("L_Omega_trend" %in% names(corr_stanvars))
   expect_true("Sigma_trend" %in% names(corr_stanvars))
-  expect_true("scaled_innovations" %in% names(corr_stanvars))
+  expect_true("scaled_innovations_trend" %in% names(corr_stanvars))
 
   # Check correlation parameters
   l_omega_stanvar <- corr_stanvars$L_Omega_trend
@@ -2227,7 +2233,7 @@ test_that("ZMVN generator integrates properly with different model types", {
   
   # Check that shared innovation system is properly used
   expect_true("innovations_trend" %in% stanvar_names_mv)
-  expect_true("scaled_innovations" %in% stanvar_names_mv)
+  expect_true("scaled_innovations_trend" %in% stanvar_names_mv)
   
   # Test 3: Factor model integration
   trend_specs_factor <- list(n_lv = 2)

@@ -2,7 +2,6 @@
 % Please edit documentation in R/mvgam-package.R
 \docType{package}
 \name{mvgam-package}
-\alias{mvgam}
 \alias{mvgam-package}
 \title{mvgam: Multivariate (Dynamic) Generalized Additive Models}
 \description{

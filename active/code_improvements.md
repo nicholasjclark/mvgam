@@ -55,6 +55,14 @@ Track medium and low priority improvements identified during code review that sh
 3. **Setup dependencies**: Use the `tests/testthat/setup.R` file for any necessary test-wide configuration, not individual test files.
 4. **NEVER use skip() in tests**: This is NON-NEGOTIABLE. All tests must run and pass. If functionality doesn't exist, write tests that reflect the current state or fix the underlying code.
 
+### Parameter Standardization Architecture (2025-08-20)
+1. **Dimension Parameter Behavior**: The current architecture for dimension parameters is INTENTIONAL and should be maintained:
+   - **Factor models**: Use both `n_series_trend` (observed series) and `n_lv_trend` (latent factors) where `n_lv_trend < n_series_trend`
+   - **Non-factor models**: Use `n_lv_trend` for all trend parameters with `n_lv_trend = n_series_trend` for consistency
+   - **Final trend matrix**: Always `matrix[n_trend, n_series_trend]` to match observed series in observation model
+   - **Matrix Z mapping**: `matrix[n_series_trend, n_lv_trend]` maps latent factors to observed series
+   - **Rationale**: This provides consistent parameter indexing across all trend generators while maintaining proper dimensional relationships for factor vs non-factor models.
+
 ## Completed Improvements
 *Archive of addressed items for reference*
 

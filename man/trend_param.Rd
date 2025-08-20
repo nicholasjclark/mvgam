@@ -35,8 +35,8 @@ conditional inclusion, bounds, monitoring flags, and labels.
 # Basic parameter
 sigma_param <- trend_param("sigma", bounds = c(0, Inf), label = "innovation_sd")
 
-# Conditional parameter  
-theta_param <- trend_param("theta", bounds = c(-1, 1), 
+# Conditional parameter
+theta_param <- trend_param("theta", bounds = c(-1, 1),
                           condition = ma, label = "ma_coefficient")
 
 # Combine parameters

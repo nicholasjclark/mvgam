@@ -8,7 +8,8 @@ register_trend_type(
   name,
   supports_factors = FALSE,
   generator_func,
-  incompatibility_reason = NULL
+  incompatibility_reason = NULL,
+  prior_spec = NULL
 )
 }
 \arguments{
@@ -19,6 +20,8 @@ register_trend_type(
 \item{generator_func}{Function that generates Stan code for this trend type}
 
 \item{incompatibility_reason}{Character string explaining why factor models aren't supported (if applicable)}
+
+\item{prior_spec}{Named list of prior specifications for trend parameters (optional)}
 }
 \value{
 Invisibly returns TRUE on successful registration

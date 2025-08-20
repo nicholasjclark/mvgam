@@ -146,7 +146,6 @@ apply_suffix_to_stan_code <- function(stan_code, patterns, suffix) {
 #'     \item is_multivariate: Logical indicating if model is multivariate
 #'   }
 #'
-#' @details
 #' The two-stage assembly process:
 #' \enumerate{
 #'   \item Extract trend stanvars from brms setup using trend specifications
@@ -661,7 +660,6 @@ prepare_stanvars_for_brms <- function(stanvars) {
 #' @param response_suffix Response suffix for multivariate models
 #' @return List of trend stanvars
 #'
-#' @details
 #' trend_specs must contain a 'dimensions' field calculated by
 #' extract_time_series_dimensions() during data validation. This ensures
 #' reliable timing information without circular dependencies.
@@ -1327,8 +1325,6 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
 #'
 #' Creates standard priors for shared Gaussian innovation parameters.
 #'
-#' @details
-#' @stan_blocks model
 #'
 #' @param effective_dim Effective dimension (n_lv for factor models, n_series otherwise)
 #' @param cor Logical, whether correlation parameters exist
@@ -1402,8 +1398,6 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
 #' Creates standard data block stanvars needed by most trend types.
 #' Uses trend-specific naming to avoid conflicts with brms variables.
 #'
-#' @details
-#' @stan_blocks data
 #'
 #' @param n_obs Number of observations (will be named n_trend in Stan)
 #' @param n_series Number of observed series
@@ -1431,55 +1425,83 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL) {
     block = "data"
   )
 
-  # Create n_lv_trend stanvar if n_lv is provided
+  # Create n_lv_trend stanvar (always needed for consistent parameter indexing)
   if (!is.null(n_lv)) {
+    # Factor model: n_lv != n_series
     n_lv_trend_stanvar <- brms::stanvar(
       x = n_lv,
       name = "n_lv_trend",
       scode = "int<lower=1> n_lv_trend;",
       block = "data"
     )
-    return(combine_stanvars(n_trend_stanvar, n_series_trend_stanvar, n_lv_trend_stanvar))
   } else {
-    return(combine_stanvars(n_trend_stanvar, n_series_trend_stanvar))
+    # Non-factor model: n_lv_trend = n_series_trend for consistent indexing
+    n_lv_trend_stanvar <- brms::stanvar(
+      x = n_series,
+      name = "n_lv_trend",
+      scode = "int<lower=1> n_lv_trend;",
+      block = "data"
+    )
   }
+  
+  return(combine_stanvars(n_trend_stanvar, n_series_trend_stanvar, n_lv_trend_stanvar))
 }
 
 #' Generate Data Block Injections for Matrix Z
 #'
-#' @details
-#' @stan_blocks data
 #'
 #' @param is_factor_model Logical indicating if this is a factor model
 #' @param n_lv Number of latent variables
 #' @param n_series Number of observed series
 #' @return List of data block stanvars
 #' @noRd
-generate_matrix_z_data <- function(is_factor_model, n_lv, n_series) {
-  # Create individual stanvar objects with both data and scode
-  # brms requires data stanvars to have both x (data) and scode (declaration)
-  n_lv_stanvar <- brms::stanvar(
-    x = n_lv,
-    name = "n_lv",
-    scode = "int<lower=1> n_lv_trend;",
-    block = "data"
-  )
-
+generate_matrix_z_data <- function(is_factor_model, n_lv, n_series, n_obs = NULL) {
+  # Create dimension stanvars with standardized naming (consistent with generate_common_trend_data)
+  
+  # Always include n_trend if n_obs is provided
+  stanvars_list <- list()
+  if (!is.null(n_obs)) {
+    n_trend_stanvar <- brms::stanvar(
+      x = n_obs,
+      name = "n_trend",
+      scode = "int<lower=1> n_trend;",
+      block = "data"
+    )
+    stanvars_list <- append(stanvars_list, list(n_trend_stanvar))
+  }
+  
   n_series_stanvar <- brms::stanvar(
     x = n_series,
-    name = "n_series",
+    name = "n_series_trend",
     scode = "int<lower=1> n_series_trend;",
     block = "data"
   )
+  stanvars_list <- append(stanvars_list, list(n_series_stanvar))
+  
+  # For factor models: n_lv != n_series; for non-factor: n_lv_trend = n_series_trend
+  if (is_factor_model) {
+    n_lv_stanvar <- brms::stanvar(
+      x = n_lv,
+      name = "n_lv_trend", 
+      scode = "int<lower=1> n_lv_trend;",
+      block = "data"
+    )
+  } else {
+    n_lv_stanvar <- brms::stanvar(
+      x = n_series,  # n_lv_trend = n_series_trend for consistency
+      name = "n_lv_trend",
+      scode = "int<lower=1> n_lv_trend;", 
+      block = "data"
+    )
+  }
+  stanvars_list <- append(stanvars_list, list(n_lv_stanvar))
 
-  # Combine using brms c() method to create proper stanvars collection
-  return(c(n_lv_stanvar, n_series_stanvar))
+  # Combine using brms c() method to create proper stanvars collection  
+  return(do.call(c, stanvars_list))
 }
 
 #' Generate Parameter Block Injections for Matrix Z
 #'
-#' @details
-#' @stan_blocks parameters
 #'
 #' @param is_factor_model Logical indicating if this is a factor model
 #' @param n_lv Number of latent variables
@@ -1503,8 +1525,6 @@ generate_matrix_z_parameters <- function(is_factor_model, n_lv, n_series) {
 
 #' Generate Transformed Data Block Injections for Matrix Z
 #'
-#' @details
-#' @stan_blocks transformed_data
 #'
 #' @param is_factor_model Logical indicating if this is a factor model
 #' @param n_lv Number of latent variables
@@ -1531,8 +1551,6 @@ generate_matrix_z_tdata <- function(is_factor_model, n_lv, n_series) {
 #' Combines all matrix Z injection functions for factor/non-factor models.
 #' This provides a single interface for matrix Z generation across all Stan blocks.
 #'
-#' @details
-#' @stan_blocks data, parameters, transformed_data
 #'
 #' @param is_factor_model Logical indicating if this is a factor model
 #' @param n_lv Number of latent variables
@@ -1563,8 +1581,6 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv, n_serie
 #' Provides standardized priors for factor models with fixed variance=1 constraint.
 #' Only generates priors when is_factor_model=TRUE.
 #'
-#' @details
-#' @stan_blocks model
 #'
 #' @param is_factor_model Logical indicating if this is a factor model
 #' @param n_lv Number of latent variables
@@ -1596,8 +1612,6 @@ generate_factor_model <- function(is_factor_model, n_lv) {
 #' WHY: All trends must use the same computation pattern:
 #' trend[i,s] = dot_product(Z[s,:], LV[i,:]) + mu_trend[ytimes[i,s]]
 #'
-#' @details
-#' @stan_blocks transformed_parameters
 #'
 #' @param n_lv Number of latent variables
 #' @param n_series Number of observed series
@@ -1630,8 +1644,6 @@ generate_trend_computation_tparameters <- function(n_lv, n_series) {
 #' WHY: All trends (AR, VAR, CAR, ZMVN) need the same hierarchical correlation
 #' machinery when groups are specified.
 #'
-#' @details
-#' @stan_blocks functions
 #'
 #' @return List of functions block stanvars
 #' @noRd
@@ -1660,8 +1672,6 @@ generate_hierarchical_functions <- function() {
 
 #' Generate Parameters Block Injections for Hierarchical Correlations
 #'
-#' @details
-#' @stan_blocks parameters
 #'
 #' @param n_groups Number of groups for hierarchical modeling
 #' @param n_subgroups Number of subgroups (typically n_lv)
@@ -1691,8 +1701,6 @@ generate_hierarchical_correlation_parameters <- function(n_groups, n_subgroups) 
 
 #' Generate Model Block Injections for Hierarchical Correlation Priors
 #'
-#' @details
-#' @stan_blocks model
 #'
 #' @param n_groups Number of groups for hierarchical modeling
 #' @return List of model block stanvars
@@ -1853,7 +1861,6 @@ generate_trend_injection_stanvars <- function(trend_specs, data_info, response_s
 #'     \item Factor model priors (for dimension-reduced models)
 #'   }
 #'
-#' @details
 #' The function generates different components based on model structure:
 #' \enumerate{
 #'   \item Factor models (n_lv < n_series): includes Z matrix and loading priors
@@ -2035,7 +2042,6 @@ generate_trend_priors_stanvar <- function(param_names, prior = NULL, stanvar_nam
 #'     \item Hierarchical correlation structures (if grouping specified)
 #'   }
 #'
-#' @details
 #' The function supports various AR model configurations:
 #' \enumerate{
 #'   \item Standard AR(p): ar1_trend, ar2_trend, ..., ar{p}_trend coefficients
@@ -2214,7 +2220,6 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #'     \item Trend computation in transformed parameters
 #'   }
 #'
-#' @details
 #' The function generates VAR model components with different configurations:
 #' \enumerate{
 #'   \item Standard VAR(p): A1_trend, A2_trend, ..., Ap_trend coefficient matrices
@@ -3067,7 +3072,6 @@ calculate_car_time_distances <- function(data_info) {
 #'     \item Trend computation in transformed parameters
 #'   }
 #'
-#' @details
 #' CAR trends use continuous-time formulation with specific constraints:
 #' \enumerate{
 #'   \item No factor models: n_lv must equal n_series (series-specific evolution)
@@ -3225,7 +3229,6 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #'     \item Trend computation in transformed parameters
 #'   }
 #'
-#' @details
 #' ZMVN trends support various model configurations:
 #' \enumerate{
 #'   \item Standard ZMVN: independent Gaussian innovations for each series
@@ -3269,15 +3272,11 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Determine if this is a factor model (n_lv < n_series)
   is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
 
-  # Generate common trend data variables first
-  common_data_stanvars <- generate_common_trend_data(n, n_series, n_lv)
-
-  # Generate block-specific injectors for matrix Z
+  # Generate block-specific injectors for matrix Z (includes dimension data)
   matrix_z_stanvars <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
 
-  # Start components list with common data
-  components <- list(common_data_stanvars)
-  components <- append_if_not_null(components, matrix_z_stanvars)
+  # Start components list with matrix Z (includes dimension data)
+  components <- list(matrix_z_stanvars)
 
   # Generate shared innovation system (provides scaled_innovations_trend)
   hierarchical_info <- if (use_grouping) {
@@ -3367,7 +3366,6 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #'     \item Trend computation in transformed parameters
 #'   }
 #'
-#' @details
 #' PW trends implement Prophet-style piecewise trend modeling:
 #' \enumerate{
 #'   \item Linear growth: piecewise linear trends with rate changes at changepoints
@@ -3424,43 +3422,37 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   # PW trends do not support factor models (series-specific changepoints required)
   is_factor_model <- FALSE
 
-  # Generate common trend data variables first
-  common_data_stanvars <- generate_common_trend_data(n, n_series, n_lv)
-
-  # Generate block-specific injectors for matrix Z
+  # Generate block-specific injectors for matrix Z (includes dimension data)
   matrix_z_stanvars <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
 
-  # Start components list with common data
-  components <- list(common_data_stanvars)
-  if (!is.null(matrix_z_stanvars)) {
-    components <- append(components, list(matrix_z_stanvars))
-  }
+  # Start components list with matrix Z (includes dimension data)
+  components <- list(matrix_z_stanvars)
 
   # Functions block - Prophet-style piecewise functions
   pw_functions_stanvar <- brms::stanvar(
     name = "pw_functions",
     scode = "
-      matrix get_changepoint_matrix(vector t, vector t_change, int T, int S) {
+      matrix get_changepoint_matrix(vector t, vector t_change_trend, int T, int S) {
         /* Function to sort changepoints */
 
         /* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/
-        matrix[T, S] A;
+        matrix[T, S] Kappa;
         row_vector[S] a_row;
         int cp_idx;
-        A = rep_matrix(0, T, S);
+        Kappa = rep_matrix(0, T, S);
         a_row = rep_row_vector(0, S);
         cp_idx = 1;
         for (i in 1 : T) {
-          while ((cp_idx <= S) && (t[i] >= t_change[cp_idx])) {
+          while ((cp_idx <= S) && (t[i] >= t_change_trend[cp_idx])) {
             a_row[cp_idx] = 1;
             cp_idx = cp_idx + 1;
           }
-          A[i] = a_row;
+          Kappa[i] = a_row;
         }
-        return A;
+        return Kappa;
       }
 
-      vector logistic_gamma(real k, real m, vector delta, vector t_change, int S) {
+      vector logistic_gamma(real k, real m, vector delta, vector t_change_trend, int S) {
         /* Function to compute a logistic trend with changepoints */
 
         /* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/
@@ -3470,28 +3462,28 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
         k_s = append_row(k, k + cumulative_sum(delta));
         m_pr = m; // The offset in the previous segment
         for (i in 1 : S) {
-          gamma[i] = (t_change[i] - m_pr) * (1 - k_s[i] / k_s[i + 1]);
+          gamma[i] = (t_change_trend[i] - m_pr) * (1 - k_s[i] / k_s[i + 1]);
           m_pr = m_pr + gamma[i]; // update for the next segment
         }
         return gamma;
       }
 
-      vector logistic_trend(real k, real m, vector delta, vector t, vector cap,
-                            matrix A, vector t_change, int S) {
+      vector logistic_trend(real k, real m, vector delta, vector t, vector cap_trend,
+                            matrix Kappa_trend, vector t_change_trend, int S) {
         /* Function to adjust a logistic trend using a carrying capacity */
 
         /* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/
         vector[S] gamma;
-        gamma = logistic_gamma(k, m, delta, t_change, S);
-        return cap .* inv_logit((k + A * delta) .* (t - (m + A * gamma)));
+        gamma = logistic_gamma(k, m, delta, t_change_trend, S);
+        return cap_trend .* inv_logit((k + Kappa_trend * delta) .* (t - (m + Kappa_trend * gamma)));
       }
 
-      vector linear_trend(real k, real m, vector delta, vector t, matrix A,
-                          vector t_change) {
+      vector linear_trend(real k, real m, vector delta, vector t, matrix Kappa_trend,
+                          vector t_change_trend) {
         /* Function to compute a linear trend with changepoints */
 
         /* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/
-        return (k + A * delta) .* t + (m + A * (-t_change .* delta));
+        return (k + Kappa_trend * delta) .* t + (m + Kappa_trend * (-t_change_trend .* delta));
       }
     ",
     block = "functions"
@@ -3500,15 +3492,15 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   # Data block - piecewise-specific data components
   pw_data_stanvar <- brms::stanvar(
     x = list(
-      n_changepoints = n_changepoints,
-      t_change = seq(0.1, 0.9, length.out = n_changepoints),  # Default changepoint times
-      changepoint_scale = changepoint_scale
+      n_change_trend = n_changepoints,
+      t_change_trend = seq(0.1, 0.9, length.out = n_changepoints),  # Default changepoint times
+      change_scale_trend = changepoint_scale
     ),
     name = "pw_data",
     scode = glue::glue("
-      int<lower=0> n_changepoints; // number of potential trend changepoints
-      vector[n_changepoints] t_change; // times of potential changepoints
-      real<lower=0> changepoint_scale; // scale of changepoint shock prior
+      int<lower=0> n_change_trend; // number of potential trend changepoints
+      vector[n_change_trend] t_change_trend; // times of potential changepoints
+      real<lower=0> change_scale_trend; // scale of changepoint shock prior
     "),
     block = "data"
   )
@@ -3521,7 +3513,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     pw_logistic_data_stanvar <- brms::stanvar(
       x = matrix(10, nrow = n, ncol = n_series),  # Default carrying capacity
       name = "pw_logistic_data",
-      scode = glue::glue("matrix[n_trend, n_series_trend] cap; // carrying capacities"),
+      scode = glue::glue("matrix[n_trend, n_lv_trend] cap_trend; // carrying capacities"),
       block = "data"
     )
   }
@@ -3531,7 +3523,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     name = "pw_transformed_data",
     scode = glue::glue("
       // sorted changepoint matrix
-      matrix[n_trend, n_changepoints] A = get_changepoint_matrix(time, t_change, n_trend, n_changepoints);
+      matrix[n_trend, n_change_trend] Kappa_trend = get_changepoint_matrix(time, t_change_trend, n_trend, n_change_trend);
     "),
     block = "tdata"
   )
@@ -3541,13 +3533,13 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     name = "pw_parameters",
     scode = glue::glue("
       // base trend growth rates
-      vector[n_series_trend] k_trend;
+      vector[n_lv_trend] k_trend;
 
       // trend offset parameters
-      vector[n_series_trend] m_trend;
+      vector[n_lv_trend] m_trend;
 
       // trend rate adjustments per series
-      matrix[n_changepoints, n_series_trend] delta_trend;
+      matrix[n_change_trend, n_lv_trend] delta_trend;
     "),
     block = "parameters"
   )
@@ -3557,15 +3549,15 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     pw_transformed_parameters_stanvar <- brms::stanvar(
       name = "pw_transformed_parameters",
       scode = glue::glue("
-        // raw latent variables (logistic piecewise trends)
-        matrix[n_trend, n_series_trend] LV;
+        // Standardized latent trend matrix (logistic piecewise trends)
+        matrix[n_trend, n_lv_trend] lv_trend;
 
         // logistic trend estimates
-        for (s in 1 : n_series_trend) {{
-          LV[1 : n_trend, s] = logistic_trend(k_trend[s], m_trend[s],
+        for (s in 1 : n_lv_trend) {{
+          lv_trend[1 : n_trend, s] = logistic_trend(k_trend[s], m_trend[s],
                                         to_vector(delta_trend[ : , s]), time,
-                                        to_vector(cap[ : , s]), A, t_change,
-                                        n_changepoints);
+                                        to_vector(cap_trend[ : , s]), Kappa_trend, t_change_trend,
+                                        n_change_trend);
         }}
       "),
       block = "tparameters"
@@ -3575,14 +3567,14 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     pw_transformed_parameters_stanvar <- brms::stanvar(
       name = "pw_transformed_parameters",
       scode = glue::glue("
-        // raw latent variables (linear piecewise trends)
-        matrix[n_trend, n_series_trend] LV;
+        // Standardized latent trend matrix (linear piecewise trends)
+        matrix[n_trend, n_lv_trend] lv_trend;
 
         // linear trend estimates
-        for (s in 1 : n_series_trend) {{
-          LV[1 : n_trend, s] = linear_trend(k_trend[s], m_trend[s],
-                                      to_vector(delta_trend[ : , s]), time, A,
-                                      t_change);
+        for (s in 1 : n_lv_trend) {{
+          lv_trend[1 : n_trend, s] = linear_trend(k_trend[s], m_trend[s],
+                                      to_vector(delta_trend[ : , s]), time, Kappa_trend,
+                                      t_change_trend);
         }}
       "),
       block = "tparameters"
@@ -3592,11 +3584,24 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   # Add trend computation stanvars
   trend_computation <- generate_trend_computation_tparameters(n_lv, n_series)
 
-  # PW trend priors using centralized helper
-  pw_priors <- generate_trend_priors_stanvar(
+  # PW trend priors - always generate defaults if no custom priors
+  # PW has its own default priors that should always be included
+  pw_model_stanvar <- brms::stanvar(
+    name = "pw_model",
+    scode = glue::glue("
+      // PW trend default priors
+      m_trend ~ student_t(3, 0, 2.5);
+      k_trend ~ std_normal();
+      to_vector(delta_trend) ~ double_exponential(0, {changepoint_scale});
+    "),
+    block = "model"
+  )
+  
+  # Also check for custom priors if provided
+  pw_custom_priors <- generate_trend_priors_stanvar(
     param_names = c("m_trend", "k_trend", "delta_trend"),
     prior = prior,
-    stanvar_name = "pw_priors"
+    stanvar_name = "pw_custom_priors"
   )
 
   # Add all required components to the list
@@ -3606,12 +3611,13 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     pw_transformed_data_stanvar,
     pw_parameters_stanvar,
     pw_transformed_parameters_stanvar,
-    trend_computation
+    trend_computation,
+    pw_model_stanvar  # Always include default priors
   ))
 
-  # Add PW priors if specified
-  if (!is.null(pw_priors)) {
-    components <- append(components, list(pw_priors))
+  # Add custom priors if specified (will override defaults)
+  if (!is.null(pw_custom_priors)) {
+    components <- append(components, list(pw_custom_priors))
   }
 
   # Add logistic-specific data if needed

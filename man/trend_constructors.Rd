@@ -5,7 +5,7 @@
 \alias{AR}
 \alias{CAR}
 \alias{VAR}
-\title{Specify autoregressive dynamic processes in \pkg{mvgam}}
+\title{Trend Model Constructors for \pkg{mvgam}}
 \usage{
 RW(
   time = NA,
@@ -28,7 +28,7 @@ AR(
   n_lv = NULL
 )
 
-CAR(time = NA, series = NA, p = 1, n_lv = NULL)
+CAR(time = NA, series = NA)
 
 VAR(
   time = NA,
@@ -101,19 +101,23 @@ for the data using:
 
 \code{series = interaction(group, subgroup, drop = TRUE)}}
 
-\item{p}{A non-negative integer specifying the autoregressive (AR) order.
-Default is \code{1}. Cannot currently be larger than \code{3} for \code{AR}
-terms, and cannot be anything other than \code{1} for continuous time AR
-(\code{CAR}) terms.}
+\item{p}{For \code{AR()} models: A positive integer or vector of positive integers
+specifying the autoregressive lag(s). Can be a single value like \code{p = 1}
+for AR(1), or a vector like \code{p = c(1, 12, 24)} for seasonal models with
+multiple lags. For \code{VAR()} models: A positive integer specifying the VAR order.
+For \code{CAR()} models: Must be \code{1} (continuous time AR(1) process).}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of
 arguments to be interpreted by the parsing functions in \pkg{mvgam}.
 }
 \description{
-Set up autoregressive or autoregressive moving average trend models in
-\pkg{mvgam}. These functions do not evaluate their arguments – they exist
-purely to help set up a model with particular autoregressive trend models.
+Specify trend models for multivariate State-Space models in \pkg{mvgam}.
+These constructor functions create trend specifications for various temporal
+dynamics including random walks (RW), autoregressive models (AR, VAR, CAR),
+Gaussian processes (GP), and piecewise trends (PW). These functions do not
+evaluate their arguments – they exist purely to help set up models with
+particular trend structures.
 }
 \details{
 \strong{Important}: Only ONE trend constructor is allowed per \code{trend_formula}.
@@ -165,10 +169,10 @@ custom_trend <- function(...) {
     amplitude = c(0, Inf),
     phase = NULL  # NULL means no bounds needed
   )
-  
+
   # Process automatically
   processed <- process_trend_params(param_bounds)
-  
+
   # Use in trend object
   structure(list(
     trend = "Custom",

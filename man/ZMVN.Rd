@@ -4,17 +4,9 @@
 \alias{ZMVN}
 \title{Specify correlated residual processes in \pkg{mvgam}}
 \usage{
-ZMVN(unit = time, gr = NA, subgr = series)
+ZMVN(time = NA, series = NA, gr = NA, subgr = NA, n_lv = NULL)
 }
 \arguments{
-\item{unit}{The unquoted name of the variable that represents the unit of
-analysis in \code{data} over which latent residuals should be correlated. This
-variable should be either a \code{numeric} or \code{integer} variable in the
-supplied \code{data}. Defaults to \code{time} to be consistent with other
-functionalities in \pkg{mvgam}, though note that the data need not be time
-series in this case. See examples below for further details and
-explanations}
-
 \item{gr}{An optional grouping variable, which must be a \code{factor} in the
 supplied \code{data}, for setting up hierarchical residual correlation
 structures. If specified, this will automatically set up a model where the
@@ -51,6 +43,14 @@ case, by \code{site}) and create the \code{series} element for the data using
 something like:
 
 \code{series = as.factor(paste0(group, '_', subgroup))}}
+
+\item{unit}{The unquoted name of the variable that represents the unit of
+analysis in \code{data} over which latent residuals should be correlated. This
+variable should be either a \code{numeric} or \code{integer} variable in the
+supplied \code{data}. Defaults to \code{time} to be consistent with other
+functionalities in \pkg{mvgam}, though note that the data need not be time
+series in this case. See examples below for further details and
+explanations}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of

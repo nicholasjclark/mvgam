@@ -287,13 +287,7 @@ parse_trend_formula <- function(trend_formula, data) {
   }
 }
 
-#' Parse Single Trend Formula
-#' 
-#' @param formula Single trend formula
-#' @param data Data frame
-#' @return List with trend type and parameters
-#' @noRd
-# NOTE: This function has been removed as it's replaced by the actual
+# NOTE: parse_single_trend_formula() has been removed as it's replaced by the actual
 # mvgam trend parsing system. The parse_trend_formula() function now
 # calls the real trend system in trend_system.R which provides the
 # complete mvgam_trend objects with monitor_params metadata.

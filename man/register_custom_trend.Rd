@@ -17,7 +17,7 @@ register_custom_trend(
 \item{supports_factors}{Logical indicating if the trend supports factor models}
 
 \item{generator_func}{Function that generates Stan code for this trend type.
-Must accept arguments (trend_spec, data_info) and return list of stanvars.}
+Must accept arguments (trend_specs, data_info) and return list of stanvars.}
 
 \item{incompatibility_reason}{Optional character string explaining why factor
 models aren't supported (if supports_factors = FALSE)}
@@ -26,18 +26,39 @@ models aren't supported (if supports_factors = FALSE)}
 Invisibly returns TRUE on successful registration
 }
 \description{
-User-facing function to register custom trend types.
+User-facing function to register custom trend types. For maximum future-proofing,
+consider using the convention-based approach instead (see Details).
+}
+\details{
+\strong{Recommended Convention-Based Approach}:
+
+Instead of calling this function, define these functions and let auto-discovery handle registration:
+\enumerate{
+\item \code{generate_mytrend_trend_stanvars(trend_specs, data_info)} - Stan code generator
+\item \code{mytrend_trend_properties()} - Returns list(supports_factors = TRUE/FALSE, incompatibility_reason = "...")
+}
+
+This approach requires zero manual registration calls and is automatically future-proof.
 }
 \examples{
 \dontrun{
-# Register a custom trend type
-my_trend_generator <- function(trend_spec, data_info) {
-  # Implementation here
-  list(stanvar(...))
+# RECOMMENDED: Convention-based approach (auto-discovered)
+generate_garch_trend_stanvars <- function(trend_specs, data_info) {
+  # GARCH trend implementation
+  list(brms::stanvar(...))
 }
 
-register_custom_trend("MyTrend", 
+garch_trend_properties <- function() {
+  list(
+    supports_factors = TRUE,
+    incompatibility_reason = NULL
+  )
+}
+# No registration call needed! Auto-discovered on package load.
+
+# ALTERNATIVE: Manual registration (discouraged)
+register_custom_trend("GARCH",
                      supports_factors = TRUE,
-                     generator_func = my_trend_generator)
+                     generator_func = generate_garch_trend_stanvars)
 }
 }

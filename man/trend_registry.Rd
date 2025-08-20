@@ -5,7 +5,7 @@
 \alias{trend_registry}
 \title{Trend System Infrastructure for mvgam}
 \format{
-An object of class \code{environment} of length 7.
+An object of class \code{environment} of length 6.
 }
 \usage{
 trend_registry

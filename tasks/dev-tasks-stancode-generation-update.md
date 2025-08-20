@@ -107,11 +107,15 @@ This document tracks implementation progress for the stancode generation update 
   - [x] 2.7.8.17 Hierarchical grouping support (20 min): **CRITICAL** - Implement proper hierarchical VAR with group-specific coefficients, shared hyperpriors, and block-structured matrices - COMPLETED: Implemented hierarchical VAR architecture with group-specific A_raw_group_trend parameters, shared Amu_trend/Aomega_trend hyperpriors, block-structured Sigma_trend assembly, and proper group indexing matrices. Added hierarchical detection logic, factor model constraints, and comprehensive validation.
   - [x] 2.7.8.18 Group-specific covariance computation (15 min): Update initial_joint_var() usage to handle group-specific Sigma_trend matrices in Omega_trend computation - COMPLETED: Confirmed group-specific correlation matrices already properly implemented with sigma_group_trend parameters and hierarchical structure. No additional changes needed as group-specific covariance computation working correctly.
   - [x] 2.7.8.19 Hierarchical prior integration (15 min): Connect VAR/VARMA hierarchical parameters with centralized prior system for group-level hyperpriors - COMPLETED: Updated centralized prior system to include all hierarchical hyperparameters (Amu_trend, Aomega_trend, Dmu_trend, Domega_trend, sigma_group_trend) ensuring proper integration with group-level parameter estimation.
-- [ ] 2.7.9 Phase 2.6: Update PW generator if needed (may not use shared innovations)
-- [ ] 2.7.10 Phase 3.1: Update all tests to expect new parameter names (innovations_trend, lv_trend, etc.)
-- [ ] 2.7.11 Phase 3.2: Update common_trend_priors to remove LV and use consistent naming
-- [ ] 2.7.12 Phase 3.3: Run full test suite and verify all trend types work with new standardization
-- [ ] 2.7.13 Phase 3.4: **CRITICAL** - Test hierarchical VAR/VARMA models with grouped data to ensure proper group-specific parameter estimation, validate group indexing, and confirm hierarchical correlation functionality
+- [x] 2.7.9 Phase 2.6: Update PW generator if needed (may not use shared innovations) - COMPLETED: Updated PW generator with standardized parameter names (Kappa_trend, n_change_trend, t_change_trend, cap_trend, change_scale_trend, lv_trend), fixed default priors generation, unified trend type from PWlinear/PWlogistic to PW with growth parameter
+- [x] 2.7.10 Phase 3.1: Update all tests to expect new parameter names (innovations_trend, lv_trend, etc.) - COMPLETED: Updated test-stan-assembly-system.R for scaled_innovations_trend, fixed PW test expectations (pw_model vs pw_priors), updated PWlinear/PWlogistic references to unified PW syntax
+- [ ] 2.7.11 Phase 3.2: **CRITICAL ARCHITECTURE CONSISTENCY** - Standardize dimension parameter generation across ALL trend generators
+  - [ ] 2.7.11.1 Step 1 (15 min): Refactor generate_common_trend_data() to be the SINGLE source of dimension stanvars (n_trend, n_series_trend, n_lv_trend) - eliminate duplicate dimension creation in other functions 
+  - [ ] 2.7.11.2 Step 2 (15 min): Update all trend generators (RW, AR, CAR, ZMVN, PW, VAR) to call generate_common_trend_data() consistently for dimensions - remove generate_matrix_z_multiblock_stanvars() dimension duplication
+  - [ ] 2.7.11.3 Step 3 (15 min): Simplify generate_matrix_z_multiblock_stanvars() to handle ONLY matrix Z creation, not dimensions - clean separation of concerns
+- [ ] 2.7.12 Phase 3.2: Update common_trend_priors to remove LV and use consistent naming
+- [ ] 2.7.13 Phase 3.3: Run full test suite and verify all trend types work with new standardization
+- [ ] 2.7.14 Phase 3.4: **CRITICAL** - Test hierarchical VAR/VARMA models with grouped data to ensure proper group-specific parameter estimation, validate group indexing, and confirm hierarchical correlation functionality
 
 ---
 

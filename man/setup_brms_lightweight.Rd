@@ -8,6 +8,7 @@ setup_brms_lightweight(
   formula,
   data,
   family = gaussian(),
+  trend_formula = NULL,
   stanvars = NULL,
   ...
 )
