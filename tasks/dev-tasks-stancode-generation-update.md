@@ -29,6 +29,31 @@ This document tracks implementation progress for the stancode generation update 
 
 ---
 
+## 🚨 CRITICAL ISSUE: VAR/VARMA Hierarchical Grouping Support
+
+**PRIORITY**: HIGH - Must be addressed immediately after likelihood implementation (tasks 2.7.8.10-2.7.8.16)
+
+**PROBLEM**: The current VAR/VARMA implementation **DOES NOT SUPPORT** hierarchical/grouped models correctly. While basic Stan code generation works, grouped data will fail because:
+
+1. **Missing Group-Specific Covariance**: Single `Sigma_trend` matrix instead of `Sigma_trend[g]` for each group
+2. **No Group Indexing**: `lv_trend` matrix lacks proper group indexing structure  
+3. **Missing Hierarchical Correlations**: No integration with hierarchical correlation infrastructure
+4. **Incomplete Group Validation**: Group-specific parameter validation missing
+
+**IMPACT**: VAR/VARMA models with `gr` parameter will:
+- Generate invalid Stan code for grouped scenarios
+- Fail to properly model group-specific process correlations  
+- Produce incorrect parameter estimates for grouped data
+- Break mvgam fitting for hierarchical VAR/VARMA models
+
+**SOLUTION**: Tasks 2.7.8.17-2.7.8.19 implement:
+- Group-specific `Sigma_trend[n_groups]` arrays
+- Proper group indexing in all VAR/VARMA parameters
+- Integration with existing hierarchical correlation infrastructure
+- Group-level hyperprior specifications
+
+---
+
 ## NEXT TASK: Parameter Standardization and Non-Centered Parameterization
 
 **Context**: The current system uses inconsistent parameter names across trend generators (raw_innovations vs innovations_trend, LV vs lv_trend, L_Omega vs L_Omega_trend). We need to standardize on a three-layer architecture:
@@ -62,19 +87,23 @@ This document tracks implementation progress for the stancode generation update 
   - [x] 2.7.8.5 Transformed data setup (15 min): Create transformed data stanvar with trend_zeros, scale_mat_trend, and hyperparameter constants (es_trend, fs_trend, gs_trend, hs_trend) - put hyperparameters in tdata not as user inputs - COMPLETED: Implemented var_tdata_stanvar with comprehensive transformed data block including trend_zeros vector, scale_mat_trend for inverse Wishart priors, complete hyperparameter arrays (es_trend, fs_trend, gs_trend, hs_trend) for A_trend coefficients, conditional MA hyperparameters (es_ma_trend, fs_ma_trend, gs_ma_trend, hs_ma_trend) when ma_lags > 0, df_trend for inverse Wishart degrees of freedom, all as constants not user inputs. Tested successfully with both VAR and VARMA cases.
   - [x] 2.7.8.6 Core parameters block (15 min): Implement VAR parameters: A_trend[lags], Sigma_trend, Amu_trend[2], Aomega_trend[2], lv_trend[n_trend], init_trend for joint initialization - COMPLETED: Implemented var_parameters_stanvar with core VAR coefficient matrices A_trend[lags] using modern Stan array syntax, innovation covariance Sigma_trend with cov_matrix constraint, hierarchical hyperparameters Amu_trend[2] and Aomega_trend[2] with array[2] for diagonal/off-diagonal distinction, conditional init_trend vector sizing (lags*n_lv for VAR, (lags+ma_lags)*n_lv for VARMA), lv_trend matrix for latent variable time series. Proper constraints applied (cov_matrix for Sigma_trend, lower=0 for Aomega_trend). Code reviewer approved implementation with praise for Stan syntax, constraints, and conditional logic. Tested successfully with both VAR and VARMA parameter combinations.
   - [x] 2.7.8.7 MA parameters block (15 min): Add conditional VARMA parameters when ma_lags > 0: D_trend[ma_lags], Dmu_trend[2], Domega_trend[2], handle VAR-only case - COMPLETED: Implemented conditional var_ma_parameters_stanvar that is only created when is_varma=TRUE (ma_lags > 0), follows same hierarchical hyperparameter structure as VAR parameters with array[2] for diagonal/off-diagonal distinction, D_trend naming follows Heaps 2022 convention for MA coefficients, added logical consistency validation between is_varma flag and ma_lags value using checkmate assertions, improved documentation explaining conditional behavior and component list structure (3 stanvars for VAR, 4 for VARMA), fixed Stan code indentation for consistency, tested successfully with ma_lags=0,1,2 cases. Code reviewer initially requested validation improvements which were addressed.
-  - [ ] 2.7.8.8 Stationary coefficient computation (15 min): **NEXT TASK** - Implement transformed parameters: compute phi_trend and theta_trend from A_trend and D_trend using rev_mapping(), handle both VAR and VARMA cases. **CONTEXT**: Create var_tparameters_stanvar with transformed parameters block that calls rev_mapping() to convert partial autocorrelations to stationary coefficients. Need conditional logic for VARMA to handle both phi and theta computation.
-  - [ ] 2.7.8.9 Initial covariance computation (15 min): Compute Omega_trend using initial_joint_var() for VARMA, implement VAR-only covariance computation, set up lv_full_trend and eps_init_trend arrays
-  - [ ] 2.7.8.10 VARMA likelihood - initialization (15 min): Implement joint initial distribution for first p+q observations using multi_normal with Omega_trend, set up mu_init_trend vector
+  - [x] 2.7.8.8 Stationary coefficient computation (15 min): Implement transformed parameters: compute phi_trend and theta_trend from A_trend and D_trend using rev_mapping(), handle both VAR and VARMA cases - COMPLETED: Implemented var_tparameters_stanvar with transformed parameters block that computes stationary coefficients (phi_trend, theta_trend) from partial autocorrelations (A_trend, D_trend) using rev_mapping() function. Uses modern Stan array syntax, handles both VAR(p) and VARMA(p,q) cases with conditional theta_trend computation, applies negative sign to theta coefficients following Heaps 2022 convention, added clear documentation explaining result array structure (row 1=coefficients, row 2=Gamma matrices), removed nested block structure for better scoping, integrated properly into 4-stanvar (VAR) and 5-stanvar (VARMA) component lists. Package loads successfully with implementation. Code reviewer provided feedback on validation (already present in parent function) and documentation improvements (addressed).
+  - [x] 2.7.8.9 Initial covariance computation (15 min): Compute Omega_trend using initial_joint_var() for VARMA, implement VAR-only covariance computation, set up lv_full_trend and eps_init_trend arrays - COMPLETED: Added Omega_trend computation to var_tparameters_stanvar using initial_joint_var() function for both VAR and VARMA cases, implemented conditional logic with proper VAR-only handling (empty theta arrays), set up lv_full_trend[n_trend + lags] working array for extended time series (y_{{1-lags}},...,y_N), added eps_init_trend[ma_lags] array for VARMA initial MA errors, implemented proper array initialization from init_trend vector with correct indexing for both VAR and VARMA parameter layouts, fixed glue template parsing issues with pre-computed conditional code blocks, tested successfully with VAR(1), VAR(2), VARMA(1,1), VARMA(2,1) cases including grouping support, all Stan code generation tests passing. Ready for next task (likelihood implementation).
+  - [ ] 2.7.8.10 VARMA likelihood - initialization (15 min): **NEXT TASK** - Implement joint initial distribution for first p+q observations using multi_normal with Omega_trend, set up mu_init_trend vector
   - [ ] 2.7.8.11 VARMA likelihood - conditional means (15 min): Implement complex conditional mean computation for VARMA dynamics: mu_t_trend[1] with VAR and MA components, handle eps_init_trend
   - [ ] 2.7.8.12 VARMA likelihood - full time series (15 min): Complete conditional mean computation for t=2 to q (transition period) and t=q+1 to N (full VARMA), handle lagged errors properly
   - [ ] 2.7.8.13 VAR coefficient priors (15 min): Implement hierarchical priors for A_trend matrices: diagonal and off-diagonal elements with Amu_trend and Aomega_trend hyperparameters
   - [ ] 2.7.8.14 MA coefficient priors (15 min): Add conditional MA priors for D_trend matrices when ma_lags > 0, implement Dmu_trend and Domega_trend hyperpriors
   - [ ] 2.7.8.15 Innovation covariance priors (15 min): Implement Sigma_trend and consider integrating with shared innovation system, integrate with centralized prior system using generate_trend_priors_stanvar()
   - [ ] 2.7.8.16 System integration and validation (15 min): Integrate factor model support, add trend computation stanvars, implement input validation for lags and ma_lags parameters, test with simple VAR(1) case
+  - [ ] 2.7.8.17 Hierarchical grouping support (20 min): **CRITICAL** - Implement hierarchical process correlations for grouped VAR/VARMA models. Add group-specific Sigma_trend matrices, integrate with hierarchical correlation infrastructure, handle group indexing in lv_trend, and ensure proper group-level parameter estimation. **CONTEXT**: VAR/VARMA models need hierarchical Sigma_trend[g] for each group g, with global/group-specific correlation structures following the pattern used in other generators. This is essential for proper grouped model functionality.
+  - [ ] 2.7.8.18 Group-specific covariance computation (15 min): Update initial_joint_var() usage to handle group-specific Sigma_trend matrices in Omega_trend computation, ensure group indexing consistency across init_trend and lv_trend parameters
+  - [ ] 2.7.8.19 Hierarchical prior integration (15 min): Connect VAR/VARMA hierarchical parameters with centralized prior system, ensure group-level hyperpriors for Amu_trend, Aomega_trend, Dmu_trend, Domega_trend follow established patterns
 - [ ] 2.7.9 Phase 2.6: Update PW generator if needed (may not use shared innovations)
 - [ ] 2.7.10 Phase 3.1: Update all tests to expect new parameter names (innovations_trend, lv_trend, etc.)
 - [ ] 2.7.11 Phase 3.2: Update common_trend_priors to remove LV and use consistent naming
 - [ ] 2.7.12 Phase 3.3: Run full test suite and verify all trend types work with new standardization
+- [ ] 2.7.13 Phase 3.4: **CRITICAL** - Test hierarchical VAR/VARMA models with grouped data to ensure proper group-specific parameter estimation, validate group indexing, and confirm hierarchical correlation functionality
 
 ---
 
@@ -136,6 +165,7 @@ This document tracks implementation progress for the stancode generation update 
 6. **Parameter Validation**: Use checkmate::assert_* for input validation following patterns in other generators.
 7. **Helper Functions**: Use append_if_not_null() helper and do.call(combine_stanvars, components) for assembly.
 8. **Testing Strategy**: Each 15-minute step should be immediately testable in isolation before proceeding.
+9. **🚨 CRITICAL HIERARCHICAL SUPPORT**: Current implementation is **INCOMPLETE** for hierarchical/grouped models. Tasks 2.7.8.17-2.7.8.19 are **ESSENTIAL** before VAR/VARMA can be used with grouped data. The generator currently lacks group-specific Sigma_trend matrices, hierarchical correlation structures, and proper group indexing - this will cause **failures** in grouped model scenarios.
 
 **Next Step**: Implement var_functions_stanvar with sqrtm(), kronecker_prod(), AtoP() functions using modern Stan array syntax.
 

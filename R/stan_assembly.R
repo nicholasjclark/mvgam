@@ -2609,17 +2609,114 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       "),
       block = "parameters"
     )
-    
-    # Add MA parameters to components list for VARMA case (4 components)
-    components <- list(var_functions_stanvar, var_tdata_stanvar, 
-                      var_parameters_stanvar, var_ma_parameters_stanvar)
+  }
+  
+  # VAR/VARMA transformed parameters - compute stationary coefficients
+  # Pre-compute conditional code blocks for cleaner glue template
+  omega_computation <- if (is_varma) {
+    "Omega_trend = initial_joint_var(Sigma_trend, phi_trend, theta_trend);"
   } else {
-    # VAR-only case: no MA parameters needed (3 components)
-    components <- list(var_functions_stanvar, var_tdata_stanvar, var_parameters_stanvar)
+    paste0(
+      "// VAR-only covariance computation (no MA terms)\n",
+      "      array[1] matrix[", n_lv, ", ", n_lv, "] empty_theta;\n",
+      "      empty_theta[1] = rep_matrix(0.0, ", n_lv, ", ", n_lv, ");\n",
+      "      Omega_trend = initial_joint_var(Sigma_trend, phi_trend, empty_theta[1:0]);"
+    )
+  }
+  
+  var_tparameters_stanvar <- brms::stanvar(
+    name = "var_tparameters", 
+    scode = glue::glue("
+      // Compute stationary coefficients using rev_mapping() from Heaps 2022
+      array[{lags}] matrix[{n_lv}, {n_lv}] phi_trend;  // Stationary VAR coefficients
+      {if(is_varma) paste0('array[', ma_lags, '] matrix[', n_lv, ', ', n_lv, '] theta_trend;  // Stationary MA coefficients') else ''}
+      
+      // Initial joint covariance matrix for stationary initialization (Heaps 2022)
+      cov_matrix[{if(is_varma) (lags + ma_lags) * n_lv else lags * n_lv}] Omega_trend;
+      
+      // Working arrays for VARMA likelihood computation  
+      vector[{n_lv}] lv_full_trend[n_trend + {lags}];  // Extended y series: y_{{1-{lags}}},...,y_N
+      {if(is_varma) paste0('vector[', n_lv, '] eps_init_trend[', ma_lags, '];  // Initial MA errors: eps_0,...,eps_{{1-', ma_lags, '}}') else ''}
+      
+      // Convert A_trend partial autocorrelations to stationary phi_trend coefficients
+      array[{lags}] matrix[{n_lv}, {n_lv}] P_var;
+      array[2, {lags}] matrix[{n_lv}, {n_lv}] result_var;
+      
+      // Transform A_trend matrices using AtoP transformation
+      for (i in 1:{lags}) {{
+        P_var[i] = AtoP(A_trend[i]);
+      }}
+      
+      // Apply reverse mapping to get stationary coefficients and Gamma matrices
+      // Row 1 of result contains phi coefficients, row 2 contains Gamma matrices
+      result_var = rev_mapping(P_var, Sigma_trend);
+      
+      // Extract phi coefficients from result (row 1 contains stationary coefficients)
+      for (i in 1:{lags}) {{
+        phi_trend[i] = result_var[1, i];
+      }}
+      
+      {if(is_varma) paste0('
+      // Convert D_trend partial autocorrelations to stationary theta_trend coefficients (VARMA only)
+      array[', ma_lags, '] matrix[', n_lv, ', ', n_lv, '] P_ma;
+      array[2, ', ma_lags, '] matrix[', n_lv, ', ', n_lv, '] result_ma;
+      
+      // Transform D_trend matrices using AtoP transformation
+      for (i in 1:', ma_lags, ') {
+        P_ma[i] = AtoP(D_trend[i]);
+      }
+      
+      // Apply reverse mapping to get MA coefficients
+      // Row 1 of result contains theta coefficients, row 2 contains Gamma matrices
+      result_ma = rev_mapping(P_ma, Sigma_trend);
+      
+      // Extract theta coefficients and apply negative sign (Heaps 2022 convention)
+      for (i in 1:', ma_lags, ') {
+        theta_trend[i] = -result_ma[1, i];
+      }
+      ') else ''}
+      
+      // Compute initial joint covariance matrix using companion matrix approach
+      {omega_computation}
+      
+      // Set up working arrays for likelihood computation
+      // Initialize lv_full_trend: first {lags} elements from init_trend (y_{{1-{lags}}},...,y_0)
+      for (i in 1:{lags}) {{
+        int start_idx = ({lags} - i) * {n_lv} + 1;
+        int end_idx = ({lags} - i + 1) * {n_lv};
+        lv_full_trend[i] = init_trend[start_idx:end_idx];
+      }}
+      
+      // Remaining elements from lv_trend (y_1,...,y_N)
+      for (i in 1:n_trend) {{
+        for (j in 1:{n_lv}) {{
+          lv_full_trend[{lags} + i, j] = lv_trend[i, j];
+        }}
+      }}
+      
+      {if(is_varma) paste0('
+      // Initialize eps_init_trend from init_trend (MA components: eps_0,...,eps_{{1-', ma_lags, '}})
+      for (i in 1:', ma_lags, ') {
+        int start_idx = ', lags, ' * ', n_lv, ' + (i - 1) * ', n_lv, ' + 1;
+        int end_idx = ', lags, ' * ', n_lv, ' + i * ', n_lv, ';
+        eps_init_trend[i] = init_trend[start_idx:end_idx];
+      }
+      ') else ''}
+    "),
+    block = "tparameters"
+  )
+  
+  # Create components list based on model type
+  if (is_varma) {
+    # Add MA parameters to components list for VARMA case (5 components)
+    components <- list(var_functions_stanvar, var_tdata_stanvar, 
+                      var_parameters_stanvar, var_ma_parameters_stanvar, var_tparameters_stanvar)
+  } else {
+    # VAR-only case: no MA parameters needed (4 components)
+    components <- list(var_functions_stanvar, var_tdata_stanvar, var_parameters_stanvar, var_tparameters_stanvar)
   }
   
   # TODO: Add remaining stanvar components in subsequent tasks
-  # - var_tparameters_stanvar (task 2.7.8.8, 2.7.8.9)
   # - var_model_stanvar (task 2.7.8.10-2.7.8.15)
   
   # Combine stanvars using established pattern
