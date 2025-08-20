@@ -2276,10 +2276,19 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     insight::format_error("VAR factor model requires {.field n_lv} <= {.field n_series}")
   }
   
-  # Determine model type
+  # Determine model type with validation
   is_varma <- ma_lags > 0
   is_factor_model <- n_lv < n_series
   use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
+  
+  # Additional validation for logical consistency
+  checkmate::assert_logical(is_varma, len = 1)
+  if (is_varma && ma_lags <= 0) {
+    insight::format_error("Internal error: VARMA flag set but {.field ma_lags} <= 0")
+  }
+  if (!is_varma && ma_lags > 0) {
+    insight::format_error("Internal error: VARMA flag not set but {.field ma_lags} > 0")
+  }
   
   # VAR/VARMA mathematical functions block with modern Stan syntax and numerical stability
   var_functions_stanvar <- brms::stanvar(
@@ -2556,11 +2565,60 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     block = "tdata"
   )
   
-  # Initialize stanvar components list
-  components <- list(var_functions_stanvar, var_tdata_stanvar)
+  # Core VAR parameters block with conditional VARMA extensions
+  var_parameters_stanvar <- brms::stanvar(
+    name = "var_parameters",
+    scode = glue::glue("
+      // Core VAR coefficient matrices (A_trend) - always present for VAR(p) and VARMA(p,q)
+      array[{lags}] matrix[{n_lv}, {n_lv}] A_trend;
+      
+      // Innovation covariance matrix - always present
+      cov_matrix[{n_lv}] Sigma_trend;
+      
+      // Hierarchical hyperparameters for A_trend coefficients
+      // [1] = diagonal elements, [2] = off-diagonal elements
+      array[2] vector[{lags}] Amu_trend;     // Means for A_trend elements
+      array[2] vector<lower=0>[{lags}] Aomega_trend;  // Precisions for A_trend elements
+      
+      // Joint initialization vector for stationary distribution
+      // Size: {lags * n_lv} for VAR(p), {(lags + ma_lags) * n_lv} for VARMA(p,q)
+      vector[{if(is_varma) (lags + ma_lags) * n_lv else lags * n_lv}] init_trend;
+      
+      // Latent variable trends - time series of latent states
+      matrix[n_trend, {n_lv}] lv_trend;
+    "),
+    block = "parameters"
+  )
+  
+  # Conditional MA parameters block for VARMA(p,q) when ma_lags > 0
+  # This creates a 4th stanvar component only for VARMA models
+  # D_trend naming follows Heaps 2022 convention for MA coefficients
+  if (is_varma) {
+    var_ma_parameters_stanvar <- brms::stanvar(
+      name = "var_ma_parameters",
+      scode = glue::glue("
+      // MA coefficient matrices (D_trend) - only present for VARMA(p,q)
+      // D_trend follows Heaps 2022 naming for Moving Average coefficients
+      array[{ma_lags}] matrix[{n_lv}, {n_lv}] D_trend;
+      
+      // Hierarchical hyperparameters for D_trend (MA) coefficients
+      // Mirrors A_trend hyperparameter structure for consistency
+      // [1] = diagonal elements, [2] = off-diagonal elements
+      array[2] vector[{ma_lags}] Dmu_trend;           // Means for D_trend elements
+      array[2] vector<lower=0>[{ma_lags}] Domega_trend;  // Precisions for D_trend elements
+      "),
+      block = "parameters"
+    )
+    
+    # Add MA parameters to components list for VARMA case (4 components)
+    components <- list(var_functions_stanvar, var_tdata_stanvar, 
+                      var_parameters_stanvar, var_ma_parameters_stanvar)
+  } else {
+    # VAR-only case: no MA parameters needed (3 components)
+    components <- list(var_functions_stanvar, var_tdata_stanvar, var_parameters_stanvar)
+  }
   
   # TODO: Add remaining stanvar components in subsequent tasks
-  # - var_parameters_stanvar (task 2.7.8.6, 2.7.8.7) 
   # - var_tparameters_stanvar (task 2.7.8.8, 2.7.8.9)
   # - var_model_stanvar (task 2.7.8.10-2.7.8.15)
   
