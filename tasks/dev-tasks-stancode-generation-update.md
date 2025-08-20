@@ -54,7 +54,23 @@ This document tracks implementation progress for the stancode generation update 
 - [x] 2.7.5 Phase 2.2: Refactor AR generator - implement 3-stanvar pattern (ar_parameters, ar_tparameters, ar_model) and use standardized parameter names - COMPLETED: Implemented clean 3-stanvar pattern with proper validation, supports multiple AR lags (including discontinuous lags), MA combinations, factor models, uses standardized parameter names (ar{lag}_trend, lv_trend, ma_innovations_trend, scaled_innovations_trend), added comprehensive tests covering unit testing, integration testing, edge cases, and system consistency
 - [x] 2.7.6 Phase 2.3: Refactor CAR generator - implement 3-stanvar pattern and standardized parameter names - COMPLETED: Implemented clean 3-stanvar pattern (car_parameters, car_tparameters, car_model), updated to use standardized parameter names (ar1_trend, lv_trend, scaled_innovations_trend), removed mu_trend from dynamics for consistency with RW/AR generators, added proper validation, maintains CAR-specific features (time_dis, continuous-time AR evolution)  
 - [x] 2.7.7 Phase 2.4: Refactor ZMVN generator - convert to non-centered parameterization with 3-stanvar pattern - COMPLETED: Implemented clean 3-stanvar pattern (zmvn_parameters, zmvn_tparameters, zmvn_model), uses shared innovation system for non-centered parameterization with direct transformation lv_trend = scaled_innovations_trend, works for both n_lv=1 and n_lv>1 cases, properly handles hierarchical and factor model cases, added comprehensive tests covering univariate/multivariate, correlations, factor models, hierarchical structures, edge cases, validation, standardized naming (11/11 tests passing)
-- [ ] 2.7.8 Phase 2.5: Refactor VAR generator - implement 3-stanvar pattern (VAR exempt from shared innovations)
+- [ ] 2.7.8 Phase 2.5: Refactor VAR/VARMA generator - implement complete Heaps 2022 stationary VARMA(p,q) with 3-stanvar pattern (VAR exempt from shared innovations)
+  - [x] 2.7.8.1 Parameter standardization design (15 min): Map all Heaps parameters to _trend naming convention, document VAR vs VARMA conditional logic based on ma_lags parameter, design 3-stanvar pattern (var_parameters, var_tparameters, var_model) - COMPLETED: Established comprehensive parameter mapping from Heaps 2022 to mvgam standards (A→A_trend, D→D_trend, phi→phi_trend, theta→theta_trend, Sigma→Sigma_trend, Omega→Omega_trend, init→init_trend, yfull→lv_full_trend, epsinit→eps_init_trend, mut→mu_t_trend, Amu→Amu_trend, Aomega→Aomega_trend, Dmu→Dmu_trend, Domega→Domega_trend). Documented conditional logic: VAR(p) when ma_lags=0 (core parameters: A_trend[lags], Amu_trend[2], Aomega_trend[2], Sigma_trend, lv_trend[n_trend], init_trend[lags*n_lv_trend]) vs VARMA(p,q) when ma_lags>0 (additional: D_trend[ma_lags], Dmu_trend[2], Domega_trend[2], extended init_trend[(lags+ma_lags)*n_lv_trend]). Designed 3-stanvar pattern: var_parameters (all parameter declarations with conditional VARMA), var_tparameters (stationary coefficient computation: phi_trend, theta_trend, Omega_trend, working arrays), var_model (VARMA likelihood + hierarchical priors). Fixed hyperparameters in transformed data: es_trend, fs_trend, gs_trend, hs_trend as constants not user inputs. Input validation: lags≥1, ma_lags≥0, factor model when n_lv<n_series.
+  - [ ] 2.7.8.2 Functions block implementation (15 min): **NEXT TASK** - Implement sqrtm(), kronecker_prod(), AtoP(), and update array syntax to modern Stan in functions block stanvar. **CONTEXT FOR NEW DEV**: Currently working on generate_var_trend_stanvars() function in R/stan_assembly.R (starts around line 2246). This function needs complete replacement following Heaps 2022 VARMA implementation (see original model in lines 113-368 above). Need to create var_functions_stanvar with 4 mathematical functions: (1) sqrtm() for matrix square root computation, (2) kronecker_prod() for Kronecker products in companion matrix approach, (3) AtoP() for partial autocorrelation transformation, (4) rev_mapping() and initial_joint_var() will be separate tasks. Update old array syntax (matrix[m,m] name[p]) to modern Stan (array[p] matrix[m,m] name). Pattern: create brms::stanvar with name="var_functions", scode="function definitions", block="functions". Follow same pattern as other trend generators in file (RW around line 1876, AR around line 2066, CAR around line 2546, ZMVN around line 2709). VAR is unique - does NOT use shared innovation system unlike other generators.
+  - [ ] 2.7.8.3 Reverse mapping function (15 min): Implement rev_mapping() function with updated array syntax, ensure proper return type for stationary VAR/VARMA coefficient computation
+  - [ ] 2.7.8.4 Initial joint variance function (15 min): Implement initial_joint_var() function for VARMA(p,q) stationary initialization using companion matrix approach
+  - [ ] 2.7.8.5 Transformed data setup (15 min): Create transformed data stanvar with trend_zeros, scale_mat_trend, and hyperparameter constants (es_trend, fs_trend, gs_trend, hs_trend) - put hyperparameters in tdata not as user inputs
+  - [ ] 2.7.8.6 Core parameters block (15 min): Implement VAR parameters: A_trend[lags], Sigma_trend, Amu_trend[2], Aomega_trend[2], lv_trend[n_trend], init_trend for joint initialization
+  - [ ] 2.7.8.7 MA parameters block (15 min): Add conditional VARMA parameters when ma_lags > 0: D_trend[ma_lags], Dmu_trend[2], Domega_trend[2], handle VAR-only case
+  - [ ] 2.7.8.8 Stationary coefficient computation (15 min): Implement transformed parameters: compute phi_trend and theta_trend from A_trend and D_trend using rev_mapping(), handle both VAR and VARMA cases
+  - [ ] 2.7.8.9 Initial covariance computation (15 min): Compute Omega_trend using initial_joint_var() for VARMA, implement VAR-only covariance computation, set up lv_full_trend and eps_init_trend arrays
+  - [ ] 2.7.8.10 VARMA likelihood - initialization (15 min): Implement joint initial distribution for first p+q observations using multi_normal with Omega_trend, set up mu_init_trend vector
+  - [ ] 2.7.8.11 VARMA likelihood - conditional means (15 min): Implement complex conditional mean computation for VARMA dynamics: mu_t_trend[1] with VAR and MA components, handle eps_init_trend
+  - [ ] 2.7.8.12 VARMA likelihood - full time series (15 min): Complete conditional mean computation for t=2 to q (transition period) and t=q+1 to N (full VARMA), handle lagged errors properly
+  - [ ] 2.7.8.13 VAR coefficient priors (15 min): Implement hierarchical priors for A_trend matrices: diagonal and off-diagonal elements with Amu_trend and Aomega_trend hyperparameters
+  - [ ] 2.7.8.14 MA coefficient priors (15 min): Add conditional MA priors for D_trend matrices when ma_lags > 0, implement Dmu_trend and Domega_trend hyperpriors
+  - [ ] 2.7.8.15 Innovation covariance priors (15 min): Implement Sigma_trend ~ inv_wishart with scale_mat_trend, integrate with centralized prior system using generate_trend_priors_stanvar()
+  - [ ] 2.7.8.16 System integration and validation (15 min): Integrate factor model support, add trend computation stanvars, implement input validation for lags and ma_lags parameters, test with simple VAR(1) case
 - [ ] 2.7.9 Phase 2.6: Update PW generator if needed (may not use shared innovations)
 - [ ] 2.7.10 Phase 3.1: Update all tests to expect new parameter names (innovations_trend, lv_trend, etc.)
 - [ ] 2.7.11 Phase 3.2: Update common_trend_priors to remove LV and use consistent naming
@@ -108,3 +124,274 @@ This document tracks implementation progress for the stancode generation update 
 - Use `code-reviewer` agent for all R code changes (non-negotiable)
 - All tests must pass before moving to the next section
 - Parameter standardization (2.7) is the critical path blocking all subsequent work
+
+## VAR/VARMA Implementation Context
+
+**Key Architectural Decisions for New Developer:**
+1. **No Shared Innovations**: VAR/VARMA generator is exempt from shared innovation system used by RW/AR/CAR/ZMVN. VAR handles its own parameter and prior system completely independently.
+2. **Conditional Structure**: Single generator handles both VAR(p) and VARMA(p,q) based on ma_lags parameter (0 = VAR only, >0 = VARMA).
+3. **Function Location**: Working in generate_var_trend_stanvars() in R/stan_assembly.R starting around line 2246 - this entire function needs replacement.
+4. **Reference Implementation**: Original Heaps 2022 VARMA model provided below for mathematical reference, but array syntax needs updating to modern Stan.
+5. **3-Stanvar Pattern**: Must follow var_parameters, var_tparameters, var_model naming pattern like other generators.
+6. **Parameter Validation**: Use checkmate::assert_* for input validation following patterns in other generators.
+7. **Helper Functions**: Use append_if_not_null() helper and do.call(combine_stanvars, components) for assembly.
+8. **Testing Strategy**: Each 15-minute step should be immediately testable in isolation before proceeding.
+
+**Next Step**: Implement var_functions_stanvar with sqrtm(), kronecker_prod(), AtoP() functions using modern Stan array syntax.
+
+## Original Heaps VARMA parameterisation (uses out of date array syntax)
+functions {
+  /* Function to compute the matrix square root */
+  matrix sqrtm(matrix A) {
+    int m = rows(A);
+    vector[m] root_root_evals = sqrt(sqrt(eigenvalues_sym(A)));
+    matrix[m, m] evecs = eigenvectors_sym(A);
+    matrix[m, m] eprod = diag_post_multiply(evecs, root_root_evals);
+    return tcrossprod(eprod);
+  }
+  /* Function to compute Kronecker product */
+  matrix kronecker_prod(matrix A, matrix B) {
+    matrix[rows(A) * rows(B), cols(A) * cols(B)] C;
+    int m = rows(A);
+    int n = cols(A);
+    int p = rows(B);
+    int q = cols(B);
+    for (i in 1:m) {
+      for (j in 1:n) {
+        int row_start = (i - 1) * p + 1;
+        int row_end = (i - 1) * p + p;
+        int col_start = (j - 1) * q + 1;
+        int col_end = (j - 1) * q + q;
+        C[row_start:row_end, col_start:col_end] = A[i, j] * B;
+      }
+    }
+    return C;
+  }
+  /* Function to transform A to P (inverse of part 2 of reparameterisation) */
+  matrix AtoP(matrix A) {
+    int m = rows(A);
+    matrix[m, m] B = tcrossprod(A);
+    for(i in 1:m) B[i, i] += 1.0;
+    return mdivide_left_spd(sqrtm(B), A);
+  }
+  /* Function to perform the reverse mapping from the Appendix. The details of
+     how to perform Step 1 are in Section S1.3 of the Supplementary Materials.
+     Returned: a length-p array of (m x m) matrices; the i-th component
+               of the array is phi_i */
+  matrix[] rev_mapping(matrix[] P, matrix Sigma) {
+    int p = size(P);
+    int m = rows(Sigma);
+    matrix[m, m] phi_for[p, p];   matrix[m, m] phi_rev[p, p];
+    matrix[m, m] Sigma_for[p+1];  matrix[m, m] Sigma_rev[p+1];
+    matrix[m, m] S_for;           matrix[m, m] S_rev;
+    matrix[m, m] S_for_list[p+1];
+    // Step 1:
+    Sigma_for[p+1] = Sigma;
+    S_for_list[p+1] = sqrtm(Sigma);
+    for(s in 1:p) {
+      // In this block of code S_rev is B^{-1} and S_for is a working matrix
+      S_for = - tcrossprod(P[p-s+1]);
+      for(i in 1:m) S_for[i, i] += 1.0;
+      S_rev = sqrtm(S_for);
+      S_for_list[p-s+1] = mdivide_right_spd(mdivide_left_spd(S_rev, 
+                              sqrtm(quad_form_sym(Sigma_for[p-s+2], S_rev))), S_rev);
+      Sigma_for[p-s+1] = tcrossprod(S_for_list[p-s+1]);
+    }
+    // Step 2:
+    Sigma_rev[1] = Sigma_for[1];
+    for(s in 0:(p-1)) {
+      S_for = S_for_list[s+1];
+      S_rev = sqrtm(Sigma_rev[s+1]);
+      phi_for[s+1, s+1] = mdivide_right_spd(S_for * P[s+1], S_rev);
+      phi_rev[s+1, s+1] = mdivide_right_spd(S_rev * P[s+1]', S_for);
+      if(s>=1) {
+        for(k in 1:s) {
+          phi_for[s+1, k] = phi_for[s, k] - phi_for[s+1, s+1] * phi_rev[s, s-k+1];
+          phi_rev[s+1, k] = phi_rev[s, k] - phi_rev[s+1, s+1] * phi_for[s, s-k+1];
+        }
+      }
+      Sigma_rev[s+2] = Sigma_rev[s+1] - quad_form_sym(Sigma_for[s+1], 
+                                                      phi_rev[s+1, s+1]');
+    }
+    return phi_for[p];
+  }
+  /* Function to compute the joint (stationary) distribution of 
+     (y_0, ..., y_{1-p}, eps_0, ..., eps_{1-q}). Details of the underpinning
+     ideas are given in Section S7 of the Supplementary Materials. */
+  matrix initial_joint_var(matrix Sigma, matrix[] phi, matrix[] theta) {
+    int p = size(phi);
+    int q = size(theta);
+    int m = rows(Sigma);
+    matrix[(p+q)*m, (p+q)*m] companion_mat = rep_matrix(0.0, (p+q)*m, (p+q)*m);
+    matrix[(p+q)*m, (p+q)*m] companion_var = rep_matrix(0.0, (p+q)*m, (p+q)*m);
+    matrix[(p+q)*m*(p+q)*m, (p+q)*m*(p+q)*m] tmp = diag_matrix(rep_vector(1.0, 
+                                                             (p+q)*m*(p+q)*m));
+    matrix[(p+q)*m, (p+q)*m] Omega;
+    // Construct phi_tilde:
+    for(i in 1:p) {
+      companion_mat[1:m, ((i-1)*m+1):(i*m)] = phi[i];
+      if(i>1) {
+        for(j in 1:m) {
+          companion_mat[(i-1)*m+j, (i-2)*m+j] = 1.0;
+        }
+      }
+    }
+    for(i in 1:q) {
+      companion_mat[1:m, ((p+i-1)*m+1):((p+i)*m)] = theta[i];
+    }
+    if(q>1) {
+      for(i in 2:q) {
+        for(j in 1:m) {
+          companion_mat[(p+i-1)*m+j, (p+i-2)*m+j] = 1.0;
+        }
+      }
+    }
+    // Construct Sigma_tilde:
+    companion_var[1:m, 1:m] = Sigma;
+    companion_var[(p*m+1):((p+1)*m), (p*m+1):((p+1)*m)] = Sigma;
+    companion_var[1:m, (p*m+1):((p+1)*m)] = Sigma;
+    companion_var[(p*m+1):((p+1)*m), 1:m] = Sigma;
+    // Compute Gamma0_tilde
+    tmp -= kronecker_prod(companion_mat, companion_mat);
+    Omega = to_matrix(tmp \ to_vector(companion_var), (p+q)*m, (p+q)*m);
+    // Ensure Omega is symmetric:
+    for(i in 1:(rows(Omega)-1)) {
+      for(j in (i+1):rows(Omega)) {
+        Omega[j, i] = Omega[i, j];
+      }
+    }
+    return Omega;
+  }
+}
+data {
+  int<lower=1> m; // Dimension of observation vector
+  int<lower=1> p; // Order of VAR component
+  int<lower=1> q; // Order of VMA component
+  int<lower=1> N; // Length of time series
+  vector[m] y[N]; // Time series
+  // Hyperparameters in exchangeable prior for the A_i (component 1 of arrays) 
+  // and D_i (component 2 of arrays). See Section 3.2 of the paper.
+  vector[2] es[2];
+  vector<lower=0>[2] fs[2];
+  vector<lower=0>[2] gs[2];
+  vector<lower=0>[2] hs[2];
+  // Hyperparameters in exchangeable inverse Wishart prior for Sigma
+  real<lower=0> scale_diag;                    // Diagonal element in scale matrix
+  real<lower=-scale_diag/(m-1)> scale_offdiag; /* Off-diagonal element in scale 
+                                                  matrix */
+  real<lower=m+3> df;                          /* Degrees of freedom (limit ensures 
+                                                  finite variance) */
+}
+transformed data {
+  vector[m] mu = rep_vector(0.0, m); // (Zero)-mean of VARMA process
+  matrix[m, m] scale_mat;            // Scale-matrix in prior for Sigma
+  for(i in 1:m) {
+    for(j in 1:m) {
+      if(i==j) scale_mat[i, j] = scale_diag;
+      else scale_mat[i, j] = scale_offdiag;
+    }
+  }
+}
+parameters {
+  vector[m*(p+q)] init; // (y_0^T, ..., y_{1-p}^T, eps_0^T, ..., eps_{1-q}^T)^T
+  matrix[m, m] A[p];    // The A_i
+  matrix[m, m] D[q];    // The D_i
+  cov_matrix[m] Sigma;  // Error variance, Sigma
+  // Means and precisions in top-level prior for the diagonal and off-diagonal
+  // elements in the A_i
+  vector[p] Amu[2];
+  vector<lower=0>[p] Aomega[2];
+  // Means and precisions in top-level prior for the diagonal and off-diagonal
+  // elements in the D_i
+  vector[q] Dmu[2];
+  vector<lower=0>[q] Domega[2];
+}
+transformed parameters {
+  matrix[m, m] phi[p];       // The phi_i
+  matrix[m, m] theta[q];     // The theta_i
+  cov_matrix[(p+q)*m] Omega; // Variance in initial distribution, i.e. Gamma0_tilde
+  vector[m] yfull[N+p];      // (y_{1-p}^T, ..., y_{N}^T)^T
+  vector[m] epsinit[q];      // (eps_0^T, ..., eps_{1-q}^T)^T
+  {
+    matrix[m, m] P[p];
+    matrix[m, m] R[q];
+    for(i in 1:p) P[i] = AtoP(A[i]);
+    for(i in 1:q) R[i] = AtoP(D[i]);
+    phi = rev_mapping(P, Sigma);
+    theta = rev_mapping(R, Sigma);
+    for(i in 1:q) theta[i] = -theta[i];
+    Omega = initial_joint_var(Sigma, phi, theta);
+    for(i in 1:p) {
+      yfull[i] = init[((p-i)*m+1):((p-i+1)*m)]; // y[1-p],...,y[0]
+    }
+    yfull[(p+1):(p+N)] = y;
+    for(i in 1:q) {
+      epsinit[i] = init[(p*m+(i-1)*m+1):(p*m+i*m)]; // eps[0],...,eps[1-q]
+    }
+  }
+}
+model {
+  vector[(p+q)*m] mut_init; /* Marginal mean of 
+                               (y_0, ..., y_{1-p}, eps_0, ..., eps_{1-q}) */
+  vector[m] mut[N];         // Conditional means of y_{1}, ..., y_{N}
+  // (Complete data) likelihood:
+  for(t in 1:p) mut_init[((t-1)*m+1):(t*m)] = mu;
+  mut_init[(p*m+1):((p+q)*m)] = rep_vector(0.0, q*m);
+  mut[1] = mu;
+  for(i in 1:p) {
+    mut[1] += phi[i] * (yfull[p+1-i] - mu);
+  }
+  for(i in 1:q) {
+    mut[1] += theta[i] * epsinit[i];
+  }
+  if(q>1) {
+    for(t in 2:q) {
+      mut[t] = mu;
+      for(i in 1:p) {
+        mut[t] += phi[i] * (yfull[p+t-i] - mu);
+      }
+      for(i in 1:(t-1)) {
+        mut[t] += theta[i] * (yfull[p+t-i] - mut[t-i]);
+      }
+      for(i in t:q) {
+        mut[t] += theta[i] * epsinit[i-t+1];
+      }
+    }
+  }
+  for(t in (q+1):N) {
+    mut[t] = mu;
+    for(i in 1:p) {
+      mut[t] += phi[i] * (yfull[p+t-i] - mu);
+    }
+    for(i in 1:q) {
+      mut[t] += theta[i] * (yfull[p+t-i] - mut[t-i]);
+    }
+  }
+  init ~ multi_normal(mut_init, Omega);
+  y ~  multi_normal(mut, Sigma);
+  // Prior:
+  Sigma ~ inv_wishart(df, scale_mat);
+  for(s in 1:p) {
+    diagonal(A[s]) ~ normal(Amu[1, s], 1 / sqrt(Aomega[1, s]));
+    for(i in 1:m) {
+      for(j in 1:m) {
+        if(i != j) A[s, i, j] ~ normal(Amu[2, s], 1 / sqrt(Aomega[2, s]));
+      }
+    }
+  }
+  for(s in 1:q) {
+    diagonal(D[s]) ~ normal(Dmu[1, s], 1 / sqrt(Domega[1, s]));
+    for(i in 1:m) {
+      for(j in 1:m) {
+        if(i != j) D[s, i, j] ~ normal(Dmu[2, s], 1 / sqrt(Domega[2, s]));
+      }
+    }
+  }
+  // Hyperprior:
+  for(i in 1:2) {
+    Amu[i] ~ normal(es[1,i], fs[1,i]);
+    Aomega[i] ~ gamma(gs[1,i], hs[1,i]); 
+    Dmu[i] ~ normal(es[2,i], fs[2,i]);
+    Domega[i] ~ gamma(gs[2,i], hs[2,i]); 
+  }
+}
