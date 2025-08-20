@@ -658,13 +658,13 @@ test_that("generate_trend_priors_stanvar creates correct stanvars", {
     stanvar_name = "test_priors"
   )
   
-  expect_true(inherits(stanvar_result, "stanvar"))
-  expect_equal(stanvar_result$name, "test_priors")
-  expect_equal(stanvar_result$block, "model")
+  expect_true(inherits(stanvar_result, "stanvars"))
+  expect_equal(stanvar_result$test_priors$name, "test_priors")
+  expect_equal(stanvar_result$test_priors$block, "model")
   
   # Check that the Stan code contains both priors
-  expect_true(grepl("ar1_trend ~ normal\\(0, 0\\.3\\)", stanvar_result$scode))
-  expect_true(grepl("sigma_trend ~ exponential\\(1\\.5\\)", stanvar_result$scode))
+  expect_true(grepl("ar1_trend ~ normal\\(0, 0\\.3\\)", stanvar_result$test_priors$scode))
+  expect_true(grepl("sigma_trend ~ exponential\\(1\\.5\\)", stanvar_result$test_priors$scode))
 })
 
 test_that("generate_trend_priors_stanvar handles empty priors correctly", {
@@ -702,40 +702,12 @@ test_that("generate_trend_priors_stanvar works with single parameter", {
     stanvar_name = "single_prior"
   )
   
-  expect_true(inherits(single_result, "stanvar"))
-  expect_equal(single_result$name, "single_prior")
-  expect_true(grepl("theta1_trend ~ normal\\(0, 0\\.2\\)", single_result$scode))
+  expect_true(inherits(single_result, "stanvars"))
+  expect_equal(single_result$single_prior$name, "single_prior")
+  expect_true(grepl("theta1_trend ~ normal\\(0, 0\\.2\\)", single_result$single_prior$scode))
 })
 
-test_that("centralized prior system integrates with MA components", {
-  # Test that MA components use the centralized system
-  test_prior <- data.frame(
-    prior = "normal(0, 0.3)",
-    class = "theta1_trend",
-    coef = "",
-    group = "",
-    resp = "",
-    dpar = "",
-    nlpar = "",
-    lb = "",
-    ub = "",
-    source = "user",
-    stringsAsFactors = FALSE
-  )
-  class(test_prior) <- c("brmsprior", "data.frame")
-  
-  # Test MA components function with prior
-  ma_components <- mvgam:::generate_ma_components(n_lv = 2, prior = test_prior)
-  
-  expect_true(is.list(ma_components))
-  expect_true("theta1_param" %in% names(ma_components))
-  expect_true("theta1_prior" %in% names(ma_components))
-  
-  # Check that the prior stanvar exists and uses the user prior
-  theta1_prior_stanvar <- ma_components$theta1_prior
-  expect_true(inherits(theta1_prior_stanvar, "stanvar"))
-  expect_true(grepl("theta1_trend ~ normal\\(0, 0\\.3\\)", theta1_prior_stanvar$scode))
-})
+# Removed obsolete test for generate_ma_components function (no longer exists)
 
 test_that("centralized prior system works with common AR parameters", {
   # Test centralized system with parameters that are in common_trend_priors
@@ -761,8 +733,8 @@ test_that("centralized prior system works with common AR parameters", {
     stanvar_name = "ar_priors"
   )
   
-  expect_true(inherits(ar_priors, "stanvar"))
-  expect_true(grepl("ar1_trend ~ normal\\(0, 0\\.2\\)", ar_priors$scode))
+  expect_true(inherits(ar_priors, "stanvars"))
+  expect_true(grepl("ar1_trend ~ normal\\(0, 0\\.2\\)", ar_priors$ar_priors$scode))
 })
 
 test_that("centralized prior system works with CAR trend parameters", {
@@ -789,9 +761,9 @@ test_that("centralized prior system works with CAR trend parameters", {
     stanvar_name = "car_priors"
   )
   
-  expect_true(inherits(car_priors, "stanvar"))
-  expect_true(grepl("ar1 ~ normal\\(0, 0\\.8\\)", car_priors$scode))
-  expect_true(grepl("sigma_trend ~ exponential\\(2\\.5\\)", car_priors$scode))
+  expect_true(inherits(car_priors, "stanvars"))
+  expect_true(grepl("ar1 ~ normal\\(0, 0\\.8\\)", car_priors$car_priors$scode))
+  expect_true(grepl("sigma_trend ~ exponential\\(2\\.5\\)", car_priors$car_priors$scode))
 })
 
 
@@ -834,18 +806,404 @@ test_that("centralized prior system input validation works correctly", {
 test_that("centralized prior system provides proper backward compatibility", {
   # Test that generators work with prior = NULL (backward compatibility)
   
-  # Test MA components with NULL prior (should work without errors)
-  ma_null <- mvgam:::generate_ma_components(n_lv = 1, prior = NULL)
-  expect_true(is.list(ma_null))
-  expect_true("theta1_param" %in% names(ma_null))
-  # Whether theta1_prior exists depends on whether there's a default in common_trend_priors
-  
   # Test generate_trend_priors_stanvar with NULL
   null_result <- mvgam:::generate_trend_priors_stanvar(
     param_names = c("param1", "param2"),
     prior = NULL,
     stanvar_name = "test"
   )
-  # Should return NULL or stanvar depending on common_trend_priors content
-  expect_true(is.null(null_result) || inherits(null_result, "stanvar"))
+  # Should return NULL or stanvars depending on common_trend_priors content
+  expect_true(is.null(null_result) || inherits(null_result, "stanvars"))
+})
+
+# Comprehensive Tests for Refactored RW and AR Generators
+# ========================================================
+
+test_that("RW generator follows 3-stanvar pattern consistently", {
+  # Test simple RW
+  trend_specs <- list(trend = "RW", n_lv = 2, ma = FALSE, cor = FALSE)
+  data_info <- list(n_obs = 100, n_series = 2)
+  
+  stanvars <- mvgam:::generate_rw_trend_stanvars(trend_specs, data_info)
+  stanvar_names <- names(stanvars)
+  
+  # Should have basic components but no parameters block for simple RW
+  expect_true("rw_tparameters" %in% stanvar_names)
+  expect_false("rw_parameters" %in% stanvar_names)  # No MA
+  expect_false("rw_model" %in% stanvar_names)  # No MA priors
+  
+  # Check that tparameters block contains correct parameter names
+  rw_tparam <- stanvars$rw_tparameters
+  expect_equal(rw_tparam$block, "tparameters")
+  expect_true(grepl("lv_trend", rw_tparam$scode))
+  expect_true(grepl("scaled_innovations_trend", rw_tparam$scode))
+})
+
+test_that("RW generator handles MA components correctly", {
+  # Test RW with MA
+  trend_specs <- list(trend = "RW", n_lv = 2, ma = TRUE, cor = FALSE)
+  data_info <- list(n_obs = 100, n_series = 2)
+  
+  stanvars <- mvgam:::generate_rw_trend_stanvars(trend_specs, data_info)
+  stanvar_names <- names(stanvars)
+  
+  # Should have all 3 stanvar blocks for MA case
+  expect_true("rw_parameters" %in% stanvar_names)  # MA params
+  expect_true("rw_tparameters" %in% stanvar_names)
+  expect_true("rw_model" %in% stanvar_names)  # MA priors
+  
+  # Check parameters block
+  rw_params <- stanvars$rw_parameters
+  expect_equal(rw_params$block, "parameters")
+  expect_true(grepl("theta1_trend", rw_params$scode))
+  
+  # Check MA transformation in tparameters
+  rw_tparam <- stanvars$rw_tparameters
+  expect_true(grepl("ma_innovations_trend", rw_tparam$scode))
+  expect_true(grepl("theta1_trend", rw_tparam$scode))
+})
+
+test_that("RW generator handles factor models and custom priors", {
+  # Test factor model RW with custom prior
+  trend_specs <- list(trend = "RW", n_lv = 2, ma = TRUE, cor = FALSE)
+  data_info <- list(n_obs = 100, n_series = 5)  # Factor model: n_lv < n_series
+  
+  # Create custom prior for theta1_trend
+  prior <- brms::set_prior("normal(0, 0.3)", class = "theta1_trend")
+  
+  stanvars <- mvgam:::generate_rw_trend_stanvars(trend_specs, data_info, prior)
+  stanvar_names <- names(stanvars)
+  
+  # Should have factor model components
+  expect_true(any(grepl("factor", stanvar_names, ignore.case = TRUE)))
+  expect_true(any(grepl("Z", stanvar_names)))
+  
+  # Should handle priors correctly
+  expect_true("rw_model" %in% stanvar_names)
+  
+  # Check that sigma_trend priors are NOT duplicated (handled by shared system)
+  if ("rw_model" %in% stanvar_names) {
+    rw_model_code <- stanvars$rw_model$scode
+    expect_false(grepl("sigma_trend", rw_model_code))
+  }
+})
+
+test_that("RW generator validation catches invalid inputs", {
+  # Test dimension validation
+  expect_error(
+    mvgam:::generate_rw_trend_stanvars(
+      trend_specs = list(trend = "RW", n_lv = 0),
+      data_info = list(n_series = 2)
+    ),
+    "not >= 1"
+  )
+  
+  expect_error(
+    mvgam:::generate_rw_trend_stanvars(
+      trend_specs = list(trend = "RW", n_lv = 2),
+      data_info = list(n_series = -1)
+    ),
+    "not >= 1"
+  )
+})
+
+test_that("AR generator follows 3-stanvar pattern consistently", {
+  # Test simple AR(2)
+  trend_specs <- list(trend = "AR", n_lv = 2, lags = 2, ma = FALSE, cor = FALSE)
+  data_info <- list(n_obs = 100, n_series = 2)
+  
+  stanvars <- mvgam:::generate_ar_trend_stanvars(trend_specs, data_info)
+  stanvar_names <- names(stanvars)
+  
+  # Should have all 3 stanvar blocks for AR
+  expect_true("ar_parameters" %in% stanvar_names)  # AR coefficients
+  expect_true("ar_tparameters" %in% stanvar_names)
+  expect_true("ar_model" %in% stanvar_names)  # AR priors
+  
+  # Check parameters block has correct AR coefficients
+  ar_params <- stanvars$ar_parameters
+  expect_equal(ar_params$block, "parameters")
+  expect_true(grepl("ar1_trend", ar_params$scode))
+  expect_true(grepl("ar2_trend", ar_params$scode))
+  
+  # Check tparameters has AR dynamics
+  ar_tparam <- stanvars$ar_tparameters
+  expect_equal(ar_tparam$block, "tparameters")
+  expect_true(grepl("lv_trend", ar_tparam$scode))
+  expect_true(grepl("ar1_trend.*\\* lv_trend", ar_tparam$scode))
+  expect_true(grepl("ar2_trend.*\\* lv_trend", ar_tparam$scode))
+})
+
+test_that("AR generator handles discontinuous lags correctly", {
+  # Test AR with non-standard lags (seasonal AR)
+  trend_specs <- list(trend = "AR", n_lv = 1, ar_lags = c(1, 12), ma = FALSE, cor = FALSE)
+  data_info <- list(n_obs = 100, n_series = 1)
+  
+  stanvars <- mvgam:::generate_ar_trend_stanvars(trend_specs, data_info)
+  
+  # Check parameters block has correct lag-specific coefficients
+  ar_params <- stanvars$ar_parameters
+  expect_true(grepl("ar1_trend", ar_params$scode))
+  expect_true(grepl("ar12_trend", ar_params$scode))
+  expect_false(grepl("ar2_trend", ar_params$scode))  # Should not have ar2
+  
+  # Check AR dynamics uses correct lags
+  ar_tparam <- stanvars$ar_tparameters
+  expect_true(grepl("ar1_trend.*\\* lv_trend", ar_tparam$scode))
+  expect_true(grepl("ar12_trend.*\\* lv_trend", ar_tparam$scode))
+  
+  # Check proper initialization for max lag (12)
+  expect_true(grepl("for \\(i in 1:12\\)", ar_tparam$scode))
+  expect_true(grepl("for \\(i in 13:n_trend\\)", ar_tparam$scode))
+})
+
+test_that("AR generator handles MA combinations correctly", {
+  # Test AR + MA
+  trend_specs <- list(trend = "AR", n_lv = 2, lags = 1, ma = TRUE, cor = FALSE)
+  data_info <- list(n_obs = 100, n_series = 2)
+  
+  stanvars <- mvgam:::generate_ar_trend_stanvars(trend_specs, data_info)
+  stanvar_names <- names(stanvars)
+  
+  # Should have both AR and MA parameters
+  expect_true("ar_parameters" %in% stanvar_names)
+  expect_true("ar_ma_parameters" %in% stanvar_names)
+  
+  # Check MA parameters block
+  ar_ma_params <- stanvars$ar_ma_parameters
+  expect_equal(ar_ma_params$block, "parameters")
+  expect_true(grepl("theta1_trend", ar_ma_params$scode))
+  
+  # Check tparameters has both AR and MA transformations
+  ar_tparam <- stanvars$ar_tparameters
+  expect_true(grepl("ma_innovations_trend", ar_tparam$scode))
+  expect_true(grepl("theta1_trend", ar_tparam$scode))
+  expect_true(grepl("ar1_trend.*\\* lv_trend", ar_tparam$scode))
+  
+  # Check model block has priors for both AR and MA parameters
+  ar_model <- stanvars$ar_model
+  expect_equal(ar_model$block, "model")
+})
+
+test_that("AR generator handles factor models correctly", {
+  # Test factor model AR
+  trend_specs <- list(trend = "AR", n_lv = 2, lags = 1, ma = FALSE, cor = FALSE)
+  data_info <- list(n_obs = 100, n_series = 4)  # Factor model: n_lv < n_series
+  
+  stanvars <- mvgam:::generate_ar_trend_stanvars(trend_specs, data_info)
+  stanvar_names <- names(stanvars)
+  
+  # Should have factor model components
+  expect_true(any(grepl("factor", stanvar_names, ignore.case = TRUE)))
+  expect_true(any(grepl("Z", stanvar_names)))
+  
+  # Should still have AR components
+  expect_true("ar_parameters" %in% stanvar_names)
+  expect_true("ar_tparameters" %in% stanvar_names)
+})
+
+test_that("AR generator handles custom priors correctly", {
+  # Test AR with custom priors for different parameters
+  trend_specs <- list(trend = "AR", n_lv = 2, lags = 2, ma = TRUE)
+  data_info <- list(n_obs = 100, n_series = 2)
+  
+  # Create custom priors for AR and MA parameters
+  priors <- c(
+    brms::set_prior("normal(0, 0.2)", class = "ar1_trend"),
+    brms::set_prior("normal(0, 0.1)", class = "ar2_trend"),
+    brms::set_prior("normal(0, 0.5)", class = "theta1_trend")
+  )
+  
+  stanvars <- mvgam:::generate_ar_trend_stanvars(trend_specs, data_info, priors)
+  
+  # Should handle priors correctly - exact content depends on prior system implementation
+  expect_true("ar_model" %in% names(stanvars))
+  
+  # Should NOT have sigma_trend priors (handled by shared system)
+  ar_model_code <- stanvars$ar_model$scode
+  expect_false(grepl("sigma_trend", ar_model_code))
+})
+
+test_that("AR generator validation catches invalid inputs", {
+  # Test dimension validation  
+  expect_error(
+    mvgam:::generate_ar_trend_stanvars(
+      trend_specs = list(trend = "AR", n_lv = 0, lags = 1),
+      data_info = list(n_series = 2)
+    ),
+    "not >= 1"
+  )
+  
+  expect_error(
+    mvgam:::generate_ar_trend_stanvars(
+      trend_specs = list(trend = "AR", n_lv = 2, lags = 0),
+      data_info = list(n_series = 2)
+    ),
+    "not >= 1"
+  )
+  
+  # Test invalid AR lags
+  expect_error(
+    mvgam:::generate_ar_trend_stanvars(
+      trend_specs = list(trend = "AR", n_lv = 2, ar_lags = c(1, -1)),
+      data_info = list(n_series = 2)
+    ),
+    "not >= 1"
+  )
+})
+
+test_that("Both RW and AR generators use shared innovation system correctly", {
+  # Test that both generators use scaled_innovations_trend and don't create sigma_trend priors
+  
+  # RW case
+  rw_specs <- list(trend = "RW", n_lv = 2, ma = FALSE, cor = FALSE)
+  data_info <- list(n_obs = 100, n_series = 2)
+  
+  rw_stanvars <- mvgam:::generate_rw_trend_stanvars(rw_specs, data_info)
+  rw_tparam <- rw_stanvars$rw_tparameters
+  expect_true(grepl("scaled_innovations_trend", rw_tparam$scode))
+  expect_false(any(grepl("sigma_trend", sapply(rw_stanvars, function(x) x$scode))))
+  
+  # AR case  
+  ar_specs <- list(trend = "AR", n_lv = 2, lags = 1, ma = FALSE, cor = FALSE)
+  
+  ar_stanvars <- mvgam:::generate_ar_trend_stanvars(ar_specs, data_info)
+  ar_tparam <- ar_stanvars$ar_tparameters
+  expect_true(grepl("scaled_innovations_trend", ar_tparam$scode))
+  expect_false(any(grepl("sigma_trend", sapply(ar_stanvars, function(x) x$scode))))
+})
+
+test_that("Helper function append_if_not_null works correctly", {
+  # Test append_if_not_null helper function
+  components <- list(a = 1, b = 2)
+  
+  # Test appending non-null item
+  result1 <- mvgam:::append_if_not_null(components, list(c = 3))
+  expect_length(result1, 3)
+  expect_equal(result1[[3]], list(c = 3))
+  
+  # Test appending null item
+  result2 <- mvgam:::append_if_not_null(components, NULL)
+  expect_length(result2, 2)
+  expect_identical(result2, components)
+  
+  # Test validation
+  expect_error(
+    mvgam:::append_if_not_null("not_a_list", list(c = 3)),
+    "Must be of type 'list'"
+  )
+})
+
+# ZMVN Generator Tests ----
+test_that("generate_zmvn_trend_stanvars works with different configurations", {
+  
+  # Test 1: Univariate ZMVN (n_lv = 1, n_series = 1)
+  trend_specs_univ <- list(n_lv = 1)
+  data_info_univ <- list(n_obs = 50, n_series = 1)
+  
+  result_univ <- mvgam:::generate_zmvn_trend_stanvars(trend_specs_univ, data_info_univ)
+  expect_s3_class(result_univ, "stanvars")
+  
+  # Should include shared innovation components
+  stanvar_names_univ <- names(result_univ)
+  expect_true("innovations_trend" %in% stanvar_names_univ)
+  expect_true("scaled_innovations" %in% stanvar_names_univ)
+  expect_true("sigma_trend" %in% stanvar_names_univ)
+  expect_true("zmvn_tparameters" %in% stanvar_names_univ)
+  
+  # Should NOT include correlation matrix for univariate case
+  expect_false("L_Omega_trend" %in% stanvar_names_univ)
+  
+  # Test 2: Multivariate ZMVN (n_lv = 3, n_series = 3)
+  trend_specs_mv <- list(n_lv = 3)
+  data_info_mv <- list(n_obs = 100, n_series = 3)
+  
+  result_mv <- mvgam:::generate_zmvn_trend_stanvars(trend_specs_mv, data_info_mv)
+  expect_s3_class(result_mv, "stanvars")
+  
+  stanvar_names_mv <- names(result_mv)
+  expect_true("innovations_trend" %in% stanvar_names_mv)
+  expect_true("scaled_innovations" %in% stanvar_names_mv)
+  expect_true("sigma_trend" %in% stanvar_names_mv)
+  expect_true("L_Omega_trend" %in% stanvar_names_mv)  # Should include correlation matrix
+  expect_true("zmvn_tparameters" %in% stanvar_names_mv)
+  
+  # Test 3: Factor model ZMVN (n_lv = 2, n_series = 4)
+  trend_specs_factor <- list(n_lv = 2)
+  data_info_factor <- list(n_obs = 80, n_series = 4)
+  
+  result_factor <- mvgam:::generate_zmvn_trend_stanvars(trend_specs_factor, data_info_factor)
+  expect_s3_class(result_factor, "stanvars")
+  
+  stanvar_names_factor <- names(result_factor)
+  expect_true("Z" %in% stanvar_names_factor)  # Factor model should include Z matrix
+  expect_true("L_Omega_trend" %in% stanvar_names_factor)  # n_lv > 1 so correlation matrix included
+  expect_true("innovations_trend" %in% stanvar_names_factor)
+  
+  # Test 4: ZMVN with grouping (hierarchical)
+  trend_specs_hier <- list(n_lv = 2, gr = "site")
+  data_info_hier <- list(n_obs = 120, n_series = 2, n_groups = 3)
+  
+  result_hier <- mvgam:::generate_zmvn_trend_stanvars(trend_specs_hier, data_info_hier)
+  expect_s3_class(result_hier, "stanvars")
+  
+  stanvar_names_hier <- names(result_hier)
+  # Hierarchical should include different correlation structure
+  expect_true("innovations_trend" %in% stanvar_names_hier)
+  expect_true("zmvn_tparameters" %in% stanvar_names_hier)
+  
+  # Test 5: ZMVN with custom priors
+  trend_specs_prior <- list(n_lv = 2)
+  data_info_prior <- list(n_obs = 60, n_series = 2)
+  custom_priors <- brms::prior(normal(0, 1), class = "sigma")
+  
+  result_prior <- mvgam:::generate_zmvn_trend_stanvars(
+    trend_specs_prior, 
+    data_info_prior, 
+    prior = custom_priors
+  )
+  expect_s3_class(result_prior, "stanvars")
+  
+  # Test 6: Validation - invalid inputs
+  expect_error(
+    mvgam:::generate_zmvn_trend_stanvars("invalid", data_info_univ),
+    "Must be of type 'list'"
+  )
+  
+  expect_error(
+    mvgam:::generate_zmvn_trend_stanvars(trend_specs_univ, "invalid"),
+    "Must be of type 'list'"
+  )
+  
+  # Test 7: Edge case - n_lv equals n_series (boundary between factor and non-factor)
+  trend_specs_boundary <- list(n_lv = 3)
+  data_info_boundary <- list(n_obs = 90, n_series = 3)
+  
+  result_boundary <- mvgam:::generate_zmvn_trend_stanvars(trend_specs_boundary, data_info_boundary)
+  expect_s3_class(result_boundary, "stanvars")
+  
+  # Should not be treated as factor model when n_lv == n_series
+  boundary_names <- names(result_boundary)
+  expect_true("L_Omega_trend" %in% boundary_names)  # Should include correlation
+})
+
+test_that("ZMVN transformed parameters use non-centered parameterization", {
+  
+  # Test that ZMVN uses scaled_innovations_trend -> lv_trend transformation
+  trend_specs <- list(n_lv = 2)
+  data_info <- list(n_obs = 50, n_series = 2)
+  
+  result <- mvgam:::generate_zmvn_trend_stanvars(trend_specs, data_info)
+  
+  # Extract transformed parameters block
+  tparams_stanvar <- result[["zmvn_tparameters"]]
+  expect_s3_class(tparams_stanvar, "stanvar")
+  expect_equal(tparams_stanvar$block, "tparameters")
+  
+  # Check that the Stan code includes the direct transformation
+  stan_code <- tparams_stanvar$scode
+  expect_true(grepl("lv_trend.*=.*scaled_innovations_trend", stan_code))
+  
+  # Should be a simple assignment, not complex dynamics
+  expect_false(grepl("for.*loop", stan_code))  # No complex loops for ZMVN
 })
