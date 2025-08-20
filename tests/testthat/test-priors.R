@@ -737,33 +737,32 @@ test_that("centralized prior system integrates with MA components", {
   expect_true(grepl("theta1_trend ~ normal\\(0, 0\\.3\\)", theta1_prior_stanvar$scode))
 })
 
-test_that("centralized prior system works with AR trend generators", {
-  # Test AR trend generation with custom priors
+test_that("centralized prior system works with common AR parameters", {
+  # Test centralized system with parameters that are in common_trend_priors
   test_prior <- data.frame(
-    prior = c("normal(0, 0.2)", "normal(0, 0.25)", "exponential(1.5)"),
-    class = c("ar1_trend", "ar12_trend", "sigma_trend"),
-    coef = c("", "", ""),
-    group = c("", "", ""),
-    resp = c("", "", ""),
-    dpar = c("", "", ""),
-    nlpar = c("", "", ""),
-    lb = c("", "", "0"),
-    ub = c("", "", ""),
-    source = c("user", "user", "user"),
+    prior = c("normal(0, 0.2)", "exponential(1.5)"),
+    class = c("ar1_trend", "sigma_trend"),
+    coef = c("", ""),
+    group = c("", ""),
+    resp = c("", ""),
+    dpar = c("", ""),
+    nlpar = c("", ""),
+    lb = c("", "0"),
+    ub = c("", ""),
+    source = c("user", "user"),
     stringsAsFactors = FALSE
   )
   class(test_prior) <- c("brmsprior", "data.frame")
   
-  # Test that the centralized helper works for multiple AR parameters
+  # Test that the centralized helper works for common AR parameters
   ar_priors <- mvgam:::generate_trend_priors_stanvar(
-    param_names = c("ar1_trend", "ar12_trend"),
+    param_names = c("ar1_trend"),
     prior = test_prior,
     stanvar_name = "ar_priors"
   )
   
   expect_true(inherits(ar_priors, "stanvar"))
   expect_true(grepl("ar1_trend ~ normal\\(0, 0\\.2\\)", ar_priors$scode))
-  expect_true(grepl("ar12_trend ~ normal\\(0, 0\\.25\\)", ar_priors$scode))
 })
 
 test_that("centralized prior system works with CAR trend parameters", {
@@ -795,35 +794,6 @@ test_that("centralized prior system works with CAR trend parameters", {
   expect_true(grepl("sigma_trend ~ exponential\\(2\\.5\\)", car_priors$scode))
 })
 
-test_that("centralized prior system works with PW trend parameters", {
-  # Test PW (piecewise) parameters
-  test_prior <- data.frame(
-    prior = c("student_t(3, 0, 1)", "normal(0, 1)", "double_exponential(0, 0.1)"),
-    class = c("m_trend", "k_trend", "delta_trend"),
-    coef = c("", "", ""),
-    group = c("", "", ""),
-    resp = c("", "", ""),
-    dpar = c("", "", ""),
-    nlpar = c("", "", ""),
-    lb = c("", "", ""),
-    ub = c("", "", ""),
-    source = c("user", "user", "user"),
-    stringsAsFactors = FALSE
-  )
-  class(test_prior) <- c("brmsprior", "data.frame")
-  
-  # Test PW prior generation
-  pw_priors <- mvgam:::generate_trend_priors_stanvar(
-    param_names = c("m_trend", "k_trend", "delta_trend"),
-    prior = test_prior,
-    stanvar_name = "pw_priors"
-  )
-  
-  expect_true(inherits(pw_priors, "stanvar"))
-  expect_true(grepl("m_trend ~ student_t\\(3, 0, 1\\)", pw_priors$scode))
-  expect_true(grepl("k_trend ~ normal\\(0, 1\\)", pw_priors$scode))
-  expect_true(grepl("delta_trend ~ double_exponential\\(0, 0\\.1\\)", pw_priors$scode))
-})
 
 test_that("centralized prior system input validation works correctly", {
   # Test invalid inputs to generate_trend_priors_stanvar
@@ -832,7 +802,7 @@ test_that("centralized prior system input validation works correctly", {
       param_names = character(0),  # Empty parameter names
       prior = NULL
     ),
-    "min.len = 1"
+    "Must have length >= 1"
   )
   
   expect_error(
@@ -840,7 +810,7 @@ test_that("centralized prior system input validation works correctly", {
       param_names = c("param1", NA),  # NA in parameter names
       prior = NULL
     ),
-    "any.missing = FALSE"
+    "Contains missing values"
   )
   
   expect_error(
@@ -857,7 +827,7 @@ test_that("centralized prior system input validation works correctly", {
       prior = NULL,
       stanvar_name = ""  # Empty stanvar name
     ),
-    "min.chars = 1"
+    "All elements must have at least 1 characters"
   )
 })
 

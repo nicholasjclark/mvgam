@@ -95,6 +95,13 @@ common_trend_priors <- list(
     bounds = c(NA, NA),
     description = "Factor loadings matrix",
     dimension = "matrix"
+  ),
+  
+  theta1_trend = list(
+    default = "normal(0, 0.5)",
+    bounds = c(-1, 1),
+    description = "MA(1) coefficient",
+    dimension = "vector"
   )
 )
 

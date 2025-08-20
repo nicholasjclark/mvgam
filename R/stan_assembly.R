@@ -1252,12 +1252,12 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
   }
 
   # 4. Raw innovations parameter (Stan will sample these with std_normal prior)
-  raw_innovations_stanvar <- brms::stanvar(
-    name = "raw_innovations",
-    scode = paste0("matrix[n_trend, ", effective_dim, "] raw_innovations;"),
+  innovations_trend_stanvar <- brms::stanvar(
+    name = "innovations_trend",
+    scode = paste0("matrix[n_trend, ", effective_dim, "] innovations_trend;"),
     block = "parameters"
   )
-  stanvar_components <- append(stanvar_components, list(raw_innovations_stanvar))
+  stanvar_components <- append(stanvar_components, list(innovations_trend_stanvar))
 
   # 5. Final innovations in transformed parameters (after correlation/MA transformation)
   if (is_hierarchical) {
@@ -1945,11 +1945,17 @@ generate_trend_priors_stanvar <- function(param_names, prior = NULL, stanvar_nam
   
   # Return stanvar only if there are priors to include
   if (length(prior_lines) > 0) {
-    return(brms::stanvar(
+    # brms::stanvar() always returns a stanvars collection, extract the individual stanvar
+    stanvar_collection <- brms::stanvar(
+      x = NULL,
       name = stanvar_name,
       scode = paste0(prior_lines, collapse = "\n"),
       block = "model"
-    ))
+    )
+    # Extract and properly class the individual stanvar
+    individual_stanvar <- stanvar_collection[[stanvar_name]]
+    class(individual_stanvar) <- "stanvar"
+    return(individual_stanvar)
   } else {
     return(NULL)
   }
