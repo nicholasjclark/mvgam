@@ -2276,3 +2276,37 @@ process_capacity_parameter <- function(cap, data) {
     "You specified {.field cap = {cap}} of type {.field {class(cap)}}."
   ))
 }
+
+#' Validate Factor + Hierarchical Restriction
+#'
+#' @description
+#' Validates that factor models and hierarchical grouping are not used together.
+#' This restriction applies to all trends that support both features.
+#'
+#' @param trend_specs Trend specification list containing n_lv, gr, subgr parameters
+#' @param n_series Number of series from data_info
+#' @param trend_name Name of the trend type for error messages (e.g., "RW", "AR", "VAR") 
+#' @return Invisible TRUE if valid, stops with error if invalid
+#' @noRd
+validate_no_factor_hierarchical <- function(trend_specs, n_series, trend_name) {
+  checkmate::assert_list(trend_specs, names = "named")
+  checkmate::assert_int(n_series, lower = 1)
+  checkmate::assert_string(trend_name)
+  
+  # Check if this is a factor model
+  n_lv <- trend_specs$n_lv
+  is_factor_model <- !is.null(n_lv) && n_lv < n_series
+  
+  # Check if hierarchical grouping is requested
+  use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
+  
+  # Factor models are incompatible with hierarchical grouping
+  if (use_grouping && is_factor_model) {
+    stop(insight::format_error(
+      glue::glue("Hierarchical {trend_name} models cannot use factor models"),
+      "Use {.field n_lv = n_series} or remove {.field gr}/{.field subgr} parameters"
+    ))
+  }
+  
+  return(invisible(TRUE))
+}

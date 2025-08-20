@@ -2770,3 +2770,63 @@ test_that("VAR Stan code uses Heaps 2022 transformation methodology", {
   expect_true(grepl("rev_mapping\\(P_ma", tparams_code)) # MA transformation call  
   expect_true(grepl("initial_joint_var\\(Sigma_trend", tparams_code)) # Omega computation
 })
+
+test_that("hierarchical RW rejects factor models correctly", {
+  # Test hierarchical RW with factor model (should error)
+  trend_specs_hier_factor <- list(
+    trend = "RW", 
+    n_lv = 2,    # Factor model: n_lv < n_series  
+    ma = FALSE,
+    gr = "group"
+  )
+  data_info_hier_factor <- list(
+    n_obs = 80, 
+    n_series = 4,
+    n_groups = 2,
+    n_subgroups = 2
+  )
+  
+  expect_error({
+    mvgam:::generate_trend_injection_stanvars(trend_specs_hier_factor, data_info_hier_factor)
+  }, "Hierarchical RW models.*cannot use factor models")
+})
+
+test_that("hierarchical AR rejects factor models correctly", {
+  # Test hierarchical AR with factor model (should error)
+  trend_specs_hier_factor <- list(
+    trend = "AR", 
+    n_lv = 2,    # Factor model: n_lv < n_series  
+    lags = 1,
+    ma = FALSE,
+    gr = "group"
+  )
+  data_info_hier_factor <- list(
+    n_obs = 80, 
+    n_series = 4,
+    n_groups = 2,
+    n_subgroups = 2
+  )
+  
+  expect_error({
+    mvgam:::generate_trend_injection_stanvars(trend_specs_hier_factor, data_info_hier_factor)
+  }, "Hierarchical AR models.*cannot use factor models")
+})
+
+test_that("hierarchical ZMVN rejects factor models correctly", {
+  # Test hierarchical ZMVN with factor model (should error)
+  trend_specs_hier_factor <- list(
+    trend = "ZMVN", 
+    n_lv = 2,    # Factor model: n_lv < n_series  
+    gr = "group"
+  )
+  data_info_hier_factor <- list(
+    n_obs = 80, 
+    n_series = 4,
+    n_groups = 2,
+    n_subgroups = 2
+  )
+  
+  expect_error({
+    mvgam:::generate_trend_injection_stanvars(trend_specs_hier_factor, data_info_hier_factor)
+  }, "Hierarchical ZMVN models.*cannot use factor models")
+})
