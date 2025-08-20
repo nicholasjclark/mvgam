@@ -1393,23 +1393,37 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
   )
 }
 
-#' Generate Common Trend Data Variables
+#' Generate All Trend Dimension Stanvars - SINGLE SOURCE OF TRUTH
 #'
-#' Creates standard data block stanvars needed by most trend types.
-#' Uses trend-specific naming to avoid conflicts with brms variables.
-#'
+#' Creates ALL standardized dimension data block stanvars needed by ALL trend types.
+#' This function consolidates dimension creation that was previously duplicated
+#' across multiple functions, ensuring consistent dimension parameter generation
+#' while maintaining proper dimensional relationships for factor vs non-factor models.
 #'
 #' @param n_obs Number of observations (will be named n_trend in Stan)
-#' @param n_series Number of observed series
-#' @param n_lv Number of latent variables (optional)
-#' @return List of common data block stanvars
+#' @param n_series Number of observed series 
+#' @param n_lv Number of latent variables (optional, determines factor model behavior)
+#' @param is_factor_model Logical indicating if this is a factor model (optional, inferred from n_lv)
+#' @return List of all dimension data block stanvars (n_trend, n_series_trend, n_lv_trend)
 #' @noRd
-generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL) {
+generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL, is_factor_model = NULL) {
+  # Input validation
   checkmate::assert_number(n_obs, lower = 1)
-  checkmate::assert_number(n_series, lower = 1)
+  checkmate::assert_number(n_series, lower = 1) 
   checkmate::assert_number(n_lv, lower = 1, null.ok = TRUE)
+  checkmate::assert_logical(is_factor_model, len = 1, null.ok = TRUE)
 
-  # Create n_trend stanvar with trend-specific naming to avoid brms conflicts
+  # Infer factor model behavior if not specified
+  if (is.null(is_factor_model)) {
+    is_factor_model <- !is.null(n_lv) && n_lv < n_series
+  }
+  
+  # Set n_lv default for non-factor models
+  if (is.null(n_lv)) {
+    n_lv <- n_series  # Non-factor model: n_lv_trend = n_series_trend
+  }
+
+  # Create n_trend stanvar - always needed
   n_trend_stanvar <- brms::stanvar(
     x = n_obs,
     name = "n_trend",
@@ -1417,7 +1431,7 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL) {
     block = "data"
   )
 
-  # Create n_series_trend stanvar
+  # Create n_series_trend stanvar - always needed
   n_series_trend_stanvar <- brms::stanvar(
     x = n_series,
     name = "n_series_trend",
@@ -1425,9 +1439,9 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL) {
     block = "data"
   )
 
-  # Create n_lv_trend stanvar (always needed for consistent parameter indexing)
-  if (!is.null(n_lv)) {
-    # Factor model: n_lv != n_series
+  # Create n_lv_trend stanvar - always needed for consistent parameter indexing
+  if (is_factor_model) {
+    # Factor model: n_lv_trend < n_series_trend (true latent factors)
     n_lv_trend_stanvar <- brms::stanvar(
       x = n_lv,
       name = "n_lv_trend",
@@ -1437,7 +1451,7 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL) {
   } else {
     # Non-factor model: n_lv_trend = n_series_trend for consistent indexing
     n_lv_trend_stanvar <- brms::stanvar(
-      x = n_series,
+      x = n_series,  # Use n_series for consistency, not n_lv
       name = "n_lv_trend",
       scode = "int<lower=1> n_lv_trend;",
       block = "data"
@@ -1455,50 +1469,8 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL) {
 #' @param n_series Number of observed series
 #' @return List of data block stanvars
 #' @noRd
-generate_matrix_z_data <- function(is_factor_model, n_lv, n_series, n_obs = NULL) {
-  # Create dimension stanvars with standardized naming (consistent with generate_common_trend_data)
-  
-  # Always include n_trend if n_obs is provided
-  stanvars_list <- list()
-  if (!is.null(n_obs)) {
-    n_trend_stanvar <- brms::stanvar(
-      x = n_obs,
-      name = "n_trend",
-      scode = "int<lower=1> n_trend;",
-      block = "data"
-    )
-    stanvars_list <- append(stanvars_list, list(n_trend_stanvar))
-  }
-  
-  n_series_stanvar <- brms::stanvar(
-    x = n_series,
-    name = "n_series_trend",
-    scode = "int<lower=1> n_series_trend;",
-    block = "data"
-  )
-  stanvars_list <- append(stanvars_list, list(n_series_stanvar))
-  
-  # For factor models: n_lv != n_series; for non-factor: n_lv_trend = n_series_trend
-  if (is_factor_model) {
-    n_lv_stanvar <- brms::stanvar(
-      x = n_lv,
-      name = "n_lv_trend", 
-      scode = "int<lower=1> n_lv_trend;",
-      block = "data"
-    )
-  } else {
-    n_lv_stanvar <- brms::stanvar(
-      x = n_series,  # n_lv_trend = n_series_trend for consistency
-      name = "n_lv_trend",
-      scode = "int<lower=1> n_lv_trend;", 
-      block = "data"
-    )
-  }
-  stanvars_list <- append(stanvars_list, list(n_lv_stanvar))
-
-  # Combine using brms c() method to create proper stanvars collection  
-  return(do.call(c, stanvars_list))
-}
+# Function removed - dimension stanvars now handled by generate_common_trend_data()
+# This eliminates "Duplicated names in 'stanvars'" bug
 
 #' Generate Parameter Block Injections for Matrix Z
 #'
@@ -1558,22 +1530,27 @@ generate_matrix_z_tdata <- function(is_factor_model, n_lv, n_series) {
 #' @return List of stanvars for matrix Z across all required blocks
 #' @noRd
 generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv, n_series) {
-  # Get individual stanvar components
-  data_stanvars <- generate_matrix_z_data(is_factor_model, n_lv, n_series)
-  param_stanvars <- generate_matrix_z_parameters(is_factor_model, n_lv, n_series)
-  tdata_stanvars <- generate_matrix_z_tdata(is_factor_model, n_lv, n_series)
-
-  # Combine using brms's native c() method for stanvars
-  # This should preserve proper class structure
-  combined_stanvars <- data_stanvars
-  if (!is.null(param_stanvars)) {
-    combined_stanvars <- c(combined_stanvars, param_stanvars)
+  # Validate inputs following CLAUDE.md standards
+  checkmate::assert_logical(is_factor_model, len = 1)
+  checkmate::assert_integerish(n_lv, len = 1, lower = 1)
+  checkmate::assert_integerish(n_series, len = 1, lower = 1)
+  
+  # Get Z matrix components (dimensions handled by generate_common_trend_data)
+  stanvars_list <- list(
+    generate_matrix_z_parameters(is_factor_model, n_lv, n_series),
+    generate_matrix_z_tdata(is_factor_model, n_lv, n_series)
+  )
+  
+  # Remove NULL elements and combine
+  non_null_stanvars <- Filter(Negate(is.null), stanvars_list)
+  
+  if (length(non_null_stanvars) == 0) {
+    return(NULL)
+  } else if (length(non_null_stanvars) == 1) {
+    return(non_null_stanvars[[1]])
+  } else {
+    return(do.call(c, non_null_stanvars))
   }
-  if (!is.null(tdata_stanvars)) {
-    combined_stanvars <- c(combined_stanvars, tdata_stanvars)
-  }
-
-  return(combined_stanvars)
 }
 
 #' Generate Factor Model Block Code
@@ -1818,6 +1795,23 @@ generate_trend_injection_stanvars <- function(trend_specs, data_info, response_s
     }
   }
 
+  # Extract and validate parameters (single source of truth)
+  n_obs <- data_info$n_obs
+  n_series <- data_info$n_series %||% 1
+  n_lv <- trend_specs$n_lv %||% n_series
+  is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
+  use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
+  
+  # Cross-cutting system validation (integration between factor models and hierarchical correlations)
+  validate_no_factor_hierarchical(trend_specs, n_series, trend_type)
+  
+  # Parameter validation
+  checkmate::assert_int(n_obs, lower = 1)
+  checkmate::assert_int(n_series, lower = 1)
+  checkmate::assert_int(n_lv, lower = 1)
+  
+  dimensions <- generate_common_trend_data(n_obs, n_series, n_lv, is_factor_model)
+  
   # Generate trend-specific stanvars using consistent naming convention
   trend_stanvars <- generator_function(trend_specs, data_info, prior = prior)
 
@@ -1826,14 +1820,15 @@ generate_trend_injection_stanvars <- function(trend_specs, data_info, response_s
     trend_stanvars <- apply_response_suffix_to_stanvars(trend_stanvars, response_suffix)
   }
 
-  # Combine shared and trend-specific stanvars
+  # Combine dimensions + shared + trend-specific stanvars
   if (!is.null(shared_stanvars)) {
-    # shared_stanvars is a named list of stanvars objects, preserve the names
-    # Combine with trend stanvars while preserving names from both sources
-    combined_stanvars <- combine_stanvars(shared_stanvars, trend_stanvars)
+    # Combine all components: dimensions + shared innovations + trend specifics
+    combined_stanvars <- combine_stanvars(dimensions, shared_stanvars, trend_stanvars)
     return(combined_stanvars)
   } else {
-    return(trend_stanvars)
+    # No shared innovations: combine dimensions + trend specifics
+    combined_stanvars <- combine_stanvars(dimensions, trend_stanvars)
+    return(combined_stanvars)
   }
 }
 
@@ -1890,18 +1885,24 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Extract dimensions and configuration
   n_lv <- trend_specs$n_lv %||% 1
   n_series <- data_info$n_series %||% 1
+  n_obs <- data_info$n_obs
 
   # Validate dimensions
   checkmate::assert_int(n_lv, lower = 1)
   checkmate::assert_int(n_series, lower = 1)
+  checkmate::assert_int(n_obs, lower = 1)
 
   is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
   has_ma <- trend_specs$ma %||% FALSE
+  
+  # Cross-cutting validation handled by injection function
 
   # Build components list following the 3-stanvar pattern
   components <- list()
 
-  # Add common data and matrix Z (these go in data block)
+  # STEP 1: Dimensions handled by calling context (no duplication)
+
+  # STEP 2: Always add matrix Z (factor=parameters, non-factor=diagonal in tdata)
   matrix_z <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
   components <- append_if_not_null(components, matrix_z)
 
@@ -2079,11 +2080,13 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   n_lv <- trend_specs$n_lv %||% 1
   lags <- trend_specs$lags %||% 1
   n_series <- data_info$n_series %||% 1
+  n_obs <- data_info$n_obs
 
   # Validate dimensions
   checkmate::assert_int(n_lv, lower = 1)
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_int(lags, lower = 1)
+  checkmate::assert_int(n_obs, lower = 1)
 
   # Convert lags to ar_lags if needed
   ar_lags <- if (!is.null(trend_specs$ar_lags)) trend_specs$ar_lags else (1:lags)
@@ -2092,11 +2095,15 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
   has_ma <- trend_specs$ma %||% FALSE
   max_lag <- max(ar_lags)
+  
+  # Cross-cutting validation handled by injection function
 
   # Build components list following the 3-stanvar pattern
   components <- list()
 
-  # Add common data and matrix Z (these go in data block)
+  # STEP 1: Dimensions handled by calling context (no duplication)
+
+  # STEP 2: Always add matrix Z (factor=parameters, non-factor=diagonal in tdata)
   matrix_z <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
   components <- append_if_not_null(components, matrix_z)
 
@@ -2286,14 +2293,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   hierarchical_info <- NULL
 
   if (is_hierarchical) {
-    # Factor models are incompatible with hierarchical grouping
-    # Z matrix is specified in transformed data when gr/subgr are supplied
-    if (n_lv < n_series) {
-      stop(insight::format_error(
-        "Hierarchical VAR models ({.field gr}/{.field subgr}) cannot use factor models",
-        "Use {.field n_lv = n_series} or remove {.field gr}/{.field subgr} parameters"
-      ))
-    }
+    # Cross-cutting validation handled by injection function
 
     # Extract hierarchical grouping information from data_info
     # Expect data_info to contain sorted dataframe information for group indexing
@@ -2563,9 +2563,6 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       {{
         {group_inds_code}
       }}
-
-      // Z matrix for hierarchical models (identity - no factor reduction)
-      matrix[n_series_trend, n_lv_trend] Z_trend = diag_matrix(rep_vector(1.0, n_lv_trend));
       ') else ''}
 
       // Hyperparameter constants for hierarchical priors (as constants, not user inputs)
@@ -2956,18 +2953,23 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     )
   }
 
-  # Add trend computation stanvars (maps lv_trend through Z matrix if factor model)
+  # STEP 1: Dimensions handled by calling context (no duplication)
+
+  # STEP 2: Add Z matrix using standard generation (VAR supports factor models unless hierarchical)
+  matrix_z <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
+
+  # Add trend computation stanvars (maps lv_trend through Z matrix)
   trend_computation <- generate_trend_computation_tparameters(n_lv, n_series)
 
   # Create components list based on model type
   base_components <- if (is_varma) {
-    # VARMA case: include MA parameters (6 base components)
-    list(var_functions_stanvar, var_tdata_stanvar,
+    # VARMA case: include MA parameters (7 components: Z + var-specific)
+    list(matrix_z, var_functions_stanvar, var_tdata_stanvar,
          var_parameters_stanvar, var_ma_parameters_stanvar,
          var_tparameters_stanvar, var_model_stanvar)
   } else {
-    # VAR-only case: no MA parameters (5 base components)
-    list(var_functions_stanvar, var_tdata_stanvar, var_parameters_stanvar,
+    # VAR-only case: no MA parameters (6 components: Z + var-specific)
+    list(matrix_z, var_functions_stanvar, var_tdata_stanvar, var_parameters_stanvar,
          var_tparameters_stanvar, var_model_stanvar)
   }
 
@@ -3104,10 +3106,12 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Extract dimensions and configuration
   n_lv <- trend_specs$n_lv %||% data_info$n_series %||% 1
   n_series <- data_info$n_series %||% 1
+  n_obs <- data_info$n_obs
 
   # Validate dimensions
   checkmate::assert_int(n_lv, lower = 1)
   checkmate::assert_int(n_series, lower = 1)
+  checkmate::assert_int(n_obs, lower = 1)
 
   # CAR does not support factor models (continuous-time AR requires
   # series-specific temporal evolution)
@@ -3130,8 +3134,10 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Build components list following the 3-stanvar pattern
   components <- list()
 
-  # Add common data (including matrix Z, though CAR doesn't use factor models)
+  # STEP 1: Dimensions handled by calling context (no duplication)
   is_factor_model <- FALSE  # CAR never uses factor models
+
+  # STEP 2: Always add matrix Z (CAR uses diagonal Z in transformed data)
   matrix_z <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
   components <- append_if_not_null(components, matrix_z)
 
@@ -3265,34 +3271,30 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # Extract key parameters following original ZMVN pattern
   n_lv <- trend_specs$n_lv %||% data_info$n_lv %||% data_info$n_series %||% 1
-  n <- data_info$n_obs
+  n_obs <- data_info$n_obs
   n_series <- data_info$n_series %||% 1
   use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
 
+  # Validate dimensions
+  checkmate::assert_int(n_obs, lower = 1)
+  checkmate::assert_int(n_series, lower = 1)
+  checkmate::assert_int(n_lv, lower = 1)
+
   # Determine if this is a factor model (n_lv < n_series)
   is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
+  
+  # Cross-cutting validation handled by injection function
 
-  # Generate block-specific injectors for matrix Z (includes dimension data)
-  matrix_z_stanvars <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
+  # Build components list following the 3-stanvar pattern
+  components <- list()
 
-  # Start components list with matrix Z (includes dimension data)
-  components <- list(matrix_z_stanvars)
+  # STEP 1: Dimensions handled by calling context (no duplication)
 
-  # Generate shared innovation system (provides scaled_innovations_trend)
-  hierarchical_info <- if (use_grouping) {
-    list(has_groups = TRUE, n_groups = data_info$n_groups %||% 1)
-  } else {
-    NULL
-  }
+  # STEP 2: Always add matrix Z (factor=parameters, non-factor=diagonal in tdata)
+  matrix_z <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
+  components <- append_if_not_null(components, matrix_z)
 
-  shared_stanvars <- generate_shared_innovation_stanvars(
-    n_lv = n_lv,
-    n_series = n_series,
-    cor = TRUE,  # ZMVN uses correlations
-    factor_model = is_factor_model,
-    hierarchical_info = hierarchical_info
-  )
-  components <- append_if_not_null(components, shared_stanvars)
+  # Shared innovations handled by injection function (no duplication)
 
   # ZMVN parameters (empty for simple case - correlation handled by shared system)
   zmvn_parameters_stanvar <- brms::stanvar(
@@ -3407,10 +3409,14 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   changepoint_scale <- trend_specs$changepoint_scale %||% 0.1
   # Use growth parameter if provided, otherwise fall back to trend_specs$type or trend_specs$growth
   trend_type <- growth %||% trend_specs$type %||% trend_specs$growth %||% "linear"
-  n <- data_info$n_obs
+  n_obs <- data_info$n_obs
   n_series <- data_info$n_series %||% 1
 
-  # Validate trend type
+  # Validate dimensions and trend type
+  checkmate::assert_int(n_obs, lower = 1)
+  checkmate::assert_int(n_series, lower = 1)
+  checkmate::assert_int(n_lv, lower = 1)
+  
   if (!trend_type %in% c("linear", "logistic")) {
     stop(insight::format_error(
       "Piecewise trend type must be 'linear' or 'logistic'.",
@@ -3422,11 +3428,14 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   # PW trends do not support factor models (series-specific changepoints required)
   is_factor_model <- FALSE
 
-  # Generate block-specific injectors for matrix Z (includes dimension data)
-  matrix_z_stanvars <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
+  # Build components list following the 3-stanvar pattern
+  components <- list()
 
-  # Start components list with matrix Z (includes dimension data)
-  components <- list(matrix_z_stanvars)
+  # STEP 1: Dimensions handled by calling context (no duplication)
+
+  # STEP 2: Always add matrix Z (PW uses diagonal Z in transformed data)
+  matrix_z <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
+  components <- append_if_not_null(components, matrix_z)
 
   # Functions block - Prophet-style piecewise functions
   pw_functions_stanvar <- brms::stanvar(

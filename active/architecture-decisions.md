@@ -630,8 +630,39 @@ extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimens
 **Architecture**: `trend_obj$validation_rules` drives automatic dispatch
 **Benefits**: Clean constructors, data-aware validation, extensible rules
 
+### 15. Ultra-Clean Stanvar Architecture (2025-08-20)
+
+**Critical Design Decision**: Eliminate duplicate stanvar names through architectural separation of concerns.
+
+**Problem Solved**: "Duplicated names in 'stanvars' are not allowed" errors caused by multiple functions creating the same dimension stanvars (`n_trend`, `n_series_trend`, `n_lv_trend`).
+
+**Architecture Solution**:
+- **Single Source of Truth**: Only `generate_common_trend_data()` creates dimension stanvars
+- **Injection Function Orchestration**: `generate_trend_injection_stanvars()` manages complete stanvar assembly:
+  - Creates dimensions via `generate_common_trend_data()`
+  - Creates shared innovations via `generate_shared_innovation_stanvars()`
+  - Calls trend generators for trend-specific logic only
+  - Handles cross-cutting validation via `validate_no_factor_hierarchical()`
+- **Clean Trend Generators**: Focus purely on trend-specific stanvars, assume dimensions exist in context
+- **No Duplication Possible**: By design, no function can create dimensions twice
+
+**Key Implementation Changes**:
+- **Removed**: `generate_matrix_z_data()` function (only created dimensions)
+- **Updated**: `generate_matrix_z_multiblock_stanvars()` to handle only Z matrix components
+- **Cleaned**: All 6 trend generators (RW, AR, CAR, ZMVN, VAR, PW) no longer create dimensions
+- **Enhanced**: Injection function provides complete stanvar orchestration
+
+**Benefits**:
+- **DRY Principle**: Dimensions created exactly once per usage context
+- **Future-Proof**: Adding new trend types = implement trend-specific logic only
+- **Clean Separation**: System integration vs domain logic clearly separated
+- **Maintainable**: Cross-cutting concerns handled in one place
+
+**Verification**: All trend types working (ZMVN=14, RW=12, VAR=13 stanvars)
+
 ## Critical Requirements
 
 **Stan Assembly**: Convention-based dispatch replaces hardcoded fields
 **Priors**: Leverage monitor_params infrastructure for all trend types  
 **Development**: Use `create_mvgam_trend()` helper, process parameters in validation layer
+**Stanvar Management**: Use injection function for complete assembly, trend generators for domain logic only
