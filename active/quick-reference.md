@@ -132,6 +132,31 @@ trend_stanvars <- generate_trend_injection_stanvars(trend_spec, data_info)
 inject_trend_into_linear_predictor(base_stancode, trend_stanvars, trend_spec)
 ```
 
+## Centralized Prior Resolution (R/priors.R)
+
+### Pattern for All Trend Generators
+```r
+# Replace hardcoded priors with centralized helper
+sigma_prior <- get_trend_parameter_prior(prior, "sigma_trend")
+ar1_prior <- get_trend_parameter_prior(prior, "ar1_trend")
+
+# Use in Stan code generation
+stan_code <- glue("
+  sigma_trend ~ {sigma_prior};
+  ar1_trend ~ {ar1_prior};
+")
+```
+
+### Resolution Strategy
+1. **User specification first**: Check brmsprior object for custom prior
+2. **Common default fallback**: Use `common_trend_priors` defaults  
+3. **Empty string fallback**: Let Stan use built-in defaults
+
+### Benefits
+- **DRY**: Eliminates hardcoded "exponential(1)" across generators
+- **Extensible**: New parameters automatically work everywhere
+- **Future-proof**: New trend types inherit prior support
+
 ## Stan Code Validation Framework (R/validations.R)
 ```r
 # Unified comprehensive validation using rstan::stanc()

@@ -981,7 +981,7 @@ test_that("CAR trend generator works correctly", {
     trend_type = "CAR"
     # Note: CAR doesn't support n_lv parameter (no factor models)
   )
-  car_stanvars <- mvgam:::generate_car_trend_stanvars(car_spec, data_info)
+  car_stanvars <- mvgam:::generate_car_trend_stanvars(car_spec, data_info, prior = NULL)
   expect_type(car_stanvars, "list")
   expect_gt(length(car_stanvars), 0)
   expect_true(any(grepl("time_dis", names(car_stanvars))))
@@ -995,7 +995,7 @@ test_that("CAR trend generator works correctly", {
     n_lv = 2
   )
   expect_error(
-    mvgam:::generate_car_trend_stanvars(car_factor_spec, data_info),
+    mvgam:::generate_car_trend_stanvars(car_factor_spec, data_info, prior = NULL),
     "CAR trends do not support factor models"
   )
 
@@ -1005,7 +1005,7 @@ test_that("CAR trend generator works correctly", {
     gr = "group"
   )
   expect_error(
-    mvgam:::generate_car_trend_stanvars(car_hierarchical_spec, data_info)
+    mvgam:::generate_car_trend_stanvars(car_hierarchical_spec, data_info, prior = NULL)
   )
 })
 

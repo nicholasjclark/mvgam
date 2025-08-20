@@ -589,3 +589,293 @@ test_that("null-coalescing operator works correctly", {
   result4 <- mvgam:::`%||%`(FALSE, "default")
   expect_equal(result4, FALSE)
 })
+
+# Test centralized prior system
+# =============================
+
+test_that("get_trend_parameter_prior works with user priors", {
+  # Create a test brmsprior object with trend parameters
+  test_prior <- data.frame(
+    prior = c("normal(0, 0.5)", "exponential(2)", ""),
+    class = c("ar1_trend", "sigma_trend", "Intercept"),
+    coef = c("", "", ""),
+    group = c("", "", ""),
+    resp = c("", "", ""),
+    dpar = c("", "", ""),
+    nlpar = c("", "", ""),
+    lb = c("", "0", ""),
+    ub = c("", "", ""),
+    source = c("user", "user", "default"),
+    stringsAsFactors = FALSE
+  )
+  class(test_prior) <- c("brmsprior", "data.frame")
+  
+  # Test extracting user-specified priors
+  ar1_prior <- mvgam:::get_trend_parameter_prior(test_prior, "ar1_trend")
+  expect_equal(ar1_prior, "normal(0, 0.5)")
+  
+  sigma_prior <- mvgam:::get_trend_parameter_prior(test_prior, "sigma_trend")
+  expect_equal(sigma_prior, "exponential(2)")
+  
+  # Test parameter not found in user priors (should check common defaults)
+  missing_prior <- mvgam:::get_trend_parameter_prior(test_prior, "theta1_trend")
+  expect_true(is.character(missing_prior))
+  # Could be empty string if not in common_trend_priors, or default if it is
+})
+
+test_that("get_trend_parameter_prior works with NULL priors", {
+  # Test with NULL prior (should use common defaults)
+  sigma_default <- mvgam:::get_trend_parameter_prior(NULL, "sigma_trend")
+  expect_true(is.character(sigma_default))
+  expect_true(nzchar(sigma_default) || sigma_default == "")
+  
+  # Test with missing parameter (should return empty string)
+  missing_default <- mvgam:::get_trend_parameter_prior(NULL, "nonexistent_param")
+  expect_equal(missing_default, "")
+})
+
+test_that("generate_trend_priors_stanvar creates correct stanvars", {
+  # Create test prior object
+  test_prior <- data.frame(
+    prior = c("normal(0, 0.3)", "exponential(1.5)", ""),
+    class = c("ar1_trend", "sigma_trend", "other_param"),
+    coef = c("", "", ""),
+    group = c("", "", ""),
+    resp = c("", "", ""),
+    dpar = c("", "", ""),
+    nlpar = c("", "", ""),
+    lb = c("", "0", ""),
+    ub = c("", "", ""),
+    source = c("user", "user", "default"),
+    stringsAsFactors = FALSE
+  )
+  class(test_prior) <- c("brmsprior", "data.frame")
+  
+  # Test creating stanvar with multiple parameters
+  stanvar_result <- mvgam:::generate_trend_priors_stanvar(
+    param_names = c("ar1_trend", "sigma_trend"),
+    prior = test_prior,
+    stanvar_name = "test_priors"
+  )
+  
+  expect_true(inherits(stanvar_result, "stanvar"))
+  expect_equal(stanvar_result$name, "test_priors")
+  expect_equal(stanvar_result$block, "model")
+  
+  # Check that the Stan code contains both priors
+  expect_true(grepl("ar1_trend ~ normal\\(0, 0\\.3\\)", stanvar_result$scode))
+  expect_true(grepl("sigma_trend ~ exponential\\(1\\.5\\)", stanvar_result$scode))
+})
+
+test_that("generate_trend_priors_stanvar handles empty priors correctly", {
+  # Test with no user priors and parameters not in common defaults
+  empty_result <- mvgam:::generate_trend_priors_stanvar(
+    param_names = c("nonexistent_param1", "nonexistent_param2"),
+    prior = NULL,
+    stanvar_name = "empty_priors"
+  )
+  
+  # Should return NULL when no priors are specified
+  expect_null(empty_result)
+})
+
+test_that("generate_trend_priors_stanvar works with single parameter", {
+  # Test with single parameter
+  test_prior <- data.frame(
+    prior = "normal(0, 0.2)",
+    class = "theta1_trend",
+    coef = "",
+    group = "",
+    resp = "",
+    dpar = "",
+    nlpar = "",
+    lb = "",
+    ub = "",
+    source = "user",
+    stringsAsFactors = FALSE
+  )
+  class(test_prior) <- c("brmsprior", "data.frame")
+  
+  single_result <- mvgam:::generate_trend_priors_stanvar(
+    param_names = "theta1_trend",
+    prior = test_prior,
+    stanvar_name = "single_prior"
+  )
+  
+  expect_true(inherits(single_result, "stanvar"))
+  expect_equal(single_result$name, "single_prior")
+  expect_true(grepl("theta1_trend ~ normal\\(0, 0\\.2\\)", single_result$scode))
+})
+
+test_that("centralized prior system integrates with MA components", {
+  # Test that MA components use the centralized system
+  test_prior <- data.frame(
+    prior = "normal(0, 0.3)",
+    class = "theta1_trend",
+    coef = "",
+    group = "",
+    resp = "",
+    dpar = "",
+    nlpar = "",
+    lb = "",
+    ub = "",
+    source = "user",
+    stringsAsFactors = FALSE
+  )
+  class(test_prior) <- c("brmsprior", "data.frame")
+  
+  # Test MA components function with prior
+  ma_components <- mvgam:::generate_ma_components(n_lv = 2, prior = test_prior)
+  
+  expect_true(is.list(ma_components))
+  expect_true("theta1_param" %in% names(ma_components))
+  expect_true("theta1_prior" %in% names(ma_components))
+  
+  # Check that the prior stanvar exists and uses the user prior
+  theta1_prior_stanvar <- ma_components$theta1_prior
+  expect_true(inherits(theta1_prior_stanvar, "stanvar"))
+  expect_true(grepl("theta1_trend ~ normal\\(0, 0\\.3\\)", theta1_prior_stanvar$scode))
+})
+
+test_that("centralized prior system works with AR trend generators", {
+  # Test AR trend generation with custom priors
+  test_prior <- data.frame(
+    prior = c("normal(0, 0.2)", "normal(0, 0.25)", "exponential(1.5)"),
+    class = c("ar1_trend", "ar12_trend", "sigma_trend"),
+    coef = c("", "", ""),
+    group = c("", "", ""),
+    resp = c("", "", ""),
+    dpar = c("", "", ""),
+    nlpar = c("", "", ""),
+    lb = c("", "", "0"),
+    ub = c("", "", ""),
+    source = c("user", "user", "user"),
+    stringsAsFactors = FALSE
+  )
+  class(test_prior) <- c("brmsprior", "data.frame")
+  
+  # Test that the centralized helper works for multiple AR parameters
+  ar_priors <- mvgam:::generate_trend_priors_stanvar(
+    param_names = c("ar1_trend", "ar12_trend"),
+    prior = test_prior,
+    stanvar_name = "ar_priors"
+  )
+  
+  expect_true(inherits(ar_priors, "stanvar"))
+  expect_true(grepl("ar1_trend ~ normal\\(0, 0\\.2\\)", ar_priors$scode))
+  expect_true(grepl("ar12_trend ~ normal\\(0, 0\\.25\\)", ar_priors$scode))
+})
+
+test_that("centralized prior system works with CAR trend parameters", {
+  # Test CAR-specific parameters
+  test_prior <- data.frame(
+    prior = c("normal(0, 0.8)", "exponential(2.5)"),
+    class = c("ar1", "sigma_trend"),  # Note: CAR uses "ar1" not "ar1_trend"
+    coef = c("", ""),
+    group = c("", ""),
+    resp = c("", ""),
+    dpar = c("", ""),
+    nlpar = c("", ""),
+    lb = c("", "0"),
+    ub = c("", ""),
+    source = c("user", "user"),
+    stringsAsFactors = FALSE
+  )
+  class(test_prior) <- c("brmsprior", "data.frame")
+  
+  # Test CAR prior generation
+  car_priors <- mvgam:::generate_trend_priors_stanvar(
+    param_names = c("ar1", "sigma_trend"),
+    prior = test_prior,
+    stanvar_name = "car_priors"
+  )
+  
+  expect_true(inherits(car_priors, "stanvar"))
+  expect_true(grepl("ar1 ~ normal\\(0, 0\\.8\\)", car_priors$scode))
+  expect_true(grepl("sigma_trend ~ exponential\\(2\\.5\\)", car_priors$scode))
+})
+
+test_that("centralized prior system works with PW trend parameters", {
+  # Test PW (piecewise) parameters
+  test_prior <- data.frame(
+    prior = c("student_t(3, 0, 1)", "normal(0, 1)", "double_exponential(0, 0.1)"),
+    class = c("m_trend", "k_trend", "delta_trend"),
+    coef = c("", "", ""),
+    group = c("", "", ""),
+    resp = c("", "", ""),
+    dpar = c("", "", ""),
+    nlpar = c("", "", ""),
+    lb = c("", "", ""),
+    ub = c("", "", ""),
+    source = c("user", "user", "user"),
+    stringsAsFactors = FALSE
+  )
+  class(test_prior) <- c("brmsprior", "data.frame")
+  
+  # Test PW prior generation
+  pw_priors <- mvgam:::generate_trend_priors_stanvar(
+    param_names = c("m_trend", "k_trend", "delta_trend"),
+    prior = test_prior,
+    stanvar_name = "pw_priors"
+  )
+  
+  expect_true(inherits(pw_priors, "stanvar"))
+  expect_true(grepl("m_trend ~ student_t\\(3, 0, 1\\)", pw_priors$scode))
+  expect_true(grepl("k_trend ~ normal\\(0, 1\\)", pw_priors$scode))
+  expect_true(grepl("delta_trend ~ double_exponential\\(0, 0\\.1\\)", pw_priors$scode))
+})
+
+test_that("centralized prior system input validation works correctly", {
+  # Test invalid inputs to generate_trend_priors_stanvar
+  expect_error(
+    mvgam:::generate_trend_priors_stanvar(
+      param_names = character(0),  # Empty parameter names
+      prior = NULL
+    ),
+    "min.len = 1"
+  )
+  
+  expect_error(
+    mvgam:::generate_trend_priors_stanvar(
+      param_names = c("param1", NA),  # NA in parameter names
+      prior = NULL
+    ),
+    "any.missing = FALSE"
+  )
+  
+  expect_error(
+    mvgam:::generate_trend_priors_stanvar(
+      param_names = "param1",
+      prior = "not_a_brmsprior"  # Invalid prior object
+    ),
+    "Assertion on 'prior' failed"
+  )
+  
+  expect_error(
+    mvgam:::generate_trend_priors_stanvar(
+      param_names = "param1",
+      prior = NULL,
+      stanvar_name = ""  # Empty stanvar name
+    ),
+    "min.chars = 1"
+  )
+})
+
+test_that("centralized prior system provides proper backward compatibility", {
+  # Test that generators work with prior = NULL (backward compatibility)
+  
+  # Test MA components with NULL prior (should work without errors)
+  ma_null <- mvgam:::generate_ma_components(n_lv = 1, prior = NULL)
+  expect_true(is.list(ma_null))
+  expect_true("theta1_param" %in% names(ma_null))
+  # Whether theta1_prior exists depends on whether there's a default in common_trend_priors
+  
+  # Test generate_trend_priors_stanvar with NULL
+  null_result <- mvgam:::generate_trend_priors_stanvar(
+    param_names = c("param1", "param2"),
+    prior = NULL,
+    stanvar_name = "test"
+  )
+  # Should return NULL or stanvar depending on common_trend_priors content
+  expect_true(is.null(null_result) || inherits(null_result, "stanvar"))
+})

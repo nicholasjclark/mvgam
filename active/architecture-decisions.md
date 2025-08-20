@@ -48,6 +48,32 @@ mvgam(y ~ x1 + x2, trend_formula = ~ AR(), data = data)
 **Stage 2**: Post-process observation model Stan code to inject trend effects and create the combined model
 
 **Critical Enhancement**: Stan assembly layer now handles complex logic moved from constructors:
+
+### 4. Centralized Prior Resolution System
+**Decision**: Single helper function for all trend parameter priors across all trend types  
+**Pattern**:
+```r
+# In any trend generator
+sigma_prior <- get_trend_parameter_prior(prior, "sigma_trend")
+ar1_prior <- get_trend_parameter_prior(prior, "ar1_trend")
+stan_code <- glue("sigma_trend ~ {sigma_prior}; ar1_trend ~ {ar1_prior};")
+```
+
+**Resolution Strategy**:
+1. **User specification first**: Check brmsprior object for custom prior
+2. **Common default fallback**: Use `common_trend_priors` defaults
+3. **Empty string**: Let Stan use its built-in defaults
+
+**Benefits**:
+- **DRY**: Eliminates hardcoded priors across all trend generators
+- **Extensible**: New parameters in `common_trend_priors` automatically work everywhere
+- **Consistent**: All trend types use identical prior resolution logic
+- **Future-proof**: New trend types automatically inherit prior support
+
+**Implementation**:
+- `get_trend_parameter_prior()` in `R/priors.R` provides centralized resolution
+- `common_trend_priors` object defines shared parameters (sigma_trend, ar1_trend, LV, Z, etc.)
+- All trend generators replace hardcoded priors with helper function calls
 - **Parameter Processing**: `process_trend_params()` called during stanvar generation, not construction
 - **Dynamic Characteristics**: Correlation requirements, factor compatibility determined with data context
 - **Environment-Dependent Logic**: Grouping variables processed with actual data structure

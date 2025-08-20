@@ -922,6 +922,212 @@ get_best_prior_match <- function(matches) {
   return(trimws(prior_string))
 }
 
+#' Map Trend Priors from brmsprior Object
+#'
+#' @description
+#' Extracts relevant priors from a brmsprior object for a specific trend type,
+#' handling ar{lag}_trend patterns and other trend-specific parameters. Uses
+#' the trend registry system for extensibility and the extract_prior_string()
+#' helper for parameter matching.
+#'
+#' @param prior A brmsprior object containing prior specifications
+#' @param trend_type Character string specifying the trend type (e.g., "AR", "RW")
+#' @return Named list of Stan distribution strings ready for stanvar generators.
+#'   Parameter names match those expected by the trend's Stan generator function.
+#'   Returns empty list if trend_type is not registered or no matching priors found.
+#'
+#' @details
+#' This function leverages the existing trend registry system for extensibility:
+#' 1. Gets prior specification from \code{get_trend_prior_spec(trend_type)}
+#' 2. For each parameter in the specification, uses \code{extract_prior_string()}
+#'    to find matching prior in the brmsprior object
+#' 3. Handles special patterns like ar{lag}_trend for AR models with multiple lags
+#' 4. Returns Stan distribution strings ready for immediate use in stanvar generators
+#' 
+#' The function is designed to be extensible - no hardcoded trend types. New trends
+#' automatically work if properly registered with \code{register_trend_type()}.
+#'
+#' @examples
+#' \dontrun{
+#' # Create priors using brms functions
+#' library(brms)
+#' my_priors <- c(
+#'   prior("exponential(1)", class = "sigma_trend"),
+#'   prior("normal(0, 0.3)", class = "ar1_trend"),
+#'   prior("normal(0, 1)", class = "b")  # observation model prior
+#' )
+#' 
+#' # Map priors for AR trend
+#' ar_priors <- map_trend_priors(my_priors, "AR")
+#' # Returns: list(sigma_trend = "exponential(1)", ar1_trend = "normal(0, 0.3)")
+#' 
+#' # Alternative using set_prior()
+#' trend_priors <- c(
+#'   set_prior("cauchy(0, 5)", class = "sigma_trend"),
+#'   set_prior("normal(0, 0.5)", class = "ar1_trend")
+#' )
+#' rw_priors <- map_trend_priors(trend_priors, "RW")
+#' # Returns: list(sigma_trend = "cauchy(0, 5)")
+#' 
+#' # For AR models with multiple lags
+#' ar_seasonal_priors <- c(
+#'   prior("normal(0, 0.3)", class = "ar1_trend"),   # lag 1
+#'   prior("normal(0, 0.2)", class = "ar12_trend"),  # lag 12 (seasonal)
+#'   prior("exponential(2)", class = "sigma_trend")
+#' )
+#' seasonal_mapped <- map_trend_priors(ar_seasonal_priors, "AR")
+#' # Returns: list(ar1_trend = "normal(0, 0.3)", 
+#' #               ar12_trend = "normal(0, 0.2)",
+#' #               sigma_trend = "exponential(2)")
+#' }
+#'
+#' @seealso \code{\link{get_trend_prior_spec}}, \code{\link{extract_prior_string}},
+#'   \code{\link{register_trend_type}}, \code{\link[brms]{prior}}, \code{\link[brms]{set_prior}}
+#' @noRd
+map_trend_priors <- function(prior, trend_type) {
+  # Input validation
+  checkmate::assert_class(prior, "brmsprior")
+  checkmate::assert_character(trend_type, len = 1, min.chars = 1, 
+                             any.missing = FALSE)
+  
+  # Get prior specification for this trend type from registry
+  trend_prior_spec <- get_trend_prior_spec(trend_type)
+  
+  # Return empty list if trend type not registered
+  if (is.null(trend_prior_spec)) {
+    rlang::warn(
+      insight::format_warning(
+        "Trend type {.field {trend_type}} not found in registry. ",
+        "No priors will be mapped."
+      ),
+      .frequency = "once"
+    )
+    return(list())
+  }
+  
+  # Initialize result list
+  mapped_priors <- list()
+  
+  # Extract priors for each parameter in the trend specification
+  for (param_name in names(trend_prior_spec)) {
+    
+    # Handle special AR lag patterns (ar1_trend, ar2_trend, ar12_trend, etc.)
+    if (grepl("^ar\\d+_trend$", param_name)) {
+      # Extract specific AR lag parameter
+      prior_string <- extract_prior_string(prior, param_name, 
+                                          handle_suffix = TRUE)
+    } else {
+      # Standard parameter extraction
+      prior_string <- extract_prior_string(prior, param_name, 
+                                          handle_suffix = TRUE)
+    }
+    
+    # Add to result if prior was found
+    if (!is.null(prior_string)) {
+      # Convert to Stan string and store
+      temp_prior_row <- data.frame(prior = prior_string, 
+                                   stringsAsFactors = FALSE)
+      mapped_priors[[param_name]] <- map_prior_to_stan_string(temp_prior_row)
+    }
+  }
+  
+  return(mapped_priors)
+}
+
+#' Get Trend Parameter Prior with Fallback to Common Default
+#'
+#' @description
+#' Centralized helper for any trend generator to access user-defined priors
+#' with automatic fallback to common defaults. This function provides the
+#' foundation for simple, DRY prior resolution across all trend types.
+#'
+#' @param prior A brmsprior object containing custom prior specifications, or NULL
+#' @param param_name Character string parameter name (e.g., "sigma_trend", "ar1_trend")
+#' @return Character string containing Stan prior distribution (e.g., "exponential(2)")
+#'   or empty string if no prior is specified (Stan will use its defaults)
+#'
+#' @details
+#' Resolution strategy:
+#' 1. **User specification first**: Checks the provided brmsprior object for the parameter
+#' 2. **Common default fallback**: Uses `common_trend_priors` if parameter is available
+#' 3. **Empty string fallback**: Returns "" if no specification found (Stan defaults)
+#'
+#' This design ensures maximum extensibility - any new trend type can call this
+#' function for any parameter and get consistent behavior. New parameters can
+#' be added to `common_trend_priors` and automatically work across all trends.
+#'
+#' @examples
+#' \dontrun{
+#' # User specified custom sigma_trend prior
+#' my_priors <- c(prior("exponential(1)", class = "sigma_trend"))
+#' get_trend_parameter_prior(my_priors, "sigma_trend")  # "exponential(1)"
+#'
+#' # No user specification, use common default
+#' get_trend_parameter_prior(NULL, "sigma_trend")  # "exponential(2)"
+#'
+#' # Parameter not in common_trend_priors
+#' get_trend_parameter_prior(NULL, "custom_param")  # ""
+#'
+#' # Usage in trend generators
+#' sigma_prior <- get_trend_parameter_prior(prior, "sigma_trend")
+#' stan_code <- glue("sigma_trend ~ {sigma_prior};")
+#' }
+#'
+#' @seealso \code{\link{extract_prior_string}}, \code{common_trend_priors}
+#' @noRd
+get_trend_parameter_prior <- function(prior = NULL, param_name) {
+  # Input validation
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE, .var.name = "prior")
+  checkmate::assert_character(param_name, len = 1, min.chars = 1, 
+                             any.missing = FALSE, .var.name = "param_name")
+  
+  # Strategy 1: Try user specification first
+  if (!is.null(prior)) {
+    user_prior <- extract_prior_string(prior, param_name, handle_suffix = TRUE)
+    if (!is.null(user_prior)) {
+      # Defensive check for helper function return
+      if (!is.character(user_prior)) {
+        stop(insight::format_error(
+          "extract_prior_string returned non-character value for parameter {.field {param_name}}"
+        ))
+      }
+      
+      # Convert to clean Stan string
+      temp_prior_row <- data.frame(prior = user_prior, stringsAsFactors = FALSE)
+      stan_string <- map_prior_to_stan_string(temp_prior_row)
+      
+      # Validate the result
+      if (!is.character(stan_string) || length(stan_string) != 1) {
+        stop(insight::format_error(
+          "map_prior_to_stan_string returned invalid result for parameter {.field {param_name}}"
+        ))
+      }
+      
+      return(stan_string)
+    }
+  }
+  
+  # Strategy 2: Fallback to common default if available
+  if (!is.list(common_trend_priors)) {
+    stop(insight::format_error(
+      "common_trend_priors must be a list structure"
+    ))
+  }
+  
+  if (param_name %in% names(common_trend_priors)) {
+    default_spec <- common_trend_priors[[param_name]]
+    if (!is.list(default_spec) || !"default" %in% names(default_spec)) {
+      stop(insight::format_error(
+        "Invalid structure for common_trend_priors parameter {.field {param_name}}"
+      ))
+    }
+    return(default_spec$default)
+  }
+  
+  # Strategy 3: Empty string fallback (Stan will use its defaults)
+  return("")
+}
+
 # =============================================================================
 # SECTION 5: UTILITY FUNCTIONS
 # =============================================================================
