@@ -652,8 +652,10 @@ generate_monitor_params <- function(trend_spec) {
   )
 
   # Add correlation parameters if enabled
+  # Note: Sigma_trend is computed from sigma_trend * L_Omega_trend in Stan,
+  # so users should not place priors on it directly
   correlation_params <- if (trend_spec$cor %||% FALSE) {
-    c("L_Omega_trend", "Sigma_trend")
+    "L_Omega_trend"
   } else {
     character(0)
   }
@@ -705,16 +707,24 @@ generate_ar_monitor_params <- function(trend_spec) {
 #' @return Character vector of VAR-specific parameters
 #' @noRd
 generate_var_monitor_params <- function(trend_spec) {
-  # VAR coefficient matrices
-  lags <- trend_spec$p %||% trend_spec$lags %||% 1
-  if (is.list(lags)) lags <- unlist(lags)
-
-  # VAR uses matrix parameters A_trend[1], A_trend[2], etc.
-  var_params <- paste0("A_trend[", seq_along(lags), "]")
-
-  # VAR always needs covariance matrix (multivariate)
-  var_params <- c(var_params, "Sigma_trend")
-
+  # VAR uses hierarchical hyperparameters following Heaps 2022 methodology
+  
+  # Base VAR hyperparameters - always present
+  var_params <- c("Amu_trend", "Aomega_trend")
+  
+  # Add MA hyperparameters if VARMA model
+  if (trend_spec$ma %||% FALSE) {
+    var_params <- c(var_params, "Dmu_trend", "Domega_trend")
+  }
+  
+  # Add group-specific parameters if hierarchical
+  if (!is.null(trend_spec$gr) && trend_spec$gr != "NA") {
+    var_params <- c(var_params, "sigma_group_trend")
+  }
+  
+  # VAR uses variance-correlation decomposition (sigma_trend + L_Omega_trend)
+  # These are handled by base_params and correlation_params in the main function
+  
   return(var_params)
 }
 

@@ -2359,3 +2359,408 @@ test_that("ZMVN follows 3-stanvar pattern architecture", {
   expect_true(grepl("lv_trend", tparams_code))
   expect_true(grepl("scaled_innovations_trend", tparams_code))
 })
+
+# VAR/VARMA Stan Assembly System Tests
+# ====================================
+
+test_that("VAR generator creates correct Stan stanvars structure", {
+  # Test basic VAR(1) stanvars generation
+  trend_specs <- list(trend = "VAR", n_lv = 2, n_series = 2, lags = 1, ma_lags = 0)
+  data_info <- list(n_obs = 50, n_series = 2)
+  
+  result <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
+  
+  expect_true(inherits(result, "stanvars"))
+  stanvar_names <- names(result)
+  
+  # Should have VAR-specific stanvars  
+  expect_true("var_functions" %in% stanvar_names)
+  expect_true("var_tdata" %in% stanvar_names)
+  expect_true("var_parameters" %in% stanvar_names)
+  expect_true("var_tparameters" %in% stanvar_names)
+  expect_true("var_model" %in% stanvar_names)
+  
+  # Should have centralized priors stanvar
+  expect_true("var_centralized_priors" %in% stanvar_names)
+  
+  # Should have trend computation
+  expect_true("trend_computation_tparameters" %in% stanvar_names)
+})
+
+test_that("VARMA generator adds MA components correctly", {
+  # Test VARMA(2,1) stanvars generation
+  trend_specs <- list(trend = "VAR", n_lv = 2, n_series = 2, lags = 2, ma_lags = 1)
+  data_info <- list(n_obs = 80, n_series = 2)
+  
+  result <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
+  
+  expect_true(inherits(result, "stanvars"))
+  stanvar_names <- names(result)
+  
+  # Should have additional MA parameters stanvar
+  expect_true("var_ma_parameters" %in% stanvar_names)
+  
+  # Check MA parameters block exists and has correct block type
+  ma_params <- result[["var_ma_parameters"]]
+  expect_equal(ma_params$block, "parameters")
+  expect_true(grepl("D_raw_trend", ma_params$scode))
+  expect_true(grepl("Dmu_trend", ma_params$scode))
+  expect_true(grepl("Domega_trend", ma_params$scode))
+})
+
+test_that("hierarchical VAR generates correct group indexing structures", {
+  # Test hierarchical VAR with 2 groups, 2 subgroups each
+  trend_specs <- list(
+    trend = "VAR", 
+    n_lv = 2, 
+    n_series = 4,  # 2 groups * 2 subgroups
+    lags = 1, 
+    ma_lags = 0,
+    gr = "group",
+    subgr = "subgroup"
+  )
+  data_info <- list(
+    n_obs = 100, 
+    n_series = 4,
+    n_groups = 2,
+    n_subgroups = 2
+  )
+  
+  result <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
+  
+  expect_true(inherits(result, "stanvars"))
+  
+  # Check transformed data block contains hierarchical structures
+  tdata_stanvar <- result[["var_tdata"]]
+  expect_equal(tdata_stanvar$block, "tdata")
+  
+  tdata_code <- tdata_stanvar$scode
+  expect_true(grepl("n_groups_trend", tdata_code))
+  expect_true(grepl("n_subgroups_trend", tdata_code))
+  expect_true(grepl("group_inds_trend", tdata_code))
+  
+  # Check parameters block has group-specific parameters
+  params_stanvar <- result[["var_parameters"]]  
+  params_code <- params_stanvar$scode
+  expect_true(grepl("A_raw_group_trend", params_code))
+  expect_true(grepl("sigma_group_trend", params_code))
+})
+
+test_that("hierarchical VAR group_inds matrix is calculated correctly", {
+  # Test group_inds calculation for different group structures
+  
+  # Scenario 1: 2 groups, 2 subgroups each (2x2 = 4 series)
+  trend_specs1 <- list(
+    trend = "VAR", 
+    n_lv = 4, 
+    n_series = 4,
+    lags = 1, 
+    ma_lags = 0,
+    gr = "group"
+  )
+  data_info1 <- list(
+    n_obs = 80, 
+    n_series = 4,
+    n_groups = 2,
+    n_subgroups = 2
+  )
+  
+  result1 <- mvgam:::generate_trend_injection_stanvars(trend_specs1, data_info1)
+  tdata_code1 <- result1[["var_tdata"]]$scode
+  
+  # Should contain group_inds assignments
+  expect_true(grepl("group_inds_trend\\[1\\] = \\{1, 2\\};", tdata_code1))
+  expect_true(grepl("group_inds_trend\\[2\\] = \\{3, 4\\};", tdata_code1))
+  
+  # Scenario 2: 3 groups, 2 subgroups each (3x2 = 6 series)
+  trend_specs2 <- list(
+    trend = "VAR", 
+    n_lv = 6, 
+    n_series = 6,
+    lags = 1, 
+    ma_lags = 0,
+    gr = "group"
+  )
+  data_info2 <- list(
+    n_obs = 120, 
+    n_series = 6,
+    n_groups = 3,
+    n_subgroups = 2
+  )
+  
+  result2 <- mvgam:::generate_trend_injection_stanvars(trend_specs2, data_info2)
+  tdata_code2 <- result2[["var_tdata"]]$scode
+  
+  # Should contain correct 3x2 group indexing
+  expect_true(grepl("group_inds_trend\\[1\\] = \\{1, 2\\};", tdata_code2))
+  expect_true(grepl("group_inds_trend\\[2\\] = \\{3, 4\\};", tdata_code2))
+  expect_true(grepl("group_inds_trend\\[3\\] = \\{5, 6\\};", tdata_code2))
+})
+
+test_that("hierarchical VAR with uneven subgroups calculates group_inds correctly", {
+  # Test more complex group structure: 2 groups with 3 and 2 subgroups respectively
+  # This should generate a 2x3 matrix with the last cell for group 2 being unused
+  trend_specs <- list(
+    trend = "VAR", 
+    n_lv = 5, 
+    n_series = 5,
+    lags = 1,
+    ma_lags = 0,
+    gr = "group"
+  )
+  data_info <- list(
+    n_obs = 100, 
+    n_series = 5,
+    n_groups = 2,
+    n_subgroups = 3  # Max subgroups per group
+  )
+  
+  result <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
+  tdata_code <- result[["var_tdata"]]$scode
+  
+  # Should generate 2x3 matrix even though group 2 only has 2 subgroups
+  expect_true(grepl("group_inds_trend\\[1\\] = \\{1, 2, 3\\};", tdata_code))
+  expect_true(grepl("group_inds_trend\\[2\\] = \\{4, 5, 6\\};", tdata_code))
+})
+
+test_that("VAR block-structured matrices prevent cross-group interactions", {
+  # Test that hierarchical VAR uses block-structured approach
+  trend_specs <- list(
+    trend = "VAR", 
+    n_lv = 4, 
+    n_series = 4,
+    lags = 1, 
+    ma_lags = 0,
+    gr = "group"
+  )
+  data_info <- list(
+    n_obs = 80, 
+    n_series = 4,
+    n_groups = 2,
+    n_subgroups = 2
+  )
+  
+  result <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
+  
+  # Check transformed parameters block uses group-specific approach
+  tparams_stanvar <- result[["var_tparameters"]]
+  tparams_code <- tparams_stanvar$scode
+  
+  # Should assemble block-structured Sigma_trend
+  expect_true(grepl("for.*group.*in.*1:n_groups_trend", tparams_code))
+  expect_true(grepl("group_inds_trend\\[group\\]", tparams_code))
+  
+  # Should use group-specific A_trend coefficients
+  expect_true(grepl("A_trend\\[.*\\].*=.*A_raw_group_trend", tparams_code))
+})
+
+test_that("VAR factor model constraints work correctly", {
+  # Test non-hierarchical VAR with factor model (should work)
+  trend_specs_factor <- list(
+    trend = "VAR", 
+    n_lv = 2,    # Factor model: n_lv < n_series
+    n_series = 4,
+    lags = 1, 
+    ma_lags = 0
+  )
+  data_info_factor <- list(n_obs = 80, n_series = 4)
+  
+  expect_no_error({
+    result_factor <- mvgam:::generate_trend_injection_stanvars(trend_specs_factor, data_info_factor)
+  })
+  
+  result_factor <- mvgam:::generate_trend_injection_stanvars(trend_specs_factor, data_info_factor)
+  
+  # Should include Z matrix for factor model
+  stanvar_names <- names(result_factor)
+  expect_true("Z_factor_model" %in% stanvar_names)
+})
+
+test_that("hierarchical VAR rejects factor models correctly", {
+  # Test hierarchical VAR with factor model (should error)
+  trend_specs_hier_factor <- list(
+    trend = "VAR", 
+    n_lv = 2,    # Factor model: n_lv < n_series  
+    n_series = 4,
+    lags = 1,
+    ma_lags = 0,
+    gr = "group"
+  )
+  data_info_hier_factor <- list(
+    n_obs = 80, 
+    n_series = 4,
+    n_groups = 2,
+    n_subgroups = 2
+  )
+  
+  expect_error({
+    mvgam:::generate_trend_injection_stanvars(trend_specs_hier_factor, data_info_hier_factor)
+  }, "Hierarchical VAR models cannot use factor model reduction")
+})
+
+test_that("VAR Stan code uses variance-correlation decomposition", {
+  # Test that VAR uses sigma_trend + L_Omega_trend instead of Sigma_trend
+  trend_specs <- list(
+    trend = "VAR", 
+    n_lv = 3, 
+    n_series = 3,
+    lags = 1, 
+    ma_lags = 0
+  )
+  data_info <- list(n_obs = 60, n_series = 3)
+  
+  result <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
+  
+  # Check parameters block uses decomposition
+  params_stanvar <- result[["var_parameters"]]
+  params_code <- params_stanvar$scode
+  expect_true(grepl("sigma_trend", params_code))
+  expect_true(grepl("L_Omega_trend", params_code))
+  
+  # Check transformed parameters computes Sigma_trend from decomposition
+  tparams_stanvar <- result[["var_tparameters"]]
+  tparams_code <- tparams_stanvar$scode
+  expect_true(grepl("Sigma_trend.*=.*diag_pre_multiply", tparams_code))
+  expect_true(grepl("sigma_trend.*L_Omega_trend", tparams_code))
+})
+
+test_that("VAR centralized prior system includes hierarchical hyperparameters", {
+  # Test that centralized priors include VAR hierarchical parameters
+  trend_specs <- list(
+    trend = "VAR", 
+    n_lv = 2, 
+    n_series = 2,
+    lags = 2, 
+    ma_lags = 1,  # VARMA to test MA priors too
+    gr = "group"  # Hierarchical to test group priors
+  )
+  data_info <- list(
+    n_obs = 100, 
+    n_series = 2,
+    n_groups = 2,
+    n_subgroups = 1
+  )
+  
+  result <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
+  
+  # Should have centralized priors stanvar
+  expect_true("var_centralized_priors" %in% names(result))
+  
+  priors_stanvar <- result[["var_centralized_priors"]]
+  expect_equal(priors_stanvar$block, "model")
+  
+  # Should include all hierarchical parameters in centralized priors
+  priors_code <- priors_stanvar$scode
+  expect_true(grepl("Amu_trend", priors_code))      # VAR hyperpriors
+  expect_true(grepl("Aomega_trend", priors_code))   # VAR hyperpriors  
+  expect_true(grepl("Dmu_trend", priors_code))      # MA hyperpriors
+  expect_true(grepl("Domega_trend", priors_code))   # MA hyperpriors
+  expect_true(grepl("sigma_trend", priors_code))    # Standard variance
+  expect_true(grepl("sigma_group_trend", priors_code))  # Group-specific variance
+})
+
+test_that("VAR validation catches invalid input combinations", {
+  # Test dimension validation
+  expect_error({
+    mvgam:::generate_trend_injection_stanvars(
+      trend_specs = list(trend = "VAR", n_lv = 0, n_series = 2, lags = 1),
+      data_info = list(n_obs = 50, n_series = 2)
+    )
+  }, "not >= 1")
+  
+  expect_error({
+    mvgam:::generate_trend_injection_stanvars(
+      trend_specs = list(trend = "VAR", n_lv = 2, n_series = 2, lags = 0),
+      data_info = list(n_obs = 50, n_series = 2)
+    )
+  }, "not >= 1")
+  
+  # Test negative MA lags
+  expect_error({
+    mvgam:::generate_trend_injection_stanvars(
+      trend_specs = list(trend = "VAR", n_lv = 2, n_series = 2, lags = 1, ma_lags = -1),
+      data_info = list(n_obs = 50, n_series = 2)
+    )
+  }, "not >= 0")
+})
+
+test_that("VAR higher-order lags generate correct coefficient arrays", {
+  # Test VAR(3) generates 3 lag coefficient matrices
+  trend_specs <- list(
+    trend = "VAR", 
+    n_lv = 2, 
+    n_series = 2,
+    lags = 3, 
+    ma_lags = 0
+  )
+  data_info <- list(n_obs = 100, n_series = 2)
+  
+  result <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
+  
+  # Check parameters block has 3 lag matrices
+  params_stanvar <- result[["var_parameters"]]
+  params_code <- params_stanvar$scode
+  
+  expect_true(grepl("array\\[3\\].*A_raw_trend", params_code))  # 3 lag matrices
+  expect_true(grepl("array\\[2\\].*vector\\[3\\].*Amu_trend", params_code))  # 3 lag hyperpriors
+  expect_true(grepl("array\\[2\\].*vector.*3.*Aomega_trend", params_code))  # 3 lag hyperpriors
+})
+
+test_that("VAR follows 3-stanvar pattern for Stan assembly", {
+  # Test that VAR follows consistent stanvar pattern
+  trend_specs <- list(
+    trend = "VAR", 
+    n_lv = 2, 
+    n_series = 2,
+    lags = 1, 
+    ma_lags = 0
+  )
+  data_info <- list(n_obs = 50, n_series = 2)
+  
+  result <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
+  stanvar_names <- names(result)
+  
+  # Core 3-stanvar pattern blocks
+  expect_true("var_parameters" %in% stanvar_names)
+  expect_true("var_tparameters" %in% stanvar_names)  
+  expect_true("var_model" %in% stanvar_names)
+  
+  # Check block assignments
+  expect_equal(result[["var_parameters"]]$block, "parameters")
+  expect_equal(result[["var_tparameters"]]$block, "tparameters")
+  expect_equal(result[["var_model"]]$block, "model")
+  
+  # Additional VAR-specific blocks
+  expect_true("var_functions" %in% stanvar_names)  # Helper functions
+  expect_true("var_tdata" %in% stanvar_names)      # Transformed data
+})
+
+test_that("VAR Stan code uses Heaps 2022 transformation methodology", {
+  # Test that VAR uses proper stationary coefficient transformation
+  trend_specs <- list(
+    trend = "VAR", 
+    n_lv = 2, 
+    n_series = 2,
+    lags = 2, 
+    ma_lags = 1
+  )
+  data_info <- list(n_obs = 80, n_series = 2)
+  
+  result <- mvgam:::generate_trend_injection_stanvars(trend_specs, data_info)
+  
+  # Check functions block contains Heaps 2022 functions
+  functions_stanvar <- result[["var_functions"]]
+  functions_code <- functions_stanvar$scode
+  
+  expect_true(grepl("AtoP", functions_code))          # A to partial autocorr transformation
+  expect_true(grepl("rev_mapping", functions_code))   # Reverse mapping for MA
+  expect_true(grepl("initial_joint_var", functions_code))  # Initial covariance computation
+  
+  # Check transformed parameters uses these functions
+  tparams_stanvar <- result[["var_tparameters"]]
+  tparams_code <- tparams_stanvar$scode
+  
+  expect_true(grepl("AtoP\\(A_raw_trend", tparams_code))  # Transformation call
+  expect_true(grepl("rev_mapping\\(P_ma", tparams_code)) # MA transformation call  
+  expect_true(grepl("initial_joint_var\\(Sigma_trend", tparams_code)) # Omega computation
+})

@@ -2248,12 +2248,12 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   checkmate::assert_list(trend_specs, names = "named")
   checkmate::assert_list(data_info, names = "named")
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
-  
+
   # Validate required trend_specs components
   checkmate::assert_int(trend_specs$lags %||% 1, lower = 1)
   checkmate::assert_int(trend_specs$ma_lags %||% 0, lower = 0)
   checkmate::assert_int(trend_specs$n_lv %||% 1, lower = 1)
-  
+
   # Validate required data_info components
   checkmate::assert_int(data_info$n_obs, lower = 1)
   checkmate::assert_int(data_info$n_series %||% 1, lower = 1)
@@ -2264,7 +2264,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   ma_lags <- trend_specs$ma_lags %||% 0
   n <- data_info$n_obs
   n_series <- data_info$n_series %||% 1
-  
+
   # VAR/VARMA constraint validation
   if (lags < 1) {
     insight::format_error("VAR model requires {.field lags} >= 1")
@@ -2275,26 +2275,53 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   if (n_lv > n_series && ma_lags == 0) {
     insight::format_error("VAR factor model requires {.field n_lv} <= {.field n_series}")
   }
-  
+
   # Check for hierarchical grouping requirements - CRITICAL for grouped VAR models
   is_hierarchical <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
   hierarchical_info <- NULL
-  
+
   if (is_hierarchical) {
+    # Factor models are incompatible with hierarchical grouping
+    # Z matrix is specified in transformed data when gr/subgr are supplied
+    if (n_lv < n_series) {
+      stop(insight::format_error(
+        "Hierarchical VAR models ({.field gr}/{.field subgr}) cannot use factor models",
+        "Use {.field n_lv = n_series} or remove {.field gr}/{.field subgr} parameters"
+      ))
+    }
+
     # Extract hierarchical grouping information from data_info
-    hierarchical_info <- extract_hierarchical_info(data_info, trend_specs)
-    n_groups <- hierarchical_info$n_groups
-    n_subgroups <- hierarchical_info$n_subgroups
-    
-    # VAR models require group-specific Sigma_trend matrices for hierarchical grouping
-    # This enables proper cross-series correlation modeling within groups
+    # Expect data_info to contain sorted dataframe information for group indexing
+    n_groups <- data_info$n_groups %||% stop("Missing n_groups in data_info for hierarchical VAR")
+    n_subgroups <- data_info$n_subgroups %||% stop("Missing n_subgroups in data_info for hierarchical VAR")
+
+    # Generate group_inds matrix: maps (group, subgroup) -> series index
+    # Based on sorted data where series = interaction(gr, subgr)
+    group_inds <- matrix(
+      1:(n_groups * n_subgroups),
+      nrow = n_groups,
+      ncol = n_subgroups,
+      byrow = TRUE
+    )
+
+    # Generate Stan code for group_inds initialization
+    group_inds_code <- paste(
+      sapply(1:nrow(group_inds), function(i) {
+        paste0("group_inds_trend[", i, "] = {",
+               paste(group_inds[i, ], collapse = ", "), "};")
+      }),
+      collapse = "\n        "
+    )
+
+    # VAR models use group-specific coefficients with shared hyperpriors
+    # and block-structured matrices for proper within-group interactions only
   }
-  
+
   # Determine model type with validation
   is_varma <- ma_lags > 0
   is_factor_model <- n_lv < n_series
   use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
-  
+
   # Additional validation for logical consistency
   checkmate::assert_logical(is_varma, len = 1)
   if (is_varma && ma_lags <= 0) {
@@ -2303,7 +2330,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   if (!is_varma && ma_lags > 0) {
     insight::format_error("Internal error: VARMA flag not set but {.field ma_lags} > 0")
   }
-  
+
   # VAR/VARMA mathematical functions block with modern Stan syntax and numerical stability
   var_functions_stanvar <- brms::stanvar(
     name = "var_functions",
@@ -2317,18 +2344,18 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       matrix sqrtm(matrix A) {
         int m = rows(A);
         vector[m] eigenvals = eigenvalues_sym(A);
-        
+
         // Numerical stability check for positive definiteness
         if (min(eigenvals) <= 1e-12) {
           reject(\"Matrix must be positive definite for square root computation\");
         }
-        
+
         vector[m] root_root_evals = sqrt(sqrt(eigenvals));
         matrix[m, m] evecs = eigenvectors_sym(A);
         matrix[m, m] eprod = diag_post_multiply(evecs, root_root_evals);
         return tcrossprod(eprod);
       }
-      
+
       /**
        * Transform P_real to P matrix using partial autocorrelation approach
        * Heaps 2022 transformation for stationarity constraints
@@ -2343,7 +2370,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         }
         return mdivide_left_spd(sqrtm(B), P_real);
       }
-      
+
       /**
        * Compute Kronecker product of two matrices
        * Used in companion matrix approach for VARMA initialization
@@ -2357,7 +2384,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         int p = rows(B);
         int q = cols(B);
         matrix[m * p, n * q] C;
-        
+
         for (i in 1:m) {
           for (j in 1:n) {
             int row_start = (i - 1) * p + 1;
@@ -2369,7 +2396,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         }
         return C;
       }
-      
+
       /**
        * Perform reverse mapping from partial autocorrelations to stationary coefficients
        * Heaps 2022 Algorithm for computing phi coefficients from P matrices
@@ -2389,7 +2416,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         array[p + 1] matrix[m, m] S_for_list;
         array[p + 1] matrix[m, m] Gamma_trans;
         array[2, p] matrix[m, m] phiGamma;
-        
+
         // Step 1: Forward pass - compute Sigma_for and S_for_list
         Sigma_for[p + 1] = Sigma;
         S_for_list[p + 1] = sqrtm(Sigma);
@@ -2401,12 +2428,12 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
           }
           S_rev = sqrtm(S_for);
           S_for_list[p - s + 1] = mdivide_right_spd(
-            mdivide_left_spd(S_rev, sqrtm(quad_form_sym(Sigma_for[p - s + 2], S_rev))), 
+            mdivide_left_spd(S_rev, sqrtm(quad_form_sym(Sigma_for[p - s + 2], S_rev))),
             S_rev
           );
           Sigma_for[p - s + 1] = tcrossprod(S_for_list[p - s + 1]);
         }
-        
+
         // Step 2: Reverse pass - compute phi coefficients and Gamma matrices
         Sigma_rev[1] = Sigma_for[1];
         Gamma_trans[1] = Sigma_for[1];
@@ -2416,25 +2443,25 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
           phi_for[s + 1, s + 1] = mdivide_right_spd(S_for * P[s + 1], S_rev);
           phi_rev[s + 1, s + 1] = mdivide_right_spd(S_rev * P[s + 1]', S_for);
           Gamma_trans[s + 2] = phi_for[s + 1, s + 1] * Sigma_rev[s + 1];
-          
+
           if (s >= 1) {
             // Update phi coefficients using recursive relations
             for (k in 1:s) {
-              phi_for[s + 1, k] = phi_for[s, k] - 
+              phi_for[s + 1, k] = phi_for[s, k] -
                                   phi_for[s + 1, s + 1] * phi_rev[s, s - k + 1];
-              phi_rev[s + 1, k] = phi_rev[s, k] - 
+              phi_rev[s + 1, k] = phi_rev[s, k] -
                                   phi_rev[s + 1, s + 1] * phi_for[s, s - k + 1];
             }
             // Update Gamma_trans using phi coefficients
             for (k in 1:s) {
-              Gamma_trans[s + 2] = Gamma_trans[s + 2] + 
+              Gamma_trans[s + 2] = Gamma_trans[s + 2] +
                                    phi_for[s, k] * Gamma_trans[s + 2 - k];
             }
           }
-          Sigma_rev[s + 2] = Sigma_rev[s + 1] - 
+          Sigma_rev[s + 2] = Sigma_rev[s + 1] -
                              quad_form_sym(Sigma_for[s + 1], phi_rev[s + 1, s + 1]');
         }
-        
+
         // Pack results: phi coefficients in row 1, Gamma matrices in row 2
         for (i in 1:p) {
           phiGamma[1, i] = phi_for[p, i];
@@ -2442,13 +2469,13 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         }
         return phiGamma;
       }
-      
+
       /**
        * Compute joint stationary covariance for VARMA(p,q) initialization
        * Heaps 2022 companion matrix approach for stationary distribution
        * @param Sigma Innovation covariance matrix (m x m)
        * @param phi Array of stationary VAR coefficient matrices
-       * @param theta Array of stationary MA coefficient matrices  
+       * @param theta Array of stationary MA coefficient matrices
        * @return Joint covariance matrix Omega for (y_0,...,y_{1-p},eps_0,...,eps_{1-q})
        */
       matrix initial_joint_var(matrix Sigma, array[] matrix[,] phi, array[] matrix[,] theta) {
@@ -2459,7 +2486,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         matrix[(p + q) * m, (p + q) * m] companion_var = rep_matrix(0.0, (p + q) * m, (p + q) * m);
         matrix[(p + q) * m * (p + q) * m, (p + q) * m * (p + q) * m] tmp;
         matrix[(p + q) * m, (p + q) * m] Omega;
-        
+
         // Construct companion matrix (phi_tilde) following Heaps 2022
         // VAR component: phi matrices in top-left block
         for (i in 1:p) {
@@ -2471,12 +2498,12 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
             }
           }
         }
-        
+
         // MA component: theta matrices in top-right block
         for (i in 1:q) {
           companion_mat[1:m, ((p + i - 1) * m + 1):((p + i) * m)] = theta[i];
         }
-        
+
         // Identity blocks for MA lags (if q > 1)
         if (q > 1) {
           for (i in 2:q) {
@@ -2485,41 +2512,57 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
             }
           }
         }
-        
-        // Construct innovation covariance matrix (Sigma_tilde) 
+
+        // Construct innovation covariance matrix (Sigma_tilde)
         // Innovations affect y_t and eps_t simultaneously
         companion_var[1:m, 1:m] = Sigma;  // For y_t innovations
         companion_var[(p * m + 1):((p + 1) * m), (p * m + 1):((p + 1) * m)] = Sigma;  // For eps_t innovations
         companion_var[1:m, (p * m + 1):((p + 1) * m)] = Sigma;  // Cross-covariance
         companion_var[(p * m + 1):((p + 1) * m), 1:m] = Sigma;  // Symmetric cross-covariance
-        
+
         // Solve Lyapunov equation: Omega = Sigma_tilde + Phi_tilde * Omega * Phi_tilde'
         // Vectorized form: vec(Omega) = (I - Phi_tilde ⊗ Phi_tilde)^{-1} vec(Sigma_tilde)
-        tmp = diag_matrix(rep_vector(1.0, (p + q) * m * (p + q) * m)) - 
+        tmp = diag_matrix(rep_vector(1.0, (p + q) * m * (p + q) * m)) -
               kronecker_prod(companion_mat, companion_mat);
-              
+
         Omega = to_matrix(tmp \\ to_vector(companion_var), (p + q) * m, (p + q) * m);
-        
+
         // Ensure numerical symmetry of result
         for (i in 1:(rows(Omega) - 1)) {
           for (j in (i + 1):rows(Omega)) {
             Omega[j, i] = Omega[i, j];
           }
         }
-        
+
         return Omega;
       }
     ",
     block = "functions"
   )
-  
+
   # VAR/VARMA transformed data with hyperparameter constants and utility arrays
   var_tdata_stanvar <- brms::stanvar(
     name = "var_tdata",
     scode = glue::glue("
       // Zero mean vector for VARMA process (following Heaps 2022)
       vector[{n_lv}] trend_zeros = rep_vector(0.0, {n_lv});
-      
+
+      {if(is_hierarchical) glue::glue('
+      // Hierarchical grouping data structures
+      int<lower=0> n_groups_trend = {n_groups};
+      int<lower=0> n_subgroups_trend = {n_subgroups};
+
+      // Group indexing matrix: maps (group, subgroup) -> series index
+      // Populated from sorted data where series = interaction(gr, subgr)
+      array[{n_groups}, {n_subgroups}] int<lower=1> group_inds_trend;
+      {{
+        {group_inds_code}
+      }}
+
+      // Z matrix for hierarchical models (identity - no factor reduction)
+      matrix[n_series_trend, n_lv_trend] Z_trend = diag_matrix(rep_vector(1.0, n_lv_trend));
+      ') else ''}
+
       // Hyperparameter constants for hierarchical priors (as constants, not user inputs)
       // For A_trend coefficient matrices: diagonal and off-diagonal elements
       array[2] vector[2] es_trend = {{
@@ -2528,7 +2571,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       }};
       array[2] vector[2] fs_trend = {{
         {{1.0, 1.0}},    // Standard deviations for diagonal elements
-        {{1.0, 1.0}}     // Standard deviations for off-diagonal elements  
+        {{1.0, 1.0}}     // Standard deviations for off-diagonal elements
       }};
       array[2] vector[2] gs_trend = {{
         {{2.0, 2.0}},    // Gamma shape parameters for diagonal precision
@@ -2538,7 +2581,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         {{1.0, 1.0}},    // Gamma rate parameters for diagonal precision
         {{1.0, 1.0}}     // Gamma rate parameters for off-diagonal precision
       }};
-      
+
       {if(is_varma) paste0('
       // Additional hyperparameters for D_trend (MA coefficient matrices) when ma_lags > 0
       array[2] vector[2] es_ma_trend = {{
@@ -2561,40 +2604,40 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     "),
     block = "tdata"
   )
-  
+
   # Core VAR parameters block with conditional VARMA extensions
   var_parameters_stanvar <- brms::stanvar(
     name = "var_parameters",
     scode = glue::glue("
-      // Raw partial autocorrelation matrices (unconstrained for stationarity enforcement)
-      array[{lags}] matrix[n_lv_trend, n_lv_trend] A_raw_trend;
-      
-      // Innovation variance and correlation decomposition
       {if(is_hierarchical) glue::glue('
-      // Hierarchical group-specific variance and correlation parameters
-      array[{n_groups}] vector<lower=0>[n_lv_trend] sigma_trend;           // Group-specific variances
-      array[{n_groups}] cholesky_factor_corr[n_lv_trend] L_Omega_trend;    // Group-specific correlations
+      // Hierarchical VAR: group-specific raw matrices with shared hyperpriors
+      array[{n_groups}, {lags}] matrix[{n_subgroups}, {n_subgroups}] A_raw_group_trend;
+
+      // Group-specific variance parameters (for hierarchical correlations)
+      array[{n_groups}] vector<lower=0>[{n_subgroups}] sigma_group_trend;
       ') else '
+      // Standard VAR: single raw matrix
+      array[{lags}] matrix[n_lv_trend, n_lv_trend] A_raw_trend;
+
       // Standard variance and correlation parameters
-      vector<lower=0>[n_lv_trend] sigma_trend;           // Variance parameters
-      cholesky_factor_corr[n_lv_trend] L_Omega_trend;    // LKJ correlation Cholesky factor
+      vector<lower=0>[n_lv_trend] sigma_trend;
+      cholesky_factor_corr[n_lv_trend] L_Omega_trend;
       '}
-      
-      // Hierarchical hyperparameters for A_raw_trend coefficients
+
+      // Shared hierarchical hyperparameters for A_raw coefficients (across all groups)
       // [1] = diagonal elements, [2] = off-diagonal elements
-      array[2] vector[{lags}] Amu_trend;     // Means for A_raw_trend elements
-      array[2] vector<lower=0>[{lags}] Aomega_trend;  // Precisions for A_raw_trend elements
-      
+      array[2] vector[{lags}] Amu_trend;     // Shared means
+      array[2] vector<lower=0>[{lags}] Aomega_trend;  // Shared precisions
+
       // Joint initialization vector for stationary distribution
-      // Size: lags * n_lv_trend for VAR(p), (lags + ma_lags) * n_lv_trend for VARMA(p,q)
       vector[{if(is_varma) paste0('(', lags, ' + ', ma_lags, ') * n_lv_trend') else paste0(lags, ' * n_lv_trend')}] init_trend;
-      
+
       // Standard latent variable trends - consistent with other trend generators
       matrix[n_trend, n_lv_trend] lv_trend;
     "),
     block = "parameters"
   )
-  
+
   # Conditional MA parameters block for VARMA(p,q) when ma_lags > 0
   # This creates a 4th stanvar component only for VARMA models
   # D_trend naming follows Heaps 2022 convention for MA coefficients
@@ -2605,7 +2648,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       // Raw MA partial autocorrelation matrices (unconstrained for stationarity)
       // D_raw_trend gets transformed to D_trend (stationary MA coefficients)
       array[{ma_lags}] matrix[n_lv_trend, n_lv_trend] D_raw_trend;
-      
+
       // Hierarchical hyperparameters for D_raw_trend (MA) coefficients
       // Mirrors A_raw_trend hyperparameter structure for consistency
       // [1] = diagonal elements, [2] = off-diagonal elements
@@ -2615,82 +2658,119 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       block = "parameters"
     )
   }
-  
+
   # VAR/VARMA transformed parameters - compute stationary coefficients
   var_tparameters_stanvar <- brms::stanvar(
-    name = "var_tparameters", 
+    name = "var_tparameters",
     scode = glue::glue("
-      // Construct innovation covariance matrices from variance-correlation decomposition
       {if(is_hierarchical) glue::glue('
-      // Group-specific covariance matrices for hierarchical VAR models
-      array[{n_groups}] matrix[n_lv_trend, n_lv_trend] L_Sigma_trend;
-      array[{n_groups}] cov_matrix[n_lv_trend] Sigma_trend;
-      
+      // Hierarchical VAR: group-specific computations then block assembly
+
+      // Group-specific hierarchical correlations and covariances
+      array[{n_groups}] cov_matrix[{n_subgroups}] Sigma_group_trend;
+      array[{n_groups}, {lags}] matrix[{n_subgroups}, {n_subgroups}] A_group_trend;
+
+      // Compute group-specific covariances using hierarchical correlation structure
       for (g in 1:{n_groups}) {{
-        L_Sigma_trend[g] = diag_pre_multiply(sigma_trend[g], L_Omega_trend[g]);
-        Sigma_trend[g] = multiply_lower_tri_self_transpose(L_Sigma_trend[g]);
+        // Combine global and local correlations using existing hierarchical infrastructure
+        matrix[{n_subgroups}, {n_subgroups}] L_Omega_group =
+          cholesky_compose(alpha_cor * multiply_lower_tri_self_transpose(L_Omega_global) +
+                           (1 - alpha_cor) * multiply_lower_tri_self_transpose(L_deviation_group[g]));
+        Sigma_group_trend[g] = multiply_lower_tri_self_transpose(
+          diag_pre_multiply(sigma_group_trend[g], L_Omega_group));
+
+        // Apply Heaps transformation per group
+        for (lag in 1:{lags}) {{
+          array[1] matrix[{n_subgroups}, {n_subgroups}] P_group;
+          P_group[1] = AtoP(A_raw_group_trend[g, lag]);
+          array[2, 1] matrix[{n_subgroups}, {n_subgroups}] result_group =
+            rev_mapping(P_group, Sigma_group_trend[g]);
+          A_group_trend[g, lag] = result_group[1, 1];
+        }}
+      }}
+
+      // Build block-structured full matrices (groups do not interact)
+      cov_matrix[n_lv_trend] Sigma_trend = rep_matrix(0, n_lv_trend, n_lv_trend);
+      array[{lags}] matrix[n_lv_trend, n_lv_trend] A_trend;
+      for (lag in 1:{lags}) {{
+        A_trend[lag] = rep_matrix(0, n_lv_trend, n_lv_trend);
+      }}
+
+      for (g in 1:{n_groups}) {{
+        Sigma_trend[group_inds_trend[g], group_inds_trend[g]] = Sigma_group_trend[g];
+        for (lag in 1:{lags}) {{
+          A_trend[lag][group_inds_trend[g], group_inds_trend[g]] = A_group_trend[g, lag];
+        }}
       }}
       ') else '
-      // Standard covariance matrix for non-hierarchical VAR models  
+      // Standard VAR: single covariance matrix and transformation
       matrix[n_lv_trend, n_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
       cov_matrix[n_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
-      '}
-      
-      // Transform raw parameters to stationary coefficients using Heaps 2022 methodology
-      // Final stationary VAR coefficients (used in dynamics)
+
+      // Transform raw parameters to stationary coefficients
       array[{lags}] matrix[n_lv_trend, n_lv_trend] A_trend;
-      {if(is_varma) glue::glue('array[{ma_lags}] matrix[n_lv_trend, n_lv_trend] D_trend;') else ''}
-      
-      // Initial joint covariance matrix for stationary initialization
-      {if(is_hierarchical) paste0('
-      // Group-specific joint covariance matrices
-      array[', n_groups, '] cov_matrix[', if(is_varma) paste0('(', lags, ' + ', ma_lags, ') * n_lv_trend') else paste0(lags, ' * n_lv_trend'), '] Omega_trend;
-      ') else paste0('
-      // Standard joint covariance matrix
-      cov_matrix[', if(is_varma) paste0('(', lags, ' + ', ma_lags, ') * n_lv_trend') else paste0(lags, ' * n_lv_trend'), '] Omega_trend;
-      ')}
-      
-      {if(is_varma) glue::glue('vector[n_lv_trend] ma_init_trend[{ma_lags}];  // Initial MA errors') else ''}
-      
+
       // Working arrays for stationarity transformation
       array[{lags}] matrix[n_lv_trend, n_lv_trend] P_var;
       array[2, {lags}] matrix[n_lv_trend, n_lv_trend] result_var;
-      
+
+      for (i in 1:{lags}) {{
+        P_var[i] = AtoP(A_raw_trend[i]);
+      }}
+
+      result_var = rev_mapping(P_var, Sigma_trend);
+
+      for (i in 1:{lags}) {{
+        A_trend[i] = result_var[1, i];
+      }}
+      '}
+
+      {if(is_varma) glue::glue('array[{ma_lags}] matrix[n_lv_trend, n_lv_trend] D_trend;') else ''}
+
+      // Joint covariance matrix for stationary initialization
+      cov_matrix[{if(is_varma) paste0('(', lags, ' + ', ma_lags, ') * n_lv_trend') else paste0(lags, ' * n_lv_trend')}] Omega_trend;
+
+      {if(is_varma) glue::glue('vector[n_lv_trend] ma_init_trend[{ma_lags}];  // Initial MA errors') else ''}
+
+      // Working arrays for stationarity transformation
+      array[{lags}] matrix[n_lv_trend, n_lv_trend] P_var;
+      array[2, {lags}] matrix[n_lv_trend, n_lv_trend] result_var;
+
       // Transform A_raw_trend to stationary A_trend using Heaps methodology
       for (i in 1:{lags}) {{
         P_var[i] = AtoP(A_raw_trend[i]);
       }}
-      
+
       // Apply reverse mapping to get stationary coefficients
       result_var = rev_mapping(P_var, Sigma_trend);
-      
+
       // Extract stationary VAR coefficients (these become our final A_trend)
       for (i in 1:{lags}) {{
         A_trend[i] = result_var[1, i];
       }}
-      
+
       {if(is_varma) glue::glue('
       // Transform D_raw_trend to stationary D_trend (VARMA only)
       array[{ma_lags}] matrix[n_lv_trend, n_lv_trend] P_ma;
       array[2, {ma_lags}] matrix[n_lv_trend, n_lv_trend] result_ma;
-      
+
       // Transform D_raw_trend matrices using AtoP transformation
       for (i in 1:{ma_lags}) {{
         P_ma[i] = AtoP(D_raw_trend[i]);
       }}
-      
+
       // Apply reverse mapping to get stationary MA coefficients
       result_ma = rev_mapping(P_ma, Sigma_trend);
-      
+
       // Extract stationary MA coefficients (negative sign per Heaps 2022)
       for (i in 1:{ma_lags}) {{
         D_trend[i] = -result_ma[1, i];
       }}
       ') else ''}
-      
+
       // Compute initial joint covariance matrix using companion matrix approach
       {if(is_varma) 'Omega_trend = initial_joint_var(Sigma_trend, A_trend, D_trend);' else 'array[1] matrix[n_lv_trend, n_lv_trend] empty_theta; empty_theta[1] = rep_matrix(0.0, n_lv_trend, n_lv_trend); Omega_trend = initial_joint_var(Sigma_trend, A_trend, empty_theta[1:0]);'}
-      
+
       {if(is_varma) glue::glue('
       // Initialize MA error terms from init_trend (VARMA specific)
       for (i in 1:{ma_lags}) {{
@@ -2702,7 +2782,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     "),
     block = "tparameters"
   )
-  
+
   # VAR/VARMA model block with joint initial distribution (Task 2.7.8.10)
   # Pre-calculate dimensions for clarity and validation
   checkmate::assert_logical(is_varma, len = 1)
@@ -2711,27 +2791,27 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   if (is_varma) {
     checkmate::assert_int(ma_lags, lower = 1)
   }
-  
+
   # Calculate initialization vector dimension: lags*n_lv_trend for VAR, (lags+ma_lags)*n_lv_trend for VARMA
   init_dim_expr <- if (is_varma) glue::glue('({lags} + {ma_lags}) * n_lv_trend') else glue::glue('{lags} * n_lv_trend')
-  
+
   var_model_stanvar <- brms::stanvar(
     name = "var_model",
     scode = glue::glue("
       // VARMA likelihood implementation following Heaps 2022 methodology
-      
+
       // Initial joint distribution for stationary VARMA initialization
       vector[{init_dim_expr}] mu_init_trend = rep_vector(0.0, {init_dim_expr});
       init_trend ~ multi_normal(mu_init_trend, Omega_trend);
-      
+
       // Conditional means for VARMA dynamics
       vector[n_lv_trend] mu_t_trend[n_trend];
       {if(is_varma) glue::glue('vector[n_lv_trend] ma_error_trend[n_trend];  // MA error terms') else ''}
-      
+
       // Compute conditional means for all time points
       for (t in 1:n_trend) {{
         mu_t_trend[t] = rep_vector(0.0, n_lv_trend);
-        
+
         // VAR component: Add autoregressive terms
         for (i in 1:{lags}) {{
           if (t - i <= 0) {{
@@ -2749,7 +2829,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
             mu_t_trend[t] += A_trend[i] * lv_trend[t - i, :];
           }}
         }}
-        
+
         {if(is_varma) glue::glue('
         // MA component: Add moving average terms for VARMA
         for (i in 1:{ma_lags}) {{
@@ -2759,25 +2839,42 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
               mu_t_trend[t] += D_trend[i] * ma_init_trend[i];
             }}
           }} else {{
-            // Use computed MA errors from previous time points  
+            // Use computed MA errors from previous time points
             mu_t_trend[t] += D_trend[i] * ma_error_trend[t - i];
           }}
         }}
         ') else ''}
       }}
-      
+
       // Observation likelihood for time series
       for (t in 1:n_trend) {{
         lv_trend[t, :] ~ multi_normal(mu_t_trend[t], Sigma_trend);
         {if(is_varma) '// Compute MA error for next iteration\n        ma_error_trend[t] = lv_trend[t, :] - mu_t_trend[t];' else ''}
       }}
-      
-      // Hierarchical priors for VAR coefficient matrices (A_raw_trend)
-      // Following Heaps 2022 hierarchical exchangeable prior structure
+
+      {if(is_hierarchical) glue::glue('
+      // Hierarchical VAR: group-specific priors with shared hyperpriors
+      for (g in 1:{n_groups}) {{
+        for (lag in 1:{lags}) {{
+          // Diagonal elements prior (shared across all groups)
+          diagonal(A_raw_group_trend[g, lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));
+
+          // Off-diagonal elements prior (shared across all groups)
+          for (i in 1:{n_subgroups}) {{
+            for (j in 1:{n_subgroups}) {{
+              if (i != j) {{
+                A_raw_group_trend[g, lag, i, j] ~ normal(Amu_trend[2, lag], 1 / sqrt(Aomega_trend[2, lag]));
+              }}
+            }}
+          }}
+        }}
+      }}
+      ') else '
+      // Standard VAR: single matrix priors
       for (lag in 1:{lags}) {{
         // Diagonal elements prior
         diagonal(A_raw_trend[lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));
-        
+
         // Off-diagonal elements prior
         for (i in 1:n_lv_trend) {{
           for (j in 1:n_lv_trend) {{
@@ -2787,14 +2884,15 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
           }}
         }}
       }}
-      
+      '}
+
       {if(is_varma) glue::glue('
       // Hierarchical priors for VARMA MA coefficient matrices (D_raw_trend)
       // Following same structure as VAR coefficients but conditional on ma_lags > 0
       for (ma_lag in 1:{ma_lags}) {{
         // Diagonal elements prior for MA coefficients
         diagonal(D_raw_trend[ma_lag]) ~ normal(Dmu_trend[1, ma_lag], 1 / sqrt(Domega_trend[1, ma_lag]));
-        
+
         // Off-diagonal elements prior for MA coefficients
         for (i in 1:n_lv_trend) {{
           for (j in 1:n_lv_trend) {{
@@ -2804,21 +2902,21 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
           }}
         }}
       }}
-      
+
       // Hyperpriors for hierarchical MA coefficient means and precisions
       for (component in 1:2) {{  // [1] diagonal, [2] off-diagonal
         Dmu_trend[component] ~ normal(es_ma_trend[component], fs_ma_trend[component]);
         Domega_trend[component] ~ gamma(gs_ma_trend[component], hs_ma_trend[component]);
       }}
       ') else ''}
-      
+
       // Innovation variance and correlation priors (consistent with other trend generators)
       // Variance parameters using inverse gamma (equivalent to existing patterns)
       sigma_trend ~ inv_gamma(1.418, 0.452);
-      
+
       // LKJ correlation prior on Cholesky factor
       L_Omega_trend ~ lkj_corr_cholesky(2);
-      
+
       // Hyperpriors for hierarchical VAR coefficient means and precisions
       // Following Heaps 2022 exchangeable hyperprior structure
       for (component in 1:2) {{  // [1] diagonal, [2] off-diagonal
@@ -2828,12 +2926,22 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     "),
     block = "model"
   )
+
+  # Generate centralized priors for trend parameters
+  # Standard parameters: sigma_trend (L_Omega_trend handled by LKJ in model block)
+  # Hierarchical hyperparameters: Amu_trend, Aomega_trend, and conditional MA/group parameters
+  var_params_to_prior <- c("sigma_trend", "Amu_trend", "Aomega_trend")
   
-  # Generate centralized priors for standard trend parameters
-  # VAR parameters (sigma_trend, L_Omega_trend) can use centralized prior system
-  # while A_trend/D_trend use specialized hierarchical Heaps 2022 priors
-  var_params_to_prior <- c("sigma_trend")  # L_Omega_trend handled by LKJ in model block
+  # Add hierarchical group parameters
+  if (is_hierarchical) {
+    var_params_to_prior <- c(var_params_to_prior, "sigma_group_trend")
+  }
   
+  # Add VARMA MA hyperparameters
+  if (is_varma) {
+    var_params_to_prior <- c(var_params_to_prior, "Dmu_trend", "Domega_trend")
+  }
+
   var_centralized_priors <- NULL
   if (length(var_params_to_prior) > 0) {
     var_centralized_priors <- generate_trend_priors_stanvar(
@@ -2842,47 +2950,47 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       stanvar_name = "var_centralized_priors"
     )
   }
-  
+
   # Add trend computation stanvars (maps lv_trend through Z matrix if factor model)
   trend_computation <- generate_trend_computation_tparameters(n_lv, n_series)
-  
+
   # Create components list based on model type
   base_components <- if (is_varma) {
     # VARMA case: include MA parameters (6 base components)
-    list(var_functions_stanvar, var_tdata_stanvar, 
-         var_parameters_stanvar, var_ma_parameters_stanvar, 
+    list(var_functions_stanvar, var_tdata_stanvar,
+         var_parameters_stanvar, var_ma_parameters_stanvar,
          var_tparameters_stanvar, var_model_stanvar)
   } else {
     # VAR-only case: no MA parameters (5 base components)
-    list(var_functions_stanvar, var_tdata_stanvar, var_parameters_stanvar, 
+    list(var_functions_stanvar, var_tdata_stanvar, var_parameters_stanvar,
          var_tparameters_stanvar, var_model_stanvar)
   }
-  
+
   # Add trend computation (required for all VAR models)
   components <- append_if_not_null(base_components, trend_computation)
-  
+
   # Add hierarchical correlation support if applicable
   if (is_hierarchical) {
     # Add existing hierarchical correlation infrastructure
     hierarchical_functions <- generate_hierarchical_functions()
     hierarchical_params <- generate_hierarchical_correlation_parameters(n_groups, n_subgroups)
     hierarchical_priors <- generate_hierarchical_correlation_model(n_groups)
-    
+
     components <- append_if_not_null(components, list(hierarchical_functions, hierarchical_params, hierarchical_priors))
   }
-  
+
   # Add factor model support if applicable
   if (is_factor_model) {
     factor_priors <- generate_factor_model(is_factor_model, n_lv)
     components <- append_if_not_null(components, factor_priors)
   }
-  
+
   # Add centralized priors if they exist (final optional component)
   components <- append_if_not_null(components, var_centralized_priors)
-  
+
   # Combine stanvars using established pattern
   result_stanvars <- do.call(combine_stanvars, components)
-  
+
   return(result_stanvars)
 }
 

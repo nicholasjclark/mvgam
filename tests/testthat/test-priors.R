@@ -1207,3 +1207,220 @@ test_that("ZMVN transformed parameters use non-centered parameterization", {
   # Should be a simple assignment, not complex dynamics
   expect_false(grepl("for.*loop", stan_code))  # No complex loops for ZMVN
 })
+
+# VAR/VARMA Prior System Tests
+# ============================
+
+test_that("VAR trend generates correct hierarchical hyperpriors", {
+  test_data <- data.frame(
+    y = rnorm(50), 
+    time = 1:50, 
+    series = factor(rep(c('A', 'B'), 25))
+  )
+  
+  # Test basic VAR(1) trend priors
+  var_priors <- mvgam:::extract_trend_priors(
+    trend_formula = ~ VAR(p = 1, time = "time", series = "series"),
+    data = test_data
+  )
+  
+  expect_true(inherits(var_priors, "brmsprior"))
+  expect_true(nrow(var_priors) >= 3)
+  
+  # Should have hierarchical VAR hyperparameters
+  expect_true(any(grepl("Amu_trend", var_priors$class)))
+  expect_true(any(grepl("Aomega_trend", var_priors$class)))
+  expect_true(any(grepl("sigma_trend", var_priors$class)))
+  expect_true(any(grepl("L_Omega_trend", var_priors$class)))
+  
+  # Check bounds for precision parameters (should be positive)
+  aomega_rows <- grepl("Aomega_trend", var_priors$class)
+  if (any(aomega_rows)) {
+    expect_equal(var_priors$lb[aomega_rows][1], "0")
+  }
+})
+
+test_that("VARMA trend generates conditional MA hyperpriors", {
+  test_data <- data.frame(
+    y = rnorm(60), 
+    time = 1:60, 
+    series = factor(rep(c('A', 'B', 'C'), 20))
+  )
+  
+  # Test VARMA(2,1) trend priors
+  varma_priors <- mvgam:::extract_trend_priors(
+    trend_formula = ~ VAR(p = 2, ma = TRUE, time = "time", series = "series"),
+    data = test_data
+  )
+  
+  expect_true(inherits(varma_priors, "brmsprior"))
+  expect_true(nrow(varma_priors) >= 5)
+  
+  # Should have VAR hyperparameters
+  expect_true(any(grepl("Amu_trend", varma_priors$class)))
+  expect_true(any(grepl("Aomega_trend", varma_priors$class)))
+  
+  # Should have MA hyperparameters (conditional on ma = TRUE)
+  expect_true(any(grepl("Dmu_trend", varma_priors$class)))
+  expect_true(any(grepl("Domega_trend", varma_priors$class)))
+  
+  # Should have variance-correlation decomposition
+  expect_true(any(grepl("sigma_trend", varma_priors$class)))
+  expect_true(any(grepl("L_Omega_trend", varma_priors$class)))
+})
+
+test_that("hierarchical VAR trend generates group-specific priors", {
+  # Create hierarchical test data with groups
+  test_data <- data.frame(
+    y = rnorm(80),
+    time = rep(1:20, 4),
+    series = factor(rep(c('A', 'B'), 40)),
+    group = factor(rep(c('G1', 'G2'), each = 40))
+  )
+  
+  # Test hierarchical VAR with grouping
+  hier_var_priors <- mvgam:::extract_trend_priors(
+    trend_formula = ~ VAR(p = 1, gr = "group", time = "time", series = "series"),
+    data = test_data
+  )
+  
+  expect_true(inherits(hier_var_priors, "brmsprior"))
+  
+  # Should have shared hyperpriors for all groups
+  expect_true(any(grepl("Amu_trend", hier_var_priors$class)))
+  expect_true(any(grepl("Aomega_trend", hier_var_priors$class)))
+  
+  # Should have group-specific variance parameters
+  expect_true(any(grepl("sigma_group_trend", hier_var_priors$class)))
+  
+  # Should have variance-correlation structure
+  expect_true(any(grepl("sigma_trend", hier_var_priors$class)))
+  expect_true(any(grepl("L_Omega_trend", hier_var_priors$class)))
+})
+
+test_that("VAR trend priors follow variance-correlation decomposition pattern", {
+  test_data <- data.frame(
+    y = rnorm(40), 
+    time = 1:40, 
+    series = factor(rep(c('X', 'Y'), 20))
+  )
+  
+  var_priors <- mvgam:::extract_trend_priors(
+    trend_formula = ~ VAR(p = 1, time = "time", series = "series"),
+    data = test_data
+  )
+  
+  # Should use sigma_trend + L_Omega_trend instead of inverse Wishart
+  expect_true(any(grepl("^sigma_trend$", var_priors$class)))
+  expect_true(any(grepl("^L_Omega_trend$", var_priors$class)))
+  
+  # Should NOT have Sigma_trend (full covariance matrix)
+  expect_false(any(grepl("^Sigma_trend$", var_priors$class)))
+  
+  # Check sigma_trend has positive lower bound
+  sigma_rows <- grepl("^sigma_trend$", var_priors$class)
+  if (any(sigma_rows)) {
+    expect_equal(var_priors$lb[sigma_rows][1], "0")
+  }
+})
+
+test_that("VAR trend priors integrate with centralized prior system", {
+  test_data <- data.frame(
+    y = rnorm(30),
+    time = 1:30,
+    series = factor('S1')
+  )
+  
+  # Test that VAR priors are extracted properly
+  var_priors <- mvgam:::extract_trend_priors(
+    trend_formula = ~ VAR(p = 1, time = "time", series = "series"),
+    data = test_data
+  )
+  
+  expect_true(inherits(var_priors, "brmsprior"))
+  
+  # Should contain the expected VAR parameters (with empty default priors)
+  expect_true(any(var_priors$class == "Amu_trend"))
+  expect_true(any(var_priors$class == "Aomega_trend"))
+  expect_true(any(var_priors$class == "sigma_trend"))
+  expect_true(any(var_priors$class == "L_Omega_trend"))
+  
+  # Should NOT contain Sigma_trend (computed in Stan)
+  expect_false(any(var_priors$class == "Sigma_trend"))
+})
+
+test_that("VAR trend validation catches factor model conflicts", {
+  test_data <- data.frame(
+    y = rnorm(60),
+    time = rep(1:20, 3),
+    series = factor(rep(c('A', 'B', 'C'), 20))
+  )
+  
+  # VAR with factor model (n_lv < n_series) should work for non-hierarchical
+  expect_no_error({
+    var_factor_priors <- mvgam:::extract_trend_priors(
+      trend_formula = ~ VAR(p = 1, n_lv = 2, time = "time", series = "series"),
+      data = test_data
+    )
+  })
+  
+  # Should include factor model parameter (Z matrix)
+  var_factor_priors <- mvgam:::extract_trend_priors(
+    trend_formula = ~ VAR(p = 1, n_lv = 2, time = "time", series = "series"),
+    data = test_data
+  )
+  expect_true(any(grepl("Z", var_factor_priors$class)))
+})
+
+test_that("higher-order VAR trends generate multiple lag coefficients", {
+  test_data <- data.frame(
+    y = rnorm(100),
+    time = 1:100,
+    series = factor(rep(c('S1', 'S2'), 50))
+  )
+  
+  # Test VAR(3) - should have multiple lag hyperparameters
+  var3_priors <- mvgam:::extract_trend_priors(
+    trend_formula = ~ VAR(p = 3, time = "time", series = "series"),
+    data = test_data
+  )
+  
+  expect_true(inherits(var3_priors, "brmsprior"))
+  
+  # Should have hyperparameters for multiple lags
+  # Amu_trend and Aomega_trend should be arrays with 3 elements (for p=3)
+  expect_true(any(grepl("Amu_trend", var3_priors$class)))
+  expect_true(any(grepl("Aomega_trend", var3_priors$class)))
+  
+  # Standard variance-correlation parameters
+  expect_true(any(grepl("sigma_trend", var3_priors$class)))
+  expect_true(any(grepl("L_Omega_trend", var3_priors$class)))
+})
+
+test_that("VAR/VARMA prior parameter naming follows conventions", {
+  test_data <- data.frame(
+    y = rnorm(50),
+    time = 1:50, 
+    series = factor('series1')
+  )
+  
+  # Test that all VAR/VARMA parameters have _trend suffix (except Z for factor models)
+  var_priors <- mvgam:::extract_trend_priors(
+    trend_formula = ~ VAR(p = 2, ma = TRUE, time = "time", series = "series"),
+    data = test_data
+  )
+  
+  # All parameters should have _trend suffix except Z (factor loading matrix)
+  trend_params <- grepl("_trend$", var_priors$class)
+  factor_loading_params <- var_priors$class == "Z"
+  
+  expect_true(all(trend_params | factor_loading_params))
+  
+  # Check specific VAR/VARMA parameter names
+  expected_params <- c("Amu_trend", "Aomega_trend", "Dmu_trend", "Domega_trend", 
+                      "sigma_trend", "L_Omega_trend")
+  actual_params <- var_priors$class[trend_params]
+  
+  # Should contain subset of expected parameters
+  expect_true(any(expected_params %in% actual_params))
+})

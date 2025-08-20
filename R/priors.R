@@ -438,6 +438,12 @@ get_parameter_type_default_prior <- function(param_name) {
   } else if (grepl("A[0-9]+_trend$", param_name)) {
     # VAR coefficient matrices
     return(list(prior = "", lb = "", ub = ""))
+  } else if (grepl("^[AD]mu_trend$", param_name)) {
+    # VAR/VARMA hyperprior means (Amu_trend, Dmu_trend)
+    return(list(prior = "", lb = "", ub = ""))
+  } else if (grepl("^[AD]omega_trend$", param_name)) {
+    # VAR/VARMA hyperprior precisions (Aomega_trend, Domega_trend) - positive
+    return(list(prior = "", lb = "0", ub = ""))
   } else if (grepl(".*_trend$", param_name)) {
     # Generic trend parameter
     return(list(prior = "", lb = "", ub = ""))
