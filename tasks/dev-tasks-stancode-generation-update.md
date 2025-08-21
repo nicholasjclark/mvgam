@@ -121,27 +121,45 @@ This document tracks implementation progress for the stancode generation update 
 
 **ISSUE**: brms trend model generates standard parameters (mu, b) but mvgam shared innovation system expects renamed parameters (mu_trend, b_trend) and mvgam-generated trend parameters such as times_trend (formerly ytimes). The parameter renaming/extraction bridge is incomplete.
 
+**ENHANCED MULTIVARIATE SCOPE**: Analysis reveals brms uses systematic response-specific naming for multivariate models (b_response_coef, sigma_response, Y_response, X_response, mu_response). mvgam must support both shared multivariate trends and response-specific trends while preserving brms multivariate structure and prediction compatibility.
+
+**KEY MULTIVARIATE PATTERNS IDENTIFIED**:
+- **Parameter Naming**: `b_{response}_{coefficient}`, `sigma_{response}`, `mu_{response}` 
+- **Data Organization**: `Y_{response}`, `X_{response}`, `N_{response}`, `K_{response}`
+- **Detection Method**: Use `is.mvbrmsterms(bterms)` and `bterms$responses`
+- **Trend Types**: (1) Shared multivariate: `trend_formula = ~ AR(p = 1, cor = TRUE)`, (2) Response-specific: `bf(y1 = ~ AR(p = 1), y2 = ~ RW())`
+- **Stan Structure**: Separate parameter blocks per response, response-specific linear predictors
+- **Prediction Compatibility**: Must maintain bidirectional parameter mapping for brms `predict()` and `fitted()` functions
+
 **10-STEP INCREMENTAL PLAN**:
 
-### Phase 1: Understand Current State (Steps 1-3)
-- [ ] 2.7.11.5 **Step 1 - Audit Parameter Extraction** (15 min): Examine what parameters trend_setup$stancode and trend_setup$standata contain, map which brms parameters need _trend suffix renaming, document current parameter naming patterns
-- [ ] 2.7.11.6 **Step 2 - Audit Data Structure Creation** (15 min): Verify how extract_time_series_dimensions provides sorted structure, design ytimes matrix creation based on sorted unique_times and unique_series, validate data sorting consistency  
-- [ ] 2.7.11.7 **Step 3 - Identify Injection Points** (15 min): Map where parameter renaming should happen in generate_combined_stancode, identify where ytimes creation should occur, document current vs needed parameter flow
+### Phase 1: Understand Current State (Steps 1-3) ✅ **COMPLETED**
+- [x] 2.7.11.5 **Step 1 - Audit Parameter Extraction** (15 min): Examined trend_setup$stancode and trend_setup$standata contents, mapped brms parameter patterns (Intercept, b_x1, sigma for univariate; b_response_coef, sigma_response for multivariate), confirmed no existing parameter renaming functionality
+- [x] 2.7.11.6 **Step 2 - Audit Data Structure Creation** (15 min): Verified extract_time_series_dimensions provides sorted structure with unique_times/unique_series, designed times_trend matrix creation approach using [n_time, n_series] indexing
+- [x] 2.7.11.7 **Step 3 - Identify Injection Points** (15 min): Mapped injection points in generate_combined_stancode (after Stage 1, before Stage 2), confirmed gap between brms trend generation and mvgam shared innovation system
 
-### Phase 2: Implement Core Infrastructure (Steps 4-6)  
-- [ ] 2.7.11.8 **Step 4 - Create Parameter Renaming System** (30 min): Implement function to extract brms trend parameters and rename with _trend suffix, handle both stancode and standata, focus on mu → mu_trend as primary case
-- [ ] 2.7.11.9 **Step 5 - Implement ytimes Creation** (30 min): Create function to generate ytimes matrix from sorted dimension information, add as stanvar during appropriate phase, ensure matrix structure matches [n_time, n_series] design
-- [ ] 2.7.11.10 **Step 6 - Update Combination Process** (20 min): Modify generate_combined_stancode to include parameter renaming step, integrate ytimes creation with existing data flow, maintain observation/trend separation
+### Phase 2: Implement Core Infrastructure (Steps 4-6) 🔄 **IN PROGRESS**
+- [ ] 2.7.11.8 **Step 4 - Create Parameter Renaming System** (45 min): **ENHANCED SCOPE** - Implement extract_and_rename_trend_parameters() with full multivariate support: (1) Detect multivariate models via is.mvbrmsterms(), (2) Handle response-specific parameters (b_response_coef, sigma_response, Y_response, X_response), (3) Support both shared and response-specific trends, (4) Maintain bidirectional parameter mapping for prediction compatibility, (5) Extract all Stan blocks except model block (likelihood), **BLOCKING ISSUE**: Need to properly handle multivariate observation models (mvbind(y1, y2) ~ x) with response-specific trend formulas (bf(y1 = ~ AR(p=1), y2 = ~ RW())) in setup_brms_lightweight - current test failing due to formula structure mismatch
+- [ ] 2.7.11.9 **Step 5 - Implement times_trend Creation** (30 min): **ENHANCED SCOPE** - Support both shared and response-specific times_trend matrices: (1) Shared: single [n_time, n_series] matrix for multivariate trends, (2) Response-specific: separate times_trend_response matrices when responses have different trend types, (3) Integrate with sorted dimension information from extract_time_series_dimensions()
+- [ ] 2.7.11.10 **Step 6 - Update Combination Process** (30 min): **ENHANCED SCOPE** - Modify generate_combined_stancode to handle multivariate parameter injection: (1) Add parameter renaming step between Stage 1 and Stage 2, (2) Support response-specific trend injection (mu_response += trend_response), (3) Maintain observation/trend separation while preserving multivariate structure
 
 ### Phase 3: Integration and Testing (Steps 7-9)
-- [ ] 2.7.11.11 **Step 7 - Test Parameter Availability** (20 min): Verify mu_trend and ytimes available in final standata, test shared innovation system access to renamed parameters, focus on Stan code compilation
-- [ ] 2.7.11.12 **Step 8 - Test Data Structure Correctness** (20 min): Validate ytimes matrix dimensions and indexing, verify mu_trend contains appropriate linear predictor values, test with simple univariate case
-- [ ] 2.7.11.13 **Step 9 - Systematic Validation** (30 min): Test multiple trend types (RW, AR, PW) with new infrastructure, ensure standata structure meets Stan code expectations, fix remaining compilation issues
+- [ ] 2.7.11.11 **Step 7 - Test Parameter Availability** (30 min): **ENHANCED SCOPE** - Verify parameter availability in both univariate and multivariate contexts: (1) Test mu_trend and times_trend availability in final standata, (2) Verify response-specific parameters (mu_response_trend, times_trend_response) for multivariate models, (3) Test shared innovation system access to renamed parameters, (4) Focus on Stan code compilation with both shared and response-specific trends
+- [ ] 2.7.11.12 **Step 8 - Test Data Structure Correctness** (30 min): **ENHANCED SCOPE** - Validate data structures for both model types: (1) Univariate: times_trend matrix [n_time, n_series] dimensions and mu_trend linear predictor values, (2) Multivariate: response-specific matrices and parameter organization, (3) Test parameter mapping preservation for prediction compatibility, (4) Verify brms multivariate structure preservation
+- [ ] 2.7.11.13 **Step 9 - Systematic Validation** (45 min): **ENHANCED SCOPE** - Test multiple configurations: (1) Univariate trends (RW, AR, PW) with new infrastructure, (2) Multivariate shared trends (trend_formula = ~ AR(p = 1, cor = TRUE)), (3) Multivariate response-specific trends (bf(y1 = ~ AR(p = 1), y2 = ~ RW())), (4) Mixed family multivariate models, (5) Ensure standata structure meets Stan code expectations across all configurations
 
 ### Phase 4: Completion (Step 10)
-- [ ] 2.7.11.14 **Step 10 - Full Integration Test** (30 min): Run complete test suite with focus on Stan compilation and data structure correctness, document parameter flow for future development, update architecture documentation
+- [ ] 2.7.11.14 **Step 10 - Full Integration Test** (45 min): **ENHANCED SCOPE** - Comprehensive validation: (1) Run complete test suite with focus on Stan compilation and data structure correctness for both univariate and multivariate models, (2) Test prediction compatibility with original brms parameter mappings, (3) Validate multivariate model workflows from mvgam quick-reference.md patterns, (4) Document parameter flow architecture for future development, (5) Update architecture documentation with multivariate parameter handling patterns
 
 ---
+
+## 🚨 **CRITICAL UNRESOLVED ISSUES**
+
+- [ ] 2.7.11.15 **Multivariate Formula Integration** (60 min): **HIGH PRIORITY** - Resolve how setup_brms_lightweight should handle the combination of multivariate observation models (mvbind(y1, y2) ~ x1 + x2) with response-specific trend formulas (bf(y1 = ~ AR(p=1), y2 = ~ RW())). Current implementation fails because:
+  - setup_brms_lightweight expects single formula parameter but multivariate trend specs require different handling
+  - Need to clarify whether trend_setup should contain individual response trends or combined multivariate structure
+  - Parameter extraction must handle response-specific naming (b_y1_x1, b_y2_x2, etc.) vs shared parameters
+  - Test infrastructure needs proper multivariate model examples that match mvgam's actual usage patterns
 
 - [ ] 2.7.12 Phase 3.2: Update common_trend_priors to remove LV and use consistent naming
 - [ ] 2.7.13 Phase 3.3: Run full test suite and verify all trend types work with new standardization

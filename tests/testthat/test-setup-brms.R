@@ -296,3 +296,342 @@ test_that("setup_brms_lightweight integrates with existing validation", {
     mvgam:::validate_brms_formula(setup$formula)
   })
 })
+
+# =============================================================================
+# PARAMETER EXTRACTION AND RENAMING TESTS
+# =============================================================================
+
+test_that("extract_and_rename_trend_parameters handles univariate models", {
+  data <- data.frame(
+    y = rnorm(30),
+    x1 = rnorm(30),
+    x2 = rnorm(30),
+    time = 1:30,
+    series = factor(rep(1:3, each = 10))
+  )
+  
+  # Setup simple univariate trend model
+  trend_setup <- setup_brms_lightweight(
+    formula = y ~ x1 + x2,
+    data = data,
+    family = gaussian()
+  )
+  
+  # Extract dimensions
+  dimensions <- mvgam:::extract_time_series_dimensions(
+    data = data,
+    time_var = "time", 
+    series_var = "series"
+  )
+  
+  # Test parameter extraction
+  extracted <- mvgam:::extract_and_rename_trend_parameters(
+    trend_setup = trend_setup,
+    dimensions = dimensions,
+    suffix = "_trend"
+  )
+  
+  # Should return a list of stanvars
+  expect_type(extracted, "list")
+  expect_true(length(extracted) > 0)
+  
+  # Should have times_trend matrix
+  expect_true("times_trend" %in% names(extracted))
+  expect_s3_class(extracted$times_trend, "stanvars")
+  
+  # Should have parameter mapping attributes
+  expect_true(!is.null(attr(extracted, "parameter_mapping")))
+  expect_true(!is.null(attr(extracted, "original_brmsfit")))
+  expect_false(attr(extracted, "is_multivariate"))
+  expect_null(attr(extracted, "response_names"))
+  
+  # Check parameter mapping structure
+  mapping <- attr(extracted, "parameter_mapping")
+  expect_true("original_to_renamed" %in% names(mapping))
+  expect_true("renamed_to_original" %in% names(mapping))
+  expect_false(mapping$is_multivariate)
+})
+
+test_that("extract_and_rename_trend_parameters handles multivariate models", {
+  data <- data.frame(
+    y1 = rnorm(30),
+    y2 = rpois(30, 5),
+    x1 = rnorm(30),
+    x2 = rnorm(30),
+    time = 1:30,
+    series = factor(rep(1:3, each = 10))
+  )
+  
+  # Setup multivariate trend model - use the pattern from quick-reference.md
+  # Multivariate observation model with response-specific trend formula
+  trend_setup <- setup_brms_lightweight(
+    formula = mvbind(y1, y2) ~ x1 + x2,  # Multivariate observation model
+    trend_formula = bf(
+      y1 = ~ 1,  # Simple trend for y1
+      y2 = ~ 1   # Simple trend for y2
+    ),
+    data = data,
+    family = list(gaussian(), poisson())
+  )
+  
+  # Extract dimensions
+  dimensions <- mvgam:::extract_time_series_dimensions(
+    data = data,
+    time_var = "time",
+    series_var = "series"
+  )
+  
+  # Test parameter extraction
+  extracted <- mvgam:::extract_and_rename_trend_parameters(
+    trend_setup = trend_setup,
+    dimensions = dimensions,
+    suffix = "_trend"
+  )
+  
+  # Should return a list of stanvars
+  expect_type(extracted, "list")
+  expect_true(length(extracted) > 0)
+  
+  # Should detect multivariate structure
+  expect_true(attr(extracted, "is_multivariate"))
+  response_names <- attr(extracted, "response_names")
+  expect_true(!is.null(response_names))
+  expect_true(all(c("y1", "y2") %in% response_names))
+  
+  # Should have times_trend matrix (shared for multivariate)
+  expect_true("times_trend" %in% names(extracted))
+  expect_s3_class(extracted$times_trend, "stanvars")
+  
+  # Check parameter mapping includes multivariate info
+  mapping <- attr(extracted, "parameter_mapping")
+  expect_true(mapping$is_multivariate)
+  expect_equal(mapping$response_names, response_names)
+})
+
+test_that("extract_and_rename_trend_parameters extracts Stan code blocks correctly", {
+  data <- data.frame(
+    y = rnorm(20),
+    x = rnorm(20),
+    time = 1:20,
+    series = factor(rep(1:2, each = 10))
+  )
+  
+  # Setup trend model with predictors
+  trend_setup <- setup_brms_lightweight(
+    formula = y ~ x,
+    data = data,
+    family = gaussian()
+  )
+  
+  dimensions <- mvgam:::extract_time_series_dimensions(data, "time", "series")
+  
+  extracted <- mvgam:::extract_and_rename_trend_parameters(
+    trend_setup = trend_setup,
+    dimensions = dimensions
+  )
+  
+  # Should extract key Stan code components
+  component_names <- names(extracted)
+  
+  # Check for expected Stan code stanvars
+  # Note: data block declarations are skipped - actual data handled via standata
+  expect_true(any(grepl("trend_parameters", component_names)))
+  
+  # Each stanvar should have proper structure
+  for (name in component_names) {
+    stanvar <- extracted[[name]]
+    expect_s3_class(stanvar, "stanvars")
+    # For stanvars objects, check the structure differently
+    expect_true(length(stanvar) >= 1)
+  }
+})
+
+test_that("extract_and_rename_trend_parameters handles parameter renaming", {
+  data <- data.frame(
+    y = rnorm(20),
+    x = rnorm(20),
+    time = 1:20,
+    series = factor(rep(1:2, each = 10))
+  )
+  
+  trend_setup <- setup_brms_lightweight(
+    formula = y ~ x,
+    data = data,
+    family = gaussian()
+  )
+  
+  dimensions <- mvgam:::extract_time_series_dimensions(data, "time", "series")
+  
+  extracted <- mvgam:::extract_and_rename_trend_parameters(
+    trend_setup = trend_setup,
+    dimensions = dimensions,
+    suffix = "_test_suffix"
+  )
+  
+  # Check parameter mapping contains renamed parameters
+  mapping <- attr(extracted, "parameter_mapping")
+  expect_true(length(mapping$original_to_renamed) > 0)
+  expect_true(length(mapping$renamed_to_original) > 0)
+  
+  # Mapping should be bidirectional
+  for (original in names(mapping$original_to_renamed)) {
+    renamed <- mapping$original_to_renamed[[original]]
+    expect_equal(mapping$renamed_to_original[[renamed]], original)
+  }
+  
+  # Renamed parameters should have the correct suffix
+  renamed_params <- names(mapping$renamed_to_original)
+  expect_true(all(endsWith(renamed_params, "_test_suffix")))
+})
+
+test_that("extract_and_rename_trend_parameters creates times_trend matrix correctly", {
+  data <- data.frame(
+    y = rnorm(24),
+    x = rnorm(24),
+    time = rep(1:12, 2),
+    series = factor(rep(1:2, each = 12))
+  )
+  
+  trend_setup <- setup_brms_lightweight(
+    formula = y ~ x,
+    data = data,
+    family = gaussian()
+  )
+  
+  dimensions <- mvgam:::extract_time_series_dimensions(data, "time", "series")
+  
+  extracted <- mvgam:::extract_and_rename_trend_parameters(
+    trend_setup = trend_setup,
+    dimensions = dimensions
+  )
+  
+  # Should have times_trend matrix
+  expect_true("times_trend" %in% names(extracted))
+  times_stanvar <- extracted$times_trend
+  
+  # Check stanvar properties
+  expect_equal(times_stanvar$name, "times_trend")
+  expect_equal(times_stanvar$block, "data")
+  expect_true(nchar(times_stanvar$scode) > 0)
+  
+  # Stan code should contain proper array declaration
+  stan_code <- times_stanvar$scode
+  expect_true(grepl("int times_trend\\[", stan_code))
+  expect_true(grepl("\\[12, 2\\]", stan_code))  # n_time=12, n_series=2
+})
+
+test_that("extract_and_rename_trend_parameters excludes likelihood from model block", {
+  data <- data.frame(
+    y = rnorm(15),
+    x = rnorm(15),
+    time = 1:15,
+    series = factor(rep(1, 15))
+  )
+  
+  trend_setup <- setup_brms_lightweight(
+    formula = y ~ x,
+    data = data,
+    family = gaussian()
+  )
+  
+  dimensions <- mvgam:::extract_time_series_dimensions(data, "time", "series")
+  
+  extracted <- mvgam:::extract_and_rename_trend_parameters(
+    trend_setup = trend_setup,
+    dimensions = dimensions
+  )
+  
+  # Look for model block stanvars
+  model_stanvars <- extracted[grepl("model", names(extracted))]
+  
+  if (length(model_stanvars) > 0) {
+    for (stanvar in model_stanvars) {
+      stan_code <- stanvar$scode
+      
+      # Should not contain likelihood statements
+      expect_false(grepl("~\\s+(normal|poisson|gamma)", stan_code))
+      expect_false(grepl("target\\s*\\+=.*_lpdf", stan_code))
+      expect_false(grepl("target\\s*\\+=.*_lpmf", stan_code))
+      
+      # May contain priors (which we want to keep)
+      # This is okay: "sigma ~ exponential(1);"
+      # This is not: "y ~ normal(mu, sigma);"
+    }
+  }
+})
+
+test_that("extract_and_rename_trend_parameters handles edge cases", {
+  # Test with minimal data
+  minimal_data <- data.frame(
+    y = rnorm(6),
+    time = 1:6,
+    series = factor(rep(1, 6))
+  )
+  
+  trend_setup <- setup_brms_lightweight(
+    formula = y ~ 1,  # Intercept only
+    data = minimal_data,
+    family = gaussian()
+  )
+  
+  dimensions <- mvgam:::extract_time_series_dimensions(minimal_data, "time", "series")
+  
+  # Should handle minimal case without errors
+  expect_no_error({
+    extracted <- mvgam:::extract_and_rename_trend_parameters(
+      trend_setup = trend_setup,
+      dimensions = dimensions
+    )
+  })
+  
+  extracted <- mvgam:::extract_and_rename_trend_parameters(
+    trend_setup = trend_setup,
+    dimensions = dimensions
+  )
+  
+  # Should still create basic structure
+  expect_type(extracted, "list")
+  expect_true("times_trend" %in% names(extracted))
+  expect_true(!is.null(attr(extracted, "parameter_mapping")))
+})
+
+test_that("extract_and_rename_trend_parameters preserves brmsfit for prediction", {
+  data <- data.frame(
+    y = rnorm(20),
+    x = rnorm(20),
+    time = 1:20,
+    series = factor(rep(1:2, each = 10))
+  )
+  
+  trend_setup <- setup_brms_lightweight(
+    formula = y ~ x,
+    data = data,
+    family = gaussian()
+  )
+  
+  dimensions <- mvgam:::extract_time_series_dimensions(data, "time", "series")
+  
+  extracted <- mvgam:::extract_and_rename_trend_parameters(
+    trend_setup = trend_setup,
+    dimensions = dimensions
+  )
+  
+  # Should preserve original brmsfit
+  original_brmsfit <- attr(extracted, "original_brmsfit")
+  expect_true(!is.null(original_brmsfit))
+  expect_s3_class(original_brmsfit, "brmsfit")
+  
+  # Should be the same object as in trend_setup
+  expect_identical(original_brmsfit, trend_setup$brmsfit)
+  
+  # Parameter mapping should enable reverse lookups for prediction
+  mapping <- attr(extracted, "parameter_mapping")
+  expect_true(length(mapping$renamed_to_original) > 0)
+  
+  # Each renamed parameter should map back to an original
+  for (renamed in names(mapping$renamed_to_original)) {
+    original <- mapping$renamed_to_original[[renamed]]
+    expect_true(nchar(original) > 0)
+    expect_false(endsWith(original, "_trend"))  # Original shouldn't have suffix
+  }
+})

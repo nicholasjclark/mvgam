@@ -363,11 +363,10 @@ test_that("formula parsing handles edge cases correctly", {
 # Test malformed formulas and error conditions
 test_that("formula parsing error handling works comprehensively", {
 
-  # Test empty formula (different from ~ 1)
-  expect_error(
-    mvgam:::parse_trend_formula(~ 1),
-    "Empty trend formula provided"
-  )
+  # Test intercept-only formula (should default to ZMVN)
+  result_intercept <- mvgam:::parse_trend_formula(~ 1)
+  expect_equal(result_intercept$trend_model$trend, "ZMVN")
+  expect_equal(result_intercept$base_formula, ~ 1)
 
   # Test formula with response variable
   expect_error(
@@ -375,11 +374,10 @@ test_that("formula parsing error handling works comprehensively", {
     "Response variable not allowed"
   )
 
-  # Test formula with no trend constructors
-  expect_error(
-    mvgam:::parse_trend_formula(~ s(time) + cov1),
-    "No trend model specified"
-  )
+  # Test formula with no trend constructors - should default to ZMVN
+  result_no_constructors <- mvgam:::parse_trend_formula(~ s(time) + cov1)
+  expect_equal(result_no_constructors$trend_model$trend, "ZMVN")
+  expect_equal(result_no_constructors$regular_terms, c("s(time)", "cov1"))
 
   # Test dot formula (should error before our validation)
   expect_error(

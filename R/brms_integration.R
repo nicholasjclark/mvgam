@@ -209,46 +209,299 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
   ))
 }
 
-#' Check if Formula is Multivariate
-#' @param formula Formula to check
-#' @return Logical indicating if formula contains multivariate response
+#' Check if Formula Object is Multivariate
+#'
+#' @description
+#' Detects multivariate formula specifications across all brms patterns:
+#' mvbind(), bf() with multiple responses, mvbf(), and combined bf() objects.
+#' Uses brms-compatible structural validation for robust detection.
+#' 
+#' Note: cbind() is NOT considered multivariate per brms standards - it creates
+#' binomial trial specifications (univariate models with trials structure).
+#'
+#' @param formula Formula object to check. Can be formula, brmsformula, 
+#'   mvbrmsformula, or bform class
+#' @return Logical indicating if formula contains multiple response variables
+#'
+#' @details
+#' Supports all major brms multivariate patterns:
+#' \itemize{
+#'   \item mvbrmsformula class objects (combined bf() formulas)
+#'   \item brmsformula objects with additional responses (bf(y1~x, y2~z))
+#'   \item formula objects with mvbind() response binding
+#'   \item All patterns validated using brms-compatible structure checks
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Pattern 1: mvbind formula (multivariate)
+#' is_multivariate_formula(mvbind(y1, y2) ~ x)  # TRUE
+#' 
+#' # Pattern 2: bf with multiple responses (multivariate)
+#' is_multivariate_formula(bf(count ~ temp, biomass ~ precip))  # TRUE
+#' 
+#' # Pattern 3: Combined bf objects (multivariate)
+#' is_multivariate_formula(bf(y1 ~ x, family = poisson()) + bf(y2 ~ x))  # TRUE
+#' 
+#' # Pattern 4: cbind formula (NOT multivariate - binomial trials)
+#' is_multivariate_formula(cbind(success, failure) ~ x)  # FALSE
+#' }
+#'
+#' @seealso \code{\link{extract_response_names}}, \code{\link{parse_multivariate_trends}}
 #' @noRd
 is_multivariate_formula <- function(formula) {
+  # Parameter validation - support all brms formula types
+  checkmate::assert(
+    inherits(formula, c("formula", "brmsformula", "mvbrmsformula", "bform")),
+    .var.name = "formula"
+  )
+
+  # Case 1: mvbrmsformula class - always multivariate (brms standard)
+  # This covers: bf() + bf() combinations and mvbf() objects
+  if (inherits(formula, "mvbrmsformula")) {
+    return(TRUE)
+  }
+  
+  # Case 2: brmsformula with additional responses (brms bf() pattern)
+  # This covers: bf(y1 ~ x, y2 ~ z) with pforms field
+  if (inherits(formula, "brmsformula")) {
+    return(!is.null(formula$pforms) && length(formula$pforms) > 0)
+  }
+  
+  # Case 3: Standard formula with mvbind binding ONLY (corrected)
+  # This covers: mvbind(y1, y2) ~ x (cbind REMOVED - not multivariate per brms)
+  if (inherits(formula, "formula")) {
+    return(has_mvbind_response(formula))
+  }
+  
+  # Default case: univariate
+  return(FALSE)
+}
+
+#' Check for mvbind Response in Formula
+#'
+#' @description
+#' Helper function that checks formula response side for mvbind() binding
+#' using robust expression parsing. cbind() is explicitly excluded as it
+#' creates binomial trial specifications, not multivariate models.
+#'
+#' @param formula Formula object to check
+#' @return Logical indicating presence of mvbind response binding
+#'
+#' @details
+#' Uses safe expression parsing rather than fragile regex patterns.
+#' Validates formula structure and ensures mvbind() is well-formed.
+#'
+#' @noRd
+has_mvbind_response <- function(formula) {
   checkmate::assert_formula(formula)
   
-  # Check for mvbind() or cbind() in response
-  response_terms <- as.character(formula)[2]
-  grepl("mvbind\\(|cbind\\(", response_terms, perl = TRUE)
+  # Validate formula has response side
+  if (length(formula) < 3) {
+    return(FALSE)
+  }
+  
+  # Get response expression (left side of ~)
+  response_expr <- formula[[2]]
+  
+  # Check if response expression is a call to mvbind
+  if (!is.call(response_expr)) {
+    return(FALSE)
+  }
+  
+  # Extract function name from call
+  call_name <- as.character(response_expr[[1]])
+  
+  # Check if call is to mvbind (not cbind)
+  if (call_name != "mvbind") {
+    return(FALSE)
+  }
+  
+  # Validate mvbind has arguments (at least 2 responses for multivariate)
+  if (length(response_expr) < 3) {
+    stop(insight::format_error(
+      "Invalid mvbind() specification in formula.",
+      "mvbind() requires at least 2 response variables for multivariate models.",
+      "Ensure syntax: mvbind(y1, y2, ...) ~ predictors"
+    ), call. = FALSE)
+  }
+  
+  return(TRUE)
 }
 
 #' Extract Response Names from Multivariate Formula
-#' @param formula Multivariate formula
-#' @return Character vector of response variable names
+#'
+#' @description
+#' Extracts response variable names from all brms multivariate formula patterns:
+#' mvbind(), bf() with multiple responses, mvbf(), and combined bf() objects.
+#' Uses robust expression parsing for reliable extraction.
+#' 
+#' Note: cbind() responses are NOT extracted as cbind() creates binomial trial
+#' specifications, not true multivariate models per brms standards.
+#'
+#' @param formula Formula object. Can be formula, brmsformula, mvbrmsformula, or bform
+#' @return Character vector of response variable names, or NULL for univariate formulas
+#'
+#' @details
+#' Handles all major brms multivariate patterns:
+#' \itemize{
+#'   \item mvbrmsformula objects: extracts from $responses field
+#'   \item brmsformula with pforms: combines main response with additional responses
+#'   \item formula with mvbind(): parses expression tree safely
+#'   \item Returns NULL for univariate formulas (including cbind)
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Pattern 1: mvbind formula
+#' extract_response_names(mvbind(y1, y2) ~ x)  # c("y1", "y2")
+#' 
+#' # Pattern 2: bf with multiple responses  
+#' extract_response_names(bf(count ~ temp, biomass ~ precip))  # c("count", "biomass")
+#' 
+#' # Pattern 3: Combined bf objects
+#' extract_response_names(bf(y1 ~ x) + bf(y2 ~ z))  # c("y1", "y2")
+#' 
+#' # Pattern 4: cbind formula (returns NULL - not multivariate)
+#' extract_response_names(cbind(success, failure) ~ x)  # NULL
+#' }
+#'
+#' @seealso \code{\link{is_multivariate_formula}}, \code{\link{parse_multivariate_trends}}
 #' @noRd
 extract_response_names <- function(formula) {
+  # Parameter validation - support all brms formula types
+  checkmate::assert(
+    inherits(formula, c("formula", "brmsformula", "mvbrmsformula", "bform")),
+    .var.name = "formula"
+  )
+
+  # Case 1: mvbrmsformula - use $responses field directly (brms standard)
+  # This covers: bf() + bf() combinations and mvbf() objects
+  if (inherits(formula, "mvbrmsformula")) {
+    if (!is.null(formula$responses)) {
+      return(formula$responses)
+    }
+  }
+  
+  # Case 2: brmsformula with pforms - combine main + additional responses
+  # This covers: bf(y1 ~ x, y2 ~ z) pattern
+  if (inherits(formula, "brmsformula")) {
+    if (!is.null(formula$pforms) && length(formula$pforms) > 0) {
+      main_resp <- formula$resp
+      additional_resp <- names(formula$pforms)
+      return(c(main_resp, additional_resp))
+    }
+  }
+  
+  # Case 3: Standard formula with mvbind binding ONLY (corrected)
+  # This covers: mvbind(y1, y2) ~ x (cbind EXCLUDED - not multivariate per brms)
+  if (inherits(formula, "formula")) {
+    return(extract_mvbind_responses(formula))
+  }
+  
+  # Default case: univariate formula
+  return(NULL)
+}
+
+#' Extract Response Names from mvbind Expression
+#'
+#' @description
+#' Helper function that extracts response variable names from mvbind()
+#' expressions using safe expression parsing. Handles complex expressions
+#' and transformations robustly.
+#'
+#' @param formula Formula object with potential mvbind response
+#' @return Character vector of response names, or NULL if no mvbind found
+#'
+#' @details
+#' Uses expression tree parsing instead of regex for robust handling of:
+#' - Simple variables: mvbind(y1, y2)
+#' - Transformed variables: mvbind(log(y1), sqrt(y2))  
+#' - Complex expressions: mvbind(y1 + offset, scale(y2))
+#'
+#' @noRd
+extract_mvbind_responses <- function(formula) {
   checkmate::assert_formula(formula)
   
-  response_side <- as.character(formula)[2]
-  
-  # Extract from mvbind() or cbind()
-  if (grepl("mvbind\\(", response_side)) {
-    # Parse mvbind(y1, y2, y3) structure
-    inner <- gsub(".*mvbind\\((.*)\\).*", "\\1", response_side)
-  } else if (grepl("cbind\\(", response_side)) {
-    # Parse cbind(y1, y2) structure
-    inner <- gsub(".*cbind\\((.*)\\).*", "\\1", response_side)
-  } else {
+  # Validate formula has response side
+  if (length(formula) < 3) {
     return(NULL)
   }
   
-  # Split by commas and clean whitespace
-  responses <- trimws(strsplit(inner, ",")[[1]])
+  # Get response expression (left side of ~)
+  response_expr <- formula[[2]]
   
-  # Remove any function calls or transformations
-  responses <- gsub("\\s*\\(.*\\)\\s*", "", responses)
-  responses <- gsub("\\s+", "", responses)
+  # Check if response expression is a call to mvbind
+  if (!is.call(response_expr) || as.character(response_expr[[1]]) != "mvbind") {
+    return(NULL)
+  }
   
-  return(responses)
+  # Extract arguments from mvbind call (skip the function name)
+  response_args <- response_expr[-1]
+  
+  # Validate we have arguments
+  if (length(response_args) == 0) {
+    return(NULL)
+  }
+  
+  # Extract variable names from each argument
+  response_names <- character(length(response_args))
+  
+  for (i in seq_along(response_args)) {
+    arg <- response_args[[i]]
+    
+    # Extract the primary variable name from expression
+    var_name <- extract_variable_name(arg)
+    
+    if (is.null(var_name) || nchar(var_name) == 0) {
+      stop(insight::format_error(
+        "Could not extract response variable name from mvbind() argument {i}.",
+        "Argument: {deparse(arg)}",
+        "Ensure all mvbind() arguments reference valid variable names."
+      ), call. = FALSE)
+    }
+    
+    response_names[i] <- var_name
+  }
+  
+  # Filter out any empty names and return
+  response_names <- response_names[nchar(response_names) > 0]
+  
+  return(if (length(response_names) > 0) response_names else NULL)
+}
+
+#' Extract Primary Variable Name from Expression
+#'
+#' @description
+#' Extracts the primary variable name from potentially complex expressions.
+#' Handles simple variables, function calls, and arithmetic operations.
+#'
+#' @param expr R expression object
+#' @return Character string with variable name, or NULL if cannot extract
+#' @noRd
+extract_variable_name <- function(expr) {
+  # Simple variable name
+  if (is.name(expr)) {
+    return(as.character(expr))
+  }
+  
+  # Function call - extract first argument that's a variable
+  if (is.call(expr)) {
+    # For function calls like log(y1), sqrt(y2), extract the main argument
+    for (arg in expr[-1]) {  # Skip function name
+      if (is.name(arg)) {
+        return(as.character(arg))
+      }
+      # Recursively check nested calls
+      nested_var <- extract_variable_name(arg)
+      if (!is.null(nested_var)) {
+        return(nested_var)
+      }
+    }
+  }
+  
+  # Could not extract variable name
+  return(NULL)
 }
 
 #' Extract Response-Specific Trend Specifications

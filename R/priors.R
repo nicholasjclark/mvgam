@@ -261,35 +261,8 @@ extract_trend_priors <- function(trend_formula, data, response_names = NULL) {
   return(trend_priors)
 }
 
-#' Parse Trend Formula to Extract Trend Specification
-#' 
-#' @param trend_formula Trend formula or list of trend formulas
-#' @param data Data frame for validation
-#' @return List containing trend specifications
-#' @noRd
-parse_trend_formula <- function(trend_formula, data) {
-  # This is a placeholder - actual implementation would parse
-  # the trend formula to extract trend type and parameters
-  # For now, return a basic structure
-  
-  if (is.list(trend_formula)) {
-    # Multivariate case - parse each formula
-    trend_specs <- lapply(names(trend_formula), function(resp) {
-      spec <- parse_single_trend_formula(trend_formula[[resp]], data)
-      spec$response <- resp
-      spec
-    })
-    names(trend_specs) <- names(trend_formula)
-    return(trend_specs)
-  } else {
-    # Univariate case
-    return(parse_single_trend_formula(trend_formula, data))
-  }
-}
-
-# NOTE: parse_single_trend_formula() has been removed as it's replaced by the actual
-# mvgam trend parsing system. The parse_trend_formula() function now
-# calls the real trend system in trend_system.R which provides the
+# NOTE: parse_trend_formula() has been moved to R/trend_system.R as part of the
+# complete mvgam trend parsing system. The function provides ZMVN defaults and
 # complete mvgam_trend objects with monitor_params metadata.
 
 #' Generate Trend Priors from Monitor Parameters
