@@ -362,11 +362,11 @@ test_that("extract_and_rename_trend_parameters handles multivariate models", {
     series = factor(rep(1:3, each = 10))
   )
   
-  # Setup multivariate trend model - use the pattern from quick-reference.md
+  # Setup multivariate trend model - use the list pattern from quick-reference.md
   # Multivariate observation model with response-specific trend formula
   trend_setup <- setup_brms_lightweight(
     formula = mvbind(y1, y2) ~ x1 + x2,  # Multivariate observation model
-    trend_formula = bf(
+    trend_formula = list(
       y1 = ~ 1,  # Simple trend for y1
       y2 = ~ 1   # Simple trend for y2
     ),
@@ -634,4 +634,150 @@ test_that("extract_and_rename_trend_parameters preserves brmsfit for prediction"
     expect_true(nchar(original) > 0)
     expect_false(endsWith(original, "_trend"))  # Original shouldn't have suffix
   }
+})
+
+test_that("extract_and_rename_trend_parameters handles multivariate shared trends correctly", {
+  data <- data.frame(
+    y1 = rnorm(30),
+    y2 = rpois(30, 5),
+    x1 = rnorm(30),
+    x2 = rnorm(30),
+    time = 1:30,
+    series = factor(rep(1:3, each = 10))
+  )
+  
+  # Setup multivariate model with shared trend (applied to all responses)
+  trend_setup <- setup_brms_lightweight(
+    formula = mvbind(y1, y2) ~ x1 + x2,
+    trend_formula = ~ AR(p = 1, time = time, series = series),  # Shared trend
+    data = data,
+    family = list(gaussian(), poisson())
+  )
+  
+  dimensions <- mvgam:::extract_time_series_dimensions(
+    data = data,
+    time_var = "time",
+    series_var = "series"
+  )
+  
+  extracted <- mvgam:::extract_and_rename_trend_parameters(
+    trend_setup = trend_setup,
+    dimensions = dimensions,
+    suffix = "_trend"
+  )
+  
+  # Check multivariate metadata
+  expect_true(attr(extracted, "is_multivariate"))
+  expect_equal(attr(extracted, "response_names"), c("y1", "y2"))
+  
+  # Parameter mapping should exist and contain renamed parameters
+  mapping <- attr(extracted, "parameter_mapping")
+  expect_true(mapping$is_multivariate)
+  expect_equal(mapping$response_names, c("y1", "y2"))
+  expect_true(length(mapping$original_to_renamed) > 0)
+  expect_true(length(mapping$renamed_to_original) > 0)
+  
+  # Check for AR-specific parameters with _trend suffix
+  renamed_params <- names(mapping$renamed_to_original)
+  ar_params <- renamed_params[grepl("ar1.*_trend$", renamed_params)]
+  expect_true(length(ar_params) > 0)  # Should have AR parameters
+  
+  # Check for times_trend matrix (shared for multivariate)
+  expect_true("times_trend" %in% names(extracted))
+  times_stanvar <- extracted$times_trend
+  expect_equal(times_stanvar$name, "times_trend")
+  expect_equal(times_stanvar$block, "data")
+  
+  # Should preserve bidirectional mapping for prediction compatibility
+  for (original in names(mapping$original_to_renamed)) {
+    renamed <- mapping$original_to_renamed[[original]]
+    expect_equal(mapping$renamed_to_original[[renamed]], original)
+  }
+  
+  # All renamed parameters should have the suffix
+  expect_true(all(endsWith(renamed_params, "_trend")))
+})
+
+test_that("extract_and_rename_trend_parameters handles multivariate response-specific trends correctly", {
+  data <- data.frame(
+    y1 = rnorm(24),
+    y2 = rpois(24, 3),
+    y3 = rbinom(24, 1, 0.5),
+    x = rnorm(24),
+    time = rep(1:12, 2),
+    series = factor(rep(c("A", "B"), each = 12))
+  )
+  
+  # Setup multivariate model with response-specific trends using list syntax
+  trend_setup <- setup_brms_lightweight(
+    formula = mvbind(y1, y2, y3) ~ x,
+    trend_formula = list(
+      y1 = ~ AR(p = 1, time = time, series = series),  # AR for y1
+      y2 = ~ RW(time = time, series = series),         # RW for y2  
+      y3 = NULL                                        # No trend for y3
+    ),
+    data = data,
+    family = list(gaussian(), poisson(), bernoulli())
+  )
+  
+  dimensions <- mvgam:::extract_time_series_dimensions(
+    data = data,
+    time_var = "time",
+    series_var = "series"
+  )
+  
+  extracted <- mvgam:::extract_and_rename_trend_parameters(
+    trend_setup = trend_setup,
+    dimensions = dimensions,
+    suffix = "_trend"
+  )
+  
+  # Check multivariate metadata  
+  expect_true(attr(extracted, "is_multivariate"))
+  expect_equal(attr(extracted, "response_names"), c("y1", "y2", "y3"))
+  
+  # Parameter mapping should reflect response-specific structure
+  mapping <- attr(extracted, "parameter_mapping")
+  expect_true(mapping$is_multivariate)
+  expect_equal(mapping$response_names, c("y1", "y2", "y3"))
+  expect_true(length(mapping$original_to_renamed) > 0)
+  expect_true(length(mapping$renamed_to_original) > 0)
+  
+  # Check for response-specific parameter patterns
+  renamed_params <- names(mapping$renamed_to_original)
+  
+  # Should have AR parameters for y1 (since it uses AR trend)
+  ar_params <- renamed_params[grepl("ar1.*_trend$", renamed_params)]
+  expect_true(length(ar_params) > 0)
+  
+  # Should have sigma parameters for y2 (since it uses RW trend)  
+  sigma_params <- renamed_params[grepl("sigma.*_trend$", renamed_params)]
+  expect_true(length(sigma_params) > 0)
+  
+  # Check for times_trend matrix structure
+  # With response-specific trends, we might have multiple times_trend matrices
+  times_trend_names <- names(extracted)[grepl("times_trend", names(extracted))]
+  expect_true(length(times_trend_names) > 0)
+  
+  # Each times_trend should be properly structured
+  for (times_name in times_trend_names) {
+    times_stanvar <- extracted[[times_name]]
+    expect_equal(times_stanvar$block, "data")
+    expect_true(nchar(times_stanvar$scode) > 0)
+    expect_true(grepl("int.*times_trend", times_stanvar$scode))
+  }
+  
+  # Verify bidirectional mapping integrity
+  for (original in names(mapping$original_to_renamed)) {
+    renamed <- mapping$original_to_renamed[[original]]
+    expect_equal(mapping$renamed_to_original[[renamed]], original)
+  }
+  
+  # All renamed parameters should have the suffix
+  expect_true(all(endsWith(renamed_params, "_trend")))
+  
+  # Original brmsfit should be preserved for prediction compatibility
+  original_brmsfit <- attr(extracted, "original_brmsfit")
+  expect_true(!is.null(original_brmsfit))
+  expect_s3_class(original_brmsfit, "brmsfit")
 })

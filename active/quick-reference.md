@@ -22,7 +22,7 @@ mvgam(log(biomass) ~ habitat + s(latitude, longitude),
       trend_formula = ~ AR(p = 2, cor = TRUE), data = data)
 
 # Complex smooths with factor trends  
-mvgam(abundance ~ te(temperature, precipitation) + s(site, bs = "re"),
+mvgam(abundance ~ t2(temperature, precipitation) + s(site, bs = "re"),
       trend_formula = ~ ZMVN(n_lv = 2), data = data)
 
 # Distributional regression with trend on mu only
@@ -63,7 +63,7 @@ mvgam(
   bf(abundance ~ x, family = poisson()) +
   bf(presence ~ x, family = bernoulli()) +
   bf(diversity ~ x, family = Gamma()),
-  trend_formula = bf(
+  trend_formula = list(
     abundance = ~ AR(p = 1),        # Population dynamics
     presence = ~ RW(),              # Occupancy trends  
     diversity = ~ PW(n_change = 2)  # Piecewise trends
@@ -146,7 +146,7 @@ mvgam(
   bf(abund ~ x, family = poisson()) +
   bf(presabs ~ x, family = bernoulli()) +
   bf(divers ~ x, family = Gamma()),
-  trend_formula = bf(
+  trend_formula = list(
     abund = ~ AR(p = 1),        # Population dynamics
     divers = ~ RW(),            # Biomass trends
     presabs = NULL              # No trend (static occupancy, defaults to ZMVN())

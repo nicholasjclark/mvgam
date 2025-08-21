@@ -180,6 +180,39 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
     # Create base formula for brms setup
     base_formula <- create_trend_base_formula(trend_specs)
     
+  } else if (is.list(trend_formula) && !is.null(names(trend_formula))) {
+    # Handle response-specific trends as validated lists
+    if (!is_mv_main) {
+      stop(insight::format_error(
+        "List {.field trend_formula} requires multivariate main formula.",
+        "Use mvbind() or bf() for multiple responses."
+      ))
+    }
+    
+    # Validate response names match
+    missing_responses <- setdiff(names(trend_formula), response_names)
+    if (length(missing_responses) > 0) {
+      stop(insight::format_error(
+        paste("Unknown responses in {.field trend_formula}:", paste(missing_responses, collapse = ", ")),
+        paste("Available responses:", paste(response_names, collapse = ", "))
+      ))
+    }
+    
+    # Parse each trend formula
+    trend_specs <- lapply(names(trend_formula), function(resp) {
+      if (is.null(trend_formula[[resp]])) return(NULL)
+      parse_trend_formula(trend_formula[[resp]])$trend_model
+    })
+    names(trend_specs) <- names(trend_formula)
+    
+    # Create base formula from first non-NULL trend
+    non_null_trends <- which(!sapply(trend_formula, is.null))
+    if (length(non_null_trends) > 0) {
+      base_formula <- trend_formula[[non_null_trends[1]]]
+    } else {
+      base_formula <- ~ 1  # Fallback if all trends are NULL
+    }
+    
   } else {
     # Single trend formula applied to all responses
     # Parse the trend formula to extract trend objects instead of storing raw formulas

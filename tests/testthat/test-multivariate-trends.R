@@ -65,6 +65,55 @@ test_that("parse_multivariate_trends handles multivariate formulas with cbind", 
   )
 })
 
+test_that("parse_multivariate_trends handles list syntax for response-specific trends", {
+  formula <- mvbind(count, biomass) ~ temp
+  trend_formula <- list(
+    count = ~ AR(p = 1),
+    biomass = ~ RW(cor = TRUE)
+  )
+  
+  # No mocking needed - test real implementation
+  result <- mvgam:::parse_multivariate_trends(formula, trend_formula)
+  
+  expect_true(result$has_trends)
+  expect_true(result$is_multivariate)
+  expect_equal(result$response_names, c("count", "biomass"))
+  expect_length(result$trend_specs, 2)
+  expect_named(result$trend_specs, c("count", "biomass"))
+  expect_true(!is.null(result$trend_specs$count))
+  expect_true(!is.null(result$trend_specs$biomass))
+})
+
+test_that("parse_multivariate_trends validates list syntax correctly", {
+  formula <- mvbind(y1, y2) ~ x
+  
+  # Test error when list used with univariate formula
+  expect_error(
+    mvgam:::parse_multivariate_trends(y ~ x, list(y = ~ AR(p = 1))),
+    "List.*trend_formula.*requires multivariate main formula"
+  )
+  
+  # Test error with unknown response names
+  expect_error(
+    mvgam:::parse_multivariate_trends(formula, list(y3 = ~ AR(p = 1))),
+    "Unknown responses.*trend_formula"
+  )
+  
+  # Test success with NULL for some responses
+  expect_no_error({
+    result <- mvgam:::parse_multivariate_trends(
+      formula, 
+      list(y1 = ~ AR(p = 1), y2 = NULL)
+    )
+    expect_true(result$has_trends)
+    expect_true(result$is_multivariate)
+    expect_length(result$trend_specs, 2)
+    expect_named(result$trend_specs, c("y1", "y2"))
+    expect_true(!is.null(result$trend_specs$y1))
+    expect_null(result$trend_specs$y2)
+  })
+})
+
 test_that("is_multivariate_formula correctly identifies multivariate formulas", {
   # Univariate cases
   expect_false(mvgam:::is_multivariate_formula(y ~ x))
