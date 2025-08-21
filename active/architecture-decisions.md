@@ -677,6 +677,28 @@ extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimens
 
 **Verification**: All trend types working (ZMVN=14, RW=12, VAR=13 stanvars)
 
+### 16. Trend Model Distribution Constraints (2025-08-21)
+
+**Critical Architectural Constraint**: All trend models are univariate Gaussian State-Space models.
+
+**Design Decision**: Trend components are ALWAYS Gaussian regardless of observation model family.
+
+**Key Implications**:
+- **Likelihood Filtering**: When extracting model blocks from brms trend models, only Gaussian likelihood patterns need to be filtered (normal distribution, normal_lpdf, normal_glm_lpdf)
+- **Parameter Simplification**: Trend model parameters are always continuous (no discrete distribution handling needed)
+- **Stan Code Generation**: Trend block patterns are predictable and consistent across all trend types
+- **Validation Simplification**: No need to validate trend distribution families or discrete parameter constraints
+
+**Implementation Guidance**:
+- `extract_non_likelihood_from_model_block()` should focus on Gaussian likelihood exclusion patterns
+- Trend generators can assume Gaussian innovations and continuous parameter spaces
+- Documentation should clarify that observation models can be any brms-supported family while trends remain Gaussian
+
+**Rationale**: 
+- State-Space models with non-Gaussian trend innovations create computational complexity without clear benefit
+- Gaussian trend processes with non-Gaussian observations provide sufficient modeling flexibility
+- Simplifies Stan code generation and parameter monitoring systems
+
 ## Critical Requirements
 
 **Stan Assembly**: Convention-based dispatch replaces hardcoded fields

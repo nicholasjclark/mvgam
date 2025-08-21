@@ -4030,24 +4030,34 @@ extract_non_likelihood_from_model_block <- function(model_block) {
   lines <- stringr::str_split(block_content, "\\n")[[1]]
   lines <- stringr::str_trim(lines)
   
-  # Keep non-likelihood lines
+  # Keep non-likelihood lines - preserve linear predictor computations
   non_likelihood_lines <- character(0)
   
   for (line in lines) {
     # Skip empty lines and comments
-    if (nchar(line) == 0 || stringr::str_starts(line, "//")) {
+    if (nchar(line) == 0 || grepl("^\\s*//", line)) {
       next
     }
     
-    # Skip likelihood statements (various patterns)
-    is_likelihood <- any(c(
-      stringr::str_detect(line, "~\\s+(normal|poisson|binomial|gamma|beta|exponential|lognormal|student_t|cauchy)\\s*\\("),
-      stringr::str_detect(line, "target\\s*\\+=.*_lpdf\\s*\\("),
-      stringr::str_detect(line, "target\\s*\\+=.*_lpmf\\s*\\("),
-      stringr::str_detect(line, "increment_log_prob\\s*\\(")
+    # Skip specific lines we don't want
+    skip_line <- any(c(
+      # Prior-only conditional statements (but keep their contents)
+      grepl("if\\s*\\(\\s*!\\s*prior_only\\s*\\)\\s*\\{?\\s*$", line),
+      grepl("if\\s*\\(\\s*prior_only\\s*\\)\\s*\\{?\\s*$", line),
+      
+      # Standalone closing braces (likely end of prior_only blocks)
+      grepl("^\\s*}\\s*$", line),
+      
+      # Actual likelihood statements
+      grepl("~\\s+normal\\s*\\(", line),
+      grepl("target\\s*\\+=.*normal.*lpdf\\s*\\(", line),
+      grepl("target\\s*\\+=.*normal.*glm.*lpdf\\s*\\(", line),
+      grepl("target\\s*\\+=.*multi_normal.*lpdf\\s*\\(", line),
+      grepl("target\\s*\\+=.*normal.*lpdf\\s*\\([^)]*\\|", line),
+      grepl("target\\s*\\+=.*Y\\s*\\|", line)
     ))
     
-    if (!is_likelihood) {
+    if (!skip_line) {
       non_likelihood_lines <- c(non_likelihood_lines, line)
     }
   }

@@ -39,8 +39,10 @@ Implementation tasks for stancode generation update feature with comprehensive p
 
 **START HERE**: Parameter extraction system completed. Now need integration testing and Stan code combination.
 
-### Remaining Minor Issues (Optional - 5 test failures)
-- **Likelihood Exclusion**: Test assertions need stanvar collection access fixes (3 failures)  
+### Remaining Minor Issues
+- **Likelihood Exclusion**: Test failures suggest that the stan_code is still containing likelihood patterns, which means filtered content is not making it through the full pipeline. The real issue appears to be that either:
+  1. The rename_parameters_in_block function is destroying the content, OR
+  2. The stanvar is not being created properly  
 - **Multivariate AR Parameters**: Pattern matching `grepl("ar1.*_trend$")` needs debugging (2 failures)
 
 ### Priority Tasks
@@ -49,7 +51,7 @@ Implementation tasks for stancode generation update feature with comprehensive p
 
 - [ ] **Step 8 - Test Data Structure Correctness** (30 min): Validate times_trend matrix [n_time, n_series] dimensions, parameter mapping preservation for prediction compatibility
 
-- [ ] **Step 9 - Systematic Validation** (45 min): Test multiple configurations: univariate trends (RW, AR, PW), multivariate shared trends, response-specific trends, mixed family models
+3- [ ] **Step 9 - Systematic Validation** (45 min): Test multiple configurations: univariate trends (RW, AR, PW), multivariate shared trends, response-specific trends, mixed family models
 
 - [ ] **Step 10 - Full Integration Test** (45 min): Complete test suite with Stan compilation focus, prediction compatibility validation, multivariate workflow testing
 
