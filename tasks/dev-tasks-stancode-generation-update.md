@@ -8,7 +8,8 @@ Implementation tasks for stancode generation update feature with comprehensive p
 - ✅ **Parameter Standardization**: All trend generators use 3-stanvar pattern with standardized naming (section 2.7) 
 - ✅ **VAR/VARMA Implementation**: Complete hierarchical grouping support with factor model constraints
 - ✅ **Parameter Extraction**: Comprehensive parameter renaming system with 97.4% test success rate (Steps 4-6)
-- 🎯 **Next Priority**: Stan code integration and validation testing (Steps 7-10)
+- 🎯 **Current Priority**: Stan code integration and validation testing (Steps 7-10)
+- ❗ **Missing TRD Core Functions**: `get_prior()`, `make_stancode()`, `make_standata()`, `prior_summary()`, `get_inits()`, `set_prior()`
 
 ---
 
@@ -53,6 +54,44 @@ Implementation tasks for stancode generation update feature with comprehensive p
 - [ ] **Step 10 - Full Integration Test** (45 min): Complete test suite with Stan compilation focus, prediction compatibility validation, multivariate workflow testing
 
 - [ ] **Multivariate Formula Integration** (60 min): Resolve setup_brms_lightweight handling of multivariate observation models with response-specific trend formulas
+
+---
+
+## 🎯 CORE USER-FACING FUNCTIONS (TRD Requirements)
+
+**CRITICAL**: The following inspection functions are core TRD objectives and must be implemented:
+
+### brms-Equivalent Inspection Functions
+- [ ] **get_prior()** (45 min): Inspect all available priors before fitting
+  - Return `mvgamprior` data frame with `trend_component` column distinguishing observation vs trend parameters
+  - Compatible with brms `brmsprior` structure for cross-package consistency
+  - Support both observation and trend model priors in unified interface
+
+- [ ] **make_stancode()** (60 min): Generate complete Stan model code before fitting
+  - Character string containing complete Stan model code with both observation and trend components
+  - Follow brms style conventions and Stan best practices
+  - Handle custom prior specifications from `get_prior()` or `set_prior()`
+
+- [ ] **make_standata()** (60 min): Generate complete Stan data list before fitting
+  - Named list containing all data for Stan model (observation + trend data components)
+  - Structure matches what would be passed to Stan during fitting
+  - Support custom prior data requirements
+
+- [ ] **prior_summary()** (30 min): Inspect priors used in fitted or specified models
+  - Data frame showing priors actually used or planned to be used
+  - Support both fitted mvgam objects and model specifications
+  - Show all priors vs non-default only option
+
+- [ ] **get_inits()** (45 min): Generate or inspect initialization values for Stan parameters
+  - List of initialization values for Stan parameters
+  - Support multiple initialization strategy options
+  - Handle both observation and trend parameter initialization
+
+### Prior Specification Functions  
+- [ ] **set_prior()** and **prior()** (30 min): Specify custom priors using brms interface patterns
+  - Follow brms `set_prior()` specification exactly with extensions for trend-specific parameters
+  - Return prior specification objects compatible with mvgam functions
+  - Support trend parameter targeting with `_trend` suffix conventions
 
 ---
 
