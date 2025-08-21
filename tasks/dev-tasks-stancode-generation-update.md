@@ -119,7 +119,7 @@ This document tracks implementation progress for the stancode generation update 
 
 **STATUS**: Architecture gap identified in parameter flow from brms trend model to mvgam shared innovation system
 
-**ISSUE**: brms trend model generates standard parameters (mu, sigma) but mvgam shared innovation system expects renamed parameters (mu_trend, ytimes). The parameter renaming/extraction bridge is incomplete.
+**ISSUE**: brms trend model generates standard parameters (mu, b) but mvgam shared innovation system expects renamed parameters (mu_trend, b_trend) and mvgam-generated trend parameters such as times_trend (formerly ytimes). The parameter renaming/extraction bridge is incomplete.
 
 **10-STEP INCREMENTAL PLAN**:
 
