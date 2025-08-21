@@ -509,13 +509,13 @@ test_that("extract_and_rename_trend_parameters creates times_trend matrix correc
   expect_true("times_trend" %in% names(extracted))
   times_stanvar <- extracted$times_trend
   
-  # Check stanvar properties
-  expect_equal(times_stanvar$name, "times_trend")
-  expect_equal(times_stanvar$block, "data")
-  expect_true(nchar(times_stanvar$scode) > 0)
+  # Check stanvar properties (access first stanvar in stanvars collection)
+  expect_equal(times_stanvar$times_trend$name, "times_trend")
+  expect_equal(times_stanvar$times_trend$block, "data")
+  expect_true(nchar(times_stanvar$times_trend$scode) > 0)
   
   # Stan code should contain proper array declaration
-  stan_code <- times_stanvar$scode
+  stan_code <- times_stanvar$times_trend$scode
   expect_true(grepl("int times_trend\\[", stan_code))
   expect_true(grepl("\\[12, 2\\]", stan_code))  # n_time=12, n_series=2
 })
@@ -545,8 +545,10 @@ test_that("extract_and_rename_trend_parameters excludes likelihood from model bl
   model_stanvars <- extracted[grepl("model", names(extracted))]
   
   if (length(model_stanvars) > 0) {
-    for (stanvar in model_stanvars) {
-      stan_code <- stanvar$scode
+    for (stanvar_name in names(model_stanvars)) {
+      stanvar_collection <- model_stanvars[[stanvar_name]]
+      # Access the stanvar within the collection
+      stan_code <- stanvar_collection[[stanvar_name]]$scode
       
       # Should not contain likelihood statements
       expect_false(grepl("~\\s+(normal|poisson|gamma)", stan_code))
@@ -685,8 +687,8 @@ test_that("extract_and_rename_trend_parameters handles multivariate shared trend
   # Check for times_trend matrix (shared for multivariate)
   expect_true("times_trend" %in% names(extracted))
   times_stanvar <- extracted$times_trend
-  expect_equal(times_stanvar$name, "times_trend")
-  expect_equal(times_stanvar$block, "data")
+  expect_equal(times_stanvar$times_trend$name, "times_trend")
+  expect_equal(times_stanvar$times_trend$block, "data")
   
   # Should preserve bidirectional mapping for prediction compatibility
   for (original in names(mapping$original_to_renamed)) {
@@ -762,9 +764,9 @@ test_that("extract_and_rename_trend_parameters handles multivariate response-spe
   # Each times_trend should be properly structured
   for (times_name in times_trend_names) {
     times_stanvar <- extracted[[times_name]]
-    expect_equal(times_stanvar$block, "data")
-    expect_true(nchar(times_stanvar$scode) > 0)
-    expect_true(grepl("int.*times_trend", times_stanvar$scode))
+    expect_equal(times_stanvar[[times_name]]$block, "data")
+    expect_true(nchar(times_stanvar[[times_name]]$scode) > 0)
+    expect_true(grepl("int.*times_trend", times_stanvar[[times_name]]$scode))
   }
   
   # Verify bidirectional mapping integrity

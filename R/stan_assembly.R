@@ -3835,7 +3835,7 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
   )
   
   # 1. Extract and rename Stan code blocks (extract from model block but exclude likelihood)
-  stan_code_stanvars <- extract_and_rename_stan_blocks(
+  stan_code_result <- extract_and_rename_stan_blocks(
     stancode = trend_setup$stancode,
     suffix = suffix,
     mapping = parameter_mapping,
@@ -3843,8 +3843,11 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
     response_names = response_names
   )
   
-  if (length(stan_code_stanvars) > 0) {
-    stanvar_components <- c(stanvar_components, stan_code_stanvars)
+  # Update mapping with results from Stan code renaming
+  parameter_mapping <- stan_code_result$mapping
+  
+  if (length(stan_code_result$stanvars) > 0) {
+    stanvar_components <- c(stanvar_components, stan_code_result$stanvars)
   }
   
   # 2. Extract and rename standata objects
@@ -3957,12 +3960,13 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
   # 1. Extract parameters block and rename parameters
   params_block <- extract_stan_block(stancode, "parameters")
   if (!is.null(params_block) && params_block != "Block not found") {
-    renamed_params_block <- rename_parameters_in_block(
+    params_result <- rename_parameters_in_block(
       params_block, suffix, mapping, "parameters", is_multivariate, response_names
     )
+    mapping <- params_result$mapping  # Update mapping
     
     stanvar_list[["trend_parameters"]] <- brms::stanvar(
-      scode = renamed_params_block,
+      scode = params_result$code,
       block = "parameters"
     )
   }
@@ -3970,12 +3974,13 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
   # 2. Extract transformed parameters block and rename references
   tparams_block <- extract_stan_block(stancode, "transformed parameters")
   if (!is.null(tparams_block) && tparams_block != "Block not found") {
-    renamed_tparams_block <- rename_parameters_in_block(
+    tparams_result <- rename_parameters_in_block(
       tparams_block, suffix, mapping, "tparameters", is_multivariate, response_names
     )
+    mapping <- tparams_result$mapping  # Update mapping
     
     stanvar_list[["trend_tparameters"]] <- brms::stanvar(
-      scode = renamed_tparams_block,
+      scode = tparams_result$code,
       block = "tparameters"
     )
   }
@@ -3987,18 +3992,22 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
     non_likelihood_model <- extract_non_likelihood_from_model_block(model_block)
     
     if (!is.null(non_likelihood_model) && nchar(stringr::str_trim(non_likelihood_model)) > 0) {
-      renamed_model_block <- rename_parameters_in_block(
+      model_result <- rename_parameters_in_block(
         non_likelihood_model, suffix, mapping, "model", is_multivariate, response_names
       )
+      mapping <- model_result$mapping  # Update mapping
       
       stanvar_list[["trend_model_priors"]] <- brms::stanvar(
-        scode = renamed_model_block,
+        scode = model_result$code,
         block = "model"
       )
     }
   }
   
-  return(stanvar_list)
+  return(list(
+    stanvars = stanvar_list,
+    mapping = mapping
+  ))
 }
 
 #' Extract Non-Likelihood Parts from Model Block
@@ -4123,61 +4132,312 @@ rename_parameters_in_block <- function(block_code, suffix, mapping, block_type, 
   
   renamed_code <- block_code
   
-  if (is_multivariate && !is.null(response_names)) {
-    # Handle multivariate parameter patterns
-    renamed_code <- rename_multivariate_parameters(
-      renamed_code, suffix, mapping, response_names
-    )
-  } else {
-    # Handle univariate parameter patterns
-    renamed_code <- rename_univariate_parameters(
-      renamed_code, suffix, mapping
-    )
+  # Since trend models are always univariate, use univariate renaming
+  # Extract all identifiers from this block and apply comprehensive renaming
+  all_identifiers <- extract_stan_identifiers(block_code)
+  
+  if (length(all_identifiers) > 0) {
+    # Filter to get identifiers that should be renamed
+    renameable_identifiers <- filter_renameable_identifiers(all_identifiers)
+    
+    # Sort by length (descending) to avoid partial replacements
+    sorted_identifiers <- renameable_identifiers[order(-nchar(renameable_identifiers))]
+    
+    for (identifier in sorted_identifiers) {
+      renamed_param <- paste0(identifier, suffix)
+      
+      # Store mapping for coordination between blocks
+      mapping$original_to_renamed[[identifier]] <- renamed_param
+      mapping$renamed_to_original[[renamed_param]] <- identifier
+      
+      # Apply replacement with word boundary protection
+      renamed_code <- apply_safe_parameter_replacement(
+        renamed_code, 
+        identifier, 
+        renamed_param
+      )
+    }
   }
   
-  return(renamed_code)
+  # Return both renamed code and updated mapping
+  return(list(
+    code = renamed_code,
+    mapping = mapping
+  ))
 }
 
-#' Rename Univariate Parameters
+#' Get comprehensive Stan reserved words list
+#' 
+#' Returns comprehensive list of Stan reserved words that should never be renamed
+#' during parameter extraction. Based on Stan language specification and testing.
+#' 
+#' @return Character vector of Stan reserved words
+#' @noRd
+get_stan_reserved_words <- function() {
+  # Comprehensive Stan reserved words based on Stan language specification
+  # and extensive testing documented in dev-tasks-stancode-generation-update.md
+  c(
+    # Stan data types
+    "int", "real", "vector", "matrix", "array", "void",
+    
+    # Stan constraints and bounds
+    "lower", "upper", "multiplier", "offset",
+    
+    # Stan block keywords
+    "functions", "data", "transformed", "parameters", "model", 
+    "generated", "quantities",
+    
+    # Stan control flow
+    "if", "else", "for", "while", "in", "break", "continue", "return",
+    
+    # Stan operators and special symbols
+    "and", "or", "not", 
+    
+    # Stan built-in variables and functions
+    "target", "increment_log_prob", "get_lp", "print", "reject",
+    "size", "length", "dimensions", "rows", "cols", "num_elements",
+    
+    # brms internal variables
+    "prior_only", "lprior", "temp_intercept", "temp_Intercept",
+    
+    # Stan mathematical functions
+    "abs", "acos", "acosh", "asin", "asinh", "atan", "atan2", "atanh",
+    "cos", "cosh", "sin", "sinh", "tan", "tanh", "exp", "exp2", "expm1",
+    "log", "log10", "log1p", "log2", "sqrt", "square", "pow", "inv", 
+    "inv_sqrt", "inv_square", "fabs", "fdim", "fmin", "fmax", "fmod",
+    "floor", "ceil", "round", "trunc", "nearbyint", "rint",
+    
+    # Stan linear algebra functions  
+    "dot_product", "columns_dot_product", "rows_dot_product", 
+    "dot_self", "columns_dot_self", "rows_dot_self", "tcrossprod",
+    "crossprod", "quad_form", "quad_form_diag", "quad_form_sym",
+    "trace", "determinant", "log_determinant", "inverse", "eigenvalues",
+    "eigenvectors", "cholesky_decompose", "singular_values", 
+    "qr_Q", "qr_R", "sort_asc", "sort_desc", "sort_indices_asc", 
+    "sort_indices_desc", "rank", "reverse",
+    
+    # Stan array/vector/matrix functions
+    "rep_array", "rep_vector", "rep_row_vector", "rep_matrix",
+    "ones_array", "ones_vector", "ones_row_vector", "ones_matrix",
+    "zeros_array", "zeros_vector", "zeros_row_vector", "zeros_matrix",
+    "uniform_simplex", "unit_vector", "linspaced_array", "linspaced_vector",
+    "linspaced_row_vector", "one_hot_array", "one_hot_vector", 
+    "one_hot_row_vector", "identity_matrix", "diag_matrix", 
+    "diag_pre_multiply", "diag_post_multiply", "block", "sub_col", 
+    "sub_row", "head", "tail", "segment", "append_array", "append_col",
+    "append_row",
+    
+    # Stan probability distributions (lpdf/lpmf)
+    "normal_lpdf", "normal_id_glm_lpdf", "student_t_lpdf", "cauchy_lpdf",
+    "double_exponential_lpdf", "logistic_lpdf", "gumbel_lpdf", 
+    "lognormal_lpdf", "chi_square_lpdf", "inv_chi_square_lpdf",
+    "scaled_inv_chi_square_lpdf", "exponential_lpdf", "gamma_lpdf",
+    "inv_gamma_lpdf", "weibull_lpdf", "frechet_lpdf", "rayleigh_lpdf",
+    "wiener_lpdf", "pareto_lpdf", "pareto_type_2_lpdf", "beta_lpdf",
+    "beta_proportion_lpdf", "uniform_lpdf", "bernoulli_lpdf", 
+    "bernoulli_logit_lpdf", "binomial_lpdf", "binomial_logit_lpdf",
+    "beta_binomial_lpdf", "hypergeometric_lpdf", "categorical_lpdf",
+    "categorical_logit_lpdf", "discrete_range_lpdf", "ordered_logistic_lpdf",
+    "ordered_probit_lpdf", "poisson_lpdf", "poisson_log_lpdf",
+    "neg_binomial_lpdf", "neg_binomial_2_lpdf", "neg_binomial_2_log_lpdf",
+    "multinomial_lpdf", "dirichlet_lpdf", "multi_normal_lpdf",
+    "multi_normal_prec_lpdf", "multi_normal_cholesky_lpdf", 
+    "multi_student_t_lpdf", "gaussian_dlm_obs_lpdf", "wishart_lpdf",
+    "inv_wishart_lpdf", "lkj_corr_lpdf", "lkj_corr_cholesky_lpdf",
+    
+    # Stan distribution CDFs
+    "normal_cdf", "normal_ccdf", "normal_lcdf", "normal_lccdf",
+    "student_t_cdf", "student_t_ccdf", "student_t_lcdf", "student_t_lccdf",
+    "cauchy_cdf", "cauchy_ccdf", "cauchy_lcdf", "cauchy_lccdf",
+    "double_exponential_cdf", "double_exponential_ccdf", 
+    "double_exponential_lcdf", "double_exponential_lccdf",
+    "logistic_cdf", "logistic_ccdf", "logistic_lcdf", "logistic_lccdf",
+    "gumbel_cdf", "gumbel_ccdf", "gumbel_lcdf", "gumbel_lccdf",
+    "lognormal_cdf", "lognormal_ccdf", "lognormal_lcdf", "lognormal_lccdf",
+    "chi_square_cdf", "chi_square_ccdf", "chi_square_lcdf", "chi_square_lccdf",
+    "inv_chi_square_cdf", "inv_chi_square_ccdf", "inv_chi_square_lcdf", 
+    "inv_chi_square_lccdf", "scaled_inv_chi_square_cdf", 
+    "scaled_inv_chi_square_ccdf", "scaled_inv_chi_square_lcdf", 
+    "scaled_inv_chi_square_lccdf", "exponential_cdf", "exponential_ccdf",
+    "exponential_lcdf", "exponential_lccdf", "gamma_cdf", "gamma_ccdf",
+    "gamma_lcdf", "gamma_lccdf", "inv_gamma_cdf", "inv_gamma_ccdf",
+    "inv_gamma_lcdf", "inv_gamma_lccdf", "weibull_cdf", "weibull_ccdf",
+    "weibull_lcdf", "weibull_lccdf", "frechet_cdf", "frechet_ccdf",
+    "frechet_lcdf", "frechet_lccdf", "rayleigh_cdf", "rayleigh_ccdf",
+    "rayleigh_lcdf", "rayleigh_lccdf", "pareto_cdf", "pareto_ccdf",
+    "pareto_lcdf", "pareto_lccdf", "pareto_type_2_cdf", "pareto_type_2_ccdf",
+    "pareto_type_2_lcdf", "pareto_type_2_lccdf", "beta_cdf", "beta_ccdf",
+    "beta_lcdf", "beta_lccdf", "beta_proportion_cdf", "beta_proportion_ccdf",
+    "beta_proportion_lcdf", "beta_proportion_lccdf", "uniform_cdf", 
+    "uniform_ccdf", "uniform_lcdf", "uniform_lccdf", "bernoulli_cdf",
+    "bernoulli_ccdf", "bernoulli_lcdf", "bernoulli_lccdf", 
+    "bernoulli_logit_cdf", "bernoulli_logit_ccdf", "bernoulli_logit_lcdf",
+    "bernoulli_logit_lccdf", "binomial_cdf", "binomial_ccdf", "binomial_lcdf",
+    "binomial_lccdf", "binomial_logit_cdf", "binomial_logit_ccdf",
+    "binomial_logit_lcdf", "binomial_logit_lccdf", "beta_binomial_cdf",
+    "beta_binomial_ccdf", "beta_binomial_lcdf", "beta_binomial_lccdf",
+    "hypergeometric_cdf", "hypergeometric_ccdf", "hypergeometric_lcdf",
+    "hypergeometric_lccdf", "poisson_cdf", "poisson_ccdf", "poisson_lcdf",
+    "poisson_lccdf", "poisson_log_cdf", "poisson_log_ccdf", "poisson_log_lcdf",
+    "poisson_log_lccdf", "neg_binomial_cdf", "neg_binomial_ccdf",
+    "neg_binomial_lcdf", "neg_binomial_lccdf", "neg_binomial_2_cdf",
+    "neg_binomial_2_ccdf", "neg_binomial_2_lcdf", "neg_binomial_2_lccdf",
+    "neg_binomial_2_log_cdf", "neg_binomial_2_log_ccdf", 
+    "neg_binomial_2_log_lcdf", "neg_binomial_2_log_lccdf",
+    
+    # Stan random number generators
+    "normal_rng", "student_t_rng", "cauchy_rng", "double_exponential_rng",
+    "logistic_rng", "gumbel_rng", "lognormal_rng", "chi_square_rng",
+    "inv_chi_square_rng", "scaled_inv_chi_square_rng", "exponential_rng",
+    "gamma_rng", "inv_gamma_rng", "weibull_rng", "frechet_rng", 
+    "rayleigh_rng", "wiener_rng", "pareto_rng", "pareto_type_2_rng",
+    "beta_rng", "beta_proportion_rng", "uniform_rng", "bernoulli_rng",
+    "bernoulli_logit_rng", "binomial_rng", "binomial_logit_rng",
+    "beta_binomial_rng", "hypergeometric_rng", "categorical_rng",
+    "categorical_logit_rng", "discrete_range_rng", "ordered_logistic_rng",
+    "ordered_probit_rng", "poisson_rng", "poisson_log_rng", 
+    "neg_binomial_rng", "neg_binomial_2_rng", "neg_binomial_2_log_rng",
+    "multinomial_rng", "dirichlet_rng", "multi_normal_rng",
+    "multi_normal_prec_rng", "multi_normal_cholesky_rng", 
+    "multi_student_t_rng", "wishart_rng", "inv_wishart_rng", 
+    "lkj_corr_rng", "lkj_corr_cholesky_rng",
+    
+    # Special Stan functions
+    "step", "is_inf", "is_nan", "positive_infinity", "negative_infinity",
+    "not_a_number", "machine_precision", "max", "min", "sum", "prod", 
+    "log_sum_exp", "mean", "variance", "sd", "distance", "squared_distance",
+    "fma", "multiply_log", "log1m", "log1p_exp", "log1m_exp", "log_diff_exp",
+    "log_mix", "log_falling_factorial", "log_rising_factorial", "lgamma",
+    "digamma", "trigamma", "lbeta", "binomial_coefficient_log", "bessel_first_kind",
+    "bessel_second_kind", "modified_bessel_first_kind", "modified_bessel_second_kind",
+    "falling_factorial", "rising_factorial", "expm1", "log1p", "hypot"
+  )
+}
+
+#' Extract all identifiers from Stan code
+#' 
+#' Uses regex to find all valid Stan identifiers for comprehensive parameter
+#' renaming. Based on proven patterns from testing.
+#' 
+#' @param stan_code Character string containing Stan code
+#' @return Character vector of unique identifiers found in code
+#' @noRd
+extract_stan_identifiers <- function(stan_code) {
+  checkmate::assert_character(stan_code, len = 1)
+  
+  # Extract all identifiers using regex pattern for valid Stan identifiers
+  # Pattern matches: letter or underscore, followed by letters, digits, underscores
+  identifiers <- regmatches(
+    stan_code, 
+    gregexpr("\\b[a-zA-Z_][a-zA-Z0-9_]*\\b", stan_code, perl = TRUE)
+  )[[1]]
+  
+  # Return unique identifiers, removing empty strings
+  unique(identifiers[nchar(identifiers) > 0])
+}
+
+#' Filter identifiers to exclude Stan reserved words and response variables
+#' 
+#' Removes Stan reserved words, essential system variables, and response variables
+#' that should never be renamed during trend parameter extraction.
+#' 
+#' @param identifiers Character vector of identifiers to filter
+#' @return Character vector of identifiers that are safe to rename
+#' @noRd
+filter_renameable_identifiers <- function(identifiers) {
+  checkmate::assert_character(identifiers)
+  
+  # Get comprehensive Stan reserved words
+  reserved_words <- get_stan_reserved_words()
+  
+  # Filter out reserved words (case-sensitive comparison)
+  non_reserved <- identifiers[!identifiers %in% reserved_words]
+  
+  # Additional filtering for response variables and obvious non-parameters
+  # Response variables should NOT be carried from trend to observation model
+  exclude_patterns <- c(
+    # Response variables (trend models are always univariate with Y only)
+    "Y", 
+    
+    # Comment words and obvious non-parameters based on comprehensive testing
+    "total", "number", "observations", "response", "variable", 
+    "population", "level", "effects", "design", "after", "centering",
+    "should", "the", "likelihood", "be", "ignored", "group",
+    "standard", "deviations", "standardized", "actual", "temporary",
+    "intercept", "centered", "predictors", "regression", "coefficients",
+    "dispersion", "parameter", "prior", "contributions", "log", "posterior"
+  )
+  
+  # Return identifiers that are not reserved words, response variables, or comment words
+  non_reserved[!non_reserved %in% exclude_patterns]
+}
+
+#' Apply parameter renaming with word boundary protection
+#' 
+#' Performs safe identifier replacement using word boundaries to prevent
+#' partial matches. Based on proven testing patterns.
+#' 
+#' @param code Character string to modify
+#' @param old_name Character string of identifier to rename
+#' @param new_name Character string of new identifier name
+#' @return Modified character string with renamed identifier
+#' @noRd
+apply_safe_parameter_replacement <- function(code, old_name, new_name) {
+  checkmate::assert_character(code, len = 1)
+  checkmate::assert_character(old_name, len = 1)
+  checkmate::assert_character(new_name, len = 1)
+  
+  # Use word boundary regex to avoid partial matches
+  # \b ensures we only match complete words
+  pattern <- paste0("\\b", old_name, "\\b")
+  gsub(pattern, new_name, code, perl = TRUE)
+}
+
+#' Rename Univariate Parameters using comprehensive identifier extraction
+#' 
+#' Replaces hardcoded parameter patterns with comprehensive Stan reserved words
+#' filtering to ensure robust parameter renaming for all brms patterns.
+#' Based on extensive testing documented in dev-tasks file.
+#' 
 #' @param code Character string of Stan code
 #' @param suffix Character suffix to append
 #' @param mapping List to store parameter mappings
 #' @return Character string with renamed parameters
 #' @noRd
 rename_univariate_parameters <- function(code, suffix, mapping) {
-  # Common brms parameter patterns for univariate models
-  brms_params <- c(
-    "\\bIntercept\\b",     # Intercept parameter
-    "\\bb\\b",             # Fixed effects vector
-    "\\bsigma\\b",         # Residual standard deviation  
-    "\\bmu\\b",            # Linear predictor
-    "\\btau\\b",           # Additional variance parameters
-    "\\bnu\\b",            # Degrees of freedom parameters
-    "\\btemp_\\w+\\b"      # Temporary brms parameters
-  )
+  checkmate::assert_character(code, len = 1)
+  checkmate::assert_character(suffix, len = 1)
+  checkmate::assert_list(mapping)
   
+  # Extract all identifiers from Stan code
+  all_identifiers <- extract_stan_identifiers(code)
+  
+  if (length(all_identifiers) == 0) {
+    return(code)
+  }
+  
+  # Filter to get identifiers that should be renamed
+  renameable_identifiers <- filter_renameable_identifiers(all_identifiers)
+  
+  # Apply renaming with word boundary protection
   renamed_code <- code
   
-  # Apply renaming to each parameter pattern
-  for (param_pattern in brms_params) {
-    # Find all matches
-    matches <- gregexpr(param_pattern, renamed_code, perl = TRUE)
-    match_strings <- regmatches(renamed_code, matches)[[1]]
+  # Sort by length (descending) to avoid partial replacements
+  sorted_identifiers <- renameable_identifiers[order(-nchar(renameable_identifiers))]
+  
+  for (identifier in sorted_identifiers) {
+    renamed_param <- paste0(identifier, suffix)
     
-    # Rename each unique match
-    unique_matches <- unique(match_strings)
-    for (param in unique_matches) {
-      if (nchar(param) > 0) {
-        renamed_param <- paste0(param, suffix)
-        
-        # Store mapping
-        mapping$original_to_renamed[[param]] <- renamed_param
-        mapping$renamed_to_original[[renamed_param]] <- param
-        
-        # Replace in code (use word boundaries)
-        renamed_code <- gsub(paste0("\\b", param, "\\b"), renamed_param, renamed_code, perl = TRUE)
-      }
-    }
+    # Store mapping for later use
+    mapping$original_to_renamed[[identifier]] <- renamed_param
+    mapping$renamed_to_original[[renamed_param]] <- identifier
+    
+    # Apply replacement with word boundary protection
+    renamed_code <- apply_safe_parameter_replacement(
+      renamed_code, 
+      identifier, 
+      renamed_param
+    )
   }
   
   return(renamed_code)
@@ -4265,33 +4525,33 @@ extract_and_rename_standata_objects <- function(standata, suffix, mapping, is_mu
   return(stanvar_list)
 }
 
-#' Extract Univariate Stan Data Objects
+#' Extract Univariate Stan Data Objects using comprehensive filtering
+#' 
+#' Applies comprehensive renaming to standata objects using same Stan reserved
+#' words filtering as the code renaming to ensure consistent namespace separation.
+#' 
 #' @param standata Named list of Stan data objects
 #' @param suffix Character suffix to append
 #' @param mapping List to store parameter mappings
 #' @return List of stanvar objects with renamed data
 #' @noRd
 extract_univariate_standata <- function(standata, suffix, mapping) {
+  checkmate::assert_list(standata, names = "named")
+  checkmate::assert_character(suffix, len = 1)
+  checkmate::assert_list(mapping)
+  
   stanvar_list <- list()
   
-  # Core brms data objects for univariate models
-  univariate_data_objects <- c(
-    "N", "K", "Kc",        # Dimensions
-    "X", "Xc",             # Design matrices  
-    "Y",                   # Response
-    "Z_1_1", "Z_1_2",      # Random effects design matrices
-    "J_1", "J_2",          # Random effects grouping info
-    "N_1", "N_2",          # Random effects dimensions
-    "M_1", "M_2",          # Random effects parameters
-    "prior_only"           # Prior only flag
-  )
+  # Get all standata names and filter using comprehensive approach
+  all_data_names <- names(standata)
+  renameable_data_names <- filter_renameable_identifiers(all_data_names)
   
-  for (data_name in names(standata)) {
-    if (data_name %in% univariate_data_objects) {
+  for (data_name in renameable_data_names) {
+    if (data_name %in% names(standata)) {
       renamed_data_name <- paste0(data_name, suffix)
       data_value <- standata[[data_name]]
       
-      # Store mapping
+      # Store mapping for coordination with Stan code renaming
       mapping$original_to_renamed[[data_name]] <- renamed_data_name
       mapping$renamed_to_original[[renamed_data_name]] <- data_name
       
@@ -4371,21 +4631,12 @@ generate_times_trend_matrices <- function(n_time, n_series, unique_times, unique
   
   stanvar_list <- list()
   
-  if (is_multivariate && !is.null(response_names)) {
-    # For multivariate models, create shared times_trend matrix
-    # (mvgam typically uses shared time structure across responses)
-    times_trend_stanvar <- create_times_trend_matrix(
-      n_time, n_series, unique_times, unique_series, "times_trend"
-    )
-    stanvar_list[["times_trend"]] <- times_trend_stanvar
-    
-  } else {
-    # For univariate models, create single times_trend matrix
-    times_trend_stanvar <- create_times_trend_matrix(
-      n_time, n_series, unique_times, unique_series, "times_trend"
-    )
-    stanvar_list[["times_trend"]] <- times_trend_stanvar
-  }
+  # Create times_trend matrix using sorted dimension information from extract_time_series_dimensions()
+  # Both univariate and multivariate use same structure since trend models are always univariate
+  times_trend_stanvar <- create_times_trend_matrix(
+    n_time, n_series, unique_times, unique_series, "times_trend"
+  )
+  stanvar_list[["times_trend"]] <- times_trend_stanvar
   
   return(stanvar_list)
 }
@@ -4399,21 +4650,25 @@ generate_times_trend_matrices <- function(n_time, n_series, unique_times, unique
 #' @return Stanvar object with times_trend matrix
 #' @noRd
 create_times_trend_matrix <- function(n_time, n_series, unique_times, unique_series, matrix_name) {
-  # Create time index matrix [n_time, n_series]
-  # Each entry contains the time index (1-based for Stan)
-  times_matrix <- matrix(0, nrow = n_time, ncol = n_series)
+  # Create properly structured 2D integer array [n_time, n_series] 
+  # Each entry times_array[i, j] contains the time index for time i, series j
+  times_array <- array(data = as.integer(0), dim = c(n_time, n_series))
   
-  # Fill matrix with time indices
+  # Fill array with time indices (proper 2D structure for Stan)
   for (i in seq_len(n_time)) {
     for (j in seq_len(n_series)) {
-      times_matrix[i, j] <- i  # 1-based time index for Stan
+      times_array[i, j] <- as.integer(i)  # Time index for this time point
     }
   }
   
-  # Create stanvar with actual matrix data (use x for data values)
+  # Create stanvar with explicit 2D integer array declaration
+  # Use both data (x) and explicit scode to override brms auto-generation
+  stan_declaration <- glue::glue("int {matrix_name}[{n_time}, {n_series}];")
+  
   brms::stanvar(
-    x = times_matrix,
+    x = times_array,
     name = matrix_name,
+    scode = stan_declaration,
     block = "data"
   )
 }
