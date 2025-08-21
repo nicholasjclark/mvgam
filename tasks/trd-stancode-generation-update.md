@@ -254,7 +254,7 @@ prior_summary(model)
 ### Edge Cases
 ```r
 # Multivariate model with different trends per response
-priors <- get_prior(cbind(count, biomass) ~ treatment, 
+priors <- get_prior(mvbind(count, biomass) ~ treatment, 
                    trend_formula = list(count = ~ AR(p = 1),
                                        biomass = ~ RW()),
                    data = ecology_data, 
