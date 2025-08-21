@@ -1680,55 +1680,6 @@ validate_combined_stancode <- function(result, silent = FALSE) {
   return(validation)
 }
 
-#' Validate Combined Stan Data
-#'
-#' @description
-#' Validates that combined Stan data is consistent and contains required elements.
-#'
-#' @param combined_data List of combined Stan data
-#' @param obs_data List of observation Stan data
-#' @param trend_data List of trend Stan data
-#' @return Invisible TRUE if valid, stops with error if invalid
-#' @noRd
-validate_combined_standata <- function(combined_data, obs_data, trend_data) {
-  checkmate::assert_list(combined_data, names = "named")
-  checkmate::assert_list(obs_data, names = "named")
-  checkmate::assert_list(trend_data, names = "named")
-
-  # Check that essential observation data elements are preserved
-  essential_obs <- c("N", "K", "y", "X")
-  missing_obs <- setdiff(essential_obs, names(combined_data))
-  missing_obs <- missing_obs[missing_obs %in% names(obs_data)]
-
-  if (length(missing_obs) > 0) {
-    stop(insight::format_error(
-      "Essential observation data elements missing from combined data:",
-      paste(missing_obs, collapse = ", ")
-    ))
-  }
-
-  # Check for dimensional consistency
-  if ("N" %in% names(combined_data) && "n" %in% names(combined_data)) {
-    if (combined_data$N != combined_data$n) {
-      insight::format_warning(
-        "Potential dimension mismatch between N ({combined_data$N}) and n ({combined_data$n}).",
-        "Check observation and trend data compatibility."
-      )
-    }
-  }
-
-  # Check that trend data makes sense
-  if ("n_series" %in% names(combined_data)) {
-    if (combined_data$n_series < 1) {
-      stop(insight::format_error(
-        "Invalid number of series: {combined_data$n_series}",
-        "Must be at least 1 for mvgam models."
-      ))
-    }
-  }
-
-  invisible(TRUE)
-}
 
 #' Validate Data-Code Compatibility
 #'

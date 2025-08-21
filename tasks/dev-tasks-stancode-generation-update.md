@@ -113,7 +113,36 @@ This document tracks implementation progress for the stancode generation update 
   - [x] 2.7.11.1 Step 1 COMPLETED: Refactor generate_common_trend_data() to be the SINGLE source of dimension stanvars (n_trend, n_series_trend, n_lv_trend) with enhanced factor/non-factor model detection and comprehensive documentation
   - [x] 2.7.11.2 Step 2 COMPLETED: Update all trend generators (RW, AR, CAR, ZMVN, PW, VAR) to call generate_common_trend_data() consistently for dimensions and add modular factor+hierarchical validation using validate_no_factor_hierarchical()
   - [x] 2.7.11.3 Step 3 CRITICAL: **DUPLICATE STANVAR NAMES BUG RESOLVED** - COMPLETED: Implemented comprehensive architectural fix: (1) Removed generate_matrix_z_data() function entirely, (2) Updated generate_matrix_z_multiblock_stanvars() to only handle Z matrix components, (3) Removed dimension creation from all 6 trend generators, (4) Updated generate_trend_injection_stanvars() to create dimensions + shared innovations + combine with trend-specific stanvars, (5) Moved cross-cutting validation (validate_no_factor_hierarchical) to injection function, (6) Removed duplicate shared innovation creation from ZMVN generator. **RESULT**: Ultra-clean architecture with single source of truth for dimensions, no duplication possible by design, all trend types working (ZMVN=14, RW=12, VAR=13 stanvars successfully generated).
-  - [ ] 2.7.11.4 Step 4 (5 min): Fix test expectations in test-stan-assembly-system.R for new error message format from validate_no_factor_hierarchical()
+  - [x] 2.7.11.4 Step 4 COMPLETED: Fixed test expectations in test-stan-assembly-system.R for new error message format from validate_no_factor_hierarchical(), implemented DRY standata merging using brms approach, fixed PW time_trend variable creation, identified shared innovation system parameter naming issues
+
+## 🔄 CURRENT PRIORITY: Parameter Extraction and Injection System
+
+**STATUS**: Architecture gap identified in parameter flow from brms trend model to mvgam shared innovation system
+
+**ISSUE**: brms trend model generates standard parameters (mu, sigma) but mvgam shared innovation system expects renamed parameters (mu_trend, ytimes). The parameter renaming/extraction bridge is incomplete.
+
+**10-STEP INCREMENTAL PLAN**:
+
+### Phase 1: Understand Current State (Steps 1-3)
+- [ ] 2.7.11.5 **Step 1 - Audit Parameter Extraction** (15 min): Examine what parameters trend_setup$stancode and trend_setup$standata contain, map which brms parameters need _trend suffix renaming, document current parameter naming patterns
+- [ ] 2.7.11.6 **Step 2 - Audit Data Structure Creation** (15 min): Verify how extract_time_series_dimensions provides sorted structure, design ytimes matrix creation based on sorted unique_times and unique_series, validate data sorting consistency  
+- [ ] 2.7.11.7 **Step 3 - Identify Injection Points** (15 min): Map where parameter renaming should happen in generate_combined_stancode, identify where ytimes creation should occur, document current vs needed parameter flow
+
+### Phase 2: Implement Core Infrastructure (Steps 4-6)  
+- [ ] 2.7.11.8 **Step 4 - Create Parameter Renaming System** (30 min): Implement function to extract brms trend parameters and rename with _trend suffix, handle both stancode and standata, focus on mu → mu_trend as primary case
+- [ ] 2.7.11.9 **Step 5 - Implement ytimes Creation** (30 min): Create function to generate ytimes matrix from sorted dimension information, add as stanvar during appropriate phase, ensure matrix structure matches [n_time, n_series] design
+- [ ] 2.7.11.10 **Step 6 - Update Combination Process** (20 min): Modify generate_combined_stancode to include parameter renaming step, integrate ytimes creation with existing data flow, maintain observation/trend separation
+
+### Phase 3: Integration and Testing (Steps 7-9)
+- [ ] 2.7.11.11 **Step 7 - Test Parameter Availability** (20 min): Verify mu_trend and ytimes available in final standata, test shared innovation system access to renamed parameters, focus on Stan code compilation
+- [ ] 2.7.11.12 **Step 8 - Test Data Structure Correctness** (20 min): Validate ytimes matrix dimensions and indexing, verify mu_trend contains appropriate linear predictor values, test with simple univariate case
+- [ ] 2.7.11.13 **Step 9 - Systematic Validation** (30 min): Test multiple trend types (RW, AR, PW) with new infrastructure, ensure standata structure meets Stan code expectations, fix remaining compilation issues
+
+### Phase 4: Completion (Step 10)
+- [ ] 2.7.11.14 **Step 10 - Full Integration Test** (30 min): Run complete test suite with focus on Stan compilation and data structure correctness, document parameter flow for future development, update architecture documentation
+
+---
+
 - [ ] 2.7.12 Phase 3.2: Update common_trend_priors to remove LV and use consistent naming
 - [ ] 2.7.13 Phase 3.3: Run full test suite and verify all trend types work with new standardization
 - [ ] 2.7.14 Phase 3.4: **CRITICAL** - Test hierarchical VAR/VARMA models with grouped data to ensure proper group-specific parameter estimation, validate group indexing, and confirm hierarchical correlation functionality

@@ -283,8 +283,14 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
     )
   }
 
-  # Combine Stan data from both models
-  combined_standata <- combine_stan_data(obs_setup$standata, trend_setup$standata)
+  # Generate complete standata using brms with trend stanvars included
+  # This follows the same pattern as assemble_mvgam_stan_data()
+  combined_standata <- generate_base_brms_standata(
+    formula = obs_setup$formula,
+    data = obs_setup$data,
+    family = obs_setup$family,
+    stanvars = trend_stanvars
+  )
 
   # Validate final Stan code if requested
   if (validate) {
@@ -371,31 +377,6 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
   return(base_code)
 }
 
-#' Combine Stan Data
-#'
-#' @description
-#' Combines Stan data from observation and trend models, handling conflicts.
-#'
-#' @param obs_data List containing observation model Stan data
-#' @param trend_data List containing trend model Stan data
-#' @return List of combined Stan data
-#' @noRd
-combine_stan_data <- function(obs_data, trend_data) {
-  checkmate::assert_list(obs_data)
-  checkmate::assert_list(trend_data)
-
-  # Start with observation data as base
-  combined_data <- obs_data
-
-  # Add trend-specific data elements
-  trend_only_names <- setdiff(names(trend_data), names(obs_data))
-  combined_data[trend_only_names] <- trend_data[trend_only_names]
-
-  # Validate combined data consistency
-  validate_combined_standata(combined_data, obs_data, trend_data)
-
-  return(combined_data)
-}
 
 #' Integration with Enhanced mvgam Function
 #'
@@ -496,8 +477,8 @@ prepare_stan_data <- function(data, variable_info) {
 # ========================================
 
 
-# Note: Legacy merge_stan_data() function removed.
-# Modern system uses combine_stan_data() for Stan data merging.
+# Note: Legacy merge_stan_data() and combine_stan_data() functions removed.
+# Modern system uses brms automatic stanvar data merging via generate_base_brms_standata().
 
 # Stan Code Processing Utilities
 # ==============================
@@ -1311,7 +1292,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
   }
 
   scaled_innovations_stanvar <- brms::stanvar(
-    name = "scaled_innovations",
+    name = "scaled_innovations_trend",
     scode = final_innovations_code,
     block = "tparameters"
   )
@@ -1604,9 +1585,9 @@ generate_trend_computation_tparameters <- function(n_lv, n_series) {
 
       // Universal trend computation: state-space dynamics + linear predictors
       // dot_product captures dynamic component, mu_trend captures trend_formula
-      for (i in 1:n) {{
-        for (s in 1:n_series) {{
-          trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[ytimes[i, s]];
+      for (i in 1:n_trend) {{
+        for (s in 1:n_series_trend) {{
+          trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[ytimes[i, s]];
         }}
       }}
     "),
@@ -3520,19 +3501,22 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   # Logistic-specific data (carrying capacity)
   if (trend_type == "logistic") {
     pw_logistic_data_stanvar <- brms::stanvar(
-      x = matrix(10, nrow = n, ncol = n_series),  # Default carrying capacity
+      x = matrix(10, nrow = n_obs, ncol = n_series),  # Default carrying capacity
       name = "pw_logistic_data",
       scode = glue::glue("matrix[n_trend, n_lv_trend] cap_trend; // carrying capacities"),
       block = "data"
     )
   }
 
-  # Transformed data block - changepoint matrix computation
+  # Transformed data block - time vector and changepoint matrix computation
   pw_transformed_data_stanvar <- brms::stanvar(
     name = "pw_transformed_data",
     scode = glue::glue("
+      // time vector for changepoint calculations
+      vector[n_trend] time_trend;
+      for (i in 1:n_trend) time_trend[i] = i;
       // sorted changepoint matrix
-      matrix[n_trend, n_change_trend] Kappa_trend = get_changepoint_matrix(time, t_change_trend, n_trend, n_change_trend);
+      matrix[n_trend, n_change_trend] Kappa_trend = get_changepoint_matrix(time_trend, t_change_trend, n_trend, n_change_trend);
     "),
     block = "tdata"
   )
@@ -3564,7 +3548,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
         // logistic trend estimates
         for (s in 1 : n_lv_trend) {{
           lv_trend[1 : n_trend, s] = logistic_trend(k_trend[s], m_trend[s],
-                                        to_vector(delta_trend[ : , s]), time,
+                                        to_vector(delta_trend[ : , s]), time_trend,
                                         to_vector(cap_trend[ : , s]), Kappa_trend, t_change_trend,
                                         n_change_trend);
         }}
@@ -3582,7 +3566,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
         // linear trend estimates
         for (s in 1 : n_lv_trend) {{
           lv_trend[1 : n_trend, s] = linear_trend(k_trend[s], m_trend[s],
-                                      to_vector(delta_trend[ : , s]), time, Kappa_trend,
+                                      to_vector(delta_trend[ : , s]), time_trend, Kappa_trend,
                                       t_change_trend);
         }}
       "),
