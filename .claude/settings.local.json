@@ -66,6 +66,15 @@
         "timeout": 60,
         "retry_count": 1
       }
+    ],
+    "post_git_commit": [
+      {
+        "name": "package-dependency-mapper-hook",
+        "script": ".claude/hooks/package-dependency-mapper-hook.ps1",
+        "enabled": true,
+        "timeout": 120,
+        "retry_count": 1
+      }
     ]
   },
   "sub_agents": {
