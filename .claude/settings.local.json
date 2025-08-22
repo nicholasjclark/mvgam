@@ -17,5 +17,51 @@
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
+  },
+  "hooks": {
+    "enabled": true,
+    "directory": ".claude/hooks",
+    "before_write": [
+      {
+        "name": "r-code-review-hook",
+        "script": ".claude/hooks/r-code-review-hook.sh",
+        "enabled": true,
+        "file_patterns": [
+          "*.R",
+          "*.r", 
+          "*.Rmd",
+          "*.rmd",
+          "*.Rnw",
+          "*.rnw"
+        ],
+        "exclude_patterns": [
+          "tests/testthat/test-*.R",
+          "inst/examples/*.R"
+        ],
+        "operations": [
+          "create",
+          "modify",
+          "update"
+        ],
+        "timeout": 60,
+        "retry_count": 1
+      }
+    ]
+  },
+  "sub_agents": {
+    "code-reviewer": {
+      "enabled": true,
+      "timeout": 45,
+      "max_retries": 2
+    }
+  },
+  "file_operations": {
+    "backup_before_write": false,
+    "confirm_destructive_operations": true
+  },
+  "logging": {
+    "level": "info",
+    "log_hooks": true,
+    "log_sub_agents": true
   }
 }
