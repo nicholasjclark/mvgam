@@ -9,3 +9,5 @@ Meta
 desktop.ini
 ^cran-comments\.md$
 ^src\.gcda$
+.claude/logs/
+.claude/backups/
