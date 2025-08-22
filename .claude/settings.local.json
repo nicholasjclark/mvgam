@@ -23,8 +23,28 @@
     "directory": ".claude/hooks",
     "before_write": [
       {
+        "name": "duplicate-function-detector-hook",
+        "script": ".claude/hooks/duplicate-function-detector-hook.ps1",
+        "enabled": true,
+        "file_patterns": [
+          "*.R",
+          "*.r"
+        ],
+        "exclude_patterns": [
+          "tests/testthat/test-*.R",
+          "inst/examples/*.R"
+        ],
+        "operations": [
+          "create",
+          "modify",
+          "update"
+        ],
+        "timeout": 30,
+        "retry_count": 1
+      },
+      {
         "name": "r-code-review-hook",
-        "script": ".claude/hooks/r-code-review-hook.sh",
+        "script": ".claude/hooks/r-code-review-hook.ps1",
         "enabled": true,
         "file_patterns": [
           "*.R",
