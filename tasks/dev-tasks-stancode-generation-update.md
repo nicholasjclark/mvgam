@@ -44,11 +44,11 @@ Implementation tasks for stancode generation update feature with comprehensive p
 
 ### Priority Tasks
 
-- [ ] **Step 7 - Test Parameter Availability** (30 min): Verify mu_trend and times_trend availability in final standata after injection, test shared innovation system access to renamed parameters
+- [ ] **Step 7 - Test Parameter Availability** (30 min): Verify mu correctly extracted from trend model stancode (either needs to be extracted directly, in the case of complex linear predictors, or created separately in the case of simple linear predictors; see models for the tests on line 524 of `test-setup-brms.R` to investigate). Verify times_trend availability in final standata after injection, test shared innovation system access to renamed parameters by expanding tests in `test-setup-brms.R`
 
-- [ ] **Step 8 - Test Data Structure Correctness** (30 min): Validate times_trend matrix [n_time, n_series] dimensions, parameter mapping preservation for prediction compatibility
+- [ ] **Step 8 - Test Data Structure Correctness** (30 min): Validate times_trend matrix [n_time, n_series] dimensions, parameter mapping preservation for prediction compatibility by expanding tests in `test-setup-brms.R`
 
-3- [ ] **Step 9 - Systematic Validation** (45 min): Test multiple configurations: univariate trends (RW, AR, PW), multivariate shared trends, response-specific trends, mixed family models
+3- [ ] **Step 9 - Systematic Validation** (45 min): Test for correct standata and stancode across multiple configurations: univariate trends (RW, AR, PW), multivariate shared trends, response-specific trends, mixed family models, by expanding tests in `test-setup-brms.R`
 
 - [ ] **Step 10 - Full Integration Test** (45 min): Complete test suite with Stan compilation focus, prediction compatibility validation, multivariate workflow testing
 
