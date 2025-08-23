@@ -1,22 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "WebFetch(domain:cran.r-project.org)",
-      "Bash(Rscript:*)",
-      "Bash(rg:*)",
-      "Bash(find:*)",
-      "Bash(grep:*)",
-      "Bash(mv:*)",
-      "Bash(ls:*)",
-      "Bash(tree:*)"
+      "Bash(git add:*)"
     ],
     "deny": [],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "acceptEdits",
+    "ask": []
   },
   "hooks": {
     "enabled": true,
@@ -48,7 +37,7 @@
         "enabled": true,
         "file_patterns": [
           "*.R",
-          "*.r", 
+          "*.r",
           "*.Rmd",
           "*.rmd",
           "*.Rnw",
