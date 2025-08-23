@@ -1,7 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add:*)"
+      "Bash(git log:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits",
@@ -56,13 +56,15 @@
         "retry_count": 1
       }
     ],
-    "post_git_commit": [
+    "PostToolUse": [
       {
-        "name": "package-dependency-mapper-hook",
-        "script": ".claude/hooks/package-dependency-mapper-hook.ps1",
-        "enabled": true,
-        "timeout": 120,
-        "retry_count": 1
+        "matcher": "Bash.*git commit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/package-dependency-mapper-hook.ps1 -Event post_git_commit -CommitHash $(git rev-parse HEAD) -CommitMessage \"$(git log -1 --pretty=%B)\""
+          }
+        ]
       }
     ]
   },
