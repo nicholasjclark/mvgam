@@ -1,5 +1,8 @@
 # TRD-stancode-generation-update Development Tasks
 
+## Prior to Work
+Read context files `active/architecture-decisions.md` and `active/quick-reference.md`
+
 ## Overview
 Implementation tasks for stancode generation update feature with comprehensive prior system integration and Stan code inspection capabilities.
 
@@ -44,7 +47,7 @@ Implementation tasks for stancode generation update feature with comprehensive p
 
 ### Priority Tasks
 
-- [ ] **Step 7 - Test Parameter Availability** (30 min): Verify mu correctly extracted from trend model stancode (either needs to be extracted directly, in the case of complex linear predictors, or created separately in the case of simple linear predictors; see models for the tests on line 524 of `test-setup-brms.R` to investigate). Verify times_trend availability in final standata after injection, test shared innovation system access to renamed parameters by expanding tests in `test-setup-brms.R`
+- [ ] **Step 7 - Test Parameter Availability** (30 min): Verify mu correctly extracted from trend model stancode (either needs to be extracted directly, in the case of complex linear predictors (s(), gp(), random effect terms), or created separately in the case of simple linear predictors (linear terms only); see models for the tests on line 524 of `test-setup-brms.R` and investigate stancode returned from `setup_brms_lightweight()`) by expanding tests in `test-setup-brms.R`. Verify times_trend availability in final standata after injection, test shared innovation system access to renamed parameters by expanding tests in `test-setup-brms.R`
 
 - [ ] **Step 8 - Test Data Structure Correctness** (30 min): Validate times_trend matrix [n_time, n_series] dimensions AND order, ensure ordering is stored as a slot in the final mvgam object for simple mapping of fitted values, predictions and residuals after model fitting. Validate parameter mapping preservation for prediction compatibility by expanding tests in `test-setup-brms.R`
 
