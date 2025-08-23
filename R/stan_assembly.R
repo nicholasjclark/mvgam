@@ -3987,6 +3987,8 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
   
   # 3. Extract model block but exclude likelihood statements
   model_block <- extract_stan_block(stancode, "model")
+  model_stanvar_created <- FALSE
+  
   if (!is.null(model_block) && model_block != "Block not found") {
     # Extract non-likelihood parts (priors, transformations)
     non_likelihood_model <- extract_non_likelihood_from_model_block(model_block)
@@ -4001,6 +4003,34 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
         scode = model_result$code,
         block = "model"
       )
+      model_stanvar_created <- TRUE
+    }
+  }
+  
+  # 4. CRITICAL: Create mu_trend if mu is missing (GLM optimization case)
+  # Only create if no explicit mu vector exists AND no model stanvar was created
+  if (!model_stanvar_created) {
+    # Check if this is a GLM optimization case (no explicit mu vector)
+    has_explicit_mu <- grepl("vector\\[.*\\]\\s+mu\\s*=", stancode)
+    has_glm_optimization <- grepl("normal_id_glm_lpdf", stancode)
+    
+    if (!has_explicit_mu && has_glm_optimization) {
+      # Create mu_trend from GLM linear predictor components
+      # For normal_id_glm_lpdf(Y | X, intercept, beta, sigma), the linear predictor is: X * beta + intercept
+      n_param <- paste0("N", suffix)  # Will be N_trend
+      mu_trend_code <- paste0(
+        "vector[", n_param, "] mu", suffix, " = Xc", suffix, " * b", suffix, " + Intercept", suffix, ";"
+      )
+      
+      # Update parameter mapping for the created mu_trend
+      mapping$original_to_renamed[["mu"]] <- paste0("mu", suffix)
+      mapping$renamed_to_original[[paste0("mu", suffix)]] <- "mu"
+      
+      stanvar_list[["trend_model_mu_creation"]] <- brms::stanvar(
+        scode = mu_trend_code,
+        block = "model"
+      )
+      model_stanvar_created <- TRUE
     }
   }
   
