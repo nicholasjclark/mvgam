@@ -10,27 +10,20 @@
   "hooks": {
     "enabled": true,
     "directory": ".claude/hooks",
-    "PreToolUse": [
+    "PostToolUse": [
       {
-        "matcher": "Write.*\\.R$|Edit.*\\.R$",
+        "matcher": "Edit:*.r|Write:*.r",
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/duplicate-function-detector-hook.ps1 -Event before_write -FilePath \"$CLAUDE_TOOL_FILE_PATH\" -Operation \"$CLAUDE_TOOL_OPERATION\""
+            "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/duplicate-function-detector-hook.ps1"
+          },
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/r-code-review-hook.ps1"
           }
         ]
       },
-      {
-        "matcher": "Write.*\\.(R|Rmd|Rnw)$|Edit.*\\.(R|Rmd|Rnw)$",
-        "hooks": [
-          {
-            "type": "command", 
-            "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/r-code-review-hook.ps1 -Event before_write -FilePath \"$CLAUDE_TOOL_FILE_PATH\" -Operation \"$CLAUDE_TOOL_OPERATION\""
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
       {
         "matcher": "Bash.*git commit",
         "hooks": [
