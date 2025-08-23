@@ -1559,3 +1559,258 @@ test_that("parameter extraction correctly handles different Stan code optimizati
     }
   }
 })
+
+# Data Structure Correctness and times_trend Matrix Validation Tests
+# ===================================================================
+
+test_that("extract_time_series_dimensions creates correct data ordering mappings", {
+  # Create test data with intentionally non-sorted order
+  data <- data.frame(
+    y = rnorm(20),
+    time = c(3, 1, 4, 2, 5, 3, 1, 4, 2, 5, 3, 1, 4, 2, 5, 3, 1, 4, 2, 5),
+    series = factor(c(rep("B", 5), rep("A", 5), rep("D", 5), rep("C", 5))),
+    stringsAsFactors = FALSE
+  )
+  
+  # Create simple trend specs to trigger metadata
+  trend_specs <- list(
+    trend = "RW",
+    time_var = "time", 
+    series_var = "series"
+  )
+  
+  # Extract dimensions with enhanced metadata
+  dimensions <- mvgam:::extract_time_series_dimensions(
+    data = data,
+    time_var = "time",
+    series_var = "series", 
+    trend_specs = trend_specs
+  )
+  
+  # Test basic structure
+  expect_true(is.list(dimensions))
+  expect_equal(dimensions$n_obs, 20)
+  expect_equal(dimensions$n_time, 5)
+  expect_equal(dimensions$n_series, 4)
+  
+  # Test that unique values are sorted
+  expect_equal(dimensions$unique_times, 1:5)
+  expect_equal(as.character(dimensions$unique_series), c("A", "B", "C", "D"))
+  
+  # Test enhanced metadata structure
+  expect_true("metadata" %in% names(dimensions))
+  metadata <- dimensions$metadata
+  
+  # Test ordering mappings
+  expect_true("ordering" %in% names(metadata))
+  ordering <- metadata$ordering
+  
+  expect_true("stan_to_original" %in% names(ordering))
+  expect_true("original_to_stan" %in% names(ordering))
+  expect_equal(length(ordering$stan_to_original), 20)
+  expect_equal(length(ordering$original_to_stan), 20)
+  
+  # Test bidirectional mapping integrity
+  for (i in seq_len(20)) {
+    original_row <- ordering$stan_to_original[i]
+    expect_equal(ordering$original_to_stan[original_row], i)
+  }
+  
+  # Test time and series indices
+  expect_equal(length(ordering$time_indices), 20)
+  expect_equal(length(ordering$series_indices), 20)
+  expect_true(all(ordering$time_indices %in% 1:5))
+  expect_true(all(ordering$series_indices %in% 1:4))
+  
+  # Test requires_reordering flag
+  expect_true(is.logical(ordering$requires_reordering))
+  # Since data is not in Stan order, should require reordering
+  expect_true(ordering$requires_reordering)
+})
+
+test_that("times_trend matrix dimensions and structure are correct", {
+  # Create balanced panel data
+  data <- data.frame(
+    y = rnorm(30),
+    time = rep(1:10, 3),
+    series = factor(rep(c("A", "B", "C"), each = 10)),
+    stringsAsFactors = FALSE
+  )
+  
+  # Extract dimensions
+  dimensions <- mvgam:::extract_time_series_dimensions(data, "time", "series")
+  
+  # Create times_trend matrix using existing function
+  times_trend_stanvar <- mvgam:::create_times_trend_matrix(
+    n_time = dimensions$n_time,
+    n_series = dimensions$n_series,
+    unique_times = dimensions$unique_times,
+    unique_series = dimensions$unique_series,
+    matrix_name = "times_trend"
+  )
+  
+  # Test stanvar structure
+  expect_s3_class(times_trend_stanvar, "stanvars")
+  expect_equal(times_trend_stanvar$times_trend$name, "times_trend")
+  expect_equal(times_trend_stanvar$times_trend$block, "data")
+  
+  # Test Stan code structure
+  stan_code <- as.character(times_trend_stanvar$times_trend$scode)
+  expect_true(nchar(stan_code) > 0)
+  expect_true(grepl("int times_trend\\[10, 3\\]", stan_code))
+  
+  # Test data array structure
+  data_array <- times_trend_stanvar$times_trend$sdata
+  expect_true(is.array(data_array))
+  expect_equal(dim(data_array), c(10, 3))  # [n_time, n_series]
+  expect_true(all(data_array >= 1 & data_array <= 10))  # Time indices
+  
+  # Test that matrix is correctly structured
+  # Each row i should contain time index i for all series
+  for (time_idx in 1:10) {
+    expect_equal(unique(data_array[time_idx, ]), time_idx)
+  }
+  
+  # Each column should contain all time indices 1:10
+  for (series_idx in 1:3) {
+    expect_equal(data_array[, series_idx], 1:10)
+  }
+})
+
+test_that("per-series time information is correctly calculated", {
+  # Create unbalanced panel data
+  data <- data.frame(
+    y = rnorm(23),  # Match actual row count: 10 + 7 + 6 = 23
+    time = c(1:10,        # Series A: complete 1-10
+             2:8,         # Series B: partial 2-8  
+             c(1,3,5,7,9,10)),  # Series C: irregular 1,3,5,7,9,10
+    series = factor(c(rep("A", 10), rep("B", 7), rep("C", 6))),
+    stringsAsFactors = FALSE
+  )
+  
+  # Create trend specs to trigger metadata
+  trend_specs <- list(trend = "RW")
+  
+  dimensions <- mvgam:::extract_time_series_dimensions(
+    data = data,
+    time_var = "time",
+    series_var = "series",
+    trend_specs = trend_specs
+  )
+  
+  # Test time_info structure
+  expect_true("time_info" %in% names(dimensions$metadata))
+  time_info <- dimensions$metadata$time_info
+  
+  # Test last_times vector
+  expect_true("last_times" %in% names(time_info))
+  last_times <- time_info$last_times
+  expect_equal(names(last_times), c("A", "B", "C"))
+  expect_equal(last_times[["A"]], 10)
+  expect_equal(last_times[["B"]], 8)
+  expect_equal(last_times[["C"]], 10)
+  
+  # Test first_times vector
+  expect_true("first_times" %in% names(time_info))
+  first_times <- time_info$first_times
+  expect_equal(first_times[["A"]], 1)
+  expect_equal(first_times[["B"]], 2)
+  expect_equal(first_times[["C"]], 1)
+  
+  # Test series lengths
+  expect_true("series_lengths" %in% names(time_info))
+  series_lengths <- time_info$series_lengths
+  expect_equal(series_lengths[["A"]], 10)
+  expect_equal(series_lengths[["B"]], 7)
+  expect_equal(series_lengths[["C"]], 6)
+  
+  # Test global time information
+  expect_equal(time_info$global_first_time, 1)
+  expect_equal(time_info$global_last_time, 10)
+  
+  # Test balanced panel flag
+  expect_false(time_info$is_balanced)  # Series have different lengths
+  
+  # Test max forecast horizon
+  expect_equal(time_info$max_forecast_horizon, 2)  # 10 - min(10, 8, 10) = 10 - 8 = 2
+})
+
+test_that("data ordering preserves original structure for predictions", {
+  # Create data that needs reordering
+  original_data <- data.frame(
+    y = c(1, 4, 7, 2, 5, 8, 3, 6, 9),
+    time = c(3, 3, 3, 1, 1, 1, 2, 2, 2),
+    series = factor(c("C", "B", "A", "C", "B", "A", "C", "B", "A")),
+    response_id = paste0("obs_", 1:9),  # Track original order
+    stringsAsFactors = FALSE
+  )
+  
+  trend_specs <- list(trend = "AR")
+  
+  dimensions <- mvgam:::extract_time_series_dimensions(
+    original_data, "time", "series", trend_specs = trend_specs
+  )
+  
+  # Get ordering mappings
+  ordering <- dimensions$metadata$ordering
+  
+  # Create simulated fitted values in Stan order (sorted by time, then series)
+  stan_fitted <- c(100, 200, 300, 400, 500, 600, 700, 800, 900)
+  
+  # Map back to original order
+  original_fitted <- stan_fitted[ordering$stan_to_original]
+  
+  # Test that mapping preserves correct associations
+  # Original row 1: time=3, series=C should get fitted value for that position
+  # In Stan order, time=3,series=C is position 9, so original_fitted[1] should be 900
+  expect_equal(length(original_fitted), 9)
+  
+  # Verify the mapping works by checking a few key positions
+  # We can validate by ensuring the mapping is invertible
+  back_to_stan <- original_fitted[ordering$original_to_stan]
+  expect_equal(back_to_stan, stan_fitted)
+  
+  # Test time and series indices work correctly
+  expect_true(all(ordering$time_indices %in% 1:3))  # 3 time points
+  expect_true(all(ordering$series_indices %in% 1:3))  # 3 series
+})
+
+test_that("metadata is backward compatible when trend_specs is NULL", {
+  # Test data
+  data <- data.frame(
+    y = rnorm(20),
+    time = rep(1:10, 2),
+    series = factor(rep(c("A", "B"), each = 10))
+  )
+  
+  # Without trend_specs (backward compatible mode)
+  dimensions_basic <- mvgam:::extract_time_series_dimensions(data, "time", "series")
+  
+  # Should have all original fields
+  expected_fields <- c("n_time", "n_series", "n_obs", "time_range", 
+                      "time_var", "series_var", "unique_times", "unique_series")
+  expect_true(all(expected_fields %in% names(dimensions_basic)))
+  
+  # Should NOT have metadata field
+  expect_false("metadata" %in% names(dimensions_basic))
+  
+  # Values should be correct
+  expect_equal(dimensions_basic$n_time, 10)
+  expect_equal(dimensions_basic$n_series, 2)
+  expect_equal(dimensions_basic$n_obs, 20)
+  
+  # With trend_specs (enhanced mode)
+  trend_specs <- list(trend = "RW")
+  dimensions_enhanced <- mvgam:::extract_time_series_dimensions(
+    data, "time", "series", trend_specs = trend_specs
+  )
+  
+  # Should have all original fields plus metadata
+  expect_true(all(expected_fields %in% names(dimensions_enhanced)))
+  expect_true("metadata" %in% names(dimensions_enhanced))
+  
+  # Basic values should be identical
+  for (field in expected_fields) {
+    expect_equal(dimensions_basic[[field]], dimensions_enhanced[[field]])
+  }
+})

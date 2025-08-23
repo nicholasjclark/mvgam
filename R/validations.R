@@ -1253,12 +1253,16 @@ validate_trend_components <- function(trend_components) {
 #' @param time_var Name of time variable (default: "time")
 #' @param series_var Name of series variable (default: "series")
 #' @param trend_type Type of trend model ("CAR" allows irregular intervals)
-#' @return List with time series dimensions and metadata
+#' @param trend_specs Optional trend specification list for enhanced metadata
+#' @return List with time series dimensions and optional enhanced metadata
 #' @noRd
-extract_time_series_dimensions <- function(data, time_var = "time", series_var = "series", trend_type = NULL) {
+extract_time_series_dimensions <- function(data, time_var = "time", series_var = "series", trend_type = NULL, trend_specs = NULL) {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_string(time_var)
   checkmate::assert_string(series_var)
+  if (!is.null(trend_specs)) {
+    checkmate::assert_list(trend_specs)
+  }
 
   # Validate required variables exist
   if (!time_var %in% colnames(data)) {
@@ -1281,6 +1285,62 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   min_time <- min(data[[time_var]], na.rm = TRUE)
   max_time <- max(data[[time_var]], na.rm = TRUE)
 
+  # Create data ordering mappings for Stan-required sorted order
+  ordering_df <- data.frame(
+    original_row = seq_len(nrow(data)),
+    time_val = data[[time_var]],
+    series_val = data[[series_var]],
+    stringsAsFactors = FALSE
+  )
+  
+  # Sort for Stan: first by time, then by series (matches times_trend matrix structure)
+  sorted_ordering <- ordering_df[order(ordering_df$time_val, ordering_df$series_val), ]
+  
+  # Create bidirectional mappings
+  stan_to_original <- sorted_ordering$original_row  # Maps Stan row index -> Original row index
+  original_to_stan <- integer(nrow(data))
+  original_to_stan[stan_to_original] <- seq_len(nrow(data))  # Maps Original row index -> Stan row index
+  
+  # Create time/series index mappings (for times_trend matrix interpretation)
+  sorted_unique_times <- sort(unique_times)
+  sorted_unique_series <- sort(unique_series)
+  time_indices <- match(sorted_ordering$time_val, sorted_unique_times)
+  series_indices <- match(sorted_ordering$series_val, sorted_unique_series)
+
+  # Calculate per-series time information for forecasting
+  if (requireNamespace("dplyr", quietly = TRUE)) {
+    series_time_info <- data %>%
+      dplyr::group_by(.data[[series_var]]) %>%
+      dplyr::summarise(
+        first_time = min(.data[[time_var]], na.rm = TRUE),
+        last_time = max(.data[[time_var]], na.rm = TRUE),
+        n_obs_series = dplyr::n(),
+        time_span = max(.data[[time_var]], na.rm = TRUE) - min(.data[[time_var]], na.rm = TRUE),
+        .groups = "drop"
+      )
+    
+    # Create named vectors for quick access (ordered by sorted unique_series)
+    last_times <- setNames(
+      series_time_info$last_time[match(sorted_unique_series, series_time_info[[1]])],
+      sorted_unique_series
+    )
+    first_times <- setNames(
+      series_time_info$first_time[match(sorted_unique_series, series_time_info[[1]])],
+      sorted_unique_series
+    )
+    series_lengths <- setNames(
+      series_time_info$n_obs_series[match(sorted_unique_series, series_time_info[[1]])],
+      sorted_unique_series
+    )
+  } else {
+    # Fallback without dplyr
+    series_time_info <- NULL
+    last_times <- NULL
+    first_times <- NULL
+    series_lengths <- NULL
+  }
+
+  # Backward compatible structure: Original fields maintained
   dimensions <- list(
     n_time = length(unique_times),          # Number of unique time points
     n_series = length(unique_series),       # Number of series
@@ -1288,9 +1348,98 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     time_range = c(min_time, max_time),    # Time range
     time_var = time_var,                   # Variable names for downstream use
     series_var = series_var,
-    unique_times = sort(unique_times),     # Sorted unique time points
-    unique_series = sort(unique_series)    # Sorted unique series
+    unique_times = sorted_unique_times,    # Sorted unique time points
+    unique_series = sorted_unique_series   # Sorted unique series
   )
+
+  # Enhanced metadata: Comprehensive information for post-processing
+  if (!is.null(trend_specs)) {
+    dimensions$metadata <- list(
+      # Variable identification
+      variables = list(
+        time_var = time_var,                    
+        series_var = series_var,                
+        gr_var = trend_specs$gr %||% 'NA',      
+        subgr_var = trend_specs$subgr %||% 'NA', 
+        has_grouping = !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
+      ),
+      
+      # Data dimensions  
+      dimensions = list(
+        n_obs = nrow(data),                     
+        n_time = length(unique_times),          
+        n_series = length(unique_series),       
+        n_groups = trend_specs$n_groups %||% 1,  
+        n_subgroups = trend_specs$n_subgroups %||% 1, 
+        n_lv = trend_specs$n_lv %||% NULL,      
+        time_range = c(min_time, max_time)      
+      ),
+      
+      # Unique values (sorted for Stan)
+      levels = list(
+        unique_times = sorted_unique_times,      
+        unique_series = sorted_unique_series,    
+        unique_groups = if (!is.null(trend_specs$gr) && trend_specs$gr != 'NA') 
+                          sort(unique(data[[trend_specs$gr]])) else NULL,
+        unique_subgroups = if (!is.null(trend_specs$subgr) && trend_specs$subgr != 'NA')
+                             sort(unique(data[[trend_specs$subgr]])) else NULL
+      ),
+      
+      # Per-series time information (key for forecasting)
+      time_info = list(
+        # Quick access vectors (ordered by sorted unique_series)
+        last_times = last_times,
+        first_times = first_times,
+        series_lengths = series_lengths,
+        
+        # Global time information
+        global_last_time = max_time,
+        global_first_time = min_time,
+        max_forecast_horizon = if (!is.null(last_times)) max_time - min(last_times, na.rm = TRUE) else 0,
+        
+        # Panel structure information
+        is_balanced = if (!is.null(series_lengths)) length(unique(series_lengths)) == 1 else FALSE,
+        series_time_info = series_time_info  # Full details by series
+      ),
+      
+      # Data ordering mappings
+      ordering = list(
+        # Core mappings between original data and Stan-required order
+        stan_to_original = stan_to_original,    
+        original_to_stan = original_to_stan,    
+        
+        # Index mappings for times_trend matrix interpretation  
+        time_indices = time_indices,            
+        series_indices = series_indices,        
+        group_indices = if (!is.null(trend_specs$gr) && trend_specs$gr != 'NA')
+                          match(data[[trend_specs$gr]], sort(unique(data[[trend_specs$gr]]))) else NULL,
+        subgroup_indices = if (!is.null(trend_specs$subgr) && trend_specs$subgr != 'NA')
+                             match(data[[trend_specs$subgr]], sort(unique(data[[trend_specs$subgr]]))) else NULL,
+        
+        # Efficiency flags
+        requires_reordering = !identical(seq_len(nrow(data)), stan_to_original)
+      ),
+      
+      # Trend model metadata
+      trend = if (!is.null(trend_specs)) list(
+        trend_type = trend_specs$trend %||% trend_specs$trend_model %||% NULL,
+        has_trend = TRUE,
+        is_factor_model = !is.null(trend_specs$n_lv) && trend_specs$n_lv < length(unique_series),
+        correlation_structure = list(
+          cor = trend_specs$cor %||% FALSE,
+          ma = trend_specs$ma %||% FALSE, 
+          lags = trend_specs$lags %||% 1
+        ),
+        trend_specs = trend_specs  
+      ) else list(has_trend = FALSE),
+      
+      # Validation flags
+      validation = list(
+        data_complete = !any(is.na(data[c(time_var, series_var)])),
+        validation_timestamp = Sys.time()
+      )
+    )
+  }
 
   # Validate regular intervals for non-CAR trends
   if (!is.null(trend_type) && trend_type != "CAR") {
