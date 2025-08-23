@@ -1,4 +1,4 @@
-#'@title Calculate randomized quantile residuals for \pkg{mvgam} objects
+#' @title Calculate randomized quantile residuals for \pkg{mvgam} objects
 #'@name add_residuals.mvgam
 #'@param object \code{list} object of class \code{mvgam}. See [mvgam()]
 #'@param ... unused
