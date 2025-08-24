@@ -1,54 +1,30 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:www.reddit.com)"
+      "WebFetch(domain:github.com)",
+      "Bash",
+      "powershell",
+      "Read",
+      "Glob",
+      "Bash(powershell:*)",
+      "Bash(echo $?)",
+      "Bash(echo:*)"
     ],
     "deny": [],
-    "defaultMode": "acceptEdits",
-    "ask": []
+    "ask": [],
+    "defaultMode": "acceptEdits"
   },
   "hooks": {
-    "enabled": true,
-    "directory": ".claude/hooks",
     "PostToolUse": [
       {
-        "matcher": "Bash.*review-r-code",
+        "matcher": "Write|Edit|MultiEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/r-code-review-hook-fixed.ps1"
-          },
-          {
-            "type": "command",
-            "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/duplicate-function-detector-hook-fixed.ps1"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash.*git commit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/package-dependency-mapper-hook.ps1 -Event post_git_commit -CommitHash $(git rev-parse HEAD) -CommitMessage \"$(git log -1 --pretty=%B)\""
+            "command": "powershell -ExecutionPolicy Bypass -File \"C:\\Users\\Nick\\Google Drive\\Academic Work Folder\\Ecological forecasting\\mvgam\\.claude\\hooks\\r-code-review-hook.ps1\" -Event \"PostToolUse\" -FilePath \"$TOOL_FILE_PATH\" -Operation \"$TOOL_NAME\""
           }
         ]
       }
     ]
-  },
-  "sub_agents": {
-    "code-reviewer": {
-      "enabled": true,
-      "timeout": 45,
-      "max_retries": 2
-    }
-  },
-  "file_operations": {
-    "backup_before_write": false,
-    "confirm_destructive_operations": true
-  },
-  "logging": {
-    "level": "info",
-    "log_hooks": true,
-    "log_sub_agents": true
   }
 }

@@ -170,10 +170,13 @@ function New-PackageDependencyMap {
 try {
     if ($Event -eq "post_git_commit" -or $Event -eq "test") {
         New-PackageDependencyMap
+        exit 2  # Success with output
     } else {
         Write-Host "Hook triggered for event: $Event (no action taken)" -ForegroundColor Gray
+        exit 0  # Silent success
     }
 } catch {
     Write-Host "Error in dependency mapper: $_" -ForegroundColor Red
     Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Red
+    exit 1  # Error
 }

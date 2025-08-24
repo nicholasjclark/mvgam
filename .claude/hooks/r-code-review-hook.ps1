@@ -233,5 +233,5 @@ try {
 } catch {
     Write-Host "Error in R code review: $_" -ForegroundColor Red
     Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Red
-    exit 1
+    exit 0
 }

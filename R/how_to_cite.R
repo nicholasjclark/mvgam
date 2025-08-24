@@ -73,10 +73,9 @@ how_to_cite <- function(object, ...) {
 }
 
 #'@export
-#'@export
-print.how_to_cite = function(x, ...) {
+print.how_to_cite <- function(x, ...) {
   cat("Methods text skeleton\n")
-  cat(insight::format_message(x$methods_text))
+  cat(insight::format_message(x$methods_text))	
   cat('\n')
 
   cat("\nPrimary references\n")
