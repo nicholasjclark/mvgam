@@ -7,6 +7,8 @@
 ^docs$
 ^.claude$
 ^Claude\.md$
+^CLAUDE\.md$
+^claude\.exe$
 ^index_files$
 ^doc$
 ^misc$
