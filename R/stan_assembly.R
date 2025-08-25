@@ -1450,6 +1450,7 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL, is_factor_m
 #' @param n_series Number of observed series
 #' @return List of data block stanvars
 #' @noRd
+#' 
 # Function removed - dimension stanvars now handled by generate_common_trend_data()
 # This eliminates "Duplicated names in 'stanvars'" bug
 

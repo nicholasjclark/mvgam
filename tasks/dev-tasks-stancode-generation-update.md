@@ -73,19 +73,19 @@ Implementation tasks for stancode generation update feature with comprehensive p
   - Support both observation and trend model priors in unified interface
   
   **Sub-tasks (each 15 minutes)**:
-  - [ ] **Sub-task 1A**: Implement `mvgam_formula()` constructor function
-    - Create function signature: `mvgam_formula(formula, trend_formula = NULL, data = NULL, family = gaussian(), ...)`
-    - Validate inputs: formula (formula/brmsformula), trend_formula (formula or NULL)  
-    - Create list structure: `list(formula = formula, trend_formula = trend_formula, ...)`
-    - Set S3 class: `c("mvgam_formula", class(formula))` to inherit from original formula class
-    - Add to R/priors.R with roxygen2 documentation
+  - [x] **Sub-task 1A**: Implement `mvgam_formula()` constructor function ✅ *(2025-08-25)*
+    - ✅ Create function signature: `mvgam_formula(formula, trend_formula = NULL)` (simplified minimal approach)
+    - ✅ Validate inputs: formula (formula/brmsformula), trend_formula (formula or NULL)  
+    - ✅ Create list structure: `list(formula = formula, trend_formula = trend_formula)`
+    - ✅ Set S3 class: `c("mvgam_formula", base_class)` with proper inheritance handling
+    - ✅ Added to R/priors.R with comprehensive roxygen2 documentation
     
-  - [ ] **Sub-task 1B**: Add comprehensive validation to `mvgam_formula()`
-    - Use checkmate for all parameter validation (formula, trend_formula, data, family)
-    - Handle different formula types: formula, brmsformula, mvbrmsformula
-    - Validate autocorrelation separation principle when trend_formula present
-    - Store validated components in mvgam_formula object
-    - Add helpful error messages using `insight::format_error()`
+  - [x] **Sub-task 1B**: Add comprehensive validation to `mvgam_formula()` ✅ *(2025-08-25)*
+    - ✅ Use checkmate for all parameter validation (formula, trend_formula)
+    - ✅ Handle different formula types: formula, brmsformula, mvbrmsformula
+    - ✅ Validate autocorrelation separation principle when trend_formula present
+    - ✅ Store validated components in mvgam_formula object
+    - ✅ Add helpful error messages using `insight::format_error()`
     
   - [ ] **Sub-task 1C**: Implement `get_prior.mvgam_formula()` S3 method
     - Function signature: `get_prior.mvgam_formula(object, ...)`  

@@ -1123,3 +1123,129 @@ get_trend_parameter_prior <- function(prior = NULL, param_name) {
 `%||%` <- function(x, y) {
   if (is.null(x)) y else x
 }
+
+# =============================================================================
+# SECTION 6: MVGAM FORMULA INTERFACE
+# =============================================================================
+# WHY: Provides a consistent interface for model specification that extends
+# brms functionality with state-space trend components. The mvgam_formula
+# constructor and associated S3 methods enable clean integration with brms
+# inspection functions without masking or conflicts.
+
+#' Create an mvgam Formula Object
+#' 
+#' @description
+#' Constructs a lightweight mvgam formula object that combines observation and 
+#' trend model formulas. This provides a clean interface for model specification
+#' that can be used with inspection functions like \code{get_prior()}, 
+#' \code{make_stancode()}, and \code{make_standata()}.
+#' 
+#' @param formula An object of class \code{formula}, \code{brmsformula}, or
+#'   \code{mvbrmsformula} describing the observation model.
+#' @param trend_formula An optional formula describing trend dynamics. Default
+#'   NULL results in pure brms equivalent model. See Details for trend syntax.
+#' 
+#' @details
+#' The mvgam_formula object is a minimal container that pairs an observation
+#' formula with an optional trend formula. Data, family, and other model
+#' specifications are provided when calling inspection or fitting functions:
+#' 
+#' \code{get_prior(mvgam_formula(y ~ x, ~ AR()), data = dat, family = poisson())}
+#' 
+#' When \code{trend_formula = NULL}, the model reduces to a pure brms 
+#' observation model. When specified, the trend_formula can include:
+#' \itemize{
+#'   \item Trend constructors: \code{RW()}, \code{AR()}, \code{CAR()}, 
+#'     \code{ZMVN()}, \code{VAR()}, \code{PW()}
+#'   \item Covariates that affect trend dynamics
+#'   \item Smooth terms using mgcv syntax
+#' }
+#' 
+#' @return An object of class \code{c("mvgam_formula", base_class)} where
+#'   base_class is the class of the input formula, containing:
+#' \itemize{
+#'   \item \code{formula}: The observation model formula
+#'   \item \code{trend_formula}: The trend model formula (or NULL)
+#' }
+#' 
+#' @examples
+#' \dontrun{
+#' # Create formula specifications
+#' mf1 <- mvgam_formula(y ~ x + (1|group))
+#' mf2 <- mvgam_formula(count ~ treatment, trend_formula = ~ AR(p = 1))
+#' mf3 <- mvgam_formula(mvbind(y1, y2) ~ x, trend_formula = ~ VAR(lags = 1))
+#' 
+#' # Use with inspection functions (data provided to the function)
+#' priors <- get_prior(mf2, data = ecology_data, family = poisson())
+#' stancode <- make_stancode(mf2, data = ecology_data, family = poisson())
+#' }
+#' 
+#' @seealso 
+#' \code{\link{get_prior.mvgam_formula}}, \code{\link{make_stancode}}, 
+#' \code{\link{make_standata}}, \code{\link{mvgam}}
+#' 
+#' @export
+mvgam_formula <- function(formula, trend_formula = NULL) {
+  
+  # Validate formula parameter - must be formula, brmsformula, or mvbrmsformula
+  checkmate::assert(
+    checkmate::check_formula(formula),
+    checkmate::check_class(formula, "brmsformula"),
+    checkmate::check_class(formula, "mvbrmsformula"),
+    .var.name = "formula"
+  )
+  
+  # Validate trend_formula if provided
+  if (!is.null(trend_formula)) {
+    checkmate::assert_formula(trend_formula, .var.name = "trend_formula")
+    
+    # Check for incompatible autocorrelation terms
+    trend_terms <- as.character(trend_formula)
+    if (length(trend_terms) > 1 && grepl("autocor\\(", trend_terms[2])) {
+      stop(insight::format_error(
+        "The {.field trend_formula} contains incompatible autocorrelation terms.",
+        "State-Space trends cannot be combined with brms autocorr() terms.",
+        "Consider using mvgam trend constructors instead."
+      ))
+    }
+  }
+  
+  # Determine appropriate class hierarchy based on input formula type
+  if (inherits(formula, "mvbrmsformula")) {
+    base_class <- "mvbrmsformula"
+  } else if (inherits(formula, "brmsformula")) {
+    base_class <- "brmsformula"
+  } else {
+    base_class <- "formula"
+  }
+  
+  # Create minimal structure with just the formulas
+  out <- list(
+    formula = formula,
+    trend_formula = trend_formula
+  )
+  
+  # Set S3 class to enable method dispatch
+  class(out) <- c("mvgam_formula", base_class)
+  
+  return(out)
+}
+
+#' Print method for mvgam_formula objects
+#' 
+#' @param x An mvgam_formula object
+#' @param ... Ignored
+#' @return The object invisibly
+#' @export
+print.mvgam_formula <- function(x, ...) {
+  cat("mvgam_formula object\n")
+  cat("Observation formula: ")
+  print(x$formula)
+  if (!is.null(x$trend_formula)) {
+    cat("Trend formula: ")
+    print(x$trend_formula)
+  } else {
+    cat("Trend formula: NULL (no trend component)\n")
+  }
+  invisible(x)
+}
