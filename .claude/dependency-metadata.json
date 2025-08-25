@@ -1,9 +1,12 @@
 ﻿{
     "version":  "2.0.0",
+    "s3_classes_count":  20,
+    "exported_functions":  66,
     "total_files":  56,
+    "s3_methods_count":  41,
     "total_functions":  399,
-    "commit_message":  "fix: update all hooks to use correct Claude Code PreToolUse/PostToolUse format\n\n- Converted before_write hooks to PreToolUse with proper matchers\n- Updated duplicate function detector to trigger on Write/Edit R files\n- Updated R code review to trigger on Write/Edit R/Rmd/Rnw files\n- All hooks now use proper Claude Code event format with environment variables\n- Minor formatting fix in add_residuals.R roxygen documentation\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude \u003cnoreply@anthropic.com\u003e",
+    "commit_message":  "test refactored signatures and S3 approach",
     "package_name":  "mvgam",
-    "generated":  "2025-08-23 22:25:10",
-    "commit_hash":  "50ffa6a12258f184f87518506d433f5b1459a3a7"
+    "generated":  "2025-08-25 22:02:37",
+    "commit_hash":  "test789"
 }

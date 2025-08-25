@@ -13,18 +13,5 @@
     "deny": [],
     "ask": [],
     "defaultMode": "acceptEdits"
-  },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -ExecutionPolicy Bypass -File \"C:\\Users\\Nick\\Google Drive\\Academic Work Folder\\Ecological forecasting\\mvgam\\.claude\\hooks\\r-code-review-hook.ps1\" -Event \"PostToolUse\" -FilePath \"$TOOL_FILE_PATH\" -Operation \"$TOOL_NAME\""
-          }
-        ]
-      }
-    ]
   }
 }
