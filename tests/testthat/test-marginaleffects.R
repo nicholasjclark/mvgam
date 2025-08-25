@@ -1,4 +1,4 @@
-# Test marginaleffects functionality with mvgam
+# Test marginaleffects functionality with the mvgam package
 
 skip_on_cran()
 
