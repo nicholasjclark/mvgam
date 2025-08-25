@@ -13,6 +13,7 @@
                        "mvgam_conditional_effects",
                        "mvgam_fevd",
                        "mvgam_forecast",
+                       "mvgam_formula",
                        "mvgam_irf",
                        "mvgam_lfo",
                        "mvgam_prefit",
@@ -80,6 +81,7 @@
                                      "how_to_cite",
                                      "mvgam",
                                      "mvgam_prefit",
+                                     "mvgam_formula",
                                      "trend_param",
                                      "mvgam_trend"
                                  ],
@@ -168,17 +170,1017 @@
                                                ]
                    },
     "metadata":  {
+                     "commit_hash":  "b2fe352496768d11c184f093084f7b145546af16",
+                     "commit_message":  "feat: implement mvgam_formula constructor with comprehensive tests\n\n- Added mvgam_formula() constructor function for minimal formula containers\n- Comprehensive parameter validation using checkmate and insight error formatting\n- S3 class hierarchy preservation for formula/brmsformula/mvbrmsformula compatibility\n- Print method for enhanced user experience with proper S3 dispatch\n- Autocorrelation separation principle validation to prevent brms conflicts\n- Complete test suite with 61 passing tests covering all functionality and edge cases\n- Fixed @noRd documentation issue in stan_assembly.R\n- Updated NAMESPACE for proper S3 method registration\n\nRelated to Sub-tasks 1A-1B in TRD-stancode-generation-update\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude \u003cnoreply@anthropic.com\u003e",
                      "version":  "2.0.0",
-                     "s3_classes_count":  20,
-                     "exported_functions":  66,
-                     "total_files":  56,
-                     "s3_methods_count":  41,
-                     "total_functions":  399,
-                     "commit_message":  "test refactored signatures and S3 approach",
+                     "exported_functions":  67,
                      "package_name":  "mvgam",
-                     "generated":  "2025-08-25 22:02:37",
-                     "commit_hash":  "test789"
+                     "external_dependencies":  [
+                                                   "bayesplot",
+                                                   "brms",
+                                                   "dplyr",
+                                                   "generics",
+                                                   "ggplot2",
+                                                   "insight",
+                                                   "loo",
+                                                   "magrittr",
+                                                   "marginaleffects",
+                                                   "methods",
+                                                   "mgcv",
+                                                   "mvnfast",
+                                                   "patchwork",
+                                                   "posterior",
+                                                   "purrr",
+                                                   "Rcpp",
+                                                   "rlang",
+                                                   "rstan",
+                                                   "rstantools",
+                                                   "tibble"
+                                               ],
+                     "total_files":  56,
+                     "generated":  "2025-08-26 09:50:57",
+                     "s3_methods_count":  41,
+                     "s3_classes_count":  21,
+                     "total_functions":  401
                  },
+    "function_dependencies":  {
+                                  "RW":  [
+                                             "create_mvgam_trend",
+                                             "validate_mvgam_trend"
+                                         ],
+                                  "handle_nonlinear_model":  [
+                                                                 "determine_trend_injection_point",
+                                                                 "extract_nonlinear_components",
+                                                                 "is_nonlinear_formula",
+                                                                 "validate_nonlinear_trend_compatibility"
+                                                             ],
+                                  "generate_combined_stancode":  [
+                                                                     "assemble_mvgam_stan_data",
+                                                                     "extract_trend_stanvars_from_setup",
+                                                                     "generate_base_brms_standata",
+                                                                     "generate_base_stancode_with_stanvars",
+                                                                     "inject_multivariate_trends_into_linear_predictors",
+                                                                     "inject_trend_into_linear_predictor",
+                                                                     "is_multivariate_trend_specs",
+                                                                     "validate_stan_code"
+                                                                 ],
+                                  "validate_no_offsets_in_trends":  [
+                                                                        "error",
+                                                                        "formula2str_mvgam",
+                                                                        "mvgam",
+                                                                        "RW"
+                                                                    ],
+                                  "pool_mvgam_fits":  [
+                                                          "apply_rubins_rules",
+                                                          "create_pooled_mvgam",
+                                                          "error",
+                                                          "mvgam"
+                                                      ],
+                                  "plot.mvgam_fevd":  [
+                                                          "AR",
+                                                          "fevd_df"
+                                                      ],
+                                  "generate_parameter_label":  "AR",
+                                  "as.array.mvgam":  "validate_variables",
+                                  "get_best_prior_match":  "AR",
+                                  "plot.mvgam":  [
+                                                     "AR",
+                                                     "mvgam",
+                                                     "plot_mvgam_factors",
+                                                     "plot_mvgam_fc",
+                                                     "plot_mvgam_pterms",
+                                                     "plot_mvgam_randomeffects",
+                                                     "plot_mvgam_resids",
+                                                     "plot_mvgam_series",
+                                                     "plot_mvgam_smooth",
+                                                     "plot_mvgam_trend",
+                                                     "plot_mvgam_uncertainty"
+                                                 ],
+                                  "irf.mvgam":  [
+                                                    "AR",
+                                                    "gen_irf",
+                                                    "irf",
+                                                    "validate_pos_integer",
+                                                    "VAR"
+                                                ],
+                                  "setup_brms_lightweight":  [
+                                                                 "error",
+                                                                 "extract_brmsterms_from_setup",
+                                                                 "extract_prior_from_setup",
+                                                                 "parse_multivariate_trends",
+                                                                 "validate_brms_formula",
+                                                                 "validate_setup_components"
+                                                             ],
+                                  "apply_validation_rules":  [
+                                                                 "is_multivariate_trend_specs",
+                                                                 "process_trend_validation_rules"
+                                                             ],
+                                  "generate_common_trend_data":  [
+                                                                     "AR",
+                                                                     "combine_stanvars",
+                                                                     "VAR"
+                                                                 ],
+                                  "fit_multiple_imputation_models":  "mvgam_single_imputation",
+                                  "parse_nonlinear_manually":  "extract_response_from_formula",
+                                  "generate_times_trend_matrices":  [
+                                                                        "create_times_trend_matrix",
+                                                                        "extract_time_series_dimensions"
+                                                                    ],
+                                  "validate_trend_properties":  "error",
+                                  "extract_nonlinear_components":  "parse_nonlinear_manually",
+                                  "summary.mvgam_fevd":  [
+                                                             "fevd_df",
+                                                             "validate_proportional"
+                                                         ],
+                                  "validate_multivariate_trend_constraints":  [
+                                                                                  "error",
+                                                                                  "parse_trend_formula"
+                                                                              ],
+                                  "plot.mvgam_residcor":  [
+                                                              "cluster_cormat",
+                                                              "gather_matrix"
+                                                          ],
+                                  "eval_trend_constructor":  [
+                                                                 "error",
+                                                                 "is.mvgam_trend"
+                                                             ],
+                                  "add_monitor_params":  "generate_monitor_params",
+                                  "validate_stan_data_structure":  "error",
+                                  "generate_matrix_z_multiblock_stanvars":  [
+                                                                                "generate_matrix_z_parameters",
+                                                                                "generate_matrix_z_tdata"
+                                                                            ],
+                                  "smooth.construct.moi.smooth.spec":  "validate_pos_integer",
+                                  "validate_trend_grouping":  [
+                                                                  "error",
+                                                                  "validate_grouping_arguments"
+                                                              ],
+                                  "fevd.mvgam":  [
+                                                     "AR",
+                                                     "fevd",
+                                                     "gen_fevd",
+                                                     "validate_pos_integer",
+                                                     "VAR"
+                                                 ],
+                                  "lfo_cv.mvgam":  [
+                                                       "cv_split",
+                                                       "log_mean_exp",
+                                                       "log_sum_exp",
+                                                       "sum_rows",
+                                                       "validate_pos_integer",
+                                                       "validate_proportional",
+                                                       "validate_series_time"
+                                                   ],
+                                  "extract_prior_string":  [
+                                                               "error",
+                                                               "get_best_prior_match"
+                                                           ],
+                                  "create_mvgam_from_combined_fit":  [
+                                                                         "create_observation_brmsfit",
+                                                                         "create_trend_brmsfit",
+                                                                         "extract_mvgam_components"
+                                                                     ],
+                                  "series_to_mvgam":  [
+                                                          "AR",
+                                                          "xts.to.ts"
+                                                      ],
+                                  "plot_mvgam_series":  [
+                                                            "plot_acf",
+                                                            "plot_ecdf",
+                                                            "plot_histogram",
+                                                            "plot_time_series",
+                                                            "validate_plot_data"
+                                                        ],
+                                  "extract_trend_stanvars_from_setup":  [
+                                                                            "error",
+                                                                            "extract_time_series_dimensions",
+                                                                            "generate_trend_injection_stanvars"
+                                                                        ],
+                                  "assemble_mvgam_stan_data":  [
+                                                                   "generate_base_brms_standata",
+                                                                   "validate_stan_data_structure"
+                                                               ],
+                                  "combine_obs_trend_priors":  "add_trend_component_attr",
+                                  "pp_check.mvgam":  [
+                                                         "add_residuals",
+                                                         "is_like_factor",
+                                                         "ppc"
+                                                     ],
+                                  "validate_stan_code_structure":  [
+                                                                       "all_times_avail",
+                                                                       "AR",
+                                                                       "are_braces_balanced",
+                                                                       "check_block_semicolons",
+                                                                       "deparse0",
+                                                                       "error",
+                                                                       "extract_code_block",
+                                                                       "list_trend_types",
+                                                                       "parse_data_declarations",
+                                                                       "parse_model_cmdstanr",
+                                                                       "process_capacity_parameter",
+                                                                       "process_lag_parameters",
+                                                                       "validate_data_code_compatibility",
+                                                                       "validate_factor_levels",
+                                                                       "validate_grouping_structure",
+                                                                       "validate_stan_code"
+                                                                   ],
+                                  "extract_regular_terms":  [
+                                                                "AR",
+                                                                "mvgam_trend_pattern"
+                                                            ],
+                                  "validate_trend_dispatch_consistency":  "error",
+                                  "mvgam_trend_pattern":  "mvgam_trend_registry",
+                                  "summary.mvgam_irf":  "validate_proportional",
+                                  "mvgam_single_imputation":  [
+                                                                  "create_mvgam_from_combined_fit",
+                                                                  "fit_mvgam_model",
+                                                                  "generate_combined_stancode_and_data",
+                                                                  "parse_multivariate_trends",
+                                                                  "setup_brms_lightweight"
+                                                              ],
+                                  "plot_mvgam_fc":  "mvgam",
+                                  "gen_fevd":  [
+                                                   "var_fecov",
+                                                   "var_psi"
+                                               ],
+                                  "generate_car_trend_stanvars":  [
+                                                                      "append_if_not_null",
+                                                                      "AR",
+                                                                      "calculate_car_time_distances",
+                                                                      "error",
+                                                                      "generate_matrix_z_multiblock_stanvars",
+                                                                      "generate_trend_computation_tparameters",
+                                                                      "generate_trend_priors_stanvar",
+                                                                      "VAR"
+                                                                  ],
+                                  "find_trend_terms":  [
+                                                           "AR",
+                                                           "dynamic",
+                                                           "mvgam_trend_registry"
+                                                       ],
+                                  "as.data.frame.mvgam":  "validate_variables",
+                                  "generate_hierarchical_functions":  [
+                                                                          "AR",
+                                                                          "VAR"
+                                                                      ],
+                                  "mvgam_trend_choices":  "mvgam_trend_registry",
+                                  "extract_and_rename_standata_objects":  [
+                                                                              "extract_multivariate_standata",
+                                                                              "extract_univariate_standata"
+                                                                          ],
+                                  "generate_forecast_metadata":  [
+                                                                     "generate_forecast_required_params",
+                                                                     "normalize_trend_type"
+                                                                 ],
+                                  "extract_mvbind_responses":  [
+                                                                   "AR",
+                                                                   "error",
+                                                                   "extract_variable_name"
+                                                               ],
+                                  "validate_stan_code":  [
+                                                             "AR",
+                                                             "error",
+                                                             "parse_model_cmdstanr"
+                                                         ],
+                                  "generate_matrix_z_tdata":  [
+                                                                  "AR",
+                                                                  "VAR"
+                                                              ],
+                                  "parse_multivariate_trends":  [
+                                                                    "create_trend_base_formula",
+                                                                    "error",
+                                                                    "extract_response_names",
+                                                                    "extract_response_trends",
+                                                                    "is_multivariate_formula",
+                                                                    "parse_trend_formula",
+                                                                    "validate_trend_formula_brms"
+                                                                ],
+                                  "prepare_stanvars_for_brms":  [
+                                                                    "AR",
+                                                                    "is_valid_stanvar",
+                                                                    "VAR"
+                                                                ],
+                                  "process_capacity_parameter":  "error",
+                                  "process_trend_params":  [
+                                                               "evaluate_param_conditions",
+                                                               "is.trend_param",
+                                                               "trend_param"
+                                                           ],
+                                  "generate_forecast_required_params":  [
+                                                                            "error",
+                                                                            "filter_ar_forecast_params",
+                                                                            "filter_car_forecast_params",
+                                                                            "filter_pw_forecast_params",
+                                                                            "filter_rw_forecast_params",
+                                                                            "filter_var_forecast_params",
+                                                                            "filter_zmvn_forecast_params",
+                                                                            "generate_monitor_params"
+                                                                        ],
+                                  "validate_autocor_separation":  [
+                                                                      "validate_obs_formula_brms",
+                                                                      "validate_trend_formula_brms"
+                                                                  ],
+                                  "validate_trend_time_intervals":  "validate_regular_time_intervals",
+                                  "how_to_cite.mvgam":  "mvgam",
+                                  "plot_mvgam_pterms":  "AR",
+                                  "generate_summary_labels":  [
+                                                                  "generate_monitor_params",
+                                                                  "generate_parameter_label",
+                                                                  "normalize_trend_type"
+                                                              ],
+                                  "generate_base_stancode_with_stanvars":  "error",
+                                  "summary.mvgam_forecast":  "validate_proportional",
+                                  "extract_non_likelihood_from_model_block":  [
+                                                                                  "apply_safe_parameter_replacement",
+                                                                                  "AR",
+                                                                                  "create_times_trend_matrix",
+                                                                                  "extract_multivariate_standata",
+                                                                                  "extract_stan_identifiers",
+                                                                                  "extract_time_series_dimensions",
+                                                                                  "extract_univariate_standata",
+                                                                                  "filter_renameable_identifiers",
+                                                                                  "format_matrix_for_stan_array",
+                                                                                  "get_stan_reserved_words",
+                                                                                  "VAR"
+                                                                              ],
+                                  "extract_stan_block":  [
+                                                             "apply_safe_parameter_replacement",
+                                                             "AR",
+                                                             "create_times_trend_matrix",
+                                                             "extract_multivariate_standata",
+                                                             "extract_stan_identifiers",
+                                                             "extract_time_series_dimensions",
+                                                             "extract_univariate_standata",
+                                                             "filter_renameable_identifiers",
+                                                             "format_matrix_for_stan_array",
+                                                             "get_stan_reserved_words",
+                                                             "VAR"
+                                                         ],
+                                  "validate_time_series_for_trends":  [
+                                                                          "extract_time_series_dimensions",
+                                                                          "is_multivariate_trend_specs",
+                                                                          "validate_series_time"
+                                                                      ],
+                                  "generate_hierarchical_correlation_parameters":  [
+                                                                                       "AR",
+                                                                                       "combine_stanvars",
+                                                                                       "VAR"
+                                                                                   ],
+                                  "var_fecov":  "var_phi",
+                                  "log_mean_exp":  "log_sum_exp",
+                                  "extract_observation_priors":  "error",
+                                  "apply_mvgam_trend_defaults":  [
+                                                                     "generate_forecast_metadata",
+                                                                     "generate_monitor_params",
+                                                                     "generate_summary_labels",
+                                                                     "get_default_validation_rules",
+                                                                     "get_mvgam_trend_defaults"
+                                                                 ],
+                                  "auto_register_trend_types":  [
+                                                                    "error",
+                                                                    "register_trend_type",
+                                                                    "validate_trend_properties"
+                                                                ],
+                                  "ordinate.jsdgam":  "validate_proportional",
+                                  "generate_zmvn_trend_stanvars":  [
+                                                                       "append_if_not_null",
+                                                                       "AR",
+                                                                       "generate_factor_model",
+                                                                       "generate_matrix_z_multiblock_stanvars",
+                                                                       "generate_trend_computation_tparameters",
+                                                                       "VAR"
+                                                                   ],
+                                  "rename_multivariate_parameters":  "AR",
+                                  "validate_trend_correlation":  "validate_correlation_requirements",
+                                  "as_draws_array.mvgam":  "validate_variables",
+                                  "evaluate_param_conditions":  [
+                                                                    "error",
+                                                                    "is.trend_param",
+                                                                    "trend_param"
+                                                                ],
+                                  "loo_compare.mvgam":  [
+                                                            "named_list",
+                                                            "split_mod_dots"
+                                                        ],
+                                  "assemble_mvgam_stan_code":  [
+                                                                   "generate_base_brms_stancode",
+                                                                   "inject_trend_into_linear_predictor",
+                                                                   "validate_stan_code"
+                                                               ],
+                                  "split_fc_dots":  [
+                                                        "AR",
+                                                        "ulapply"
+                                                    ],
+                                  "extract_response_trends":  [
+                                                                  "error",
+                                                                  "validate_multivariate_trend_constraints"
+                                                              ],
+                                  "register_core_trends":  "auto_register_trend_types",
+                                  "has_mvbind_response":  "error",
+                                  "validate_no_factor_hierarchical":  "error",
+                                  "extract_and_rename_stan_blocks":  [
+                                                                         "AR",
+                                                                         "extract_non_likelihood_from_model_block",
+                                                                         "extract_stan_block",
+                                                                         "rename_parameters_in_block",
+                                                                         "VAR"
+                                                                     ],
+                                  "create_trend_parameter_prior":  "get_default_trend_parameter_prior",
+                                  "register_trend_type":  [
+                                                              "error",
+                                                              "get_default_incompatibility_reason"
+                                                          ],
+                                  "gen_irf":  [
+                                                  "var_phi",
+                                                  "var_psi"
+                                              ],
+                                  "prepare_mvgam_stancode":  [
+                                                                 "generate_combined_stancode",
+                                                                 "validate_time_series_for_trends"
+                                                             ],
+                                  "as_draws_df.mvgam":  "validate_variables",
+                                  "extract_response_names":  "extract_mvbind_responses",
+                                  "create_trend_brmsfit":  [
+                                                               "extract_trend_parameters",
+                                                               "subset_stanfit_parameters"
+                                                           ],
+                                  "ensure_registry_initialized":  [
+                                                                      "is_registry_initialized",
+                                                                      "register_core_trends"
+                                                                  ],
+                                  "validate_trend_specs":  "list_trend_types",
+                                  "validate_list_trend_formula":  [
+                                                                      "AR",
+                                                                      "error",
+                                                                      "RW",
+                                                                      "validate_single_trend_formula"
+                                                                  ],
+                                  "validate_brms_formula":  "validate_obs_formula_brms",
+                                  "generate_combined_stancode_and_data":  "generate_combined_stancode",
+                                  "dispatch_validation_rule":  "get_validation_rule_dispatch_table",
+                                  "validate_factor_compatibility":  "error",
+                                  "as_draws_list.mvgam":  "validate_variables",
+                                  "extract_multivariate_standata":  [
+                                                                        "AR",
+                                                                        "VAR"
+                                                                    ],
+                                  "map_prior_to_stan_string":  [
+                                                                   "AR",
+                                                                   "error"
+                                                               ],
+                                  "dyn_to_gpspline":  "dynamic",
+                                  "plot_mvgam_smooth":  [
+                                                            "AR",
+                                                            "GP"
+                                                        ],
+                                  "generate_innovation_model":  [
+                                                                    "AR",
+                                                                    "get_trend_parameter_prior",
+                                                                    "VAR"
+                                                                ],
+                                  "add_consistent_dispatch_metadata":  "get_trend_dispatch_function",
+                                  "residual_cor.jsdgam":  "validate_proportional",
+                                  "var_psi":  "var_phi",
+                                  "generate_stan_array_declaration":  "format_matrix_for_stan_array",
+                                  "mvgam_single_dataset":  [
+                                                               "create_mvgam_from_combined_fit",
+                                                               "fit_mvgam_model",
+                                                               "generate_combined_stancode",
+                                                               "generate_combined_stancode_and_data",
+                                                               "is_multivariate_trend_specs",
+                                                               "parse_multivariate_trends",
+                                                               "setup_brms_lightweight",
+                                                               "validate_autocor_separation",
+                                                               "validate_time_series_for_trends"
+                                                           ],
+                                  "ZMVN":  "create_mvgam_trend",
+                                  "mvgam_attach":  "core_unloaded",
+                                  "plot.mvgam_forecast":  "validate_pos_integer",
+                                  "conditional_effects.mvgam":  "split_termlabs",
+                                  "extract_univariate_standata":  [
+                                                                      "AR",
+                                                                      "filter_renameable_identifiers",
+                                                                      "VAR"
+                                                                  ],
+                                  "extract_mvgam_components":  [
+                                                                   "extract_series_information",
+                                                                   "extract_time_information",
+                                                                   "extract_trend_component_info"
+                                                               ],
+                                  "get_trend_parameter_prior":  [
+                                                                    "error",
+                                                                    "extract_prior_string",
+                                                                    "map_prior_to_stan_string"
+                                                                ],
+                                  "add_summary_labels":  "generate_summary_labels",
+                                  "plot_mvgam_trend":  "validate_pos_integer",
+                                  "register_custom_trend":  "register_trend_type",
+                                  "generate_hierarchical_correlation_model":  [
+                                                                                  "AR",
+                                                                                  "combine_stanvars",
+                                                                                  "VAR"
+                                                                              ],
+                                  "validate_single_trend_formula":  [
+                                                                        "AR",
+                                                                        "error",
+                                                                        "formula2str_mvgam",
+                                                                        "mvgam",
+                                                                        "RW",
+                                                                        "validate_no_brms_autocor_in_trends",
+                                                                        "validate_no_offsets_in_trends"
+                                                                    ],
+                                  "residual_cor.mvgam":  "residual_cor",
+                                  "extract_and_rename_trend_parameters":  [
+                                                                              "extract_and_rename_stan_blocks",
+                                                                              "extract_and_rename_standata_objects",
+                                                                              "extract_response_names_from_brmsfit",
+                                                                              "generate_times_trend_matrices",
+                                                                              "is_multivariate_brmsfit"
+                                                                          ],
+                                  "as_draws.mvgam":  "validate_variables",
+                                  "generate_monitor_params":  [
+                                                                  "error",
+                                                                  "generate_ar_monitor_params",
+                                                                  "generate_car_monitor_params",
+                                                                  "generate_pw_monitor_params",
+                                                                  "generate_rw_monitor_params",
+                                                                  "generate_var_monitor_params",
+                                                                  "generate_zmvn_monitor_params",
+                                                                  "normalize_trend_type"
+                                                              ],
+                                  "process_trend_validation_rules":  "dispatch_validation_rule",
+                                  "generate_matrix_z_parameters":  [
+                                                                       "AR",
+                                                                       "VAR"
+                                                                   ],
+                                  "check_block_semicolons":  "AR",
+                                  "create_pooled_mvgam":  "extract_pooling_diagnostics",
+                                  "validate_trend_factor_compatibility":  "error",
+                                  "validate_regular_time_intervals":  [
+                                                                          "AR",
+                                                                          "CAR",
+                                                                          "error"
+                                                                      ],
+                                  "filter_renameable_identifiers":  "get_stan_reserved_words",
+                                  "GP":  [
+                                             "AR",
+                                             "deparse0",
+                                             "RW",
+                                             "warn_default_series_variable",
+                                             "warn_default_time_variable"
+                                         ],
+                                  "custom_trend":  "validate_mvgam_trend",
+                                  "validate_offsets_in_obs":  [
+                                                                  "formula2str_mvgam",
+                                                                  "mvgam"
+                                                              ],
+                                  "parse_model_rstan":  [
+                                                            "error",
+                                                            "eval_silent"
+                                                        ],
+                                  "validate_mvgam_trend":  "error",
+                                  "map_trend_priors":  [
+                                                           "extract_prior_string",
+                                                           "get_trend_prior_spec",
+                                                           "map_prior_to_stan_string"
+                                                       ],
+                                  "extract_trend_priors":  [
+                                                               "generate_trend_priors",
+                                                               "parse_trend_formula"
+                                                           ],
+                                  "VAR":  "create_mvgam_trend",
+                                  "plot_mvgam_uncertainty":  "intersect_hist",
+                                  "get_default_trend_parameter_prior":  "get_parameter_type_default_prior",
+                                  "rename_parameters_in_block":  [
+                                                                     "apply_safe_parameter_replacement",
+                                                                     "AR",
+                                                                     "extract_stan_identifiers",
+                                                                     "filter_renameable_identifiers"
+                                                                 ],
+                                  "loo.mvgam":  "clean_ll",
+                                  "validate_trend_components":  "error",
+                                  "PW":  [
+                                             "create_mvgam_trend",
+                                             "error"
+                                         ],
+                                  "create_observation_brmsfit":  [
+                                                                     "extract_observation_parameters",
+                                                                     "subset_stanfit_parameters"
+                                                                 ],
+                                  "create_times_trend_matrix":  [
+                                                                    "AR",
+                                                                    "VAR"
+                                                                ],
+                                  "smooth.construct.mod.smooth.spec":  "validate_pos_integer",
+                                  "validate_series_time":  [
+                                                               "all_times_avail",
+                                                               "error",
+                                                               "validate_factor_levels",
+                                                               "validate_grouping_structure"
+                                                           ],
+                                  "c.trend_param":  "error",
+                                  "mvgam":  [
+                                                "mvgam_multiple",
+                                                "mvgam_single_dataset"
+                                            ],
+                                  "check_semicolon_syntax":  [
+                                                                 "AR",
+                                                                 "check_block_semicolons",
+                                                                 "extract_code_block"
+                                                             ],
+                                  "add_forecast_metadata":  "generate_forecast_metadata",
+                                  "rename_univariate_parameters":  [
+                                                                       "apply_safe_parameter_replacement",
+                                                                       "AR",
+                                                                       "extract_stan_identifiers",
+                                                                       "filter_renameable_identifiers"
+                                                                   ],
+                                  "decimalplaces":  "AR",
+                                  "parse_model_cmdstanr":  [
+                                                               "error",
+                                                               "eval_silent"
+                                                           ],
+                                  "cluster_cormat":  "reorder_clusters",
+                                  "parse_trend_formula":  [
+                                                              "AR",
+                                                              "dynamic",
+                                                              "error",
+                                                              "eval_trend_constructor",
+                                                              "GP",
+                                                              "mvgam_trend_registry",
+                                                              "RW",
+                                                              "validate_trend_components"
+                                                          ],
+                                  "residuals.mvgam":  "validate_proportional",
+                                  "eval_silent":  [
+                                                      "as_one_logical",
+                                                      "error",
+                                                      "is_try_error"
+                                                  ],
+                                  "ensemble.mvgam_forecast":  [
+                                                                  "allsame",
+                                                                  "split_fc_dots",
+                                                                  "validate_pos_integer"
+                                                              ],
+                                  "generate_trend_injection_stanvars":  [
+                                                                            "apply_response_suffix_to_stanvars",
+                                                                            "combine_stanvars",
+                                                                            "error",
+                                                                            "extract_hierarchical_info",
+                                                                            "generate_common_trend_data",
+                                                                            "generate_innovation_model",
+                                                                            "generate_shared_innovation_stanvars",
+                                                                            "register_core_trends",
+                                                                            "validate_no_factor_hierarchical"
+                                                                        ],
+                                  "combine_stanvars":  "error",
+                                  "inject_trend_into_linear_predictor":  [
+                                                                             "append_if_not_null",
+                                                                             "apply_response_suffix_to_stanvars",
+                                                                             "apply_safe_parameter_replacement",
+                                                                             "AR",
+                                                                             "calculate_car_time_distances",
+                                                                             "CAR",
+                                                                             "combine_stanvars",
+                                                                             "create_times_trend_matrix",
+                                                                             "error",
+                                                                             "eval_silent",
+                                                                             "extract_and_rename_stan_blocks",
+                                                                             "extract_and_rename_standata_objects",
+                                                                             "extract_hierarchical_info",
+                                                                             "extract_multivariate_standata",
+                                                                             "extract_non_likelihood_from_model_block",
+                                                                             "extract_response_names_from_brmsfit",
+                                                                             "extract_stan_block",
+                                                                             "extract_stan_identifiers",
+                                                                             "extract_time_series_dimensions",
+                                                                             "extract_univariate_standata",
+                                                                             "filter_renameable_identifiers",
+                                                                             "find_matching_brace",
+                                                                             "format_matrix_for_stan_array",
+                                                                             "generate_ar_trend_stanvars",
+                                                                             "generate_base_brms_stancode",
+                                                                             "generate_base_brms_standata",
+                                                                             "generate_car_trend_stanvars",
+                                                                             "generate_combined_stancode",
+                                                                             "generate_common_trend_data",
+                                                                             "generate_factor_model",
+                                                                             "generate_hierarchical_correlation_model",
+                                                                             "generate_hierarchical_correlation_parameters",
+                                                                             "generate_hierarchical_functions",
+                                                                             "generate_innovation_model",
+                                                                             "generate_matrix_z_multiblock_stanvars",
+                                                                             "generate_matrix_z_parameters",
+                                                                             "generate_matrix_z_tdata",
+                                                                             "generate_pw_trend_stanvars",
+                                                                             "generate_rw_trend_stanvars",
+                                                                             "generate_shared_innovation_stanvars",
+                                                                             "generate_times_trend_matrices",
+                                                                             "generate_trend_computation_tparameters",
+                                                                             "generate_trend_priors_stanvar",
+                                                                             "generate_var_trend_stanvars",
+                                                                             "generate_zmvn_trend_stanvars",
+                                                                             "get_stan_reserved_words",
+                                                                             "get_trend_parameter_prior",
+                                                                             "is_multivariate_brmsfit",
+                                                                             "PW",
+                                                                             "register_core_trends",
+                                                                             "rename_parameters_in_block",
+                                                                             "RW",
+                                                                             "validate_no_factor_hierarchical",
+                                                                             "validate_stan_code",
+                                                                             "validate_stan_data_structure",
+                                                                             "VAR",
+                                                                             "ZMVN"
+                                                                         ],
+                                  "validate_obs_formula_brms":  [
+                                                                    "check_brms_autocor_usage",
+                                                                    "error",
+                                                                    "formula2str_mvgam",
+                                                                    "get_trend_validation_patterns",
+                                                                    "mvgam",
+                                                                    "RW",
+                                                                    "validate_offsets_in_obs"
+                                                                ],
+                                  "extract_time_series_dimensions":  [
+                                                                         "error",
+                                                                         "validate_regular_time_intervals"
+                                                                     ],
+                                  "build_ar_prior_spec":  "error",
+                                  "mvgam_formula":  "error",
+                                  "parse_data_declarations":  "AR",
+                                  "mvgam_multiple":  [
+                                                         "fit_multiple_imputation_models",
+                                                         "pool_mvgam_fits",
+                                                         "validate_multiple_imputation_datasets"
+                                                     ],
+                                  "as_one_logical":  "deparse0",
+                                  "generate_trend_computation_tparameters":  [
+                                                                                 "AR",
+                                                                                 "VAR"
+                                                                             ],
+                                  "validate_bf_trend_formula":  [
+                                                                    "extract_all_bf_formulas",
+                                                                    "validate_single_trend_formula"
+                                                                ],
+                                  "AR":  "create_mvgam_trend",
+                                  "generate_var_trend_stanvars":  [
+                                                                      "append_if_not_null",
+                                                                      "AR",
+                                                                      "error",
+                                                                      "generate_factor_model",
+                                                                      "generate_hierarchical_correlation_model",
+                                                                      "generate_hierarchical_correlation_parameters",
+                                                                      "generate_hierarchical_functions",
+                                                                      "generate_matrix_z_multiblock_stanvars",
+                                                                      "generate_trend_computation_tparameters",
+                                                                      "generate_trend_priors_stanvar",
+                                                                      "VAR"
+                                                                  ],
+                                  "generate_rw_trend_stanvars":  [
+                                                                     "append_if_not_null",
+                                                                     "AR",
+                                                                     "generate_factor_model",
+                                                                     "generate_matrix_z_multiblock_stanvars",
+                                                                     "generate_trend_computation_tparameters",
+                                                                     "generate_trend_priors_stanvar",
+                                                                     "VAR"
+                                                                 ],
+                                  "ppc.mvgam":  [
+                                                    "AR",
+                                                    "ecdf_plotdat"
+                                                ],
+                                  "plot_mvgam_resids":  "validate_pos_integer",
+                                  "validate_and_process_trend_parameters":  [
+                                                                                "error",
+                                                                                "process_capacity_parameter",
+                                                                                "process_lag_parameters"
+                                                                            ],
+                                  "validate_stan_code_fragment":  [
+                                                                      "all_times_avail",
+                                                                      "AR",
+                                                                      "are_braces_balanced",
+                                                                      "check_block_semicolons",
+                                                                      "deparse0",
+                                                                      "error",
+                                                                      "extract_code_block",
+                                                                      "list_trend_types",
+                                                                      "parse_data_declarations",
+                                                                      "parse_model_cmdstanr",
+                                                                      "process_capacity_parameter",
+                                                                      "process_lag_parameters",
+                                                                      "validate_data_code_compatibility",
+                                                                      "validate_factor_levels",
+                                                                      "validate_grouping_structure",
+                                                                      "validate_stan_code",
+                                                                      "validate_stan_code_structure"
+                                                                  ],
+                                  "as.matrix.mvgam":  "validate_variables",
+                                  "split_mod_dots":  [
+                                                         "AR",
+                                                         "ulapply"
+                                                     ],
+                                  "integrate_nonlinear_with_assembly":  "handle_nonlinear_model",
+                                  "generate_ar_trend_stanvars":  [
+                                                                     "append_if_not_null",
+                                                                     "AR",
+                                                                     "generate_factor_model",
+                                                                     "generate_matrix_z_multiblock_stanvars",
+                                                                     "generate_trend_computation_tparameters",
+                                                                     "generate_trend_priors_stanvar",
+                                                                     "VAR"
+                                                                 ],
+                                  "validate_grouping_structure":  [
+                                                                      "error",
+                                                                      "validate_factor_levels"
+                                                                  ],
+                                  "xts.to.ts":  "AR",
+                                  "generate_shared_innovation_stanvars":  [
+                                                                              "AR",
+                                                                              "generate_hierarchical_correlation_model",
+                                                                              "generate_hierarchical_correlation_parameters",
+                                                                              "generate_hierarchical_functions",
+                                                                              "VAR"
+                                                                          ],
+                                  "generate_factor_model":  [
+                                                                "AR",
+                                                                "combine_stanvars",
+                                                                "VAR"
+                                                            ],
+                                  "dynamic":  "validate_pos_integer",
+                                  "validate_no_brms_autocor_in_trends":  [
+                                                                             "AR",
+                                                                             "error"
+                                                                         ],
+                                  "tidy.mvgam":  "split_hier_Sigma",
+                                  "extract_code_block":  [
+                                                             "append_if_not_null",
+                                                             "apply_response_suffix_to_stanvars",
+                                                             "apply_safe_parameter_replacement",
+                                                             "AR",
+                                                             "calculate_car_time_distances",
+                                                             "CAR",
+                                                             "combine_stanvars",
+                                                             "create_times_trend_matrix",
+                                                             "error",
+                                                             "eval_silent",
+                                                             "extract_and_rename_stan_blocks",
+                                                             "extract_and_rename_standata_objects",
+                                                             "extract_hierarchical_info",
+                                                             "extract_multivariate_standata",
+                                                             "extract_non_likelihood_from_model_block",
+                                                             "extract_response_names_from_brmsfit",
+                                                             "extract_stan_block",
+                                                             "extract_stan_identifiers",
+                                                             "extract_time_series_dimensions",
+                                                             "extract_univariate_standata",
+                                                             "filter_renameable_identifiers",
+                                                             "find_matching_brace",
+                                                             "format_matrix_for_stan_array",
+                                                             "generate_ar_trend_stanvars",
+                                                             "generate_base_brms_stancode",
+                                                             "generate_base_brms_standata",
+                                                             "generate_car_trend_stanvars",
+                                                             "generate_combined_stancode",
+                                                             "generate_common_trend_data",
+                                                             "generate_factor_model",
+                                                             "generate_hierarchical_correlation_model",
+                                                             "generate_hierarchical_correlation_parameters",
+                                                             "generate_hierarchical_functions",
+                                                             "generate_innovation_model",
+                                                             "generate_matrix_z_multiblock_stanvars",
+                                                             "generate_matrix_z_parameters",
+                                                             "generate_matrix_z_tdata",
+                                                             "generate_pw_trend_stanvars",
+                                                             "generate_rw_trend_stanvars",
+                                                             "generate_shared_innovation_stanvars",
+                                                             "generate_times_trend_matrices",
+                                                             "generate_trend_computation_tparameters",
+                                                             "generate_trend_injection_stanvars",
+                                                             "generate_trend_priors_stanvar",
+                                                             "generate_var_trend_stanvars",
+                                                             "generate_zmvn_trend_stanvars",
+                                                             "get_stan_reserved_words",
+                                                             "get_trend_parameter_prior",
+                                                             "inject_trend_into_linear_predictor",
+                                                             "is_multivariate_brmsfit",
+                                                             "is_valid_stanvar",
+                                                             "PW",
+                                                             "register_core_trends",
+                                                             "rename_parameters_in_block",
+                                                             "RW",
+                                                             "validate_no_factor_hierarchical",
+                                                             "validate_stan_code",
+                                                             "validate_stan_data_structure",
+                                                             "VAR",
+                                                             "ZMVN"
+                                                         ],
+                                  "CAR":  "create_mvgam_trend",
+                                  "generate_trend_priors":  [
+                                                                "create_empty_brmsprior",
+                                                                "generate_trend_priors_from_monitor_params"
+                                                            ],
+                                  "validate_trend_formula_brms":  [
+                                                                      "error",
+                                                                      "validate_bf_trend_formula",
+                                                                      "validate_list_trend_formula",
+                                                                      "validate_single_trend_formula"
+                                                                  ],
+                                  "sim_mvgam":  [
+                                                    "GP",
+                                                    "lkj_corr",
+                                                    "periodic_gp",
+                                                    "random_Sigma",
+                                                    "RW",
+                                                    "validate_pos_integer",
+                                                    "validate_proportional",
+                                                    "var_phi"
+                                                ],
+                                  "get_trend_info":  "error",
+                                  "plot_mvgam_randomeffects":  "AR",
+                                  "create_mvgam_trend":  [
+                                                             "add_consistent_dispatch_metadata",
+                                                             "apply_mvgam_trend_defaults",
+                                                             "AR",
+                                                             "deparse0",
+                                                             "process_arg",
+                                                             "validate_mvgam_trend",
+                                                             "warn_default_series_variable",
+                                                             "warn_default_time_variable"
+                                                         ],
+                                  "validate_grouping_arguments":  "error",
+                                  "generate_trend_priors_from_monitor_params":  [
+                                                                                    "create_empty_brmsprior",
+                                                                                    "create_trend_parameter_prior"
+                                                                                ],
+                                  "generate_trend_priors_stanvar":  [
+                                                                        "AR",
+                                                                        "get_trend_parameter_prior",
+                                                                        "VAR"
+                                                                    ],
+                                  "plot.mvgam_irf":  "validate_pos_integer",
+                                  "process_arg":  [
+                                                      "AR",
+                                                      "deparse0"
+                                                  ],
+                                  "apply_rubins_rules":  "pool_parameter_estimates",
+                                  "process_lag_parameters":  "error",
+                                  "print.mvgam":  "print_model_specification_simple",
+                                  "add_complete_metadata":  [
+                                                                "add_forecast_metadata",
+                                                                "add_monitor_params",
+                                                                "add_summary_labels"
+                                                            ],
+                                  "prepare_stan_data":  "validate_factor_levels",
+                                  "is_multivariate_formula":  "has_mvbind_response",
+                                  "as_draws_matrix.mvgam":  "validate_variables",
+                                  "validate_combined_stancode":  [
+                                                                     "validate_data_code_compatibility",
+                                                                     "validate_stan_code",
+                                                                     "validate_stan_code_structure"
+                                                                 ],
+                                  "interpret_mvgam":  [
+                                                          "AR",
+                                                          "dyn_to_gphilbert",
+                                                          "dyn_to_gpspline",
+                                                          "dynamic"
+                                                      ],
+                                  "validate_nonlinear_trend_compatibility":  "error",
+                                  "apply_response_suffix_to_stanvars":  [
+                                                                            "apply_suffix_to_name",
+                                                                            "apply_suffix_to_stan_code",
+                                                                            "AR"
+                                                                        ],
+                                  "validate_data_code_compatibility":  [
+                                                                           "error",
+                                                                           "extract_code_block",
+                                                                           "parse_data_declarations"
+                                                                       ],
+                                  "validate_multiple_imputation_datasets":  [
+                                                                                "error",
+                                                                                "validate_missing_patterns"
+                                                                            ],
+                                  "generate_pw_trend_stanvars":  [
+                                                                     "append_if_not_null",
+                                                                     "AR",
+                                                                     "error",
+                                                                     "generate_matrix_z_multiblock_stanvars",
+                                                                     "generate_trend_computation_tparameters",
+                                                                     "generate_trend_priors_stanvar",
+                                                                     "VAR"
+                                                                 ],
+                                  "as_draws_rvars.mvgam":  "validate_variables",
+                                  "validate_setup_components":  [
+                                                                    "AR",
+                                                                    "error"
+                                                                ],
+                                  "stability.mvgam":  [
+                                                          "AR",
+                                                          "error",
+                                                          "VAR"
+                                                      ],
+                                  "extract_stan_identifiers":  "AR"
+                              },
     "functions":  {
                       "validate_variables":  "R/as.data.frame.mvgam.R",
                       "check_brms_autocor_usage":  "R/validations.R",
@@ -190,6 +1192,7 @@
                       "get_trend_info":  "R/trend_system.R",
                       "is.trend_param":  "R/trend_system.R",
                       "generate_rw_trend_stanvars":  "R/stan_assembly.R",
+                      "mvgam_formula":  "R/priors.R",
                       "loo.mvgam":  "R/loo.mvgam.R",
                       "split_termlabs":  "R/conditional_effects.R",
                       "varma_recursC":  "R/RcppExports.R",
@@ -286,7 +1289,7 @@
                       "mvgam_trend_registry":  "R/trend_system.R",
                       "add_consistent_dispatch_metadata":  "R/trend_system.R",
                       "pool_parameter_estimates":  "R/mvgam_core.R",
-                      "is_try_error":  "R/validations.R",
+                      "print.mvgam_formula":  "R/priors.R",
                       "apply_suffix_to_stan_code":  "R/stan_assembly.R",
                       "eval_trend_constructor":  "R/trend_system.R",
                       "gather_matrix":  "R/mvgam_residcor-class.R",
@@ -565,6 +1568,7 @@
                       "dispatch_validation_rule":  "R/validations.R",
                       "get_default_incompatibility_reason":  "R/trend_system.R",
                       "extract_and_rename_standata_objects":  "R/stan_assembly.R",
+                      "is_try_error":  "R/validations.R",
                       "get_stan_reserved_words":  "R/stan_assembly.R",
                       "AR":  "R/trend_system.R",
                       "residual_cor.jsdgam":  "R/residual_cor.R",
@@ -580,6 +1584,43 @@
                       "validate_offsets_in_obs":  "R/validations.R",
                       "generate_base_brms_stancode":  "R/stan_assembly.R"
                   },
+    "file_purposes":  {
+                          "R/tidier_methods.R":  "Method implementations",
+                          "R/mvgam_forecast-class.R":  "Class definitions and methods",
+                          "R/mvgam-class.R":  "Class definitions and methods",
+                          "R/plot_mvgam_factors.R":  "Plotting and visualization",
+                          "R/plot.mvgam.R":  "Plotting and visualization",
+                          "R/residual_cor.R":  "Residual analysis",
+                          "R/zzz.R":  "Package startup and attachment",
+                          "R/stan_assembly.R":  "Stan model integration",
+                          "R/validations.R":  "Input validation and checks",
+                          "R/mvgam_fevd-class.R":  "Class definitions and methods",
+                          "R/priors.R":  "Prior specification",
+                          "R/print.mvgam.R":  "Print methods for objects",
+                          "R/plot_mvgam_trend.R":  "Trend modeling",
+                          "R/as.data.frame.mvgam.R":  "Data documentation and loading",
+                          "R/plot_mvgam_series.R":  "Plotting and visualization",
+                          "R/brms_integration.R":  "brms integration",
+                          "R/plot_mvgam_fc.R":  "Plotting and visualization",
+                          "R/RcppExports.R":  "Exported functions",
+                          "R/mvgam_irf-class.R":  "Class definitions and methods",
+                          "R/plot_mvgam_smooth.R":  "Plotting and visualization",
+                          "R/portal_data.R":  "Data documentation and loading",
+                          "R/marginaleffects.mvgam.R":  "Marginal effects",
+                          "R/conditional_effects.R":  "Conditional effects",
+                          "R/mvgam_core.R":  "Core package functionality",
+                          "R/mcmc_plot.mvgam.R":  "Plotting and visualization",
+                          "R/plot_mvgam_resids.R":  "Plotting and visualization",
+                          "R/all_neon_tick_data.R":  "Data documentation and loading",
+                          "R/utils-pipe.R":  "Utility functions",
+                          "R/plot_mvgam_uncertainty.R":  "Plotting and visualization",
+                          "R/mvgam_residcor-class.R":  "Class definitions and methods",
+                          "R/trend_system.R":  "Trend modeling",
+                          "R/plot_mvgam_pterms.R":  "Plotting and visualization",
+                          "R/add_residuals.R":  "Residual analysis",
+                          "R/residuals.mvgam.R":  "Residual analysis",
+                          "R/plot_mvgam_randomeffects.R":  "Plotting and visualization"
+                      },
     "dependencies":  {
 
                      },
@@ -623,6 +1664,7 @@
                      "lv_correlations",
                      "mcmc_plot",
                      "mvgam",
+                     "mvgam_formula",
                      "mvgam_trend_choices",
                      "ordinate",
                      "plot_comparisons",
@@ -662,6 +1704,7 @@
                                 "get_trend_info":  "get_trend_info \u003c- function(name) {",
                                 "is.trend_param":  "is.trend_param \u003c- function(x) {",
                                 "generate_rw_trend_stanvars":  "generate_rw_trend_stanvars \u003c- function(trend_specs, data_info, prior = NULL) {",
+                                "mvgam_formula":  "mvgam_formula \u003c- function(formula, trend_formula = NULL) {",
                                 "loo.mvgam":  "loo.mvgam \u003c- function(x, incl_dynamics = FALSE, ...) {",
                                 "split_termlabs":  "split_termlabs = function(lab) {",
                                 "varma_recursC":  "varma_recursC \u003c- function(A, A2, A3, theta, linpreds, errors, drift, last_trends, h) {",
@@ -758,7 +1801,7 @@
                                 "mvgam_trend_registry":  "mvgam_trend_registry \u003c- function() {",
                                 "add_consistent_dispatch_metadata":  "add_consistent_dispatch_metadata \u003c- function(trend_obj) {",
                                 "pool_parameter_estimates":  "pool_parameter_estimates \u003c- function(param_list) {",
-                                "is_try_error":  "is_try_error \u003c- function(x) {",
+                                "print.mvgam_formula":  "print.mvgam_formula \u003c- function(x, ...) {",
                                 "apply_suffix_to_stan_code":  "apply_suffix_to_stan_code \u003c- function(stan_code, patterns, suffix) {",
                                 "eval_trend_constructor":  "eval_trend_constructor \u003c- function(trend_call) {",
                                 "gather_matrix":  "gather_matrix \u003c- function(mat) {",
@@ -1037,6 +2080,7 @@
                                 "dispatch_validation_rule":  "dispatch_validation_rule \u003c- function(rule, trend_spec, data) {",
                                 "get_default_incompatibility_reason":  "get_default_incompatibility_reason \u003c- function(name) {",
                                 "extract_and_rename_standata_objects":  "extract_and_rename_standata_objects \u003c- function(standata, suffix, mapping, is_multivariate, response_names) {",
+                                "is_try_error":  "is_try_error \u003c- function(x) {",
                                 "get_stan_reserved_words":  "get_stan_reserved_words \u003c- function() {",
                                 "AR":  "AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {",
                                 "residual_cor.jsdgam":  "residual_cor.jsdgam \u003c- function( object, summary = TRUE, robust = FALSE, probs = c(0.025, 0.975), ... ) {",
@@ -1130,6 +2174,16 @@
                                                "is_s3_method":  false,
                                                "arguments":  "dat"
                                            },
+                              "mvgam_formula":  {
+                                                    "s3_class":  "",
+                                                    "s3_method":  "",
+                                                    "signature":  "mvgam_formula \u003c- function(formula, trend_formula = NULL) {",
+                                                    "is_s3_method":  false,
+                                                    "arguments":  [
+                                                                      "formula",
+                                                                      "trend_formula"
+                                                                  ]
+                                                },
                               "loo.mvgam":  {
                                                 "s3_class":  "mvgam",
                                                 "s3_method":  "loo",
@@ -2077,13 +3131,13 @@
                                                                "is_s3_method":  false,
                                                                "arguments":  "param_list"
                                                            },
-                              "is_try_error":  {
-                                                   "s3_class":  "",
-                                                   "s3_method":  "",
-                                                   "signature":  "is_try_error \u003c- function(x) {",
-                                                   "is_s3_method":  false,
-                                                   "arguments":  "x"
-                                               },
+                              "print.mvgam_formula":  {
+                                                          "s3_class":  "mvgam_formula",
+                                                          "s3_method":  "print",
+                                                          "signature":  "print.mvgam_formula \u003c- function(x, ...) {",
+                                                          "is_s3_method":  true,
+                                                          "arguments":  "x"
+                                                      },
                               "apply_suffix_to_stan_code":  {
                                                                 "s3_class":  "",
                                                                 "s3_method":  "",
@@ -4731,6 +5785,13 @@
                                                                                             "response_names"
                                                                                         ]
                                                                       },
+                              "is_try_error":  {
+                                                   "s3_class":  "",
+                                                   "s3_method":  "",
+                                                   "signature":  "is_try_error \u003c- function(x) {",
+                                                   "is_s3_method":  false,
+                                                   "arguments":  "x"
+                                               },
                               "get_stan_reserved_words":  {
                                                               "s3_class":  "",
                                                               "s3_method":  "",
@@ -5140,7 +6201,9 @@
                                            "extract_prior_string",
                                            "get_best_prior_match",
                                            "map_trend_priors",
-                                           "get_trend_parameter_prior"
+                                           "get_trend_parameter_prior",
+                                           "mvgam_formula",
+                                           "print.mvgam_formula"
                                        ],
                         "R/RcppExports.R":  [
                                                 "ar3_recursC",
