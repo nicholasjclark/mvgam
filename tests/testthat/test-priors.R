@@ -1,7 +1,7 @@
 # Tests for Prior Specification System
 # =====================================
 
-# Test prior helper functions
+# Test prior specification helper functions
 # ----------------------------
 
 test_that("has_trend_priors detects trend parameters correctly", {
