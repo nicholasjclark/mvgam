@@ -1,4 +1,4 @@
-context("marginaleffects")
+# Test marginaleffects functionality
 
 skip_on_cran()
 
