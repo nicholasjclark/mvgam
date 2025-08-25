@@ -6,6 +6,9 @@ $CACHE_FILE = ".claude/package-dependency-map.json"
 $METADATA_FILE = ".claude/dependency-metadata.json"
 $VISUALIZATION_FILE = ".claude/dependency-graph.md"
 
+# Suppress output - all Write-Host calls removed or redirected to Write-Debug
+$DebugPreference = 'SilentlyContinue'
+
 function Get-PackageName {
     if (Test-Path "DESCRIPTION") {
         $content = Get-Content "DESCRIPTION"
@@ -26,6 +29,27 @@ function Get-PackageVersion {
         }
     }
     return "0.0.0"
+}
+
+function Get-ExternalDependencies {
+    $dependencies = @()
+    if (Test-Path "DESCRIPTION") {
+        $content = Get-Content "DESCRIPTION" -Raw
+        # Extract Imports and Depends
+        if ($content -match 'Imports:\s*([^:\r\n]+(?:\r?\n\s+[^:\r\n]+)*)') {
+            $imports = $matches[1] -replace '\s+', ' '
+            $dependencies += ($imports -split ',\s*' | ForEach-Object { 
+                ($_ -split '\s*\(')[0].Trim() 
+            } | Where-Object { $_ -and $_ -ne '' })
+        }
+        if ($content -match 'Depends:\s*([^:\r\n]+(?:\r?\n\s+[^:\r\n]+)*)') {
+            $depends = $matches[1] -replace '\s+', ' '
+            $dependencies += ($depends -split ',\s*' | ForEach-Object { 
+                ($_ -split '\s*\(')[0].Trim() 
+            } | Where-Object { $_ -and $_ -ne 'R' -and $_ -ne '' })
+        }
+    }
+    return $dependencies | Sort-Object -Unique
 }
 
 function Get-ExportedFunctions {
@@ -119,6 +143,52 @@ function Get-FunctionSignature {
     return ""
 }
 
+function Get-FunctionCalls {
+    param([string]$Content, [string]$FunctionName, [string[]]$AllFunctionNames)
+    
+    $calls = @()
+    
+    # Extract the function body
+    $lines = $Content -split '\r?\n'
+    $inFunction = $false
+    $braceCount = 0
+    $functionBody = ""
+    
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $line = $lines[$i]
+        
+        if ($line -match "^\s*$([regex]::Escape($FunctionName))\s*(<-|=)\s*function") {
+            $inFunction = $true
+            # Count braces on the same line
+            $braceCount = ($line.ToCharArray() | Where-Object { $_ -eq '{' }).Count - ($line.ToCharArray() | Where-Object { $_ -eq '}' }).Count
+            $functionBody += $line + "`n"
+            continue
+        }
+        
+        if ($inFunction) {
+            $functionBody += $line + "`n"
+            $braceCount += ($line.ToCharArray() | Where-Object { $_ -eq '{' }).Count - ($line.ToCharArray() | Where-Object { $_ -eq '}' }).Count
+            
+            if ($braceCount -eq 0 -and $line -match '}') {
+                break
+            }
+        }
+    }
+    
+    # Look for function calls in the body
+    foreach ($func in $AllFunctionNames) {
+        if ($func -ne $FunctionName) {  # Don't count self-references
+            # Look for function calls: func( or func ( but not inside quotes
+            $pattern = "(?<!['\`"`"])$([regex]::Escape($func))\s*\("
+            if ($functionBody -match $pattern) {
+                $calls += $func
+            }
+        }
+    }
+    
+    return $calls | Sort-Object -Unique
+}
+
 function Get-S3Methods {
     param([string]$Content)
     
@@ -202,43 +272,69 @@ function Analyze-FunctionSignature {
     return $result
 }
 
-function Find-CircularDependency {
-    param([string]$FunctionName, [hashtable]$DetailedDeps, [hashtable]$Functions, [string[]]$Visited, [string[]]$Path)
+function Get-FilePurpose {
+    param([string]$FilePath)
     
-    if ($FunctionName -in $Path) {
-        # Found a cycle
-        $cycleStart = [array]::IndexOf($Path, $FunctionName)
-        $cycle = $Path[$cycleStart..($Path.Length-1)] + $FunctionName
-        return ($cycle -join ' -> ')
+    $fileName = Split-Path -Leaf $FilePath
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($fileName)
+    
+    # Common patterns for R package files
+    $purposes = @{
+        'zzz' = 'Package startup and attachment'
+        'RcppExports' = 'Rcpp compiled function exports'
+        'data' = 'Data documentation and loading'
+        'utils' = 'Utility functions'
+        'helpers' = 'Helper functions'
+        'plot' = 'Plotting and visualization'
+        'print' = 'Print methods for objects'
+        'summary' = 'Summary methods'
+        'predict' = 'Prediction methods'
+        'fit' = 'Model fitting'
+        'stan' = 'Stan model integration'
+        'brms' = 'brms integration'
+        'validation' = 'Input validation and checks'
+        'priors' = 'Prior specification'
+        'diagnostic' = 'Model diagnostics'
+        'forecast' = 'Forecasting functions'
+        'trend' = 'Trend modeling'
+        'smooth' = 'Smoothing functions'
+        'simulate' = 'Simulation functions'
+        'residual' = 'Residual analysis'
+        'effects' = 'Effect calculations'
+        'marginal' = 'Marginal effects'
+        'conditional' = 'Conditional effects'
+        'core' = 'Core package functionality'
+        'class' = 'Class definitions and methods'
+        'methods' = 'Method implementations'
+        'export' = 'Exported functions'
+        'internal' = 'Internal functions'
     }
     
-    if ($FunctionName -in $Visited) {
-        return $null
-    }
-    
-    $Visited += $FunctionName
-    $Path += $FunctionName
-    
-    # Get the file containing this function
-    if (!$Functions.ContainsKey($FunctionName)) {
-        return $null
-    }
-    
-    $file = $Functions[$FunctionName]
-    if (!$DetailedDeps.ContainsKey($file) -or !$DetailedDeps[$file].ContainsKey($FunctionName)) {
-        return $null
-    }
-    
-    # Check internal dependencies
-    $deps = $DetailedDeps[$file][$FunctionName].internal_deps
-    foreach ($dep in $deps) {
-        $result = Find-CircularDependency -FunctionName $dep -DetailedDeps $DetailedDeps -Functions $Functions -Visited $Visited -Path $Path
-        if ($result) {
-            return $result
+    foreach ($pattern in $purposes.Keys) {
+        if ($baseName -match $pattern) {
+            return $purposes[$pattern]
         }
     }
     
-    return $null
+    # Try to infer from file name
+    if ($baseName -match '^(.+?)[-_]') {
+        $prefix = $matches[1]
+        switch ($prefix) {
+            'plot' { return 'Plotting functions' }
+            'get' { return 'Getter/accessor functions' }
+            'set' { return 'Setter/mutator functions' }
+            'check' { return 'Validation and checking' }
+            'make' { return 'Constructor functions' }
+            'build' { return 'Building/assembly functions' }
+            'extract' { return 'Data extraction' }
+            'generate' { return 'Generation functions' }
+            'compute' { return 'Computational functions' }
+            'calculate' { return 'Calculation functions' }
+            default { return '' }
+        }
+    }
+    
+    return ''
 }
 
 function Get-FunctionDefinitions {
@@ -247,12 +343,14 @@ function Get-FunctionDefinitions {
     $functions = @{}
     $definitions = @{}
     $function_signatures = @{}
+    $function_dependencies = @{}
     $s3_methods = @{}
     $s3_classes = @()
+    $file_purposes = @{}
     
-    # Analyze each file for functions and S3 methods
+    # First pass: collect all function names
     foreach ($file in $Files) {
-        Write-Host "Analyzing $file..." -ForegroundColor Blue
+        Write-Debug "Analyzing $file..."
         
         if (!(Test-Path $file)) {
             continue
@@ -263,8 +361,13 @@ function Get-FunctionDefinitions {
             continue
         }
         
+        # Get file purpose
+        $purpose = Get-FilePurpose -FilePath $file
+        if ($purpose) {
+            $file_purposes[$file] = $purpose
+        }
+        
         $fileFunctions = @()
-        $fileSignatures = @{}
         
         # Function definition patterns
         $patterns = @(
@@ -281,45 +384,58 @@ function Get-FunctionDefinitions {
                     $cleanName = $functionName.Trim()
                     $fileFunctions += $cleanName
                     $functions[$cleanName] = $file
-                    
-                    # Extract function signature
-                    $signature = Get-FunctionSignature -Content $content -FunctionName $cleanName
-                    if ($signature) {
-                        $fileSignatures[$cleanName] = $signature
-                        $function_signatures[$cleanName] = $signature
-                    }
-                }
-            }
-        }
-        
-        # Extract S3 methods from this file
-        $fileS3Methods = Get-S3Methods -Content $content
-        foreach ($method in $fileS3Methods.Keys) {
-            if (!$s3_methods.ContainsKey($method)) {
-                $s3_methods[$method] = @()
-            }
-            $s3_methods[$method] += $fileS3Methods[$method]
-            # Track unique classes
-            foreach ($class in $fileS3Methods[$method]) {
-                if ($class -notin $s3_classes) {
-                    $s3_classes += $class
                 }
             }
         }
         
         if ($fileFunctions.Count -gt 0) {
             $definitions[$file] = $fileFunctions
-            Write-Host "Found $($fileFunctions.Count) functions: $($fileFunctions -join ', ')" -ForegroundColor Green
-        }
-        
-        if ($fileS3Methods.Count -gt 0) {
-            $methodSummary = $fileS3Methods.Keys | ForEach-Object { "$_(" + ($fileS3Methods[$_] -join ', ') + ")" }
-            Write-Host "Found S3 methods: $($methodSummary -join ', ')" -ForegroundColor Magenta
         }
     }
     
-    # Second pass: analyze function signatures for detailed information
-    Write-Host "Step 1b: Analyzing function signatures..." -ForegroundColor Yellow
+    # Second pass: analyze signatures and dependencies
+    foreach ($file in $Files) {
+        if (!(Test-Path $file)) {
+            continue
+        }
+        
+        $content = Get-Content $file -Raw -ErrorAction SilentlyContinue
+        if (!$content) {
+            continue
+        }
+        
+        if ($definitions.ContainsKey($file)) {
+            foreach ($funcName in $definitions[$file]) {
+                # Extract signature
+                $signature = Get-FunctionSignature -Content $content -FunctionName $funcName
+                if ($signature) {
+                    $function_signatures[$funcName] = $signature
+                }
+                
+                # Extract function calls (dependencies)
+                $calls = Get-FunctionCalls -Content $content -FunctionName $funcName -AllFunctionNames $functions.Keys
+                if ($calls.Count -gt 0) {
+                    $function_dependencies[$funcName] = $calls
+                }
+            }
+        }
+        
+        # Extract S3 methods
+        $fileS3Methods = Get-S3Methods -Content $content
+        foreach ($method in $fileS3Methods.Keys) {
+            if (!$s3_methods.ContainsKey($method)) {
+                $s3_methods[$method] = @()
+            }
+            $s3_methods[$method] += $fileS3Methods[$method]
+            foreach ($class in $fileS3Methods[$method]) {
+                if ($class -notin $s3_classes) {
+                    $s3_classes += $class
+                }
+            }
+        }
+    }
+    
+    # Third pass: analyze function signatures for detailed information
     $detailed_analysis = @{}
     
     foreach ($funcName in $function_signatures.Keys) {
@@ -332,19 +448,22 @@ function Get-FunctionDefinitions {
         functions = $functions
         definitions = $definitions  
         function_signatures = $function_signatures
+        function_dependencies = $function_dependencies
         detailed_analysis = $detailed_analysis
         s3_methods = $s3_methods
         s3_classes = $s3_classes | Sort-Object -Unique
+        file_purposes = $file_purposes
     }
 }
 
 function New-PackageDependencyMap {
-    Write-Host "Creating package-wide function dependency map..." -ForegroundColor Cyan
+    Write-Debug "Creating package-wide function dependency map..."
     
     $startTime = Get-Date
     
-    # Get exported functions
+    # Get exported functions and external dependencies
     $exportedFunctions = Get-ExportedFunctions
+    $externalDeps = Get-ExternalDependencies
     
     # Initialize the dependency map structure
     $dependencyMap = @{
@@ -357,6 +476,7 @@ function New-PackageDependencyMap {
             total_files = 0
             total_functions = 0
             exported_functions = $exportedFunctions.Count
+            external_dependencies = $externalDeps
         }
         functions = @{}
         definitions = @{}
@@ -368,23 +488,24 @@ function New-PackageDependencyMap {
     $rFiles = Get-AllRFiles
     $dependencyMap.metadata.total_files = $rFiles.Count
     
-    Write-Host "Analyzing $($rFiles.Count) R files..." -ForegroundColor Green
+    Write-Debug "Analyzing $($rFiles.Count) R files..."
     
-    # Find function definitions, signatures, and S3 methods
-    Write-Host "Step 1: Discovering function definitions..." -ForegroundColor Yellow
+    # Find function definitions, signatures, dependencies, and S3 methods
     $funcResults = Get-FunctionDefinitions -Files $rFiles -ExportedFunctions $exportedFunctions
     $dependencyMap.functions = $funcResults.functions
     $dependencyMap.definitions = $funcResults.definitions
     $dependencyMap.function_signatures = $funcResults.function_signatures
+    $dependencyMap.function_dependencies = $funcResults.function_dependencies
     $dependencyMap.detailed_analysis = $funcResults.detailed_analysis
     $dependencyMap.s3_methods = $funcResults.s3_methods
     $dependencyMap.s3_classes = $funcResults.s3_classes
+    $dependencyMap.file_purposes = $funcResults.file_purposes
     $dependencyMap.metadata.total_functions = $funcResults.functions.Count
     $dependencyMap.metadata.s3_methods_count = $funcResults.s3_methods.Count
     $dependencyMap.metadata.s3_classes_count = $funcResults.s3_classes.Count
     
     # Save results
-    Write-Host "Step 2: Saving dependency map..." -ForegroundColor Yellow
+    Write-Debug "Saving dependency map..."
     
     # Save main dependency map
     $dependencyMap | ConvertTo-Json -Depth 10 | Out-File -FilePath $CACHE_FILE -Encoding UTF8
@@ -410,7 +531,7 @@ function New-PackageDependencyMap {
 
 **Generated:** $($dependencyMap.metadata.generated)  
 **Package:** $($dependencyMap.metadata.package_name) v$($dependencyMap.metadata.version)  
-**Commit:** $($dependencyMap.metadata.commit_hash)  
+**Commit:** $($CommitHash.Substring(0, [Math]::Min(7, $CommitHash.Length)))  
 
 ## Summary
 
@@ -420,6 +541,20 @@ function New-PackageDependencyMap {
 - **Internal Functions:** $($internalFunctions.Count)
 - **S3 Methods:** $($dependencyMap.metadata.s3_methods_count)
 - **S3 Classes:** $($dependencyMap.metadata.s3_classes_count)
+
+## External Dependencies
+
+"@
+    
+    if ($externalDeps.Count -gt 0) {
+        foreach ($dep in $externalDeps) {
+            $markdown += "- $dep`n"
+        }
+    } else {
+        $markdown += "- None (base R only)`n"
+    }
+    
+    $markdown += @"
 
 ## User Interface (Exported Functions)
 
@@ -454,40 +589,105 @@ function New-PackageDependencyMap {
         $markdown += "- " + ($dependencyMap.s3_classes -join ', ') + "`n"
     }
     
-    # S3 Methods
-    $markdown += "`n### S3 Methods`n"
+    # S3 Methods (limit to most important)
+    $markdown += "`n### Key S3 Methods`n"
+    $importantMethods = @('plot', 'print', 'summary', 'predict', 'residuals', 'fitted')
     foreach ($method in ($dependencyMap.s3_methods.Keys | Sort-Object)) {
-        $classes = $dependencyMap.s3_methods[$method] | Sort-Object -Unique
-        $markdown += "- **$method()**: " + ($classes -join ', ') + "`n"
+        if ($method -in $importantMethods -or $dependencyMap.s3_methods[$method].Count -ge 2) {
+            $classes = $dependencyMap.s3_methods[$method] | Sort-Object -Unique
+            $markdown += "- **$method()**: " + ($classes -join ', ') + "`n"
+        }
     }
     
-    # Key function signatures
+    # Core data structures
+    $markdown += "`n## Core Data Structures`n"
+    $markdown += "- **mvgam object**: Fitted model with data, parameters, and predictions`n"
+    $markdown += "- **mvgam_prefit**: Pre-compilation model structure`n"
+    $markdown += "- **mvgam_forecast**: Forecast results with uncertainty`n"
+    $markdown += "- **trend_param**: Trend model specifications`n"
+    
+    # Key function dependencies (limit to most important)
+    $markdown += "`n## Key Function Dependencies`n"
+    
+    $keyDeps = @('mvgam', 'plot.mvgam', 'sim_mvgam', 'lfo_cv.mvgam')
+    foreach ($func in $keyDeps) {
+        if ($dependencyMap.function_dependencies.ContainsKey($func)) {
+            $deps = $dependencyMap.function_dependencies[$func]
+            if ($deps.Count -gt 0) {
+                # Limit to first 5 dependencies for brevity
+                $depList = if ($deps.Count -gt 5) { 
+                    ($deps[0..4] -join ', ') + ", ..."
+                } else {
+                    $deps -join ', '
+                }
+                $markdown += "- **$func()** calls: $depList`n"
+            }
+        }
+    }
+    
+    # Key function signatures (reduced set)
     $markdown += "`n## Key Function Signatures`n"
     
-    $keyFunctions = @('mvgam', 'plot.mvgam', 'conditional_effects.mvgam', 'sim_mvgam', 'lfo_cv.mvgam')
+    $keyFunctions = @('mvgam', 'sim_mvgam')
     foreach ($keyFunc in $keyFunctions) {
         if ($dependencyMap.function_signatures.ContainsKey($keyFunc)) {
             $signature = $dependencyMap.function_signatures[$keyFunc]
+            # Truncate long signatures
+            if ($signature.Length -gt 150) {
+                $signature = $signature.Substring(0, 147) + "..."
+            }
             $markdown += "`n### ``$keyFunc``:`n"
             $markdown += "``````r`n$signature`n```````n"
             
             if ($dependencyMap.detailed_analysis.ContainsKey($keyFunc)) {
                 $analysis = $dependencyMap.detailed_analysis[$keyFunc]
                 if ($analysis.arguments.Count -gt 0) {
-                    $markdown += "**Arguments**: " + ($analysis.arguments -join ', ') + "`n"
-                }
-                if ($analysis.is_s3_method) {
-                    $markdown += "**S3 Method**: $($analysis.s3_method) for class $($analysis.s3_class)`n"
+                    # Show first 6 arguments
+                    $argList = if ($analysis.arguments.Count -gt 6) {
+                        ($analysis.arguments[0..5] -join ', ') + ", ..."
+                    } else {
+                        $analysis.arguments -join ', '
+                    }
+                    $markdown += "**Arguments**: $argList`n"
                 }
             }
         }
     }
 
-    $markdown += "`n`n## Function Definitions by File`n"
-
-    foreach ($file in $dependencyMap.definitions.Keys) {
-        $funcs = $dependencyMap.definitions[$file] -join ", "
-        $markdown += "`n### $file`n`n$funcs`n"
+    # File organization (with purposes)
+    $markdown += "`n## File Organization`n"
+    
+    # Group files by category
+    $coreFiles = @('R/mvgam_core.R', 'R/mvgam.R', 'R/sim_mvgam.R')
+    $validationFiles = $dependencyMap.definitions.Keys | Where-Object { $_ -match 'validat|check' }
+    $plotFiles = $dependencyMap.definitions.Keys | Where-Object { $_ -match 'plot' }
+    $stanFiles = $dependencyMap.definitions.Keys | Where-Object { $_ -match 'stan|brms' }
+    
+    foreach ($file in $coreFiles) {
+        if ($dependencyMap.definitions.ContainsKey($file)) {
+            $purpose = if ($dependencyMap.file_purposes.ContainsKey($file)) { 
+                ": " + $dependencyMap.file_purposes[$file] 
+            } else { "" }
+            $markdown += "- **$file**$purpose`n"
+        }
+    }
+    
+    if ($validationFiles.Count -gt 0) {
+        $markdown += "- **Validation**: " + (($validationFiles | Select-Object -First 3) -join ', ')
+        if ($validationFiles.Count -gt 3) { $markdown += ", ..." }
+        $markdown += "`n"
+    }
+    
+    if ($plotFiles.Count -gt 0) {
+        $markdown += "- **Plotting**: " + (($plotFiles | Select-Object -First 3) -join ', ')
+        if ($plotFiles.Count -gt 3) { $markdown += ", ..." }
+        $markdown += "`n"
+    }
+    
+    if ($stanFiles.Count -gt 0) {
+        $markdown += "- **Stan/brms**: " + (($stanFiles | Select-Object -First 3) -join ', ')
+        if ($stanFiles.Count -gt 3) { $markdown += ", ..." }
+        $markdown += "`n"
     }
     
     $markdown | Out-File -FilePath $VISUALIZATION_FILE -Encoding UTF8
@@ -495,24 +695,22 @@ function New-PackageDependencyMap {
     $endTime = Get-Date
     $duration = ($endTime - $startTime).TotalSeconds
     
-    Write-Host ""
-    Write-Host "Package dependency mapping complete!" -ForegroundColor Green
-    Write-Host "Duration: $([math]::Round($duration, 2)) seconds" -ForegroundColor Cyan
-    Write-Host "Check .claude/ directory for detailed maps and reports" -ForegroundColor Cyan
-    Write-Host ""
+    Write-Debug "Package dependency mapping complete!"
+    Write-Debug "Duration: $([math]::Round($duration, 2)) seconds"
 }
 
 # Main execution
 try {
     if ($Event -eq "post_git_commit" -or $Event -eq "test") {
         New-PackageDependencyMap
-        exit 2  # Success with output
+        exit 2  # Success with output (but no output shown due to Write-Debug)
     } else {
-        Write-Host "Hook triggered for event: $Event (no action taken)" -ForegroundColor Gray
+        Write-Debug "Hook triggered for event: $Event (no action taken)"
         exit 0  # Silent success
     }
 } catch {
-    Write-Host "Error in dependency mapper: $_" -ForegroundColor Red
-    Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Red
+    # Only show errors, not regular output
+    Write-Error "Error in dependency mapper: $_"
+    Write-Error "Stack trace: $($_.ScriptStackTrace)"
     exit 1  # Error
 }
