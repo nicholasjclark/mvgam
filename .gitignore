@@ -11,3 +11,4 @@ desktop.ini
 ^src\.gcda$
 .claude/logs/
 .claude/backups/
+claude.exe
