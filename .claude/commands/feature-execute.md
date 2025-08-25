@@ -5,26 +5,27 @@ You are a senior R package developer specializing efficient, quality, DRY R prog
 ## Task Implementation Protocol
 
 ### Acquire Package Context
-- Run the architecture-analyzer agent to gain a systematic overview of the following R files: `R/stan_assembly.R`, `R/mvgam_core.R`, `R/brms_integration.R`, `R/trend_system.R`, `R/validations.R`, `R/priors.R`
+- View package structure and dependency files in .claude/dependency-graph.md
 
 ### Sub-Task Execution
 - **MANDATORY STOP:** After completing each sub-task, you **MUST** stop and ask user permission before proceeding
 - **One sub-task at a time:** Do **NOT** start the next sub‑task until you ask the user for permission and they say "yes" or "y"
 - **15-minute rule:** Each sub-task must be completable within 15 minutes
 - **Code review:** ALWAYS use the code-reviewer agent to verify any proposed R code changes
+- **Tests:** Add new tests related to the subtasks to a NEW folder script in `tests/testthat` and use the test-runner agent whenever running tests 
 - **Mark completed:** Change `[ ]` to `[x]` immediately upon sub-task completion
+- **Test cleanup:** Ask the user where the subtask related tests should be moved to, then move them ONLY after the user answers
 - **Always pause:** Never proceed to the next sub-task without explicit user approval
 
 ### Parent Task Completion Sequence
 When **all** subtasks under a parent task are `[x]`:
 
 1. **Test & Validate:**
-   - Run `devtools::load_all(); devtools::test()` - all tests must pass
+   - Use the r-test-runner agent to run all subtask tests
 
 2. **Stage & Clean:**
    - Stage changes: `git add .`
    - Remove temporary files and debug code
-   - Ensure roxygen2 documentation is current
 
 3. **Commit:**
    ```bash
@@ -85,7 +86,7 @@ When **ALL** tasks are `[x]`:
    - Ensure roxygen2 documentation for all functions (`@param`, `@return`, `@examples`, `@export`)
    - Write comprehensive tests in `tests/testthat/`
    - Implement proper input validation
-   - `tryCatch()`, `skip()`, placeholder and fallback functions are FORBIDDEN
+   - `tryCatch()`, `skip()`, placeholder and fallback functions are **FORBIDDEN**
 
 ### Workflow Process
 1. Check which sub-task is next
@@ -108,25 +109,3 @@ Before marking any parent task complete:
 - [ ] Code reviewer approval received
 - [ ] Documentation complete with working examples
 - [ ] No temporary or debug code remains
-
-## Commit Message Examples
-
-```bash
-# Function implementation
-git commit -m "feat: implement data validation functions" \
-  -m "- Add validate_input() with comprehensive checks" \
-  -m "- Include S3 methods for different data types" \
-  -m "Related to T1.2 in TRD-data-processing"
-
-# Testing
-git commit -m "test: add validation test suite" \
-  -m "- Tests edge cases and error conditions" \
-  -m "- Validates S3 method dispatch" \
-  -m "Related to T3.1 in TRD-data-processing"
-
-# Documentation  
-git commit -m "docs: add roxygen2 documentation" \
-  -m "- Complete @param and @return docs" \
-  -m "- Add runnable examples" \
-  -m "Related to T4.1 in TRD-data-processing"
-```

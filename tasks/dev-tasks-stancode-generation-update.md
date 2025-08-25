@@ -61,33 +61,89 @@ Implementation tasks for stancode generation update feature with comprehensive p
   - Expanded tests in test-setup-brms.R with 5 new comprehensive test cases
   - All 611 tests passing after fixing 5 real bugs in validation and test construction
 
-3- [ ] **Step 9 - Systematic Validation** (45 min): Test for correct standata and stancode across multiple configurations: univariate trends (RW, AR, PW), multivariate shared trends, response-specific trends, mixed family models, by expanding tests in `test-setup-brms.R`
 
-- [ ] **Step 10 - Full Integration Test** (45 min): Complete test suite with Stan compilation focus, prediction compatibility validation, multivariate workflow testing
+### Step 9 - brms-Equivalent Inspection Functions
 
-- [ ] **Multivariate Formula Integration** (60 min): Resolve setup_brms_lightweight handling of multivariate observation models with response-specific trend formulas
+**Implementation Strategy**: Use `mvgam_formula()` constructor + S3 method dispatch to extend brms functions cleanly without masking
 
----
-
-## 🎯 CORE USER-FACING FUNCTIONS (TRD Requirements)
-
-**CRITICAL**: The following inspection functions are core TRD objectives and must be implemented:
-
-### brms-Equivalent Inspection Functions
-- [ ] **get_prior()** (45 min): Inspect all available priors before fitting
-  - Return `mvgamprior` data frame with `trend_component` column distinguishing observation vs trend parameters
-  - Compatible with brms `brmsprior` structure for cross-package consistency
+- [ ] **mvgam_formula() constructor + get_prior.mvgam_formula()** (120 min total - 8 sub-tasks of 15 min each): 
+  - Create `mvgam_formula()` constructor for consistent interface across inspection functions
+  - Add `get_prior.mvgam_formula()` S3 method for clean brms integration
+  - Return `brmsprior` data frame with `trend_component` column distinguishing observation vs trend parameters
   - Support both observation and trend model priors in unified interface
+  
+  **Sub-tasks (each 15 minutes)**:
+  - [ ] **Sub-task 1A**: Implement `mvgam_formula()` constructor function
+    - Create function signature: `mvgam_formula(formula, trend_formula = NULL, data = NULL, family = gaussian(), ...)`
+    - Validate inputs: formula (formula/brmsformula), trend_formula (formula or NULL)  
+    - Create list structure: `list(formula = formula, trend_formula = trend_formula, ...)`
+    - Set S3 class: `c("mvgam_formula", class(formula))` to inherit from original formula class
+    - Add to R/priors.R with roxygen2 documentation
+    
+  - [ ] **Sub-task 1B**: Add comprehensive validation to `mvgam_formula()`
+    - Use checkmate for all parameter validation (formula, trend_formula, data, family)
+    - Handle different formula types: formula, brmsformula, mvbrmsformula
+    - Validate autocorrelation separation principle when trend_formula present
+    - Store validated components in mvgam_formula object
+    - Add helpful error messages using `insight::format_error()`
+    
+  - [ ] **Sub-task 1C**: Implement `get_prior.mvgam_formula()` S3 method
+    - Function signature: `get_prior.mvgam_formula(object, ...)`  
+    - Extract components: `formula <- object$formula`, `trend_formula <- object$trend_formula`
+    - Delegate to `brms::get_prior()` when `trend_formula = NULL`
+    - Add trend_component = "observation" column to brms results
+    - Handle additional parameters passed via `...` to brms
+    
+  - [ ] **Sub-task 1D**: Add trend component integration to get_prior method
+    - Call `extract_response_names(formula)` to get response variable names  
+    - Call `extract_trend_priors(trend_formula, data, response_names)` for trend priors
+    - Add `trend_component = "trend"` column to trend-generated priors
+    - Combine using `rbind(obs_priors, trend_priors)` preserving brmsprior class
+    - Handle empty trend_priors case gracefully
+    
+  - [ ] **Sub-task 1E**: Test brms compatibility (exact equivalence)  
+    - Create test file `tests/testthat/test-mvgam-formula.R`
+    - Test: `mvgam_formula(y ~ x, trend_formula = NULL)` → `get_prior()` identical to brms
+    - Test with different family types: gaussian(), poisson(), binomial() 
+    - Test with different formula types: formula, brmsformula objects
+    - Verify S3 dispatch works correctly and doesn't mask brms methods
+    
+  - [ ] **Sub-task 1F**: Test trend functionality and integration
+    - Test trend_component column addition for both observation and trend parameters
+    - Test with different trend types: RW(), AR(p=1), PW() constructors
+    - Test multivariate formulas: mvbind(y1, y2) ~ x with shared trends  
+    - Verify trend parameter naming follows _trend suffix convention
+    - Test integration with `extract_response_names()` and `extract_trend_priors()`
+    
+  - [ ] **Sub-task 1G**: Add comprehensive documentation and examples
+    - Complete roxygen2 for both `mvgam_formula()` and `get_prior.mvgam_formula()` 
+    - Add realistic workflow examples: construct → inspect → modify priors
+    - Document S3 class structure and inheritance from base formula classes
+    - Add @family prior-functions tag and @seealso references
+    - Show integration with make_stancode(), make_standata() patterns
+    
+  - [ ] **Sub-task 1H**: Integration testing and ecosystem validation
+    - Test returned brmsprior objects work with `brms::set_prior()`
+    - Test error handling: malformed inputs, incompatible autocorr + trends
+    - Create examples showing complete workflow: construct → inspect → modify → fit
+    - Verify mvgam_formula objects can be reused across inspection functions  
+    - Test that formula inheritance preserves brms compatibility
 
-- [ ] **make_stancode()** (60 min): Generate complete Stan model code before fitting
+- [ ] **make_stancode.mvgam_formula()** (60 min): Generate complete Stan model code before fitting
+  - Add S3 method: `make_stancode.mvgam_formula(object, prior = NULL, ...)`
+  - Extract formula and trend_formula from mvgam_formula object
   - Character string containing complete Stan model code with both observation and trend components
-  - Follow brms style conventions and Stan best practices
+  - Follow brms style conventions and Stan best practices  
   - Handle custom prior specifications from `get_prior()` or `set_prior()`
+  - Integrate with existing `generate_combined_stancode_and_data()` function
 
-- [ ] **make_standata()** (60 min): Generate complete Stan data list before fitting
+- [ ] **make_standata.mvgam_formula()** (60 min): Generate complete Stan data list before fitting
+  - Add S3 method: `make_standata.mvgam_formula(object, prior = NULL, ...)`
+  - Extract formula and trend_formula from mvgam_formula object
   - Named list containing all data for Stan model (observation + trend data components)
   - Structure matches what would be passed to Stan during fitting
   - Support custom prior data requirements
+  - Integrate with existing Stan data preparation pipeline
 
 - [ ] **prior_summary()** (30 min): Inspect priors used in fitted or specified models
   - Data frame showing priors actually used or planned to be used
@@ -105,7 +161,12 @@ Implementation tasks for stancode generation update feature with comprehensive p
   - Return prior specification objects compatible with mvgam functions
   - Support trend parameter targeting with `_trend` suffix conventions
 
----
+- [ ] **Step 10 - Multivariate Formula Integration** (60 min): Resolve setup_brms_lightweight handling of multivariate observation models with response-specific trend formulas
+
+- [ ] **Step 11 - Systematic Validation** (45 min): Test for correct standata and stancode across multiple configurations: univariate trends (RW, AR, PW), multivariate shared trends, response-specific trends, mixed family models, by expanding tests in `test-setup-brms.R`
+
+- [ ] **Step 12 - Full Integration Test** (45 min): Complete test suite with Stan compilation focus, prediction compatibility validation, multivariate workflow testing
+
 
 ## PENDING FUTURE SECTIONS
 
