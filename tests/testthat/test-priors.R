@@ -1596,3 +1596,653 @@ test_that("get_prior methods are properly exported and registered", {
     expect_true(method %in% methods_list)
   }
 })
+
+# =============================================================================
+# Tests for Sub-task 1D: Trend Component Integration in get_prior
+# =============================================================================
+
+test_that("get_prior.mvgam_formula adds trend_component column correctly", {
+  # Create test data with time series structure
+  test_data <- data.frame(
+    count = rpois(50, 5),
+    temperature = rnorm(50),
+    time = 1:50,
+    series = factor(rep(c("A", "B"), 25))
+  )
+  
+  # Create mvgam_formula with trend
+  mf <- mvgam_formula(
+    count ~ temperature,
+    trend_formula = ~ AR(p = 1, time = "time", series = "series")
+  )
+  
+  # Get priors using S3 method
+  combined_priors <- get_prior(mf, data = test_data, family = poisson())
+  
+  # Should return brmsprior object with trend_component column
+  expect_true(inherits(combined_priors, "brmsprior"))
+  expect_true("trend_component" %in% names(combined_priors))
+  
+  # Should have both observation and trend components
+  expect_true("observation" %in% combined_priors$trend_component)
+  expect_true("trend" %in% combined_priors$trend_component)
+  
+  # Observation parameters should be marked as "observation"
+  obs_rows <- combined_priors$trend_component == "observation"
+  expect_true(any(combined_priors$class[obs_rows] == "Intercept"))
+  expect_true(any(combined_priors$class[obs_rows] == "b"))
+  
+  # Trend parameters should be marked as "trend" and have _trend suffix
+  trend_rows <- combined_priors$trend_component == "trend"
+  expect_true(all(grepl("_trend$|^Z$", combined_priors$class[trend_rows])))
+  
+  # Should have AR-specific trend parameters
+  expect_true(any(grepl("ar.*_trend", combined_priors$class[trend_rows])))
+  expect_true(any(grepl("sigma_trend", combined_priors$class[trend_rows])))
+})
+
+test_that("get_prior.mvgam_formula handles empty trend_priors gracefully", {
+  # Create test data
+  test_data <- data.frame(
+    y = rnorm(20),
+    x = rnorm(20),
+    time = 1:20,
+    series = factor('A')
+  )
+  
+  # Create mvgam_formula with trend_formula that results in empty priors
+  mf <- mvgam_formula(
+    y ~ x,
+    trend_formula = ~ 1  # Should result in ZMVN with possibly no monitor_params
+  )
+  
+  # Should handle gracefully without errors
+  expect_no_error({
+    priors <- get_prior(mf, data = test_data, family = gaussian())
+  })
+  
+  priors <- get_prior(mf, data = test_data, family = gaussian())
+  
+  # Should still have trend_component column
+  expect_true("trend_component" %in% names(priors))
+  
+  # Should have observation priors at minimum
+  expect_true("observation" %in% priors$trend_component)
+  
+  # All observation priors should be marked correctly
+  obs_rows <- priors$trend_component == "observation"
+  expect_true(sum(obs_rows) >= 3)  # At least Intercept, b, sigma
+})
+
+test_that("get_prior.mvgam_formula integrates extract_response_names correctly", {
+  # Create multivariate test data
+  test_data <- data.frame(
+    count = rpois(40, 3),
+    biomass = rnorm(40),
+    temperature = rnorm(40),
+    time = 1:40,
+    series = factor(rep(c("A", "B"), 20))
+  )
+  
+  # Create multivariate mvgam_formula using bf() pattern from quick reference
+  mf <- mvgam_formula(
+    brms::bf(count ~ temperature, family = poisson()) + 
+    brms::bf(biomass ~ temperature, family = gaussian()),
+    trend_formula = ~ AR(p = 1, time = "time", series = "series")
+  )
+  
+  # Get priors - multivariate bf() formulas handle family internally
+  mv_priors <- get_prior(mf, data = test_data)
+  
+  # Should have trend_component column
+  expect_true("trend_component" %in% names(mv_priors))
+  
+  # Should have both observation and trend parameters
+  expect_true("observation" %in% mv_priors$trend_component)
+  expect_true("trend" %in% mv_priors$trend_component)
+  
+  # Should have multivariate-specific structure in observation parameters
+  obs_rows <- mv_priors$trend_component == "observation"
+  expect_true(any(grepl("count", mv_priors$resp[obs_rows])))
+  expect_true(any(grepl("biomass", mv_priors$resp[obs_rows])))
+  
+  # Trend parameters should have _trend suffix
+  trend_rows <- mv_priors$trend_component == "trend"
+  if (sum(trend_rows) > 0) {
+    expect_true(all(grepl("_trend$|^Z$", mv_priors$class[trend_rows])))
+  }
+})
+
+test_that("get_prior.mvgam_formula combines priors preserving brmsprior class", {
+  # Create test data
+  test_data <- data.frame(
+    y = rnorm(30),
+    x = rnorm(30),
+    time = 1:30,
+    series = factor('series1')
+  )
+  
+  # Create mvgam_formula
+  mf <- mvgam_formula(
+    y ~ x,
+    trend_formula = ~ RW(time = "time", series = "series")
+  )
+  
+  # Get combined priors
+  combined <- get_prior(mf, data = test_data, family = gaussian())
+  
+  # Should preserve brmsprior class structure
+  expect_true(inherits(combined, "brmsprior"))
+  expect_true(inherits(combined, "data.frame"))
+  
+  # Should have all required brmsprior columns
+  expected_cols <- c("prior", "class", "coef", "group", "resp", "dpar", "nlpar", 
+                    "lb", "ub", "source", "trend_component")
+  expect_true(all(expected_cols %in% names(combined)))
+  
+  # Should maintain brmsprior attributes if any
+  class_attr <- attr(combined, "class")
+  expect_true("brmsprior" %in% class_attr)
+  expect_true("data.frame" %in% class_attr)
+  
+  # Row binding should work correctly - no duplicate or missing rows
+  obs_count <- sum(combined$trend_component == "observation")
+  trend_count <- sum(combined$trend_component == "trend")
+  expect_equal(nrow(combined), obs_count + trend_count)
+  expect_gt(obs_count, 0)  # Should have observation priors
+})
+
+test_that("get_prior.mvgam_formula trend_component column matches parameter types", {
+  # Create test data
+  test_data <- data.frame(
+    count = rpois(40, 4),
+    habitat = factor(rep(c("forest", "grassland"), 20)),
+    time = 1:40,
+    series = factor(rep(c("site1", "site2"), 20))
+  )
+  
+  # Create mvgam_formula with trend
+  mf <- mvgam_formula(
+    count ~ habitat,
+    trend_formula = ~ VAR(p = 1, time = "time", series = "series")
+  )
+  
+  # Get priors
+  priors <- get_prior(mf, data = test_data, family = poisson())
+  
+  # Check observation parameters are correctly tagged
+  obs_rows <- priors$trend_component == "observation"
+  obs_classes <- priors$class[obs_rows]
+  
+  # Standard brms observation parameters should not have _trend suffix
+  expect_false(any(grepl("_trend$", obs_classes)))
+  expect_true(any(obs_classes %in% c("Intercept", "b", "sd", "sigma")))
+  
+  # Check trend parameters are correctly tagged
+  trend_rows <- priors$trend_component == "trend"
+  if (sum(trend_rows) > 0) {
+    trend_classes <- priors$class[trend_rows]
+    
+    # All trend parameters should have _trend suffix (except Z for factor models)
+    non_z_params <- trend_classes[trend_classes != "Z"]
+    expect_true(all(grepl("_trend$", non_z_params)))
+    
+    # Should have VAR-specific parameters
+    expect_true(any(grepl("Amu_trend|Aomega_trend|sigma_trend|L_Omega_trend", trend_classes)))
+  }
+})
+
+test_that("get_prior.mvgam_formula works with different trend types", {
+  # Create test data
+  test_data <- data.frame(
+    y = rnorm(30),
+    x = rnorm(30),
+    time = 1:30,
+    series = factor('A')
+  )
+  
+  # Test with different trend constructors
+  trend_types <- list(
+    RW = ~ RW(time = "time", series = "series"),
+    AR = ~ AR(p = 1, time = "time", series = "series"),
+    PW = ~ PW(n_change = 1, time = "time", series = "series"),
+    ZMVN = ~ 1  # Default ZMVN
+  )
+  
+  for (trend_name in names(trend_types)) {
+    # Create mvgam_formula with specific trend
+    mf <- mvgam_formula(y ~ x, trend_formula = trend_types[[trend_name]])
+    
+    # Should work without error
+    expect_no_error({
+      priors <- get_prior(mf, data = test_data, family = gaussian())
+    })
+    
+    # Get priors
+    priors <- get_prior(mf, data = test_data, family = gaussian())
+    
+    # Should have trend_component column
+    expect_true("trend_component" %in% names(priors), 
+                info = paste("Missing trend_component for:", trend_name))
+    
+    # Should have observation parameters
+    expect_true("observation" %in% priors$trend_component,
+                info = paste("Missing observation component for:", trend_name))
+    
+    # Should preserve brmsprior class
+    expect_true(inherits(priors, "brmsprior"),
+                info = paste("Class not preserved for:", trend_name))
+  }
+})
+
+test_that("get_prior.mvgam_formula handles factor models correctly", {
+  # Create test data for factor model (n_lv < n_series)
+  test_data <- data.frame(
+    y = rnorm(60),
+    x = rnorm(60),
+    time = rep(1:20, 3),
+    series = factor(rep(c("A", "B", "C"), 20))
+  )
+  
+  # Create mvgam_formula with factor model
+  mf <- mvgam_formula(
+    y ~ x,
+    trend_formula = ~ AR(p = 1, cor = TRUE, n_lv = 2, time = "time", series = "series")
+  )
+  
+  # Get priors
+  factor_priors <- get_prior(mf, data = test_data, family = gaussian())
+  
+  # Should have trend_component column
+  expect_true("trend_component" %in% names(factor_priors))
+  
+  # Should have both observation and trend parameters
+  expect_true("observation" %in% factor_priors$trend_component)
+  expect_true("trend" %in% factor_priors$trend_component)
+  
+  # Check trend parameters
+  trend_rows <- factor_priors$trend_component == "trend"
+  if (sum(trend_rows) > 0) {
+    trend_classes <- factor_priors$class[trend_rows]
+    
+    # Factor models should include Z matrix
+    expect_true("Z" %in% trend_classes)
+    
+    # Should have AR parameters with _trend suffix
+    expect_true(any(grepl("ar.*_trend", trend_classes)))
+    
+    # Should have correlation parameters (cor = TRUE)
+    expect_true(any(grepl("L_Omega_trend", trend_classes)))
+  }
+})
+
+test_that("get_prior.mvgam_formula error handling works correctly", {
+  # Create test data
+  test_data <- data.frame(
+    y = rnorm(20),
+    x = rnorm(20),
+    time = 1:20,
+    series = factor('A')
+  )
+  
+  # Test with formula missing response variable
+  mf_bad <- mvgam_formula(~ x)  # No response
+  expect_error(
+    get_prior(mf_bad, data = test_data),
+    "missing response variable"
+  )
+  
+  # Test with invalid data
+  mf_good <- mvgam_formula(y ~ x, trend_formula = ~ AR(time = "time", series = "series"))
+  expect_error(
+    get_prior(mf_good, data = "not_a_dataframe"),
+    "Must be of type 'data.frame'"
+  )
+  
+  # Test with empty data
+  expect_error(
+    get_prior(mf_good, data = data.frame()),
+    "Must have at least 1 rows"
+  )
+  
+  # Test with invalid family
+  expect_error(
+    get_prior(mf_good, data = test_data, family = "not_a_family"),
+    "Must inherit from class 'family'"
+  )
+})
+
+# =============================================================================
+# COMPREHENSIVE Tests for extract_trend_priors: Missing Trend Types & Complex Linear Predictors
+# =============================================================================
+
+test_that("extract_trend_priors works with ALL available trend types", {
+  # Create comprehensive test data with all necessary variables
+  test_data <- data.frame(
+    y = rnorm(60),
+    x1 = rnorm(60),
+    x2 = rnorm(60),
+    time = rep(1:20, 3),
+    series = factor(rep(c("A", "B", "C"), 20)),
+    site = factor(rep(c("site1", "site2"), 30)),
+    habitat = factor(sample(c("forest", "grassland"), 60, TRUE))
+  )
+  
+  # Test all available trend types with appropriate parameters
+  trend_type_tests <- list(
+    # Well-tested types (verification)
+    "AR_basic" = ~ AR(p = 1, time = "time", series = "series"),
+    "AR_seasonal" = ~ AR(p = c(1, 12), time = "time", series = "series"),
+    "RW_basic" = ~ RW(time = "time", series = "series"),
+    "VAR_basic" = ~ VAR(p = 1, time = "time", series = "series"),
+    "ZMVN_explicit" = ~ ZMVN(time = "time", series = "series"),
+    
+    # Missing/under-tested types (critical additions)
+    "CAR_basic" = ~ CAR(time = "time", series = "series"),
+    "PW_changepoint" = ~ PW(n_change = 1, time = "time", series = "series"),
+    "PW_multi_change" = ~ PW(n_change = 2, growth = "logistic", time = "time", series = "series"),
+    "GP_trend" = ~ GP(time = "time", series = "series"),
+    
+    # Factor model variations
+    "AR_factor" = ~ AR(p = 1, n_lv = 2, time = "time", series = "series"),
+    "CAR_factor" = ~ CAR(n_lv = 2, time = "time", series = "series"),
+    
+    # Hierarchical variations
+    "VAR_hierarchical" = ~ VAR(p = 1, gr = "site", time = "time", series = "series"),
+    "AR_hierarchical" = ~ AR(p = 1, gr = "site", time = "time", series = "series")
+  )
+  
+  for (test_name in names(trend_type_tests)) {
+    trend_formula <- trend_type_tests[[test_name]]
+    
+    # Should work without error for all trend types
+    expect_no_error({
+      trend_priors <- extract_trend_priors(
+        trend_formula = trend_formula,
+        data = test_data,
+        response_names = "y"
+      )
+    })
+    
+    # Get the priors
+    trend_priors <- extract_trend_priors(
+      trend_formula = trend_formula,
+      data = test_data,
+      response_names = "y"
+    )
+    
+    # Should return proper brmsprior object
+    expect_true(inherits(trend_priors, "brmsprior"), 
+                info = paste("Not brmsprior for:", test_name))
+    
+    # Should have proper structure (may be empty for some trend types)
+    expect_true(is.data.frame(trend_priors),
+                info = paste("Not data.frame for:", test_name))
+    
+    # If not empty, should have trend parameters with proper naming
+    if (nrow(trend_priors) > 0) {
+      # All trend parameters should have _trend suffix except Z (factor loading matrix)
+      trend_params <- trend_priors$class[trend_priors$class != "Z"]
+      expect_true(all(grepl("_trend$", trend_params)),
+                  info = paste("Missing _trend suffix for:", test_name))
+    }
+  }
+})
+
+test_that("extract_trend_priors works with complex linear predictors in trend formulas", {
+  # Create rich test data matching the formula patterns from test-setup-brms.R
+  test_data <- data.frame(
+    y = rnorm(72),
+    x1 = rnorm(72),
+    x2 = rnorm(72), 
+    x3 = rnorm(72),
+    fac = factor(sample(c('A', 'B', 'C'), 72, TRUE)),
+    habitat = factor(sample(c("forest", "grassland", "wetland"), 72, TRUE)),
+    temperature = rnorm(72),
+    precipitation = rnorm(72),
+    time = rep(1:24, 3),
+    series = factor(rep(c("site1", "site2", "site3"), 24)),
+    group = factor(rep(c("region1", "region2"), 36))
+  )
+  
+  # Test comprehensive linear predictor patterns in trend formulas
+  # These mirror the patterns from test-setup-brms.R but applied to trend_formula
+  complex_trend_formulas <- list(
+    # Simple linear predictors + trend
+    "Linear_plus_trend" = ~ x1 + AR(p = 1, time = "time", series = "series"),
+    "Multiple_pred_trend" = ~ x1 + x2 + temperature + RW(time = "time", series = "series"),
+    
+    # Factor/categorical predictors + trend  
+    "Factor_plus_trend" = ~ habitat + AR(p = 1, time = "time", series = "series"),
+    "Mixed_types_trend" = ~ x1 + habitat + temperature + VAR(p = 1, time = "time", series = "series"),
+    
+    # Smooth terms + trend
+    "Smooth_plus_trend" = ~ s(temperature) + AR(p = 1, time = "time", series = "series"),
+    "Multi_smooth_trend" = ~ s(x1) + s(temperature) + RW(time = "time", series = "series"),
+    
+    # Tensor products + trend
+    "Tensor_plus_trend" = ~ t2(temperature, precipitation) + AR(p = 1, time = "time", series = "series"),
+    "Complex_tensor_trend" = ~ te(x1, x2) + t2(temperature, precipitation) + VAR(p = 1, time = "time", series = "series"),
+    
+    # Gaussian processes + trend
+    "GP_plus_trend" = ~ gp(temperature, x1) + AR(p = 1, time = "time", series = "series"),
+    "GP_grouping_trend" = ~ gp(temperature, x1, by = fac) + RW(time = "time", series = "series"),
+    
+    # Random effects + trend (if supported)
+    "Random_plus_trend" = ~ x1 + (1|fac) + AR(p = 1, time = "time", series = "series"),
+    "Complex_random_trend" = ~ temperature + (1 + x1|habitat) + VAR(p = 1, time = "time", series = "series"),
+    
+    # Mixed complex patterns
+    "Everything_trend" = ~ s(temperature) + te(x1, x2) + habitat + CAR(time = "time", series = "series"),
+    "Hierarchical_complex" = ~ s(temperature) + habitat + AR(p = 1, gr = "group", time = "time", series = "series")
+  )
+  
+  for (test_name in names(complex_trend_formulas)) {
+    trend_formula <- complex_trend_formulas[[test_name]]
+    
+    # Should parse and extract priors without error
+    expect_no_error({
+      trend_priors <- extract_trend_priors(
+        trend_formula = trend_formula,
+        data = test_data,
+        response_names = "y"
+      )
+    })
+    
+    # Get the priors
+    trend_priors <- extract_trend_priors(
+      trend_formula = trend_formula,
+      data = test_data,
+      response_names = "y"
+    )
+    
+    # Should return proper brmsprior object
+    expect_true(inherits(trend_priors, "brmsprior"),
+                info = paste("Not brmsprior for:", test_name))
+    
+    # Should have proper structure
+    expect_true(is.data.frame(trend_priors),
+                info = paste("Not data.frame for:", test_name))
+    
+    # Should have expected columns
+    expected_cols <- c("prior", "class", "coef", "group", "resp", "dpar", "nlpar", "lb", "ub", "source")
+    expect_true(all(expected_cols %in% names(trend_priors)),
+                info = paste("Missing columns for:", test_name))
+    
+    # If trend parameters exist, they should follow naming conventions
+    if (nrow(trend_priors) > 0) {
+      trend_param_classes <- trend_priors$class[trend_priors$class != "Z"]
+      if (length(trend_param_classes) > 0) {
+        expect_true(all(grepl("_trend$", trend_param_classes)),
+                    info = paste("Wrong parameter naming for:", test_name))
+      }
+    }
+  }
+})
+
+test_that("extract_trend_priors handles trend-specific parameter variations", {
+  # Create test data
+  test_data <- data.frame(
+    y = rnorm(48),
+    temperature = rnorm(48),
+    site = factor(rep(c("A", "B"), 24)),
+    time = rep(1:24, 2),
+    series = factor(rep(c("series1", "series2"), 24))
+  )
+  
+  # Test trend-specific parameter variations that should generate different prior structures
+  trend_parameter_tests <- list(
+    # AR variations
+    "AR_no_correlation" = ~ AR(p = 1, cor = FALSE, time = "time", series = "series"),
+    "AR_with_correlation" = ~ AR(p = 1, cor = TRUE, time = "time", series = "series"),
+    "AR_seasonal_lags" = ~ AR(p = c(1, 6, 12), time = "time", series = "series"),
+    "AR_with_MA" = ~ AR(p = 1, ma = TRUE, time = "time", series = "series"),
+    
+    # VAR variations  
+    "VAR_simple" = ~ VAR(p = 1, time = "time", series = "series"),
+    "VAR_higher_order" = ~ VAR(p = 3, time = "time", series = "series"),
+    "VARMA_model" = ~ VAR(p = 2, ma = TRUE, time = "time", series = "series"),
+    
+    # Factor model variations
+    "AR_factor_small" = ~ AR(p = 1, n_lv = 1, time = "time", series = "series"),
+    "VAR_factor_model" = ~ VAR(p = 1, n_lv = 1, cor = TRUE, time = "time", series = "series"),
+    "RW_factor_corr" = ~ RW(cor = TRUE, n_lv = 1, time = "time", series = "series"),
+    
+    # Hierarchical variations
+    "AR_hierarchical_simple" = ~ AR(p = 1, gr = "site", time = "time", series = "series"),
+    "VAR_hierarchical_complex" = ~ VAR(p = 1, gr = "site", cor = TRUE, time = "time", series = "series"),
+    
+    # PW variations (if implemented)
+    "PW_linear_growth" = ~ PW(n_change = 1, growth = "linear", time = "time", series = "series"),
+    "PW_logistic_growth" = ~ PW(n_change = 2, growth = "logistic", time = "time", series = "series")
+  )
+  
+  for (test_name in names(trend_parameter_tests)) {
+    trend_formula <- trend_parameter_tests[[test_name]]
+    
+    # Should work without error
+    expect_no_error({
+      priors <- extract_trend_priors(
+        trend_formula = trend_formula,
+        data = test_data,
+        response_names = "y"
+      )
+    })
+    
+    priors <- extract_trend_priors(
+      trend_formula = trend_formula,
+      data = test_data,
+      response_names = "y"
+    )
+    
+    # Should return brmsprior
+    expect_true(inherits(priors, "brmsprior"),
+                info = paste("Not brmsprior for:", test_name))
+    
+    # Validate parameter-specific expectations
+    if (nrow(priors) > 0) {
+      classes <- priors$class
+      
+      # AR models should have ar*_trend parameters
+      if (grepl("^AR", test_name)) {
+        expect_true(any(grepl("ar.*_trend", classes)),
+                   info = paste("Missing AR parameters for:", test_name))
+      }
+      
+      # VAR models should have VAR-specific parameters
+      if (grepl("^VAR", test_name)) {
+        expect_true(any(grepl("Amu_trend|Aomega_trend", classes)),
+                   info = paste("Missing VAR parameters for:", test_name))
+      }
+      
+      # Factor models should have Z matrix
+      if (grepl("factor", test_name)) {
+        expect_true("Z" %in% classes,
+                   info = paste("Missing Z matrix for factor model:", test_name))
+      }
+      
+      # Correlation models should have correlation parameters
+      if (grepl("cor.*TRUE|correlation", test_name)) {
+        expect_true(any(grepl("L_Omega_trend", classes)),
+                   info = paste("Missing correlation parameters for:", test_name))
+      }
+    }
+  }
+})
+
+test_that("extract_trend_priors integrates properly with get_prior.mvgam_formula for complex cases", {
+  # Test that complex trend formulas work end-to-end with the full get_prior system
+  test_data <- data.frame(
+    count = rpois(36, 5),
+    biomass = rnorm(36, 10, 2),
+    temperature = rnorm(36),
+    habitat = factor(sample(c("A", "B", "C"), 36, TRUE)),
+    time = rep(1:12, 3),
+    series = factor(rep(c("site1", "site2", "site3"), 12))
+  )
+  
+  # Test end-to-end integration with complex cases
+  integration_tests <- list(
+    # Complex univariate
+    "Complex_univariate" = list(
+      obs_formula = count ~ s(temperature) + habitat,
+      trend_formula = ~ temperature + AR(p = 1, cor = TRUE, time = "time", series = "series"),
+      family = poisson()
+    ),
+    
+    # Multivariate with complex trends using bf() pattern
+    "Complex_multivariate" = list(
+      obs_formula = brms::bf(count ~ temperature + habitat, family = poisson()) + 
+                   brms::bf(biomass ~ temperature + habitat, family = gaussian()),
+      trend_formula = ~ s(temperature) + VAR(p = 1, time = "time", series = "series"),
+      family = NULL  # bf() formulas handle family internally
+    ),
+    
+    # Factor model with predictors
+    "Factor_with_predictors" = list(
+      obs_formula = count ~ temperature,
+      trend_formula = ~ habitat + AR(p = 1, n_lv = 2, time = "time", series = "series"),
+      family = poisson()
+    )
+  )
+  
+  for (test_name in names(integration_tests)) {
+    test_case <- integration_tests[[test_name]]
+    
+    # Create mvgam_formula
+    mf <- mvgam_formula(
+      formula = test_case$obs_formula,
+      trend_formula = test_case$trend_formula
+    )
+    
+    # Should work end-to-end
+    expect_no_error({
+      combined_priors <- get_prior(mf, data = test_data, family = test_case$family)
+    })
+    
+    combined_priors <- get_prior(mf, data = test_data, family = test_case$family)
+    
+    # Should have both observation and trend components
+    expect_true("trend_component" %in% names(combined_priors),
+                info = paste("Missing trend_component for:", test_name))
+    expect_true("observation" %in% combined_priors$trend_component,
+                info = paste("Missing observation priors for:", test_name))
+    expect_true("trend" %in% combined_priors$trend_component,
+                info = paste("Missing trend priors for:", test_name))
+    
+    # Should properly separate observation and trend parameters
+    obs_rows <- combined_priors$trend_component == "observation"
+    trend_rows <- combined_priors$trend_component == "trend"
+    
+    expect_gt(sum(obs_rows), 0, info = paste("No observation parameters for:", test_name))
+    # Trend parameters might be 0 for some configurations, but if present should be labeled correctly
+    if (sum(trend_rows) > 0) {
+      trend_classes <- combined_priors$class[trend_rows]
+      non_z_classes <- trend_classes[trend_classes != "Z"]
+      if (length(non_z_classes) > 0) {
+        expect_true(all(grepl("_trend$", non_z_classes)),
+                   info = paste("Wrong trend parameter naming for:", test_name))
+      }
+    }
+  }
+})

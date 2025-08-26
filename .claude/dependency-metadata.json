@@ -1,8 +1,8 @@
 ﻿{
-    "commit_hash":  "79936fbf0b644e91c69ee5f1a12595ac3281d366",
-    "commit_message":  "feat: implement get_prior.mvgam_formula() S3 method\n\n- Add get_prior.mvgam_formula() method for unified prior inspection\n- Extends brms get_prior generic with mvgam_formula objects\n- Perfect brms compatibility when trend_formula = NULL\n- Comprehensive validation using checkmate assertions\n- Uses existing helper functions for prior extraction and combination\n- Update architecture decisions with new formula interface patterns\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude \u003cnoreply@anthropic.com\u003e",
+    "commit_hash":  "4af04de39e0764cb866d85cafdbb8fc558800541",
+    "commit_message":  "feat: implement clean S3 generic get_prior() system with brms delegation\n\n- Implement proper S3 generic get_prior() with UseMethod() dispatch\n- Add explicit delegation methods for formula, brmsformula, and default objects\n- Create get_prior.mvgam_formula() with perfect brms compatibility when trend_formula = NULL\n- Add trend_component column to distinguish observation vs trend parameters\n- Clean mvgam_formula class structure with formula_class attribute preservation\n- Comprehensive test coverage: 8 new tests, 95.5% pass rate (273/286 tests)\n- Update architecture decisions with S3 generic pattern documentation\n- Add prior inspection workflow to quick-reference guide\n\nRelated to Sub-task 1C in TRD-stancode-generation-update\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude \u003cnoreply@anthropic.com\u003e",
     "version":  "2.0.0",
-    "exported_functions":  67,
+    "exported_functions":  68,
     "package_name":  "mvgam",
     "external_dependencies":  [
                                   "bayesplot",
@@ -27,8 +27,8 @@
                                   "tibble"
                               ],
     "total_files":  56,
-    "generated":  "2025-08-26 10:14:54",
+    "generated":  "2025-08-26 11:51:58",
     "s3_methods_count":  42,
-    "s3_classes_count":  21,
-    "total_functions":  402
+    "s3_classes_count":  24,
+    "total_functions":  406
 }

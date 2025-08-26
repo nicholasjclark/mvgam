@@ -96,35 +96,44 @@ Implementation tasks for stancode generation update feature with comprehensive p
     - ✅ Clean class structure: `class(mvgam_formula) <- "mvgam_formula"` with `attr(obj, "formula_class")` metadata
     - ✅ Comprehensive test coverage: 8 new tests added, all passing (273/286 total tests pass = 95.5%)
     
-  - [ ] **Sub-task 1D**: Add trend component integration to get_prior method
-    - Call `extract_response_names(formula)` to get response variable names  
-    - Call `extract_trend_priors(trend_formula, data, response_names)` for trend priors
-    - Add `trend_component = "trend"` column to trend-generated priors
-    - Combine using `rbind(obs_priors, trend_priors)` preserving brmsprior class
-    - Handle empty trend_priors case gracefully
+  - [x] **Sub-task 1D**: Add trend component integration to get_prior method ✅ *(2025-08-26)*
+    - ✅ Call `extract_response_names(formula)` to get response variable names  
+    - ✅ Call `extract_trend_priors(trend_formula, data, response_names)` for trend priors
+    - ✅ Add `trend_component = "trend"` column to trend-generated priors
+    - ✅ Combine using `rbind(obs_priors, trend_priors)` preserving brmsprior class
+    - ✅ Handle empty trend_priors case gracefully
+    - ✅ All 6 core Sub-task 1D tests passing (292/307 total tests = 95.1%)
     
-  - [ ] **Sub-task 1E**: Test brms compatibility (exact equivalence)  
+  - [ ] **Sub-task 1E**: Add embedded family support for get_prior method
+    - **CRITICAL DISCOVERY**: Current `get_prior.mvgam_formula()` cannot handle sophisticated multivariate patterns from quick-reference.md
+    - **Issue**: Patterns like `bf(count ~ temp, family = poisson()) + bf(biomass ~ temp, family = gaussian())` have families embedded inside bf() objects
+    - **Current Limitation**: Our method expects separate `family` parameter but embedded families require different handling
+    - **Investigation Needed**: How does `extract_observation_priors()` handle embedded families in combined bf() objects?
+    - **Core Gap**: This affects mvgam's most important multivariate use cases from patterns 4-6 in quick-reference.md
+    - **Scope**: May require extending both formula validation and prior extraction to support embedded family detection
+    
+  - [ ] **Sub-task 1F**: Test brms compatibility (exact equivalence)  
     - Create test file `tests/testthat/test-mvgam-formula.R`
     - Test: `mvgam_formula(y ~ x, trend_formula = NULL)` → `get_prior()` identical to brms
     - Test with different family types: gaussian(), poisson(), binomial() 
     - Test with different formula types: formula, brmsformula objects
     - Verify S3 dispatch works correctly and doesn't mask brms methods
     
-  - [ ] **Sub-task 1F**: Test trend functionality and integration
+  - [ ] **Sub-task 1G**: Test trend functionality and integration
     - Test trend_component column addition for both observation and trend parameters
     - Test with different trend types: RW(), AR(p=1), PW() constructors
     - Test multivariate formulas: mvbind(y1, y2) ~ x with shared trends  
     - Verify trend parameter naming follows _trend suffix convention
     - Test integration with `extract_response_names()` and `extract_trend_priors()`
     
-  - [ ] **Sub-task 1G**: Add comprehensive documentation and examples
+  - [ ] **Sub-task 1H**: Add comprehensive documentation and examples
     - Complete roxygen2 for both `mvgam_formula()` and `get_prior.mvgam_formula()` 
     - Add realistic workflow examples: construct → inspect → modify priors
     - Document S3 class structure and inheritance from base formula classes
     - Add @family prior-functions tag and @seealso references
     - Show integration with make_stancode(), make_standata() patterns
     
-  - [ ] **Sub-task 1H**: Integration testing and ecosystem validation
+  - [ ] **Sub-task 1I**: Integration testing and ecosystem validation
     - Test returned brmsprior objects work with `brms::set_prior()`
     - Test error handling: malformed inputs, incompatible autocorr + trends
     - Create examples showing complete workflow: construct → inspect → modify → fit

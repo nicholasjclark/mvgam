@@ -1415,6 +1415,14 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
     response_names = response_names
   )
   
+  # Add trend_component column to trend priors before combining
+  if (nrow(trend_priors) > 0) {
+    trend_priors$trend_component <- "trend"
+  }
+  
+  # Add trend_component column to observation priors for consistency
+  obs_priors$trend_component <- "observation"
+
   # Combine observation and trend priors using existing helper function
   combined_priors <- combine_obs_trend_priors(obs_priors, trend_priors)
   
