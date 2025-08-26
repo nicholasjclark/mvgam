@@ -1400,11 +1400,15 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
   # Input validation (required by CLAUDE.md standards)
   checkmate::assert_class(object, "mvgam_formula")
   checkmate::assert_data_frame(data, min.rows = 1)
-  checkmate::assert_class(family, "family")
   
-  # Extract formula components from mvgam_formula object (use direct indexing)
+  # Extract formula components from mvgam_formula object
   formula <- object[[1]]  # object$formula triggers S3 dispatch issues
   trend_formula <- object[[2]]  # object$trend_formula
+  
+  # Validate family parameter conditionally based on formula type
+  if (!has_embedded_families(formula)) {
+    checkmate::assert_class(family, "family")
+  }
   
   # Validate formula structure before proceeding
   if (length(formula) < 3) {

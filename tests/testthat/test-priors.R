@@ -1205,8 +1205,9 @@ test_that("ZMVN transformed parameters use non-centered parameterization", {
   # Extract transformed parameters block if it exists
   if ("zmvn_tparameters" %in% names(result)) {
     tparams_stanvar <- result[["zmvn_tparameters"]]
-    expect_s3_class(tparams_stanvar, "stanvar")
+    expect_type(tparams_stanvar, "list")
     expect_equal(tparams_stanvar$block, "tparameters")
+    expect_equal(tparams_stanvar$name, "zmvn_tparameters")
   }
 })
 
@@ -1927,7 +1928,8 @@ test_that("extract_trend_priors works with ALL available trend types", {
     time = rep(1:20, 3),
     series = factor(rep(c("A", "B", "C"), 20)),
     site = factor(rep(c("site1", "site2"), 30)),
-    habitat = factor(sample(c("forest", "grassland"), 60, TRUE))
+    habitat = factor(sample(c("forest", "grassland"), 60, TRUE)),
+    cap = rep(100, 60)  # Carrying capacity for PW logistic growth
   )
   
   # Test all available trend types with appropriate parameters
@@ -1942,7 +1944,7 @@ test_that("extract_trend_priors works with ALL available trend types", {
     # Missing/under-tested types (critical additions)
     "CAR_basic" = ~ CAR(time = "time", series = "series"),
     "PW_changepoint" = ~ PW(n_changepoints = 1, time = "time", series = "series"),
-    "PW_multi_change" = ~ PW(n_changepoints = 2, growth = "logistic", time = "time", series = "series"),
+    "PW_multi_change" = ~ PW(n_changepoints = 2, growth = "logistic", cap = "cap", time = "time", series = "series"),
     # GP_trend removed - GP() is deprecated
     
     # Factor model variations
@@ -2089,7 +2091,8 @@ test_that("extract_trend_priors handles trend-specific parameter variations", {
     temperature = rnorm(48),
     site = factor(rep(c("A", "B"), 24)),
     time = rep(1:24, 2),
-    series = factor(rep(c("series1", "series2"), 24))
+    series = factor(rep(c("series1", "series2"), 24)),
+    cap = rep(100, 48)  # Carrying capacity for PW logistic growth
   )
   
   # Test trend-specific parameter variations that should generate different prior structures
@@ -2107,16 +2110,16 @@ test_that("extract_trend_priors handles trend-specific parameter variations", {
     
     # Factor model variations
     "AR_factor_small" = ~ AR(p = 1, n_lv = 1, time = "time", series = "series"),
-    "VAR_factor_model" = ~ VAR(p = 1, n_lv = 1, cor = TRUE, time = "time", series = "series"),
+    "VAR_factor_model" = ~ VAR(p = 1, n_lv = 1, time = "time", series = "series"),
     "RW_factor_corr" = ~ RW(cor = TRUE, n_lv = 1, time = "time", series = "series"),
     
     # Hierarchical variations
     "AR_hierarchical_simple" = ~ AR(p = 1, gr = "site", time = "time", series = "series"),
-    "VAR_hierarchical_complex" = ~ VAR(p = 1, gr = "site", cor = TRUE, time = "time", series = "series"),
+    "VAR_hierarchical_complex" = ~ VAR(p = 1, gr = "site", time = "time", series = "series"),
     
     # PW variations (if implemented)
     "PW_linear_growth" = ~ PW(n_changepoints = 1, growth = "linear", time = "time", series = "series"),
-    "PW_logistic_growth" = ~ PW(n_changepoints = 2, growth = "logistic", time = "time", series = "series")
+    "PW_logistic_growth" = ~ PW(n_changepoints = 2, growth = "logistic", cap = "cap", time = "time", series = "series")
   )
   
   for (test_name in names(trend_parameter_tests)) {

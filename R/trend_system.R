@@ -1965,30 +1965,25 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
 #' @return A validated mvgam_trend object
 #' @noRd
 eval_trend_constructor <- function(trend_call) {
-
-  tryCatch({
-    # Parse and evaluate the expression
-    expr <- str2expression(trend_call)[[1]]
-    trend_obj <- eval(expr, envir = parent.frame(2))
-
-    # Validate result
-    if (!is.mvgam_trend(trend_obj)) {
-      insight::format_error(
-        "Invalid trend constructor result.",
-        "Expression {.code {trend_call}} did not produce a valid trend object.",
-        "Check that you're using a supported trend constructor."
-      )
-    }
-
-    return(trend_obj)
-
-  }, error = function(e) {
+  checkmate::assert_string(trend_call)
+  
+  # Parse the expression
+  expr <- str2expression(trend_call)[[1]]
+  
+  # Use package namespace where trend constructors are defined
+  pkg_env <- asNamespace("mvgam")
+  trend_obj <- eval(expr, envir = pkg_env)
+  
+  # Validate result
+  if (!is.mvgam_trend(trend_obj)) {
     insight::format_error(
-      "Failed to evaluate trend constructor.",
-      "Error in {.code {trend_call}}: {e$message}",
-      "Check the syntax and parameters of your trend constructor call."
+      "Invalid trend constructor result.",
+      "Expression {.code {trend_call}} did not produce a valid trend object.",
+      "Check that you're using a supported trend constructor."
     )
-  })
+  }
+  
+  return(trend_obj)
 }
 
 #' Print method for mvgam trend objects

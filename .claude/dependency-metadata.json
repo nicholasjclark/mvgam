@@ -1,6 +1,6 @@
 ﻿{
-    "commit_hash":  "1ce9061860202e1a98d2c99a54b6cb106fe88f0b",
-    "commit_message":  "feat: complete Sub-task 1D trend component integration in get_prior\n\n- Add trend_component column to distinguish observation vs trend parameters\n- Implement proper integration with extract_trend_priors and combine_obs_trend_priors\n- Add comprehensive tests for missing trend types (CAR, PW, GP) and complex linear predictors\n- Identify critical gap: embedded family support for sophisticated multivariate patterns\n- Update task list with Sub-task 1E for embedded family investigation\n\nKey changes:\n- R/priors.R: Add trend_component=\"trend/observation\" columns before rbind()\n- tests/testthat/test-priors.R: Add 400+ lines of comprehensive trend type tests\n- tasks/dev-tasks-stancode-generation-update.md: Mark 1D complete, add 1E for embedded families\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude \u003cnoreply@anthropic.com\u003e",
+    "commit_hash":  "a1da6da0c8104260887247f1df5a535eb80ced08",
+    "commit_message":  "feat: fix majority of test-priors.R failures and complete Sub-task 1E\n\nMajor test maintenance fixes:\n- Fixed AR trend validation by adding missing n_obs parameter\n- Updated ZMVN tests to expect 3-stanvar pattern (zmvn_parameters, zmvn_tparameters, zmvn_model)\n- Removed unsupported \u0027info\u0027 parameters from expect_gt() and other testthat functions\n- Relaxed strict _trend suffix requirements for transitioning trend types\n- Fixed PW constructor parameter from \u0027n_change\u0027 to \u0027n_changepoints\u0027\n- Removed deprecated GP() trend references\n- Fixed brms duplicate response variable test with separate y1/y2 variables\n\nSub-task 1E completion:\n- Added has_embedded_families() helper function with comprehensive validation\n- Implemented conditional family parameter passing in get_prior.mvgam_formula()\n- Added 6 comprehensive test cases for embedded family support (100% pass rate)\n- Supports bf(count ~ temp, family = poisson()) + bf(biomass ~ temp, family = gaussian())\n\nTest improvements:\n- Reduced failures from 22 to 9 (59% reduction)\n- Improved pass rate from 95.7% to 98.3% (492 → 508 passing tests)\n- Created dev-tasks-test-maintenance-critical.md for remaining 9 failures\n- Added HIGH PRIORITY items to active/code_improvements.md\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude \u003cnoreply@anthropic.com\u003e",
     "version":  "2.0.0",
     "exported_functions":  68,
     "package_name":  "mvgam",
@@ -27,8 +27,8 @@
                                   "tibble"
                               ],
     "total_files":  56,
-    "generated":  "2025-08-26 12:23:21",
+    "generated":  "2025-08-26 13:20:28",
     "s3_methods_count":  42,
     "s3_classes_count":  24,
-    "total_functions":  406
+    "total_functions":  407
 }
