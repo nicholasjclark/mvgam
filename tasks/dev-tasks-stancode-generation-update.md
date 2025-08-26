@@ -6,19 +6,6 @@ Read context files `active/architecture-decisions.md` and `active/quick-referenc
 ## Overview
 Implementation tasks for stancode generation update feature with comprehensive prior system integration and Stan code inspection capabilities.
 
-## Current Status
-- ✅ **Foundation Systems**: Core prior and Stan generation systems (sections 1.0-2.6)
-- ✅ **Parameter Standardization**: All trend generators use 3-stanvar pattern with standardized naming (section 2.7) 
-- ✅ **VAR/VARMA Implementation**: Complete hierarchical grouping support with factor model constraints
-- ✅ **Parameter Extraction**: Comprehensive parameter renaming system with 97.4% test success rate (Steps 4-6)
-- ✅ **get_prior() Implementation**: Clean S3 generic system with perfect brms delegation completed
-- ✅ **Embedded Family Support**: Sub-task 1E complete - handles bf() formulas with embedded families
-- ✅ **Test Failures Resolved**: All major test-priors.R failures fixed (trend constructors, S3 classes, parameters)
-- 🎯 **Current Priority**: Complete remaining sub-tasks 1F-1I for mvgam_formula system
-- ❗ **Missing TRD Core Functions**: `make_stancode()`, `make_standata()`, `prior_summary()`, `get_inits()`, `set_prior()`
-
----
-
 ## COMPLETED MAJOR SECTIONS
 
 ### 1.0-2.6 Foundation and Core Systems ✅
