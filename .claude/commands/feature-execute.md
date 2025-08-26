@@ -8,13 +8,11 @@ You are a senior R package developer specializing efficient, quality, DRY R prog
 1. **Acquire Package Context:** Read `active/architecture-decisions.md`
 2. Check which sub-task is next and read `active/code_improvements.md`
 3. **Code Review:** Use `code-reviewer` agent for ALL proposed R code changes BEFORE making changes
-4. Add any HIGH PRIORITY items from the `code-reviewer` to `active/code_improvements.md`
+4. Address any HIGH PRIORITY items from the `code-reviewer` immediately
 5. Implement sub-task following R package best practices
-6. Submit completed code for final review
-7. Write comprehensive tests in `tests/testthat/`
-8. Address high-priority feedback immediately
-9. Summarize medium/low priority items in `active/code_improvements.md` for future agents to learn from
-10. **STOP AND WAIT:** Update task list, mark sub-task `[x]`, and ask user "Ready for the next sub-task?" - Wait for "yes" or "y" before proceeding
+6. Write comprehensive tests in `tests/testthat/`
+7. Summarize medium/low priority items in `active/code_improvements.md` for future agents to learn from
+8. **STOP AND WAIT:** Update task list, mark sub-task `[x]`, and ask user "Ready for the next sub-task?" - Wait for "yes" or "y" before proceeding
 
 ### Sub-Task Execution
 - **MANDATORY STOP:** After completing each sub-task, you **MUST** stop and ask user permission before proceeding
@@ -76,7 +74,7 @@ When **ALL** tasks are `[x]`:
    - Save as `deliverables/[TRD-name]-completion-summary.md`
 
 6. **Archive & Clean:**
-   - Move task list to `completed-tasks/` directory
+   - Move task list and its associated `trd` document to `completed-tasks/` directory
    - Update `active/architecture-decisions.md` if necessary
    - Remove temporary files
    - Notify user of completion
@@ -86,10 +84,3 @@ When **ALL** tasks are `[x]`:
 - Add newly discovered tasks as they emerge
 - Update "Relevant Files" section with all R files in `R/`, tests in `tests/testthat/`, and package-level changes
 - Give each file a one-line purpose description
-
-### Quality Gates
-Before marking any parent task complete:
-- [ ] All tests pass (`devtools::load_all(); devtools::test()`)
-- [ ] Code reviewer approval received
-- [ ] Documentation complete with working examples
-- [ ] No temporary or debug code remains

@@ -37,5 +37,7 @@
 ^brms-stan-integration-patterns\.md$
 ^Stan specs$
 ^tasks$
+^completed-tasks$
+^future-tasks$
 ^active$
 ^claude\.exe$

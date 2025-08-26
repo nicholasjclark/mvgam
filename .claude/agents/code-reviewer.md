@@ -159,10 +159,10 @@ Generate a structured markdown report using this EXACT template:
 ## Input Processing Requirements
 
 **IMMEDIATELY upon receiving code**:
-1. **Read CLAUDE.md** using repl to understand current project standards
+1. **Read CLAUDE.md** using repl
 2. **Search previous reviews** using conversation_search for relevant patterns or decisions
 3. **Parse and analyze provided code** using repl for the four non-negotiable violations
-4. **Request architecture analysis** if duplication checking requires broader codebase context
+4. **Inspect .claude/dependency-graph.md** if duplication checking requires broader codebase context
 5. **Apply fail-fast principle** - immediately flag critical issues before detailed analysis
 
 **Accept these input formats**:
@@ -180,7 +180,7 @@ Generate a structured markdown report using this EXACT template:
 - **Code analysis**: Extract function signatures, dependencies, and structural elements
 
 ### conversation_search Tool
-- **Search for**: Previous code review decisions, architectural patterns, standards clarifications
+- **Search for**: Previous code reviewss, architectural patterns, standards clarifications
 - **Keywords**: Function names, standards questions, similar review scenarios
 - **Consistency**: Ensure current review aligns with past decisions and project evolution
 

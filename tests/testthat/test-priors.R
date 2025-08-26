@@ -176,11 +176,11 @@ test_that("extract_trend_priors handles NULL trend_formula", {
 test_that("integrated system generates correct AR prior structure", {
   # Single series for basic test
   test_data_single <- data.frame(y = rnorm(50), time = 1:50, series = 'A')
-  
+
   # Multi-series for correlation test
   test_data_multi <- data.frame(
-    y = rnorm(50), 
-    time = rep(1:25, 2), 
+    y = rnorm(50),
+    time = rep(1:25, 2),
     series = factor(rep(c('A', 'B'), each = 25))
   )
 
@@ -235,8 +235,8 @@ test_that("integrated system generates correct RW prior structure", {
 test_that("integrated system generates correct VAR prior structure", {
   # VAR requires multi-series data for correlation parameters
   test_data <- data.frame(
-    y = rnorm(50), 
-    time = rep(1:25, 2), 
+    y = rnorm(50),
+    time = rep(1:25, 2),
     series = factor(rep(c('A', 'B'), each = 25))
   )
 
@@ -2038,7 +2038,7 @@ test_that("extract_trend_priors works with complex linear predictors in trend fo
 
     # Tensor products + trend
     "Tensor_plus_trend" = ~ t2(temperature, precipitation) + AR(p = 1, time = "time", series = "series"),
-    "Complex_tensor_trend" = ~ te(x1, x2) + t2(temperature, precipitation) + VAR(p = 1, time = "time", series = "series"),
+    "Complex_tensor_trend" = ~ t2(x1, x2) + t2(temperature, precipitation) + VAR(p = 1, time = "time", series = "series"),
 
     # Gaussian processes + trend
     "GP_plus_trend" = ~ gp(temperature, x1) + AR(p = 1, time = "time", series = "series"),
@@ -2049,7 +2049,7 @@ test_that("extract_trend_priors works with complex linear predictors in trend fo
     "Complex_random_trend" = ~ temperature + (1 + x1|habitat) + VAR(p = 1, time = "time", series = "series"),
 
     # Mixed complex patterns
-    "Everything_trend" = ~ s(temperature) + te(x1, x2) + habitat + CAR(time = "time", series = "series"),
+    "Everything_trend" = ~ s(temperature) + t2(x1, x2) + habitat + CAR(time = "time", series = "series"),
     "Hierarchical_complex" = ~ s(temperature) + habitat + AR(p = 1, gr = "group", time = "time", series = "series")
   )
 
@@ -2229,7 +2229,7 @@ test_that("extract_trend_priors integrates properly with get_prior.mvgam_formula
     # Pattern 1: mvbind() with shared trend (classic multivariate)
     "Multivariate_mvbind_shared" = list(
       obs_formula = brms::mvbind(count, biomass) ~ temperature,
-      trend_formula = ~ AR(p = 1, time = "time", series = "series"), 
+      trend_formula = ~ AR(p = 1, time = "time", series = "series"),
       family = gaussian()  # mvbind handles multivariate structure internally
     ),
 
@@ -2242,7 +2242,7 @@ test_that("extract_trend_priors integrates properly with get_prior.mvgam_formula
 
     # Pattern 2: bf() with multiple responses and shared trend
     "Multivariate_bf_shared" = list(
-      obs_formula = brms::bf(count ~ temperature, family = poisson()) + 
+      obs_formula = brms::bf(count ~ temperature, family = poisson()) +
                    brms::bf(biomass ~ habitat, family = gaussian()),
       trend_formula = ~ VAR(p = 1, time = "time", series = "series"),
       family = NULL  # bf() formulas handle family internally
@@ -2333,7 +2333,7 @@ test_that("extract_trend_priors integrates properly with get_prior.mvgam_formula
 test_that("trend formula priors match brms priors exactly (with _trend suffix)", {
   # This test ensures that allowed predictors in brms also work in trend_formula
   # and produce identical priors (except for the _trend suffix)
-  
+
   test_data <- data.frame(
     count = rpois(60, 5),
     temperature = rnorm(60),
@@ -2344,78 +2344,78 @@ test_that("trend formula priors match brms priors exactly (with _trend suffix)",
     x1 = rnorm(60),
     x2 = rnorm(60)
   )
-  
+
   # Test Case 1: Basic smooth terms s()
   trend_formula_smooth <- ~ s(temperature) + AR(p = 1, time = "time", series = "series")
   mf_smooth <- mvgam_formula(count ~ habitat, trend_formula = trend_formula_smooth)
-  
+
   mvgam_priors_smooth <- get_prior(mf_smooth, data = test_data, family = poisson())
   trend_priors_smooth <- mvgam_priors_smooth[mvgam_priors_smooth$trend_component == "trend", ]
-  
+
   # Get equivalent brms priors for smooth terms
   brms_priors_smooth <- brms::get_prior(count ~ s(temperature), data = test_data, family = poisson())
-  
+
   # Check for smooth-related parameters with _trend suffix
   sds_classes <- unique(brms_priors_smooth$class[grepl("^sds", brms_priors_smooth$class)])
   for (sds_class in sds_classes) {
     expect_true(paste0(sds_class, "_trend") %in% trend_priors_smooth$class)
   }
-  
+
   # Test Case 2: Random effects terms (1 | group)
   trend_formula_re <- ~ (1 | site) + RW(time = "time", series = "series")
   mf_re <- mvgam_formula(count ~ temperature, trend_formula = trend_formula_re)
-  
+
   mvgam_priors_re <- get_prior(mf_re, data = test_data, family = poisson())
   trend_priors_re <- mvgam_priors_re[mvgam_priors_re$trend_component == "trend", ]
-  
+
   # Get equivalent brms priors for the random effect term
   brms_priors_re <- brms::get_prior(count ~ (1 | site), data = test_data, family = poisson())
-  
+
   # Check for sd parameters with _trend suffix
   expect_true("sd_trend" %in% trend_priors_re$class)
-  
+
   # Test Case 3: Fixed effects with interactions
-  trend_formula_interact <- ~ temperature * habitat + ZMVN(cor = TRUE, time = "time", series = "series")
+  trend_formula_interact <- ~ temperature * habitat + ZMVN(time = "time", series = "series")
   mf_interact <- mvgam_formula(count ~ 1, trend_formula = trend_formula_interact)
-  
+
   mvgam_priors_interact <- get_prior(mf_interact, data = test_data, family = poisson())
   trend_priors_interact <- mvgam_priors_interact[mvgam_priors_interact$trend_component == "trend", ]
-  
+
   # Should have b_trend parameters for fixed effects
   expect_true("b_trend" %in% trend_priors_interact$class)
-  
+
   # Should have specific coefficients for interactions
   expect_true(any(grepl("temperature:habitat", trend_priors_interact$coef)))
-  
+
   # Test Case 4: Ensure observation and trend priors don't overlap inappropriately
   for (test_name in c("smooth", "re", "interact")) {
     priors_obj <- get(paste0("mvgam_priors_", test_name))
     obs_priors <- priors_obj[priors_obj$trend_component == "observation", ]
     trend_priors <- priors_obj[priors_obj$trend_component == "trend", ]
-    
+
     # No observation parameter should appear in trend priors without _trend suffix
     obs_classes <- unique(obs_priors$class[obs_priors$class != ""])
     trend_classes <- unique(trend_priors$class[trend_priors$class != ""])
-    
+
     # Remove _trend suffix from trend classes for comparison
     trend_classes_base <- gsub("_trend$", "", trend_classes)
-    
+
     # Special case: Z is allowed in both (factor loading matrix)
     obs_classes <- obs_classes[obs_classes != "Z"]
     trend_classes_base <- trend_classes_base[trend_classes_base != "Z"]
-    
+
     # Check no overlap except for legitimate special parameters
     overlap <- intersect(obs_classes, trend_classes_base)
-    special_params <- c("Intercept", "sigma")  
+    special_params <- c("Intercept", "sigma")
     unexpected_overlap <- setdiff(overlap, special_params)
-    
+
     expect_length(unexpected_overlap, 0)
   }
 })
 
 test_that("trend formula validation rejects brms addition terms", {
   # Test that offset() is properly rejected in trend formulas (already implemented)
-  
+
   test_data <- data.frame(
     y = rnorm(50),
     time = rep(1:10, 5),
@@ -2423,13 +2423,13 @@ test_that("trend formula validation rejects brms addition terms", {
     x = rnorm(50),
     weights = runif(50)
   )
-  
+
   # offset() should be rejected in trend formula (already validated)
   expect_error(
     mvgam_formula(y ~ x, trend_formula = ~ offset(log(weights)) + RW(time = "time", series = "series")),
     regexp = "Offset.*not.*allowed.*trend_formula"
   )
-  
+
   # brms autocorr should be rejected in trend formula (already validated)
   expect_error(
     mvgam_formula(y ~ x, trend_formula = ~ ar(p = 1) + RW(time = "time", series = "series")),
@@ -2659,15 +2659,15 @@ test_that("RW trend provides all expected parameters", {
     time = 1:20,
     series = factor("A")
   )
-  
+
   # Basic RW trend
   mf_rw <- mvgam_formula(y ~ x, trend_formula = ~ RW())
   priors_rw <- get_prior(mf_rw, data = test_data, family = poisson())
   trend_priors <- priors_rw[priors_rw$trend_component == "trend", ]
-  
+
   # RW should have sigma_trend (base parameter)
   expect_true("sigma_trend" %in% trend_priors$class)
-  
+
   # All trend parameters should have _trend suffix (excluding Z matrix)
   trend_classes <- trend_priors$class[trend_priors$class != "Z"]
   expect_true(all(grepl("_trend$", trend_classes)))
@@ -2680,25 +2680,25 @@ test_that("AR trend provides all expected parameters", {
     time = 1:30,
     series = factor(rep(c("A", "B"), each = 15))
   )
-  
+
   # AR(p=1) trend
   mf_ar1 <- mvgam_formula(y ~ x, trend_formula = ~ AR(p = 1))
   priors_ar1 <- get_prior(mf_ar1, data = test_data, family = poisson())
   trend_priors_ar1 <- priors_ar1[priors_ar1$trend_component == "trend", ]
-  
+
   # AR should have sigma_trend (base) and ar1_trend (lag 1)
   expect_true("sigma_trend" %in% trend_priors_ar1$class)
   expect_true("ar1_trend" %in% trend_priors_ar1$class)
-  
+
   # AR(p=2) trend
   mf_ar2 <- mvgam_formula(y ~ x, trend_formula = ~ AR(p = 2))
   priors_ar2 <- get_prior(mf_ar2, data = test_data, family = poisson())
   trend_priors_ar2 <- priors_ar2[priors_ar2$trend_component == "trend", ]
-  
+
   # AR(p=2) should have ar1_trend AND ar2_trend
   expect_true("ar1_trend" %in% trend_priors_ar2$class)
   expect_true("ar2_trend" %in% trend_priors_ar2$class)
-  
+
   # All trend parameters should have _trend suffix (excluding Z matrix)
   trend_classes <- trend_priors_ar1$class[trend_priors_ar1$class != "Z"]
   expect_true(all(grepl("_trend$", trend_classes)))
@@ -2711,15 +2711,15 @@ test_that("AR trend with correlation provides correlation parameters", {
     time = rep(1:20, 2),
     series = factor(rep(c("A", "B"), each = 20))
   )
-  
+
   # AR with correlation
   mf_ar_cor <- mvgam_formula(y ~ x, trend_formula = ~ AR(p = 1, cor = TRUE))
   priors_ar_cor <- get_prior(mf_ar_cor, data = test_data, family = poisson())
   trend_priors_cor <- priors_ar_cor[priors_ar_cor$trend_component == "trend", ]
-  
+
   # Should have correlation parameter
   expect_true("L_Omega_trend" %in% trend_priors_cor$class)
-  
+
   # Should still have base AR parameters
   expect_true("sigma_trend" %in% trend_priors_cor$class)
   expect_true("ar1_trend" %in% trend_priors_cor$class)
@@ -2732,15 +2732,15 @@ test_that("AR trend with factor model provides Z matrix parameters", {
     time = rep(1:20, 3),
     series = factor(rep(c("A", "B", "C"), each = 20))
   )
-  
+
   # AR with factor model (n_lv < n_series)
   mf_ar_factor <- mvgam_formula(y ~ x, trend_formula = ~ AR(p = 1, n_lv = 2))
   priors_ar_factor <- get_prior(mf_ar_factor, data = test_data, family = poisson())
   trend_priors_factor <- priors_ar_factor[priors_ar_factor$trend_component == "trend", ]
-  
+
   # Should have Z matrix for factor model
   expect_true("Z" %in% trend_priors_factor$class)
-  
+
   # Should still have base AR parameters
   expect_true("sigma_trend" %in% trend_priors_factor$class)
   expect_true("ar1_trend" %in% trend_priors_factor$class)
@@ -2753,17 +2753,17 @@ test_that("VAR trend provides all expected parameters", {
     time = rep(1:20, 2),
     series = factor(rep(c("A", "B"), each = 20))
   )
-  
+
   # VAR trend
   mf_var <- mvgam_formula(y ~ x, trend_formula = ~ VAR(p = 1))
   priors_var <- get_prior(mf_var, data = test_data, family = poisson())
   trend_priors_var <- priors_var[priors_var$trend_component == "trend", ]
-  
+
   # VAR should have hierarchical hyperparameters (Heaps 2022 methodology)
   expect_true("sigma_trend" %in% trend_priors_var$class)
   expect_true("Amu_trend" %in% trend_priors_var$class)
   expect_true("Aomega_trend" %in% trend_priors_var$class)
-  
+
   # All trend parameters should have _trend suffix (excluding Z matrix)
   trend_classes <- trend_priors_var$class[trend_priors_var$class != "Z"]
   expect_true(all(grepl("_trend$", trend_classes)))
@@ -2776,15 +2776,15 @@ test_that("CAR trend provides expected parameters", {
     time = 1:20,
     series = factor("A")
   )
-  
+
   # CAR trend
   mf_car <- mvgam_formula(y ~ x, trend_formula = ~ CAR())
   priors_car <- get_prior(mf_car, data = test_data, family = poisson())
   trend_priors_car <- priors_car[priors_car$trend_component == "trend", ]
-  
+
   # CAR uses ar1 without _trend suffix (legacy naming)
   expect_true("ar1" %in% trend_priors_car$class)
-  
+
   # CAR DOES use sigma_trend as base parameter (corrected expectation)
   expect_true("sigma_trend" %in% trend_priors_car$class)
 })
@@ -2796,18 +2796,18 @@ test_that("ZMVN trend provides expected parameters", {
     time = rep(1:20, 2),
     series = factor(rep(c("A", "B"), each = 20))
   )
-  
+
   # ZMVN trend
   mf_zmvn <- mvgam_formula(y ~ x, trend_formula = ~ ZMVN())
   priors_zmvn <- get_prior(mf_zmvn, data = test_data, family = poisson())
   trend_priors_zmvn <- priors_zmvn[priors_zmvn$trend_component == "trend", ]
-  
+
   # ZMVN has base variance parameters
   expect_true("sigma_trend" %in% trend_priors_zmvn$class)
-  
+
   # ZMVN always has correlation structure (cor = TRUE hardcoded)
   expect_true("L_Omega_trend" %in% trend_priors_zmvn$class)
-  
+
   # Should not have other trend-specific parameters beyond base + correlation
   trend_classes <- trend_priors_zmvn$class[trend_priors_zmvn$class != "Z"]
   expected_zmvn <- c("sigma_trend", "L_Omega_trend")
@@ -2822,18 +2822,18 @@ test_that("PW trend provides all expected parameters", {
     time = 1:20,
     series = factor("A")
   )
-  
+
   # PW trend
   mf_pw <- mvgam_formula(y ~ x, trend_formula = ~ PW())
   priors_pw <- get_prior(mf_pw, data = test_data, family = poisson())
   trend_priors_pw <- priors_pw[priors_pw$trend_component == "trend", ]
-  
+
   # PW should have piecewise-specific parameters
   expect_true("sigma_trend" %in% trend_priors_pw$class)
   expect_true("k_trend" %in% trend_priors_pw$class)
   expect_true("m_trend" %in% trend_priors_pw$class)
   expect_true("delta_trend" %in% trend_priors_pw$class)
-  
+
   # All trend parameters should have _trend suffix (excluding Z matrix)
   trend_classes <- trend_priors_pw$class[trend_priors_pw$class != "Z"]
   expect_true(all(grepl("_trend$", trend_classes)))
