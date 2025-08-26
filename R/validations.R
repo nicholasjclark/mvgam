@@ -469,15 +469,18 @@ validate_regular_time_intervals <- function(time_values, time_var = "time") {
 
   # Check for series-specific irregular intervals
   # This would need series information to implement fully
-  rlang::warn(
-    insight::format_warning(
-      "Time interval validation performed on combined data.",
-      "Ensure each series has regular intervals individually.",
-      "Some trends may not support series-specific irregular time intervals."
-    ),
-    .frequency = "once",
-    .frequency_id = "series_interval_warning"
-  )
+  # Only warn in interactive sessions, not during testing
+  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+    rlang::warn(
+      insight::format_warning(
+        "Time interval validation performed on combined data.",
+        "Ensure each series has regular intervals individually.",
+        "Some trends may not support series-specific irregular time intervals."
+      ),
+      .frequency = "once",
+      .frequency_id = "series_interval_warning"
+    )
+  }
 
   invisible(TRUE)
 }

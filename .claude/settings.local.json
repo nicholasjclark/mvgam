@@ -10,7 +10,8 @@
       "Bash(echo $?)",
       "Bash(echo:*)",
       "WebSearch",
-      "WebFetch(domain:paulbuerkner.com)"
+      "WebFetch(domain:paulbuerkner.com)",
+      "WebFetch(domain:paul-buerkner.github.io)"
     ],
     "deny": [],
     "ask": [],
