@@ -80,7 +80,7 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 1. **Input Validation**: Use `checkmate::assert_*()` for all function parameters
 2. **Error Messages**: Use `insight::format_error()` for user-friendly error formatting
 3. **Warnings**: Use `insight::format_warning()` for informative warnings
-4. **Session Warnings**: Use `if (!identical(Sys.getenv("TESTTHAT", "true") rlang::warn(..., .frequency = "once")` for one-time warnings
+4. **Session Warnings**: Use `if (!identical(Sys.getenv("TESTTHAT"), "true")) rlang::warn(..., .frequency = "once")` for one-time warnings
 
 #### Message Formatting Standards
 - Use `{.field parameter_name}` for parameter highlighting

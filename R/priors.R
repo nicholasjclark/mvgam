@@ -256,7 +256,8 @@ extract_trend_priors <- function(trend_formula, data, response_names = NULL) {
   trend_spec <- parse_trend_formula(trend_formula, data)
   
   # Generate priors based on trend type using convention-based dispatch
-  trend_priors <- generate_trend_priors(trend_spec, response_names)
+  # Pass data through for base formula prior extraction
+  trend_priors <- generate_trend_priors(trend_spec, data, response_names)
   
   return(trend_priors)
 }
@@ -272,25 +273,118 @@ extract_trend_priors <- function(trend_formula, data, response_names = NULL) {
 #'   multivariate models
 #' @return A brmsprior object with trend priors
 #' @noRd
-generate_trend_priors <- function(trend_spec, response_names = NULL) {
-  checkmate::assert_list(trend_spec)
+generate_trend_priors <- function(trend_spec, data, response_names = NULL) {
+  # Comprehensive parameter validation per code reviewer requirements
+  checkmate::assert_list(trend_spec, names = "named")
+  checkmate::assert_data_frame(data, min.rows = 1)
   if (!is.null(response_names)) {
     checkmate::assert_character(response_names, min.len = 1)
   }
   
-  # Handle the actual mvgam trend specification structure
-  if (is.list(trend_spec) && "trend_model" %in% names(trend_spec)) {
-    # Extract the trend model specification
-    trend_model <- trend_spec$trend_model
-    
-    if (inherits(trend_model, "mvgam_trend")) {
-      # Use the new integrated approach: generate priors from monitor_params
-      return(generate_trend_priors_from_monitor_params(trend_model))
+  # Validate trend_spec structure before accessing components
+  if (!"trend_model" %in% names(trend_spec)) {
+    stop(insight::format_error(
+      "Invalid {.field trend_spec} structure.",
+      "Expected component {.field trend_model} not found."
+    ))
+  }
+  
+  if (!"base_formula" %in% names(trend_spec)) {
+    stop(insight::format_error(
+      "Invalid {.field trend_spec} structure.", 
+      "Expected component {.field base_formula} not found."
+    ))
+  }
+  
+  # Validate component types
+  if (!is.null(trend_spec$trend_model)) {
+    checkmate::assert_class(trend_spec$trend_model, "mvgam_trend")
+  }
+  if (!is.null(trend_spec$base_formula)) {
+    checkmate::assert_class(trend_spec$base_formula, "formula")
+  }
+  
+  # Initialize list to collect different prior sources
+  prior_list <- list()
+  
+  # Extract components from validated trend_spec
+  trend_model <- trend_spec$trend_model
+  base_formula <- trend_spec$base_formula
+  
+  # 1. Get trend constructor priors (AR, RW, etc.)
+  if (inherits(trend_model, "mvgam_trend")) {
+    prior_list$constructor <- generate_trend_priors_from_monitor_params(trend_model)
+  }
+  
+  # 2. Get base formula priors using existing mvgam infrastructure
+  # Use setup_brms_lightweight which handles fake response variables automatically
+  if (!is.null(base_formula) && inherits(base_formula, "formula")) {
+    # Extract priors for all formulas except no-intercept (~0)
+    # This includes intercept-only (~1) which should generate Intercept_trend
+    if (!all.equal(base_formula, ~ 0, check.attributes = FALSE) == TRUE) {
+      
+      # Call verified setup_brms_lightweight function
+      trend_setup <- setup_brms_lightweight(
+        formula = base_formula,
+        data = data,
+        family = gaussian()
+      )
+      
+      # Validate that setup returned expected structure
+      if (!is.list(trend_setup)) {
+        stop(insight::format_error(
+          "setup_brms_lightweight returned unexpected structure.",
+          "Expected list object with prior component."
+        ))
+      }
+      
+      if (!"prior" %in% names(trend_setup)) {
+        stop(insight::format_error(
+          "setup_brms_lightweight missing expected {.field prior} component.",
+          "Cannot extract base formula priors."
+        ))
+      }
+      
+      # Extract and validate prior structure
+      base_priors <- trend_setup$prior
+      if (!inherits(base_priors, c("brmsprior", "data.frame"))) {
+        stop(insight::format_error(
+          "Invalid prior structure from setup_brms_lightweight.",
+          "Expected brmsprior data frame."
+        ))
+      }
+      
+      # Add _trend suffix to distinguish from observation priors
+      if (nrow(base_priors) > 0) {
+        # Validate expected columns exist
+        if (!"class" %in% names(base_priors)) {
+          stop(insight::format_error(
+            "Invalid base_priors structure.",
+            "Missing required {.field class} column."
+          ))
+        }
+        
+        # Add _trend suffix to all classes except sigma (which conflicts with trend constructor)
+        # and exclude sigma entirely to prevent conflicts
+        mask <- base_priors$class != "" & base_priors$class != "sigma"
+        base_priors$class[mask] <- paste0(base_priors$class[mask], "_trend")
+        
+        # Remove sigma rows to prevent conflicts with trend constructor sigma_trend
+        base_priors <- base_priors[base_priors$class != "sigma", , drop = FALSE]
+        
+        prior_list$base <- base_priors
+      }
     }
   }
   
-  # Fallback: return empty prior if structure not recognized
-  return(create_empty_brmsprior())
+  # Combine all priors
+  if (length(prior_list) == 0) {
+    return(create_empty_brmsprior())
+  }
+  
+  combined <- do.call(rbind, prior_list)
+  class(combined) <- c("brmsprior", "data.frame")
+  return(combined)
 }
 
 #' Generate Trend Priors from Monitor Parameters

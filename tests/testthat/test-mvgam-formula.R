@@ -404,4 +404,21 @@ test_that("trend_component column behavior", {
   result_clean <- result[, !names(result) %in% "trend_component"]
   expect_identical(names(result_clean), names(brms_result))
   expect_equal(nrow(result), nrow(brms_result))
+  
+  # Test with trend formula ~ 1 should include Intercept_trend
+  test_data_trend <- data.frame(y = rnorm(20), time = 1:20, series = factor(rep("A", 20)))
+  result_with_trend <- get_prior(mvgam_formula(y ~ 1, trend_formula = ~ 1), 
+                                family = gaussian(), data = test_data_trend)
+  
+  # Should have both observation and trend components
+  expect_true(any(result_with_trend$trend_component == "observation"))
+  expect_true(any(result_with_trend$trend_component == "trend"))
+  
+  # Should specifically include Intercept_trend parameter
+  expect_true(any(result_with_trend$class == "Intercept_trend"))
+  
+  # Should have observation Intercept, trend Intercept_trend, and sigma_trend
+  expect_true(any(result_with_trend$class == "Intercept" & result_with_trend$trend_component == "observation"))
+  expect_true(any(result_with_trend$class == "Intercept_trend" & result_with_trend$trend_component == "trend"))
+  expect_true(any(result_with_trend$class == "sigma_trend" & result_with_trend$trend_component == "trend"))
 })

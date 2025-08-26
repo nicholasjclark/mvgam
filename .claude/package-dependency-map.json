@@ -207,7 +207,7 @@
                                                    "tibble"
                                                ],
                      "total_files":  56,
-                     "generated":  "2025-08-26 20:13:47",
+                     "generated":  "2025-08-27 08:28:17",
                      "s3_methods_count":  42,
                      "s3_classes_count":  24,
                      "total_functions":  407
@@ -834,7 +834,8 @@
                                                               "GP",
                                                               "mvgam_trend_registry",
                                                               "RW",
-                                                              "validate_trend_components"
+                                                              "validate_trend_components",
+                                                              "ZMVN"
                                                           ],
                                   "residuals.mvgam":  "validate_proportional",
                                   "eval_silent":  [
@@ -1106,7 +1107,9 @@
                                   "CAR":  "create_mvgam_trend",
                                   "generate_trend_priors":  [
                                                                 "create_empty_brmsprior",
-                                                                "generate_trend_priors_from_monitor_params"
+                                                                "error",
+                                                                "generate_trend_priors_from_monitor_params",
+                                                                "setup_brms_lightweight"
                                                             ],
                                   "validate_trend_formula_brms":  [
                                                                       "error",
@@ -1861,7 +1864,7 @@
                                 "plottable":  "plottable = function(x) {",
                                 "validate_stan_data_structure":  "validate_stan_data_structure \u003c- function(stan_data) {",
                                 "register_trend_type":  "register_trend_type \u003c- function(name, supports_factors = FALSE, generator_func, incompatibility_reason = NULL, prior_spec = NULL) {",
-                                "generate_trend_priors":  "generate_trend_priors \u003c- function(trend_spec, response_names = NULL) {",
+                                "generate_trend_priors":  "generate_trend_priors \u003c- function(trend_spec, data, response_names = NULL) {",
                                 "plot.mvgam_lfo":  "plot.mvgam_lfo = function(x, ...) {",
                                 "validate_no_brms_autocor_in_trends":  "validate_no_brms_autocor_in_trends \u003c- function(formula_str) {",
                                 "var_trend_properties":  "var_trend_properties \u003c- function() {",
@@ -3395,10 +3398,11 @@
                               "generate_trend_priors":  {
                                                             "s3_class":  "",
                                                             "s3_method":  "",
-                                                            "signature":  "generate_trend_priors \u003c- function(trend_spec, response_names = NULL) {",
+                                                            "signature":  "generate_trend_priors \u003c- function(trend_spec, data, response_names = NULL) {",
                                                             "is_s3_method":  false,
                                                             "arguments":  [
                                                                               "trend_spec",
+                                                                              "data",
                                                                               "response_names"
                                                                           ]
                                                         },

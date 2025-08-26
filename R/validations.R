@@ -370,15 +370,17 @@ validate_correlation_requirements <- function(gr, cor) {
   # If grouping is specified, correlation should generally be FALSE
   # unless explicitly requested for cross-group correlation
   if (!is.null(gr) && cor) {
-    rlang::warn(
-      insight::format_warning(
-        "Correlation enabled with grouping variable '{gr}'.",
-        "This models cross-group correlations which may be computationally intensive.",
-        "Consider {.field cor = FALSE} for within-group correlations only."
-      ),
-      .frequency = "once",
-      .frequency_id = "correlation_with_grouping"
-    )
+    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+      rlang::warn(
+        insight::format_warning(
+          "Correlation enabled with grouping variable '{gr}'.",
+          "This models cross-group correlations which may be computationally intensive.",
+          "Consider {.field cor = FALSE} for within-group correlations only."
+        ),
+        .frequency = "once",
+        .frequency_id = "correlation_with_grouping"
+      )
+    }
   }
 
   return(cor)
@@ -394,11 +396,13 @@ validate_correlation_requirements <- function(gr, cor) {
 #' @noRd
 validate_time_variable <- function(time_var) {
   if (is.null(time_var)) {
-    rlang::warn(
-      "Using default 'time' variable. Specify time parameter explicitly for clarity.",
-      .frequency = "once",
-      .frequency_id = "default_time_variable"
-    )
+    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+      rlang::warn(
+        "Using default 'time' variable. Specify time parameter explicitly for clarity.",
+        .frequency = "once",
+        .frequency_id = "default_time_variable"
+      )
+    }
     return("time")
   }
 
@@ -421,11 +425,13 @@ validate_time_variable <- function(time_var) {
 #' @noRd
 validate_series_variable <- function(series_var) {
   if (is.null(series_var)) {
-    rlang::warn(
-      "Using default 'series' variable. Specify series parameter explicitly for clarity.",
-      .frequency = "once",
-      .frequency_id = "default_series_variable"
-    )
+    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+      rlang::warn(
+        "Using default 'series' variable. Specify series parameter explicitly for clarity.",
+        .frequency = "once",
+        .frequency_id = "default_series_variable"
+      )
+    }
     return("series")
   }
 
@@ -1453,25 +1459,29 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
 }
 
 warn_default_time_variable <- function() {
-  rlang::warn(
-    insight::format_warning(
-      "Using default time variable 'time'.",
-      "Specify {.field time = your_time_var} if your time variable has a different name."
-    ),
-    .frequency = "once",
-    .frequency_id = "mvgam_default_time_var"
-  )
+  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+    rlang::warn(
+      insight::format_warning(
+        "Using default time variable 'time'.",
+        "Specify {.field time = your_time_var} if your time variable has a different name."
+      ),
+      .frequency = "once",
+      .frequency_id = "mvgam_default_time_var"
+    )
+  }
 }
 
 warn_default_series_variable <- function() {
-  rlang::warn(
-    insight::format_warning(
-      "Using default series variable 'series'.",
-      "Specify {.field series = your_series_var} if your series variable has a different name."
-    ),
-    .frequency = "once",
-    .frequency_id = "mvgam_default_series_var"
-  )
+  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+    rlang::warn(
+      insight::format_warning(
+        "Using default series variable 'series'.",
+        "Specify {.field series = your_series_var} if your series variable has a different name."
+      ),
+      .frequency = "once",
+      .frequency_id = "mvgam_default_series_var"
+    )
+  }
 }
 
 #' Validate mvgam_trend object structure

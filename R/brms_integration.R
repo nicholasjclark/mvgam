@@ -45,11 +45,11 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     
     # Update formula to include trend_y response
     if (attr(terms(formula), 'intercept') == 1) {
-      # Has intercept: trend_y ~ . - 1 (drop intercept for identifiability)
-      formula <- update(formula, trend_y ~ . - 1)
-    } else {
-      # No intercept: trend_y ~ .
+      # Has intercept: keep intercept to get Intercept_trend prior
       formula <- update(formula, trend_y ~ .)
+    } else {
+      # No intercept: explicitly remove intercept
+      formula <- update(formula, trend_y ~ . - 1)
     }
   }
 

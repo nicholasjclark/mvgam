@@ -1,8 +1,5 @@
 # TRD-stancode-generation-update Development Tasks
 
-## Prior to Work
-Read context files `active/architecture-decisions.md` and `active/quick-reference.md`
-
 ## Overview
 Implementation tasks for stancode generation update feature with comprehensive prior system integration and Stan code inspection capabilities.
 
@@ -102,30 +99,27 @@ Implementation tasks for stancode generation update feature with comprehensive p
       - Fixed ZMVN incorrectly adding L_Omega_trend for single series
       - Added data-context-aware filtering in generate_trend_priors_from_monitor_params()
       - Added dimensions calculation in parse_trend_formula() using existing extract_time_series_dimensions()
+      
+   - [X] **Sub-task 1I**: Complete validation that all priors from trend_formula are correctly returned
+    - Use the test-runner agent to run all tests in test-priors.R and test-mvgam_formula.R
+    - Validate logic in `generate_trend_priors()` to ensure ALL brms-generated priors are returned with the correct "_trend" suffix 
     
-  - [ ] **Sub-task 1I**: Add comprehensive documentation and examples
-    - Use the test-runner agent to run tests in test-priors.R and test-mvgam_formula.R
-    - Expand integration tests to ensure priors for simple and complex predictors in trend_formula are returned correctly
-    - Complete roxygen2 for both `mvgam_formula()` and `get_prior.mvgam_formula()` 
-    - Add realistic workflow examples: construct → inspect → modify priors
+   - [ ] **Sub-task 1I**: Comprehensive brms addition-terms validation (45 min)
+    - Survey all brms addition-terms that should NOT be supported in trend_formula
+    - Add validation functions to reject: weights(), cens(), trunc(), mi(), trials(), rate(), vreal(), vint()
+    - Extend existing `validate_single_trend_formula()` with comprehensive checks
+    - Add comprehensive tests covering all forbidden addition-terms with clear error messages to test-priors.R and test-mvgam_formula.R
+    - Use the test-runner agent to run complete test files in test-priors.R and test-mvgam_formula.R
+    - Validate that trend_formula only accepts: fixed effects, random effects, smooths, gp(), tensor products
+    - Document allowed vs forbidden terms in trend_formula validation architecture
     - Document S3 class structure and inheritance from base formula classes
-    - Add @family prior-functions tag and @seealso references
-    - Show integration with make_stancode(), make_standata() patterns
     
   - [ ] **Sub-task 1J**: Integration testing and ecosystem validation
     - Test returned brmsprior objects work with `brms::set_prior()`
     - Test error handling: malformed inputs, incompatible autocorr + trends
-    - Create examples showing complete workflow: construct → inspect → modify → fit
+    - Create roxygen2 examples showing complete workflow: construct → inspect → modify → fit
     - Verify mvgam_formula objects can be reused across inspection functions  
     - Test that formula inheritance preserves brms compatibility
-    
-  - [ ] **Sub-task 1K**: Comprehensive brms addition-terms validation (45 min)
-    - Survey all brms addition-terms that should NOT be supported in trend_formula
-    - Add validation functions to reject: weights(), cens(), trunc(), mi(), trials(), rate(), vreal(), vint()
-    - Extend existing `validate_single_trend_formula()` with comprehensive checks
-    - Add comprehensive tests covering all forbidden addition-terms with clear error messages
-    - Validate that trend_formula only accepts: fixed effects, random effects, smooths, gp(), tensor products
-    - Document allowed vs forbidden terms in trend_formula validation architecture
 
 - [ ] **make_stancode.mvgam_formula()** (60 min): Generate complete Stan model code before fitting
   - Add S3 method: `make_stancode.mvgam_formula(object, prior = NULL, ...)`
@@ -152,6 +146,9 @@ Implementation tasks for stancode generation update feature with comprehensive p
   - List of initialization values for Stan parameters
   - Support multiple initialization strategy options
   - Handle both observation and trend parameter initialization
+  - Add realistic workflow examples to roxygyen2 documents: construct → inspect → modify priors
+  - Add @seealso references
+  - Show integration with make_stancode(), make_standata() patterns
 
 ### Prior Specification Functions  
 - [ ] **set_prior()** and **prior()** (30 min): Specify custom priors using brms interface patterns

@@ -1906,14 +1906,9 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
 
   # Handle formulas without explicit trend constructors (default to ZMVN)
   if (should_default_to_zmvn) {
-    trend_components <- list(trend1 = list(
-      trend = "ZMVN",
-      cor = TRUE,
-      time = "time",  # Default time variable
-      series = "series",  # Default series variable
-      formula = if (is_intercept_only) ~ 1 else trend_formula,
-      constructor = "ZMVN()"
-    ))
+    # Create proper mvgam_trend object using constructor with default arguments
+    # ZMVN(time = NA, series = NA, cor = TRUE, n_lv = NULL) where NA becomes "time"/"series"
+    trend_components <- list(trend1 = ZMVN())
   } else {
     # Parse trend constructor calls with error handling (brms pattern)
     trend_components <- vector("list", length(trend_terms))
