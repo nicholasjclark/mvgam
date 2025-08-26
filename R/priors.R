@@ -309,6 +309,14 @@ generate_trend_priors_from_monitor_params <- function(trend_obj) {
   # Get monitor parameters that need priors
   monitor_params <- trend_obj$monitor_params
   
+  # Filter out correlation parameters for single-series trends
+  # L_Omega_trend only makes sense with multiple series (n_series > 1)
+  if ("L_Omega_trend" %in% monitor_params && 
+      !is.null(trend_obj$dimensions) && 
+      trend_obj$dimensions$n_series == 1) {
+    monitor_params <- setdiff(monitor_params, "L_Omega_trend")
+  }
+  
   if (length(monitor_params) == 0) {
     return(create_empty_brmsprior())
   }

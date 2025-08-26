@@ -1443,7 +1443,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
 
   # Validate regular intervals for non-CAR trends
   if (!is.null(trend_type) && trend_type != "CAR") {
-    validate_regular_time_intervals(data, time_var, series_var, dimensions)
+    validate_regular_time_intervals(data[[time_var]], time_var)
   }
 
   return(dimensions)

@@ -101,13 +101,15 @@ Implementation tasks for stancode generation update feature with comprehensive p
     - Updated CAR and ZMVN test expectations to match actual behavior
     - 99.2% test pass rate (610/615 tests)
     
-  - [ ] **Sub-task 1H**: Critical parameter generation fixes (PRIORITY)
-    - **CRITICAL**: Fix ZMVN single-series correlation parameter issue
-      - ZMVN incorrectly adds L_Omega_trend for single series (should only have sigma_trend)
-      - Root cause: cor=TRUE hardcoded in ZMVN constructor regardless of data context
-      - Solution: Add data-context-aware filtering in generate_trend_priors_from_monitor_params()
-    - **RESOLVED**: Fix remaining test failures (multivariate brmsformula construction)
-    - **CRITICAL**: Implement context-aware parameter filtering for all trend types
+  - [x] **Sub-task 1H**: Critical parameter generation fixes ✅ *(2025-08-26)*
+    - ✅ **RESOLVED**: Fix ZMVN single-series correlation parameter issue
+      - Fixed ZMVN incorrectly adding L_Omega_trend for single series (now only has sigma_trend)
+      - Root cause identified: cor=TRUE hardcoded in ZMVN constructor regardless of data context
+      - Solution implemented: Added data-context-aware filtering in generate_trend_priors_from_monitor_params()
+      - Added dimensions calculation in parse_trend_formula() using existing extract_time_series_dimensions()
+      - Single-series ZMVN now correctly shows only sigma_trend, multi-series shows both sigma_trend and L_Omega_trend
+    - ✅ **RESOLVED**: Fixed function call parameters in extract_time_series_dimensions()
+    - ✅ **IMPLEMENTED**: Context-aware parameter filtering using existing infrastructure
     
   - [ ] **Sub-task 1I**: Add comprehensive documentation and examples
     - Complete roxygen2 for both `mvgam_formula()` and `get_prior.mvgam_formula()` 

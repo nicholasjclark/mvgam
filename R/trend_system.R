@@ -1953,6 +1953,20 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
 
   # Since we enforce single trend type, trend_model is always the first component
   trend_model <- trend_components[[1]]
+  
+  # Calculate dimensions from data for proper parameter filtering
+  if (!is.null(data)) {
+    # Use existing infrastructure to calculate dimensions
+    dimensions <- extract_time_series_dimensions(
+      data = data,
+      time_var = trend_model$time,
+      series_var = trend_model$series,
+      trend_type = trend_model$trend
+    )
+    
+    # Add dimensions to trend_model for filtering
+    trend_model$dimensions <- dimensions
+  }
 
   return(list(
     base_formula = base_formula,

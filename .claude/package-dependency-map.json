@@ -207,7 +207,7 @@
                                                    "tibble"
                                                ],
                      "total_files":  56,
-                     "generated":  "2025-08-26 15:42:46",
+                     "generated":  "2025-08-26 16:19:00",
                      "s3_methods_count":  42,
                      "s3_classes_count":  24,
                      "total_functions":  407
@@ -830,6 +830,7 @@
                                                               "dynamic",
                                                               "error",
                                                               "eval_trend_constructor",
+                                                              "extract_time_series_dimensions",
                                                               "GP",
                                                               "mvgam_trend_registry",
                                                               "RW",
