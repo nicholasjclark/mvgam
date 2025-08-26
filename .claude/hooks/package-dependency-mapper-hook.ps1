@@ -701,7 +701,7 @@ function New-PackageDependencyMap {
 
 # Main execution
 try {
-    if ($Event -eq "post_git_commit" -or $Event -eq "test") {
+    if ($Event -eq "post_git_commit" -or $Event -eq "pre_git_commit" -or $Event -eq "test") {
         New-PackageDependencyMap
         exit 2  # Success with output (but no output shown due to Write-Debug)
     } else {

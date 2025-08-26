@@ -1,6 +1,6 @@
 ﻿{
-    "commit_hash":  "bfec859c8d3f95f1f8aeb17d7d952f32fda3c390",
-    "commit_message":  "feat: complete Sub-task 1F brms compatibility testing\n\n- Add comprehensive brms compatibility tests to test-mvgam-formula.R\n- Verify perfect equivalence when trend_formula = NULL\n- Test family compatibility (gaussian, poisson, binomial)\n- Test formula type compatibility (formula, brmsformula, mvbrmsformula)\n- Verify S3 dispatch works correctly and doesn\u0027t mask brms methods\n- Fix class hierarchy preservation in mvgam_formula constructor\n- Fix failing tests in test-priors.R (class expectations, invalid CAR test)\n- All 661 tests now passing (102 + 559)\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude \u003cnoreply@anthropic.com\u003e",
+    "commit_hash":  "",
+    "commit_message":  "",
     "version":  "2.0.0",
     "exported_functions":  68,
     "package_name":  "mvgam",
@@ -27,7 +27,7 @@
                                   "tibble"
                               ],
     "total_files":  56,
-    "generated":  "2025-08-26 14:02:03",
+    "generated":  "2025-08-26 14:09:55",
     "s3_methods_count":  42,
     "s3_classes_count":  24,
     "total_functions":  407
