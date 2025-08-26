@@ -60,7 +60,6 @@ Implementation tasks for stancode generation update feature with comprehensive p
     - ✅ Validate inputs: formula (formula/brmsformula), trend_formula (formula or NULL)  
     - ✅ Create list structure: `list(formula = formula, trend_formula = trend_formula)`
     - ✅ Set S3 class: `c("mvgam_formula", base_class)` with proper inheritance handling
-    - ✅ Added to R/priors.R with comprehensive roxygen2 documentation
     
   - [x] **Sub-task 1B**: Add comprehensive validation to `mvgam_formula()` ✅ *(2025-08-25)*
     - ✅ Use checkmate for all parameter validation (formula, trend_formula)
@@ -75,7 +74,6 @@ Implementation tasks for stancode generation update feature with comprehensive p
     - ✅ Main implementation: `get_prior.mvgam_formula(object, data, family = gaussian(), ...)`
     - ✅ Perfect brms delegation when `trend_formula = NULL` with `trend_component = "observation"` column
     - ✅ Clean class structure: `class(mvgam_formula) <- "mvgam_formula"` with `attr(obj, "formula_class")` metadata
-    - ✅ Comprehensive test coverage: 8 new tests added, all passing (273/286 total tests pass = 95.5%)
     
   - [x] **Sub-task 1D**: Add trend component integration to get_prior method ✅ *(2025-08-26)*
     - ✅ Call `extract_response_names(formula)` to get response variable names  
@@ -83,7 +81,6 @@ Implementation tasks for stancode generation update feature with comprehensive p
     - ✅ Add `trend_component = "trend"` column to trend-generated priors
     - ✅ Combine using `rbind(obs_priors, trend_priors)` preserving brmsprior class
     - ✅ Handle empty trend_priors case gracefully
-    - ✅ All 6 core Sub-task 1D tests passing (292/307 total tests = 95.1%)
     
   - [x] **Sub-task 1E**: Add embedded family support for get_prior method ✅ *(2025-08-26)*
     - ✅ **RESOLVED**: Implemented `has_embedded_families()` detection function in R/priors.R
@@ -99,18 +96,16 @@ Implementation tasks for stancode generation update feature with comprehensive p
     - Fixed critical bug in extract_mvbind_responses() function
     - Fixed AR(p=2) parameter generation bug - now correctly generates ar1_trend AND ar2_trend
     - Updated CAR and ZMVN test expectations to match actual behavior
-    - 99.2% test pass rate (610/615 tests)
     
   - [x] **Sub-task 1H**: Critical parameter generation fixes ✅ *(2025-08-26)*
     - ✅ **RESOLVED**: Fix ZMVN single-series correlation parameter issue
-      - Fixed ZMVN incorrectly adding L_Omega_trend for single series (now only has sigma_trend)
-      - Root cause identified: cor=TRUE hardcoded in ZMVN constructor regardless of data context
-      - Solution implemented: Added data-context-aware filtering in generate_trend_priors_from_monitor_params()
+      - Fixed ZMVN incorrectly adding L_Omega_trend for single series
+      - Added data-context-aware filtering in generate_trend_priors_from_monitor_params()
       - Added dimensions calculation in parse_trend_formula() using existing extract_time_series_dimensions()
-      - Single-series ZMVN now correctly shows only sigma_trend, multi-series shows both sigma_trend and L_Omega_trend
     
-  - [ ] **Sub-task 1I**: Fix ALL test warnings and failures, and add comprehensive documentation and examples
-    - Use the test-runner agent to run tests in test-priors.R. Mask one-time warnings and fix any errors
+  - [ ] **Sub-task 1I**: Add comprehensive documentation and examples
+    - Use the test-runner agent to run tests in test-priors.R and test-mvgam_formula.R
+    - Expand integration tests to ensure priors for simple and complex predictors in trend_formula are returned correctly
     - Complete roxygen2 for both `mvgam_formula()` and `get_prior.mvgam_formula()` 
     - Add realistic workflow examples: construct → inspect → modify priors
     - Document S3 class structure and inheritance from base formula classes
@@ -123,6 +118,14 @@ Implementation tasks for stancode generation update feature with comprehensive p
     - Create examples showing complete workflow: construct → inspect → modify → fit
     - Verify mvgam_formula objects can be reused across inspection functions  
     - Test that formula inheritance preserves brms compatibility
+    
+  - [ ] **Sub-task 1K**: Comprehensive brms addition-terms validation (45 min)
+    - Survey all brms addition-terms that should NOT be supported in trend_formula
+    - Add validation functions to reject: weights(), cens(), trunc(), mi(), trials(), rate(), vreal(), vint()
+    - Extend existing `validate_single_trend_formula()` with comprehensive checks
+    - Add comprehensive tests covering all forbidden addition-terms with clear error messages
+    - Validate that trend_formula only accepts: fixed effects, random effects, smooths, gp(), tensor products
+    - Document allowed vs forbidden terms in trend_formula validation architecture
 
 - [ ] **make_stancode.mvgam_formula()** (60 min): Generate complete Stan model code before fitting
   - Add S3 method: `make_stancode.mvgam_formula(object, prior = NULL, ...)`

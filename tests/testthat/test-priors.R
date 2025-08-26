@@ -174,12 +174,20 @@ test_that("extract_trend_priors handles NULL trend_formula", {
 # ------------------------------------
 
 test_that("integrated system generates correct AR prior structure", {
-  test_data <- data.frame(y = rnorm(50), time = 1:50, series = 'A')
+  # Single series for basic test
+  test_data_single <- data.frame(y = rnorm(50), time = 1:50, series = 'A')
+  
+  # Multi-series for correlation test
+  test_data_multi <- data.frame(
+    y = rnorm(50), 
+    time = rep(1:25, 2), 
+    series = factor(rep(c('A', 'B'), each = 25))
+  )
 
   # Test AR trend without correlation (specify time/series to avoid warnings)
   ar_priors <- mvgam:::extract_trend_priors(
     trend_formula = ~ AR(p = 1, cor = FALSE, time = "time", series = "series"),
-    data = test_data
+    data = test_data_single
   )
 
   expect_true(inherits(ar_priors, "brmsprior"))
@@ -196,10 +204,10 @@ test_that("integrated system generates correct AR prior structure", {
     expect_equal(ar_priors$ub[ar_rows][1], "0.99")
   }
 
-  # Test with correlation
+  # Test with correlation (requires multi-series data)
   ar_priors_cor <- mvgam:::extract_trend_priors(
     trend_formula = ~ AR(p = 1, cor = TRUE, time = "time", series = "series"),
-    data = test_data
+    data = test_data_multi
   )
 
   expect_true(any(grepl("L_Omega_trend", ar_priors_cor$class)))
@@ -225,7 +233,12 @@ test_that("integrated system generates correct RW prior structure", {
 })
 
 test_that("integrated system generates correct VAR prior structure", {
-  test_data <- data.frame(y = rnorm(50), time = 1:50, series = 'A')
+  # VAR requires multi-series data for correlation parameters
+  test_data <- data.frame(
+    y = rnorm(50), 
+    time = rep(1:25, 2), 
+    series = factor(rep(c('A', 'B'), each = 25))
+  )
 
   var_priors <- mvgam:::extract_trend_priors(
     trend_formula = ~ VAR(time = "time", series = "series"),
@@ -490,6 +503,7 @@ test_that("parse_trend_formula handles simple formulas", {
 test_that("parse_trend_formula handles formulas without trend constructors", {
   data <- data.frame(
     time = 1:10,
+    series = factor(rep(1:2, each = 5)),
     temperature = rnorm(10),
     habitat = factor(c('A','B'))
   )
@@ -1329,10 +1343,11 @@ test_that("VAR trend priors follow variance-correlation decomposition pattern", 
 })
 
 test_that("VAR trend priors integrate with centralized prior system", {
+  # VAR correlation parameters require multi-series data
   test_data <- data.frame(
-    y = rnorm(30),
-    time = 1:30,
-    series = factor('S1')
+    y = rnorm(40),
+    time = rep(1:20, 2),
+    series = factor(rep(c('S1', 'S2'), each = 20))
   )
 
   # Test that VAR priors are extracted properly
@@ -2227,15 +2242,16 @@ test_that("extract_trend_priors integrates properly with get_prior.mvgam_formula
 
     # Pattern 2: bf() with multiple responses and shared trend
     "Multivariate_bf_shared" = list(
-      obs_formula = brms::brmsformula(count ~ temperature, biomass ~ habitat),
+      obs_formula = brms::bf(count ~ temperature, family = poisson()) + 
+                   brms::bf(biomass ~ habitat, family = gaussian()),
       trend_formula = ~ VAR(p = 1, time = "time", series = "series"),
-      family = gaussian()  # bf() handles response-specific processing
+      family = NULL  # bf() formulas handle family internally
     ),
 
     # Pattern 3: Combined bf() objects with different families and shared trend
     "Multivariate_combined_bf" = list(
-      obs_formula = brms::brmsformula(count ~ temperature, family = poisson()) +
-                   brms::brmsformula(biomass ~ temperature, family = gaussian()),
+      obs_formula = brms::bf(count ~ temperature, family = poisson()) +
+                   brms::bf(biomass ~ temperature, family = gaussian()),
       trend_formula = ~ RW(cor = TRUE, n_lv = 2, time = "time", series = "series"),
       family = NULL  # bf() formulas handle family internally
     ),
@@ -2243,8 +2259,8 @@ test_that("extract_trend_priors integrates properly with get_prior.mvgam_formula
     # Pattern 4: mvbf() wrapper with complex trend
     "Multivariate_mvbf" = list(
       obs_formula = brms::mvbrmsformula(
-        brms::brmsformula(count ~ temperature, family = poisson()),
-        brms::brmsformula(biomass ~ habitat, family = gaussian())
+        brms::bf(count ~ temperature, family = poisson()),
+        brms::bf(biomass ~ habitat, family = gaussian())
       ),
       trend_formula = ~ AR(p = 1, cor = TRUE, time = "time", series = "series"),
       family = NULL  # mvbf() handles families internally
@@ -2309,6 +2325,116 @@ test_that("extract_trend_priors integrates properly with get_prior.mvgam_formula
       expect_true(all(combined_priors$trend_component == "observation"))
     }
   }
+})
+
+# Critical Integration Tests for Trend Formula Prior Equivalence
+# ===============================================================
+
+test_that("trend formula priors match brms priors exactly (with _trend suffix)", {
+  # This test ensures that allowed predictors in brms also work in trend_formula
+  # and produce identical priors (except for the _trend suffix)
+  
+  test_data <- data.frame(
+    count = rpois(60, 5),
+    temperature = rnorm(60),
+    habitat = factor(sample(c("A", "B", "C"), 60, TRUE)),
+    site = factor(rep(paste0("site", 1:5), 12)),
+    time = rep(1:12, 5),
+    series = factor(rep(paste0("sp", 1:5), 12)),
+    x1 = rnorm(60),
+    x2 = rnorm(60)
+  )
+  
+  # Test Case 1: Basic smooth terms s()
+  trend_formula_smooth <- ~ s(temperature) + AR(p = 1, time = "time", series = "series")
+  mf_smooth <- mvgam_formula(count ~ habitat, trend_formula = trend_formula_smooth)
+  
+  mvgam_priors_smooth <- get_prior(mf_smooth, data = test_data, family = poisson())
+  trend_priors_smooth <- mvgam_priors_smooth[mvgam_priors_smooth$trend_component == "trend", ]
+  
+  # Get equivalent brms priors for smooth terms
+  brms_priors_smooth <- brms::get_prior(count ~ s(temperature), data = test_data, family = poisson())
+  
+  # Check for smooth-related parameters with _trend suffix
+  sds_classes <- unique(brms_priors_smooth$class[grepl("^sds", brms_priors_smooth$class)])
+  for (sds_class in sds_classes) {
+    expect_true(paste0(sds_class, "_trend") %in% trend_priors_smooth$class)
+  }
+  
+  # Test Case 2: Random effects terms (1 | group)
+  trend_formula_re <- ~ (1 | site) + RW(time = "time", series = "series")
+  mf_re <- mvgam_formula(count ~ temperature, trend_formula = trend_formula_re)
+  
+  mvgam_priors_re <- get_prior(mf_re, data = test_data, family = poisson())
+  trend_priors_re <- mvgam_priors_re[mvgam_priors_re$trend_component == "trend", ]
+  
+  # Get equivalent brms priors for the random effect term
+  brms_priors_re <- brms::get_prior(count ~ (1 | site), data = test_data, family = poisson())
+  
+  # Check for sd parameters with _trend suffix
+  expect_true("sd_trend" %in% trend_priors_re$class)
+  
+  # Test Case 3: Fixed effects with interactions
+  trend_formula_interact <- ~ temperature * habitat + ZMVN(cor = TRUE, time = "time", series = "series")
+  mf_interact <- mvgam_formula(count ~ 1, trend_formula = trend_formula_interact)
+  
+  mvgam_priors_interact <- get_prior(mf_interact, data = test_data, family = poisson())
+  trend_priors_interact <- mvgam_priors_interact[mvgam_priors_interact$trend_component == "trend", ]
+  
+  # Should have b_trend parameters for fixed effects
+  expect_true("b_trend" %in% trend_priors_interact$class)
+  
+  # Should have specific coefficients for interactions
+  expect_true(any(grepl("temperature:habitat", trend_priors_interact$coef)))
+  
+  # Test Case 4: Ensure observation and trend priors don't overlap inappropriately
+  for (test_name in c("smooth", "re", "interact")) {
+    priors_obj <- get(paste0("mvgam_priors_", test_name))
+    obs_priors <- priors_obj[priors_obj$trend_component == "observation", ]
+    trend_priors <- priors_obj[priors_obj$trend_component == "trend", ]
+    
+    # No observation parameter should appear in trend priors without _trend suffix
+    obs_classes <- unique(obs_priors$class[obs_priors$class != ""])
+    trend_classes <- unique(trend_priors$class[trend_priors$class != ""])
+    
+    # Remove _trend suffix from trend classes for comparison
+    trend_classes_base <- gsub("_trend$", "", trend_classes)
+    
+    # Special case: Z is allowed in both (factor loading matrix)
+    obs_classes <- obs_classes[obs_classes != "Z"]
+    trend_classes_base <- trend_classes_base[trend_classes_base != "Z"]
+    
+    # Check no overlap except for legitimate special parameters
+    overlap <- intersect(obs_classes, trend_classes_base)
+    special_params <- c("Intercept", "sigma")  
+    unexpected_overlap <- setdiff(overlap, special_params)
+    
+    expect_length(unexpected_overlap, 0)
+  }
+})
+
+test_that("trend formula validation rejects brms addition terms", {
+  # Test that offset() is properly rejected in trend formulas (already implemented)
+  
+  test_data <- data.frame(
+    y = rnorm(50),
+    time = rep(1:10, 5),
+    series = factor(rep(1:5, each = 10)),
+    x = rnorm(50),
+    weights = runif(50)
+  )
+  
+  # offset() should be rejected in trend formula (already validated)
+  expect_error(
+    mvgam_formula(y ~ x, trend_formula = ~ offset(log(weights)) + RW(time = "time", series = "series")),
+    regexp = "Offset.*not.*allowed.*trend_formula"
+  )
+  
+  # brms autocorr should be rejected in trend formula (already validated)
+  expect_error(
+    mvgam_formula(y ~ x, trend_formula = ~ ar(p = 1) + RW(time = "time", series = "series")),
+    regexp = "brms.*autocorr.*not.*allowed.*trend"
+  )
 })
 
 # Embedded Family Support Tests for Sub-task 1E
