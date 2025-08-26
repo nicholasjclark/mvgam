@@ -165,13 +165,16 @@
                                        "matrix.moi.smooth",
                                        "matrix.mod.smooth"
                                    ],
+                       "get_prior":  [
+                                         "mvgam_formula"
+                                     ],
                        "conditional_effects":  [
                                                    "mvgam"
                                                ]
                    },
     "metadata":  {
-                     "commit_hash":  "b2fe352496768d11c184f093084f7b145546af16",
-                     "commit_message":  "feat: implement mvgam_formula constructor with comprehensive tests\n\n- Added mvgam_formula() constructor function for minimal formula containers\n- Comprehensive parameter validation using checkmate and insight error formatting\n- S3 class hierarchy preservation for formula/brmsformula/mvbrmsformula compatibility\n- Print method for enhanced user experience with proper S3 dispatch\n- Autocorrelation separation principle validation to prevent brms conflicts\n- Complete test suite with 61 passing tests covering all functionality and edge cases\n- Fixed @noRd documentation issue in stan_assembly.R\n- Updated NAMESPACE for proper S3 method registration\n\nRelated to Sub-tasks 1A-1B in TRD-stancode-generation-update\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude \u003cnoreply@anthropic.com\u003e",
+                     "commit_hash":  "79936fbf0b644e91c69ee5f1a12595ac3281d366",
+                     "commit_message":  "feat: implement get_prior.mvgam_formula() S3 method\n\n- Add get_prior.mvgam_formula() method for unified prior inspection\n- Extends brms get_prior generic with mvgam_formula objects\n- Perfect brms compatibility when trend_formula = NULL\n- Comprehensive validation using checkmate assertions\n- Uses existing helper functions for prior extraction and combination\n- Update architecture decisions with new formula interface patterns\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude \u003cnoreply@anthropic.com\u003e",
                      "version":  "2.0.0",
                      "exported_functions":  67,
                      "package_name":  "mvgam",
@@ -198,10 +201,10 @@
                                                    "tibble"
                                                ],
                      "total_files":  56,
-                     "generated":  "2025-08-26 09:50:57",
-                     "s3_methods_count":  41,
+                     "generated":  "2025-08-26 10:14:54",
+                     "s3_methods_count":  42,
                      "s3_classes_count":  21,
-                     "total_functions":  401
+                     "total_functions":  402
                  },
     "function_dependencies":  {
                                   "RW":  [
@@ -282,6 +285,10 @@
                                                                  ],
                                   "fit_multiple_imputation_models":  "mvgam_single_imputation",
                                   "parse_nonlinear_manually":  "extract_response_from_formula",
+                                  "eval_trend_constructor":  [
+                                                                 "error",
+                                                                 "is.mvgam_trend"
+                                                             ],
                                   "generate_times_trend_matrices":  [
                                                                         "create_times_trend_matrix",
                                                                         "extract_time_series_dimensions"
@@ -300,10 +307,13 @@
                                                               "cluster_cormat",
                                                               "gather_matrix"
                                                           ],
-                                  "eval_trend_constructor":  [
-                                                                 "error",
-                                                                 "is.mvgam_trend"
-                                                             ],
+                                  "get_prior.mvgam_formula":  [
+                                                                  "combine_obs_trend_priors",
+                                                                  "error",
+                                                                  "extract_observation_priors",
+                                                                  "extract_response_names",
+                                                                  "extract_trend_priors"
+                                                              ],
                                   "add_monitor_params":  "generate_monitor_params",
                                   "validate_stan_data_structure":  "error",
                                   "generate_matrix_z_multiblock_stanvars":  [
@@ -1248,6 +1258,7 @@
                       "create_trend_parameter_prior":  "R/priors.R",
                       "generate_rw_monitor_params":  "R/trend_system.R",
                       "combine_stanvars":  "R/stan_assembly.R",
+                      "custom_trend":  "R/trend_system.R",
                       "series_to_mvgam":  "R/series_to_mvgam.R",
                       "is_multivariate_brmsfit":  "R/stan_assembly.R",
                       "interpret_mvgam":  "R/interpret_mvgam.R",
@@ -1510,7 +1521,7 @@
                       "ensure_registry_initialized":  "R/trend_system.R",
                       "generate_ar_monitor_params":  "R/trend_system.R",
                       "get_vcov.mvgam":  "R/marginaleffects.mvgam.R",
-                      "custom_trend":  "R/trend_system.R",
+                      "get_prior.mvgam_formula":  "R/priors.R",
                       "get_best_prior_match":  "R/priors.R",
                       "format_matrix_for_stan_array":  "R/stan_assembly.R",
                       "CAR":  "R/trend_system.R",
@@ -1760,6 +1771,7 @@
                                 "create_trend_parameter_prior":  "create_trend_parameter_prior \u003c- function(param_name, trend_obj) {",
                                 "generate_rw_monitor_params":  "generate_rw_monitor_params \u003c- function(trend_spec) {",
                                 "combine_stanvars":  "combine_stanvars \u003c- function(...) {",
+                                "custom_trend":  "custom_trend \u003c- function(trend, tpars, forecast_fun, stancode_fun, standata_fun = NULL, bounds = list(), characteristics = list(), ...) {",
                                 "series_to_mvgam":  "series_to_mvgam \u003c- function(series, freq, train_prop = 0.85) {",
                                 "is_multivariate_brmsfit":  "is_multivariate_brmsfit \u003c- function(brmsfit) {",
                                 "interpret_mvgam":  "interpret_mvgam = function(formula, N, family) {",
@@ -2022,7 +2034,7 @@
                                 "ensure_registry_initialized":  "ensure_registry_initialized \u003c- function() {",
                                 "generate_ar_monitor_params":  "generate_ar_monitor_params \u003c- function(trend_spec) {",
                                 "get_vcov.mvgam":  "get_vcov.mvgam \u003c- function(model, vcov = NULL, ...) {",
-                                "custom_trend":  "custom_trend \u003c- function(trend, tpars, forecast_fun, stancode_fun, standata_fun = NULL, bounds = list(), characteristics = list(), ...) {",
+                                "get_prior.mvgam_formula":  "get_prior.mvgam_formula \u003c- function(object, ...) {",
                                 "get_best_prior_match":  "get_best_prior_match \u003c- function(matches) {",
                                 "format_matrix_for_stan_array":  "format_matrix_for_stan_array \u003c- function(matrix) {",
                                 "CAR":  "CAR = function(time = NA, series = NA) {",
@@ -2710,6 +2722,13 @@
                                               "is_s3_method":  false,
                                               "arguments":  "x"
                                           },
+                              "get_prior.mvgam_formula":  {
+                                                              "s3_class":  "mvgam_formula",
+                                                              "s3_method":  "get_prior",
+                                                              "signature":  "get_prior.mvgam_formula \u003c- function(object, ...) {",
+                                                              "is_s3_method":  true,
+                                                              "arguments":  "object"
+                                                          },
                               "summary.mvgam_irf":  {
                                                         "s3_class":  "mvgam_irf",
                                                         "s3_method":  "summary",
@@ -2800,18 +2819,6 @@
                                                                          "N"
                                                                      ]
                                                    },
-                              "generate_stan_array_declaration":  {
-                                                                      "s3_class":  "",
-                                                                      "s3_method":  "",
-                                                                      "signature":  "generate_stan_array_declaration \u003c- function(var_name, var_type, dimensions, data_matrix) {",
-                                                                      "is_s3_method":  false,
-                                                                      "arguments":  [
-                                                                                        "var_name",
-                                                                                        "var_type",
-                                                                                        "dimensions",
-                                                                                        "data_matrix"
-                                                                                    ]
-                                                                  },
                               "ulapply":  {
                                               "s3_class":  "",
                                               "s3_method":  "",
@@ -3796,12 +3803,17 @@
                                                           "is_s3_method":  false,
                                                           "arguments":  "stan_code"
                                                       },
-                              "extract_observation_priors_only":  {
+                              "generate_stan_array_declaration":  {
                                                                       "s3_class":  "",
                                                                       "s3_method":  "",
-                                                                      "signature":  "extract_observation_priors_only \u003c- function(prior) {",
+                                                                      "signature":  "generate_stan_array_declaration \u003c- function(var_name, var_type, dimensions, data_matrix) {",
                                                                       "is_s3_method":  false,
-                                                                      "arguments":  "prior"
+                                                                      "arguments":  [
+                                                                                        "var_name",
+                                                                                        "var_type",
+                                                                                        "dimensions",
+                                                                                        "data_matrix"
+                                                                                    ]
                                                                   },
                               "var_fecov":  {
                                                 "s3_class":  "",
@@ -5044,6 +5056,13 @@
                                                                       "replace"
                                                                   ]
                                                 },
+                              "extract_observation_priors_only":  {
+                                                                      "s3_class":  "",
+                                                                      "s3_method":  "",
+                                                                      "signature":  "extract_observation_priors_only \u003c- function(prior) {",
+                                                                      "is_s3_method":  false,
+                                                                      "arguments":  "prior"
+                                                                  },
                               "ppc":  {
                                           "s3_class":  "",
                                           "s3_method":  "",
@@ -6203,7 +6222,8 @@
                                            "map_trend_priors",
                                            "get_trend_parameter_prior",
                                            "mvgam_formula",
-                                           "print.mvgam_formula"
+                                           "print.mvgam_formula",
+                                           "get_prior.mvgam_formula"
                                        ],
                         "R/RcppExports.R":  [
                                                 "ar3_recursC",

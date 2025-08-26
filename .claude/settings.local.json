@@ -8,7 +8,9 @@
       "Glob",
       "Bash(powershell:*)",
       "Bash(echo $?)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "WebSearch",
+      "WebFetch(domain:paulbuerkner.com)"
     ],
     "deny": [],
     "ask": [],

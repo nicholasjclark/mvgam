@@ -4,8 +4,17 @@ You are a senior R package developer specializing efficient, quality, DRY R prog
 
 ## Task Implementation Protocol
 
-### Acquire Package Context
-- View package structure and dependency files in .claude/dependency-graph.md
+## Workflow Process (NON-NEGOTIABLE)
+1. **Acquire Package Context:** Read `active/architecture-decisions.md`
+2. Check which sub-task is next and read `active/code_improvements.md`
+3. **Code Review:** Use `code-reviewer` agent for ALL proposed R code changes BEFORE making changes
+4. Add any HIGH PRIORITY items from the `code-reviewer` to `active/code_improvements.md`
+5. Implement sub-task following R package best practices
+6. Submit completed code for final review
+7. Write comprehensive tests in `tests/testthat/`
+8. Address high-priority feedback immediately
+9. Summarize medium/low priority items in `active/code_improvements.md` for future agents to learn from
+10. **STOP AND WAIT:** Update task list, mark sub-task `[x]`, and ask user "Ready for the next sub-task?" - Wait for "yes" or "y" before proceeding
 
 ### Sub-Task Execution
 - **MANDATORY STOP:** After completing each sub-task, you **MUST** stop and ask user permission before proceeding
@@ -71,31 +80,6 @@ When **ALL** tasks are `[x]`:
    - Update `active/architecture-decisions.md` if necessary
    - Remove temporary files
    - Notify user of completion
-
-## AI Instructions
-
-### Required Actions (NON-NEGOTIABLE)
-1. **Code Review:** Use `code-reviewer` agent for ALL R code changes
-2. **File Management:** 
-   - Read/create `active/code_improvements.md`
-   - Check `active/` directory for context files
-   - Keep `active/architecture-decisions.md` under 800 lines
-
-3. **Standards Compliance:**
-   - Follow existing package naming conventions
-   - Ensure roxygen2 documentation for all functions (`@param`, `@return`, `@examples`, `@export`)
-   - Write comprehensive tests in `tests/testthat/`
-   - Implement proper input validation
-   - `tryCatch()`, `skip()`, placeholder and fallback functions are **FORBIDDEN**
-
-### Workflow Process
-1. Check which sub-task is next
-2. Present planned code to code-reviewer agent BEFORE implementing
-3. Implement sub-task following R package best practices
-4. Submit completed code for final review
-5. Address high-priority feedback immediately
-6. Summarize medium/low priority items in `active/code_improvements.md` for future agents to learn from
-7. **STOP AND WAIT:** Update task list, mark sub-task `[x]`, and ask user "Ready for the next sub-task?" - Wait for "yes" or "y" before proceeding
 
 ### Task List Maintenance
 - Mark completed tasks `[x]` per protocol

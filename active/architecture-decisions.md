@@ -5,9 +5,7 @@
 ## Foundation Decisions
 
 ### 1. Single-Fit Dual-Object Architecture
-**Decision**: One mvgam object containing two brmsfit-like objects for post-processing  
-**Rationale**: Enables seamless brms ecosystem integration while preserving multivariate correlations  
-**Implementation**: 
+- One mvgam object containing two brmsfit-like objects for post-processing  
 - brms generates linear predictors (`mu`, `mu_trend`) from two formulae
 - Stan models from two brmsfit objects (using `backend = "mock"`) are combined to contain observation + trend components
 - Combined Stan model passed to Stan for joint estimation
@@ -47,19 +45,15 @@ mvgam(y ~ x1 + x2, trend_formula = ~ AR(), data = data)
 **Stage 1**: Generate trend stanvars and trend Stan data in `generate_trend_stanvars()`
 **Stage 2**: Post-process observation model Stan code to inject trend effects and create the combined model
 
-**Critical Enhancement**: Stan assembly layer now handles complex logic moved from constructors:
-
-### 4. Parameter Extraction and Injection System (2025-08-21)
-**Decision**: Comprehensive parameter renaming system for namespace separation
-**Problem**: Observation and trend models generate identical parameter names causing Stan compilation conflicts
-**Solution**: Systematic `_trend` suffix application to all trend model parameters/data
+### 4. Parameter Extraction and Injection System
+- Comprehensive parameter renaming system
+- Systematic `_trend` suffix application to all trend model parameters/data
 
 **Implementation**:
 - `extract_and_rename_trend_parameters()` in `R/stan_assembly.R`: Processes brms trend models and renames all parameters/data with `_trend` suffix
 - `create_times_trend_matrix()`: Generates 2D integer arrays using explicit Stan syntax `int times_trend[n_time, n_series];`  
 - Stanvars collection architecture: Returns proper brms `stanvars` collections compatible with `c()` combination method
 - Reserved word filtering: Excludes 432 Stan reserved words from renaming
-- **Result**: 97.4% test success rate, complete namespace separation between observation and trend parameter spaces
 
 **Critical Integration Points**:
 - `generate_combined_stancode()` workflow: Parameter extraction integrated between Stage 1 (trend generation) and Stage 2 (injection)
@@ -81,22 +75,23 @@ stan_code <- glue("sigma_trend ~ {sigma_prior}; ar1_trend ~ {ar1_prior};")
 2. **Common default fallback**: Use `common_trend_priors` defaults
 3. **Empty string**: Let Stan use its built-in defaults
 
-**Benefits**:
-- **DRY**: Eliminates hardcoded priors across all trend generators
-- **Extensible**: New parameters in `common_trend_priors` automatically work everywhere
-- **Consistent**: All trend types use identical prior resolution logic
-- **Future-proof**: New trend types automatically inherit prior support
-
 **Implementation**:
 - `get_trend_parameter_prior()` in `R/priors.R` provides centralized resolution
 - `common_trend_priors` object defines shared parameters (sigma_trend, ar1_trend, LV, Z, etc.)
-- All trend generators replace hardcoded priors with helper function calls
 - **Parameter Processing**: `process_trend_params()` called during stanvar generation, not construction
 - **Dynamic Characteristics**: Correlation requirements, factor compatibility determined with data context
 - **Environment-Dependent Logic**: Grouping variables processed with actual data structure
-- **Dispatch Resolution**: Convention-based function lookup replaces hardcoded dispatch fields
 
-### 4. Autocorrelation Separation Principle
+### 5. S3 Generic Pattern for Inspection Functions
+**Decision**: Create mvgam-owned S3 generics with explicit brms delegation
+**Implementation**: 
+```r
+get_prior <- function(object, ...) UseMethod("get_prior")
+get_prior.formula <- function(object, ...) brms::get_prior(object, ...)
+get_prior.mvgam_formula <- function(object, data, ...) { /* trend integration */ }
+```
+
+### 6. Autocorrelation Separation Principle
 **Critical Innovation**: Distinguish observation-level correlation from State-Space dynamics
 
 **Allowed Combinations**:
@@ -206,7 +201,6 @@ mu_biomass += mu_trend_biomass;
 
 ### 1. Native Support Decision
 **Decision**: Build multiple imputation into core mvgam rather than external wrapper
-**Benefits**: Seamless Rubin's rules pooling, integrated LFO-CV, consistent interfaces
 
 ### 2. Pooling Strategy
 **Approach**: Pool at parameter level using Rubin's rules
@@ -225,9 +219,8 @@ mu_biomass += mu_trend_biomass;
 **Principle**: Preserve all brms Stan optimizations (GLM primitives, threading, etc.)
 **Implementation**: Let brms handle observation model complexity entirely
 
-### 3. Simplified Constructor Architecture (2024 Enhancement)
-**Decision**: Trend constructors become minimal object creators using `create_mvgam_trend()`
-**Rationale**: Separation of concerns - constructors create, other layers process
+### 3. Simplified Constructor Architecture
+-  Trend constructors become minimal object creators using `create_mvgam_trend()`
 
 **Constructor Pattern**:
 ```r
@@ -253,14 +246,10 @@ AR <- function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, 
 }
 ```
 
-**Key Changes**:
 - **Base type dispatch**: Always use "AR", "RW", "VAR", "PW" (never "AR1", "VAR2", "PWlinear", etc.)
 - **Exported helper**: `create_mvgam_trend()` with consistent dot-prefix parameters (.time, .series, .gr, .subgr)
 - **Rule-based validation**: Validation dispatch based on `validation_rules` field automatically assigned
 - **Automatic metadata**: Dispatch function names generated via convention (generate_ar_trend_stanvars, forecast_ar_rcpp)
-- **No complex logic**: All processing moved to validation/Stan assembly layers
-
-**Complex Logic Migration**:
 - **Grouping Processing** → `apply_validation_rules()` in R/validations.R (has data context)
 - **Parameter Processing** → `generate_trend_injection_stanvars()` in R/stan_assembly.R (has full context)
 - **Correlation Requirements** → validation layer rule-based dispatch
@@ -284,7 +273,7 @@ ZMVN()            # trend = 'ZMVN'
 
 ### 4. Variable Name Management Architecture
 
-**Critical Design Decision**: Store variable names in final mvgam object for clean downstream processing
+- Store variable names in final mvgam object for clean downstream processing
 ```r
 # Stored in final mvgam object
 variable_info = list(
@@ -308,9 +297,7 @@ variable_info = list(
 
 ### 5. Data Ordering Architecture
 
-**Critical Design Decision**: Explicit data ordering for Stan without data pollution
-
-**Clean Ordering Strategy**:
+- Explicit data ordering for Stan without data pollution
 - **Separation of Concerns**: Keep validation logic separate from ordering logic
 - **No Data Pollution**: Never add tracking columns to the user's data
 - **Explicit Stan Requirements**: Data must be ordered by series then time for efficient Stan computation
@@ -420,7 +407,6 @@ forecast.mvgam <- function(object, newdata) {
   do.call(object$forecast_dispatch$function_name, list(params, object$states, horizon))
 }
 ```
-
 
 ### 11. brms Stanvar Block Naming Conventions
 
@@ -575,7 +561,6 @@ validate_time_series_for_trends(data, trend_specs) -> list(data, dimensions)
 extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimensions required
 ```
 
-
 ### 14. Prior Specification Using Native brms Classes
 
 **Critical Design Decision**: Use `brmsprior` class throughout rather than creating custom mvgamprior class
@@ -593,7 +578,6 @@ extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimens
 - Apply `_trend` suffix convention consistently for all trend parameters
 - Optionally use attributes on brmsprior objects for mvgam-specific metadata if needed
 - Leverage brms `get_prior()` for observation model priors directly
-
 
 ## Enhanced Architecture
 
@@ -620,11 +604,6 @@ extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimens
 
 ### 15. Ultra-Clean Stanvar Architecture
 
-**Critical Design Decision**: Eliminate duplicate stanvar names through architectural separation of concerns.
-
-**Problem Solved**: "Duplicated names in 'stanvars' are not allowed" errors caused by multiple functions creating the same dimension stanvars (`n_trend`, `n_series_trend`, `n_lv_trend`).
-
-**Architecture Solution**:
 - **Single Source of Truth**: Only `generate_common_trend_data()` creates dimension stanvars
 - **Injection Function Orchestration**: `generate_trend_injection_stanvars()` manages complete stanvar assembly:
   - Creates dimensions via `generate_common_trend_data()`
@@ -633,13 +612,6 @@ extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimens
   - Handles cross-cutting validation via `validate_no_factor_hierarchical()`
 - **Clean Trend Generators**: Focus purely on trend-specific stanvars, assume dimensions exist in context
 - **No Duplication Possible**: By design, no function can create dimensions twice
-
-**Key Implementation Changes**:
-- **Removed**: `generate_matrix_z_data()` function (only created dimensions)
-- **Updated**: `generate_matrix_z_multiblock_stanvars()` to handle only Z matrix components
-- **Cleaned**: All 6 trend generators (RW, AR, CAR, ZMVN, VAR, PW) no longer create dimensions
-- **Enhanced**: Injection function provides complete stanvar orchestration
-
 
 ### 16. Trend Model Distribution Constraints
 
@@ -657,11 +629,6 @@ extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimens
 - `extract_non_likelihood_from_model_block()` should focus on Gaussian likelihood exclusion patterns
 - Trend generators can assume Gaussian innovations and continuous parameter spaces
 - Documentation should clarify that observation models can be any brms-supported family while trends remain Gaussian
-
-**Rationale**: 
-- State-Space models with non-Gaussian trend innovations create computational complexity without clear benefit
-- Gaussian trend processes with non-Gaussian observations provide sufficient modeling flexibility
-- Simplifies Stan code generation and parameter monitoring systems
 
 ### 17. mvgam Formula Interface and Prior Inspection System
 
@@ -688,11 +655,3 @@ priors_obs_only <- get_prior(mvgam_formula(y ~ x), data = dat)
 - **Existing Helper Functions**: Leverages `extract_observation_priors()`, `extract_trend_priors()`, `combine_obs_trend_priors()`
 - **Response Name Extraction**: Uses `extract_response_names()` from brms integration layer
 - **Validation Standards**: Full `checkmate::assert_*()` validation with `insight::format_error()` messaging
-
-
-## Critical Requirements
-
-**Stan Assembly**: Convention-based dispatch replaces hardcoded fields
-**Priors**: Leverage monitor_params infrastructure for all trend types  
-**Development**: Use `create_mvgam_trend()` helper, process parameters in validation layer
-**Stanvar Management**: Use injection function for complete assembly, trend generators for domain logic only

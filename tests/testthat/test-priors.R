@@ -1424,3 +1424,175 @@ test_that("VAR/VARMA prior parameter naming follows conventions", {
   # Should contain subset of expected parameters
   expect_true(any(expected_params %in% actual_params))
 })
+
+# =============================================================================
+# Tests for get_prior() S3 Generic System
+# =============================================================================
+
+test_that("get_prior S3 generic works with regular formulas (brms delegation)", {
+  # Create test data
+  test_data <- data.frame(
+    y = rnorm(20),
+    x = rnorm(20),
+    group = factor(rep(1:4, 5))
+  )
+  
+  # Test that get_prior works with regular formulas (should delegate to brms)
+  formula <- y ~ x + (1|group)
+  priors_formula <- get_prior(formula, data = test_data, family = gaussian())
+  
+  # Should return brmsprior object
+  expect_true(inherits(priors_formula, "brmsprior"))
+  expect_true(inherits(priors_formula, "data.frame"))
+  
+  # Should have standard brms columns
+  expected_cols <- c("prior", "class", "coef", "group", "resp", "dpar", "nlpar", "lb", "ub", "source")
+  expect_true(all(expected_cols %in% names(priors_formula)))
+  
+  # Should have some priors for this model structure
+  expect_gt(nrow(priors_formula), 3)
+  
+  # Should have expected parameter classes for this model
+  expect_true("Intercept" %in% priors_formula$class)
+  expect_true("b" %in% priors_formula$class)
+  expect_true("sd" %in% priors_formula$class)
+})
+
+test_that("get_prior works with brmsformula objects", {
+  # Create test data  
+  test_data <- data.frame(
+    count = rpois(20, 5),
+    treatment = factor(rep(c("A", "B"), 10))
+  )
+  
+  # Test with brmsformula object
+  bf_obj <- brms::bf(count ~ treatment, family = poisson())
+  priors_bf <- get_prior(bf_obj, data = test_data)
+  
+  # Should return brmsprior object
+  expect_true(inherits(priors_bf, "brmsprior"))
+  expect_gt(nrow(priors_bf), 2)
+  
+  # Should have expected parameter classes for poisson model
+  expect_true("Intercept" %in% priors_bf$class)
+  expect_true("b" %in% priors_bf$class)
+})
+
+test_that("get_prior.mvgam_formula works for observation-only models (no trend)", {
+  # Create test data
+  test_data <- data.frame(
+    y = rnorm(20),
+    x = rnorm(20),
+    group = factor(rep(1:4, 5))
+  )
+  
+  # Create mvgam_formula with no trend
+  mf <- mvgam_formula(y ~ x + (1|group))
+  
+  # Get priors using S3 method dispatch
+  priors_mvgam <- get_prior(mf, data = test_data, family = gaussian())
+  
+  # Should return brmsprior object
+  expect_true(inherits(priors_mvgam, "brmsprior"))
+  expect_true(inherits(priors_mvgam, "data.frame"))
+  
+  # Should have trend_component column added
+  expect_true("trend_component" %in% names(priors_mvgam))
+  
+  # All trend_component values should be "observation" for no-trend model  
+  expect_true(all(priors_mvgam$trend_component == "observation"))
+  
+  # Should have expected parameter classes
+  expect_true("Intercept" %in% priors_mvgam$class)
+  expect_true("b" %in% priors_mvgam$class)
+  expect_true("sd" %in% priors_mvgam$class)
+  expect_true("sigma" %in% priors_mvgam$class)
+  
+  # Should match brms output exactly (except for trend_component column)
+  formula <- y ~ x + (1|group)
+  priors_brms <- brms::get_prior(formula, data = test_data, family = gaussian())
+  
+  # Remove trend_component column for comparison
+  priors_mvgam_clean <- priors_mvgam[, !names(priors_mvgam) %in% "trend_component"]
+  
+  # Should have same structure and content
+  expect_equal(names(priors_mvgam_clean), names(priors_brms))
+  expect_equal(nrow(priors_mvgam_clean), nrow(priors_brms))
+  expect_equal(priors_mvgam_clean$class, priors_brms$class)
+})
+
+test_that("get_prior.mvgam_formula preserves original formula class information", {
+  # Test with regular formula
+  formula <- y ~ x
+  mf_formula <- mvgam_formula(formula)
+  expect_equal(attr(mf_formula, "formula_class"), "formula")
+  
+  # Test with brmsformula
+  bf_obj <- brms::bf(count ~ treatment, family = poisson())
+  mf_brmsformula <- mvgam_formula(bf_obj)
+  expect_equal(attr(mf_brmsformula, "formula_class"), "brmsformula")
+  
+  # Test mvgam_formula class structure
+  expect_equal(class(mf_formula), "mvgam_formula")
+  expect_equal(class(mf_brmsformula), "mvgam_formula")
+})
+
+test_that("get_prior input validation works correctly", {
+  # Test with invalid object
+  expect_error(get_prior("not a valid object"))
+  
+  # Test with mvgam_formula but missing data
+  mf <- mvgam_formula(y ~ x)
+  expect_error(get_prior(mf), "data")
+  
+  # Test with invalid data
+  test_data <- data.frame(y = rnorm(20), x = rnorm(20))
+  expect_error(get_prior(mf, data = "not a data frame"))
+  expect_error(get_prior(mf, data = data.frame()))  # Empty data frame
+  
+  # Test with invalid family
+  expect_error(get_prior(mf, data = test_data, family = "not a family"))
+})
+
+test_that("get_prior S3 method dispatch works correctly", {
+  # Create test data
+  test_data <- data.frame(
+    y = rnorm(20),
+    x = rnorm(20)
+  )
+  
+  # Test that different object classes dispatch to correct methods
+  formula <- y ~ x
+  mf <- mvgam_formula(formula)
+  bf_obj <- brms::bf(y ~ x)
+  
+  # All should return brmsprior objects but with different characteristics
+  priors_formula <- get_prior(formula, data = test_data)
+  priors_mvgam <- get_prior(mf, data = test_data)  
+  priors_brmsformula <- get_prior(bf_obj, data = test_data)
+  
+  # All should be brmsprior objects
+  expect_true(inherits(priors_formula, "brmsprior"))
+  expect_true(inherits(priors_mvgam, "brmsprior"))
+  expect_true(inherits(priors_brmsformula, "brmsprior"))
+  
+  # Only mvgam_formula should have trend_component column
+  expect_false("trend_component" %in% names(priors_formula))
+  expect_true("trend_component" %in% names(priors_mvgam))
+  expect_false("trend_component" %in% names(priors_brmsformula))
+})
+
+test_that("get_prior methods are properly exported and registered", {
+  # Check that generic exists
+  expect_true(exists("get_prior"))
+  
+  # Check that methods are registered
+  methods_list <- methods("get_prior")
+  expected_methods <- c("get_prior.default", "get_prior.formula", 
+                       "get_prior.brmsformula", "get_prior.mvgam_formula")
+  
+  # All expected methods should be in the methods list
+  for (method in expected_methods) {
+    expect_true(method %in% methods_list)
+  }
+})

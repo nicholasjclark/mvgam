@@ -1,5 +1,18 @@
 # mvgam-brms Quick Reference
 
+## Prior Inspection Workflow
+```r
+# Create mvgam_formula object
+mf <- mvgam_formula(count ~ treatment, trend_formula = ~ AR(p = 1))
+
+# Inspect available priors
+priors <- get_prior(mf, data = data, family = poisson())
+
+# Filter by component  
+obs_priors <- priors[priors$trend_component == "observation", ]
+trend_priors <- priors[priors$trend_component == "trend", ]
+```
+
 ## Core Formula Patterns
 
 ### Standard State-Space

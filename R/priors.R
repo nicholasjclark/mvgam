@@ -1210,23 +1210,24 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
     }
   }
   
-  # Determine appropriate class hierarchy based on input formula type
+  # Determine and store formula type for later use
   if (inherits(formula, "mvbrmsformula")) {
-    base_class <- "mvbrmsformula"
+    formula_class <- "mvbrmsformula"
   } else if (inherits(formula, "brmsformula")) {
-    base_class <- "brmsformula"
+    formula_class <- "brmsformula"
   } else {
-    base_class <- "formula"
+    formula_class <- "formula"
   }
   
-  # Create minimal structure with just the formulas
+  # Create structure with formulas and class metadata
   out <- list(
     formula = formula,
     trend_formula = trend_formula
   )
   
-  # Set S3 class to enable method dispatch
-  class(out) <- c("mvgam_formula", base_class)
+  # Set clean S3 class for method dispatch, store original class as attribute
+  class(out) <- "mvgam_formula"
+  attr(out, "formula_class") <- formula_class
   
   return(out)
 }
@@ -1250,25 +1251,90 @@ print.mvgam_formula <- function(x, ...) {
   invisible(x)
 }
 
-#' Get Priors for mvgam Formula Objects
+#' Get Prior Specifications for Model Objects
+#'
+#' @description
+#' S3 generic function for extracting prior specifications from various model
+#' objects. This function provides a unified interface for prior inspection
+#' across different model types, with full brms compatibility and extensions
+#' for mvgam State-Space models.
+#'
+#' @param object Model specification object (formula, brmsformula, mvgam_formula, etc.)
+#' @param ... Additional arguments passed to methods
+#'
+#' @details
+#' This generic function dispatches to appropriate methods based on object class:
+#' \itemize{
+#'   \item \code{formula}: Delegates to \code{brms::get_prior}
+#'   \item \code{brmsformula}: Delegates to \code{brms::get_prior}  
+#'   \item \code{mvgam_formula}: Uses mvgam's extended prior system
+#'   \item Default: Falls back to \code{brms::get_prior}
+#' }
+#'
+#' @return A \code{brmsprior} data frame with prior specifications
+#'
+#' @examples
+#' \dontrun{
+#' # Works with regular formulas (delegates to brms)
+#' get_prior(y ~ x + (1|group), data = dat)
+#' 
+#' # Works with mvgam_formula objects  
+#' mf <- mvgam_formula(y ~ x, trend_formula = ~ AR(p = 1))
+#' get_prior(mf, data = dat)
+#' }
+#'
+#' @seealso \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}}
+#' @export
+get_prior <- function(object, ...) {
+  UseMethod("get_prior")
+}
+
+#' Default method for get_prior - delegates to brms
+#'
+#' @param object Model specification object
+#' @param ... Additional arguments passed to \code{brms::get_prior}
+#' @return A \code{brmsprior} data frame
+#' @export
+get_prior.default <- function(object, ...) {
+  brms::get_prior(object, ...)
+}
+
+#' Formula method for get_prior - explicit brms delegation
+#'
+#' @param object A formula object
+#' @param ... Additional arguments passed to \code{brms::get_prior}
+#' @return A \code{brmsprior} data frame
+#' @export  
+get_prior.formula <- function(object, ...) {
+  brms::get_prior(object, ...)
+}
+
+#' brmsformula method for get_prior - explicit brms delegation
+#'
+#' @param object A brmsformula object
+#' @param ... Additional arguments passed to \code{brms::get_prior}
+#' @return A \code{brmsprior} data frame
+#' @export
+get_prior.brmsformula <- function(object, ...) {
+  brms::get_prior(object, ...)
+}
+
+#' mvgam_formula method for get_prior - main implementation
 #'
 #' @description
 #' Extracts and combines prior specifications for both observation and trend 
-#' components of an mvgam model. This S3 method extends the brms \code{get_prior}
-#' generic to work with mvgam_formula objects, providing a unified interface
-#' for prior inspection before model fitting.
+#' components of an mvgam model. This method provides a unified interface
+#' for prior inspection before model fitting with full brms compatibility.
 #'
 #' @param object An object of class \code{mvgam_formula} created by 
 #'   \code{\link{mvgam_formula}}
-#' @param ... Additional arguments passed to the function, including:
-#'   \itemize{
-#'     \item \code{data}: Data frame containing model variables (required)
-#'     \item \code{family}: Response distribution family (optional, default gaussian())
-#'     \item Additional arguments passed to \code{brms::get_prior}
-#'   }
+#' @param data A data frame containing the variables in the model (required)
+#' @param family A description of the response distribution and link function
+#'   (default gaussian())
+#' @param ... Additional arguments passed to \code{brms::get_prior}
 #'
 #' @return A \code{brmsprior} data frame combining observation and trend priors
-#'   with an additional \code{trend_component} attribute distinguishing:
+#'   with an additional \code{trend_component} column distinguishing:
 #'   \itemize{
 #'     \item \code{"observation"}: Parameters from the observation model
 #'     \item \code{"trend"}: Parameters from the trend model (with _trend suffix)
@@ -1282,7 +1348,7 @@ print.mvgam_formula <- function(x, ...) {
 #'   \item Extracts observation model priors using \code{brms::get_prior}
 #'   \item Extracts trend model priors using mvgam's trend system
 #'   \item Combines them into a unified \code{brmsprior} object
-#'   \item Adds the \code{trend_component} attribute for easy filtering
+#'   \item Adds the \code{trend_component} column for easy filtering
 #' }
 #'
 #' @examples
@@ -1298,44 +1364,34 @@ print.mvgam_formula <- function(x, ...) {
 #' priors2 <- get_prior(mf2, data = ecology_data, family = poisson())
 #' 
 #' # Filter by component
-#' obs_priors <- priors2[attr(priors2, "trend_component") == "observation", ]
-#' trend_priors <- priors2[attr(priors2, "trend_component") == "trend", ]
+#' obs_priors <- priors2[priors2$trend_component == "observation", ]
+#' trend_priors <- priors2[priors2$trend_component == "trend", ]
 #' }
 #'
 #' @seealso \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}}, 
 #'   \code{\link{make_stancode}}, \code{\link{make_standata}}
 #' @export
-get_prior.mvgam_formula <- function(object, ...) {
+get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
   
-  # Add proper parameter validation
+  # Input validation (required by CLAUDE.md standards)
   checkmate::assert_class(object, "mvgam_formula")
+  checkmate::assert_data_frame(data, min.rows = 1)
+  checkmate::assert_class(family, "family")
   
-  # Extract formula components from mvgam_formula object
-  formula <- object$formula
-  trend_formula <- object$trend_formula
+  # Extract formula components from mvgam_formula object (use direct indexing)
+  formula <- object[[1]]  # object$formula triggers S3 dispatch issues
+  trend_formula <- object[[2]]  # object$trend_formula
   
-  # Extract additional arguments, ensuring data is required
-  dots <- list(...)
-  if (!"data" %in% names(dots)) {
+  # Validate formula structure before proceeding
+  if (length(formula) < 3) {
     stop(insight::format_error(
-      "The {.field data} argument is required for prior extraction."
+      "Formula missing response variable.",
+      "Ensure formula has form: y ~ predictors"
     ))
   }
   
-  # Add validation for extracted parameters
-  data <- dots$data
-  checkmate::assert_data_frame(data, min.rows = 1)
-  
-  # Handle family parameter with validation
-  if ("family" %in% names(dots)) {
-    family <- dots$family
-    checkmate::assert_class(family, "family")
-  } else {
-    family <- gaussian()
-  }
-  
-  # Extract observation model priors using existing helper function
-  obs_priors <- extract_observation_priors(
+  # Call brms::get_prior directly, bypassing mvgam validation layers
+  obs_priors <- brms::get_prior(
     formula = formula,
     data = data,
     family = family,
@@ -1344,8 +1400,8 @@ get_prior.mvgam_formula <- function(object, ...) {
   
   # Handle case where no trend formula is specified
   if (is.null(trend_formula)) {
-    # Add trend_component attribute for consistency
-    attr(obs_priors, "trend_component") <- rep("observation", nrow(obs_priors))
+    # Add trend_component column as specified in requirements
+    obs_priors$trend_component <- "observation"
     return(obs_priors)
   }
   

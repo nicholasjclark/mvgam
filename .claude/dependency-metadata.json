@@ -1,6 +1,6 @@
 ﻿{
-    "commit_hash":  "b2fe352496768d11c184f093084f7b145546af16",
-    "commit_message":  "feat: implement mvgam_formula constructor with comprehensive tests\n\n- Added mvgam_formula() constructor function for minimal formula containers\n- Comprehensive parameter validation using checkmate and insight error formatting\n- S3 class hierarchy preservation for formula/brmsformula/mvbrmsformula compatibility\n- Print method for enhanced user experience with proper S3 dispatch\n- Autocorrelation separation principle validation to prevent brms conflicts\n- Complete test suite with 61 passing tests covering all functionality and edge cases\n- Fixed @noRd documentation issue in stan_assembly.R\n- Updated NAMESPACE for proper S3 method registration\n\nRelated to Sub-tasks 1A-1B in TRD-stancode-generation-update\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude \u003cnoreply@anthropic.com\u003e",
+    "commit_hash":  "79936fbf0b644e91c69ee5f1a12595ac3281d366",
+    "commit_message":  "feat: implement get_prior.mvgam_formula() S3 method\n\n- Add get_prior.mvgam_formula() method for unified prior inspection\n- Extends brms get_prior generic with mvgam_formula objects\n- Perfect brms compatibility when trend_formula = NULL\n- Comprehensive validation using checkmate assertions\n- Uses existing helper functions for prior extraction and combination\n- Update architecture decisions with new formula interface patterns\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude \u003cnoreply@anthropic.com\u003e",
     "version":  "2.0.0",
     "exported_functions":  67,
     "package_name":  "mvgam",
@@ -27,8 +27,8 @@
                                   "tibble"
                               ],
     "total_files":  56,
-    "generated":  "2025-08-26 09:50:57",
-    "s3_methods_count":  41,
+    "generated":  "2025-08-26 10:14:54",
+    "s3_methods_count":  42,
     "s3_classes_count":  21,
-    "total_functions":  401
+    "total_functions":  402
 }
