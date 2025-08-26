@@ -108,10 +108,9 @@ Implementation tasks for stancode generation update feature with comprehensive p
       - Solution implemented: Added data-context-aware filtering in generate_trend_priors_from_monitor_params()
       - Added dimensions calculation in parse_trend_formula() using existing extract_time_series_dimensions()
       - Single-series ZMVN now correctly shows only sigma_trend, multi-series shows both sigma_trend and L_Omega_trend
-    - ✅ **RESOLVED**: Fixed function call parameters in extract_time_series_dimensions()
-    - ✅ **IMPLEMENTED**: Context-aware parameter filtering using existing infrastructure
     
-  - [ ] **Sub-task 1I**: Add comprehensive documentation and examples
+  - [ ] **Sub-task 1I**: Fix ALL test warnings and failures, and add comprehensive documentation and examples
+    - Use the test-runner agent to run tests in test-priors.R. Mask one-time warnings and fix any errors
     - Complete roxygen2 for both `mvgam_formula()` and `get_prior.mvgam_formula()` 
     - Add realistic workflow examples: construct → inspect → modify priors
     - Document S3 class structure and inheritance from base formula classes
