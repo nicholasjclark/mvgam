@@ -1,6 +1,6 @@
 ﻿{
-    "commit_hash":  "a1da6da0c8104260887247f1df5a535eb80ced08",
-    "commit_message":  "feat: fix majority of test-priors.R failures and complete Sub-task 1E\n\nMajor test maintenance fixes:\n- Fixed AR trend validation by adding missing n_obs parameter\n- Updated ZMVN tests to expect 3-stanvar pattern (zmvn_parameters, zmvn_tparameters, zmvn_model)\n- Removed unsupported \u0027info\u0027 parameters from expect_gt() and other testthat functions\n- Relaxed strict _trend suffix requirements for transitioning trend types\n- Fixed PW constructor parameter from \u0027n_change\u0027 to \u0027n_changepoints\u0027\n- Removed deprecated GP() trend references\n- Fixed brms duplicate response variable test with separate y1/y2 variables\n\nSub-task 1E completion:\n- Added has_embedded_families() helper function with comprehensive validation\n- Implemented conditional family parameter passing in get_prior.mvgam_formula()\n- Added 6 comprehensive test cases for embedded family support (100% pass rate)\n- Supports bf(count ~ temp, family = poisson()) + bf(biomass ~ temp, family = gaussian())\n\nTest improvements:\n- Reduced failures from 22 to 9 (59% reduction)\n- Improved pass rate from 95.7% to 98.3% (492 → 508 passing tests)\n- Created dev-tasks-test-maintenance-critical.md for remaining 9 failures\n- Added HIGH PRIORITY items to active/code_improvements.md\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude \u003cnoreply@anthropic.com\u003e",
+    "commit_hash":  "4895dfd15a427da59a70c2c8b73fac6ec7056a14",
+    "commit_message":  "feat: complete Sub-task 1E embedded family support with critical test fixes\n\n- Implement embedded family support in get_prior.mvgam_formula()\n- Add has_embedded_families() detection for bf() formulas with embedded families\n- Make family parameter validation conditional based on formula type\n- Fix trend constructor evaluation by removing forbidden tryCatch\n- Use proper namespace (asNamespace(\"mvgam\")) for trend constructor access\n- Fix ZMVN stanvar S3 class test expectation (list vs stanvar)\n- Fix PW logistic growth tests by adding cap parameter and data column\n- Remove invalid cor parameter from VAR constructor tests\n- Update task documentation with completion status and next steps\n\nRelated to Sub-task 1E in TRD-stancode-generation-update\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude \u003cnoreply@anthropic.com\u003e",
     "version":  "2.0.0",
     "exported_functions":  68,
     "package_name":  "mvgam",
@@ -27,7 +27,7 @@
                                   "tibble"
                               ],
     "total_files":  56,
-    "generated":  "2025-08-26 13:20:28",
+    "generated":  "2025-08-26 13:45:04",
     "s3_methods_count":  42,
     "s3_classes_count":  24,
     "total_functions":  407
