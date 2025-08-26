@@ -1225,8 +1225,14 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
     trend_formula = trend_formula
   )
   
-  # Set clean S3 class for method dispatch, store original class as attribute
-  class(out) <- "mvgam_formula"
+  # Set S3 class hierarchy preserving original formula class
+  if (formula_class == "mvbrmsformula") {
+    class(out) <- c("mvgam_formula", "mvbrmsformula")
+  } else if (formula_class == "brmsformula") {
+    class(out) <- c("mvgam_formula", "brmsformula")
+  } else {
+    class(out) <- c("mvgam_formula", "formula")
+  }
   attr(out, "formula_class") <- formula_class
   
   return(out)

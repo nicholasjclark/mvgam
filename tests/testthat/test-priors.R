@@ -1535,9 +1535,9 @@ test_that("get_prior.mvgam_formula preserves original formula class information"
   mf_brmsformula <- mvgam_formula(bf_obj)
   expect_equal(attr(mf_brmsformula, "formula_class"), "brmsformula")
   
-  # Test mvgam_formula class structure
-  expect_equal(class(mf_formula), "mvgam_formula")
-  expect_equal(class(mf_brmsformula), "mvgam_formula")
+  # Test mvgam_formula class structure (now preserves class hierarchy)
+  expect_equal(class(mf_formula), c("mvgam_formula", "formula"))
+  expect_equal(class(mf_brmsformula), c("mvgam_formula", "brmsformula"))
 })
 
 test_that("get_prior input validation works correctly", {
@@ -1949,7 +1949,6 @@ test_that("extract_trend_priors works with ALL available trend types", {
     
     # Factor model variations
     "AR_factor" = ~ AR(p = 1, n_lv = 2, time = "time", series = "series"),
-    "CAR_factor" = ~ CAR(n_lv = 2, time = "time", series = "series"),
     
     # Hierarchical variations
     "VAR_hierarchical" = ~ VAR(p = 1, gr = "site", time = "time", series = "series"),

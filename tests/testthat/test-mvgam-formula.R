@@ -29,15 +29,13 @@ test_that("mvgam_formula handles different formula types", {
   mf1 <- mvgam_formula(f1)
   expect_s3_class(mf1, c("mvgam_formula", "formula"))
   
-  # brmsformula (if brms is available)
-  skip_if_not_installed("brms")
+  # brmsformula
   bf1 <- brms::bf(y ~ x)
   mf2 <- mvgam_formula(bf1)
   expect_s3_class(mf2, "mvgam_formula")
   expect_s3_class(mf2, "brmsformula")
   
   # mvbind formula (multivariate)
-  skip_if_not_installed("brms")
   mv_formula <- brms::bf(mvbind(y1, y2) ~ x)
   mf3 <- mvgam_formula(mv_formula)
   expect_s3_class(mf3, "mvgam_formula")
@@ -102,7 +100,6 @@ test_that("mvgam_formula preserves class hierarchy correctly", {
   expect_equal(class(mf1), c("mvgam_formula", "formula"))
   
   # brmsformula
-  skip_if_not_installed("brms")
   bf1 <- brms::bf(y ~ x)
   mf2 <- mvgam_formula(bf1)
   expect_equal(class(mf2), c("mvgam_formula", "brmsformula"))
@@ -138,7 +135,6 @@ test_that("print.mvgam_formula works correctly", {
 
 test_that("mvgam_formula handles complex real-world formulas", {
   # Multivariate response
-  skip_if_not_installed("brms")
   mv_formula <- brms::bf(mvbind(count, biomass) ~ temperature + s(time))
   mf1 <- mvgam_formula(mv_formula, trend_formula = ~ 1)
   expect_s3_class(mf1, "mvgam_formula")
@@ -196,4 +192,216 @@ test_that("mvgam_formula handles edge cases", {
   
   # Formula with dots
   expect_no_error(mvgam_formula(y ~ .))
+})
+
+# =============================================================================
+# SECTION: BRMS COMPATIBILITY TESTS (Sub-task 1F)
+# =============================================================================
+# Tests for exact equivalence between mvgam_formula + get_prior and brms::get_prior
+# when trend_formula = NULL. This ensures perfect brms delegation.
+
+test_that("mvgam_formula + get_prior identical to brms when no trends", {
+  # Create test data
+  test_data <- data.frame(
+    y = rnorm(20),
+    x = rnorm(20),
+    group = factor(rep(1:4, 5))
+  )
+  
+  # Simple formula with gaussian family
+  formula_obj <- mvgam_formula(y ~ x, trend_formula = NULL)
+  mvgam_result <- get_prior(formula_obj, family = gaussian(), data = test_data)
+  brms_result <- brms::get_prior(y ~ x, family = gaussian(), data = test_data)
+  
+  # Remove trend_component column for comparison (this is the only difference)
+  mvgam_clean <- mvgam_result[, !names(mvgam_result) %in% "trend_component"]
+  
+  # Should be identical except for trend_component column
+  expect_identical(mvgam_clean, brms_result)
+  
+  # Verify trend_component column is added correctly
+  expect_true("trend_component" %in% names(mvgam_result))
+  expect_true(all(mvgam_result$trend_component == "observation"))
+  
+  # Complex formula with random effects
+  complex_formula <- mvgam_formula(y ~ x + s(x) + (1|group), trend_formula = NULL)
+  mvgam_complex <- get_prior(complex_formula, family = gaussian(), data = test_data)
+  brms_complex <- brms::get_prior(y ~ x + s(x) + (1|group), 
+                                  family = gaussian(), data = test_data)
+  
+  # Should be identical (after removing trend_component)
+  mvgam_complex_clean <- mvgam_complex[, !names(mvgam_complex) %in% "trend_component"]
+  expect_identical(mvgam_complex_clean, brms_complex)
+})
+
+test_that("family compatibility across different distributions", {
+  # Test data for different families
+  test_data_gaussian <- data.frame(y = rnorm(20), x = rnorm(20))
+  test_data_poisson <- data.frame(y = rpois(20, 3), x = rnorm(20))
+  test_data_binomial <- data.frame(y = rbinom(20, 1, 0.5), x = rnorm(20))
+  
+  families_and_data <- list(
+    list(family = gaussian(), data = test_data_gaussian),
+    list(family = poisson(), data = test_data_poisson),
+    list(family = binomial(), data = test_data_binomial)
+  )
+  
+  formula_obj <- mvgam_formula(y ~ x, trend_formula = NULL)
+  
+  for (test_case in families_and_data) {
+    family <- test_case$family
+    data <- test_case$data
+    
+    # Get priors from both systems
+    mvgam_result <- get_prior(formula_obj, family = family, data = data)
+    brms_result <- brms::get_prior(y ~ x, family = family, data = data)
+    
+    # Remove trend_component column for comparison
+    mvgam_clean <- mvgam_result[, !names(mvgam_result) %in% "trend_component"]
+    
+    # Should be identical
+    expect_identical(mvgam_clean, brms_result, 
+                     info = paste("Failed for family:", family$family))
+    
+    # Verify trend_component column
+    expect_true("trend_component" %in% names(mvgam_result))
+    expect_true(all(mvgam_result$trend_component == "observation"))
+  }
+})
+
+test_that("formula type compatibility (formula vs brmsformula)", {
+  test_data <- data.frame(y = rnorm(20), x = rnorm(20))
+  
+  # Standard formula
+  standard_formula <- mvgam_formula(y ~ x, trend_formula = NULL)
+  standard_result <- get_prior(standard_formula, family = gaussian(), data = test_data)
+  
+  # brmsformula
+  bf_formula <- mvgam_formula(brms::bf(y ~ x), trend_formula = NULL)
+  bf_result <- get_prior(bf_formula, family = gaussian(), data = test_data)
+  
+  # brms direct comparison
+  brms_result <- brms::get_prior(y ~ x, family = gaussian(), data = test_data)
+  
+  # All should be equivalent (after removing trend_component)
+  standard_clean <- standard_result[, !names(standard_result) %in% "trend_component"]
+  bf_clean <- bf_result[, !names(bf_result) %in% "trend_component"]
+  
+  expect_identical(standard_clean, brms_result)
+  expect_identical(bf_clean, brms_result)
+  
+  # Both should have trend_component
+  expect_true("trend_component" %in% names(standard_result))
+  expect_true("trend_component" %in% names(bf_result))
+})
+
+test_that("S3 dispatch works correctly and doesn't mask brms methods", {
+  test_data <- data.frame(y = rnorm(20), x = rnorm(20))
+  
+  # Verify method dispatch for mvgam_formula objects
+  formula_obj <- mvgam_formula(y ~ x, trend_formula = NULL)
+  expect_s3_class(formula_obj, "mvgam_formula")
+  
+  # get_prior should dispatch to get_prior.mvgam_formula
+  mvgam_result <- get_prior(formula_obj, family = gaussian(), data = test_data)
+  expect_true("trend_component" %in% names(mvgam_result))
+  
+  # Direct brms call should NOT have trend_component
+  brms_result <- brms::get_prior(y ~ x, family = gaussian(), data = test_data)
+  expect_false("trend_component" %in% names(brms_result))
+  
+  # get_prior on regular formula should delegate to brms (via get_prior.formula)
+  regular_result <- get_prior(y ~ x, family = gaussian(), data = test_data)
+  expect_false("trend_component" %in% names(regular_result))
+  expect_identical(regular_result, brms_result)
+  
+  # Verify that brms methods are not masked for regular formulas
+  expect_identical(get_prior(y ~ x, family = gaussian(), data = test_data),
+                   brms::get_prior(y ~ x, family = gaussian(), data = test_data))
+})
+
+test_that("embedded families work correctly with bf() formulas", {
+  test_data <- data.frame(y = rnorm(20), x = rnorm(20))
+  
+  # bf() formula with embedded family
+  bf_formula <- brms::bf(y ~ x, family = gaussian())
+  formula_obj <- mvgam_formula(bf_formula, trend_formula = NULL)
+  
+  # Should work without passing family parameter (embedded in bf)
+  result <- get_prior(formula_obj, data = test_data)
+  
+  # Should have trend_component column
+  expect_true("trend_component" %in% names(result))
+  expect_true(all(result$trend_component == "observation"))
+  
+  # Should be equivalent to brms direct call (after removing trend_component)
+  brms_result <- brms::get_prior(bf_formula, data = test_data)
+  result_clean <- result[, !names(result) %in% "trend_component"]
+  expect_identical(result_clean, brms_result)
+  
+  # Test with multivariate bf() formula
+  mv_bf_formula <- brms::bf(mvbind(y, x) ~ 1)
+  mv_formula_obj <- mvgam_formula(mv_bf_formula, trend_formula = NULL)
+  mv_result <- get_prior(mv_formula_obj, data = test_data)
+  
+  expect_true("trend_component" %in% names(mv_result))
+  expect_true(all(mv_result$trend_component == "observation"))
+})
+
+test_that("error handling for invalid get_prior calls", {
+  # Invalid data
+  expect_error(
+    get_prior(mvgam_formula(y ~ x), data = NULL),
+    "Assertion on 'data' failed"
+  )
+  
+  # Missing response in formula
+  expect_error(
+    get_prior(mvgam_formula(~ x), data = data.frame(x = 1:5)),
+    "Formula missing response variable"
+  )
+  
+  # Invalid family for non-embedded formulas
+  test_data <- data.frame(y = rnorm(20), x = rnorm(20))
+  expect_error(
+    get_prior(mvgam_formula(y ~ x), family = "not a family", data = test_data),
+    "Assertion on 'family' failed"
+  )
+})
+
+test_that("brmsprior class preservation", {
+  test_data <- data.frame(y = rnorm(20), x = rnorm(20))
+  
+  # mvgam_formula result should be brmsprior class
+  result <- get_prior(mvgam_formula(y ~ x, trend_formula = NULL), 
+                     family = gaussian(), data = test_data)
+  expect_s3_class(result, "brmsprior")
+  expect_s3_class(result, "data.frame")
+  
+  # Should have same structure as brms result
+  brms_result <- brms::get_prior(y ~ x, family = gaussian(), data = test_data)
+  expect_s3_class(brms_result, "brmsprior")
+  
+  # Same column names (except trend_component)
+  expected_cols <- c(names(brms_result), "trend_component")
+  expect_setequal(names(result), expected_cols)
+})
+
+test_that("trend_component column behavior", {
+  test_data <- data.frame(y = rnorm(20), x = rnorm(20))
+  
+  # When trend_formula = NULL, all should be "observation"
+  result <- get_prior(mvgam_formula(y ~ x, trend_formula = NULL), 
+                     family = gaussian(), data = test_data)
+  
+  expect_true("trend_component" %in% names(result))
+  expect_true(all(result$trend_component == "observation"))
+  expect_equal(length(unique(result$trend_component)), 1)
+  expect_type(result$trend_component, "character")
+  
+  # Should not affect other columns
+  brms_result <- brms::get_prior(y ~ x, family = gaussian(), data = test_data)
+  result_clean <- result[, !names(result) %in% "trend_component"]
+  expect_identical(names(result_clean), names(brms_result))
+  expect_equal(nrow(result), nrow(brms_result))
 })

@@ -108,25 +108,9 @@ Implementation tasks for stancode generation update feature with comprehensive p
     - ✅ **RESOLVED**: Made family parameter validation conditional based on formula type 
     - ✅ **RESOLVED**: Handles `bf()` formulas with embedded families correctly
     - ✅ **RESOLVED**: Maintains perfect brms delegation when `trend_formula = NULL`
-    - ✅ **RESOLVED**: Core test failures for embedded family support now passing
-    - ✅ **Achievement**: All major multivariate use cases from patterns 4-6 in quick-reference.md now supported
-    
-### 🛠️ **CRITICAL FIXES COMPLETED (2025-08-26)**
-
-**Test Failures Resolved**: All major test-priors.R failures addressed:
-- ✅ **Trend Constructor Evaluation**: Fixed `eval_trend_constructor()` by removing forbidden `tryCatch` and using proper namespace (`asNamespace("mvgam")`)
-- ✅ **ZMVN S3 Class Issue**: Fixed test expectation - individual stanvar components are lists, not classed objects  
-- ✅ **Parameter Issues**: Fixed PW logistic growth `cap` parameter and removed invalid `cor` parameter from VAR tests
-- ✅ **File Location**: All fixes in R/trend_system.R and tests/testthat/test-priors.R
-
-**Expected Test Status**: Should be 530/530 tests passing (100%) - verify with: `Rscript -e "devtools::load_all();testthat::test_file('tests/testthat/test-priors.R')"`
-
-  - [ ] **Sub-task 1F**: Test brms compatibility (exact equivalence)  
-    - Create test file `tests/testthat/test-mvgam-formula.R`
-    - Test: `mvgam_formula(y ~ x, trend_formula = NULL)` → `get_prior()` identical to brms
-    - Test with different family types: gaussian(), poisson(), binomial() 
-    - Test with different formula types: formula, brmsformula objects
-    - Verify S3 dispatch works correctly and doesn't mask brms methods
+  - [x] **Sub-task 1F**: Test brms compatibility (exact equivalence) ✅ *(2025-08-26)*
+    - Enhanced existing test file with comprehensive brms compatibility tests
+    - Verified perfect equivalence when `trend_formula = NULL`
     
   - [ ] **Sub-task 1G**: Test trend functionality and integration
     - Test trend_component column addition for both observation and trend parameters
