@@ -1249,3 +1249,118 @@ print.mvgam_formula <- function(x, ...) {
   }
   invisible(x)
 }
+
+#' Get Priors for mvgam Formula Objects
+#'
+#' @description
+#' Extracts and combines prior specifications for both observation and trend 
+#' components of an mvgam model. This S3 method extends the brms \code{get_prior}
+#' generic to work with mvgam_formula objects, providing a unified interface
+#' for prior inspection before model fitting.
+#'
+#' @param object An object of class \code{mvgam_formula} created by 
+#'   \code{\link{mvgam_formula}}
+#' @param ... Additional arguments passed to the function, including:
+#'   \itemize{
+#'     \item \code{data}: Data frame containing model variables (required)
+#'     \item \code{family}: Response distribution family (optional, default gaussian())
+#'     \item Additional arguments passed to \code{brms::get_prior}
+#'   }
+#'
+#' @return A \code{brmsprior} data frame combining observation and trend priors
+#'   with an additional \code{trend_component} attribute distinguishing:
+#'   \itemize{
+#'     \item \code{"observation"}: Parameters from the observation model
+#'     \item \code{"trend"}: Parameters from the trend model (with _trend suffix)
+#'   }
+#'
+#' @details
+#' When \code{trend_formula = NULL}, this function behaves identically to 
+#' \code{brms::get_prior}, ensuring perfect brms compatibility for observation-only
+#' models. When a trend formula is specified, the function:
+#' \enumerate{
+#'   \item Extracts observation model priors using \code{brms::get_prior}
+#'   \item Extracts trend model priors using mvgam's trend system
+#'   \item Combines them into a unified \code{brmsprior} object
+#'   \item Adds the \code{trend_component} attribute for easy filtering
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Create mvgam_formula objects
+#' mf1 <- mvgam_formula(y ~ x + (1|group))  # No trend
+#' mf2 <- mvgam_formula(count ~ treatment, ~ AR(p = 1))  # With trend
+#' 
+#' # Get priors (identical to brms when no trend)
+#' priors1 <- get_prior(mf1, data = dat, family = poisson())
+#' 
+#' # Get combined priors with trend parameters
+#' priors2 <- get_prior(mf2, data = ecology_data, family = poisson())
+#' 
+#' # Filter by component
+#' obs_priors <- priors2[attr(priors2, "trend_component") == "observation", ]
+#' trend_priors <- priors2[attr(priors2, "trend_component") == "trend", ]
+#' }
+#'
+#' @seealso \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}}, 
+#'   \code{\link{make_stancode}}, \code{\link{make_standata}}
+#' @export
+get_prior.mvgam_formula <- function(object, ...) {
+  
+  # Add proper parameter validation
+  checkmate::assert_class(object, "mvgam_formula")
+  
+  # Extract formula components from mvgam_formula object
+  formula <- object$formula
+  trend_formula <- object$trend_formula
+  
+  # Extract additional arguments, ensuring data is required
+  dots <- list(...)
+  if (!"data" %in% names(dots)) {
+    stop(insight::format_error(
+      "The {.field data} argument is required for prior extraction."
+    ))
+  }
+  
+  # Add validation for extracted parameters
+  data <- dots$data
+  checkmate::assert_data_frame(data, min.rows = 1)
+  
+  # Handle family parameter with validation
+  if ("family" %in% names(dots)) {
+    family <- dots$family
+    checkmate::assert_class(family, "family")
+  } else {
+    family <- gaussian()
+  }
+  
+  # Extract observation model priors using existing helper function
+  obs_priors <- extract_observation_priors(
+    formula = formula,
+    data = data,
+    family = family,
+    ...
+  )
+  
+  # Handle case where no trend formula is specified
+  if (is.null(trend_formula)) {
+    # Add trend_component attribute for consistency
+    attr(obs_priors, "trend_component") <- rep("observation", nrow(obs_priors))
+    return(obs_priors)
+  }
+  
+  # Extract response variable names for trend prior generation
+  response_names <- extract_response_names(formula)
+  
+  # Extract trend model priors using existing helper function
+  trend_priors <- extract_trend_priors(
+    trend_formula = trend_formula,
+    data = data,
+    response_names = response_names
+  )
+  
+  # Combine observation and trend priors using existing helper function
+  combined_priors <- combine_obs_trend_priors(obs_priors, trend_priors)
+  
+  return(combined_priors)
+}

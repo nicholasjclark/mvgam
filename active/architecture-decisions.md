@@ -381,12 +381,6 @@ monitor_params <- generate_monitor_params(trend_spec)
 - `normalize_trend_type()` - Handles trend type variations
 - `add_monitor_params(trend_obj)` - Enhancement function
 
-**Benefits**:
-1. **Zero Manual Specification**: No manual monitor_params maintenance required
-2. **Future-Proof**: New trends just add their generator function
-3. **Complex Lag Support**: Handles AR(p = c(1,12)) → ar1_trend, ar12_trend automatically
-4. **Factor Model Integration**: Automatically includes "Z" when n_lv specified
-5. **Correlation Awareness**: Adds L_Omega_trend, Sigma_trend when cor = TRUE
 
 ### 10. Ultra-Efficient Forecasting System
 
@@ -427,12 +421,6 @@ forecast.mvgam <- function(object, newdata) {
 }
 ```
 
-**Benefits**:
-1. **Near-Zero Runtime Overhead**: Forecast calls are direct function dispatches
-2. **Minimal Memory Usage**: No duplicate parameter or state storage
-3. **Fast Validation**: Pre-computed time structures for newdata validation
-4. **Stan Integration**: Leverages existing monitor_params system for state tracking
-5. **Extensible**: New trends just specify function name + required parameters
 
 ### 11. brms Stanvar Block Naming Conventions
 
@@ -587,11 +575,6 @@ validate_time_series_for_trends(data, trend_specs) -> list(data, dimensions)
 extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimensions required
 ```
 
-**Benefits**:
-1. **Reliability**: All dimensions calculated from actual data, not missing specification fields
-2. **Performance**: Dimensions calculated once during validation, reused everywhere
-3. **Maintainability**: Clear separation between validation logic and trend generation
-4. **Robustness**: Eliminates missing `n_time`/`n_obs` errors in trend generators
 
 ### 14. Prior Specification Using Native brms Classes
 
@@ -611,13 +594,8 @@ extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimens
 - Optionally use attributes on brmsprior objects for mvgam-specific metadata if needed
 - Leverage brms `get_prior()` for observation model priors directly
 
-**Key Benefits**:
-- No custom S3 methods to maintain
-- Direct pass-through to brms for observation model prior handling
-- Simplified codebase with fewer conversion points
-- Better long-term maintainability
 
-## Enhanced Architecture (2025-08-16)
+## Enhanced Architecture
 
 ### 12. Integrated Prior Generation System
 
@@ -629,25 +607,18 @@ extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimens
 - **Parameter Type Defaults**: Intelligent defaults based on parameter name patterns
 - **Factor Model Support**: Handles `Z` matrix and `_trend` suffixed parameters correctly
 
-**Key Benefits**:
-- New trends automatically get prior support without manual work
-- Priors match exactly what parameters are monitored
-- Maintains `_trend` suffix naming convention
-- Supports multivariate, distributional, and factor models
 
 ### 13. Registry System with Auto-Discovery
 
 **Decision**: Auto-discovery eliminates manual registry maintenance.
 **Pattern**: For trend "FOO", define `generate_foo_trend_stanvars()` + `foo_trend_properties()`
-**Benefits**: Zero registration calls, future-proof extensibility, fail-fast validation
 
 ### 14. Enhanced Validation with Rule-Based Dispatch  
 
 **Decision**: Move parameter processing to validation layer with data context.
 **Architecture**: `trend_obj$validation_rules` drives automatic dispatch
-**Benefits**: Clean constructors, data-aware validation, extensible rules
 
-### 15. Ultra-Clean Stanvar Architecture (2025-08-20)
+### 15. Ultra-Clean Stanvar Architecture
 
 **Critical Design Decision**: Eliminate duplicate stanvar names through architectural separation of concerns.
 
@@ -669,15 +640,8 @@ extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimens
 - **Cleaned**: All 6 trend generators (RW, AR, CAR, ZMVN, VAR, PW) no longer create dimensions
 - **Enhanced**: Injection function provides complete stanvar orchestration
 
-**Benefits**:
-- **DRY Principle**: Dimensions created exactly once per usage context
-- **Future-Proof**: Adding new trend types = implement trend-specific logic only
-- **Clean Separation**: System integration vs domain logic clearly separated
-- **Maintainable**: Cross-cutting concerns handled in one place
 
-**Verification**: All trend types working (ZMVN=14, RW=12, VAR=13 stanvars)
-
-### 16. Trend Model Distribution Constraints (2025-08-21)
+### 16. Trend Model Distribution Constraints
 
 **Critical Architectural Constraint**: All trend models are univariate Gaussian State-Space models.
 
@@ -698,6 +662,33 @@ extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimens
 - State-Space models with non-Gaussian trend innovations create computational complexity without clear benefit
 - Gaussian trend processes with non-Gaussian observations provide sufficient modeling flexibility
 - Simplifies Stan code generation and parameter monitoring systems
+
+### 17. mvgam Formula Interface and Prior Inspection System
+
+**Design Decision**: Extend brms `get_prior` generic with mvgam_formula S3 method for unified prior inspection.
+
+**Architecture Components**:
+- **mvgam_formula Constructor**: Lightweight container pairing observation + trend formulas
+- **S3 Method Dispatch**: `get_prior.mvgam_formula()` extends brms functionality cleanly
+- **Native brms Compatibility**: When `trend_formula = NULL`, behaves identically to `brms::get_prior`
+- **Unified Prior Objects**: Uses native `brmsprior` class with `trend_component` attribute
+
+**Key Design Patterns**:
+```r
+# Clean interface - data/family provided to inspection functions
+mf <- mvgam_formula(y ~ x, trend_formula = ~ AR(p = 1))
+priors <- get_prior(mf, data = dat, family = poisson())
+
+# Perfect brms equivalence when no trends
+priors_obs_only <- get_prior(mvgam_formula(y ~ x), data = dat)
+# Identical to: brms::get_prior(y ~ x, data = dat)
+```
+
+**Integration Points**:
+- **Existing Helper Functions**: Leverages `extract_observation_priors()`, `extract_trend_priors()`, `combine_obs_trend_priors()`
+- **Response Name Extraction**: Uses `extract_response_names()` from brms integration layer
+- **Validation Standards**: Full `checkmate::assert_*()` validation with `insight::format_error()` messaging
+
 
 ## Critical Requirements
 
