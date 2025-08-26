@@ -207,7 +207,7 @@
                                                    "tibble"
                                                ],
                      "total_files":  56,
-                     "generated":  "2025-08-26 14:09:55",
+                     "generated":  "2025-08-26 15:42:46",
                      "s3_methods_count":  42,
                      "s3_classes_count":  24,
                      "total_functions":  407
@@ -629,12 +629,7 @@
                                                                       "register_core_trends"
                                                                   ],
                                   "validate_trend_specs":  "list_trend_types",
-                                  "validate_list_trend_formula":  [
-                                                                      "AR",
-                                                                      "error",
-                                                                      "RW",
-                                                                      "validate_single_trend_formula"
-                                                                  ],
+                                  "generate_ar_monitor_params":  "AR",
                                   "validate_brms_formula":  "validate_obs_formula_brms",
                                   "generate_combined_stancode_and_data":  "generate_combined_stancode",
                                   "dispatch_validation_rule":  "get_validation_rule_dispatch_table",
@@ -782,7 +777,12 @@
                                                                      "filter_renameable_identifiers"
                                                                  ],
                                   "loo.mvgam":  "clean_ll",
-                                  "validate_trend_components":  "error",
+                                  "validate_list_trend_formula":  [
+                                                                      "AR",
+                                                                      "error",
+                                                                      "RW",
+                                                                      "validate_single_trend_formula"
+                                                                  ],
                                   "PW":  [
                                              "create_mvgam_trend",
                                              "error"
@@ -939,6 +939,7 @@
                                                          "pool_mvgam_fits",
                                                          "validate_multiple_imputation_datasets"
                                                      ],
+                                  "validate_trend_components":  "error",
                                   "as_one_logical":  "deparse0",
                                   "generate_trend_computation_tparameters":  [
                                                                                  "AR",

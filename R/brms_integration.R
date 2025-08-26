@@ -465,7 +465,7 @@ extract_mvbind_responses <- function(formula) {
   response_expr <- formula[[2]]
   
   # Check if response expression is a call to mvbind
-  if (!is.call(response_expr) || as.character(response_expr[[1]]) != "mvbind") {
+  if (!is.call(response_expr) || as.character(response_expr[[1]])[1] != "mvbind") {
     return(NULL)
   }
   

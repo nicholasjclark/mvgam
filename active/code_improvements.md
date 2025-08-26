@@ -6,11 +6,7 @@ Track medium and low priority improvements identified during code review that sh
 ## HIGH PRIORITY Items
 *Critical issues that must be resolved immediately - NON-NEGOTIABLE*
 
-### Embedded Family Support in get_prior.mvgam_formula() (2025-08-26)
-1. **API Stability Risk**: Using `brms:::get_mv_families()` creates fragile dependency on internal brms functions that could break in future versions. Replace with public brms API or implement family extraction using documented methods.
-2. **Missing Validation**: Core helper functions lack comprehensive parameter validation required by project standards. Add `checkmate::assert_multi_class(formula, c("formula", "brmsformula", "mvbrmsformula"))` to all formula-handling functions.
-3. **Unsafe Internal API Usage**: Direct access to brms internals (`brms:::get_mv_families`) violates stable API principles and must be replaced with public methods.
-4. **Logic Robustness**: `mapply()` usage may fail with length mismatches between `bterms$forms` and `families` - add length validation and use safer iteration patterns.
+(No active high priority items - resolved embedded family support issues as of 2025-08-26)
 
 ## Medium Priority Items
 *Items that affect maintainability or could cause issues in edge cases*
@@ -75,4 +71,8 @@ Track medium and low priority improvements identified during code review that sh
 ## Completed Improvements
 *Archive of addressed items for reference*
 
-(To be populated as items are completed)
+### Embedded Family Support Resolution (2025-08-26)
+1. **✅ RESOLVED**: API stability risk - current implementation uses only public brms APIs (`brms::get_prior()`)
+2. **✅ RESOLVED**: Parameter validation - comprehensive `checkmate::assert_*()` validation implemented in all helper functions
+3. **✅ RESOLVED**: Internal API usage - no `brms:::` usage found in current implementation
+4. **✅ RESOLVED**: Logic robustness - no `mapply()` usage found, using safe alternatives

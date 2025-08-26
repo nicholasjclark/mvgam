@@ -14,11 +14,11 @@
 create_validated_trend_specs <- function(trend_formula, data, main_formula = y ~ 1) {
   # Use our standardized pipeline to parse trends
   mv_spec <- mvgam:::parse_multivariate_trends(main_formula, trend_formula)
-  
+
   if (mv_spec$has_trends) {
     # Validate time series and inject dimensions (our critical fix!)
     validation_result <- mvgam:::validate_time_series_for_trends(data, mv_spec$trend_specs)
-    
+
     # Inject dimensions using our standardized structure
     if (mvgam:::is_multivariate_trend_specs(mv_spec$trend_specs)) {
       # Multivariate: inject into each response-specific trend spec
@@ -29,7 +29,7 @@ create_validated_trend_specs <- function(trend_formula, data, main_formula = y ~
       # Univariate: inject directly into trend object
       mv_spec$trend_specs$dimensions <- validation_result$dimensions
     }
-    
+
     return(mv_spec$trend_specs)
   } else {
     return(NULL)
@@ -109,7 +109,7 @@ test_that("AR trend stanvar generation works", {
   expect_true("dimensions" %in% names(trend_specs))
   expect_equal(trend_specs$dimensions$n_obs, nrow(data))
   expect_equal(trend_specs$dimensions$n_series, 1)
-  
+
   data_info <- list(
     data = data,
     n_series = trend_specs$dimensions$n_series,
@@ -189,7 +189,7 @@ test_that("RW trend simple intercept model compiles", {
   # Verify dimensions were properly injected
   expect_true("dimensions" %in% names(trend_specs))
   expect_equal(trend_specs$dimensions$n_obs, nrow(data))
-  
+
   data_info <- list(
     data = data,
     n_series = trend_specs$dimensions$n_series,
@@ -240,7 +240,7 @@ test_that("VAR trend simple intercept model compiles", {
   # Verify dimensions were properly injected
   expect_true("dimensions" %in% names(trend_specs))
   expect_equal(trend_specs$dimensions$n_obs, nrow(data))
-  
+
   data_info <- list(
     data = data,
     n_series = trend_specs$dimensions$n_series,
@@ -290,7 +290,7 @@ test_that("CAR trend simple intercept model compiles", {
   # Verify dimensions were properly injected
   expect_true("dimensions" %in% names(trend_specs))
   expect_equal(trend_specs$dimensions$n_obs, nrow(data))
-  
+
   data_info <- list(
     data = data,
     n_series = trend_specs$dimensions$n_series,
@@ -340,7 +340,7 @@ test_that("ZMVN trend simple intercept model compiles", {
   # Verify dimensions were properly injected
   expect_true("dimensions" %in% names(trend_specs))
   expect_equal(trend_specs$dimensions$n_obs, nrow(data))
-  
+
   data_info <- list(
     data = data,
     n_series = trend_specs$dimensions$n_series,
@@ -390,7 +390,7 @@ test_that("PW trend simple intercept model compiles", {
   # Verify dimensions were properly injected
   expect_true("dimensions" %in% names(trend_specs))
   expect_equal(trend_specs$dimensions$n_obs, nrow(data))
-  
+
   data_info <- list(
     data = data,
     n_series = trend_specs$dimensions$n_series,
@@ -702,7 +702,7 @@ test_that("RW trend full Stan assembly pipeline works", {
   # Verify dimensions were properly injected
   expect_true("dimensions" %in% names(trend_specs))
   expect_equal(trend_specs$dimensions$n_obs, nrow(data))
-  
+
   data_info <- list(
     data = data,
     n_series = trend_specs$dimensions$n_series,
@@ -1378,38 +1378,4 @@ test_that("pipeline handles factor models with proper dimension validation", {
   # Check for factor model indicators in Stan code
   expect_match(combined_result$stancode, "matrix\\[.*\\] Z")
   expect_match(combined_result$stancode, "to_vector\\(Z\\) ~ normal\\(0, 1\\)")
-})
-
-test_that("complete mvgam() function flow works without placeholder functions", {
-  skip("Requires implementation of fit_mvgam_model()")
-
-  data <- data.frame(
-    time = rep(1:30, 2),
-    series = factor(rep(c("A", "B"), each = 30)),
-    y = rnorm(60),
-    x = rnorm(60)
-  )
-
-  # This is the actual user-facing function call
-  result <- mvgam(
-    formula = y ~ x,
-    trend_formula = ~ RW(time = time, series = series),
-    data = data,
-    series = factor(rep(c("A", "B"), each = 30)),
-    y = rnorm(60),
-    x = rnorm(60)
-  )
-
-  # This is the actual user-facing function call
-  result <- mvgam(
-    formula = y ~ x,
-    trend_formula = ~ RW(time = time, series = series),
-    data = data,
-    family = gaussian(),
-    backend = "rstan"
-  )
-
-  expect_s3_class(result, "mvgam")
-  expect_true("obs_model" %in% names(result))
-  expect_true("trend_model" %in% names(result))
 })

@@ -697,7 +697,16 @@ generate_ar_monitor_params <- function(trend_spec) {
   lags <- trend_spec$p %||% trend_spec$lags %||% 1
   if (is.list(lags)) lags <- unlist(lags)
 
-  ar_params <- paste0("ar", lags, "_trend")
+  # Handle different lag specifications correctly:
+  # p=2 means AR(2) with lags 1:2 (standard AR model interpretation)
+  # p=c(1,3) means specific lags 1,3 (sparse AR model)
+  if (length(lags) == 1 && is.numeric(lags)) {
+    # Single integer: create standard AR(p) with all lags 1:p
+    ar_params <- paste0("ar", 1:lags, "_trend")
+  } else {
+    # Vector or multiple values: use specific lags only
+    ar_params <- paste0("ar", lags, "_trend")
+  }
 
   return(ar_params)
 }
