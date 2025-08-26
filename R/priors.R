@@ -1371,6 +1371,30 @@ get_prior.brmsformula <- function(object, ...) {
 #' @seealso \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}}, 
 #'   \code{\link{make_stancode}}, \code{\link{make_standata}}
 #' @export
+
+#' Detect Embedded Families in Formula Objects
+#' 
+#' Checks if a formula object contains embedded family specifications
+#' (e.g., bf(y1 ~ x, family = poisson()) + bf(y2 ~ x, family = gaussian()))
+#' 
+#' @param formula A formula, brmsformula, or mvbrmsformula object
+#' @return Logical indicating whether embedded families are present
+#' @noRd
+has_embedded_families <- function(formula) {
+  checkmate::assert_multi_class(formula, c("formula", "brmsformula", "mvbrmsformula"))
+  
+  if (inherits(formula, "mvbrmsformula") && !is.null(formula$forms)) {
+    # Multivariate case: check if any bf() component has embedded family
+    return(any(sapply(formula$forms, function(x) !is.null(x$family))))
+  } else if (inherits(formula, "brmsformula")) {
+    # Single brmsformula with potential embedded family
+    return(!is.null(formula$family))
+  }
+  
+  # Regular formula objects cannot have embedded families
+  return(FALSE)
+}
+
 get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
   
   # Input validation (required by CLAUDE.md standards)
@@ -1390,13 +1414,14 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
     ))
   }
   
-  # Call brms::get_prior directly, bypassing mvgam validation layers
-  obs_priors <- brms::get_prior(
-    formula = formula,
-    data = data,
-    family = family,
-    ...
-  )
+  # Extract observation priors with embedded family support
+  if (has_embedded_families(formula)) {
+    # Let brms handle embedded families - don't pass family parameter
+    obs_priors <- brms::get_prior(formula = formula, data = data, ...)
+  } else {
+    # Pass family parameter for non-embedded cases  
+    obs_priors <- brms::get_prior(formula = formula, data = data, family = family, ...)
+  }
   
   # Handle case where no trend formula is specified
   if (is.null(trend_formula)) {
