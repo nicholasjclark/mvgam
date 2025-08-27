@@ -504,6 +504,25 @@ deparse0 <- function(expr, ...) {
   paste(deparse(expr, ...), collapse = "")
 }
 
+#' Handle NSE Parameter Conversion  
+#' 
+#' @description
+#' Convert expressions to character strings using brms's NSE pattern.
+#' This ensures consistent behavior with brms for prior specifications
+#' while avoiding code duplication across NSE-handling functions.
+#'
+#' @param expr Expression captured via substitute()
+#' @return Character string representation
+#' @noRd
+handle_nse_param <- function(expr) {
+  if (is.character(expr)) {
+    return(expr)
+  } else {
+    # Use standard R deparse with consistent formatting
+    return(paste(deparse(expr, width.cutoff = 500L), collapse = " "))
+  }
+}
+
 #' Check if Formula is Nonlinear
 #'
 #' @description
@@ -2604,4 +2623,150 @@ is_trend_term <- function(expr, trend_patterns) {
   any(vapply(trend_patterns, function(pattern) {
     grepl(pattern, expr_text, fixed = TRUE)
   }, logical(1)))
+}
+
+# =============================================================================
+# PRIOR PARAMETER VALIDATION FUNCTIONS
+# =============================================================================
+# WHY: Validation functions for prior parameter specifications. These functions
+# ensure that trend parameter class names and bounds are valid before creating
+# brmsprior objects. Separated from prior creation logic for clean architecture.
+
+#' Validate Trend Parameter Class Names
+#' 
+#' @description
+#' Validates that a trend parameter class name is valid for mvgam trend parameters.
+#' Uses existing trend infrastructure and common_trend_priors for validation
+#' rather than hardcoded patterns for future-proof extensibility.
+#'
+#' @param class Parameter class name to validate (should have "_trend" suffix)
+#' @return Invisible TRUE if valid, stops with error if invalid
+#' @noRd
+validate_trend_parameter_class <- function(class) {
+  checkmate::assert_string(class)
+  
+  # Must have _trend suffix for trend parameters
+  if (!grepl("_trend$", class)) {
+    stop(insight::format_error(
+      "Invalid trend parameter class: {.field {class}}.",
+      "Trend parameter classes must end with '_trend' suffix."
+    ))
+  }
+  
+  # Get valid trend parameter classes from common_trend_priors (future-proof)
+  valid_common <- names(common_trend_priors)
+  
+  # Check if parameter exists in common definitions
+  if (class %in% valid_common) {
+    return(invisible(TRUE))
+  }
+  
+  # Additional pattern validation for extensibility
+  # These patterns allow for custom trend parameters not in common_trend_priors
+  valid_patterns <- c(
+    "^ar[0-9]+_trend$",     # AR coefficients: ar1_trend, ar2_trend, etc.
+    "^theta[0-9]+_trend$",  # MA coefficients: theta1_trend, theta2_trend, etc.
+    "^A[0-9]+_trend$",      # VAR coefficients: A1_trend, A2_trend, etc.
+    "^sigma_trend$",        # Innovation variance
+    "^LV.*_trend$",         # Latent variables
+    "^Z.*_trend$",          # Factor loadings
+    "^L_Omega_trend$",      # Cholesky correlation matrix
+    "^rw_trend$"            # Random walk specific
+  )
+  
+  is_valid_pattern <- any(sapply(valid_patterns, function(p) grepl(p, class)))
+  
+  if (!is_valid_pattern) {
+    stop(insight::format_error(
+      "Invalid trend parameter class: {.field {class}}.",
+      "Valid trend classes must match registered patterns.",
+      "Common classes: {.val {paste(valid_common, collapse = ', ')}}"
+    ))
+  }
+  
+  return(invisible(TRUE))
+}
+
+#' Validate Trend Parameter Bounds
+#' 
+#' @description
+#' Validates parameter bounds for trend parameters, ensuring consistency with
+#' statistical constraints and common_trend_priors specifications.
+#' Uses existing infrastructure for future-proof validation.
+#'
+#' @param class Parameter class name
+#' @param lb Lower bound (numeric or NA)
+#' @param ub Upper bound (numeric or NA) 
+#' @return Invisible TRUE if valid, stops with error if invalid
+#' @noRd
+validate_trend_parameter_bounds <- function(class, lb, ub) {
+  checkmate::assert_string(class)
+  checkmate::assert_number(lb, na.ok = TRUE)
+  checkmate::assert_number(ub, na.ok = TRUE)
+  
+  # Check bounds consistency
+  if (!is.na(lb) && !is.na(ub) && lb >= ub) {
+    stop(insight::format_error(
+      "Invalid bounds for {.field {class}}: lb ({lb}) must be less than ub ({ub})"
+    ))
+  }
+  
+  # Use common_trend_priors for constraint validation (future-proof)
+  if (class %in% names(common_trend_priors)) {
+    expected_bounds <- common_trend_priors[[class]]$bounds
+    
+    # Check against expected lower bound
+    if (!is.na(expected_bounds[1]) && !is.na(lb) && lb < expected_bounds[1]) {
+      stop(insight::format_error(
+        "Lower bound {lb} for {.field {class}} is below recommended minimum {expected_bounds[1]}"
+      ))
+    }
+    
+    # Check against expected upper bound  
+    if (!is.na(expected_bounds[2]) && !is.na(ub) && ub > expected_bounds[2]) {
+      stop(insight::format_error(
+        "Upper bound {ub} for {.field {class}} is above recommended maximum {expected_bounds[2]}"
+      ))
+    }
+  }
+  
+  # Apply additional statistical constraints
+  if (grepl("^ar[0-9]+_trend$", class)) {
+    # AR coefficients should be bounded for stationarity (general guidance)
+    if (!is.na(lb) && lb < -1) {
+      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+        rlang::warn(
+          insight::format_warning(
+            "Lower bound {lb} for {.field {class}} may lead to non-stationary behavior.",
+            "Consider lb >= -1 for stationarity."
+          ),
+          .frequency = "once",
+          .frequency_id = paste0("ar_bounds_", class)
+        )
+      }
+    }
+    if (!is.na(ub) && ub > 1) {
+      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+        rlang::warn(
+          insight::format_warning(
+            "Upper bound {ub} for {.field {class}} may lead to non-stationary behavior.",
+            "Consider ub <= 1 for stationarity."
+          ),
+          .frequency = "once",
+          .frequency_id = paste0("ar_bounds_", class)
+        )
+      }
+    }
+  }
+  
+  if (class == "sigma_trend" || grepl("sigma.*_trend$", class)) {
+    # Variance parameters must be positive
+    if (!is.na(lb) && lb < 0) {
+      stop(insight::format_error(
+        "Lower bound for {.field {class}} must be >= 0 (variance parameter)"
+      ))
+    }
+  }
+  
+  return(invisible(TRUE))
 }

@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-08-27 14:44:26  
+**Generated:** 2025-08-27 16:18:16  
 **Package:** mvgam v2.0.0  
 **Commit:**   
 
 ## Summary
 
 - **Total Files:** 56
-- **Total Functions:** 418
-- **Exported Functions:** 69
-- **Internal Functions:** 375
+- **Total Functions:** 424
+- **Exported Functions:** 70
+- **Internal Functions:** 380
 - **S3 Methods:** 42
 - **S3 Classes:** 25
 

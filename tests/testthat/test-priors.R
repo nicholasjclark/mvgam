@@ -26,7 +26,7 @@ create_test_data <- function(n = 20, n_series = 1) {
 }
 
 mock_trend_prior <- function() {
-  prior <- data.frame(
+  prior_df <- data.frame(
     prior = c("", ""),
     class = c("ar1_trend", "sigma_trend"),
     coef = c("", ""),
@@ -38,12 +38,12 @@ mock_trend_prior <- function() {
     source = c("default", "default"),
     stringsAsFactors = FALSE
   )
-  class(prior) <- c("brmsprior", "data.frame")
-  prior
+  class(prior_df) <- c("brmsprior", "data.frame")
+  prior_df
 }
 
 mock_obs_prior <- function() {
-  prior <- data.frame(
+  prior_df <- data.frame(
     prior = "",
     class = "Intercept",
     coef = "",
@@ -55,8 +55,8 @@ mock_obs_prior <- function() {
     source = "default",
     stringsAsFactors = FALSE
   )
-  class(prior) <- c("brmsprior", "data.frame")
-  prior
+  class(prior_df) <- c("brmsprior", "data.frame")
+  prior_df
 }
 
 # Core prior extraction and detection tests
@@ -480,6 +480,145 @@ test_that("set_prior integrates with prior workflow", {
   mixed_result <- set_prior("normal(0, 1)", class = c("b", "ar1_trend"))
   expect_s3_class(mixed_result, "brmsprior")
   expect_true(nrow(mixed_result) > 0)
+})
+
+# prior() wrapper function tests
+# ------------------------------
+test_that("prior() function works for observation parameters", {
+  # Basic observation parameter (delegated to brms)
+  obs_prior <- prior("normal(0, 2)", class = "Intercept")
+  expect_s3_class(obs_prior, "brmsprior")
+  expect_equal(obs_prior$prior[1], "normal(0, 2)")
+  expect_equal(obs_prior$class[1], "Intercept")
+  expect_true(isTRUE(attr(obs_prior, "mvgam_enhanced")))
+  expect_equal(attr(obs_prior, "trend_components")[1], "observation")
+  
+  # Coefficient parameter
+  coef_prior <- prior("normal(0, 0.5)", class = "b", coef = "x1")
+  expect_equal(coef_prior$coef[1], "x1")
+  expect_equal(attr(coef_prior, "trend_components")[1], "observation")
+})
+
+test_that("prior() function works for trend parameters", {
+  # Basic trend parameter
+  ar_prior <- prior("normal(0, 0.5)", class = "ar1_trend")
+  expect_s3_class(ar_prior, "brmsprior")
+  expect_equal(ar_prior$prior[1], "normal(0, 0.5)")
+  expect_equal(ar_prior$class[1], "ar1_trend")
+  expect_true(isTRUE(attr(ar_prior, "mvgam_enhanced")))
+  expect_equal(attr(ar_prior, "trend_components")[1], "trend")
+  
+  # Sigma trend parameter
+  sigma_prior <- prior("exponential(2)", class = "sigma_trend")
+  expect_equal(sigma_prior$prior[1], "exponential(2)")
+  expect_equal(sigma_prior$class[1], "sigma_trend")
+  expect_equal(attr(sigma_prior, "trend_components")[1], "trend")
+})
+
+test_that("prior() function handles unquoted NSE expressions", {
+  # Test unquoted expressions to ensure NSE works properly
+  # This tests the do.call() fix for brms NSE behavior
+  
+  # Observation parameters with unquoted expressions
+  obs_prior_unquoted <- prior(normal(0, 2), class = Intercept)
+  expect_s3_class(obs_prior_unquoted, "brmsprior")
+  expect_equal(obs_prior_unquoted$prior[1], "normal(0, 2)")
+  expect_equal(obs_prior_unquoted$class[1], "Intercept")
+  expect_equal(attr(obs_prior_unquoted, "trend_components")[1], "observation")
+  
+  # Coefficient parameter with unquoted class
+  coef_prior_unquoted <- prior(normal(0, 0.5), class = b, coef = "x1")
+  expect_equal(coef_prior_unquoted$prior[1], "normal(0, 0.5)")
+  expect_equal(coef_prior_unquoted$class[1], "b")
+  expect_equal(coef_prior_unquoted$coef[1], "x1")
+  expect_equal(attr(coef_prior_unquoted, "trend_components")[1], "observation")
+  
+  # Trend parameters with unquoted expressions
+  ar_prior_unquoted <- prior(normal(0, 0.3), class = ar1_trend)
+  expect_s3_class(ar_prior_unquoted, "brmsprior")
+  expect_equal(ar_prior_unquoted$prior[1], "normal(0, 0.3)")
+  expect_equal(ar_prior_unquoted$class[1], "ar1_trend")
+  expect_equal(attr(ar_prior_unquoted, "trend_components")[1], "trend")
+  
+  # Sigma trend parameter with unquoted expression
+  sigma_prior_unquoted <- prior(exponential(2), class = sigma_trend)
+  expect_equal(sigma_prior_unquoted$prior[1], "exponential(2)")
+  expect_equal(sigma_prior_unquoted$class[1], "sigma_trend")
+  expect_equal(attr(sigma_prior_unquoted, "trend_components")[1], "trend")
+  
+  # Mixed quoted/unquoted expressions
+  mixed_prior <- prior(normal(0, 1), class = "ar2_trend", coef = "")
+  expect_equal(mixed_prior$prior[1], "normal(0, 1)")
+  expect_equal(mixed_prior$class[1], "ar2_trend")
+  expect_equal(attr(mixed_prior, "trend_components")[1], "trend")
+  
+  # Complex expressions (functions of functions)
+  complex_prior <- prior(student_t(3, 0, 2.5), class = Intercept)
+  expect_equal(complex_prior$prior[1], "student_t(3, 0, 2.5)")
+  expect_equal(complex_prior$class[1], "Intercept")
+  expect_equal(attr(complex_prior, "trend_components")[1], "observation")
+})
+
+test_that("prior() function validates trend parameters", {
+  # Valid trend parameters pass
+  expect_no_error(prior("normal(0, 1)", class = "ar1_trend"))
+  expect_no_error(prior("normal(0, 1)", class = "sigma_trend"))
+  expect_no_error(prior("normal(0, 1)", class = "ar2_trend"))
+  expect_no_error(prior("normal(0, 1)", class = "theta1_trend"))
+  
+  # Invalid trend class names fail
+  expect_error(prior("normal(0, 1)", class = "invalid_trend"))
+  expect_error(prior("normal(0, 1)", class = "fake_trend"))
+  
+  # Bounds validation for trend parameters
+  expect_no_error(prior("normal(0, 1)", class = "ar1_trend", lb = -0.9, ub = 0.9))
+  expect_error(prior("normal(0, 1)", class = "ar1_trend", lb = 0.5, ub = 0.3))  # lb >= ub
+  expect_error(prior("normal(0, 1)", class = "sigma_trend", lb = -1))  # negative lb for variance
+})
+
+test_that("prior() function supports + operator", {
+  # Create individual priors
+  obs_prior <- prior("normal(0, 2)", class = "Intercept")
+  trend_prior <- prior("normal(0, 0.5)", class = "ar1_trend")
+  
+  # Combine with + operator
+  combined <- obs_prior + trend_prior
+  expect_s3_class(combined, "brmsprior")
+  expect_equal(nrow(combined), 2)
+  
+  # Check attributes
+  components <- attr(combined, "trend_components")
+  expect_equal(sum(components == "observation"), 1)
+  expect_equal(sum(components == "trend"), 1)
+  
+  # Chain multiple priors
+  sigma_prior <- prior("exponential(2)", class = "sigma_trend")
+  multi_combined <- obs_prior + trend_prior + sigma_prior
+  expect_equal(nrow(multi_combined), 3)
+  
+  components_multi <- attr(multi_combined, "trend_components")
+  expect_equal(sum(components_multi == "observation"), 1)
+  expect_equal(sum(components_multi == "trend"), 2)
+})
+
+test_that("prior() function handles bounds correctly", {
+  # Unbounded parameters
+  unbounded <- prior("normal(0, 1)", class = "ar1_trend")
+  expect_true(is.na(unbounded$lb))
+  expect_true(is.na(unbounded$ub))
+  
+  # Bounded parameters
+  bounded <- prior("normal(0, 1)", class = "ar1_trend", lb = -0.9, ub = 0.9)
+  expect_equal(bounded$lb, -0.9)
+  expect_equal(bounded$ub, 0.9)
+  
+  # Bounds validation for AR coefficients outside bounds from common_trend_priors
+  # ar1_trend has bounds c(-1, 1) so values outside this range throw errors
+  expect_error(prior("normal(0, 1)", class = "ar1_trend", lb = -1.5))
+  expect_error(prior("normal(0, 1)", class = "ar1_trend", ub = 1.5))
+  
+  # Values within bounds work fine
+  expect_no_error(prior("normal(0, 1)", class = "ar1_trend", lb = -0.9, ub = 0.9))
 })
 
 # Prior combination tests

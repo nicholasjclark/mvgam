@@ -2231,3 +2231,244 @@ set_prior <- function(prior, class = "b", coef = "", group = "", resp = "",
     }
   }
 }
+
+# =============================================================================
+# SECTION 6: PRIOR() WRAPPER FUNCTION  
+# =============================================================================
+# WHY: Provides brms-compatible prior() interface with automatic trend parameter
+# detection and routing. Follows composition pattern by wrapping brms::prior()
+# for observation parameters while adding mvgam-specific logic for trend parameters.
+
+#' Set Prior Distributions for mvgam Model Parameters
+#'
+#' @description
+#' A wrapper around \code{brms::prior} that provides unified interface for
+#' specifying prior distributions on both observation and trend model parameters.
+#' Maintains full brms syntax compatibility while automatically detecting and
+#' properly handling mvgam trend parameters.
+#'
+#' @param prior Character string defining the prior distribution in Stan syntax.
+#'   Examples: "normal(0, 1)", "exponential(2)", "uniform(-1, 1)"
+#' @param class Parameter class. Standard brms classes ("b", "Intercept", "sd") 
+#'   are routed to brms::prior(). Trend parameter classes with "_trend" suffix
+#'   are handled by mvgam system with validation.
+#' @param coef Optional name of a specific coefficient within the parameter class.
+#'   Only used for classes that group multiple coefficients.
+#' @param group Optional name of a grouping factor to specify group-level priors.
+#' @param resp Optional name of response variable for multivariate models.
+#' @param dpar Optional name of distributional parameter (e.g., "sigma", "shape").
+#' @param nlpar Optional name of non-linear parameter for non-linear models.
+#' @param lb Optional numeric lower bound for parameter. Use NA for unbounded.
+#' @param ub Optional numeric upper bound for parameter. Use NA for unbounded.
+#' @param source Character string indicating source of prior specification.
+#'   Usually "user" for explicitly set priors, "default" for package defaults.
+#'
+#' @return A \code{brmsprior} object (data frame) containing the prior 
+#'   specification. For trend parameters, the object includes mvgam-specific
+#'   attributes for proper integration. Can be combined with other priors
+#'   using the \code{+} operator.
+#'
+#' @details 
+#' This function provides several key advantages:
+#' 
+#' \subsection{Automatic Parameter Routing}{
+#' - **Observation parameters**: Routed to \code{brms::prior()} with identical behavior
+#' - **Trend parameters**: Validated and processed through mvgam system with 
+#'   trend-specific constraints and validation
+#' - **Detection**: Trend parameters identified by "_trend" suffix (e.g., "ar1_trend", "sigma_trend")
+#' }
+#' 
+#' \subsection{Full brms Compatibility}{
+#' - Identical syntax and return structure to \code{brms::prior()}
+#' - All brms functionality preserved for observation model parameters
+#' - Seamless integration with existing brms workflows and functions
+#' }
+#' 
+#' \subsection{Enhanced Trend Support}{
+#' - Validation of trend parameter class names against registered trend types
+#' - Constraint validation using \code{common_trend_priors} specifications
+#' - Integration with mvgam's centralized prior system
+#' }
+#'
+#' @section Prior Combination:
+#' Multiple priors can be combined using the \code{+} operator:
+#' \preformatted{
+#' # Combine observation and trend priors
+#' combined <- mvgam::prior("normal(0, 2)", class = "Intercept") +
+#'             mvgam::prior("normal(0, 0.5)", class = "ar1_trend")
+#' }
+#'
+#' @section Parameter Classes:
+#' 
+#' \subsection{Standard brms Classes}{
+#' All standard brms parameter classes are supported:
+#' - \code{"Intercept"}: Population-level intercepts
+#' - \code{"b"}: Population-level coefficients  
+#' - \code{"sd"}: Standard deviations of group-level effects
+#' - \code{"cor"}: Correlations of group-level effects
+#' }
+#' 
+#' \subsection{mvgam Trend Classes}{
+#' Trend parameters use "_trend" suffix convention:
+#' - \code{"sigma_trend"}: Innovation standard deviations
+#' - \code{"ar1_trend"}, \code{"ar2_trend"}: AR coefficients by lag
+#' - \code{"rw_trend"}: Random walk parameters  
+#' - And others depending on trend type registration
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Basic usage - observation model priors (delegated to brms::prior)
+#' obs_intercept <- prior("normal(0, 2)", class = "Intercept")
+#' obs_coef <- prior("normal(0, 0.5)", class = "b", coef = "x1")
+#' 
+#' # Trend model priors (handled by mvgam)
+#' ar_prior <- prior("normal(0, 0.5)", class = "ar1_trend")
+#' sigma_prior <- prior("exponential(2)", class = "sigma_trend")
+#' 
+#' # Combine multiple priors using + operator
+#' all_priors <- obs_intercept + ar_prior + sigma_prior
+#' 
+#' # Use in mvgam model
+#' fit <- mvgam(y ~ x1, trend_formula = ~ AR(p = 1), 
+#'              data = data, prior = all_priors)
+#' }
+#'
+#' @seealso \code{\link{set_prior}}, \code{\link{get_prior.mvgam_formula}}, 
+#'   \code{\link[brms]{prior}}, \code{\link{mvgam_formula}}
+#' @export
+prior <- function(prior, class = "b", coef = "", group = "", resp = "", 
+                 dpar = "", nlpar = "", lb = NA, ub = NA, source = "user") {
+  
+  # Apply NSE conversion to all parameters like brms does
+  prior <- handle_nse_param(substitute(prior))
+  class <- handle_nse_param(substitute(class))
+  coef <- handle_nse_param(substitute(coef))
+  group <- handle_nse_param(substitute(group))
+  resp <- handle_nse_param(substitute(resp))
+  dpar <- handle_nse_param(substitute(dpar))
+  nlpar <- handle_nse_param(substitute(nlpar))
+  
+  # Input validation after NSE conversion
+  checkmate::assert_string(prior)
+  checkmate::assert_string(class)
+  checkmate::assert_string(coef)
+  checkmate::assert_string(group)
+  checkmate::assert_string(resp)
+  checkmate::assert_string(dpar)
+  checkmate::assert_string(nlpar)
+  checkmate::assert_number(lb, na.ok = TRUE)
+  checkmate::assert_number(ub, na.ok = TRUE)
+  checkmate::assert_string(source)
+  
+  # Detect if this is a trend parameter
+  is_trend_param <- grepl("_trend$", class)
+  
+  if (is_trend_param) {
+    # Handle mvgam-specific trend parameter logic
+    
+    # Validate trend parameter class name (using validation function from validations.R)
+    validate_trend_parameter_class(class)
+    
+    # Validate bounds for trend parameters (using validation function from validations.R)
+    validate_trend_parameter_bounds(class, lb, ub)
+    
+    # Create brmsprior-compatible object with mvgam extensions
+    result <- create_trend_prior_object(prior, class, coef, group, resp, 
+                                       dpar, nlpar, lb, ub, source)
+    
+  } else {
+    # Delegate to brms::prior() for observation parameters preserving NSE behavior
+    # Note: brms::prior() doesn't accept source parameter, so we exclude it
+    # Use do.call to preserve user's original expressions for brms NSE
+    call_args <- list(
+      prior = prior, class = class, coef = coef, group = group,
+      resp = resp, dpar = dpar, nlpar = nlpar, lb = lb, ub = ub
+    )
+    result <- do.call(brms::prior, call_args)
+    
+    # brms::prior() creates the source column automatically, but we need to ensure
+    # it matches our specified source value for consistency
+    if ("source" %in% names(result)) {
+      result$source <- source
+    }
+  }
+  
+  # Add mvgam attributes for both trend and observation parameters
+  result <- add_mvgam_prior_attributes(result, is_trend = is_trend_param)
+  
+  return(result)
+}
+
+# =============================================================================
+# HELPER FUNCTIONS FOR PRIOR() WRAPPER
+# =============================================================================
+
+#' Create Trend Prior Object
+#' 
+#' @description
+#' Creates a brmsprior-compatible object for trend parameters. Ensures proper
+#' data.frame structure and class attributes for seamless integration with
+#' existing brms functionality.
+#'
+#' @param prior Prior distribution string
+#' @param class Parameter class
+#' @param coef Coefficient name
+#' @param group Group name
+#' @param resp Response name
+#' @param dpar Distributional parameter
+#' @param nlpar Non-linear parameter
+#' @param lb Lower bound
+#' @param ub Upper bound
+#' @param source Prior source
+#' @return A brmsprior object for trend parameters
+#' @noRd
+create_trend_prior_object <- function(prior, class, coef, group, resp, 
+                                     dpar, nlpar, lb, ub, source) {
+  
+  # Create brmsprior-compatible data.frame structure
+  result <- data.frame(
+    prior = prior,
+    class = class, 
+    coef = coef,
+    group = group,
+    resp = resp,
+    dpar = dpar,
+    nlpar = nlpar,
+    lb = lb,
+    ub = ub,
+    source = source,
+    stringsAsFactors = FALSE
+  )
+  
+  # Set brmsprior class for compatibility with existing methods
+  class(result) <- c("brmsprior", "data.frame")
+  
+  return(result)
+}
+
+#' Add mvgam-Specific Attributes to Prior Objects
+#' 
+#' @description
+#' Adds mvgam-specific attributes to brmsprior objects for enhanced functionality
+#' while maintaining full brms compatibility. Uses attribute-based approach to
+#' avoid modifying the core data.frame structure.
+#'
+#' @param prior_obj A brmsprior object
+#' @param is_trend Logical indicating if this contains trend parameters
+#' @return The prior object with mvgam attributes added
+#' @noRd
+add_mvgam_prior_attributes <- function(prior_obj, is_trend = FALSE) {
+  
+  # Add trend component classification
+  if (is_trend) {
+    trend_components <- rep("trend", nrow(prior_obj))
+  } else {
+    trend_components <- rep("observation", nrow(prior_obj))
+  }
+  
+  attr(prior_obj, "trend_components") <- trend_components
+  attr(prior_obj, "mvgam_enhanced") <- TRUE
+  
+  return(prior_obj)
+}

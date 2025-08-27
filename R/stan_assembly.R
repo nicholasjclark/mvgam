@@ -1442,15 +1442,6 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL, is_factor_m
   return(combine_stanvars(n_trend_stanvar, n_series_trend_stanvar, n_lv_trend_stanvar))
 }
 
-#' Generate Data Block Injections for Matrix Z
-#'
-#'
-#' @param is_factor_model Logical indicating if this is a factor model
-#' @param n_lv Number of latent variables
-#' @param n_series Number of observed series
-#' @return List of data block stanvars
-#' @noRd
-#' 
 # Function removed - dimension stanvars now handled by generate_common_trend_data()
 # This eliminates "Duplicated names in 'stanvars'" bug
 

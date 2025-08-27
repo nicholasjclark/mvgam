@@ -158,7 +158,7 @@ Implementation tasks for stancode generation update feature with comprehensive p
       - ✅ Mixed parameter handling with helpful user warnings
       - ✅ Complete compatibility with all brms::set_prior() usage patterns
     
-  - [ ] **Sub-task 1O**: Create mvgam::prior() wrapper function with + operator support (15 min)
+  - [X] **Sub-task 1O**: Create mvgam::prior() wrapper function with + operator support (15 min)
     - Use r-package-analyzer to understand how brms::prior() works internally
     - Full brms syntax compatibility: `mvgam::prior(normal(0, 1), class = ar1_trend)`
     - Support `+` operator for combining observation and trend priors
