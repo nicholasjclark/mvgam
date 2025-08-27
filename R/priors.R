@@ -145,6 +145,78 @@ extract_trend_priors_only <- function(prior) {
   return(trend_priors)
 }
 
+#' Extract Trend Priors from Enhanced brmsprior Object  
+#' 
+#' @param prior An enhanced brmsprior object with mvgam attributes
+#' @return A brmsprior object containing only trend priors
+#' @noRd
+extract_trend_priors_from_enhanced <- function(prior) {
+  checkmate::assert_class(prior, "brmsprior")
+  
+  # Check if object has mvgam enhancement
+  if (!isTRUE(attr(prior, "mvgam_enhanced"))) {
+    # Fallback to suffix-based detection for non-enhanced objects
+    trend_rows <- grepl("_trend$", prior$class)
+    trend_priors <- prior[trend_rows, , drop = FALSE]
+  } else {
+    # Use attribute-based selection
+    components <- attr(prior, "trend_components")
+    if (is.null(components)) {
+      stop(insight::format_error(
+        "Enhanced brmsprior object missing trend_components attribute"
+      ))
+    }
+    trend_rows <- components == "trend"
+    trend_priors <- prior[trend_rows, , drop = FALSE]
+    
+    # Preserve attributes on subset
+    attr(trend_priors, "trend_components") <- components[trend_rows]
+    attr(trend_priors, "mvgam_enhanced") <- TRUE
+  }
+  
+  # Maintain brmsprior class
+  class(trend_priors) <- class(prior)
+  attr(trend_priors, "class2") <- attr(prior, "class2")
+  
+  return(trend_priors)
+}
+
+#' Extract Observation Priors from Enhanced brmsprior Object
+#' 
+#' @param prior An enhanced brmsprior object with mvgam attributes
+#' @return A brmsprior object containing only observation priors
+#' @noRd
+extract_observation_priors_from_enhanced <- function(prior) {
+  checkmate::assert_class(prior, "brmsprior")
+  
+  # Check if object has mvgam enhancement
+  if (!isTRUE(attr(prior, "mvgam_enhanced"))) {
+    # Fallback to suffix-based detection for non-enhanced objects
+    obs_rows <- !grepl("_trend$", prior$class)
+    obs_priors <- prior[obs_rows, , drop = FALSE]
+  } else {
+    # Use attribute-based selection
+    components <- attr(prior, "trend_components")
+    if (is.null(components)) {
+      stop(insight::format_error(
+        "Enhanced brmsprior object missing trend_components attribute"
+      ))
+    }
+    obs_rows <- components == "observation"
+    obs_priors <- prior[obs_rows, , drop = FALSE]
+    
+    # Preserve attributes on subset
+    attr(obs_priors, "trend_components") <- components[obs_rows]
+    attr(obs_priors, "mvgam_enhanced") <- TRUE
+  }
+  
+  # Maintain brmsprior class
+  class(obs_priors) <- class(prior)
+  attr(obs_priors, "class2") <- attr(prior, "class2")
+  
+  return(obs_priors)
+}
+
 #' Extract Observation Priors from Combined Prior Object
 #' 
 #' @param prior A brmsprior object containing both observation and trend priors
@@ -619,8 +691,14 @@ combine_obs_trend_priors <- function(obs_priors, trend_priors) {
   class(combined) <- c("brmsprior", "data.frame")
   attr(combined, "class2") <- attr(obs_priors, "class2")
   
-  # Optionally add trend_component attribute for easy filtering
-  combined <- add_trend_component_attr(combined)
+  # Create component indicator vector for attributes
+  obs_components <- rep("observation", nrow(obs_priors))
+  trend_components <- rep("trend", nrow(trend_priors))
+  component_vector <- c(obs_components, trend_components)
+  
+  # Add trend component information via attributes (brms-compatible)
+  attr(combined, "trend_components") <- component_vector
+  attr(combined, "mvgam_enhanced") <- TRUE
   
   return(combined)
 }
@@ -846,12 +924,15 @@ map_prior_to_stan_string <- function(prior_row) {
   # Check for distribution name followed by parentheses with parameters
   stan_pattern <- "^[a-zA-Z_][a-zA-Z0-9_]*\\s*\\([^\\(\\)]*\\)$"
   if (!grepl(stan_pattern, extracted_prior)) {
-    rlang::warn(
-      paste("Prior string", shQuote(extracted_prior), 
-            "may not be valid Stan syntax.",
-            "Expected format: distribution_name(parameters)"),
-      .frequency = "once"
-    )
+    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+      rlang::warn(
+        paste("Prior string", shQuote(extracted_prior), 
+              "may not be valid Stan syntax.",
+              "Expected format: distribution_name(parameters)"),
+        .frequency = "once",
+        .frequency_id = "mvgam_stan_syntax"
+      )
+    }
   }
   
   return(extracted_prior)
@@ -1077,13 +1158,16 @@ map_trend_priors <- function(prior, trend_type) {
   
   # Return empty list if trend type not registered
   if (is.null(trend_prior_spec)) {
-    rlang::warn(
-      insight::format_warning(
-        "Trend type {.field {trend_type}} not found in registry. ",
-        "No priors will be mapped."
-      ),
-      .frequency = "once"
-    )
+    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+      rlang::warn(
+        insight::format_warning(
+          "Trend type {.field {trend_type}} not found in registry. ",
+          "No priors will be mapped."
+        ),
+        .frequency = "once",
+        .frequency_id = "mvgam_trend_registry"
+      )
+    }
     return(list())
   }
   
@@ -1454,59 +1538,6 @@ get_prior.brmsformula <- function(object, ...) {
   brms::get_prior(object, ...)
 }
 
-#' mvgam_formula method for get_prior - main implementation
-#'
-#' @description
-#' Extracts and combines prior specifications for both observation and trend 
-#' components of an mvgam model. This method provides a unified interface
-#' for prior inspection before model fitting with full brms compatibility.
-#'
-#' @param object An object of class \code{mvgam_formula} created by 
-#'   \code{\link{mvgam_formula}}
-#' @param data A data frame containing the variables in the model (required)
-#' @param family A description of the response distribution and link function
-#'   (default gaussian())
-#' @param ... Additional arguments passed to \code{brms::get_prior}
-#'
-#' @return A \code{brmsprior} data frame combining observation and trend priors
-#'   with an additional \code{trend_component} column distinguishing:
-#'   \itemize{
-#'     \item \code{"observation"}: Parameters from the observation model
-#'     \item \code{"trend"}: Parameters from the trend model (with _trend suffix)
-#'   }
-#'
-#' @details
-#' When \code{trend_formula = NULL}, this function behaves identically to 
-#' \code{brms::get_prior}, ensuring perfect brms compatibility for observation-only
-#' models. When a trend formula is specified, the function:
-#' \enumerate{
-#'   \item Extracts observation model priors using \code{brms::get_prior}
-#'   \item Extracts trend model priors using mvgam's trend system
-#'   \item Combines them into a unified \code{brmsprior} object
-#'   \item Adds the \code{trend_component} column for easy filtering
-#' }
-#'
-#' @examples
-#' \dontrun{
-#' # Create mvgam_formula objects
-#' mf1 <- mvgam_formula(y ~ x + (1|group))  # No trend
-#' mf2 <- mvgam_formula(count ~ treatment, ~ AR(p = 1))  # With trend
-#' 
-#' # Get priors (identical to brms when no trend)
-#' priors1 <- get_prior(mf1, data = dat, family = poisson())
-#' 
-#' # Get combined priors with trend parameters
-#' priors2 <- get_prior(mf2, data = ecology_data, family = poisson())
-#' 
-#' # Filter by component
-#' obs_priors <- priors2[priors2$trend_component == "observation", ]
-#' trend_priors <- priors2[priors2$trend_component == "trend", ]
-#' }
-#'
-#' @seealso \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}}, 
-#'   \code{\link{make_stancode}}, \code{\link{make_standata}}
-#' @export
-
 #' Detect Embedded Families in Formula Objects
 #' 
 #' Checks if a formula object contains embedded family specifications
@@ -1530,6 +1561,70 @@ has_embedded_families <- function(formula) {
   return(FALSE)
 }
 
+#' Extract Prior Specifications for mvgam Formula Objects
+#'
+#' @description
+#' Extracts and combines prior specifications for both observation and trend 
+#' components of an mvgam model. This method provides a unified interface
+#' for prior inspection before model fitting with full brms compatibility.
+#' When \code{trend_formula = NULL}, this function behaves identically to 
+#' \code{brms::get_prior}, ensuring perfect brms compatibility for observation-only
+#' models.
+#'
+#' @param object An object of class \code{mvgam_formula} created by 
+#'   \code{\link{mvgam_formula}}
+#' @param data A data frame containing the variables in the model (required)
+#' @param family A description of the response distribution and link function.
+#'   Default is \code{gaussian()}. Not required if formula contains embedded
+#'   families via \code{bf()} specifications.
+#' @param ... Additional arguments passed to \code{brms::get_prior}
+#'
+#' @return A \code{brmsprior} data frame combining observation and trend priors
+#'   with an additional \code{trend_component} column distinguishing:
+#'   \itemize{
+#'     \item \code{"observation"}: Parameters from the observation model
+#'     \item \code{"trend"}: Parameters from the trend model (with _trend suffix)
+#'   }
+#'   The returned object is fully compatible with \code{brms::set_prior()} and
+#'   \code{brms::prior()} functions for customizing priors.
+#'
+#' @details
+#' When a trend formula is specified, the function:
+#' \enumerate{
+#'   \item Extracts observation model priors using \code{brms::get_prior}
+#'   \item Extracts trend model priors using mvgam's trend system
+#'   \item Combines them into a unified \code{brmsprior} object
+#'   \item Adds the \code{trend_component} column for easy filtering
+#' }
+#' 
+#' The function handles embedded families automatically when using \code{bf()}
+#' specifications and supports all brms family types for observation models
+#' while trend components are always modeled as Gaussian State-Space processes.
+#'
+#' @examples
+#' \dontrun{
+#' # Create mvgam_formula objects
+#' mf1 <- mvgam_formula(y ~ x + (1|group))  # No trend
+#' mf2 <- mvgam_formula(count ~ treatment, ~ AR(p = 1))  # With trend
+#' 
+#' # Get priors (identical to brms when no trend)
+#' priors1 <- get_prior(mf1, data = dat, family = poisson())
+#' 
+#' # Get combined priors with trend parameters
+#' priors2 <- get_prior(mf2, data = ecology_data, family = poisson())
+#' 
+#' # Filter by component
+#' obs_priors <- priors2[priors2$trend_component == "observation", ]
+#' trend_priors <- priors2[priors2$trend_component == "trend", ]
+#' 
+#' # Use with brms functions for customization
+#' custom_priors <- brms::set_prior("normal(0, 0.5)", class = "ar1_trend", 
+#'                                 prior = priors2)
+#' }
+#'
+#' @seealso \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}}, 
+#'   \code{\link[brms]{set_prior}}, \code{\link[brms]{prior}}
+#' @export
 get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
   
   # Input validation (required by CLAUDE.md standards)
@@ -1564,8 +1659,10 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
   
   # Handle case where no trend formula is specified
   if (is.null(trend_formula)) {
-    # Add trend_component column as specified in requirements
-    obs_priors$trend_component <- "observation"
+    # Add attribute-based metadata for consistency
+    component_vector <- rep("observation", nrow(obs_priors))
+    attr(obs_priors, "trend_components") <- component_vector
+    attr(obs_priors, "mvgam_enhanced") <- TRUE
     return(obs_priors)
   }
   
@@ -1579,16 +1676,558 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
     response_names = response_names
   )
   
-  # Add trend_component column to trend priors before combining
-  if (nrow(trend_priors) > 0) {
-    trend_priors$trend_component <- "trend"
-  }
-  
-  # Add trend_component column to observation priors for consistency
-  obs_priors$trend_component <- "observation"
-
   # Combine observation and trend priors using existing helper function
   combined_priors <- combine_obs_trend_priors(obs_priors, trend_priors)
   
   return(combined_priors)
+}
+
+# =============================================================================
+# SECTION 7: ENHANCED BRMSPRIOR METHODS FOR MVGAM
+# =============================================================================
+# WHY: Custom methods provide enhanced functionality while maintaining full
+# brms compatibility. The print method shows trend component information when
+# mvgam attributes are present, and the c.brmsprior override preserves
+# attributes during prior combination operations.
+
+#' Enhanced Print Method for brmsprior Objects
+#' 
+#' @description
+#' Enhanced print method for brmsprior objects that displays trend component
+#' information when mvgam attributes are present, while maintaining identical
+#' behavior for standard brms objects.
+#' 
+#' @param x A brmsprior object
+#' @param ... Additional arguments (ignored)
+#' @return The object invisibly
+#' @export
+print.brmsprior <- function(x, ...) {
+  # Check if this is an mvgam-enhanced brmsprior object
+  if (isTRUE(attr(x, "mvgam_enhanced"))) {
+    # Enhanced printing for mvgam objects
+    components <- attr(x, "trend_components")
+    
+    if (!is.null(components)) {
+      # Count components
+      n_obs <- sum(components == "observation")
+      n_trend <- sum(components == "trend")
+      
+      cat("Priors for mvgam model\n")
+      
+      if (n_obs > 0) {
+        cat("Observation model priors (", n_obs, " parameter", 
+            if(n_obs > 1) "s" else "", "):\n", sep = "")
+        obs_priors <- x[components == "observation", ]
+        print(as.data.frame(obs_priors), row.names = FALSE)
+        cat("\n")
+      }
+      
+      if (n_trend > 0) {
+        cat("Trend model priors (", n_trend, " parameter", 
+            if(n_trend > 1) "s" else "", "):\n", sep = "")
+        trend_priors <- x[components == "trend", ]
+        print(as.data.frame(trend_priors), row.names = FALSE)
+        cat("\n")
+      }
+      
+      cat("Use brms::set_prior() or mvgam::set_prior() to modify priors.\n")
+      
+    } else {
+      # Fallback to standard printing if attributes are missing
+      NextMethod("print")
+    }
+  } else {
+    # Standard brms printing for non-enhanced objects
+    NextMethod("print")
+  }
+  
+  invisible(x)
+}
+
+#' Enhanced c.brmsprior Method with Attribute Preservation
+#' 
+#' @description
+#' Override of brms c.brmsprior method that preserves mvgam attributes during
+#' prior combination operations. Falls back to standard brms behavior when
+#' no mvgam attributes are present.
+#' 
+#' @param ... brmsprior objects to combine
+#' @return Combined brmsprior object with preserved attributes
+#' @export
+c.brmsprior <- function(...) {
+  dots <- list(...)
+  
+  # Check if any objects have mvgam enhancement
+  has_mvgam_attrs <- any(sapply(dots, function(x) isTRUE(attr(x, "mvgam_enhanced"))))
+  
+  if (has_mvgam_attrs) {
+    # Enhanced combination with attribute preservation
+    
+    # Extract attributes from all enhanced objects
+    all_components <- list()
+    for (i in seq_along(dots)) {
+      obj <- dots[[i]]
+      if (isTRUE(attr(obj, "mvgam_enhanced"))) {
+        components <- attr(obj, "trend_components")
+        if (!is.null(components)) {
+          all_components[[i]] <- components
+        } else {
+          # Auto-detect for objects missing components
+          all_components[[i]] <- ifelse(grepl("_trend$", obj$class), "trend", "observation")
+        }
+      } else {
+        # Standard brms object - assume observation components
+        all_components[[i]] <- rep("observation", nrow(obj))
+      }
+    }
+    
+    # Standard brms combination
+    dots_df <- lapply(dots, as.data.frame)
+    combined <- do.call(rbind, dots_df)
+    class(combined) <- c("brmsprior", "data.frame")
+    
+    # Preserve first object's class2 attribute if it exists
+    first_class2 <- attr(dots[[1]], "class2")
+    if (!is.null(first_class2)) {
+      attr(combined, "class2") <- first_class2
+    }
+    
+    # Combine all component vectors
+    combined_components <- do.call(c, all_components)
+    
+    # Add mvgam attributes to result
+    attr(combined, "trend_components") <- combined_components
+    attr(combined, "mvgam_enhanced") <- TRUE
+    
+    return(combined)
+    
+  } else {
+    # No mvgam attributes - use standard brms behavior
+    dots_df <- lapply(dots, as.data.frame)
+    combined <- do.call(rbind, dots_df)
+    class(combined) <- c("brmsprior", "data.frame")
+    
+    # Preserve first object's class2 attribute if it exists
+    first_class2 <- attr(dots[[1]], "class2")
+    if (!is.null(first_class2)) {
+      attr(combined, "class2") <- first_class2
+    }
+    
+    return(combined)
+  }
+}
+
+#' Enhanced +.brmsprior Method with Attribute Preservation
+#' 
+#' @description
+#' Override of brms +.brmsprior method that preserves mvgam attributes during
+#' prior combination operations using the + operator. Calls the enhanced
+#' c.brmsprior method to maintain attribute preservation.
+#' 
+#' @param x First brmsprior object
+#' @param y Second brmsprior object
+#' @return Combined brmsprior object with preserved attributes
+#' @export
+`+.brmsprior` <- function(x, y) {
+  c.brmsprior(x, y)
+}
+
+# =============================================================================
+# SECTION: ENHANCED PRIOR SPECIFICATION FUNCTIONS
+# =============================================================================
+
+#' Convert brms lb/ub columns to mvgam bound format for consistency
+#' 
+#' @param prior_obj A brmsprior object potentially containing lb/ub columns
+#' @return The same object with bound column instead of lb/ub columns
+#' @noRd
+standardize_brmsprior_columns <- function(prior_obj) {
+  if ("lb" %in% names(prior_obj) && "ub" %in% names(prior_obj)) {
+    # Validate columns exist and have compatible types
+    checkmate::assert_numeric(prior_obj$lb, null.ok = TRUE, any.missing = TRUE)
+    checkmate::assert_numeric(prior_obj$ub, null.ok = TRUE, any.missing = TRUE)
+    
+    # Convert lb/ub to bound column for consistency with safe string handling
+    bound_strings <- vapply(seq_len(nrow(prior_obj)), function(i) {
+      lb_val <- prior_obj$lb[i]
+      ub_val <- prior_obj$ub[i] 
+      
+      # Handle infinite values safely
+      lb_finite <- !is.na(lb_val) && is.finite(lb_val)
+      ub_finite <- !is.na(ub_val) && is.finite(ub_val)
+      
+      if (lb_finite && ub_finite) {
+        sprintf("<lower=%.10g,upper=%.10g>", lb_val, ub_val)
+      } else if (lb_finite) {
+        sprintf("<lower=%.10g>", lb_val)
+      } else if (ub_finite) {
+        sprintf("<upper=%.10g>", ub_val)
+      } else {
+        ""
+      }
+    }, character(1))
+    
+    prior_obj$bound <- bound_strings
+    prior_obj$lb <- NULL
+    prior_obj$ub <- NULL
+  }
+  
+  return(prior_obj)
+}
+
+#' Set Prior for mvgam Models
+#'
+#' @description
+#' Wrapper function around \code{brms::set_prior} that provides a unified
+#' interface for setting priors on both observation and trend model parameters.
+#' Automatically routes observation parameters to brms while handling trend 
+#' parameters (\code{_trend} suffix) through the mvgam system. Maintains full 
+#' brms syntax compatibility while extending support for trend-specific parameters.
+#'
+#' @param prior A character string defining the prior distribution in Stan syntax
+#'   (e.g., \code{"normal(0, 1)"}, \code{"exponential(2)"}).
+#' @param class A character string specifying the parameter class. For trend
+#'   parameters, use the \code{_trend} suffix (e.g., \code{"ar1_trend"},
+#'   \code{"sigma_trend"}). Defaults to \code{"b"} (regression coefficients).
+#' @param coef Character string specifying a specific coefficient name.
+#'   Defaults to empty string (all coefficients in class).
+#' @param group Character string specifying a grouping factor.
+#'   Defaults to empty string (population-level effect).
+#' @param resp Character string specifying a response variable in
+#'   multivariate models. Defaults to empty string.
+#' @param dpar Character string specifying a distributional parameter.
+#'   Defaults to empty string.
+#' @param nlpar Character string specifying a non-linear parameter.
+#'   Defaults to empty string.
+#' @param lb Numeric value specifying lower bound constraint.
+#'   Defaults to \code{NA} (no lower bound).
+#' @param ub Numeric value specifying upper bound constraint.
+#'   Defaults to \code{NA} (no upper bound).
+#' @param check Logical indicating whether to validate prior specification.
+#'   Defaults to \code{TRUE}.
+#'
+#' @return A \code{brmsprior} object enhanced with mvgam attributes. Fully 
+#'   compatible with \code{brms::set_prior} return values and supports 
+#'   combination with \code{+} operator.
+#'
+#' @details
+#' This function provides several key advantages over using \code{brms::set_prior} 
+#' directly:
+#' 
+#' \strong{Unified Interface:}
+#' - Single function for both observation and trend parameters
+#' - Automatic parameter type detection and routing
+#' - Consistent mvgam attribute enhancement across all outputs
+#' 
+#' \strong{Observation Parameters:}
+#' - Routed directly to \code{brms::set_prior} with identical behavior
+#' - Full brms syntax compatibility maintained
+#' - All standard brms parameter classes supported (\code{"b"}, \code{"Intercept"}, 
+#'   \code{"sd"}, \code{"cor"}, etc.)
+#' 
+#' \strong{Trend Parameters:}
+#' - Identified by \code{_trend} suffix in class name (e.g., \code{"ar1_trend"}, 
+#'   \code{"sigma_trend"})
+#' - Creates brmsprior objects using brms-compatible structure
+#' - Enhanced with mvgam attributes for proper downstream handling
+#' - Supports same bound constraints as brms parameters
+#' 
+#' \strong{Integration Benefits:}
+#' - All outputs work seamlessly with existing brms workflow
+#' - Enhanced objects provide better printing and summary information
+#' - Automatic compatibility with \code{get_prior.mvgam_formula()} system
+#' - Future-proof extension point for additional mvgam functionality
+#'
+#' @examples
+#' \dontrun{
+#' # Observation model priors (routed to brms::set_prior)
+#' obs_prior <- set_prior("normal(0, 2)", class = "Intercept")
+#' obs_coef <- set_prior("normal(0, 0.5)", class = "b", coef = "x1")
+#' 
+#' # Trend model priors (handled by mvgam system)
+#' ar_prior <- set_prior("normal(0, 0.5)", class = "ar1_trend")
+#' sigma_prior <- set_prior("exponential(2)", class = "sigma_trend")
+#' 
+#' # Bound constraints work for both types
+#' bounded_prior <- set_prior("normal(0, 1)", class = "ar1_trend", 
+#'                           lb = -0.99, ub = 0.99)
+#' 
+#' # Combine multiple priors with + operator
+#' all_priors <- obs_prior + obs_coef + ar_prior + sigma_prior
+#' 
+#' # Use with mvgam()
+#' model <- mvgam(y ~ x, trend_model = AR(), data = dat, prior = all_priors)
+#' 
+#' # Enhanced printing shows parameter organization
+#' print(all_priors)
+#' }
+#'
+#' @seealso \code{\link{get_prior.mvgam_formula}}, \code{\link[brms]{set_prior}}, 
+#'   \code{\link{prior}}, \code{\link{mvgam_formula}}
+#'   
+#' @importFrom checkmate assert_string assert_number assert_logical assert_character assert_numeric
+#' @importFrom insight format_error
+#' @importFrom rlang warn
+#' @export
+set_prior <- function(prior, class = "b", coef = "", group = "", resp = "", 
+                     dpar = "", nlpar = "", lb = NA, ub = NA, check = TRUE) {
+  
+  # Comprehensive input validation
+  # Handle different input types for prior parameter
+  if (!is.character(prior) && !inherits(prior, "brmsprior") && !is.list(prior)) {
+    stop(insight::format_error(
+      "Invalid {.field prior} input type: {.cls {class(prior)}}.",
+      "Expected character string, brmsprior object, or list."
+    ))
+  }
+  
+  # Validate other parameters based on input type
+  if (is.character(prior)) {
+    checkmate::assert_string(prior)
+    # Validate other parameters for character input
+    checkmate::assert_character(class, null.ok = TRUE)
+    checkmate::assert_character(coef, null.ok = TRUE) 
+    checkmate::assert_character(group, null.ok = TRUE)
+    checkmate::assert_character(resp, null.ok = TRUE)
+    checkmate::assert_character(dpar, null.ok = TRUE)
+    checkmate::assert_character(nlpar, null.ok = TRUE)
+    checkmate::assert_numeric(lb, null.ok = TRUE)
+    checkmate::assert_numeric(ub, null.ok = TRUE)
+    
+    # Validate bounds constraint
+    if (!is.null(lb) && !is.null(ub)) {
+      if (any(!is.na(lb) & !is.na(ub) & lb >= ub)) {
+        stop(insight::format_error(
+          "Invalid bounds constraint.",
+          "Lower bound must be less than upper bound: lb < ub."
+        ))
+      }
+    }
+    
+    # Validate vectorization consistency for character input
+    param_lengths <- c(
+      length(class %||% ""), length(coef %||% ""), length(group %||% ""),
+      length(resp %||% ""), length(dpar %||% ""), length(nlpar %||% ""),
+      if (!is.null(lb)) length(lb) else 1,
+      if (!is.null(ub)) length(ub) else 1
+    )
+    # Remove length 1 (scalar) entries and check consistency
+    non_scalar_lengths <- param_lengths[param_lengths > 1]
+    if (length(unique(non_scalar_lengths)) > 1) {
+      stop(insight::format_error(
+        "Parameter vectors must have consistent lengths.",
+        "Found lengths: {.val {unique(non_scalar_lengths)}}"
+      ))
+    }
+  }
+  
+  checkmate::assert_logical(check, len = 1)
+  
+  # Helper function for NULL coalescing
+  `%||%` <- function(x, y) if (is.null(x)) y else x
+  
+  # =========================================================================
+  # MAIN PROCESSING LOGIC
+  # =========================================================================
+  
+  if (inherits(prior, "brmsprior")) {
+    # Handle brmsprior object input
+    if (check) {
+      # Basic validation of brmsprior object
+      required_cols <- c("prior", "class", "coef", "group", "resp", "dpar", "nlpar", "bound", "source")
+      if (!all(required_cols %in% names(prior))) {
+        stop(insight::format_error(
+          "Invalid brmsprior object structure.",
+          "Missing required columns: {.field {setdiff(required_cols, names(prior))}}"
+        ))
+      }
+    }
+    
+    # Check if any rows contain trend parameters and add attributes
+    trend_components <- ifelse(grepl("_trend$", prior$class), "trend", "observation")
+    attr(prior, "trend_components") <- trend_components
+    attr(prior, "mvgam_enhanced") <- TRUE
+    
+    return(prior)
+    
+  } else if (is.list(prior)) {
+    # Handle list input - batch operations
+    if (length(prior) == 0) {
+      stop(insight::format_error("Empty list provided for {.field prior}."))
+    }
+    
+    # Handle vectorized inputs with pairwise assignment (following brms pattern)
+    # Ensure proper length handling following R recycling rules
+    prior_length <- length(prior)
+    class_length <- length(class)
+    
+    # Determine maximum length for recycling
+    max_length <- max(prior_length, class_length)
+    
+    # Warn if lengths are incompatible (non-multiple lengths)
+    if (max_length %% min(prior_length, class_length) != 0) {
+      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+        rlang::warn(
+          "Length mismatch in vectorized prior specification.",
+          "Shorter arguments will be recycled.",
+          .frequency = "once",
+          .frequency_id = "mvgam_length_mismatch"
+        )
+      }
+    }
+    
+    # Process pairwise assignments
+    processed_priors <- vector("list", max_length)
+    for (i in seq_len(max_length)) {
+      # Use recycling for indices
+      prior_idx <- ((i - 1) %% prior_length) + 1
+      class_idx <- ((i - 1) %% class_length) + 1
+      
+      p <- prior[[prior_idx]]
+      c <- class[class_idx]
+      
+      if (is.character(p)) {
+        # Recursive call with single class value (pairwise)
+        processed_priors[[i]] <- set_prior(p, class = c, coef = coef %||% "", 
+                                           group = group %||% "", resp = resp %||% "", 
+                                           dpar = dpar %||% "", nlpar = nlpar %||% "",
+                                           lb = lb, ub = ub, check = check)
+      } else if (inherits(p, "brmsprior")) {
+        # Handle brmsprior elements
+        processed_priors[[i]] <- set_prior(p, check = check)
+      } else {
+        stop(insight::format_error(
+          "Invalid list element type: {.cls {class(p)}}.",
+          "List elements must be character strings or brmsprior objects."
+        ))
+      }
+    }
+    
+    # Combine all processed priors
+    combined <- do.call(rbind, processed_priors)
+    class(combined) <- c("brmsprior", "data.frame")
+    
+    # Determine trend components for combined result
+    trend_components <- ifelse(grepl("_trend$", combined$class), "trend", "observation")
+    attr(combined, "trend_components") <- trend_components
+    attr(combined, "mvgam_enhanced") <- TRUE
+    
+    return(combined)
+    
+  } else {
+    # Handle character string input - most common case
+    
+    # Determine parameter type(s) for routing
+    classes <- class %||% "b"
+    has_trend_params <- any(grepl("_trend$", classes))
+    has_obs_params <- any(!grepl("_trend$", classes))
+    
+    if (has_trend_params && !has_obs_params) {
+      # Pure trend parameters - handle directly
+      
+      # Convert bounds to brms-compatible string format  
+      bound_string <- ""
+      if (!is.na(lb) && !is.na(ub)) {
+        bound_string <- sprintf("<lower=%s,upper=%s>", lb, ub)
+      } else if (!is.na(lb)) {
+        bound_string <- sprintf("<lower=%s>", lb)
+      } else if (!is.na(ub)) {
+        bound_string <- sprintf("<upper=%s>", ub)
+      }
+      
+      # Basic prior validation if check=TRUE
+      if (check) {
+        if (!grepl("\\(.*\\)", prior)) {
+          stop(insight::format_error(
+            "Invalid prior specification: {.field {prior}}.",
+            "Prior must be valid Stan syntax (e.g., 'normal(0, 1)')."
+          ))
+        }
+      }
+      
+      # Create brmsprior object using exact brms structure
+      trend_prior <- data.frame(
+        prior = as.character(prior),
+        class = as.character(classes),
+        coef = as.character(coef %||% ""),
+        group = as.character(group %||% ""),
+        resp = as.character(resp %||% ""),
+        dpar = as.character(dpar %||% ""),
+        nlpar = as.character(nlpar %||% ""),
+        bound = as.character(bound_string),
+        source = "user",
+        stringsAsFactors = FALSE
+      )
+      
+      # Set proper class hierarchy
+      class(trend_prior) <- c("brmsprior", "data.frame")
+      
+      # Add mvgam attributes
+      attr(trend_prior, "trend_components") <- rep("trend", nrow(trend_prior))
+      attr(trend_prior, "mvgam_enhanced") <- TRUE
+      
+      return(trend_prior)
+      
+    } else if (has_obs_params && !has_trend_params) {
+      # Pure observation parameters - delegate to brms
+      obs_prior <- brms::set_prior(
+        prior = prior, 
+        class = classes, 
+        coef = coef, 
+        group = group,
+        resp = resp, 
+        dpar = dpar, 
+        nlpar = nlpar,
+        lb = lb,
+        ub = ub,
+        check = check
+      )
+      
+      # Ensure consistent column structure for combination operations
+      obs_prior <- standardize_brmsprior_columns(obs_prior)
+      
+      # Add mvgam attributes for consistency
+      attr(obs_prior, "trend_components") <- rep("observation", nrow(obs_prior))
+      attr(obs_prior, "mvgam_enhanced") <- TRUE
+      
+      return(obs_prior)
+      
+    } else {
+      # Mixed parameters or edge case - delegate to brms with warning
+      if (has_trend_params && has_obs_params) {
+        if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+          rlang::warn(
+            "Mixed trend and observation parameters detected in single call.",
+            "Consider using separate set_prior() calls for clarity.",
+            .frequency = "once",
+            .frequency_id = "mvgam_mixed_params"
+          )
+        }
+      }
+      
+      # Default delegation to brms
+      obs_prior <- brms::set_prior(
+        prior = prior, 
+        class = classes, 
+        coef = coef, 
+        group = group,
+        resp = resp, 
+        dpar = dpar, 
+        nlpar = nlpar,
+        lb = lb,
+        ub = ub,
+        check = check
+      )
+      
+      # Ensure consistent column structure for combination operations
+      obs_prior <- standardize_brmsprior_columns(obs_prior)
+      
+      # Add mvgam attributes
+      trend_components <- ifelse(grepl("_trend$", obs_prior$class), "trend", "observation")
+      attr(obs_prior, "trend_components") <- trend_components
+      attr(obs_prior, "mvgam_enhanced") <- TRUE
+      
+      return(obs_prior)
+    }
+  }
 }

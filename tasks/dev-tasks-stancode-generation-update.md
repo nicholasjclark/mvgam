@@ -114,10 +114,101 @@ Implementation tasks for stancode generation update feature with comprehensive p
     - Document allowed vs forbidden terms in trend_formula validation architecture
     - Document S3 class structure and inheritance from base formula classes
     
-  - [ ] **Sub-task 1J**: Integration testing and ecosystem validation
-    - Test returned brmsprior objects work with `brms::set_prior()` and `brms::prior()` for both trend and observation parameters
-    - Verify mvgam_formula objects can be reused across inspection functions  
-    - Test that formula inheritance preserves brms compatibility
+  - [x] **Sub-task 1J**: Integration testing and ecosystem validation ✅ *(2025-08-27)*
+    - ✅ Test returned brmsprior objects work with `brms::set_prior()` and `brms::prior()` for both trend and observation parameters
+    - ✅ Verify mvgam_formula objects can be reused across inspection functions  
+    - ✅ Test that formula inheritance preserves brms compatibility
+    - ✅ Enhanced test coverage with proper S3 method registration and documentation
+
+### **Phase 1: Fix brmsprior Compatibility Issues (45 min)**
+
+  - [X] **Sub-task 1K**: Replace trend_component column with attributes-based metadata (15 min)
+    - Remove `trend_component` column from `get_prior.mvgam_formula()` return
+    - Add `attr(priors, "trend_components")` with vector indicating each row's component type
+    - Update `combine_obs_trend_priors()` to use attributes instead of columns
+    - Verify brms functions work with clean brmsprior structure
+    
+  - [X] **Sub-task 1L**: Add custom print/summary methods for enhanced brmsprior objects (15 min)  
+    - Create `print.brmsprior` method that shows trend component info when mvgam attributes exist
+    - Add `summary.brmsprior` enhancement for mvgam-specific metadata
+    - Ensure standard brms objects print unchanged (compatibility check)
+    - Override `c.brmsprior` to preserve attributes during combination
+    
+  - [X] **Sub-task 1M**: Update integration tests for attribute-based approach (15 min)
+    - Fix all related tests to use attributes instead of columns  
+    - Test brms ecosystem integration with clean brmsprior objects
+    - Verify `brms::set_prior()` and `brms::prior()` work correctly
+    - Test attribute preservation through prior combination operations
+
+### **Phase 2: Enhanced Prior Interface (60 min)**
+
+  - [X] **Sub-task 1N**: Create mvgam::set_prior() wrapper function (15 min) ✅ *(2025-08-27)*
+    - ✅ Route observation parameters to `brms::set_prior()` automatically  
+    - ✅ Handle trend parameters (`_trend` suffix) through mvgam system
+    - ✅ Maintain full brms syntax compatibility
+    - ✅ Return enhanced brmsprior with proper attributes
+    - ✅ Added comprehensive documentation with examples and architectural justification
+    - ✅ Fixed attribute consistency for trend_components (vector for both parameter types)
+    - ✅ Added proper @importFrom declarations and NAMESPACE export
+    - ✅ **COMPREHENSIVE REVISION**: Added full support for all brms input patterns:
+      - ✅ Character strings, brmsprior objects, and list inputs
+      - ✅ Vectorized operations with parameter consistency validation
+      - ✅ Bounds constraint validation (lb < ub)
+      - ✅ Comprehensive input type validation and error handling
+      - ✅ Mixed parameter handling with helpful user warnings
+      - ✅ Complete compatibility with all brms::set_prior() usage patterns
+    
+  - [ ] **Sub-task 1O**: Create mvgam::prior() wrapper function with + operator support (15 min)
+    - Full brms syntax compatibility: `mvgam::prior(normal(0, 1), class = ar1_trend)`
+    - Support `+` operator for combining observation and trend priors
+    - Handle both brms-style and mvgam trend parameter specifications
+    - Automatic detection and routing based on parameter class names
+    
+  - [ ] **Sub-task 1P**: Add prior validation and parameter detection system (15 min)
+    - Validate trend parameter class names against registered trend types
+    - Clear error messages for invalid parameter specifications  
+    - Parameter existence checking (e.g., `ar2_trend` only valid when `p >= 2`)
+    - Integration with existing trend registry system
+    
+  - [ ] **Sub-task 1Q**: Update mvgam() main function to accept mixed prior specifications (15 min)
+    - Accept enhanced brmsprior objects with trend and observation components
+    - Route trend priors to Stan generation system properly
+    - Route observation priors to brms system unchanged
+    - Backwards compatibility with current prior specifications
+
+### **Phase 3: Advanced Features (45 min)**
+
+  - [ ] **Sub-task 1R**: Smart prior merging system - users modify subset while keeping defaults (15 min)
+    - Allow users to specify only changed priors, keep defaults for rest
+    - Intelligent merging of user specifications with `get_prior()` defaults
+    - Preserve user customizations while filling in missing specifications
+    - Handle both observation and trend parameter defaults appropriately
+    
+  - [ ] **Sub-task 1S**: Enhanced inspection functions: prior_summary.mvgam(), retrospective prior inspection (15 min)  
+    - `prior_summary.mvgam()` method for fitted models showing actual priors used
+    - Retrospective inspection of trend vs observation prior sources
+    - Integration with existing mvgam object structure
+    - Clear display of default vs user-specified priors
+    
+  - [ ] **Sub-task 1T**: Comprehensive documentation with realistic workflow examples (15 min)
+    - Complete roxygen2 documentation for all wrapper functions
+    - Realistic workflow examples in documentation
+    - Integration examples with `make_stancode`/`make_standata`  
+    - Clear explanation of observation vs trend parameter handling
+
+### **Phase 4: Robust Integration (30 min)**
+
+  - [ ] **Sub-task 1U**: Cross-function compatibility testing with make_stancode/standata and multivariate models (15 min)
+    - Test enhanced priors work with `make_stancode.mvgam_formula()`
+    - Test enhanced priors work with `make_standata.mvgam_formula()`
+    - Multivariate model compatibility with response-specific trend priors
+    - Performance testing with complex prior specifications
+    
+  - [ ] **Sub-task 1V**: Comprehensive error handling, edge case management, clear user messaging (15 min)
+    - Graceful handling of invalid prior combinations
+    - Clear error messages for common user mistakes
+    - Edge case handling (empty priors, conflicting specifications, etc.)  
+    - Documentation of limitations and constraints
 
 - [ ] **make_stancode.mvgam_formula()** (60 min): Generate complete Stan model code before fitting
   - Add S3 method: `make_stancode.mvgam_formula(object, prior = NULL, ...)`

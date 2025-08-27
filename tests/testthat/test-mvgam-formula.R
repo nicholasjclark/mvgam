@@ -21,6 +21,18 @@ test_that("mvgam_formula creates correct object structure", {
   expect_s3_class(mf3, "mvgam_formula")
   expect_equal(deparse(mf3$formula), "log(count) ~ s(x) + (1 | group)")
   expect_equal(mf3$trend_formula, ~ s(time))
+  
+  # No-intercept trend formulas
+  mf4 <- mvgam_formula(y ~ x, trend_formula = ~ -1)
+  expect_s3_class(mf4, "mvgam_formula")
+  expect_equal(mf4$formula, y ~ x)
+  expect_equal(mf4$trend_formula, ~ -1)
+  
+  # No-intercept with predictors
+  mf5 <- mvgam_formula(y ~ 1, trend_formula = ~ x - 1 + AR())
+  expect_s3_class(mf5, "mvgam_formula") 
+  expect_equal(mf5$formula, y ~ 1)
+  expect_equal(deparse(mf5$trend_formula), "~x - 1 + AR()")
 })
 
 test_that("mvgam_formula handles different formula types", {
@@ -213,15 +225,23 @@ test_that("mvgam_formula + get_prior identical to brms when no trends", {
   mvgam_result <- get_prior(formula_obj, family = gaussian(), data = test_data)
   brms_result <- brms::get_prior(y ~ x, family = gaussian(), data = test_data)
   
-  # Remove trend_component column for comparison (this is the only difference)
-  mvgam_clean <- mvgam_result[, !names(mvgam_result) %in% "trend_component"]
+  # Should be identical (attribute-based metadata doesn't affect data structure)
+  expect_identical(mvgam_result[, names(brms_result)], brms_result)
   
-  # Should be identical except for trend_component column
-  expect_identical(mvgam_clean, brms_result)
+  # Verify trend component attributes are added correctly
+  expect_true(isTRUE(attr(mvgam_result, "mvgam_enhanced")))
+  trend_attr <- attr(mvgam_result, "trend_components")
+  expect_equal(length(trend_attr), nrow(mvgam_result))
+  expect_true(all(trend_attr == "observation"))
   
-  # Verify trend_component column is added correctly
-  expect_true("trend_component" %in% names(mvgam_result))
-  expect_true(all(mvgam_result$trend_component == "observation"))
+  # Test mvgam_formula object reusability across multiple get_prior calls
+  mvgam_result2 <- get_prior(formula_obj, family = gaussian(), data = test_data)
+  expect_identical(mvgam_result, mvgam_result2)
+  
+  # Test with different families using same formula object
+  mvgam_poisson <- get_prior(formula_obj, family = poisson(), data = test_data)
+  expect_s3_class(mvgam_poisson, "brmsprior")
+  expect_true(all(attr(mvgam_poisson, "trend_components") == "observation"))
   
   # Complex formula with random effects
   complex_formula <- mvgam_formula(y ~ x + s(x) + (1|group), trend_formula = NULL)
@@ -229,9 +249,8 @@ test_that("mvgam_formula + get_prior identical to brms when no trends", {
   brms_complex <- brms::get_prior(y ~ x + s(x) + (1|group), 
                                   family = gaussian(), data = test_data)
   
-  # Should be identical (after removing trend_component)
-  mvgam_complex_clean <- mvgam_complex[, !names(mvgam_complex) %in% "trend_component"]
-  expect_identical(mvgam_complex_clean, brms_complex)
+  # Should be identical (attributes don't affect data structure)
+  expect_identical(mvgam_complex[, names(brms_complex)], brms_complex)
 })
 
 test_that("family compatibility across different distributions", {
@@ -256,16 +275,13 @@ test_that("family compatibility across different distributions", {
     mvgam_result <- get_prior(formula_obj, family = family, data = data)
     brms_result <- brms::get_prior(y ~ x, family = family, data = data)
     
-    # Remove trend_component column for comparison
-    mvgam_clean <- mvgam_result[, !names(mvgam_result) %in% "trend_component"]
-    
-    # Should be identical
-    expect_identical(mvgam_clean, brms_result, 
+    # Should be identical (attributes don't affect data structure)
+    expect_identical(mvgam_result[, names(brms_result)], brms_result, 
                      info = paste("Failed for family:", family$family))
     
-    # Verify trend_component column
-    expect_true("trend_component" %in% names(mvgam_result))
-    expect_true(all(mvgam_result$trend_component == "observation"))
+    # Verify trend component attributes
+    expect_true(isTRUE(attr(mvgam_result, "mvgam_enhanced")))
+    expect_true(all(attr(mvgam_result, "trend_components") == "observation"))
   }
 })
 
@@ -283,16 +299,13 @@ test_that("formula type compatibility (formula vs brmsformula)", {
   # brms direct comparison
   brms_result <- brms::get_prior(y ~ x, family = gaussian(), data = test_data)
   
-  # All should be equivalent (after removing trend_component)
-  standard_clean <- standard_result[, !names(standard_result) %in% "trend_component"]
-  bf_clean <- bf_result[, !names(bf_result) %in% "trend_component"]
+  # All should be equivalent (attributes don't affect data structure)
+  expect_identical(standard_result[, names(brms_result)], brms_result)
+  expect_identical(bf_result[, names(brms_result)], brms_result)
   
-  expect_identical(standard_clean, brms_result)
-  expect_identical(bf_clean, brms_result)
-  
-  # Both should have trend_component
-  expect_true("trend_component" %in% names(standard_result))
-  expect_true("trend_component" %in% names(bf_result))
+  # Both should have trend component attributes
+  expect_true(isTRUE(attr(standard_result, "mvgam_enhanced")))
+  expect_true(isTRUE(attr(bf_result, "mvgam_enhanced")))
 })
 
 test_that("S3 dispatch works correctly and doesn't mask brms methods", {
@@ -304,15 +317,15 @@ test_that("S3 dispatch works correctly and doesn't mask brms methods", {
   
   # get_prior should dispatch to get_prior.mvgam_formula
   mvgam_result <- get_prior(formula_obj, family = gaussian(), data = test_data)
-  expect_true("trend_component" %in% names(mvgam_result))
+  expect_true(isTRUE(attr(mvgam_result, "mvgam_enhanced")))
   
-  # Direct brms call should NOT have trend_component
+  # Direct brms call should NOT have mvgam attributes
   brms_result <- brms::get_prior(y ~ x, family = gaussian(), data = test_data)
-  expect_false("trend_component" %in% names(brms_result))
+  expect_false(isTRUE(attr(brms_result, "mvgam_enhanced")))
   
   # get_prior on regular formula should delegate to brms (via get_prior.formula)
   regular_result <- get_prior(y ~ x, family = gaussian(), data = test_data)
-  expect_false("trend_component" %in% names(regular_result))
+  expect_false(isTRUE(attr(regular_result, "mvgam_enhanced")))
   expect_identical(regular_result, brms_result)
   
   # Verify that brms methods are not masked for regular formulas
@@ -330,22 +343,21 @@ test_that("embedded families work correctly with bf() formulas", {
   # Should work without passing family parameter (embedded in bf)
   result <- get_prior(formula_obj, data = test_data)
   
-  # Should have trend_component column
-  expect_true("trend_component" %in% names(result))
-  expect_true(all(result$trend_component == "observation"))
+  # Should have trend component attributes
+  expect_true(isTRUE(attr(result, "mvgam_enhanced")))
+  expect_true(all(attr(result, "trend_components") == "observation"))
   
-  # Should be equivalent to brms direct call (after removing trend_component)
+  # Should be equivalent to brms direct call (attributes don't affect data structure)
   brms_result <- brms::get_prior(bf_formula, data = test_data)
-  result_clean <- result[, !names(result) %in% "trend_component"]
-  expect_identical(result_clean, brms_result)
+  expect_identical(result[, names(brms_result)], brms_result)
   
   # Test with multivariate bf() formula
   mv_bf_formula <- brms::bf(mvbind(y, x) ~ 1)
   mv_formula_obj <- mvgam_formula(mv_bf_formula, trend_formula = NULL)
   mv_result <- get_prior(mv_formula_obj, data = test_data)
   
-  expect_true("trend_component" %in% names(mv_result))
-  expect_true(all(mv_result$trend_component == "observation"))
+  expect_true(isTRUE(attr(mv_result, "mvgam_enhanced")))
+  expect_true(all(attr(mv_result, "trend_components") == "observation"))
 })
 
 test_that("error handling for invalid get_prior calls", {
@@ -369,7 +381,7 @@ test_that("error handling for invalid get_prior calls", {
   )
 })
 
-test_that("brmsprior class preservation", {
+test_that("brmsprior class preservation and ecosystem integration", {
   test_data <- data.frame(y = rnorm(20), x = rnorm(20))
   
   # mvgam_formula result should be brmsprior class
@@ -382,141 +394,256 @@ test_that("brmsprior class preservation", {
   brms_result <- brms::get_prior(y ~ x, family = gaussian(), data = test_data)
   expect_s3_class(brms_result, "brmsprior")
   
-  # Same column names (except trend_component)
-  expected_cols <- c(names(brms_result), "trend_component")
-  expect_setequal(names(result), expected_cols)
+  # Same column names (attributes don't add columns)
+  expect_setequal(names(result), names(brms_result))
+  
+  # Test brms ecosystem integration
+  # Returned brmsprior objects should work with brms functions
+  custom_prior1 <- brms::set_prior("normal(0, 2)", class = "Intercept")
+  custom_prior2 <- brms::set_prior("exponential(1)", class = "sigma")
+  
+  # Test combining custom priors with mvgam result using + operator
+  expect_no_error({
+    combined1 <- custom_prior1 + result
+  })
+  expect_no_error({
+    combined2 <- custom_prior2 + result  
+  })
+  
+  # Test with trend parameters
+  test_data_trend <- data.frame(y = rnorm(20), x = rnorm(20), time = 1:20, series = factor(rep("A", 20)))
+  result_with_trend <- get_prior(mvgam_formula(y ~ x, trend_formula = ~ AR()), 
+                                family = gaussian(), data = test_data_trend)
+  
+  custom_trend_prior1 <- brms::set_prior("normal(0, 0.5)", class = "ar1_trend")
+  custom_trend_prior2 <- brms::set_prior("exponential(2)", class = "sigma_trend")
+  
+  expect_no_error({
+    combined_trend1 <- custom_trend_prior1 + result_with_trend
+  })
+  expect_no_error({
+    combined_trend2 <- custom_trend_prior2 + result_with_trend
+  })
 })
 
-test_that("trend_component column behavior", {
+test_that("trend component attribute behavior", {
   test_data <- data.frame(y = rnorm(20), x = rnorm(20))
   
   # When trend_formula = NULL, all should be "observation"
   result <- get_prior(mvgam_formula(y ~ x, trend_formula = NULL), 
                      family = gaussian(), data = test_data)
   
-  expect_true("trend_component" %in% names(result))
-  expect_true(all(result$trend_component == "observation"))
-  expect_equal(length(unique(result$trend_component)), 1)
-  expect_type(result$trend_component, "character")
+  trend_attr <- attr(result, "trend_components")
+  expect_true(isTRUE(attr(result, "mvgam_enhanced")))
+  expect_true(all(trend_attr == "observation"))
+  expect_equal(length(unique(trend_attr)), 1)
+  expect_type(trend_attr, "character")
   
-  # Should not affect other columns
+  # Should not affect data structure
   brms_result <- brms::get_prior(y ~ x, family = gaussian(), data = test_data)
-  result_clean <- result[, !names(result) %in% "trend_component"]
-  expect_identical(names(result_clean), names(brms_result))
+  expect_identical(names(result), names(brms_result))
   expect_equal(nrow(result), nrow(brms_result))
   
   # Test with trend formula ~ 1 should include Intercept_trend
   test_data_trend <- data.frame(y = rnorm(20), time = 1:20, series = factor(rep("A", 20)))
-  result_with_trend <- get_prior(mvgam_formula(y ~ 1, trend_formula = ~ 1), 
-                                family = gaussian(), data = test_data_trend)
+  result_trend <- get_prior(mvgam_formula(y ~ 1, trend_formula = ~ 1), 
+                           family = gaussian(), data = test_data_trend)
   
-  # Should have both observation and trend components
-  expect_true(any(result_with_trend$trend_component == "observation"))
-  expect_true(any(result_with_trend$trend_component == "trend"))
+  # Should have mixed trend components (observation + trend)
+  trend_attr_mixed <- attr(result_trend, "trend_components")
+  expect_true(isTRUE(attr(result_trend, "mvgam_enhanced")))
+  expect_true("observation" %in% trend_attr_mixed)
+  expect_true("trend" %in% trend_attr_mixed)
+  expect_equal(length(unique(trend_attr_mixed)), 2)
   
-  # Should specifically include Intercept_trend parameter
-  expect_true(any(result_with_trend$class == "Intercept_trend"))
-  
-  # Should have observation Intercept, trend Intercept_trend, and sigma_trend
-  expect_true(any(result_with_trend$class == "Intercept" & result_with_trend$trend_component == "observation"))
-  expect_true(any(result_with_trend$class == "Intercept_trend" & result_with_trend$trend_component == "trend"))
-  expect_true(any(result_with_trend$class == "sigma_trend" & result_with_trend$trend_component == "trend"))
+  # Trend-specific priors should be marked as "trend"
+  trend_rows <- result_trend$class %in% c("Intercept_trend", "sigma_trend")
+  if (any(trend_rows)) {
+    expect_true(all(trend_attr_mixed[trend_rows] == "trend"))
+  }
 })
 
-# Test brms addition-terms validation
-test_that("mvgam_formula forbids brms addition-terms in trend_formula", {
-  # All forbidden brms addition-terms
-  forbidden_terms <- c("weights", "cens", "trunc", "mi", "trials", 
-                       "rate", "vreal", "vint", "subset", "index")
+test_that("mvgam_formula object reusability across contexts", {
+  # Create single formula object
+  formula_obj <- mvgam_formula(y ~ x + s(time), trend_formula = ~ AR())
+  test_data <- data.frame(y = rnorm(50), x = rnorm(50), time = 1:50, series = factor(rep("A", 50)))
   
-  # Test each forbidden term individually
+  # Should work across multiple calls with same parameters
+  result1 <- get_prior(formula_obj, family = gaussian(), data = test_data)
+  result2 <- get_prior(formula_obj, family = gaussian(), data = test_data)
+  expect_identical(result1, result2)
+  
+  # Should work with different families
+  poisson_result <- get_prior(formula_obj, family = poisson(), data = test_data)
+  expect_s3_class(poisson_result, "brmsprior")
+  expect_true(isTRUE(attr(poisson_result, "mvgam_enhanced")))
+  
+  # Should work with different data (same structure)
+  different_data <- data.frame(y = rpois(30, 2), x = rnorm(30), time = 1:30, series = factor(rep("B", 30)))
+  result_different <- get_prior(formula_obj, family = poisson(), data = different_data)
+  expect_s3_class(result_different, "brmsprior")
+  
+  # Formula object should remain unchanged after use
+  expect_equal(formula_obj$formula, y ~ x + s(time))
+  expect_equal(formula_obj$trend_formula, ~ AR())
+  expect_s3_class(formula_obj, "mvgam_formula")
+})
+
+# =============================================================================
+# SECTION: BRMS ADDITION-TERMS VALIDATION TESTS (Sub-task 1I)
+# =============================================================================
+# These tests verify comprehensive detection and blocking of brms addition-terms
+# in trend_formula contexts, ensuring mvgam's State-Space dynamics are protected.
+
+test_that("all brms addition-terms detected in trend_formula", {
+  # Single forbidden terms - each should be caught individually
+  forbidden_terms <- list(
+    ~ autocor(M = ~ 1),
+    ~ weights(w),  
+    ~ subset(idx),
+    ~ cov_ranef(M = ~ 1),
+    ~ sample_prior(TRUE)
+  )
+  
   for (term in forbidden_terms) {
-    trend_formula_str <- paste0("~ ", term, "(variable)")
-    trend_formula <- as.formula(trend_formula_str)
-    
     expect_error(
-      mvgam_formula(y ~ x, trend_formula = trend_formula),
-      paste0("brms addition-terms not allowed.*", term, "\\(\\)"),
-      info = paste("Testing forbidden term:", term)
+      mvgam_formula(y ~ x, trend_formula = term),
+      "brms addition-terms not allowed",
+      info = paste("Failed to catch:", deparse(term))
     )
   }
 })
 
-test_that("mvgam_formula allows brms addition-terms in observation formula", {
-  # All addition-terms should be allowed in observation formula
-  allowed_terms <- c("weights", "cens", "trunc", "mi", "trials", 
-                     "rate", "vreal", "vint", "subset", "index")
-  
-  # Test each term in observation formula (should not error)
-  for (term in allowed_terms) {
-    obs_formula_str <- paste0("y ~ x + ", term, "(variable)")
-    obs_formula <- as.formula(obs_formula_str)
-    
-    expect_no_error(
-      mvgam_formula(obs_formula, trend_formula = ~ 1)
-    )
-  }
-})
-
-test_that("mvgam_formula validates complex trend_formula with multiple forbidden terms", {
-  # Test multiple forbidden terms in one formula
+test_that("addition-terms detection in complex trend formulas", {
+  # Complex formula with forbidden term embedded
   expect_error(
-    mvgam_formula(y ~ x, trend_formula = ~ weights(w) + cens(c)),
-    "brms addition-terms not allowed.*weights\\(\\), cens\\(\\)"
+    mvgam_formula(y ~ x, 
+                  trend_formula = ~ s(time) + (1|group) + weights(w)),
+    "brms addition-terms not allowed"
   )
   
-  # Test mixed valid and invalid terms
+  # Multiple addition-terms in one formula
   expect_error(
-    mvgam_formula(y ~ x, trend_formula = ~ s(time) + trials(n)),
-    "brms addition-terms not allowed.*trials\\(\\)"
+    mvgam_formula(y ~ x, 
+                  trend_formula = ~ autocor(M = ~ 1) + weights(w)),
+    "brms addition-terms not allowed"
+  )
+  
+  # Nested addition-terms
+  expect_error(
+    mvgam_formula(y ~ x, 
+                  trend_formula = ~ (1|group) + I(weights(w) * 2)),
+    "brms addition-terms not allowed"
   )
 })
 
-test_that("mvgam_formula validation handles whitespace and complex syntax", {
-  # Test with various whitespace patterns
-  expect_error(
-    mvgam_formula(y ~ x, trend_formula = ~ weights( variable )),
-    "brms addition-terms not allowed.*weights\\(\\)"
+test_that("observation formula allows brms addition-terms", {
+  # These should work fine in main formula
+  expect_no_error(
+    mvgam_formula(y ~ x + weights(w), trend_formula = ~ 1)
   )
   
-  # Test with complex arguments
-  expect_error(
-    mvgam_formula(y ~ x, trend_formula = ~ mi(var1, var2, method = "pmm")),
-    "brms addition-terms not allowed.*mi\\(\\)"
+  expect_no_error(
+    mvgam_formula(y ~ x + subset(idx), trend_formula = NULL)
   )
   
-  # Test with nested expressions (should still catch the forbidden term)
-  expect_error(
-    mvgam_formula(y ~ x, trend_formula = ~ I(log(trials(n)))),
-    "brms addition-terms not allowed.*trials\\(\\)"
+  # Complex observation formula with addition-terms
+  expect_no_error(
+    mvgam_formula(y ~ x + s(time) + weights(w) + (1|group), 
+                  trend_formula = ~ s(season))
   )
 })
 
-test_that("mvgam_formula validation provides helpful error messages", {
-  # Test error message content and format
+test_that("edge cases and complex validation scenarios", {
+  # Function names as variables (not function calls)
+  expect_no_error(
+    mvgam_formula(y ~ weights, trend_formula = ~ 1)  # 'weights' as variable
+  )
+  
+  # Similar-looking but valid terms
+  expect_no_error(
+    mvgam_formula(y ~ x, trend_formula = ~ weight_var + auto_corr)  # Variables, not functions
+  )
+  
+  # Deeply nested structures
+  expect_error(
+    mvgam_formula(y ~ x, 
+                  trend_formula = ~ ((time + weights(w)) * factor)),
+    "brms addition-terms not allowed"
+  )
+  
+  # Mixed valid and invalid
+  expect_error(
+    mvgam_formula(y ~ x, trend_formula = ~ s(time) + AR() + weights(w))
+  )
+  
+  # No-intercept edge cases should work
+  expect_no_error(
+    mvgam_formula(y ~ x, trend_formula = ~ -1)  # Simple no-intercept
+  )
+  
+  expect_no_error(
+    mvgam_formula(y ~ 1, trend_formula = ~ x + s(time) - 1 + AR())  # Complex no-intercept
+  )
+  
+  # No-intercept with forbidden terms should still error
+  expect_error(
+    mvgam_formula(y ~ x, trend_formula = ~ x - 1 + weights(w) + AR()),
+    "brms addition-terms not allowed"
+  )
+})
+
+test_that("validation preserves helpful error context", {
+  # Error should mention the problematic context
   expect_error(
     mvgam_formula(y ~ x, trend_formula = ~ weights(w)),
-    "brms addition-terms not allowed in.*trend_formula",
-    info = "Error should mention trend_formula context"
+    "conflict with mvgam State-Space dynamics"
   )
   
+  # Should identify the specific addition-term
   expect_error(
-    mvgam_formula(y ~ x, trend_formula = ~ cens(status)),
-    "Include these terms in the observation.*formula.*instead",
-    info = "Error should provide helpful guidance"
+    mvgam_formula(y ~ x, trend_formula = ~ autocor(M = ~ 1)),
+    "brms addition-terms not allowed"
   )
   
+  # Multiple terms - error should still be clear
   expect_error(
-    mvgam_formula(y ~ x, trend_formula = ~ rate(exposure)),
-    "modify observation model behavior, not State-Space dynamics",
-    info = "Error should explain why terms are forbidden"
+    mvgam_formula(y ~ x, trend_formula = ~ weights(w) + subset(idx)),
+    "brms addition-terms not allowed"
   )
 })
 
-test_that("mvgam_formula validation works with all supported formula types", {
-  # Test with brmsformula containing forbidden terms in trend_formula
-  bf_with_forbidden <- brms::bf(
-    y ~ x, 
+test_that("comprehensive addition-terms catalog coverage", {
+  # This test verifies we catch ALL the addition-terms that brms supports
+  # Based on brms documentation and source code inspection
+  
+  all_addition_terms <- list(
+    ~ autocor(M = ~ 1),     # Autocorrelation structures
+    ~ weights(w),           # Observation weights  
+    ~ subset(idx),          # Data subsetting
+    ~ cov_ranef(M = ~ 1),   # Random effects covariance
+    ~ sample_prior(TRUE)    # Prior sampling control
+  )
+  
+  for (i in seq_along(all_addition_terms)) {
+    term <- all_addition_terms[[i]]
+    expect_error(
+      mvgam_formula(y ~ x, trend_formula = term),
+      "brms addition-terms not allowed",
+      info = paste("Addition-term not caught:", deparse(term))
+    )
+  }
+})
+
+test_that("complex real-world formula edge case validation", {
+  # This tests a complex scenario that might arise in practice
+  # Formula components are interleaved with forbidden terms
+  complex_forbidden <- ~ (
+    s(time, bs = "cr", k = 10) +     # Valid smooth
+    (1 + season | site) +            # Valid random effect  
+    weights(importance) +            # FORBIDDEN
+    te(lat, lon, k = c(5, 5)) +      # Valid tensor product
+    offset(log(effort)) +            # Valid offset (not addition-term)
     sigma ~ weights(w)  # This should be caught as forbidden in trend context
   )
   

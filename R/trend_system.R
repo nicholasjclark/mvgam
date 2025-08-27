@@ -742,8 +742,8 @@ generate_var_monitor_params <- function(trend_spec) {
 #' @return Character vector of CAR-specific parameters
 #' @noRd
 generate_car_monitor_params <- function(trend_spec) {
-  # CAR uses ar1 without _trend suffix (legacy naming)
-  return(c("ar1"))
+  # CAR uses ar1_trend following standard _trend suffix convention
+  return(c("ar1_trend"))
 }
 
 #' Generate ZMVN-specific monitor parameters
@@ -1857,16 +1857,20 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
   # Extract term labels (mvgam pattern)
   tf <- attr(tf_safe, 'term.labels')
   
-  # Check for intercept-only formula (~ 1) which should default to ZMVN
+  # Check for intercept-only formula (~ 1) or no-intercept formula (~ -1)
+  # Both should default to ZMVN
   is_intercept_only <- length(tf) == 0 && attr(tf_safe, 'intercept') == 1
+  is_no_intercept_only <- length(tf) == 0 && attr(tf_safe, 'intercept') == 0
+  is_simple_formula <- is_intercept_only || is_no_intercept_only
 
-  # Validate non-empty formula but allow intercept-only (brms pattern)
-  if (length(tf) == 0 && !is_intercept_only) {
-    insight::format_error(
-      "Empty trend formula provided.",
-      "The {.field trend_formula} must contain at least one term.",
-      "Example: {.code ~ RW()} or {.code ~ s(time) + AR()}"
-    )
+  # Validate that we have some meaningful formula structure
+  # Allow ~ 1, ~ -1, and formulas with actual terms
+  if (length(tf) == 0 && !is_simple_formula) {
+    stop(insight::format_error(
+      "Invalid trend formula structure.",
+      "The {.field trend_formula} has no terms and no intercept specification.",
+      "Use {.code ~ 1}, {.code ~ -1}, or include predictors/trend constructors."
+    ))
   }
 
   # Find trend terms using mvgam-style detection with brms-inspired robustness
@@ -1890,7 +1894,7 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
   regular_terms <- if (length(regular_indices) > 0) tf[regular_indices] else character(0)
 
   # Allow any formula without explicit trend constructors to default to ZMVN
-  # This covers both intercept-only (~ 1) and regular formulas (~ gp(time))
+  # This covers: intercept-only (~ 1), no-intercept (~ -1), and regular formulas (~ gp(time))
   has_explicit_trends <- length(trend_terms) > 0
   should_default_to_zmvn <- !has_explicit_trends
 
@@ -1922,31 +1926,18 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
   # Validate trend components for any remaining conflicts
   validate_trend_components(trend_components)
 
-  # Create base formula without trend constructors (brms pattern)
-  # offsets not allowed in trend_formula
+  # Create base formula without trend constructors using structure-preserving rlang approach
   offset_attr <- attr(tf_safe, 'offset')
 
   if (!is.null(offset_attr)) {
-    insight::format_error(
+    stop(insight::format_error(
       "Offsets not allowed in trend_formula.",
       "Check for invalid syntax in {.field trend_formula}."
-    )
+    ))
   }
 
-  base_formula <- if (length(regular_terms) > 0) {
-      try(reformulate(regular_terms, response = NULL), silent = TRUE)
-  } else {
-      ~ 1  # Intercept only
-  }
-
-  # Ensure formula reconstruction succeeded
-  if (inherits(base_formula, "try-error")) {
-    insight::format_error(
-      "Failed to reconstruct base formula.",
-      "Regular terms could not be combined into a valid formula.",
-      "Check for invalid predictor syntax in {.field trend_formula}."
-    )
-  }
+  # Use rlang-based approach to preserve complex formula structures like (1|series)
+  base_formula <- parse_base_formula_safe(trend_formula, trend_terms)
 
   # Since we enforce single trend type, trend_model is always the first component
   trend_model <- trend_components[[1]]

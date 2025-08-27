@@ -893,6 +893,9 @@ validate_single_trend_formula <- function(formula, context = NULL, allow_respons
 
   # Forbid brms addition-terms in trend formulas (conflicts with State-Space)
   validate_no_addition_terms_in_trends(formula_str)
+  
+  # Forbid multiple trend constructors in single formula
+  validate_no_multiple_trend_constructors(formula_str)
 
   return(formula)
 }
@@ -990,6 +993,37 @@ validate_no_addition_terms_in_trends <- function(formula_str) {
     ))
   }
 
+  return(invisible(NULL))
+}
+
+#' Validate no multiple trend constructors in trend formulas
+#'
+#' Trend formulas should contain exactly one trend constructor (AR, RW, VAR, etc.)
+#' Multiple trend constructors like ~AR() + RW() are not allowed.
+#' 
+#' @param formula_str String representation of trend formula
+#' @noRd
+validate_no_multiple_trend_constructors <- function(formula_str) {
+  # Use existing infrastructure to detect trend constructors
+  trend_patterns <- get_trend_validation_patterns()
+  
+  detected_trends <- character(0)
+  for (pattern in names(trend_patterns)) {
+    if (grepl(pattern, formula_str, perl = TRUE)) {
+      detected_trends <- c(detected_trends, trend_patterns[[pattern]])
+    }
+  }
+  
+  if (length(detected_trends) > 1) {
+    stop(insight::format_error(
+      "Multiple trend constructors found in single {.field trend_formula}:",
+      paste("Found:", paste(unique(detected_trends), collapse = " + ")),
+      "Each trend formula must contain exactly one trend constructor.",
+      "For multiple trends, use response-specific formulas:",
+      "{.code trend_formula = list(y1 = ~ AR(), y2 = ~ RW())}"
+    ))
+  }
+  
   return(invisible(NULL))
 }
 
@@ -2462,4 +2496,111 @@ validate_no_factor_hierarchical <- function(trend_specs, n_series, trend_name) {
   }
   
   return(invisible(TRUE))
+}
+
+# Formula Parsing Helpers
+# =======================
+# These functions provide structure-preserving formula manipulation using rlang
+# to avoid reformulate() issues with complex formula structures like (1|series)
+
+#' Parse base formula by removing trend constructor terms (structure-preserving)
+#' 
+#' @description
+#' Safely removes trend constructor terms from a formula while preserving 
+#' complex structures like (1|group) random effects. Uses rlang AST manipulation
+#' to avoid reformulate() issues.
+#' 
+#' @param trend_formula A formula object containing potential trend terms
+#' @param trend_terms Character vector of trend constructor patterns to remove
+#' @return A formula object with trend terms removed, preserving structure
+#' @noRd
+parse_base_formula_safe <- function(trend_formula, trend_terms) {
+  # Input validation - non-negotiable per CLAUDE.md
+  checkmate::assert_class(trend_formula, "formula")
+  checkmate::assert_character(trend_terms, min.len = 0)
+  
+  if (length(trend_terms) == 0) {
+    return(trend_formula)
+  }
+  
+  # Extract and clean right-hand side expression using rlang
+  rhs_expr <- rlang::f_rhs(trend_formula)
+  cleaned_expr <- remove_trend_expressions(rhs_expr, trend_terms, depth = 0)
+  
+  # Handle case where all terms were removed
+  if (is.null(cleaned_expr)) {
+    cleaned_expr <- quote(1)  # Default to intercept-only
+  }
+  
+  # Reconstruct formula preserving environment (no lhs for trend formulas)
+  rlang::new_formula(lhs = NULL, rhs = cleaned_expr, env = rlang::f_env(trend_formula))
+}
+
+#' Recursively remove trend expressions from AST
+#' 
+#' @description
+#' Walks the expression tree to remove trend constructor calls while preserving
+#' the overall formula structure. Handles nested expressions safely.
+#' 
+#' @param expr Expression to process
+#' @param trend_patterns Character vector of trend patterns to match
+#' @param depth Current recursion depth for protection
+#' @return Cleaned expression or NULL if expression should be removed
+#' @noRd
+remove_trend_expressions <- function(expr, trend_patterns, depth = 0) {
+  # Input validation
+  checkmate::assert_character(trend_patterns)
+  checkmate::assert_int(depth, lower = 0)
+  
+  # Recursion depth protection
+  if (depth > 50) {
+    stop(insight::format_error(
+      "Formula nesting too deep (>50 levels).",
+      "Simplify the trend formula structure."
+    ))
+  }
+  
+  if (rlang::is_call(expr, "+")) {
+    args <- rlang::call_args(expr)
+    lhs <- remove_trend_expressions(args[[1]], trend_patterns, depth + 1)
+    rhs <- remove_trend_expressions(args[[2]], trend_patterns, depth + 1)
+    
+    # Handle removal logic preserving valid expressions
+    if (is.null(lhs) && is.null(rhs)) {
+      return(NULL)
+    } else if (is.null(lhs)) {
+      return(rhs)
+    } else if (is.null(rhs)) {
+      return(lhs)
+    } else {
+      return(rlang::expr(!!lhs + !!rhs))
+    }
+  } else {
+    # Check if this expression is a trend term
+    if (is_trend_term(expr, trend_patterns)) {
+      return(NULL)
+    } else {
+      return(expr)
+    }
+  }
+}
+
+#' Check if expression matches trend term patterns
+#' 
+#' @description
+#' Determines if an expression represents a trend constructor term that
+#' should be removed from the base formula.
+#' 
+#' @param expr Expression to check
+#' @param trend_patterns Character vector of trend patterns to match against
+#' @return Logical indicating if expression is a trend term
+#' @noRd  
+is_trend_term <- function(expr, trend_patterns) {
+  # Input validation
+  checkmate::assert_character(trend_patterns)
+  
+  expr_text <- rlang::expr_text(expr)
+  any(vapply(trend_patterns, function(pattern) {
+    grepl(pattern, expr_text, fixed = TRUE)
+  }, logical(1)))
 }
