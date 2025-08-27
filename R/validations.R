@@ -972,7 +972,8 @@ validate_no_brms_autocor_in_trends <- function(formula_str) {
 validate_no_addition_terms_in_trends <- function(formula_str) {
   # Complete list of brms addition-terms from brms source code analysis
   addition_terms <- c("weights", "cens", "trunc", "mi", "trials", 
-                     "rate", "vreal", "vint", "subset", "index")
+                     "rate", "vreal", "vint", "subset", "index",
+                     "cov_ranef")
   
   # Use same pattern as brms: term_name followed by opening parenthesis
   addition_term_pattern <- paste0("\\b(", paste(addition_terms, collapse = "|"), ")\\s*\\(")
