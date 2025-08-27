@@ -207,10 +207,10 @@
                                                    "tibble"
                                                ],
                      "total_files":  56,
-                     "generated":  "2025-08-27 08:33:17",
+                     "generated":  "2025-08-27 10:57:51",
                      "s3_methods_count":  42,
                      "s3_classes_count":  24,
-                     "total_functions":  407
+                     "total_functions":  408
                  },
     "function_dependencies":  {
                                   "RW":  [
@@ -507,6 +507,7 @@
                                                               ],
                                   "generate_base_stancode_with_stanvars":  "error",
                                   "summary.mvgam_forecast":  "validate_proportional",
+                                  "as_one_logical":  "deparse0",
                                   "extract_non_likelihood_from_model_block":  [
                                                                                   "apply_safe_parameter_replacement",
                                                                                   "AR",
@@ -705,6 +706,7 @@
                                                                         "formula2str_mvgam",
                                                                         "mvgam",
                                                                         "RW",
+                                                                        "validate_no_addition_terms_in_trends",
                                                                         "validate_no_brms_autocor_in_trends",
                                                                         "validate_no_offsets_in_trends"
                                                                     ],
@@ -934,7 +936,7 @@
                                                                          "validate_regular_time_intervals"
                                                                      ],
                                   "build_ar_prior_spec":  "error",
-                                  "mvgam_formula":  "error",
+                                  "mvgam_formula":  "validate_single_trend_formula",
                                   "parse_data_declarations":  "AR",
                                   "mvgam_multiple":  [
                                                          "fit_multiple_imputation_models",
@@ -942,7 +944,7 @@
                                                          "validate_multiple_imputation_datasets"
                                                      ],
                                   "validate_trend_components":  "error",
-                                  "as_one_logical":  "deparse0",
+                                  "validate_no_addition_terms_in_trends":  "error",
                                   "generate_trend_computation_tparameters":  [
                                                                                  "AR",
                                                                                  "VAR"
@@ -1369,6 +1371,7 @@
                       "smooth.construct.moi.smooth.spec":  "R/monotonic.R",
                       "generate_parameter_label":  "R/trend_system.R",
                       "stability.mvgam":  "R/stability.R",
+                      "validate_no_addition_terms_in_trends":  "R/validations.R",
                       "add_residuals.mvgam":  "R/add_residuals.R",
                       "setup_brms_lightweight":  "R/brms_integration.R",
                       "validate_multiple_imputation_datasets":  "R/mvgam_core.R",
@@ -1888,6 +1891,7 @@
                                 "smooth.construct.moi.smooth.spec":  "smooth.construct.moi.smooth.spec \u003c- function(object, data, knots) {",
                                 "generate_parameter_label":  "generate_parameter_label \u003c- function(param_name, trend_type, trend_spec) {",
                                 "stability.mvgam":  "stability.mvgam = function(object, ...) {",
+                                "validate_no_addition_terms_in_trends":  "validate_no_addition_terms_in_trends \u003c- function(formula_str) {",
                                 "add_residuals.mvgam":  "add_residuals.mvgam = function(object, ...) {",
                                 "setup_brms_lightweight":  "setup_brms_lightweight \u003c- function(formula, data, family = gaussian(), trend_formula = NULL, stanvars = NULL, ...) {",
                                 "validate_multiple_imputation_datasets":  "validate_multiple_imputation_datasets \u003c- function(data_list) {",
@@ -3150,6 +3154,13 @@
                                                 "is_s3_method":  false,
                                                 "arguments":  "x"
                                             },
+                              "add_residuals":  {
+                                                    "s3_class":  "",
+                                                    "s3_method":  "",
+                                                    "signature":  "add_residuals \u003c- function(object, ...) {",
+                                                    "is_s3_method":  false,
+                                                    "arguments":  "object"
+                                                },
                               "mvgam_trend_registry":  {
                                                            "s3_class":  "",
                                                            "s3_method":  "",
@@ -3549,16 +3560,6 @@
                                                                             "mgcv_model"
                                                                         ]
                                                       },
-                              "validate_plot_data":  {
-                                                         "s3_class":  "",
-                                                         "s3_method":  "",
-                                                         "signature":  "validate_plot_data \u003c- function(data, y) {",
-                                                         "is_s3_method":  false,
-                                                         "arguments":  [
-                                                                           "data",
-                                                                           "y"
-                                                                       ]
-                                                     },
                               "generate_pw_monitor_params":  {
                                                                  "s3_class":  "",
                                                                  "s3_method":  "",
@@ -3612,6 +3613,13 @@
                                                       "is_s3_method":  true,
                                                       "arguments":  "object"
                                                   },
+                              "validate_no_addition_terms_in_trends":  {
+                                                                           "s3_class":  "",
+                                                                           "s3_method":  "",
+                                                                           "signature":  "validate_no_addition_terms_in_trends \u003c- function(formula_str) {",
+                                                                           "is_s3_method":  false,
+                                                                           "arguments":  "formula_str"
+                                                                       },
                               "check_block_semicolons":  {
                                                              "s3_class":  "",
                                                              "s3_method":  "",
@@ -3897,13 +3905,17 @@
                                                                      "h"
                                                                  ]
                                                },
-                              "add_residuals":  {
-                                                    "s3_class":  "",
-                                                    "s3_method":  "",
-                                                    "signature":  "add_residuals \u003c- function(object, ...) {",
-                                                    "is_s3_method":  false,
-                                                    "arguments":  "object"
-                                                },
+                              "plot.mvgam_conditional_effects":  {
+                                                                     "s3_class":  "mvgam_conditional_effects",
+                                                                     "s3_method":  "plot",
+                                                                     "signature":  "plot.mvgam_conditional_effects = function(x, plot = TRUE, ask = FALSE, ...) {",
+                                                                     "is_s3_method":  true,
+                                                                     "arguments":  [
+                                                                                       "x",
+                                                                                       "plot",
+                                                                                       "ask"
+                                                                                   ]
+                                                                 },
                               "extract_trend_stanvars_from_setup":  {
                                                                         "s3_class":  "",
                                                                         "s3_method":  "",
@@ -5083,17 +5095,16 @@
                                                                                    "data"
                                                                                ]
                                                              },
-                              "plot.mvgam_conditional_effects":  {
-                                                                     "s3_class":  "mvgam_conditional_effects",
-                                                                     "s3_method":  "plot",
-                                                                     "signature":  "plot.mvgam_conditional_effects = function(x, plot = TRUE, ask = FALSE, ...) {",
-                                                                     "is_s3_method":  true,
-                                                                     "arguments":  [
-                                                                                       "x",
-                                                                                       "plot",
-                                                                                       "ask"
-                                                                                   ]
-                                                                 },
+                              "validate_plot_data":  {
+                                                         "s3_class":  "",
+                                                         "s3_method":  "",
+                                                         "signature":  "validate_plot_data \u003c- function(data, y) {",
+                                                         "is_s3_method":  false,
+                                                         "arguments":  [
+                                                                           "data",
+                                                                           "y"
+                                                                       ]
+                                                     },
                               "plot_mvgam_randomeffects":  {
                                                                "s3_class":  "",
                                                                "s3_method":  "",
@@ -6073,6 +6084,7 @@
                                                 "validate_single_trend_formula",
                                                 "check_brms_autocor_usage",
                                                 "validate_no_brms_autocor_in_trends",
+                                                "validate_no_addition_terms_in_trends",
                                                 "validate_no_offsets_in_trends",
                                                 "validate_offsets_in_obs",
                                                 "validate_multivariate_trend_constraints",

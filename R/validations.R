@@ -891,6 +891,9 @@ validate_single_trend_formula <- function(formula, context = NULL, allow_respons
   # Forbid brms autocorrelation in trend formulas (conflicts with State-Space)
   validate_no_brms_autocor_in_trends(formula_str)
 
+  # Forbid brms addition-terms in trend formulas (conflicts with State-Space)
+  validate_no_addition_terms_in_trends(formula_str)
+
   return(formula)
 }
 
@@ -931,7 +934,8 @@ validate_no_brms_autocor_in_trends <- function(formula_str) {
     "\\bma\\s*\\(" = "ma()",
     "\\barma\\s*\\(" = "arma()",
     "\\bcosy\\s*\\(" = "cosy()",
-    "\\bunstr\\s*\\(" = "unstr()"
+    "\\bunstr\\s*\\(" = "unstr()",
+    "\\bautocor\\s*\\(" = "autocor()"
   )
 
   detected_autocor <- character(0)
@@ -947,6 +951,42 @@ validate_no_brms_autocor_in_trends <- function(formula_str) {
       paste("Found:", paste(unique(detected_autocor), collapse = ", ")),
       "These conflict with mvgam State-Space dynamics.",
       "Use mvgam trend types instead: {.code ar(p = 1)} → {.code AR(p = 1)}"
+    ))
+  }
+
+  return(invisible(NULL))
+}
+
+#' Validate no brms addition-terms in trend formulas
+#'
+#' Validates that trend formulas do not contain brms addition-terms like
+#' weights(), cens(), trunc(), mi(), trials(), rate(), vreal(), vint(),
+#' subset(), index(). These terms are allowed in observation formulas but
+#' not in trend formulas since they modify observation model behavior.
+#'
+#' @param formula_str String representation of trend formula
+#' @noRd
+validate_no_addition_terms_in_trends <- function(formula_str) {
+  # Complete list of brms addition-terms from brms source code analysis
+  addition_terms <- c("weights", "cens", "trunc", "mi", "trials", 
+                     "rate", "vreal", "vint", "subset", "index")
+  
+  # Use same pattern as brms: term_name followed by opening parenthesis
+  addition_term_pattern <- paste0("\\b(", paste(addition_terms, collapse = "|"), ")\\s*\\(")
+  
+  # Extract any found addition-terms
+  matches <- regmatches(formula_str, gregexpr(addition_term_pattern, formula_str, perl = TRUE))[[1]]
+  
+  if (length(matches) > 0) {
+    # Extract just the function names (remove parentheses and arguments)
+    detected_terms <- gsub("\\s*\\(.*", "", matches)
+    detected_terms <- paste0(unique(detected_terms), "()")
+    
+    stop(insight::format_error(
+      "brms addition-terms not allowed in {.field trend_formula}:",
+      paste("Found:", paste(detected_terms, collapse = ", ")),
+      "These terms modify observation model behavior, not State-Space dynamics.",
+      "Include these terms in the observation {.field formula} instead."
     ))
   }
 

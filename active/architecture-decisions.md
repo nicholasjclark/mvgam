@@ -663,3 +663,5 @@ priors_obs_only <- get_prior(mvgam_formula(y ~ x), data = dat)
 **Trend Formula**: State-Space restricted - Only fixed effects, interactions, random effects, smooths, `gp()` allowed. Defaults to ZMVN() if no trend constructor specified.
 
 **Forbidden in trend_formula**: All brms addition-terms (`offset()`, `weights()`, `cens()`, etc.) and brms autocorr (`ar()`, `ma()`, etc.)
+
+**User Documentation**: Complete list of forbidden terms and rationale documented in `?mvgam_formula` with examples of correct/incorrect usage patterns.

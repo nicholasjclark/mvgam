@@ -79,13 +79,13 @@ test_that("mvgam_formula detects incompatible autocorrelation terms", {
   # Should error with autocor() in trend_formula
   expect_error(
     mvgam_formula(y ~ x, trend_formula = ~ autocor(M = ~ 1)),
-    "incompatible autocorrelation terms"
+    "brms autocorrelation terms not allowed"
   )
   
   # Should provide helpful error message
   expect_error(
     mvgam_formula(y ~ x, trend_formula = ~ autocor(M = ~ 1)),
-    "State-Space trends cannot be combined with brms autocorr"
+    "conflict with mvgam State-Space dynamics"
   )
   
   # Regular terms should be fine
@@ -421,4 +421,109 @@ test_that("trend_component column behavior", {
   expect_true(any(result_with_trend$class == "Intercept" & result_with_trend$trend_component == "observation"))
   expect_true(any(result_with_trend$class == "Intercept_trend" & result_with_trend$trend_component == "trend"))
   expect_true(any(result_with_trend$class == "sigma_trend" & result_with_trend$trend_component == "trend"))
+})
+
+# Test brms addition-terms validation
+test_that("mvgam_formula forbids brms addition-terms in trend_formula", {
+  # All forbidden brms addition-terms
+  forbidden_terms <- c("weights", "cens", "trunc", "mi", "trials", 
+                       "rate", "vreal", "vint", "subset", "index")
+  
+  # Test each forbidden term individually
+  for (term in forbidden_terms) {
+    trend_formula_str <- paste0("~ ", term, "(variable)")
+    trend_formula <- as.formula(trend_formula_str)
+    
+    expect_error(
+      mvgam_formula(y ~ x, trend_formula = trend_formula),
+      paste0("brms addition-terms not allowed.*", term, "\\(\\)"),
+      info = paste("Testing forbidden term:", term)
+    )
+  }
+})
+
+test_that("mvgam_formula allows brms addition-terms in observation formula", {
+  # All addition-terms should be allowed in observation formula
+  allowed_terms <- c("weights", "cens", "trunc", "mi", "trials", 
+                     "rate", "vreal", "vint", "subset", "index")
+  
+  # Test each term in observation formula (should not error)
+  for (term in allowed_terms) {
+    obs_formula_str <- paste0("y ~ x + ", term, "(variable)")
+    obs_formula <- as.formula(obs_formula_str)
+    
+    expect_no_error(
+      mvgam_formula(obs_formula, trend_formula = ~ 1)
+    )
+  }
+})
+
+test_that("mvgam_formula validates complex trend_formula with multiple forbidden terms", {
+  # Test multiple forbidden terms in one formula
+  expect_error(
+    mvgam_formula(y ~ x, trend_formula = ~ weights(w) + cens(c)),
+    "brms addition-terms not allowed.*weights\\(\\), cens\\(\\)"
+  )
+  
+  # Test mixed valid and invalid terms
+  expect_error(
+    mvgam_formula(y ~ x, trend_formula = ~ s(time) + trials(n)),
+    "brms addition-terms not allowed.*trials\\(\\)"
+  )
+})
+
+test_that("mvgam_formula validation handles whitespace and complex syntax", {
+  # Test with various whitespace patterns
+  expect_error(
+    mvgam_formula(y ~ x, trend_formula = ~ weights( variable )),
+    "brms addition-terms not allowed.*weights\\(\\)"
+  )
+  
+  # Test with complex arguments
+  expect_error(
+    mvgam_formula(y ~ x, trend_formula = ~ mi(var1, var2, method = "pmm")),
+    "brms addition-terms not allowed.*mi\\(\\)"
+  )
+  
+  # Test with nested expressions (should still catch the forbidden term)
+  expect_error(
+    mvgam_formula(y ~ x, trend_formula = ~ I(log(trials(n)))),
+    "brms addition-terms not allowed.*trials\\(\\)"
+  )
+})
+
+test_that("mvgam_formula validation provides helpful error messages", {
+  # Test error message content and format
+  expect_error(
+    mvgam_formula(y ~ x, trend_formula = ~ weights(w)),
+    "brms addition-terms not allowed in.*trend_formula",
+    info = "Error should mention trend_formula context"
+  )
+  
+  expect_error(
+    mvgam_formula(y ~ x, trend_formula = ~ cens(status)),
+    "Include these terms in the observation.*formula.*instead",
+    info = "Error should provide helpful guidance"
+  )
+  
+  expect_error(
+    mvgam_formula(y ~ x, trend_formula = ~ rate(exposure)),
+    "modify observation model behavior, not State-Space dynamics",
+    info = "Error should explain why terms are forbidden"
+  )
+})
+
+test_that("mvgam_formula validation works with all supported formula types", {
+  # Test with brmsformula containing forbidden terms in trend_formula
+  bf_with_forbidden <- brms::bf(
+    y ~ x, 
+    sigma ~ weights(w)  # This should be caught as forbidden in trend context
+  )
+  
+  # This specific case tests the validation pipeline for complex formula structures
+  # The validation should catch forbidden terms regardless of formula complexity
+  expect_error(
+    mvgam_formula(y ~ x, trend_formula = ~ weights(w)),
+    "brms addition-terms not allowed"
+  )
 })

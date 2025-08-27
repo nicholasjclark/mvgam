@@ -104,7 +104,7 @@ Implementation tasks for stancode generation update feature with comprehensive p
     - Use the test-runner agent to run all tests in test-priors.R and test-mvgam_formula.R
     - Validate logic in `generate_trend_priors()` to ensure ALL brms-generated priors are returned with the correct "_trend" suffix 
     
-   - [ ] **Sub-task 1I**: Comprehensive brms addition-terms validation (45 min)
+   - [X] **Sub-task 1I**: Comprehensive brms addition-terms validation (45 min)
     - Survey all brms addition-terms that should NOT be supported in trend_formula
     - Add validation functions to reject: weights(), cens(), trunc(), mi(), trials(), rate(), vreal(), vint()
     - Extend existing `validate_single_trend_formula()` with comprehensive checks
@@ -115,9 +115,7 @@ Implementation tasks for stancode generation update feature with comprehensive p
     - Document S3 class structure and inheritance from base formula classes
     
   - [ ] **Sub-task 1J**: Integration testing and ecosystem validation
-    - Test returned brmsprior objects work with `brms::set_prior()`
-    - Test error handling: malformed inputs, incompatible autocorr + trends
-    - Create roxygen2 examples showing complete workflow: construct → inspect → modify → fit
+    - Test returned brmsprior objects work with `brms::set_prior()` and `brms::prior()` for both trend and observation parameters
     - Verify mvgam_formula objects can be reused across inspection functions  
     - Test that formula inheritance preserves brms compatibility
 

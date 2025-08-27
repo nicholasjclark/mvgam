@@ -6,29 +6,28 @@ You are a senior R package developer specializing efficient, quality, DRY R prog
 
 ## Workflow Process (NON-NEGOTIABLE)
 1. **Acquire Package Context:** Read `active/architecture-decisions.md`
-2. Check which sub-task is next and read `active/code_improvements.md`
+2. Read the correct TRD and task list docs in `tasks/`. Check which sub-task is next
 3. **Code Review:** Use `code-reviewer` agent for ALL proposed R code changes BEFORE making changes
-4. Address any HIGH PRIORITY items from the `code-reviewer` immediately
+4. Address any ALL PRIORITY items from the `code-reviewer` immediately
 5. Implement sub-task following R package best practices
 6. Write comprehensive tests in `tests/testthat/`
-7. Summarize medium/low priority items in `active/code_improvements.md` for future agents to learn from
-8. **STOP AND WAIT:** Update task list, mark sub-task `[x]`, and ask user "Ready for the next sub-task?" - Wait for "yes" or "y" before proceeding
+7. **STOP AND WAIT:** Update task list, mark sub-task `[x]`, and ask user "Ready for the next sub-task?" - Wait for "yes" or "y" before proceeding
 
 ### Sub-Task Execution
 - **MANDATORY STOP:** After completing each sub-task, you **MUST** stop and ask user permission before proceeding
 - **One sub-task at a time:** Do **NOT** start the next sub‑task until you ask the user for permission and they say "yes" or "y"
 - **15-minute rule:** Each sub-task must be completable within 15 minutes
 - **Code review:** ALWAYS use the code-reviewer agent to verify any proposed R code changes
-- **Tests:** Add new tests related to the subtasks to a NEW folder script in `tests/testthat` and use the test-runner agent whenever running tests 
+- **Tests:** Add new tests related to the sub-tasks in `tests/testthat` and use the test-runner agent whenever running tests 
 - **Mark completed:** Change `[ ]` to `[x]` immediately upon sub-task completion
-- **Test cleanup:** Ask the user where the subtask related tests should be moved to, then move them ONLY after the user answers
+- **Test cleanup:** Ask the user where the sub-task related tests should be moved to, then move them ONLY after the user answers
 - **Always pause:** Never proceed to the next sub-task without explicit user approval
 
 ### Parent Task Completion Sequence
-When **all** subtasks under a parent task are `[x]`:
+When **all** sub-tasks under a parent task are `[x]`:
 
 1. **Test & Validate:**
-   - Use the r-test-runner agent to run all subtask tests
+   - Use the r-test-runner agent to run all sub-task tests
 
 2. **Stage & Clean:**
    - Stage changes: `git add .`
@@ -55,7 +54,6 @@ When **ALL** tasks are `[x]`:
 3. **Final Code Review:**
    - Submit complete implementation to `code-reviewer` agent (check the actual file contents first using Read tool before sending to code-reviewer)
    - Address high-priority feedback
-   - Update `active/code_improvements.md` with medium/low priority items to ensure future agents can learn from any failures
 
 4. **Final Commit & Tag:**
    ```bash

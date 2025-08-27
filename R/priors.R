@@ -1260,7 +1260,41 @@ get_trend_parameter_prior <- function(prior = NULL, param_name) {
 #'   \item Trend constructors: \code{RW()}, \code{AR()}, \code{CAR()}, 
 #'     \code{ZMVN()}, \code{VAR()}, \code{PW()}
 #'   \item Covariates that affect trend dynamics
-#'   \item Smooth terms using mgcv syntax
+#'   \item Smooth terms using mgcv syntax: \code{s()}, \code{te()}, \code{ti()}, \code{t2()}
+#'   \item Random effects: \code{(1|group)}, \code{(slope|group)}
+#'   \item Gaussian processes: \code{gp()}
+#' }
+#' 
+#' @section Trend Formula Restrictions:
+#' The trend_formula has specific restrictions to maintain compatibility with
+#' State-Space dynamics and prevent conflicts between observation-level and
+#' trend-level modeling:
+#' 
+#' \strong{Forbidden Terms:}
+#' \itemize{
+#'   \item brms addition-terms: \code{weights()}, \code{cens()}, \code{trunc()},
+#'     \code{mi()}, \code{trials()}, \code{rate()}, \code{vreal()}, \code{vint()},
+#'     \code{subset()}, \code{index()}
+#'   \item brms autocorrelation: \code{ar()}, \code{ma()}, \code{arma()},
+#'     \code{cosy()}, \code{unstr()}, \code{autocor()}
+#'   \item Offset terms: \code{offset()}
+#' }
+#' 
+#' \strong{Rationale:}
+#' Addition-terms modify observation model behavior (weights, censoring, exposure,
+#' etc.) and should be specified in the main observation formula. Autocorrelation
+#' terms conflict with mvgam's State-Space dynamics. All forbidden terms remain
+#' fully supported in the main observation formula.
+#' 
+#' \strong{Examples:}
+#' \preformatted{
+#' # Correct usage
+#' mvgam_formula(y ~ x + weights(w), trend_formula = ~ AR(p = 1))
+#' mvgam_formula(count ~ offset(log_exposure), trend_formula = ~ RW())
+#' 
+#' # Incorrect usage (will error)
+#' mvgam_formula(y ~ x, trend_formula = ~ AR() + weights(w))
+#' mvgam_formula(y ~ x, trend_formula = ~ RW() + offset(z))
 #' }
 #' 
 #' @return An object of class \code{c("mvgam_formula", base_class)} where
@@ -1301,15 +1335,8 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
   if (!is.null(trend_formula)) {
     checkmate::assert_formula(trend_formula, .var.name = "trend_formula")
     
-    # Check for incompatible autocorrelation terms
-    trend_terms <- as.character(trend_formula)
-    if (length(trend_terms) > 1 && grepl("autocor\\(", trend_terms[2])) {
-      stop(insight::format_error(
-        "The {.field trend_formula} contains incompatible autocorrelation terms.",
-        "State-Space trends cannot be combined with brms autocorr() terms.",
-        "Consider using mvgam trend constructors instead."
-      ))
-    }
+    # Use comprehensive trend formula validation from validations.R
+    validate_single_trend_formula(trend_formula, context = "trend_formula")
   }
   
   # Determine and store formula type for later use

@@ -40,9 +40,45 @@ observation model. When specified, the trend_formula can include:
 \item Trend constructors: \code{RW()}, \code{AR()}, \code{CAR()},
 \code{ZMVN()}, \code{VAR()}, \code{PW()}
 \item Covariates that affect trend dynamics
-\item Smooth terms using mgcv syntax
+\item Smooth terms using mgcv syntax: \code{s()}, \code{te()}, \code{ti()}, \code{t2()}
+\item Random effects: \code{(1|group)}, \code{(slope|group)}
+\item Gaussian processes: \code{gp()}
 }
 }
+\section{Trend Formula Restrictions}{
+
+The trend_formula has specific restrictions to maintain compatibility with
+State-Space dynamics and prevent conflicts between observation-level and
+trend-level modeling:
+
+\strong{Forbidden Terms:}
+\itemize{
+\item brms addition-terms: \code{weights()}, \code{cens()}, \code{trunc()},
+\code{mi()}, \code{trials()}, \code{rate()}, \code{vreal()}, \code{vint()},
+\code{subset()}, \code{index()}
+\item brms autocorrelation: \code{ar()}, \code{ma()}, \code{arma()},
+\code{cosy()}, \code{unstr()}, \code{autocor()}
+\item Offset terms: \code{offset()}
+}
+
+\strong{Rationale:}
+Addition-terms modify observation model behavior (weights, censoring, exposure,
+etc.) and should be specified in the main observation formula. Autocorrelation
+terms conflict with mvgam's State-Space dynamics. All forbidden terms remain
+fully supported in the main observation formula.
+
+\strong{Examples:}
+\preformatted{
+# Correct usage
+mvgam_formula(y ~ x + weights(w), trend_formula = ~ AR(p = 1))
+mvgam_formula(count ~ offset(log_exposure), trend_formula = ~ RW())
+
+# Incorrect usage (will error)
+mvgam_formula(y ~ x, trend_formula = ~ AR() + weights(w))
+mvgam_formula(y ~ x, trend_formula = ~ RW() + offset(z))
+}
+}
+
 \examples{
 \dontrun{
 # Create formula specifications
