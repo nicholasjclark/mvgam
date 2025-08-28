@@ -294,13 +294,14 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
       message("Validating combined Stan code...")
     }
 
-    validated_code <- validate_stan_code(
+    validate_stan_code(
       combined_stancode,
       backend = backend,
       silent = silent
     )
 
-    combined_stancode <- validated_code
+    # Validation function returns TRUE/FALSE, not modified code
+    # combined_stancode remains unchanged after validation
   }
 
   return(list(
@@ -652,8 +653,7 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
   base_stanvars <- trend_setup$stanvars %||% NULL
 
   # Generate trend-specific stanvars if trend spec is provided
-  # Handle both trend_type and trend_model for compatibility
-  trend_type <- trend_specs$trend_type %||% trend_specs$trend_model
+  trend_type <- trend_specs$trend
   trend_stanvars <- if (!is.null(trend_specs) && !is.null(trend_type)) {
     # Dimensions should be pre-calculated and included in trend_specs
     # This eliminates circular dependency and ensures reliable dimension information
@@ -926,7 +926,7 @@ assemble_mvgam_stan_code <- function(obs_formula, trend_stanvars = NULL, data,
   # If no trend stanvars, return base code
   if (is.null(trend_stanvars) || length(trend_stanvars) == 0) {
     if (validate) {
-      base_stancode <- validate_stan_code(base_stancode, backend = backend)
+      validate_stan_code(base_stancode, backend = backend)
     }
     return(base_stancode)
   }
@@ -939,7 +939,7 @@ assemble_mvgam_stan_code <- function(obs_formula, trend_stanvars = NULL, data,
 
   # Validate final code if requested
   if (validate) {
-    final_stancode <- validate_stan_code(final_stancode, backend = backend)
+    validate_stan_code(final_stancode, backend = backend)
   }
 
   return(final_stancode)
@@ -1250,7 +1250,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     # Hierarchical case: innovations depend on group structure
     final_innovations_code <- paste0("
     // Scaled innovations after applying hierarchical correlations
-    matrix[n, ", effective_dim, "] scaled_innovations_trend;
+    matrix[n_trend, ", effective_dim, "] scaled_innovations_trend;
 
     // Apply group-specific correlations to raw innovations
     for (g in 1:n_groups) {
@@ -1268,7 +1268,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     # Simple correlated case
     final_innovations_code <- paste0("
     // Scaled innovations after applying correlations
-    matrix[n, ", effective_dim, "] scaled_innovations_trend;
+    matrix[n_trend, ", effective_dim, "] scaled_innovations_trend;
 
     // Apply correlation transformation using efficient non-centered parameterization
     {
@@ -1279,7 +1279,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     # Uncorrelated case
     final_innovations_code <- paste0("
     // Scaled innovations (uncorrelated case)
-    matrix[n, ", effective_dim, "] scaled_innovations_trend;
+    matrix[n_trend, ", effective_dim, "] scaled_innovations_trend;
 
     // Apply scaling using vectorized operations
     {
@@ -1575,7 +1575,7 @@ generate_trend_computation_tparameters <- function(n_lv, n_series) {
       // dot_product captures dynamic component, mu_trend captures trend_formula
       for (i in 1:n_trend) {{
         for (s in 1:n_series_trend) {{
-          trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[ytimes[i, s]];
+          trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
         }}
       }}
     "),

@@ -185,18 +185,6 @@ Implementation tasks for stancode generation update feature with comprehensive p
       - Remove parameter class validation from prior functions (they become pure data manipulation)
       - Test that all prior-related functions work with pure brms objects
     - **LAST**: Use r-test-runner to verify all tests pass after complete attribute elimination
-    
-  - [ ] **Sub-task 1Q**: Document the new prior workflow without masking (15 min)
-    - Update roxygen2 documentation for get_prior.mvgam_formula()
-    - Add examples showing `brms::prior()` usage with _trend parameters
-    - Document that users should use brms::prior() directly
-    - Add migration guide from old mvgam::prior() to brms::prior()
-    
-  - [ ] **Sub-task 1R**: Verify S3 dispatch doesn't mask brms functions (15 min)
-    - **FIRST**: Use r-package-analyzer to understand S3 method dispatch rules and potential conflicts
-    - Test that regular formulas still route to brms::get_prior()
-    - Verify that only mvgam_formula objects route to our method
-    - Document the S3 dispatch behavior clearly
 
 ### **Phase 3: Clean Integration and Testing (30 min)**
     
