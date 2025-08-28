@@ -167,14 +167,14 @@ Implementation tasks for stancode generation update feature with comprehensive p
     - ✅ Update test-priors.R to use `brms::prior()` instead of `mvgam::prior()` and remove mvgam attribute expectations
     - ✅ All 346 tests in test-priors.R now pass (100% success rate)
     
-  - [ ] **Sub-task 1P**: Complete elimination of mvgam prior attribute system (45 min)
+  - [X] **Sub-task 1P**: Complete elimination of mvgam prior attribute system (45 min)
     - **CRITICAL**: Replace all attribute-based logic with naming convention detection (`grepl("_trend$", prior$class)`)
     - **Phase 1 - Core Functions (20 min)**:
       - Update `extract_trend_priors()` to filter by `grepl("_trend$", prior$class)` instead of `trend_components` attribute
       - Update `extract_observation_priors()` to filter by `!grepl("_trend$", prior$class)` instead of attributes  
       - Update `combine_obs_trend_priors()` to simple `rbind()`, remove all attribute creation
-      - Update `print.brmsprior()` to detect trend/obs rows by naming, remove attribute checks
-      - Update `c.brmsprior()` to standard brmsprior combination, remove attribute handling
+      - Remove `print.brmsprior()` and `c.brmsprior()`
+      
     - **Phase 2 - Remove set_prior() (15 min)**:
       - Delete `mvgam::set_prior()` function entirely from R/priors.R
       - Update NAMESPACE via `devtools::document()` 

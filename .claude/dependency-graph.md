@@ -1,17 +1,17 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-08-28 12:12:28  
+**Generated:** 2025-08-28 12:25:36  
 **Package:** mvgam v2.0.0  
 **Commit:**   
 
 ## Summary
 
 - **Total Files:** 56
-- **Total Functions:** 421
-- **Exported Functions:** 69
-- **Internal Functions:** 378
+- **Total Functions:** 419
+- **Exported Functions:** 78
+- **Internal Functions:** 376
 - **S3 Methods:** 42
-- **S3 Classes:** 25
+- **S3 Classes:** 24
 
 ## External Dependencies
 - bayesplot
@@ -46,18 +46,17 @@
 ## S3 Object System
 
 ### S3 Classes
-- array.mvgam, brmsformula, brmsprior, construct.mod.smooth.spec, construct.moi.smooth.spec, data.frame.mvgam, default, formula, how_to_cite, jsdgam, matrix.mod.smooth, matrix.moi.smooth, matrix.mvgam, mvgam, mvgam_conditional_effects, mvgam_fevd, mvgam_forecast, mvgam_formula, mvgam_irf, mvgam_lfo, mvgam_prefit, mvgam_residcor, mvgam_trend, to.ts, trend_param
+- array.mvgam, brmsformula, construct.mod.smooth.spec, construct.moi.smooth.spec, data.frame.mvgam, default, formula, how_to_cite, jsdgam, matrix.mod.smooth, matrix.moi.smooth, matrix.mvgam, mvgam, mvgam_conditional_effects, mvgam_fevd, mvgam_forecast, mvgam_formula, mvgam_irf, mvgam_lfo, mvgam_prefit, mvgam_residcor, mvgam_trend, to.ts, trend_param
 
 ### Key S3 Methods
 - **as()**: array.mvgam, data.frame.mvgam, matrix.mvgam
-- **c()**: brmsprior, trend_param
 - **find_predictors()**: mvgam, mvgam_prefit
 - **get_data()**: mvgam, mvgam_prefit
 - **get_prior()**: brmsformula, default, formula, mvgam_formula
 - **is()**: mvgam_trend, trend_param
 - **plot()**: mvgam, mvgam_conditional_effects, mvgam_fevd, mvgam_forecast, mvgam_irf, mvgam_lfo, mvgam_residcor
 - **Predict()**: matrix.mod.smooth, matrix.moi.smooth
-- **print()**: brmsprior, how_to_cite, mvgam, mvgam_conditional_effects, mvgam_formula, mvgam_prefit, mvgam_trend, trend_param
+- **print()**: how_to_cite, mvgam, mvgam_conditional_effects, mvgam_formula, mvgam_prefit, mvgam_trend, trend_param
 - **residual_cor()**: jsdgam, mvgam
 - **residuals()**: mvgam
 - **smooth()**: construct.mod.smooth.spec, construct.moi.smooth.spec
