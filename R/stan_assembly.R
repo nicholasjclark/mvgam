@@ -678,11 +678,23 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
       n_groups = trend_specs$n_groups,
       n_subgroups = trend_specs$n_subgroups,
       time_var = dimensions$time_var,
-      series_var = dimensions$series_var
+      series_var = dimensions$series_var,
+      unique_times = dimensions$unique_times,
+      unique_series = dimensions$unique_series
     )
 
-    # Use the existing trend injection system with response suffix
-    generate_trend_injection_stanvars(trend_specs, data_info, response_suffix)
+    # Extract brms parameters (handles mu_trend creation/extraction) + generate trend stanvars
+    brms_stanvars <- extract_and_rename_trend_parameters(
+      trend_setup = trend_setup,
+      dimensions = dimensions,
+      suffix = if (response_suffix == "") "_trend" else paste0("_trend", response_suffix)
+    )
+    
+    # Generate trend-specific stanvars (without common components)
+    trend_stanvars <- generate_trend_specific_stanvars(trend_specs, data_info, response_suffix)
+    
+    # Combine brms parameters with trend-specific stanvars
+    combine_stanvars(brms_stanvars, trend_stanvars)
   } else {
     NULL
   }
@@ -1681,7 +1693,7 @@ generate_hierarchical_correlation_model <- function(n_groups) {
 #' @param data_info Data information list
 #' @return List of stanvars for trend injection
 #' @noRd
-generate_trend_injection_stanvars <- function(trend_specs, data_info, response_suffix = "", prior = NULL) {
+generate_trend_specific_stanvars <- function(trend_specs, data_info, response_suffix = "", prior = NULL) {
   # Validate inputs
   checkmate::assert_list(trend_specs)
   checkmate::assert_list(data_info)
@@ -1779,9 +1791,8 @@ generate_trend_injection_stanvars <- function(trend_specs, data_info, response_s
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_int(n_lv, lower = 1)
   
-  dimensions <- generate_common_trend_data(n_obs, n_series, n_lv, is_factor_model)
-  
   # Generate trend-specific stanvars using consistent naming convention
+  # Note: Common components (dimensions, times_trend, mu_trend) handled by extract_and_rename_trend_parameters
   trend_stanvars <- generator_function(trend_specs, data_info, prior = prior)
 
   # Apply response suffix post-processing for multivariate models
@@ -1789,17 +1800,14 @@ generate_trend_injection_stanvars <- function(trend_specs, data_info, response_s
     trend_stanvars <- apply_response_suffix_to_stanvars(trend_stanvars, response_suffix)
   }
 
-  # Combine dimensions + shared + trend-specific stanvars
+  # Combine shared and trend-specific stanvars
   if (!is.null(shared_stanvars)) {
-    # Combine all components: dimensions + shared innovations + trend specifics
-    combined_stanvars <- combine_stanvars(dimensions, shared_stanvars, trend_stanvars)
-    return(combined_stanvars)
+    return(combine_stanvars(shared_stanvars, trend_stanvars))
   } else {
-    # No shared innovations: combine dimensions + trend specifics
-    combined_stanvars <- combine_stanvars(dimensions, trend_stanvars)
-    return(combined_stanvars)
+    return(trend_stanvars)
   }
 }
+
 
 #' Random Walk Trend Generator
 #'
@@ -3945,9 +3953,9 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
   # Skip extracting data block declarations from Stan code
   # Data is handled via extract_and_rename_standata_objects with actual values
   
-  # 1. Extract parameters block and rename parameters
-  params_block <- extract_stan_block(stancode, "parameters")
-  if (!is.null(params_block) && params_block != "Block not found") {
+  # 1. Extract parameters block content (without headers) and rename parameters
+  params_block <- extract_stan_block_content(stancode, "parameters")
+  if (!is.null(params_block) && nchar(params_block) > 0) {
     params_result <- rename_parameters_in_block(
       params_block, suffix, mapping, "parameters", is_multivariate, response_names
     )
@@ -3959,9 +3967,9 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
     )
   }
   
-  # 2. Extract transformed parameters block and rename references
-  tparams_block <- extract_stan_block(stancode, "transformed parameters")
-  if (!is.null(tparams_block) && tparams_block != "Block not found") {
+  # 2. Extract transformed parameters block content (without headers) and rename references
+  tparams_block <- extract_stan_block_content(stancode, "transformed parameters")
+  if (!is.null(tparams_block) && nchar(tparams_block) > 0) {
     tparams_result <- rename_parameters_in_block(
       tparams_block, suffix, mapping, "tparameters", is_multivariate, response_names
     )
@@ -3973,15 +3981,15 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
     )
   }
   
-  # 3. Extract model block but exclude likelihood statements
-  model_block <- extract_stan_block(stancode, "model")
+  # 3. Extract model block content (without headers) but exclude likelihood statements
+  model_block <- extract_stan_block_content(stancode, "model")
   model_stanvar_created <- FALSE
   
-  if (!is.null(model_block) && model_block != "Block not found") {
+  if (!is.null(model_block) && nchar(model_block) > 0) {
     # Extract non-likelihood parts (priors, transformations)
     non_likelihood_model <- extract_non_likelihood_from_model_block(model_block)
     
-    if (!is.null(non_likelihood_model) && nchar(stringr::str_trim(non_likelihood_model)) > 0) {
+    if (!is.null(non_likelihood_model) && nchar(trimws(non_likelihood_model)) > 0) {
       model_result <- rename_parameters_in_block(
         non_likelihood_model, suffix, mapping, "model", is_multivariate, response_names
       )
@@ -4016,7 +4024,7 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
       
       stanvar_list[["trend_model_mu_creation"]] <- brms::stanvar(
         scode = mu_trend_code,
-        block = "model"
+        block = "tparameters"
       )
       model_stanvar_created <- TRUE
     }
@@ -4135,6 +4143,54 @@ extract_stan_block <- function(stancode, block_name) {
   }
   
   return(substr(stancode, start_pos, end_pos))
+}
+
+#' Extract Stan Block Inner Content
+#'
+#' @description
+#' Extracts only the inner content of a Stan block (without block headers).
+#' This is specifically designed for creating brms stanvars where the scode
+#' should contain only raw declarations, not block headers.
+#'
+#' @param stancode Character string containing full Stan code
+#' @param block_name Name of block to extract ("parameters", "data", etc.)
+#' @return Character string with inner block content (trimmed)
+#' @noRd
+extract_stan_block_content <- function(stancode, block_name) {
+  checkmate::assert_string(stancode, min.chars = 1)
+  checkmate::assert_string(block_name, min.chars = 1)
+  
+  # Use existing extract_stan_block for the heavy lifting
+  full_block <- extract_stan_block(stancode, block_name)
+  
+  # Handle the case where block wasn't found
+  if (identical(full_block, "Block not found")) {
+    stop(insight::format_error(
+      "Stan block {.field {block_name}} not found in code"
+    ), call. = FALSE)
+  }
+  
+  # Extract inner content safely
+  opening_brace <- regexpr("\\{", full_block)
+  closing_braces <- gregexpr("\\}", full_block)[[1]]
+  
+  if (opening_brace[1] == -1 || length(closing_braces) == 0) {
+    stop(insight::format_error(
+      "Malformed Stan block {.field {block_name}}"
+    ), call. = FALSE)
+  }
+  
+  inner_start <- opening_brace[1] + 1
+  inner_end <- max(closing_braces) - 1
+  
+  # Handle empty blocks
+  if (inner_end < inner_start) {
+    return("")
+  }
+  
+  inner_content <- substr(full_block, inner_start, inner_end)
+  # Use base R trimws instead of stringr::str_trim
+  trimws(inner_content)
 }
 
 #' Rename Parameters in Stan Code Block

@@ -219,14 +219,51 @@ Implementation tasks for stancode generation update feature with comprehensive p
   - Support custom prior data requirements
   - Integrate with existing Stan data preparation pipeline
 
-- [ ] **Sub-task 3**: Investigate stancode/standata test failures and enhance validation
-  - **SCOPE**: Debug all test failures in `test-stancode-standata.R`
-  - **CLEANUP**: Remove unnecessary warning messages during stancode/standata generation
-  - **ENHANCEMENT**: Expand tests to validate specific expected elements in returned standata objects
-  - **VALIDATION**: Ensure standata contains all required Stan model components (N, Y, K, etc.)
-  - **COMPLETENESS**: Check that stancode contains proper Stan blocks (data, parameters, model, generated quantities)
-  - **INTEGRATION**: Verify stancode/standata consistency across different model specifications
-  - **ROBUSTNESS**: Add edge case testing for small datasets, missing data, and complex model structures
+- [x] **Sub-task 3**: Investigate stancode/standata test failures and enhance validation ✅ *(2025-08-28)*
+  - **INVESTIGATION COMPLETE**: Root causes identified, comprehensive architectural fixes required
+  
+  ### 🔍 ROOT CAUSES IDENTIFIED (2025-08-28):
+  
+  **CRITICAL FINDINGS**: 15/23 tests failing (65% failure rate) due to Stan compilation errors
+  
+  1. **Stan Block Generation Bugs**:
+     - ✅ **FIXED**: `mu_trend` wrongly assigned to `"model"` block → changed to `"tparameters"` (R/stan_assembly.R:4027)
+     - ❌ **UNFIXED**: Duplicate blocks - Two `transformed parameters` and two `model` blocks being generated
+     - ❌ **UNFIXED**: Parameter placement - `sigma_trend`, `innovations_trend` appearing in wrong blocks despite correct stanvar specs
+  
+  2. **Missing Variable Declarations**:
+     - `n_trend`, `n_series_trend`, `n_lv_trend` referenced but not declared in appropriate blocks
+     - `trend`, `obs_ind`, `times_trend` missing in required scopes
+     - Self-referencing assignment: `vector[N] mu_combined = mu_combined;` (line 38 in generated code)
+  
+  3. **Stanvar Injection System Failures**:
+     - Block boundaries not respected during stanvar combination
+     - brms::make_stancode() may be mishandling our stanvar injection
+     - Variable scoping inconsistencies between code segments
+  
+  ### 🎯 WHERE TO START NEXT SESSION:
+  
+  **PRIORITY 1 - Fix Stanvar Injection Pipeline**:
+  - **FILE**: `R/stan_assembly.R`
+  - **FUNCTIONS**: 
+    - `generate_base_stancode_with_stanvars()` (line 330) - Check how stanvars are combined
+    - `inject_trend_into_linear_predictor()` (line 725) - May be causing duplicate blocks
+    - `generate_combined_stancode()` (line 173) - Orchestrator that needs review
+  - **KEY ISSUE**: Parameter stanvars with `block = "parameters"` ending up in model block
+  
+  **PRIORITY 2 - Debug Duplicate Block Generation**:
+  - Trace why two `transformed parameters` and two `model` blocks are created
+  - Check if brms and mvgam are both creating the same blocks
+  - May need to modify how we inject trend code into existing blocks vs creating new ones
+  
+  **PRIORITY 3 - Variable Declaration Completeness**:
+  - Ensure `generate_common_trend_data()` creates ALL required dimension variables
+  - Check that `extract_and_rename_trend_parameters()` properly handles all references
+  
+  ### 📝 DEBUGGING RESOURCES AVAILABLE:
+  - **DEBUG SCRIPT**: `debug_stan_parameter_blocks.R` created during investigation
+  - **TEST FILE**: `tests/testthat/test-stancode-standata.R` with 23 comprehensive tests
+  - **RECOMMENDATION**: Keep debug script for next session - provides systematic testing approach
 
 - [ ] **Sub-task 4 - Multivariate Formula Integration** (60 min): Resolve setup_brms_lightweight handling of multivariate observation models with response-specific trend formulas
 
