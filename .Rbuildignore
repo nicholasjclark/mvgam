@@ -39,5 +39,5 @@
 ^tasks$
 ^completed-tasks$
 ^future-tasks$
-^active$
+^architecture$
 ^claude\.exe$

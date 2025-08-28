@@ -73,6 +73,7 @@ If no functions are specified, respond with: "Please specify which functions you
 ## Analysis Methodology
 
 ### 1. Function Location and Extraction
+- Use `active/dependency-graph.md` as a starting point
 - Parse specified R files to locate target functions using regex patterns
 - Extract complete function definitions including roxygen documentation
 - Identify function boundaries and capture surrounding context

@@ -40,24 +40,19 @@
 - `tests/testthat/test-stancode-standata.R`: Target test file with 15/23 failing tests
 - `debug_stan_parameter_blocks.R`: Debug script for systematic testing
 ### **Phase 1: Investigation and Design** (90 min)
-
-- [ ] **Sub-task A1**: Investigate data flow and access points (30 min)
-  - Trace where observation-level data is available during stanvar generation/injection pipeline
-  - Determine how to access time/series information for each observation that brms includes  
-  - Map out the timing: when do we have both brms final observation data AND trend specifications?
-  - Document the data structures available at each pipeline stage
   
-- [ ] **Sub-task A2**: Analyze brms data processing behavior (30 min)
-  - Understand exactly how brms decides which observations to include/exclude
-  - Test with datasets containing missing values to see brms ordering behavior
-  - Determine if brms provides metadata about excluded observations
-  - Verify that `prepare_stan_data()` ordering is preserved by brms processing
+- [x] **Sub-task A1**: Analyze brms data processing behavior (30 min) ✅ COMPLETED
+  - **FINDINGS**: brms automatically excludes NA responses, preserves input ordering for non-missing obs
+  - **KEY INSIGHT**: brms does NOT create `obs_ind` array - we must create our own mapping
+  - **IMPLICATION**: Need to track `which(!is.na(y))` and map each obs to trend[time, series] position
+  - **TEST CONFIRMED**: Created test scripts verifying brms behavior with missing data patterns
   
-- [ ] **Sub-task A3**: Design the mapping strategy (30 min)
+- [ ] **Sub-task A2**: Design the mapping strategy (30 min)
   - Choose data structure: `array[N] int obs_trend_linear_idx` vs `array[N] int obs_time_idx; array[N] int obs_series_idx`
   - Decide creation point: during trend stanvar generation vs during injection function
   - Plan missing data handling: systematic missing vs random missing vs no missing
   - Design validation approach to detect misaligned mappings
+  - Update `architecture/stan-data-flow-pipeline.md` accordingly
 
 ### **Phase 2: Implementation** (120 min)
 
@@ -66,18 +61,21 @@
   - Generate mapping array: for each observation n → corresponding trend[time_idx, series_idx] position
   - Handle edge cases: single series, single time point, irregular time series
   - Add comprehensive input validation and error handling
+  - Update `architecture/stan-data-flow-pipeline.md` accordingly
   
 - [ ] **Sub-task B2**: Integrate mapping into stanvar generation pipeline (45 min)
   - Add mapping creation to `extract_trend_stanvars_from_setup()` or equivalent function
   - Ensure mapping gets included as "data" block stanvar in trend_stanvars collection
   - Pass observation data through pipeline to mapping creation point
   - Add mapping metadata to trend specifications for downstream usage
+  - Update `architecture/stan-data-flow-pipeline.md` accordingly
   
 - [ ] **Sub-task B3**: Update injection logic to use mapping (30 min)
   - Replace `obs_ind` references with `obs_trend_mapping` in `inject_trend_into_linear_predictor()`
   - Support both 2D matrix access `trend[time_idx, series_idx]` and linear indexing strategies
   - Add validation that mapping array exists and has correct dimensions
   - Preserve existing injection logic structure while eliminating undefined variable dependency
+  - Update `architecture/stan-data-flow-pipeline.md` accordingly
 
 ### **Phase 3: Testing and Validation** (90 min)
 
@@ -107,7 +105,7 @@
   - Create helper functions to inspect obs_trend_mapping correctness
   
 - [ ] **Sub-task D2**: Document architecture decision and usage (15 min)
-  - Update `active/architecture-decisions.md` with missing data handling approach
+  - Update `architecture/architecture-decisions.md` with missing data handling approach
   - Document when/why obs_trend_mapping is created vs obs_ind approach
   - Add examples of mapping structure for different missing data patterns
 

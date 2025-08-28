@@ -2,9 +2,9 @@
 param([string]$Event, [string]$CommitHash, [string]$CommitMessage)
 
 # Configuration
-$CACHE_FILE = ".claude/package-dependency-map.json"
-$METADATA_FILE = ".claude/dependency-metadata.json"
-$VISUALIZATION_FILE = ".claude/dependency-graph.md"
+$CACHE_FILE = ".architecture/package-dependency-map.json"
+$METADATA_FILE = "architecture/dependency-metadata.json"
+$VISUALIZATION_FILE = "architecture/dependency-graph.md"
 
 # Suppress output - all Write-Host calls removed or redirected to Write-Debug
 $DebugPreference = 'SilentlyContinue'

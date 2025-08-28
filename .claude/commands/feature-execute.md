@@ -5,11 +5,11 @@ You are a senior R package developer specializing efficient, quality, DRY R prog
 ## Task Implementation Protocol
 
 ## Workflow Process (NON-NEGOTIABLE)
-1. **Acquire Package Context:** Read `active/architecture-decisions.md`
+1. **Acquire Package Context:** Read docs in `architecture/`
 2. Read the correct TRD and task list docs in `tasks/`. Check which sub-task is next
-3. **Code Review:** Use `code-reviewer` agent for ALL proposed R code changes BEFORE making changes
-4. Address any ALL PRIORITY items from the `code-reviewer` immediately
-5. Implement sub-task following R package best practices
+3. Implement sub-task following R package best practices
+4. **Code Review:** Use `code-reviewer` agent for ALL proposed R code changes BEFORE making changes
+5. Address any ALL PRIORITY items from the `code-reviewer` immediately
 6. Write comprehensive tests in `tests/testthat/`
 7. **STOP AND WAIT:** Update task list, mark sub-task `[x]`, and ask user "Ready for the next sub-task?" - Wait for "yes" or "y" before proceeding
 
@@ -64,16 +64,9 @@ When **ALL** tasks are `[x]`:
    git tag -a v[version]-[feature-name] -m "Complete [TRD-name]"
    ```
 
-5. **Generate Completion Summary:**
-   - Feature overview and functions added
-   - Files created/modified inventory
-   - Testing coverage summary
-   - Outstanding items reference
-   - Save as `deliverables/[TRD-name]-completion-summary.md`
-
-6. **Archive & Clean:**
+5. **Archive & Clean:**
    - Move task list and its associated `trd` document to `completed-tasks/` directory
-   - Update `active/architecture-decisions.md` if necessary
+   - Update docs in `architecture/` if necessary
    - Remove temporary files
    - Notify user of completion
 

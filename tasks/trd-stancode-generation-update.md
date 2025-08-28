@@ -23,7 +23,7 @@ Users cannot inspect generated Stan code, modify priors, or validate model speci
 1. **Model Specification:** User specifies formula, trend_formula, data, and family
 2. **Prior Inspection:** User calls `get_prior()` to see all available priors with defaults
 3. **Prior Modification:** User modifies priors using `set_prior()`, `prior()`, or direct data frame manipulation
-4. **Code/Data Inspection:** User optionally calls `make_stancode()` and `make_standata()` to preview generated code
+4. **Code/Data Inspection:** User optionally calls `stancode()` and `standata()` to preview generated code
 5. **Model Fitting:** User calls `mvgam()` with custom priors, system uses improved Stan generation internally
 6. **Post-Fit Inspection:** User calls `prior_summary()` to verify priors used in fitted model
 
@@ -35,23 +35,7 @@ Users cannot inspect generated Stan code, modify priors, or validate model speci
 
 ## 3. Function Specifications
 
-### 3.1 `get_prior()`
-**Purpose:** Inspect all available priors for a specified model before fitting
-**Parameters:**
-- `formula` (required): Main observation model formula
-- `trend_formula` (optional): Trend model specification, default NULL
-- `data` (required): Data frame containing model variables
-- `family` (optional): Response distribution family, default gaussian()
-- `...` (optional): Additional arguments passed to brms setup
-
-**Return Value:** 
-- `mvgamprior` data frame with columns: `prior`, `class`, `coef`, `group`, `resp`, `dpar`, `nlpar`, `lb`, `ub`, `source`, `trend_component`
-- `trend_component` column distinguishes observation vs trend parameters
-- Compatible with brms `brmsprior` structure for cross-package consistency
-
-**Side Effects:** None (read-only inspection)
-
-### 3.2 `make_stancode()`
+### 3.1 `stancode()`
 **Purpose:** Generate complete Stan model code before fitting
 **Parameters:**
 - `formula` (required): Main observation model formula
@@ -66,9 +50,7 @@ Users cannot inspect generated Stan code, modify priors, or validate model speci
 - Includes both observation and trend components when trend_formula specified
 - Code follows brms style conventions and Stan best practices
 
-**Side Effects:** None (read-only generation)
-
-### 3.3 `make_standata()`
+### 3.2 `standata()`
 **Purpose:** Generate complete Stan data list before fitting
 **Parameters:** Same as `make_stancode()`
 
@@ -77,17 +59,7 @@ Users cannot inspect generated Stan code, modify priors, or validate model speci
 - Includes both observation and trend data components
 - Structure matches what would be passed to Stan during fitting
 
-**Side Effects:** None (read-only generation)
-
-### 3.4 `set_prior()` and `prior()`
-**Purpose:** Specify custom priors using brms interface patterns
-**Parameters:** Follow brms `set_prior()` specification exactly, with extensions for trend-specific parameters
-
-**Return Value:** Prior specification objects compatible with mvgam functions
-
-**Side Effects:** None (specification only)
-
-### 3.5 `prior_summary()`
+### 3.3 `prior_summary()`
 **Purpose:** Inspect priors used in fitted or specified models
 **Parameters:**
 - `object` (required): Fitted mvgam object or model specification
@@ -95,8 +67,6 @@ Users cannot inspect generated Stan code, modify priors, or validate model speci
 - `...` (optional): Additional arguments
 
 **Return Value:** Data frame showing priors actually used or planned to be used
-
-**Side Effects:** None (read-only inspection)
 
 ### 3.6 `get_inits()`
 **Purpose:** Generate or inspect initialization values for Stan parameters
@@ -159,14 +129,13 @@ User Input → get_prior()/make_stan*() → setup_brms_lightweight()
 ### Function Signatures
 All inspection functions must accept the same core arguments as `mvgam()` for consistency:
 ```r
-get_prior(formula, trend_formula = NULL, data, family = gaussian(), ...)
-make_stancode(formula, trend_formula = NULL, data, family = gaussian(), prior = NULL, ...)
-make_standata(formula, trend_formula = NULL, data, family = gaussian(), prior = NULL, ...)
+get_prior(mvgam_formula, data, family = gaussian(), ...)
+stancode(mvgam_formula, data, family = gaussian(), prior = NULL, ...)
+standata(mvgam_formula, data, family = gaussian(), prior = NULL, ...)
 ```
 
 ### Parameter Naming Conventions
 - Use brms-compatible argument names where possible
-- `trend_formula` distinguishes from brms `formula` argument
 - `prior` argument accepts output from `get_prior()` or `set_prior()`
 
 ### Default Behaviors
@@ -209,7 +178,7 @@ Follow CLAUDE.md formatting with `insight::format_error()`:
 ```r
 # Should generate identical Stan code to brms
 get_prior(y ~ x + (1|group), data = dat, family = poisson())
-stancode <- make_stancode(y ~ x + (1|group), data = dat, family = poisson())
+stancode <- stancode(y ~ x + (1|group), data = dat, family = poisson())
 # stancode should match: brm(y ~ x + (1|group), data = dat, family = poisson(), 
 #                           backend = "mock")$stancode
 ```
@@ -227,22 +196,22 @@ priors$prior[priors$class == "ar1_trend"] <- "normal(0, 0.5)"
 priors$prior[priors$class == "sigma_trend"] <- "exponential(2)"
 
 # 3. Inspect generated code
-stancode <- make_stancode(count ~ treatment + s(time), 
-                         trend_formula = ~ AR(p = 1, cor = TRUE),
+stancode <- stancode(mvgam_formula(count ~ treatment + s(time), 
+                         trend_formula = ~ AR(p = 1, cor = TRUE)),
                          data = ecology_data, 
                          family = poisson(),
                          prior = priors)
 
 # 4. Check data structure
-standata <- make_standata(count ~ treatment + s(time), 
-                         trend_formula = ~ AR(p = 1, cor = TRUE),
+standata <- standata(mvgam_formula(count ~ treatment + s(time), 
+                         trend_formula = ~ AR(p = 1, cor = TRUE)),
                          data = ecology_data, 
                          family = poisson(),
                          prior = priors)
 
 # 5. Fit model with custom priors
-model <- mvgam(count ~ treatment + s(time), 
-               trend_formula = ~ AR(p = 1, cor = TRUE),
+model <- mvgam(mvgam_formula(count ~ treatment + s(time), 
+               trend_formula = ~ AR(p = 1, cor = TRUE)),
                data = ecology_data, 
                family = poisson(),
                prior = priors)
@@ -254,41 +223,29 @@ prior_summary(model)
 ### Edge Cases
 ```r
 # Multivariate model with different trends per response
-priors <- get_prior(mvbind(count, biomass) ~ treatment, 
+priors <- get_prior(mvgam_formula(mvbind(count, biomass) ~ treatment, 
                    trend_formula = list(count = ~ AR(p = 1),
-                                       biomass = ~ RW()),
+                                       biomass = ~ RW())),
                    data = ecology_data, 
                    family = c(poisson(), gaussian()))
 
 # Factor model with hierarchical correlations
-get_prior(count ~ treatment, 
-          trend_formula = ~ AR(p = 1, cor = TRUE, gr = site, n_lv = 2),
+get_prior(mvgam_formula(count ~ treatment, 
+          trend_formula = ~ AR(p = 1, cor = TRUE, gr = site, n_lv = 2)),
           data = ecology_data, 
           family = poisson())
-```
-
-### Integration Examples
-```r
-# Using brms set_prior() interface
-custom_priors <- set_prior("normal(0, 0.1)", class = "ar1_trend") +
-                set_prior("exponential(1)", class = "sigma_trend")
-
-model <- mvgam(count ~ treatment, 
-               trend_formula = ~ AR(p = 1),
-               data = ecology_data,
-               prior = custom_priors)
 ```
 
 ## 9. Testing Requirements
 
 ### Unit Tests (Per Function)
 - `get_prior()`: Test with various formula combinations, multivariate models, edge cases
-- `make_stancode()`: Verify generated code compiles, matches brms when appropriate
-- `make_standata()`: Check data structure correctness, validate required elements
+- `stancode()`: Verify generated code compiles, matches brms when appropriate
+- `standata()`: Check data structure correctness, validate required elements
 - Prior specification functions: Test brms compatibility and custom trend parameters
 
 ### Integration Tests (Workflow Tests)
-- Complete workflow from `get_prior()` → modify → `make_stan*()` → `mvgam()` → `prior_summary()`
+- Complete workflow from `get_prior()` → modify → `stan*()` → `mvgam()` → `prior_summary()`
 - Cross-validation: results from inspection functions match fitted model behavior
 - Multivariate model workflows with different trends per response
 
@@ -318,45 +275,6 @@ Each function requires:
 - `@seealso` cross-references to related functions
 - `@export` tags for user-facing functions
 
-### Function-Specific Documentation
-```r
-#' Inspect Available Priors for mvgam Models
-#'
-#' Returns a data frame of all prior specifications that can be applied 
-#' to parameters in an mvgam model. Similar to \code{\link[brms]{get_prior}}
-#' but extended for State-Space trend components.
-#'
-#' @param formula An object of class \code{formula} describing the observation model
-#' @param trend_formula An optional formula describing trend dynamics. Default NULL
-#'   results in pure brms equivalent model. See \code{\link{trend_formulae}} for syntax.
-#' @param data A data frame containing the variables in the model
-#' @param family A description of the response distribution and link function
-#' @param ... Additional arguments passed to model setup
-#'
-#' @return A \code{mvgamprior} data frame with columns:
-#'   \itemize{
-#'     \item \code{prior}: Prior specification (empty for defaults)
-#'     \item \code{class}: Parameter class (e.g., "b", "ar1_trend", "sigma_trend")
-#'     \item \code{coef}: Specific coefficient name (if applicable)
-#'     \item \code{resp}: Response variable name (for multivariate models)
-#'     \item \code{source}: Source of prior ("default" or "user")
-#'     \item \code{trend_component}: "observation" or "trend" to distinguish components
-#'   }
-#'
-#' @examples
-#' # Basic usage - no trends (equivalent to brms)
-#' get_prior(y ~ x, data = dat, family = gaussian())
-#'
-#' # With trend specification
-#' get_prior(count ~ treatment, 
-#'           trend_formula = ~ AR(p = 1), 
-#'           data = ecology_data, 
-#'           family = poisson())
-#'
-#' @seealso \code{\link{make_stancode}}, \code{\link{set_prior}}, \code{\link{mvgam}}
-#' @export
-```
-
 ### README Examples
 Update package README with workflow examples showing new inspection capabilities
 
@@ -371,19 +289,8 @@ Update package README with workflow examples showing new inspection capabilities
 
 ## 11. Implementation Notes for Developers
 
-### Code Organization
-```
-R/
-├── priors.R              # get_prior(), prior_summary(), set_prior() extensions
-├── stancode.R            # make_stancode() implementation  
-├── standata.R            # make_standata() implementation
-├── stan_assembly.R       # Enhanced stanvar combination and injection logic
-├── validations.R         # Enhanced validation with Stan-specific checks
-└── trend_system.R        # Enhanced registry and dispatch system
-```
 
 ### R Idioms to Use
-- S3 method dispatch for `print.mvgamprior`, `summary.mvgamprior` methods
 - Consistent use of `checkmate::assert_*()` for input validation
 - `insight::format_error()` for user-friendly error messages
 - Standard R formula processing with `terms()`, `all.vars()`, etc.
@@ -462,18 +369,6 @@ R/
 4. **Parameter Monitoring:** Automatic parameter discovery includes all trend parameters
 
 ## 14. Open Questions
-
-### Technical Decisions Still Needed
-1. **Prior Data Frame Extension:** Should `mvgamprior` inherit from `brmsprior` or be independent class?
-2. **Multivariate Prior Specification:** How should users specify different priors for different responses?
-3. **Stan Block Organization:** Should trend components go in specific Stan blocks or be flexible?
-4. **Parameter Transformation:** How should bounded parameters be handled in prior specification?
-
-### User Experience Questions
-1. **Function Naming:** Should we use `mvgam_get_prior()` or `get_prior()` for disambiguation?
-2. **Error Detail Level:** How much Stan-specific detail should appear in error messages?
-3. **Default Prior Strategy:** Should defaults be conservative (wide) or informative (narrow)?
-4. **Inspection Output Format:** Should `make_stancode()` return formatted Stan code or raw strings?
 
 ### Implementation Uncertainties
 1. **brms Integration Depth:** How tightly should we integrate with brms internal functions?

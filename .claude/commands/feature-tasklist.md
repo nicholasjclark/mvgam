@@ -11,17 +11,22 @@ You are an expert R package architect focused on implementing new features in a 
 ## Process
 
 1. **Receive TRD Reference:** The user points the AI to a specific TRD file
-2. **Acquire Package Context:** Read package structure and dependency files in .claude/dependency-graph.md
+
+2. **Acquire Package Context:** Read package structure and dependency files in `architecture/`
+
 3. **Analyze TRD:** Read and analyze the functional requirements, user journey, function specifications, and other sections of the specified TRD
+
 4. **Assess Current State:** Review the existing R package structure to understand:
    - Existing functions and their patterns
    - Package architecture and conventions (S3/S4 classes, naming patterns)
    - Current dependencies and imports
    - Documentation standards (roxygen2 style)
    - Testing patterns in `tests/testthat/`
-   - Files in the `/active` directory for relevant context
+   
 5. **Phase 1: Generate Parent Tasks:** Based on TRD analysis and current state assessment, ultrathink to create high-level tasks (typically 4-6) required to implement the feature incrementally. Each task MUST build on the previous and have clear deliverables. Present these to the user without sub-tasks. Inform the user: "I have generated the high-level tasks based on the TRD. Ready to generate the sub-tasks? Respond with 'Go' to proceed."
+
 6. **Wait for Confirmation:** Pause and wait for the user to respond with "Go"
+
 7. **Phase 2: Generate Sub-Tasks:** Break down each parent task into 15-minute sub-tasks that:
    - Follow logical implementation order
    - Are specific and actionable for junior developers
@@ -29,7 +34,9 @@ You are an expert R package architect focused on implementing new features in a 
    - Reference specific R package conventions
    - Consider roxygen2 documentation requirements
 8. **Identify Relevant Files:** List R files to be created/modified and their corresponding test files in `tests/testthat/`
+
 9. **Generate Final Output:** Combine into the final Markdown structure
+
 10. **Save Task List:** Save as `dev-tasks-[trd-file-name].md` in `/tasks/` directory
 
 ## 15-Minute Sub-Task Guidelines
@@ -86,12 +93,15 @@ Each sub-task must be completable in ≤15 minutes and should:
 - [ ] 1.0 Parent Task Title
   - [ ] 1.1 [Specific sub-task ≤15 min - include file name and exact objective]
   - [ ] 1.2 [Specific sub-task ≤15 min - include validation criteria]
+  
 - [ ] 2.0 Parent Task Title  
   - [ ] 2.1 [Specific sub-task ≤15 min - reference any /active files needed]
   - [ ] 2.2 [Specific sub-task ≤15 min - include roxygen2 documentation]
+  
 - [ ] 3.0 Testing & Validation
   - [ ] 3.1 [Specific test creation task ≤15 min]
   - [ ] 3.2 [Specific test validation task ≤15 min]
+  
 - [ ] 4.0 Documentation & Integration
   - [ ] 4.1 [Documentation task ≤15 min]
   - [ ] 4.2 [Package integration task ≤15 min]
