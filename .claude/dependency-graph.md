@@ -1,16 +1,16 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-08-28 12:59:42  
+**Generated:** 2025-08-28 13:56:01  
 **Package:** mvgam v2.0.0  
 **Commit:**   
 
 ## Summary
 
-- **Total Files:** 56
-- **Total Functions:** 418
-- **Exported Functions:** 68
-- **Internal Functions:** 376
-- **S3 Methods:** 42
+- **Total Files:** 57
+- **Total Functions:** 421
+- **Exported Functions:** 70
+- **Internal Functions:** 377
+- **S3 Methods:** 44
 - **S3 Classes:** 24
 
 ## External Dependencies
@@ -93,5 +93,5 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **R/sim_mvgam.R**
 - **Validation**: R/validations.R
 - **Plotting**: R/plot_mvgam_factors.R, R/plot.mvgam.R, R/plot_mvgam_uncertainty.R, ...
-- **Stan/brms**: R/stan_assembly.R, R/brms_integration.R
+- **Stan/brms**: R/stan_assembly.R, R/brms_integration.R, R/make_stan.R
 
