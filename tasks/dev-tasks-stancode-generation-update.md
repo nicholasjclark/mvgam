@@ -158,58 +158,78 @@ Implementation tasks for stancode generation update feature with comprehensive p
       - ✅ Mixed parameter handling with helpful user warnings
       - ✅ Complete compatibility with all brms::set_prior() usage patterns
     
-  - [X] **Sub-task 1O**: Create mvgam::prior() wrapper function with + operator support (15 min)
-    - Use r-package-analyzer to understand how brms::prior() works internally
-    - Full brms syntax compatibility: `mvgam::prior(normal(0, 1), class = ar1_trend)`
-    - Support `+` operator for combining observation and trend priors
-    - Handle both brms-style and mvgam trend parameter specifications
-    - Automatic detection and routing based on parameter class names
+  - [x] **Sub-task 1O**: Remove mvgam::prior() function to avoid masking ✅ *(2025-08-28)*
+    - ✅ Use r-package-analyzer to verify how brms::prior() handles custom class names and whether it already supports arbitrary suffixes
+    - ✅ Delete the `prior()` function from R/priors.R completely
+    - ✅ Update documentation to show users should use `brms::prior()` directly
+    - ✅ Verify that `brms::prior()` already works with `_trend` suffix parameters
+    - ✅ Update any internal code that was using `mvgam::prior()` to use `brms::prior()`
+    - ✅ Update test-priors.R to use `brms::prior()` instead of `mvgam::prior()` and remove mvgam attribute expectations
+    - ✅ All 346 tests in test-priors.R now pass (100% success rate)
     
-  - [ ] **Sub-task 1P**: Add prior validation and parameter detection system (15 min)
-    - Validate trend parameter class names against registered trend types
-    - Clear error messages for invalid parameter specifications  
-    - Parameter existence checking (e.g., `ar2_trend` only valid when `p >= 2`)
-    - Integration with existing trend registry system
+  - [ ] **Sub-task 1P**: Complete elimination of mvgam prior attribute system (45 min)
+    - **CRITICAL**: Replace all attribute-based logic with naming convention detection (`grepl("_trend$", prior$class)`)
+    - **Phase 1 - Core Functions (20 min)**:
+      - Update `extract_trend_priors()` to filter by `grepl("_trend$", prior$class)` instead of `trend_components` attribute
+      - Update `extract_observation_priors()` to filter by `!grepl("_trend$", prior$class)` instead of attributes  
+      - Update `combine_obs_trend_priors()` to simple `rbind()`, remove all attribute creation
+      - Update `print.brmsprior()` to detect trend/obs rows by naming, remove attribute checks
+      - Update `c.brmsprior()` to standard brmsprior combination, remove attribute handling
+    - **Phase 2 - Remove set_prior() (15 min)**:
+      - Delete `mvgam::set_prior()` function entirely from R/priors.R
+      - Update NAMESPACE via `devtools::document()` 
+      - Update all internal code to use `brms::set_prior()` directly
+      - Update all tests to use `brms::set_prior()` instead of `set_prior()`
+    - **Phase 3 - Validation Architecture (10 min)**:
+      - Move trend parameter validation to trend setup phase (where we have full context)
+      - Remove parameter class validation from prior functions (they become pure data manipulation)
+      - Test that all prior-related functions work with pure brms objects
+    - **LAST**: Use r-test-runner to verify all tests pass after complete attribute elimination
     
-  - [ ] **Sub-task 1Q**: Update mvgam() main function to accept mixed prior specifications (15 min)
-    - Accept enhanced brmsprior objects with trend and observation components
-    - Route trend priors to Stan generation system properly
-    - Route observation priors to brms system unchanged
-    - Backwards compatibility with current prior specifications
+  - [ ] **Sub-task 1Q**: Remove set_prior() to avoid masking (15 min)
+    - **FIRST**: Use r-package-analyzer to understand how brms::set_prior() handles custom class names with suffixes
+    - Use r-package-analyzer to understand S3 method dispatch rules and potential conflicts
+    - Ultrathink to come up with a solution that completely avoids masking
+    
+  - [ ] **Sub-task 1R**: Update mvgam() to intercept and split priors (15 min)
+    - **FIRST**: Use pathfinder agent to locate the main mvgam() function and understand its current prior handling
+    - Add logic in mvgam() to detect brmsprior objects in `prior` argument
+    - Split priors based on `_trend` suffix: `grepl("_trend$", prior$class)`
+    - Pass observation priors to brms setup functions unchanged
+    - Pass trend priors to Stan generation functions
+    - Test with mixed prior specifications
+    
+  - [ ] **Sub-task 1S**: Document the new prior workflow without masking (15 min)
+    - Update roxygen2 documentation for get_prior.mvgam_formula()
+    - Add examples showing `brms::prior()` usage with _trend parameters
+    - Document that users should use brms::prior() and brms::set_prior() directly
+    - Add migration guide from old mvgam::prior() to brms::prior()
+    - Update vignettes if necessary
+    
+  - [ ] **Sub-task 1T**: Verify S3 dispatch doesn't mask brms functions (15 min)
+    - **FIRST**: Use r-package-analyzer to understand S3 method dispatch rules and potential conflicts
+    - Test that regular formulas still route to brms::get_prior()
+    - Verify that only mvgam_formula objects route to our method
+    - Document the S3 dispatch behavior clearly
+    - Add tests demonstrating non-masking behavior
+    - **LAST**: Use r-test-runner agent to verify masking tests pass
 
-### **Phase 3: Advanced Features (45 min)**
+### **Phase 3: Clean Integration and Testing (30 min)**
 
-  - [ ] **Sub-task 1R**: Smart prior merging system - users modify subset while keeping defaults (15 min)
-    - Allow users to specify only changed priors, keep defaults for rest
-    - Intelligent merging of user specifications with `get_prior()` defaults
-    - Preserve user customizations while filling in missing specifications
-    - Handle both observation and trend parameter defaults appropriately
+  - [ ] **Sub-task 1U**: Integration test with complete workflow (15 min)
+    - Create complete test: get_prior() → brms::prior() → mvgam()
+    - Test multivariate models with response-specific trend priors
+    - Verify prior routing works correctly in mvgam()
+    - Test that observation and trend priors are correctly separated
+    - **LAST**: Use r-test-runner agent to verify integration tests pass
     
-  - [ ] **Sub-task 1S**: Enhanced inspection functions: prior_summary.mvgam(), retrospective prior inspection (15 min)  
-    - `prior_summary.mvgam()` method for fitted models showing actual priors used
-    - Retrospective inspection of trend vs observation prior sources
-    - Integration with existing mvgam object structure
-    - Clear display of default vs user-specified priors
-    
-  - [ ] **Sub-task 1T**: Comprehensive documentation with realistic workflow examples (15 min)
-    - Complete roxygen2 documentation for all wrapper functions
-    - Realistic workflow examples in documentation
-    - Integration examples with `make_stancode`/`make_standata`  
-    - Clear explanation of observation vs trend parameter handling
-
-### **Phase 4: Robust Integration (30 min)**
-
-  - [ ] **Sub-task 1U**: Cross-function compatibility testing with make_stancode/standata and multivariate models (15 min)
-    - Test enhanced priors work with `make_stancode.mvgam_formula()`
-    - Test enhanced priors work with `make_standata.mvgam_formula()`
-    - Multivariate model compatibility with response-specific trend priors
-    - Performance testing with complex prior specifications
-    
-  - [ ] **Sub-task 1V**: Comprehensive error handling, edge case management, clear user messaging (15 min)
-    - Graceful handling of invalid prior combinations
-    - Clear error messages for common user mistakes
-    - Edge case handling (empty priors, conflicting specifications, etc.)  
-    - Documentation of limitations and constraints
+  - [ ] **Sub-task 1V**: Clean up and finalize non-masking approach (15 min)
+    - **FIRST**: Use pathfinder agent to search for any remaining mvgam::prior() references in codebase
+    - Remove any remaining references to mvgam::prior() from codebase
+    - Ensure NAMESPACE doesn't export prior() function
+    - Update any remaining documentation
+    - **LAST**: Use r-test-runner agent for final test run
+    - Update completed sub-tasks in task list
 
 - [ ] **make_stancode.mvgam_formula()** (60 min): Generate complete Stan model code before fitting
   - Add S3 method: `make_stancode.mvgam_formula(object, prior = NULL, ...)`

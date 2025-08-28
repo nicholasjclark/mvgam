@@ -2,7 +2,7 @@
     "commit_hash":  "",
     "commit_message":  "",
     "version":  "2.0.0",
-    "exported_functions":  70,
+    "exported_functions":  69,
     "package_name":  "mvgam",
     "external_dependencies":  [
                                   "bayesplot",
@@ -27,8 +27,8 @@
                                   "tibble"
                               ],
     "total_files":  56,
-    "generated":  "2025-08-27 16:18:16",
+    "generated":  "2025-08-28 12:12:28",
     "s3_methods_count":  42,
     "s3_classes_count":  25,
-    "total_functions":  424
+    "total_functions":  421
 }
