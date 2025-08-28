@@ -47,7 +47,7 @@ transformed parameters {
       trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
     }
   }
-  lprior += student_t_lpdf(Intercept | 3, -0.3, 2.5);
+  lprior += student_t_lpdf(Intercept | 3, -0.4, 2.5);
   lprior += student_t_lpdf(sigma | 3, 0, 2.5)
     - 1 * student_t_lccdf(0 | 3, 0, 2.5);
 }
