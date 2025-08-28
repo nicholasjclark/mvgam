@@ -238,19 +238,19 @@ test_that("logLik has reasonable ouputs", {
 test_that("predict has reasonable outputs", {
   newdat1 <- data.frame(series = 'series_1')
   expect_error(
-    predict(mvgam_example1, newdata = newdat1),
+    predict(mvgam:::mvgam_example1, newdata = newdat1),
     "the following required variables are missing from newdata:\n season"
   )
 
   newdat2 <- data.frame(series = factor('series_1'), time = 1)
   expect_error(
-    predict(mvgam_example1, newdata = newdat2),
+    predict(mvgam:::mvgam_example1, newdata = newdat2),
     "the following required variables are missing from newdata:\n season"
   )
 
   newdat3 <- list(series = factor('series_1'), time = 1)
   expect_error(
-    predict(mvgam_example4, newdata = newdat3),
+    predict(mvgam:::mvgam_example4, newdata = newdat3),
     "the following required variables are missing from newdata:\n season"
   )
 
