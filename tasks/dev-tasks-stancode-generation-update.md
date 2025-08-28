@@ -233,7 +233,7 @@ Implementation tasks for stancode generation update feature with comprehensive p
   
   2. **Missing Variable Declarations**:
      - `n_trend`, `n_series_trend`, `n_lv_trend` referenced but not declared in appropriate blocks
-     - `trend`, `obs_ind`, `times_trend` missing in required scopes
+     - `trend`, `obs_ind`, `times_trend` missing in required scopes (`obs_ind` should not exist)
      - Self-referencing assignment: `vector[N] mu_combined = mu_combined;` (line 38 in generated code)
   
   3. **Stanvar Injection System Failures**:
@@ -264,6 +264,95 @@ Implementation tasks for stancode generation update feature with comprehensive p
   - **DEBUG SCRIPT**: `debug_stan_parameter_blocks.R` created during investigation
   - **TEST FILE**: `tests/testthat/test-stancode-standata.R` with 23 comprehensive tests
   - **RECOMMENDATION**: Keep debug script for next session - provides systematic testing approach
+
+## 🚨 **CRITICAL PRIORITY**: Observation-to-Trend Mapping Implementation (Option 1)
+
+**STATUS**: Next immediate priority before any further stancode investigation  
+**ISSUE**: Current trend injection assumes no missing data, causing misalignment between brms observations and trend matrix positions  
+**SOLUTION**: Create obs_trend_mapping during injection to handle missing data correctly
+
+### **Phase 1: Investigation and Design** (90 min)
+
+- [ ] **Sub-task A1**: Investigate data flow and access points (30 min)
+  - Trace where observation-level data is available during stanvar generation/injection pipeline
+  - Determine how to access time/series information for each observation that brms includes  
+  - Map out the timing: when do we have both brms final observation data AND trend specifications?
+  - Document the data structures available at each pipeline stage
+  
+- [ ] **Sub-task A2**: Analyze brms data processing behavior (30 min)
+  - Understand exactly how brms decides which observations to include/exclude
+  - Test with datasets containing missing values to see brms ordering behavior
+  - Determine if brms provides metadata about excluded observations
+  - Verify that `prepare_stan_data()` ordering is preserved by brms processing
+  
+- [ ] **Sub-task A3**: Design the mapping strategy (30 min)
+  - Choose data structure: `array[N] int obs_trend_linear_idx` vs `array[N] int obs_time_idx; array[N] int obs_series_idx`
+  - Decide creation point: during trend stanvar generation vs during injection function
+  - Plan missing data handling: systematic missing vs random missing vs no missing
+  - Design validation approach to detect misaligned mappings
+
+### **Phase 2: Implementation** (120 min)
+
+- [ ] **Sub-task B1**: Implement mapping creation infrastructure (45 min)
+  - Create `generate_obs_trend_mapping()` function that takes observation data + trend dimensions
+  - Generate mapping array: for each observation n → corresponding trend[time_idx, series_idx] position
+  - Handle edge cases: single series, single time point, irregular time series
+  - Add comprehensive input validation and error handling
+  
+- [ ] **Sub-task B2**: Integrate mapping into stanvar generation pipeline (45 min)
+  - Add mapping creation to `extract_trend_stanvars_from_setup()` or equivalent function
+  - Ensure mapping gets included as "data" block stanvar in trend_stanvars collection
+  - Pass observation data through pipeline to mapping creation point
+  - Add mapping metadata to trend specifications for downstream usage
+  
+- [ ] **Sub-task B3**: Update injection logic to use mapping (30 min)
+  - Replace direct indexing `trend[time_idx, series_idx]` with mapping-based approach
+  - Support both 2D matrix access and linear indexing strategies
+  - Add validation that mapping array exists and has correct dimensions
+  - Preserve existing injection logic structure while eliminating obs_ind dependency
+
+### **Phase 3: Testing and Validation** (90 min)
+
+- [ ] **Sub-task C1**: Test mapping with controlled datasets (45 min)
+  - **Complete data**: No missing values - verify mapping == direct indexing results
+  - **Random missing**: 20% randomly missing observations across series/time  
+  - **Systematic missing**: Some series start later, some end earlier
+  - **Edge cases**: Single series, single time point, all-but-one missing
+  
+- [ ] **Sub-task C2**: Validate against existing test suite (30 min)
+  - Run all 23 tests in `test-stancode-standata.R` with new mapping approach
+  - Fix any regressions introduced by mapping implementation
+  - Verify that Stan compilation errors are resolved
+  - Ensure generated Stan code structure is valid
+  
+- [ ] **Sub-task C3**: Performance and correctness validation (15 min)
+  - Compare trend injection results with/without missing data
+  - Verify that mapping overhead is minimal for complete data cases
+  - Test with larger datasets to ensure scalability
+  - Validate that trend effects are correctly applied to matching observations
+
+### **Phase 4: Integration and Documentation** (30 min)
+
+- [ ] **Sub-task D1**: Update debug script and diagnostic tools (15 min)
+  - Enhance `debug_stan_parameter_blocks.R` to test mapping creation and usage
+  - Add mapping validation to Stan code analysis functions
+  - Create helper functions to inspect obs_trend_mapping correctness
+  
+- [ ] **Sub-task D2**: Document architecture decision and usage (15 min)
+  - Update `active/architecture-decisions.md` with missing data handling approach
+  - Document when/why obs_trend_mapping is created vs obs_ind approach
+  - Add examples of mapping structure for different missing data patterns
+
+**TOTAL ESTIMATED TIME**: 330 minutes (5.5 hours)
+
+**SUCCESS CRITERIA**: 
+- ✅ All 23 stancode/standata tests pass
+- ✅ Generated Stan code compiles without errors  
+- ✅ Trend effects correctly applied even with missing data
+- ✅ No performance regression for complete data cases
+- ✅ Robust handling of various missing data patterns
+
+---
 
 - [ ] **Sub-task 4 - Multivariate Formula Integration** (60 min): Resolve setup_brms_lightweight handling of multivariate observation models with response-specific trend formulas
 
