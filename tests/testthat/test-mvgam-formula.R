@@ -229,10 +229,10 @@ test_that("mvgam_formula + get_prior identical to brms when no trends", {
   expect_identical(mvgam_result[, names(brms_result)], brms_result)
   
   # Verify trend component attributes are added correctly
-  expect_true(isTRUE(attr(mvgam_result, "mvgam_enhanced")))
-  trend_attr <- attr(mvgam_result, "trend_components")
-  expect_equal(length(trend_attr), nrow(mvgam_result))
-  expect_true(all(trend_attr == "observation"))
+  # Check structure
+  expect_s3_class(mvgam_result, "brmsprior")
+  # Should have only observation parameters (no _trend suffix)
+  expect_true(all(!grepl("_trend$", mvgam_result$class)))
   
   # Test mvgam_formula object reusability across multiple get_prior calls
   mvgam_result2 <- get_prior(formula_obj, family = gaussian(), data = test_data)
@@ -279,9 +279,8 @@ test_that("family compatibility across different distributions", {
     expect_identical(mvgam_result[, names(brms_result)], brms_result, 
                      info = paste("Failed for family:", family$family))
     
-    # Verify trend component attributes
-    expect_true(isTRUE(attr(mvgam_result, "mvgam_enhanced")))
-    expect_true(all(attr(mvgam_result, "trend_components") == "observation"))
+    # Verify structure (should have only observation parameters, no _trend suffix)
+    expect_true(all(!grepl("_trend$", mvgam_result$class)))
   }
 })
 
@@ -303,9 +302,9 @@ test_that("formula type compatibility (formula vs brmsformula)", {
   expect_identical(standard_result[, names(brms_result)], brms_result)
   expect_identical(bf_result[, names(brms_result)], brms_result)
   
-  # Both should have trend component attributes
-  expect_true(isTRUE(attr(standard_result, "mvgam_enhanced")))
-  expect_true(isTRUE(attr(bf_result, "mvgam_enhanced")))
+  # Both should be valid brmsprior objects
+  expect_s3_class(standard_result, "brmsprior")
+  expect_s3_class(bf_result, "brmsprior")
 })
 
 test_that("S3 dispatch works correctly and doesn't mask brms methods", {
@@ -317,15 +316,15 @@ test_that("S3 dispatch works correctly and doesn't mask brms methods", {
   
   # get_prior should dispatch to get_prior.mvgam_formula
   mvgam_result <- get_prior(formula_obj, family = gaussian(), data = test_data)
-  expect_true(isTRUE(attr(mvgam_result, "mvgam_enhanced")))
+  expect_s3_class(mvgam_result, "brmsprior")
   
-  # Direct brms call should NOT have mvgam attributes
+  # Direct brms call should return standard brmsprior
   brms_result <- brms::get_prior(y ~ x, family = gaussian(), data = test_data)
-  expect_false(isTRUE(attr(brms_result, "mvgam_enhanced")))
+  expect_s3_class(brms_result, "brmsprior")
   
   # get_prior on regular formula should delegate to brms (via get_prior.formula)
   regular_result <- get_prior(y ~ x, family = gaussian(), data = test_data)
-  expect_false(isTRUE(attr(regular_result, "mvgam_enhanced")))
+  expect_s3_class(regular_result, "brmsprior")
   expect_identical(regular_result, brms_result)
   
   # Verify that brms methods are not masked for regular formulas
@@ -343,11 +342,11 @@ test_that("embedded families work correctly with bf() formulas", {
   # Should work without passing family parameter (embedded in bf)
   result <- get_prior(formula_obj, data = test_data)
   
-  # Should have trend component attributes
-  expect_true(isTRUE(attr(result, "mvgam_enhanced")))
-  expect_true(all(attr(result, "trend_components") == "observation"))
+  # Should be valid brmsprior with only observation parameters
+  expect_s3_class(result, "brmsprior")
+  expect_true(all(!grepl("_trend$", result$class)))
   
-  # Should be equivalent to brms direct call (attributes don't affect data structure)
+  # Should be equivalent to brms direct call
   brms_result <- brms::get_prior(bf_formula, data = test_data)
   expect_identical(result[, names(brms_result)], brms_result)
   
@@ -356,8 +355,8 @@ test_that("embedded families work correctly with bf() formulas", {
   mv_formula_obj <- mvgam_formula(mv_bf_formula, trend_formula = NULL)
   mv_result <- get_prior(mv_formula_obj, data = test_data)
   
-  expect_true(isTRUE(attr(mv_result, "mvgam_enhanced")))
-  expect_true(all(attr(mv_result, "trend_components") == "observation"))
+  expect_s3_class(mv_result, "brmsprior")
+  expect_true(all(!grepl("_trend$", mv_result$class)))
 })
 
 test_that("error handling for invalid get_prior calls", {
@@ -415,8 +414,8 @@ test_that("brmsprior class preservation and ecosystem integration", {
   result_with_trend <- get_prior(mvgam_formula(y ~ x, trend_formula = ~ AR()), 
                                 family = gaussian(), data = test_data_trend)
   
-  custom_trend_prior1 <- brms::set_prior("normal(0, 0.5)", class = "ar1_trend")
-  custom_trend_prior2 <- brms::set_prior("exponential(2)", class = "sigma_trend")
+  custom_trend_prior1 <- brms::prior("normal(0, 0.5)", class = "ar1_trend")
+  custom_trend_prior2 <- brms::prior("exponential(2)", class = "sigma_trend")
   
   expect_no_error({
     combined_trend1 <- custom_trend_prior1 + result_with_trend
@@ -429,38 +428,33 @@ test_that("brmsprior class preservation and ecosystem integration", {
 test_that("trend component attribute behavior", {
   test_data <- data.frame(y = rnorm(20), x = rnorm(20))
   
-  # When trend_formula = NULL, all should be "observation"
+  # When trend_formula = NULL, should have only observation parameters
   result <- get_prior(mvgam_formula(y ~ x, trend_formula = NULL), 
                      family = gaussian(), data = test_data)
   
-  trend_attr <- attr(result, "trend_components")
-  expect_true(isTRUE(attr(result, "mvgam_enhanced")))
-  expect_true(all(trend_attr == "observation"))
-  expect_equal(length(unique(trend_attr)), 1)
-  expect_type(trend_attr, "character")
+  expect_s3_class(result, "brmsprior")
+  expect_true(all(!grepl("_trend$", result$class)))  # No trend parameters
   
-  # Should not affect data structure
+  # Should be identical to brms result
   brms_result <- brms::get_prior(y ~ x, family = gaussian(), data = test_data)
   expect_identical(names(result), names(brms_result))
   expect_equal(nrow(result), nrow(brms_result))
   
-  # Test with trend formula ~ 1 should include Intercept_trend
+  # Test with trend formula ~ 1 should include trend parameters
   test_data_trend <- data.frame(y = rnorm(20), time = 1:20, series = factor(rep("A", 20)))
   result_trend <- get_prior(mvgam_formula(y ~ 1, trend_formula = ~ 1), 
                            family = gaussian(), data = test_data_trend)
   
-  # Should have mixed trend components (observation + trend)
-  trend_attr_mixed <- attr(result_trend, "trend_components")
-  expect_true(isTRUE(attr(result_trend, "mvgam_enhanced")))
-  expect_true("observation" %in% trend_attr_mixed)
-  expect_true("trend" %in% trend_attr_mixed)
-  expect_equal(length(unique(trend_attr_mixed)), 2)
+  # Should have both observation and trend parameters
+  expect_s3_class(result_trend, "brmsprior")
+  obs_params <- !grepl("_trend$", result_trend$class)
+  trend_params <- grepl("_trend$", result_trend$class)
+  expect_true(any(obs_params))    # Has observation parameters
+  expect_true(any(trend_params))  # Has trend parameters
   
-  # Trend-specific priors should be marked as "trend"
-  trend_rows <- result_trend$class %in% c("Intercept_trend", "sigma_trend")
-  if (any(trend_rows)) {
-    expect_true(all(trend_attr_mixed[trend_rows] == "trend"))
-  }
+  # Trend-specific priors should have _trend suffix
+  trend_classes <- result_trend$class[trend_params]
+  expect_true(all(grepl("_trend$", trend_classes)))
 })
 
 test_that("mvgam_formula object reusability across contexts", {
@@ -482,7 +476,6 @@ test_that("mvgam_formula object reusability across contexts", {
   # Should work with different families
   poisson_result <- get_prior(formula_obj, family = poisson(), data = test_data)
   expect_s3_class(poisson_result, "brmsprior")
-  expect_true(isTRUE(attr(poisson_result, "mvgam_enhanced")))
   
   # Should work with different data (same structure)
   different_data <- data.frame(y = rpois(30, 2), x = rnorm(30), time = 1:30, series = factor(rep("B", 30)))

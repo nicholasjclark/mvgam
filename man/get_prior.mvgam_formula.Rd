@@ -66,7 +66,7 @@ obs_priors <- priors2[priors2$trend_component == "observation", ]
 trend_priors <- priors2[priors2$trend_component == "trend", ]
 
 # Use with brms functions for customization
-custom_priors <- brms::set_prior("normal(0, 0.5)", class = "ar1_trend", 
+custom_priors <- brms::set_prior("normal(0, 0.5)", class = "ar1_trend",
                                 prior = priors2)
 }
 
