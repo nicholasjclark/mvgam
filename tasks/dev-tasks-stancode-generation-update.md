@@ -215,26 +215,34 @@ Implementation tasks for stancode generation update feature with comprehensive p
     - ✅ **VALIDATION**: All 25 tests in test-priors.R now pass (100% success rate)
     - ✅ **NO SKIPS**: Eliminated skip conditions, proper expectations added
 
-- [ ] **make_stancode.mvgam_formula()** (60 min): Generate complete Stan model code before fitting
-  - Add S3 method: `make_stancode.mvgam_formula(object, prior = NULL, ...)`
+- [X] **stancode.mvgam_formula()** (60 min): Generate complete Stan model code before fitting
+  - Add S3 method: `stancode.mvgam_formula(object, prior = NULL, ...)`
   - Extract formula and trend_formula from mvgam_formula object
   - Character string containing complete Stan model code with both observation and trend components
   - Follow brms style conventions and Stan best practices  
   - Handle custom prior specifications from `prior()` or `prior_string()` etc...
   - Integrate with existing `generate_combined_stancode_and_data()` function
 
-- [ ] **make_standata.mvgam_formula()** (60 min): Generate complete Stan data list before fitting
-  - Add S3 method: `make_standata.mvgam_formula(object, prior = NULL, ...)`
+- [X] **standata.mvgam_formula()** (60 min): Generate complete Stan data list before fitting
+  - Add S3 method: `standata.mvgam_formula(object, prior = NULL, ...)`
   - Extract formula and trend_formula from mvgam_formula object
   - Named list containing all data for Stan model (observation + trend data components)
   - Structure matches what would be passed to Stan during fitting
   - Support custom prior data requirements
   - Integrate with existing Stan data preparation pipeline
 
-- [ ] **Step 10 - Multivariate Formula Integration** (60 min): Resolve setup_brms_lightweight handling of multivariate observation models with response-specific trend formulas
+- [ ] **Sub-task 3**: Investigate stancode/standata test failures and enhance validation
+  - **SCOPE**: Debug all test failures in `test-stancode-standata.R`
+  - **CLEANUP**: Remove unnecessary warning messages during stancode/standata generation
+  - **ENHANCEMENT**: Expand tests to validate specific expected elements in returned standata objects
+  - **VALIDATION**: Ensure standata contains all required Stan model components (N, Y, K, etc.)
+  - **COMPLETENESS**: Check that stancode contains proper Stan blocks (data, parameters, model, generated quantities)
+  - **INTEGRATION**: Verify stancode/standata consistency across different model specifications
+  - **ROBUSTNESS**: Add edge case testing for small datasets, missing data, and complex model structures
 
-- [ ] **Step 11 - Systematic Validation** (45 min): Test for correct standata and stancode across multiple configurations: univariate trends (RW, AR, PW), multivariate shared trends, response-specific trends, mixed family models, by expanding tests in `test-setup-brms.R`
+- [ ] **Sub-task 4 - Multivariate Formula Integration** (60 min): Resolve setup_brms_lightweight handling of multivariate observation models with response-specific trend formulas
 
+- [ ] **Sub-task 5 - Systematic Validation** (45 min): Test for correct standata and stancode across multiple configurations: univariate trends (RW, AR, PW), multivariate shared trends, response-specific trends, mixed family models, by expanding tests in `test-setup-brms.R`
 
 ## PENDING FUTURE SECTIONS
 

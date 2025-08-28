@@ -25,7 +25,7 @@ base_class is the class of the input formula, containing:
 Constructs a lightweight mvgam formula object that combines observation and
 trend model formulas. This provides a clean interface for model specification
 that can be used with inspection functions like \code{get_prior()},
-\code{make_stancode()}, and \code{make_standata()}.
+\code{stancode()}, and \code{standata()}.
 }
 \details{
 The mvgam_formula object is a minimal container that pairs an observation
@@ -88,11 +88,11 @@ mf3 <- mvgam_formula(mvbind(y1, y2) ~ x, trend_formula = ~ VAR(lags = 1))
 
 # Use with inspection functions (data provided to the function)
 priors <- get_prior(mf2, data = ecology_data, family = poisson())
-stancode <- make_stancode(mf2, data = ecology_data, family = poisson())
+stancode <- stancode(mf2, data = ecology_data, family = poisson())
 }
 
 }
 \seealso{
-\code{\link{get_prior.mvgam_formula}}, \code{\link{make_stancode}},
-\code{\link{make_standata}}, \code{\link{mvgam}}
+\code{\link{get_prior.mvgam_formula}}, \code{\link{stancode}},
+\code{\link{standata}}, \code{\link{mvgam}}
 }

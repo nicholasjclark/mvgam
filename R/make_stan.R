@@ -1,4 +1,4 @@
-# Internal shared function for both make_stancode and make_standata
+# Internal shared function for both stancode and standata
 # @noRd
 generate_stan_components_mvgam_formula <- function(formula, data, family = gaussian(),
                                                    prior = NULL, data2 = NULL,
@@ -166,10 +166,10 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
 #' model fitting. This allows users to inspect the generated Stan code for
 #' debugging, understanding, or modification purposes.
 #'
-#' @param formula An \code{mvgam_formula} object created by \code{mvgam_formula()}.
+#' @param object An \code{mvgam_formula} object created by \code{mvgam_formula()}.
 #' @param data A data frame containing all variables referenced in the formula.
 #' @param family A family object or character string specifying the response
-#'   distribution. If \code{formula} contains embedded family specifications,
+#'   distribution. If \code{object} contains embedded family specifications,
 #'   this parameter can be omitted.
 #' @param prior An optional \code{brmsprior} object containing custom prior
 #'   specifications. Can be created using \code{brms::prior()}.
@@ -204,33 +204,33 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
 #' mf <- mvgam_formula(count ~ temperature, trend_formula = ~ AR(p = 1))
 #'
 #' # Generate Stan code
-#' stan_code <- make_stancode(mf, data = ecology_data, family = poisson())
+#' stan_code <- stancode(mf, data = ecology_data, family = poisson())
 #' cat(stan_code)
 #'
 #' # With custom priors
 #' custom_priors <- brms::prior("normal(0, 0.5)", class = "ar1_trend") +
 #'                  brms::prior("exponential(2)", class = "sigma_trend")
-#' stan_code_custom <- make_stancode(mf, data = ecology_data,
-#'                                   family = poisson(), prior = custom_priors)
+#' stan_code_custom <- stancode(mf, data = ecology_data,
+#'                              family = poisson(), prior = custom_priors)
 #' }
 #'
 #' @seealso
 #' \code{\link{mvgam_formula}}, \code{\link{get_prior.mvgam_formula}},
-#' \code{\link{make_standata}}, \code{\link{mvgam}}
+#' \code{\link{standata}}, \code{\link{mvgam}}
 #'
 #' @export
-make_stancode.mvgam_formula <- function(formula, data, family = gaussian(),
-                                        prior = NULL, data2 = NULL,
-                                        sample_prior = "no", sparse = NULL,
-                                        knots = NULL, drop_unused_levels = TRUE,
-                                        backend = "rstan",
-                                        threads = getOption("mc.cores", 1),
-                                        normalize = TRUE, save_model = NULL,
-                                        stan_funs = NULL, silent = 1L, ...) {
+stancode.mvgam_formula <- function(object, data, family = gaussian(),
+                                   prior = NULL, data2 = NULL,
+                                   sample_prior = "no", sparse = NULL,
+                                   knots = NULL, drop_unused_levels = TRUE,
+                                   backend = "rstan",
+                                   threads = getOption("mc.cores", 1),
+                                   normalize = TRUE, save_model = NULL,
+                                   stan_funs = NULL, silent = 1L, ...) {
 
   # Generate all Stan components using shared function
   combined_components <- generate_stan_components_mvgam_formula(
-    formula = formula, data = data, family = family, prior = prior,
+    formula = object, data = data, family = family, prior = prior,
     data2 = data2, sample_prior = sample_prior, sparse = sparse,
     knots = knots, drop_unused_levels = drop_unused_levels,
     backend = backend, threads = threads, normalize = normalize,
@@ -246,7 +246,10 @@ make_stancode.mvgam_formula <- function(formula, data, family = gaussian(),
     )
   }
 
-  return(combined_components$stancode)
+  # Add mvgam-specific stancode class with brms compatibility
+  stancode <- combined_components$stancode
+  class(stancode) <- c("mvgamstancode", "stancode", "character")
+  return(stancode)
 }
 
 #' Generate Stan Data for mvgam Formula
@@ -255,10 +258,10 @@ make_stancode.mvgam_formula <- function(formula, data, family = gaussian(),
 #' model fitting. This allows users to inspect the generated data structure for
 #' debugging, understanding, or modification purposes.
 #'
-#' @param formula An \code{mvgam_formula} object created by \code{mvgam_formula()}.
+#' @param object An \code{mvgam_formula} object created by \code{mvgam_formula()}.
 #' @param data A data frame containing all variables referenced in the formula.
 #' @param family A family object or character string specifying the response
-#'   distribution. If \code{formula} contains embedded family specifications,
+#'   distribution. If \code{object} contains embedded family specifications,
 #'   this parameter can be omitted.
 #' @param prior An optional \code{brmsprior} object containing custom prior
 #'   specifications. Can be created using \code{brms::prior()}.
@@ -286,31 +289,31 @@ make_stancode.mvgam_formula <- function(formula, data, family = gaussian(),
 #' mf <- mvgam_formula(count ~ temperature, trend_formula = ~ AR(p = 1))
 #'
 #' # Generate Stan data
-#' stan_data <- make_standata(mf, data = ecology_data, family = poisson())
+#' stan_data <- standata(mf, data = ecology_data, family = poisson())
 #' str(stan_data)
 #'
 #' # With custom priors
 #' custom_priors <- brms::prior("normal(0, 0.5)", class = "ar1_trend") +
 #'                  brms::prior("exponential(2)", class = "sigma_trend")
-#' stan_data_custom <- make_standata(mf, data = ecology_data,
-#'                                   family = poisson(), prior = custom_priors)
+#' stan_data_custom <- standata(mf, data = ecology_data,
+#'                              family = poisson(), prior = custom_priors)
 #' }
 #'
 #' @seealso
 #' \code{\link{mvgam_formula}}, \code{\link{get_prior.mvgam_formula}},
-#' \code{\link{make_stancode}}, \code{\link{mvgam}}
+#' \code{\link{stancode}}, \code{\link{mvgam}}
 #'
 #' @export
-make_standata.mvgam_formula <- function(formula, data, family = gaussian(),
-                                        prior = NULL, data2 = NULL,
-                                        sample_prior = "no", sparse = NULL,
-                                        knots = NULL, drop_unused_levels = TRUE,
-                                        stanvars = NULL, threads = getOption("mc.cores", 1),
-                                        ...) {
+standata.mvgam_formula <- function(object, data, family = gaussian(),
+                                   prior = NULL, data2 = NULL,
+                                   sample_prior = "no", sparse = NULL,
+                                   knots = NULL, drop_unused_levels = TRUE,
+                                   stanvars = NULL, threads = getOption("mc.cores", 1),
+                                   ...) {
 
   # Generate all Stan components using shared function
   combined_components <- generate_stan_components_mvgam_formula(
-    formula = formula, data = data, family = family, prior = prior,
+    formula = object, data = data, family = family, prior = prior,
     data2 = data2, sample_prior = sample_prior, sparse = sparse,
     knots = knots, drop_unused_levels = drop_unused_levels,
     stanvars = stanvars, threads = threads, ...

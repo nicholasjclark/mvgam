@@ -184,10 +184,6 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
 
   # If no trend specification, return observation model as-is
   if (is.null(trend_setup) || is.null(trend_specs)) {
-    if (silent < 2) {
-      message("No trend specification provided. Returning observation model without trends.")
-    }
-
     return(list(
       stancode = obs_setup$stancode,
       standata = obs_setup$standata,
@@ -322,7 +318,7 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
 #'
 #' @description
 #' Generates base brms Stan code incorporating trend stanvars.
-#' Uses brms::make_stancode with injected stanvars.
+#' Uses brms::make_stancode internally with injected stanvars.
 #'
 #' @param obs_setup List containing observation model setup
 #' @param trend_stanvars List of trend stanvars to inject

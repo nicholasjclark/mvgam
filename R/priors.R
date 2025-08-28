@@ -1287,7 +1287,7 @@ get_trend_parameter_prior <- function(prior = NULL, param_name) {
 #' Constructs a lightweight mvgam formula object that combines observation and
 #' trend model formulas. This provides a clean interface for model specification
 #' that can be used with inspection functions like \code{get_prior()},
-#' \code{make_stancode()}, and \code{make_standata()}.
+#' \code{stancode()}, and \code{standata()}.
 #'
 #' @param formula An object of class \code{formula}, \code{brmsformula}, or
 #'   \code{mvbrmsformula} describing the observation model.
@@ -1360,12 +1360,12 @@ get_trend_parameter_prior <- function(prior = NULL, param_name) {
 #'
 #' # Use with inspection functions (data provided to the function)
 #' priors <- get_prior(mf2, data = ecology_data, family = poisson())
-#' stancode <- make_stancode(mf2, data = ecology_data, family = poisson())
+#' stancode <- stancode(mf2, data = ecology_data, family = poisson())
 #' }
 #'
 #' @seealso
-#' \code{\link{get_prior.mvgam_formula}}, \code{\link{make_stancode}},
-#' \code{\link{make_standata}}, \code{\link{mvgam}}
+#' \code{\link{get_prior.mvgam_formula}}, \code{\link{stancode}},
+#' \code{\link{standata}}, \code{\link{mvgam}}
 #'
 #' @export
 mvgam_formula <- function(formula, trend_formula = NULL) {

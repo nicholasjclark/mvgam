@@ -1,17 +1,17 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-08-28 13:56:01  
+**Generated:** 2025-08-28 14:42:36  
 **Package:** mvgam v2.0.0  
 **Commit:**   
 
 ## Summary
 
 - **Total Files:** 57
-- **Total Functions:** 421
-- **Exported Functions:** 70
-- **Internal Functions:** 377
+- **Total Functions:** 424
+- **Exported Functions:** 68
+- **Internal Functions:** 382
 - **S3 Methods:** 44
-- **S3 Classes:** 24
+- **S3 Classes:** 25
 
 ## External Dependencies
 - bayesplot
@@ -46,7 +46,7 @@
 ## S3 Object System
 
 ### S3 Classes
-- array.mvgam, brmsformula, construct.mod.smooth.spec, construct.moi.smooth.spec, data.frame.mvgam, default, formula, how_to_cite, jsdgam, matrix.mod.smooth, matrix.moi.smooth, matrix.mvgam, mvgam, mvgam_conditional_effects, mvgam_fevd, mvgam_forecast, mvgam_formula, mvgam_irf, mvgam_lfo, mvgam_prefit, mvgam_residcor, mvgam_trend, to.ts, trend_param
+- array.mvgam, brmsformula, construct.mod.smooth.spec, construct.moi.smooth.spec, data.frame.mvgam, default, formula, how_to_cite, jsdgam, matrix.mod.smooth, matrix.moi.smooth, matrix.mvgam, mvgam, mvgam_conditional_effects, mvgam_fevd, mvgam_forecast, mvgam_formula, mvgam_irf, mvgam_lfo, mvgam_prefit, mvgam_residcor, mvgam_trend, mvgamstancode, to.ts, trend_param
 
 ### Key S3 Methods
 - **as()**: array.mvgam, data.frame.mvgam, matrix.mvgam
@@ -56,10 +56,11 @@
 - **is()**: mvgam_trend, trend_param
 - **plot()**: mvgam, mvgam_conditional_effects, mvgam_fevd, mvgam_forecast, mvgam_irf, mvgam_lfo, mvgam_residcor
 - **Predict()**: matrix.mod.smooth, matrix.moi.smooth
-- **print()**: how_to_cite, mvgam, mvgam_conditional_effects, mvgam_formula, mvgam_prefit, mvgam_trend, trend_param
+- **print()**: how_to_cite, mvgam, mvgam_conditional_effects, mvgam_formula, mvgam_prefit, mvgam_trend, mvgamstancode, trend_param
 - **residual_cor()**: jsdgam, mvgam
 - **residuals()**: mvgam
 - **smooth()**: construct.mod.smooth.spec, construct.moi.smooth.spec
+- **stancode()**: mvgam, mvgam_formula, mvgam_prefit
 - **summary()**: mvgam_fevd, mvgam_forecast, mvgam_irf
 
 ## Core Data Structures

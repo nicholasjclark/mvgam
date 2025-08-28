@@ -102,3 +102,87 @@ print.mvgam_prefit = function(x, ...) {
   cat('\nStatus:\n')
   cat('Not fitted', '\n')
 }
+
+#' Extract Stan Code from mvgam Objects
+#'
+#' Extract the Stan model code used to fit mvgam objects. This function
+#' follows brms conventions and returns a character vector with \code{stancode} class.
+#'
+#' @param object A fitted \code{mvgam} object or \code{mvgam_prefit} object.
+#' @param ... Currently unused.
+#'
+#' @return A character string containing the Stan model code with class
+#'   \code{c("stancode", "character")}.
+#'
+#' @details This method extracts the Stan code that was used to fit the model.
+#'   The returned object has the \code{stancode} class, making it compatible
+#'   with brms workflows and allowing users to inspect, modify, or save the
+#'   generated Stan code.
+#'
+#' @examples
+#' \dontrun{
+#' # Fit a simple mvgam model
+#' data(portal_data)
+#' mod <- mvgam(count ~ s(time), 
+#'              trend_formula = ~ RW(), 
+#'              data = portal_data, 
+#'              family = poisson())
+#'
+#' # Extract and inspect Stan code
+#' code <- stancode(mod)
+#' cat(code)
+#' 
+#' # Check class
+#' class(code)
+#' }
+#'
+#' @export
+stancode.mvgam <- function(object, ...) {
+  checkmate::assert_class(object, "mvgam")
+  
+  if (is.null(object$stancode)) {
+    insight::format_error(
+      "Stan code not found in mvgam object.",
+      "The model may have been fitted with an older version that didn't store Stan code."
+    )
+  }
+  
+  # Add mvgam-specific stancode class with brms compatibility
+  code <- object$stancode
+  class(code) <- c("mvgamstancode", "stancode", "character")
+  return(code)
+}
+
+#' @rdname stancode.mvgam
+#' @export
+stancode.mvgam_prefit <- function(object, ...) {
+  checkmate::assert_class(object, "mvgam_prefit")
+  
+  if (is.null(object$stancode)) {
+    insight::format_error(
+      "Stan code not found in mvgam_prefit object.",
+      "The prefit object may not have been properly generated."
+    )
+  }
+  
+  # Add mvgam-specific stancode class with brms compatibility
+  code <- object$stancode
+  class(code) <- c("mvgamstancode", "stancode", "character")
+  return(code)
+}
+
+#' Print mvgam Stan Code Objects
+#'
+#' Print method for mvgamstancode objects that displays Stan model code in a 
+#' clean, readable format.
+#'
+#' @param x A mvgamstancode object.
+#' @param ... Currently unused.
+#'
+#' @return The mvgamstancode object is returned invisibly.
+#'
+#' @export
+print.mvgamstancode <- function(x, ...) {
+  cat(x, sep = '\n')
+  invisible(x)
+}
