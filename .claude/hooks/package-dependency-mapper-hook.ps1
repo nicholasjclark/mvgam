@@ -572,25 +572,26 @@ function Get-FunctionDefinitions {
         }
     }
     
-    # Second pass: analyze function dependencies (only for changed files for efficiency)
-    foreach ($filePath in $ChangedFiles) {
-        if (!(Test-Path $filePath) -or !$definitions.ContainsKey($filePath)) {
-            continue
-        }
-        
-        $content = Get-Content $filePath -Raw -ErrorAction SilentlyContinue
-        if (!$content) {
-            continue
-        }
-        
-        foreach ($funcName in $definitions[$filePath]) {
-            # Extract function calls (dependencies)
-            $calls = Get-FunctionCalls -Content $content -FunctionName $funcName -AllFunctionNames $functions.Keys
-            if ($calls.Count -gt 0) {
-                $function_dependencies[$funcName] = $calls
-            }
-        }
-    }
+    # Second pass: analyze function dependencies (temporarily disabled for performance)
+    # TODO: Optimize Get-FunctionCalls function to avoid O(n²) regex operations
+    # foreach ($filePath in $ChangedFiles) {
+    #     if (!(Test-Path $filePath) -or !$definitions.ContainsKey($filePath)) {
+    #         continue
+    #     }
+    #     
+    #     $content = Get-Content $filePath -Raw -ErrorAction SilentlyContinue
+    #     if (!$content) {
+    #         continue
+    #     }
+    #     
+    #     foreach ($funcName in $definitions[$filePath]) {
+    #         # Extract function calls (dependencies)
+    #         $calls = Get-FunctionCalls -Content $content -FunctionName $funcName -AllFunctionNames $functions.Keys
+    #         if ($calls.Count -gt 0) {
+    #             $function_dependencies[$funcName] = $calls
+    #         }
+    #     }
+    # }
     
     # Third pass: analyze function signatures for detailed information
     $detailed_analysis = @{}
@@ -893,7 +894,7 @@ function New-PackageDependencyMap {
 try {
     if ($Event -eq "post_git_commit" -or $Event -eq "pre_git_commit" -or $Event -eq "test") {
         New-PackageDependencyMap
-        exit 2  # Success with output (but no output shown due to Write-Debug)
+        exit 0  # Success
     } else {
         Write-Debug "Hook triggered for event: $Event (no action taken)"
         exit 0  # Silent success
