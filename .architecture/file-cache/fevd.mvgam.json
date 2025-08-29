@@ -1,0 +1,24 @@
+﻿{
+    "s3_methods":  {
+                       "fevd":  [
+                                    "mvgam"
+                                ]
+                   },
+    "functions":  [
+                      "fevd",
+                      "fevd.mvgam",
+                      "gen_fevd",
+                      "var_fecov"
+                  ],
+    "purpose":  "",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "fevd":  "fevd \u003c- function(object, ...) {",
+                                "var_fecov":  "var_fecov \u003c- function(x, h) {",
+                                "gen_fevd":  "gen_fevd \u003c- function(x, h = 6, ...) {",
+                                "fevd.mvgam":  "fevd.mvgam \u003c- function(object, h = 10, ...) {"
+                            },
+    "file":  "R/fevd.mvgam.R"
+}

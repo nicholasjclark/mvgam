@@ -1,13 +1,100 @@
-# Package-Wide Function Dependency Mapper Hook
+# Package-Wide Function Dependency Mapper Hook - Optimized Version
 param([string]$Event, [string]$CommitHash, [string]$CommitMessage)
 
 # Configuration
 $CACHE_FILE = ".architecture/package-dependency-map.json"
 $METADATA_FILE = "architecture/dependency-metadata.json"
 $VISUALIZATION_FILE = "architecture/dependency-graph.md"
+$FILE_CACHE_DIR = ".architecture/file-cache"
 
 # Suppress output - all Write-Host calls removed or redirected to Write-Debug
 $DebugPreference = 'SilentlyContinue'
+
+# Pre-compile regex patterns for better performance
+$Script:CompiledRegex = @{
+    FunctionDef1 = [regex]::new('^\s*([a-zA-Z_][a-zA-Z0-9_.]*)\s*<-\s*function\s*\(', [System.Text.RegularExpressions.RegexOptions]::Multiline -bor [System.Text.RegularExpressions.RegexOptions]::Compiled)
+    FunctionDef2 = [regex]::new('^\s*([a-zA-Z_][a-zA-Z0-9_.]*)\s*=\s*function\s*\(', [System.Text.RegularExpressions.RegexOptions]::Multiline -bor [System.Text.RegularExpressions.RegexOptions]::Compiled)
+    S3Method = [regex]::new('^\s*([a-zA-Z_][a-zA-Z0-9_.]*\.[a-zA-Z_][a-zA-Z0-9_.]*)\s*(<-|=)\s*function', [System.Text.RegularExpressions.RegexOptions]::Multiline -bor [System.Text.RegularExpressions.RegexOptions]::Compiled)
+    FunctionArgs = [regex]::new('function\s*\(([^)]*)\)', [System.Text.RegularExpressions.RegexOptions]::Compiled)
+    ParamName = [regex]::new('^([a-zA-Z_][a-zA-Z0-9_.]*)', [System.Text.RegularExpressions.RegexOptions]::Compiled)
+    ImportsSection = [regex]::new('Imports:\s*([^:\r\n]+(?:\r?\n\s+[^:\r\n]+)*)', [System.Text.RegularExpressions.RegexOptions]::Compiled)
+    DependsSection = [regex]::new('Depends:\s*([^:\r\n]+(?:\r?\n\s+[^:\r\n]+)*)', [System.Text.RegularExpressions.RegexOptions]::Compiled)
+}
+
+# Ensure cache directory exists
+if (!(Test-Path $FILE_CACHE_DIR)) {
+    New-Item -ItemType Directory -Path $FILE_CACHE_DIR -Force | Out-Null
+}
+
+# Ensure architecture directory exists
+$architectureDir = Split-Path $CACHE_FILE -Parent
+if (!(Test-Path $architectureDir)) {
+    New-Item -ItemType Directory -Path $architectureDir -Force | Out-Null
+}
+
+function Get-FileHash-Fast {
+    param([string]$FilePath)
+    
+    if (!(Test-Path $FilePath)) { return $null }
+    
+    $fileInfo = Get-Item $FilePath
+    return "$($fileInfo.Length):$($fileInfo.LastWriteTime.Ticks)"
+}
+
+function Get-ChangedFiles {
+    param([string[]]$AllFiles)
+    
+    $changedFiles = @()
+    $cacheMetaFile = Join-Path $FILE_CACHE_DIR "file-metadata.json"
+    $lastFileHashes = @{}
+    
+    if (Test-Path $cacheMetaFile) {
+        try {
+            $lastFileHashes = Get-Content $cacheMetaFile | ConvertFrom-Json -AsHashtable -ErrorAction SilentlyContinue
+        } catch {
+            # If cache is corrupted, process all files
+            $lastFileHashes = @{}
+        }
+    }
+    
+    foreach ($file in $AllFiles) {
+        $currentHash = Get-FileHash-Fast -FilePath $file
+        $lastHash = $lastFileHashes[$file]
+        
+        if ($currentHash -ne $lastHash) {
+            $changedFiles += $file
+            $lastFileHashes[$file] = $currentHash
+        }
+    }
+    
+    # Save updated file hashes
+    $lastFileHashes | ConvertTo-Json -Depth 2 | Out-File -FilePath $cacheMetaFile -Encoding UTF8
+    
+    return $changedFiles
+}
+
+function Get-CachedFileAnalysis {
+    param([string]$FilePath)
+    
+    $cacheFile = Join-Path $FILE_CACHE_DIR ([System.IO.Path]::GetFileNameWithoutExtension($FilePath) + ".json")
+    
+    if (Test-Path $cacheFile) {
+        try {
+            return Get-Content $cacheFile | ConvertFrom-Json -AsHashtable -ErrorAction SilentlyContinue
+        } catch {
+            return $null
+        }
+    }
+    
+    return $null
+}
+
+function Set-CachedFileAnalysis {
+    param([string]$FilePath, [hashtable]$Analysis)
+    
+    $cacheFile = Join-Path $FILE_CACHE_DIR ([System.IO.Path]::GetFileNameWithoutExtension($FilePath) + ".json")
+    $Analysis | ConvertTo-Json -Depth 5 | Out-File -FilePath $cacheFile -Encoding UTF8
+}
 
 function Get-PackageName {
     if (Test-Path "DESCRIPTION") {
@@ -35,15 +122,20 @@ function Get-ExternalDependencies {
     $dependencies = @()
     if (Test-Path "DESCRIPTION") {
         $content = Get-Content "DESCRIPTION" -Raw
-        # Extract Imports and Depends
-        if ($content -match 'Imports:\s*([^:\r\n]+(?:\r?\n\s+[^:\r\n]+)*)') {
-            $imports = $matches[1] -replace '\s+', ' '
+        
+        # Extract Imports using pre-compiled regex
+        $importsMatch = $Script:CompiledRegex.ImportsSection.Match($content)
+        if ($importsMatch.Success) {
+            $imports = $importsMatch.Groups[1].Value -replace '\s+', ' '
             $dependencies += ($imports -split ',\s*' | ForEach-Object { 
                 ($_ -split '\s*\(')[0].Trim() 
             } | Where-Object { $_ -and $_ -ne '' })
         }
-        if ($content -match 'Depends:\s*([^:\r\n]+(?:\r?\n\s+[^:\r\n]+)*)') {
-            $depends = $matches[1] -replace '\s+', ' '
+        
+        # Extract Depends using pre-compiled regex
+        $dependsMatch = $Script:CompiledRegex.DependsSection.Match($content)
+        if ($dependsMatch.Success) {
+            $depends = $dependsMatch.Groups[1].Value -replace '\s+', ' '
             $dependencies += ($depends -split ',\s*' | ForEach-Object { 
                 ($_ -split '\s*\(')[0].Trim() 
             } | Where-Object { $_ -and $_ -ne 'R' -and $_ -ne '' })
@@ -220,9 +312,10 @@ function Extract-FunctionArguments {
     
     if (!$Signature) { return @() }
     
-    # Extract content between parentheses
-    if ($Signature -match 'function\s*\(([^)]*)\)') {
-        $paramString = $matches[1].Trim()
+    # Extract content between parentheses using pre-compiled regex
+    $argsMatch = $Script:CompiledRegex.FunctionArgs.Match($Signature)
+    if ($argsMatch.Success) {
+        $paramString = $argsMatch.Groups[1].Value.Trim()
         if (!$paramString) { return @() }
         
         # Split by comma and extract parameter names
@@ -231,9 +324,10 @@ function Extract-FunctionArguments {
         
         foreach ($param in $params) {
             $param = $param.Trim()
-            # Extract parameter name (before = if there's a default value)
-            if ($param -match '^([a-zA-Z_][a-zA-Z0-9_.]*)') {
-                $arguments += $matches[1]
+            # Extract parameter name (before = if there's a default value) using pre-compiled regex
+            $paramMatch = $Script:CompiledRegex.ParamName.Match($param)
+            if ($paramMatch.Success) {
+                $arguments += $paramMatch.Groups[1].Value
             }
         }
         
@@ -337,8 +431,9 @@ function Get-FilePurpose {
     return ''
 }
 
+
 function Get-FunctionDefinitions {
-    param([string[]]$Files, [string[]]$ExportedFunctions)
+    param([string[]]$Files, [string[]]$ExportedFunctions, [string[]]$ChangedFiles)
     
     $functions = @{}
     $definitions = @{}
@@ -348,89 +443,151 @@ function Get-FunctionDefinitions {
     $s3_classes = @()
     $file_purposes = @{}
     
-    # First pass: collect all function names
-    foreach ($file in $Files) {
-        Write-Debug "Analyzing $file..."
+    Write-Debug "Processing $($Files.Count) files ($($ChangedFiles.Count) changed)..."
+    
+    # Process files with caching optimization
+    $fileResults = @()
+    foreach ($filePath in $Files) {
+        Write-Debug "Processing $filePath..."
         
-        if (!(Test-Path $file)) {
+        if (!(Test-Path $filePath)) {
             continue
         }
         
-        $content = Get-Content $file -Raw -ErrorAction SilentlyContinue
+        # Skip cache if file has changed
+        if ($filePath -in $ChangedFiles) {
+            # Force re-analysis by removing cache
+            $cacheFile = Join-Path $FILE_CACHE_DIR ([System.IO.Path]::GetFileNameWithoutExtension($filePath) + ".json")
+            if (Test-Path $cacheFile) {
+                Remove-Item $cacheFile -Force
+            }
+        }
+        
+        # Check cache first
+        $cached = Get-CachedFileAnalysis -FilePath $filePath
+        if ($cached -and ($filePath -notin $ChangedFiles)) {
+            Write-Debug "Using cached analysis for $filePath"
+            $fileResults += $cached
+            continue
+        }
+        
+        $content = Get-Content $filePath -Raw -ErrorAction SilentlyContinue
         if (!$content) {
             continue
+        }
+        
+        $result = @{
+            file = $filePath
+            functions = @()
+            function_signatures = @{}
+            function_dependencies = @{}
+            s3_methods = @{}
+            purpose = ""
         }
         
         # Get file purpose
-        $purpose = Get-FilePurpose -FilePath $file
+        $purpose = Get-FilePurpose -FilePath $filePath
         if ($purpose) {
-            $file_purposes[$file] = $purpose
+            $result.purpose = $purpose
         }
         
+        # Find function definitions using pre-compiled regex
         $fileFunctions = @()
         
-        # Function definition patterns
-        $patterns = @(
-            '^\s*([a-zA-Z_][a-zA-Z0-9_.]*)\s*<-\s*function\s*\(',
-            '^\s*([a-zA-Z_][a-zA-Z0-9_.]*)\s*=\s*function\s*\('
-        )
+        $matches1 = $Script:CompiledRegex.FunctionDef1.Matches($content)
+        $matches2 = $Script:CompiledRegex.FunctionDef2.Matches($content)
         
-        foreach ($pattern in $patterns) {
-            $matches = [regex]::Matches($content, $pattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)
-            foreach ($match in $matches) {
-                $functionName = $match.Groups[1].Value
-                
-                if ($functionName -and $functionName.Trim() -ne "") {
-                    $cleanName = $functionName.Trim()
-                    $fileFunctions += $cleanName
-                    $functions[$cleanName] = $file
-                }
+        foreach ($match in ($matches1 + $matches2)) {
+            $functionName = $match.Groups[1].Value.Trim()
+            if ($functionName -and $functionName -ne "") {
+                $fileFunctions += $functionName
             }
         }
         
-        if ($fileFunctions.Count -gt 0) {
-            $definitions[$file] = $fileFunctions
+        $result.functions = $fileFunctions
+        
+        # Analyze each function in this file
+        foreach ($funcName in $fileFunctions) {
+            # Extract signature
+            $signature = Get-FunctionSignature -Content $content -FunctionName $funcName
+            if ($signature) {
+                $result.function_signatures[$funcName] = $signature
+            }
+        }
+        
+        # Extract S3 methods using pre-compiled regex
+        $s3Matches = $Script:CompiledRegex.S3Method.Matches($content)
+        foreach ($match in $s3Matches) {
+            $methodName = $match.Groups[1].Value
+            if ($methodName.Contains('.')) {
+                $parts = $methodName -split '\.'
+                $method = $parts[0]
+                $class = $parts[1..($parts.Length-1)] -join '.'
+                
+                if (!$result.s3_methods.ContainsKey($method)) {
+                    $result.s3_methods[$method] = @()
+                }
+                $result.s3_methods[$method] += $class
+            }
+        }
+        
+        # Cache the result
+        Set-CachedFileAnalysis -FilePath $filePath -Analysis $result
+        
+        $fileResults += $result
+    }
+    
+    # Combine results from parallel processing
+    foreach ($fileResult in $fileResults) {
+        if (!$fileResult) { continue }
+        
+        $filePath = $fileResult.file
+        $definitions[$filePath] = $fileResult.functions
+        
+        if ($fileResult.purpose) {
+            $file_purposes[$filePath] = $fileResult.purpose
+        }
+        
+        # Add functions to global function map
+        foreach ($funcName in $fileResult.functions) {
+            $functions[$funcName] = $filePath
+        }
+        
+        # Add function signatures
+        foreach ($funcName in $fileResult.function_signatures.Keys) {
+            $function_signatures[$funcName] = $fileResult.function_signatures[$funcName]
+        }
+        
+        # Add S3 methods
+        foreach ($method in $fileResult.s3_methods.Keys) {
+            if (!$s3_methods.ContainsKey($method)) {
+                $s3_methods[$method] = @()
+            }
+            $s3_methods[$method] += $fileResult.s3_methods[$method]
+            foreach ($class in $fileResult.s3_methods[$method]) {
+                if ($class -notin $s3_classes) {
+                    $s3_classes += $class
+                }
+            }
         }
     }
     
-    # Second pass: analyze signatures and dependencies
-    foreach ($file in $Files) {
-        if (!(Test-Path $file)) {
+    # Second pass: analyze function dependencies (only for changed files for efficiency)
+    foreach ($filePath in $ChangedFiles) {
+        if (!(Test-Path $filePath) -or !$definitions.ContainsKey($filePath)) {
             continue
         }
         
-        $content = Get-Content $file -Raw -ErrorAction SilentlyContinue
+        $content = Get-Content $filePath -Raw -ErrorAction SilentlyContinue
         if (!$content) {
             continue
         }
         
-        if ($definitions.ContainsKey($file)) {
-            foreach ($funcName in $definitions[$file]) {
-                # Extract signature
-                $signature = Get-FunctionSignature -Content $content -FunctionName $funcName
-                if ($signature) {
-                    $function_signatures[$funcName] = $signature
-                }
-                
-                # Extract function calls (dependencies)
-                $calls = Get-FunctionCalls -Content $content -FunctionName $funcName -AllFunctionNames $functions.Keys
-                if ($calls.Count -gt 0) {
-                    $function_dependencies[$funcName] = $calls
-                }
-            }
-        }
-        
-        # Extract S3 methods
-        $fileS3Methods = Get-S3Methods -Content $content
-        foreach ($method in $fileS3Methods.Keys) {
-            if (!$s3_methods.ContainsKey($method)) {
-                $s3_methods[$method] = @()
-            }
-            $s3_methods[$method] += $fileS3Methods[$method]
-            foreach ($class in $fileS3Methods[$method]) {
-                if ($class -notin $s3_classes) {
-                    $s3_classes += $class
-                }
+        foreach ($funcName in $definitions[$filePath]) {
+            # Extract function calls (dependencies)
+            $calls = Get-FunctionCalls -Content $content -FunctionName $funcName -AllFunctionNames $functions.Keys
+            if ($calls.Count -gt 0) {
+                $function_dependencies[$funcName] = $calls
             }
         }
     }
@@ -457,13 +614,34 @@ function Get-FunctionDefinitions {
 }
 
 function New-PackageDependencyMap {
-    Write-Debug "Creating package-wide function dependency map..."
+    Write-Debug "Creating optimized package-wide function dependency map..."
     
     $startTime = Get-Date
     
     # Get exported functions and external dependencies
     $exportedFunctions = Get-ExportedFunctions
     $externalDeps = Get-ExternalDependencies
+    
+    # Discover all R files
+    $rFiles = Get-AllRFiles
+    Write-Debug "Found $($rFiles.Count) R files"
+    
+    # Determine which files have changed since last run
+    $changedFiles = Get-ChangedFiles -AllFiles $rFiles
+    Write-Debug "Changed files: $($changedFiles.Count) of $($rFiles.Count)"
+    
+    # Load existing analysis if available
+    $existingAnalysis = @{}
+    if ((Test-Path $CACHE_FILE) -and ($changedFiles.Count -lt $rFiles.Count)) {
+        try {
+            $existingData = Get-Content $CACHE_FILE | ConvertFrom-Json -AsHashtable
+            $existingAnalysis = $existingData
+            Write-Debug "Loaded existing analysis"
+        } catch {
+            Write-Debug "Could not load existing analysis, starting fresh"
+            $existingAnalysis = @{}
+        }
+    }
     
     # Initialize the dependency map structure
     $dependencyMap = @{
@@ -473,10 +651,12 @@ function New-PackageDependencyMap {
             commit_message = $CommitMessage
             package_name = Get-PackageName
             version = Get-PackageVersion
-            total_files = 0
+            total_files = $rFiles.Count
             total_functions = 0
             exported_functions = $exportedFunctions.Count
             external_dependencies = $externalDeps
+            changed_files = $changedFiles.Count
+            cached_files = ($rFiles.Count - $changedFiles.Count)
         }
         functions = @{}
         definitions = @{}
@@ -484,14 +664,24 @@ function New-PackageDependencyMap {
         exported = $exportedFunctions
     }
     
-    # Discover all R files
-    $rFiles = Get-AllRFiles
-    $dependencyMap.metadata.total_files = $rFiles.Count
+    Write-Debug "Analyzing $($rFiles.Count) R files ($($changedFiles.Count) changed, $($rFiles.Count - $changedFiles.Count) cached)..."
     
-    Write-Debug "Analyzing $($rFiles.Count) R files..."
+    # Find function definitions, signatures, dependencies, and S3 methods with optimizations
+    $funcResults = Get-FunctionDefinitions -Files $rFiles -ExportedFunctions $exportedFunctions -ChangedFiles $changedFiles
     
-    # Find function definitions, signatures, dependencies, and S3 methods
-    $funcResults = Get-FunctionDefinitions -Files $rFiles -ExportedFunctions $exportedFunctions
+    # Merge with existing analysis for unchanged files
+    if ($existingAnalysis.Count -gt 0) {
+        # Copy over function dependencies for unchanged files
+        if ($existingAnalysis.ContainsKey('function_dependencies')) {
+            foreach ($funcName in $existingAnalysis.function_dependencies.Keys) {
+                $funcFile = $funcResults.functions[$funcName]
+                if ($funcFile -and ($funcFile -notin $changedFiles)) {
+                    $funcResults.function_dependencies[$funcName] = $existingAnalysis.function_dependencies[$funcName]
+                }
+            }
+        }
+    }
+    
     $dependencyMap.functions = $funcResults.functions
     $dependencyMap.definitions = $funcResults.definitions
     $dependencyMap.function_signatures = $funcResults.function_signatures

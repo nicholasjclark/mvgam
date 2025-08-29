@@ -1,0 +1,16 @@
+﻿{
+    "s3_methods":  {
+
+                   },
+    "functions":  [
+                      "plot_mvgam_trend"
+                  ],
+    "purpose":  "Trend modeling",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "plot_mvgam_trend":  "plot_mvgam_trend = function( object, series = 1, newdata, data_test, realisations = FALSE, n_realisations = 15, n_cores = 1, derivatives = FALSE, xlab, ylab ) {"
+                            },
+    "file":  "R/plot_mvgam_trend.R"
+}

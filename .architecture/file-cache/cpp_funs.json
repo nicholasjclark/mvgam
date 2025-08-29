@@ -1,0 +1,16 @@
+﻿{
+    "s3_methods":  {
+
+                   },
+    "functions":  [
+
+                  ],
+    "purpose":  "",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+
+                            },
+    "file":  "R/cpp_funs.R"
+}

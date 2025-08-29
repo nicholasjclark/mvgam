@@ -1,0 +1,26 @@
+﻿{
+    "s3_methods":  {
+
+                   },
+    "functions":  [
+                      "repair_names",
+                      "repair_stanfit",
+                      "repair_variable_names",
+                      "is_equal",
+                      "ulapply",
+                      "seq_rows"
+                  ],
+    "purpose":  "",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "ulapply":  "ulapply \u003c- function(X, FUN, ..., recursive = TRUE, use.names = TRUE) {",
+                                "repair_stanfit":  "repair_stanfit \u003c- function(x) {",
+                                "repair_names":  "repair_names \u003c- function(x) {",
+                                "repair_variable_names":  "repair_variable_names \u003c- function(x) {",
+                                "seq_rows":  "seq_rows = function(x) {",
+                                "is_equal":  "is_equal \u003c- function(x, y, check.attributes = FALSE, ...) {"
+                            },
+    "file":  "R/backends.R"
+}

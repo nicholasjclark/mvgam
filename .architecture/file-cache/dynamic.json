@@ -1,0 +1,16 @@
+﻿{
+    "s3_methods":  {
+
+                   },
+    "functions":  [
+                      "dynamic"
+                  ],
+    "purpose":  "",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "dynamic":  "dynamic = function(variable, k, rho = 5, stationary = TRUE, scale = TRUE) {"
+                            },
+    "file":  "R/dynamic.R"
+}

@@ -1,0 +1,20 @@
+﻿{
+    "s3_methods":  {
+                       "ordinate":  [
+                                        "jsdgam"
+                                    ]
+                   },
+    "functions":  [
+                      "ordinate",
+                      "ordinate.jsdgam"
+                  ],
+    "purpose":  "",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "ordinate.jsdgam":  "ordinate.jsdgam \u003c- function( object, which_lvs = c(1, 2), biplot = TRUE, alpha = 0.5, label_sites = TRUE, ... ) {",
+                                "ordinate":  "ordinate \u003c- function(object, ...) {"
+                            },
+    "file":  "R/ordinate.jsdgam.R"
+}

@@ -1,0 +1,20 @@
+﻿{
+    "s3_methods":  {
+                       "stability":  [
+                                         "mvgam"
+                                     ]
+                   },
+    "functions":  [
+                      "stability",
+                      "stability.mvgam"
+                  ],
+    "purpose":  "",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "stability":  "stability \u003c- function(object, ...) {",
+                                "stability.mvgam":  "stability.mvgam = function(object, ...) {"
+                            },
+    "file":  "R/stability.R"
+}

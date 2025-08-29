@@ -1,0 +1,26 @@
+﻿{
+    "s3_methods":  {
+                       "irf":  [
+                                   "mvgam"
+                               ]
+                   },
+    "functions":  [
+                      "irf",
+                      "irf.mvgam",
+                      "gen_irf",
+                      "var_phi",
+                      "var_psi"
+                  ],
+    "purpose":  "",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "irf":  "irf \u003c- function(object, ...) {",
+                                "irf.mvgam":  "irf.mvgam \u003c- function( object, h = 10, cumulative = FALSE, orthogonal = FALSE, ... ) {",
+                                "var_phi":  "var_phi \u003c- function(x, h = 10) {",
+                                "gen_irf":  "gen_irf \u003c- function(x, h = 6, cumulative = TRUE, orthogonal = FALSE) {",
+                                "var_psi":  "var_psi \u003c- function(x, h = 10) {"
+                            },
+    "file":  "R/irf.mvgam.R"
+}

@@ -1,0 +1,20 @@
+﻿{
+    "s3_methods":  {
+                       "add_residuals":  [
+                                             "mvgam"
+                                         ]
+                   },
+    "functions":  [
+                      "add_residuals",
+                      "add_residuals.mvgam"
+                  ],
+    "purpose":  "Residual analysis",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "add_residuals.mvgam":  "add_residuals.mvgam = function(object, ...) {",
+                                "add_residuals":  "add_residuals \u003c- function(object, ...) {"
+                            },
+    "file":  "R/add_residuals.R"
+}
