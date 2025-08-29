@@ -588,9 +588,14 @@ function Get-FunctionDefinitions {
         }
     }
     
-    # Second pass: analyze function dependencies (limited to key files for performance)
-    $keyFilesPattern = 'mvgam_core|mvgam\.R|sim_mvgam|plot\.mvgam|lfo_cv|series_to_mvgam'
-    $keyFiles = $ChangedFiles | Where-Object { $_ -match $keyFilesPattern } | Select-Object -First 5
+    # Second pass: analyze function dependencies (prioritize key integration files)
+    $priorityFilesPattern = 'brms_integration|priors|stan_assembly|trend_system|mvgam_core|validations'
+    $coreFilesPattern = 'mvgam\.R|sim_mvgam|plot\.mvgam|lfo_cv|series_to_mvgam'
+    
+    # Prioritize Stan/brms integration files + core/validation files first, then other core files
+    $priorityFiles = $ChangedFiles | Where-Object { $_ -match $priorityFilesPattern }
+    $coreFiles = $ChangedFiles | Where-Object { $_ -match $coreFilesPattern }
+    $keyFiles = ($priorityFiles + $coreFiles) | Select-Object -First 10
     
     foreach ($filePath in $keyFiles) {
         if (!(Test-Path $filePath) -or !$definitions.ContainsKey($filePath)) {
@@ -603,10 +608,19 @@ function Get-FunctionDefinitions {
             continue
         }
         
-        # Only analyze exported functions and key internal functions for performance
-        $keyFunctions = $definitions[$filePath] | Where-Object { 
-            $_ -in $exportedFunctions -or $_ -match 'mvgam|plot|validate|check'
-        } | Select-Object -First 3
+        # Prioritize functions based on file importance
+        if ($filePath -match $priorityFilesPattern) {
+            # For priority files (Stan/brms integration, core, validations), analyze more functions
+            $keyFunctions = $definitions[$filePath] | Where-Object { 
+                $_ -in $exportedFunctions -or 
+                $_ -match 'brms|stan|formula|prior|trend|code|data|assemble|validate|check|generate|build|mvgam|is\.'
+            } | Select-Object -First 8
+        } else {
+            # For other core files, standard selection
+            $keyFunctions = $definitions[$filePath] | Where-Object { 
+                $_ -in $exportedFunctions -or $_ -match 'mvgam|plot|validate|check'
+            } | Select-Object -First 3
+        }
         
         foreach ($funcName in $keyFunctions) {
             # Extract function calls (dependencies) using optimized method
@@ -823,6 +837,28 @@ function New-PackageDependencyMap {
     
     # Enhanced function dependencies section for LLM agents
     $markdown += "`n## Function Dependencies & Architecture`n"
+    
+    # Prioritized Stan/brms integration functions
+    $stanBrmsFunctions = @()
+    foreach ($func in $dependencyMap.function_dependencies.Keys) {
+        $file = $dependencyMap.functions[$func]
+        if ($file -match 'brms_integration|priors|stan_assembly|trend_system|mvgam_core|validations') {
+            $stanBrmsFunctions += $func
+        }
+    }
+    
+    if ($stanBrmsFunctions.Count -gt 0) {
+        $markdown += "`n### Priority Integration Functions (Stan/brms/Core/Validation)`n"
+        $topPriority = $stanBrmsFunctions | Select-Object -First 6
+        foreach ($func in $topPriority) {
+            $deps = $dependencyMap.function_dependencies[$func]
+            $filePath = $dependencyMap.functions[$func]
+            if ($deps.Count -gt 0) {
+                $markdown += "- **$func()** (``$filePath``)`n"
+                $markdown += "  - Internal calls: " + ($deps -join ', ') + "`n"
+            }
+        }
+    }
     
     # Core workflow functions
     $coreWorkflow = @('mvgam', 'sim_mvgam', 'plot.mvgam', 'predict.mvgam', 'lfo_cv.mvgam', 'series_to_mvgam')
