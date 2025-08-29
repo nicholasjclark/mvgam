@@ -231,7 +231,9 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
       resp_stanvars <- extract_trend_stanvars_from_setup(
         trend_setup,
         resp_trend_specs,
-        response_suffix = paste0("_", resp_name)
+        response_suffix = paste0("_", resp_name),
+        obs_data = obs_setup$data,
+        response_name = resp_name
       )
 
       if (!is.null(resp_stanvars)) {
@@ -772,112 +774,154 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
 #' @return Modified Stan code with trend injection
 #' @noRd
 inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
-  checkmate::assert_string(base_stancode)
+  # Input validation
+  checkmate::assert_string(base_stancode, min.chars = 1)
   checkmate::assert_list(trend_stanvars, null.ok = TRUE)
-
-  # If no trends, return unchanged
+  
+  # Early return if no trends to inject
   if (is.null(trend_stanvars) || length(trend_stanvars) == 0) {
     return(base_stancode)
   }
-
-  # Split code into lines for easier manipulation
-  code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
-
-  # Find the transformed parameters block or create one if it doesn't exist
-  tp_block_start <- which(grepl("^\\s*transformed\\s+parameters\\s*\\{", code_lines))
-
-  if (length(tp_block_start) == 0) {
-    # No transformed parameters block exists, create one before model block
-    model_block_start <- which(grepl("^\\s*model\\s*\\{", code_lines))
-
-    if (length(model_block_start) == 0) {
-      stop(insight::format_error(
-        "Cannot find model block in Stan code for trend injection.",
-        "Stan code structure is invalid."
-      ))
-    }
-
-    # Insert transformed parameters block before model block
-    new_tp_block <- c(
-      "transformed parameters {",
-      "  // Combined linear predictor with trend effects",
-      "  vector[N] mu_combined = mu;",
-      "",
-      "  // Add trend effects if available",
-      "  if (size(trend) > 0) {",
-      "    mu_combined += trend[obs_ind];",
-      "  }",
-      "}"
-    )
-
-    # Insert the new block
-    code_lines <- c(
-      code_lines[1:(model_block_start[1] - 1)],
-      new_tp_block,
-      "",
-      code_lines[model_block_start[1]:length(code_lines)]
-    )
-
-  } else {
-    # Transformed parameters block exists, modify it
-    tp_start <- tp_block_start[1]
-    tp_end <- find_matching_brace(code_lines, tp_start)
-
-    if (length(tp_end) == 0) {
-      stop(insight::format_error(
-        "Cannot find end of transformed parameters block.",
-        "Stan code structure may be invalid."
-      ))
-    }
-
-    # Find mu declaration and modify it
-    mu_lines <- which(grepl("vector\\[.*\\]\\s+mu\\s*=", code_lines[(tp_start+1):(tp_end-1)]))
-
-    if (length(mu_lines) > 0) {
-      # mu is declared in transformed parameters, modify it
-      mu_line_idx <- tp_start + mu_lines[1]
-
-      # Insert trend addition after mu declaration
-      trend_addition <- c(
-        "",
-        "  // Add trend effects",
-        "  if (size(trend) > 0) {",
-        "    mu += trend[obs_ind];",
-        "  }"
-      )
-
-      code_lines <- c(
-        code_lines[1:mu_line_idx],
-        trend_addition,
-        code_lines[(mu_line_idx+1):length(code_lines)]
-      )
-
-    } else {
-      # mu not found in transformed parameters, add combined predictor
-      trend_addition <- c(
-        "  // Combined linear predictor with trend effects",
-        "  vector[N] mu_combined = mu;",
-        "  if (size(trend) > 0) {",
-        "    mu_combined += trend[obs_ind];",
-        "  }"
-      )
-
-      # Insert before closing brace of transformed parameters
-      code_lines <- c(
-        code_lines[1:(tp_end-1)],
-        trend_addition,
-        code_lines[tp_end:length(code_lines)]
-      )
-
-      # Update likelihood to use mu_combined instead of mu
-      code_lines <- gsub("\\bmu\\b", "mu_combined", code_lines)
+  
+  # Extract and validate mapping arrays
+  mapping_arrays <- list(time_arrays = character(0), series_arrays = character(0))
+  
+  for (stanvar in trend_stanvars) {
+    if (inherits(stanvar, "stanvar") && !is.null(stanvar$name)) {
+      if (grepl("obs_trend_time", stanvar$name)) {
+        mapping_arrays$time_arrays <- c(mapping_arrays$time_arrays, stanvar$name)  
+      }
+      if (grepl("obs_trend_series", stanvar$name)) {
+        mapping_arrays$series_arrays <- c(mapping_arrays$series_arrays, stanvar$name)
+      }
     }
   }
-
-  # Rejoin the code
-  modified_code <- paste(code_lines, collapse = "\n")
-
-  return(modified_code)
+  
+  # Validate mapping arrays exist
+  if (length(mapping_arrays$time_arrays) == 0 || length(mapping_arrays$series_arrays) == 0) {
+    stop(insight::format_error(
+      "Missing observation-to-trend mapping arrays in trend_stanvars.",
+      "Expected obs_trend_time and obs_trend_series arrays from generate_obs_trend_mapping().",
+      "This indicates a problem in the stanvar generation pipeline."
+    ), call. = FALSE)
+  }
+  
+  # Validate arrays are paired
+  if (length(mapping_arrays$time_arrays) != length(mapping_arrays$series_arrays)) {
+    stop(insight::format_error(
+      "Mismatched mapping arrays: {length(mapping_arrays$time_arrays)} time arrays but {length(mapping_arrays$series_arrays)} series arrays.",
+      "Each obs_trend_time array must have a corresponding obs_trend_series array.",
+      "Check the stanvar generation process for consistency."
+    ), call. = FALSE)
+  }
+  
+  # Parse Stan code
+  code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
+  
+  # Find transformed parameters block
+  tp_start <- which(grepl("^\\s*transformed\\s+parameters\\s*\\{", code_lines))
+  
+  if (length(tp_start) == 0) {
+    # No transformed parameters block - find model block to insert before
+    model_start <- which(grepl("^\\s*model\\s*\\{", code_lines))
+    if (length(model_start) == 0) {
+      stop(insight::format_error(
+        "Cannot find model block in Stan code for trend injection.",
+        "Stan code structure is invalid.",
+        "This may indicate a problem with brms code generation."
+      ), call. = FALSE)
+    }
+    
+    # Create transformed parameters block content only
+    tp_content <- generate_trend_injection_code(mapping_arrays)
+    tp_block <- c("transformed parameters {", tp_content, "}")
+    
+    # Insert before model block
+    code_lines <- c(
+      code_lines[1:(model_start[1] - 1)],
+      tp_block,
+      "",
+      code_lines[model_start[1]:length(code_lines)]
+    )
+    
+  } else {
+    # Transformed parameters block exists - find end and insert content
+    tp_start_idx <- tp_start[1]
+    
+    # Find matching closing brace using base R
+    brace_count <- 0
+    tp_end_idx <- NULL
+    
+    for (i in tp_start_idx:length(code_lines)) {
+      line <- code_lines[i]
+      # Count braces using base R
+      open_braces <- lengths(gregexpr("\\{", line, fixed = TRUE))
+      close_braces <- lengths(gregexpr("\\}", line, fixed = TRUE))
+      # Handle case where no matches found (returns -1)
+      if (open_braces == -1) open_braces <- 0
+      if (close_braces == -1) close_braces <- 0
+      
+      brace_count <- brace_count + open_braces - close_braces
+      if (i > tp_start_idx && brace_count == 0) {
+        tp_end_idx <- i
+        break
+      }
+    }
+    
+    if (is.null(tp_end_idx)) {
+      stop(insight::format_error(
+        "Cannot find end of transformed parameters block.",
+        "Stan code structure may be invalid due to unmatched braces.",
+        "This may indicate a problem with brms code generation."
+      ), call. = FALSE)
+    }
+    
+    # Generate and insert trend injection content before closing brace
+    injection_content <- generate_trend_injection_code(mapping_arrays)
+    
+    code_lines <- c(
+      code_lines[1:(tp_end_idx - 1)],
+      injection_content,
+      code_lines[tp_end_idx:length(code_lines)]
+    )
+  }
+  
+  return(paste(code_lines, collapse = "\n"))
+  
+  # Internal helper function for generating Stan code content
+  generate_trend_injection_code <- function(mapping_arrays) {
+    checkmate::assert_list(mapping_arrays)
+    checkmate::assert_names(names(mapping_arrays), must.include = c("time_arrays", "series_arrays"))
+    
+    injection_lines <- c("", "  // Add trend effects using mapping arrays")
+    
+    # Generate for each response (handles both univariate and multivariate)
+    for (i in seq_along(mapping_arrays$time_arrays)) {
+      time_array <- mapping_arrays$time_arrays[i]
+      series_array <- mapping_arrays$series_arrays[i] 
+      
+      # Extract response suffix using base R
+      response_suffix <- ""
+      match_result <- regexpr("_y\\d+$", time_array)
+      if (match_result != -1) {
+        response_suffix <- regmatches(time_array, match_result)
+      }
+      
+      # Generate variable names based on suffix
+      mu_var <- if (response_suffix == "") "mu" else paste0("mu", response_suffix)
+      trend_var <- if (response_suffix == "") "trend" else paste0("trend", response_suffix)
+      n_var <- if (response_suffix == "") "N" else paste0("N", response_suffix)
+      
+      # Generate direct mu modification loop
+      injection_lines <- c(injection_lines,
+        paste0("  for (n in 1:", n_var, ") {"),
+        paste0("    ", mu_var, "[n] += ", trend_var, "[", time_array, "[n], ", series_array, "[n]];"),
+        "  }"
+      )
+    }
+    
+    return(injection_lines)
+  }
 }
 
 #' Inject Multivariate Trends into Linear Predictors

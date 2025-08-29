@@ -80,7 +80,7 @@
                                 "generate_shared_innovation_stanvars":  "generate_shared_innovation_stanvars \u003c- function(n_lv, n_series, cor = FALSE, factor_model = FALSE, hierarchical_info = NULL) {",
                                 "generate_matrix_z_tdata":  "generate_matrix_z_tdata \u003c- function(is_factor_model, n_lv, n_series) {",
                                 "inject_trend_into_linear_predictor":  "inject_trend_into_linear_predictor \u003c- function(base_stancode, trend_stanvars) {",
-                                "extract_trend_stanvars_from_setup":  "extract_trend_stanvars_from_setup \u003c- function(trend_setup, trend_specs, response_suffix = \"\") {",
+                                "extract_trend_stanvars_from_setup":  "extract_trend_stanvars_from_setup \u003c- function(trend_setup, trend_specs, response_suffix = \"\", obs_data = NULL, response_name = NULL) {",
                                 "extract_and_rename_stan_blocks":  "extract_and_rename_stan_blocks \u003c- function(stancode, suffix, mapping, is_multivariate, response_names) {",
                                 "extract_non_likelihood_from_model_block":  "extract_non_likelihood_from_model_block \u003c- function(model_block) {",
                                 "format_matrix_for_stan_array":  "format_matrix_for_stan_array \u003c- function(matrix) {",

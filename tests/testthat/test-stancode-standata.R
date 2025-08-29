@@ -135,6 +135,14 @@ test_that("stancode generates correct Stan blocks", {
 
   # Should contain smooth terms from mgcv
   expect_match2(code, "s_")  # mgcv smooth term prefix
+  
+  # Mapping functionality: should contain obs_trend_time and obs_trend_series arrays
+  expect_match2(code, "obs_trend_time")
+  expect_match2(code, "obs_trend_series")
+  
+  # Mapping functionality: should use correct injection pattern (not obs_ind)
+  expect_match2(code, "mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\]")
+  expect_false(grepl("obs_ind", code))  # Should not use old broken pattern
 })
 
 test_that("stancode handles multivariate specifications", {
@@ -154,6 +162,16 @@ test_that("stancode handles multivariate specifications", {
   expect_match2(code_shared, "count")
   expect_match2(code_shared, "biomass")
   expect_match2(code_shared, "L_Omega_trend")  # Correlation matrix
+  
+  # Multivariate mapping functionality: should have response-specific arrays
+  expect_match2(code_shared, "obs_trend_time_count")
+  expect_match2(code_shared, "obs_trend_series_count")
+  expect_match2(code_shared, "obs_trend_time_biomass")
+  expect_match2(code_shared, "obs_trend_series_biomass")
+  
+  # Multivariate mapping: should have response-specific injection patterns
+  expect_match2(code_shared, "mu_count\\[n\\] \\+= trend_count\\[obs_trend_time_count\\[n\\], obs_trend_series_count\\[n\\]\\]")
+  expect_match2(code_shared, "mu_biomass\\[n\\] \\+= trend_biomass\\[obs_trend_time_biomass\\[n\\], obs_trend_series_biomass\\[n\\]\\]")
 })
 
 test_that("stancode integrates custom priors correctly", {
@@ -217,6 +235,18 @@ test_that("standata.mvgam_formula returns proper list structure", {
 
   # Should contain trend-related data
   expect_true(any(grepl("trend", names(standata_result))))
+  
+  # Mapping functionality: should contain observation-to-trend mapping arrays
+  expect_true("obs_trend_time" %in% names(standata_result))
+  expect_true("obs_trend_series" %in% names(standata_result))
+  
+  # Mapping arrays should have correct dimensions
+  expect_equal(length(standata_result$obs_trend_time), standata_result$N)
+  expect_equal(length(standata_result$obs_trend_series), standata_result$N)
+  
+  # Mapping arrays should contain valid indices
+  expect_true(all(standata_result$obs_trend_time >= 1))
+  expect_true(all(standata_result$obs_trend_series >= 1))
 })
 
 test_that("standata handles different data structures", {
@@ -250,6 +280,18 @@ test_that("standata processes missing data correctly", {
   # Exact behavior depends on mvgam's missing data handling
   expect_true("N" %in% names(standata_result))
   expect_gte(standata_result$N, 0)  # Should have some observations
+  
+  # Missing data mapping: mapping arrays should match reduced observation count
+  expect_true("obs_trend_time" %in% names(standata_result))
+  expect_true("obs_trend_series" %in% names(standata_result))
+  
+  # Mapping arrays should align with non-missing observations
+  expect_equal(length(standata_result$obs_trend_time), standata_result$N)
+  expect_equal(length(standata_result$obs_trend_series), standata_result$N)
+  
+  # Should have fewer observations than original data due to missings
+  original_data <- setup_stan_test_data()$univariate
+  expect_lt(standata_result$N, nrow(original_data))
 })
 
 test_that("standata integrates with trend systems", {

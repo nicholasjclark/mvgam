@@ -57,7 +57,7 @@
 
 ### **Phase 2: Implementation** (120 min)
 
-- [ ] **Sub-task B1**: Implement mapping creation infrastructure (45 min)
+- [X] **Sub-task B1**: Implement mapping creation infrastructure (45 min)
   - Read `architecture/stan-data-flow-pipeline.md`
   - Create `generate_obs_trend_mapping()` function that takes observation data + trend dimensions
   - Generate mapping array: for each observation n → corresponding trend[time_idx, series_idx] position
@@ -65,7 +65,7 @@
   - Add comprehensive input validation and error handling
   - Update `architecture/stan-data-flow-pipeline.md` accordingly
   
-- [ ] **Sub-task B2**: Integrate mapping into stanvar generation pipeline (45 min)
+- [X] **Sub-task B2**: Integrate mapping into stanvar generation pipeline (45 min)
   - Read `architecture/stan-data-flow-pipeline.md`
   - Add mapping creation to `extract_trend_stanvars_from_setup()` or equivalent function
   - Ensure mapping gets included as "data" block stanvar in trend_stanvars collection
@@ -73,7 +73,7 @@
   - Add mapping metadata to trend specifications for downstream usage
   - Update `architecture/stan-data-flow-pipeline.md` accordingly
   
-- [ ] **Sub-task B3**: Update injection logic to use mapping (30 min)
+- [X] **Sub-task B3**: Update injection logic to use mapping (30 min)
   - Read `architecture/stan-data-flow-pipeline.md`
   - Replace `obs_ind` references with `obs_trend_mapping` in `inject_trend_into_linear_predictor()`
   - Support both 2D matrix access `trend[time_idx, series_idx]` and linear indexing strategies
@@ -81,37 +81,31 @@
   - Preserve existing injection logic structure while eliminating undefined variable dependency
   - Update `architecture/stan-data-flow-pipeline.md` accordingly
 
-### **Phase 3: Testing and Validation** (90 min)
+### **Phase 3: Architecture Refactoring and Testing** (90 min)
 
-- [ ] **Sub-task C1**: Test mapping with controlled datasets (45 min)
-  - **Complete data**: No missing values - verify mapping == direct indexing results
-  - **Random missing**: 20% randomly missing observations across series/time  
-  - **Systematic missing**: Some series start later, some end earlier
-  - **Edge cases**: Single series, single time point, all-but-one missing
-  
-- [ ] **Sub-task C2**: Validate against existing test suite (30 min)
-  - Run all 23 tests in `test-stancode-standata.R` with new mapping approach
-  - Fix any regressions introduced by mapping implementation
-  - Verify that Stan compilation errors are resolved
-  - Ensure generated Stan code structure is valid
-  
-- [ ] **Sub-task C3**: Performance and correctness validation (15 min)
-  - Compare trend injection results with/without missing data
-  - Verify that mapping overhead is minimal for complete data cases
-  - Test with larger datasets to ensure scalability
-  - Validate that trend effects are correctly applied to matching observations
+- [ ] **Sub-task C1**: Refactor mapping generation into extract_time_series_dimensions() (45 min)
+  - Modify `extract_time_series_dimensions()` to accept `response_vars` parameter (required, not optional)
+  - Generate mappings within dimension extraction: call `generate_obs_trend_mapping()` for each response
+  - Return mappings in dimensions result structure alongside existing fields
+  - Update function signature and documentation for new centralized approach
+
+- [ ] **Sub-task C2**: Update calling code to use cleaner mapping architecture (30 min)  
+  - Update `validate_time_series_for_trends()` to pass response variables to dimension extraction
+  - Modify `extract_trend_stanvars_from_setup()` to extract mappings from dimensions.mappings instead of generating separately
+  - Remove complex parameter threading: `obs_data` and `response_name` parameters no longer needed
+  - Revert multivariate and univariate calling code to simpler structure without extra parameters
+
+- [ ] **Sub-task C3**: Validate refactored mapping system (15 min)
+  - Run all 23 tests in `test-stancode-standata.R` to validate refactored approach  
+  - Fix any regressions from architecture changes
+  - Verify Stan code generation and compilation works correctly
+  - Test with both univariate and multivariate models, complete and missing data cases
 
 ### **Phase 4: Integration and Documentation** (30 min)
 
 - [ ] **Sub-task D1**: Update debug script and diagnostic tools (15 min)
   - Enhance `debug_stan_parameter_blocks.R` to test mapping creation and usage
   - Add mapping validation to Stan code analysis functions
-  - Create helper functions to inspect obs_trend_mapping correctness
-  
-- [ ] **Sub-task D2**: Document architecture decision and usage (15 min)
-  - Update `architecture/architecture-decisions.md` with missing data handling approach
-  - Document when/why obs_trend_mapping is created vs obs_ind approach
-  - Add examples of mapping structure for different missing data patterns
 
 **TOTAL ESTIMATED TIME**: 330 minutes (5.5 hours)
 

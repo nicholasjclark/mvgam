@@ -121,7 +121,7 @@ mvgam(
 
 ### 2. Response-Specific Parameter Naming
 **Pattern**: Follow brms multivariate naming conventions
-```stan
+```r
 // Multivariate responses generate response-specific parameters
 vector[N_count] mu_count = rep_vector(0.0, N_count);
 vector[N_biomass] mu_biomass = rep_vector(0.0, N_biomass);
@@ -150,7 +150,7 @@ mu_biomass += mu_trend_biomass;
 2. **Validation**: Registry-based compatibility checking prevents invalid factor models
 3. **Variance Constraint**: Dynamic factor variances must be fixed to 1 for identifiability
 4. **Matrix Z Location**: Estimated in `parameters` block (factor model) vs `transformed data` (non-factor), or supplied in `data` block when trend mapping
-5. **Universal Computation**: All factor models use `trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[ytimes[i, s]]`; non-factor models use `trend[i, s] = dot_product(Z[s, :], LV[i, :]);`
+5. **Universal Computation**: All trend models use `trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[times_trend[i, s]]`
 6. **Code Deduplication**: Shared utility functions ensure consistent patterns across trend types
 7. **Registration**: New trend types must explicitly declare factor compatibility in registry
 
@@ -325,7 +325,7 @@ variable_info = list(
 **Critical Design Decision**: Trend parameters (variances, ar parameters, etc..) must avoid naming conflicts with brms observation model parameters
 
 **Naming Convention**:
-```stan
+```r
 // Trend variance parameters - use _trend suffix
 vector<lower=0>[n_lv] sigma_trend;     // Univariate trend variances
 matrix[n_lv, n_lv] Sigma_trend;        // Multivariate trend covariance
@@ -442,13 +442,59 @@ valid_blocks <- c("tparameters", "transformed_parameters", "tdata", "transformed
   4. Suffix pattern: All parameters/data get `_y1`, `_y2` suffixes per response
   5. Independent treatment: Each response can have completely different model structures
 
+## Stan Code Data Flow Architecture
+
+### **CRITICAL: Complete Stan Code Flow**
+
+**Purpose**: Define exactly how trend values are computed and combined with brms observation models in Stan code.
+
+**Stage 1: Trend Value Computation** (in transformed parameters block):
+```r
+// Universal computation for ALL trend models:
+for (i in 1:n_time) {
+  for (s in 1:n_series) {
+    trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[times_trend[i, s]];
+  }
+}
+```
+
+**Stage 2: Observation-Trend Integration** (in transformed parameters block):
+```r
+// Combine brms linear predictor (mu) with mvgam trend effects:
+for (n in 1:N) {
+  mu[n] += trend[obs_trend_time[n], obs_trend_series[n]];
+}
+// Result: mu[n] = brms_effects + trend_effects for each observation
+```
+
+**Key Data Structures**:
+- `trend[n_time, n_series]`: Matrix of computed trend values over time and series  
+- `times_trend[n_time, n_series]`: Maps trend positions to time indices for mu_trend access
+- `obs_trend_time[N]`, `obs_trend_series[N]`: Map each brms observation to trend matrix position
+- `mu[N]`: brms linear predictor, extended with trend effects
+- `mu_trend[...]`: Trend intercepts/means from brms trend model
+- `Z[n_series, n_lv]`: Factor loadings matrix
+- `LV[n_time, n_lv]`: Latent variable matrix (dynamic states)
+
+**Critical Design Decision**: The `trend` matrix contains the **final computed trend values** that get added to `mu`. The `mu_trend` array contains **trend intercepts** used during trend computation. Both components are essential for all trend models.
+
 ## Critical Integration Points
+
+### Centralized Mapping Generation Architecture
+
+**Design Decision**: Mapping generation is centralized within `extract_time_series_dimensions()` to eliminate complex parameter threading and ensure mappings are always available when dimensions are computed.
+
+**Rationale**: 
+- Every trend model needs both dimensions and observation-to-trend mappings
+- Generating them together eliminates threading response variables through multiple function calls
+- Centralizes all data structure analysis in one location for better maintainability
+- Ensures mappings are always consistent with dimension calculations
 
 ### Data Flow Overview
 ```
 User Input → mvgam() → parse_multivariate_trends() → setup_brms_lightweight() 
-→ validate_time_series_for_trends() → extract_time_series_dimensions()
-→ trend_specs$dimensions ← dimensions
+→ validate_time_series_for_trends() → extract_time_series_dimensions(response_vars)
+→ {dimensions + mappings} ← comprehensive time series analysis
 → generate_combined_stancode() → extract_trend_stanvars_from_setup() 
 → fit_mvgam_model() → create_mvgam_from_combined_fit()
 ```
