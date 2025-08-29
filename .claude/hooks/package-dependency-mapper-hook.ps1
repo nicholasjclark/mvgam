@@ -240,7 +240,7 @@ function Get-FunctionCalls {
     
     $calls = @()
     
-    # Extract the function body
+    # Extract the function body efficiently
     $lines = $Content -split '\r?\n'
     $inFunction = $false
     $braceCount = 0
@@ -267,18 +267,19 @@ function Get-FunctionCalls {
         }
     }
     
-    # Look for function calls in the body
-    foreach ($func in $AllFunctionNames) {
-        if ($func -ne $FunctionName) {  # Don't count self-references
-            # Look for function calls: func( or func ( but not inside quotes
-            $pattern = "(?<!['\`"`"])$([regex]::Escape($func))\s*\("
-            if ($functionBody -match $pattern) {
-                $calls += $func
-            }
+    # Optimized approach: find all function calls with one regex, then filter
+    # Look for any identifier followed by '(' - much faster than individual searches
+    $callMatches = [regex]::Matches($functionBody, '([a-zA-Z_][a-zA-Z0-9_.]*)(\s*)\(', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    
+    $foundCalls = @{}
+    foreach ($match in $callMatches) {
+        $funcCall = $match.Groups[1].Value
+        if ($funcCall -in $AllFunctionNames -and $funcCall -ne $FunctionName) {
+            $foundCalls[$funcCall] = $true
         }
     }
     
-    return $calls | Sort-Object -Unique
+    return $foundCalls.Keys | Sort-Object
 }
 
 function Get-S3Methods {
@@ -572,26 +573,34 @@ function Get-FunctionDefinitions {
         }
     }
     
-    # Second pass: analyze function dependencies (temporarily disabled for performance)
-    # TODO: Optimize Get-FunctionCalls function to avoid O(n²) regex operations
-    # foreach ($filePath in $ChangedFiles) {
-    #     if (!(Test-Path $filePath) -or !$definitions.ContainsKey($filePath)) {
-    #         continue
-    #     }
-    #     
-    #     $content = Get-Content $filePath -Raw -ErrorAction SilentlyContinue
-    #     if (!$content) {
-    #         continue
-    #     }
-    #     
-    #     foreach ($funcName in $definitions[$filePath]) {
-    #         # Extract function calls (dependencies)
-    #         $calls = Get-FunctionCalls -Content $content -FunctionName $funcName -AllFunctionNames $functions.Keys
-    #         if ($calls.Count -gt 0) {
-    #             $function_dependencies[$funcName] = $calls
-    #         }
-    #     }
-    # }
+    # Second pass: analyze function dependencies (limited to key files for performance)
+    $keyFilesPattern = 'mvgam_core|mvgam\.R|sim_mvgam|plot\.mvgam|lfo_cv|series_to_mvgam'
+    $keyFiles = $ChangedFiles | Where-Object { $_ -match $keyFilesPattern } | Select-Object -First 5
+    
+    foreach ($filePath in $keyFiles) {
+        if (!(Test-Path $filePath) -or !$definitions.ContainsKey($filePath)) {
+            continue
+        }
+        
+        Write-Debug "Analyzing dependencies in $filePath..."
+        $content = Get-Content $filePath -Raw -ErrorAction SilentlyContinue
+        if (!$content) {
+            continue
+        }
+        
+        # Only analyze exported functions and key internal functions for performance
+        $keyFunctions = $definitions[$filePath] | Where-Object { 
+            $_ -in $exportedFunctions -or $_ -match 'mvgam|plot|validate|check'
+        } | Select-Object -First 3
+        
+        foreach ($funcName in $keyFunctions) {
+            # Extract function calls (dependencies) using optimized method
+            $calls = Get-FunctionCalls -Content $content -FunctionName $funcName -AllFunctionNames $functions.Keys
+            if ($calls.Count -gt 0) {
+                $function_dependencies[$funcName] = $calls
+            }
+        }
+    }
     
     # Third pass: analyze function signatures for detailed information
     $detailed_analysis = @{}
@@ -797,23 +806,46 @@ function New-PackageDependencyMap {
     $markdown += "- **mvgam_forecast**: Forecast results with uncertainty`n"
     $markdown += "- **trend_param**: Trend model specifications`n"
     
-    # Key function dependencies (limit to most important)
-    $markdown += "`n## Key Function Dependencies`n"
+    # Enhanced function dependencies section for LLM agents
+    $markdown += "`n## Function Dependencies & Architecture`n"
     
-    $keyDeps = @('mvgam', 'plot.mvgam', 'sim_mvgam', 'lfo_cv.mvgam')
-    foreach ($func in $keyDeps) {
+    # Core workflow functions
+    $coreWorkflow = @('mvgam', 'sim_mvgam', 'plot.mvgam', 'predict.mvgam', 'lfo_cv.mvgam', 'series_to_mvgam')
+    $markdown += "`n### Core Workflow Functions`n"
+    
+    foreach ($func in $coreWorkflow) {
         if ($dependencyMap.function_dependencies.ContainsKey($func)) {
             $deps = $dependencyMap.function_dependencies[$func]
+            $filePath = $dependencyMap.functions[$func]
             if ($deps.Count -gt 0) {
-                # Limit to first 5 dependencies for brevity
-                $depList = if ($deps.Count -gt 5) { 
-                    ($deps[0..4] -join ', ') + ", ..."
-                } else {
-                    $deps -join ', '
-                }
-                $markdown += "- **$func()** calls: $depList`n"
+                $markdown += "- **$func()** (``$filePath``)`n"
+                $markdown += "  - Internal calls: " + ($deps -join ', ') + "`n"
+            }
+        } elseif ($dependencyMap.functions.ContainsKey($func)) {
+            $filePath = $dependencyMap.functions[$func]
+            $markdown += "- **$func()** (``$filePath``) - No internal dependencies tracked`n"
+        }
+    }
+    
+    # Most connected internal functions (those with most dependencies)
+    $markdown += "`n### Most Connected Internal Functions`n"
+    $functionsByDepCount = @()
+    foreach ($func in $dependencyMap.function_dependencies.Keys) {
+        $depCount = $dependencyMap.function_dependencies[$func].Count
+        if ($depCount -gt 3) {  # Functions with more than 3 dependencies
+            $functionsByDepCount += @{
+                name = $func
+                deps = $dependencyMap.function_dependencies[$func]
+                count = $depCount
+                file = $dependencyMap.functions[$func]
             }
         }
+    }
+    
+    $topConnected = $functionsByDepCount | Sort-Object { $_.count } -Descending | Select-Object -First 8
+    foreach ($func in $topConnected) {
+        $markdown += "- **$($func.name)()** (``$($func.file)``) - $($func.count) dependencies`n"
+        $markdown += "  - Calls: " + ($func.deps -join ', ') + "`n"
     }
     
     # Key function signatures (reduced set)
@@ -845,41 +877,151 @@ function New-PackageDependencyMap {
         }
     }
 
-    # File organization (with purposes)
-    $markdown += "`n## File Organization`n"
+    # Enhanced file organization for LLM agents
+    $markdown += "`n## File Organization & Function Locations`n"
     
-    # Group files by category
-    $coreFiles = @('R/mvgam_core.R', 'R/mvgam.R', 'R/sim_mvgam.R')
-    $validationFiles = $dependencyMap.definitions.Keys | Where-Object { $_ -match 'validat|check' }
-    $plotFiles = $dependencyMap.definitions.Keys | Where-Object { $_ -match 'plot' }
-    $stanFiles = $dependencyMap.definitions.Keys | Where-Object { $_ -match 'stan|brms' }
+    # Create file categories with function counts and purposes
+    $fileCategories = @{
+        'Core' = @()
+        'Plotting' = @()
+        'Stan/Modeling' = @()
+        'Validation' = @()
+        'S3 Methods' = @()
+        'Utilities' = @()
+        'Data' = @()
+        'Other' = @()
+    }
     
-    foreach ($file in $coreFiles) {
-        if ($dependencyMap.definitions.ContainsKey($file)) {
-            $purpose = if ($dependencyMap.file_purposes.ContainsKey($file)) { 
-                ": " + $dependencyMap.file_purposes[$file] 
-            } else { "" }
-            $markdown += "- **$file**$purpose`n"
+    foreach ($file in $dependencyMap.definitions.Keys) {
+        $functionCount = $dependencyMap.definitions[$file].Count
+        $purpose = if ($dependencyMap.file_purposes.ContainsKey($file)) { 
+            $dependencyMap.file_purposes[$file] 
+        } else { "" }
+        
+        $fileInfo = @{
+            path = $file
+            functions = $dependencyMap.definitions[$file]
+            count = $functionCount
+            purpose = $purpose
+        }
+        
+        # Categorize files
+        if ($file -match 'mvgam_core|mvgam\.R|sim_mvgam') {
+            $fileCategories['Core'] += $fileInfo
+        } elseif ($file -match 'plot') {
+            $fileCategories['Plotting'] += $fileInfo
+        } elseif ($file -match 'stan|brms|make_stan') {
+            $fileCategories['Stan/Modeling'] += $fileInfo
+        } elseif ($file -match 'validat|check') {
+            $fileCategories['Validation'] += $fileInfo
+        } elseif ($file -match 'print|summary|predict|residuals|fitted') {
+            $fileCategories['S3 Methods'] += $fileInfo
+        } elseif ($file -match 'utils|helpers|globals') {
+            $fileCategories['Utilities'] += $fileInfo
+        } elseif ($file -match 'data') {
+            $fileCategories['Data'] += $fileInfo
+        } else {
+            $fileCategories['Other'] += $fileInfo
         }
     }
     
-    if ($validationFiles.Count -gt 0) {
-        $markdown += "- **Validation**: " + (($validationFiles | Select-Object -First 3) -join ', ')
-        if ($validationFiles.Count -gt 3) { $markdown += ", ..." }
-        $markdown += "`n"
+    # Output categorized files with rich information
+    foreach ($category in $fileCategories.Keys) {
+        $files = $fileCategories[$category]
+        if ($files.Count -gt 0) {
+            $markdown += "`n### $category Files`n"
+            $sortedFiles = $files | Sort-Object { $_.count } -Descending
+            
+            foreach ($fileInfo in $sortedFiles) {
+                $markdown += "- **``$($fileInfo.path)``** ($($fileInfo.count) functions)"
+                if ($fileInfo.purpose) {
+                    $markdown += " - $($fileInfo.purpose)"
+                }
+                $markdown += "`n"
+                
+                # Show key functions in this file
+                $keyFunctions = $fileInfo.functions | Where-Object { 
+                    $_ -in $exportedFunctions -or 
+                    $_ -in $coreWorkflow -or 
+                    $dependencyMap.function_dependencies.ContainsKey($_)
+                } | Select-Object -First 5
+                
+                if ($keyFunctions.Count -gt 0) {
+                    $markdown += "  - Key functions: " + ($keyFunctions -join ', ')
+                    if ($fileInfo.functions.Count -gt $keyFunctions.Count) {
+                        $markdown += " (+ $($fileInfo.functions.Count - $keyFunctions.Count) more)"
+                    }
+                    $markdown += "`n"
+                }
+            }
+        }
     }
     
-    if ($plotFiles.Count -gt 0) {
-        $markdown += "- **Plotting**: " + (($plotFiles | Select-Object -First 3) -join ', ')
-        if ($plotFiles.Count -gt 3) { $markdown += ", ..." }
-        $markdown += "`n"
+    # Function location quick reference
+    $markdown += "`n## Function Location Quick Reference`n"
+    $markdown += "`n### Exported Functions by File`n"
+    
+    $exportedByFile = @{}
+    foreach ($func in $exportedFunctions) {
+        if ($dependencyMap.functions.ContainsKey($func)) {
+            $file = $dependencyMap.functions[$func]
+            if (!$exportedByFile.ContainsKey($file)) {
+                $exportedByFile[$file] = @()
+            }
+            $exportedByFile[$file] += $func
+        }
     }
     
-    if ($stanFiles.Count -gt 0) {
-        $markdown += "- **Stan/brms**: " + (($stanFiles | Select-Object -First 3) -join ', ')
-        if ($stanFiles.Count -gt 3) { $markdown += ", ..." }
-        $markdown += "`n"
+    foreach ($file in ($exportedByFile.Keys | Sort-Object)) {
+        $functions = $exportedByFile[$file] | Sort-Object
+        $markdown += "- **``$file``**: " + ($functions -join ', ') + "`n"
     }
+    
+    # External package usage analysis for LLM agents
+    $markdown += "`n## External Package Integration`n"
+    
+    # Group external dependencies by likely use case
+    $packageUsage = @{
+        'Bayesian/MCMC' = @('brms', 'rstan', 'rstantools', 'posterior', 'loo', 'bayesplot')
+        'Data Manipulation' = @('dplyr', 'purrr', 'tibble', 'magrittr')
+        'Modeling/Statistics' = @('mgcv', 'mvnfast', 'marginaleffects', 'generics')
+        'Visualization' = @('ggplot2', 'patchwork')
+        'Infrastructure' = @('methods', 'Rcpp', 'rlang', 'insight')
+    }
+    
+    foreach ($category in $packageUsage.Keys) {
+        $packages = $packageUsage[$category] | Where-Object { $_ -in $externalDeps }
+        if ($packages.Count -gt 0) {
+            $markdown += "`n### $category`n"
+            foreach ($pkg in $packages) {
+                $markdown += "- **$pkg**: "
+                # Add common usage descriptions
+                switch ($pkg) {
+                    'brms' { $markdown += "Bayesian regression model framework integration" }
+                    'rstan' { $markdown += "Stan probabilistic programming interface" }
+                    'mgcv' { $markdown += "GAM (Generalized Additive Model) functionality" }
+                    'ggplot2' { $markdown += "Grammar of graphics plotting system" }
+                    'dplyr' { $markdown += "Data frame manipulation and transformation" }
+                    'posterior' { $markdown += "Tools for working with posterior distributions" }
+                    'loo' { $markdown += "Leave-one-out cross-validation and model comparison" }
+                    'marginaleffects' { $markdown += "Marginal effects and predictions" }
+                    'insight' { $markdown += "Unified interface to model information" }
+                    'Rcpp' { $markdown += "R and C++ integration for performance" }
+                    default { $markdown += "Package functionality" }
+                }
+                $markdown += "`n"
+            }
+        }
+    }
+    
+    # LLM Agent helpful notes
+    $markdown += "`n## Notes for LLM Agents`n"
+    $markdown += "- **Primary workflow**: ``mvgam()`` -> model fitting -> ``plot()``, ``predict()``, ``summary()`` methods`n"
+    $markdown += "- **Stan integration**: Package heavily relies on Stan/brms for Bayesian computation`n" 
+    $markdown += "- **S3 system**: Extensive use of S3 classes (``mvgam``, ``mvgam_forecast``, etc.) with method dispatch`n"
+    $markdown += "- **Time series focus**: Specialized for multivariate time series with trend modeling`n"
+    $markdown += "- **File patterns**: ``R/plot_*.R`` for visualization, ``R/*_mvgam.R`` for S3 methods, ``R/validations.R`` for input checking`n"
+    $markdown += "- **Core functions often call**: validation functions, Stan code generation, data preprocessing utilities`n"
     
     $markdown | Out-File -FilePath $VISUALIZATION_FILE -Encoding UTF8
     
