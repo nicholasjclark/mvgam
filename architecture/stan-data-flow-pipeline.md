@@ -52,15 +52,20 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 
 ### Stage 5: Stanvar Generation
 - **Entry point**: `extract_trend_stanvars_from_setup()` in `R/stan_assembly.R`
-- **Input**: trend_setup and trend specifications with injected dimensions
+- **Input**: trend_setup and trend specifications with injected dimensions, observation data
 - **Processing**:
   - Extracts brms trend parameters and renames with `_trend` suffix
   - Creates `times_trend` matrix using `generate_times_trend_matrices()`
   - The `times_trend[i,j]` matrix maps time i, series j to time indices
+  - **NEW**: Creates observation-to-trend mapping arrays via `generate_obs_trend_mapping()`
+    - `obs_trend_time[n]`: time index for observation n
+    - `obs_trend_series[n]`: series index for observation n
   - Generates trend-specific Stan variables (innovations, parameters, etc.)
-- **Output**: Comprehensive stanvar objects for trend model
+- **Output**: Comprehensive stanvar objects for trend model including mapping arrays
 - **Available data structures**:
   - `times_trend` matrix [n_time, n_series] with time indexing
+  - `obs_trend_time` array [N] mapping each observation to its time index
+  - `obs_trend_series` array [N] mapping each observation to its series index
   - Trend parameters (`sigma_trend`, `Intercept_trend`, etc.)
   - Innovation matrices and state vectors
 
@@ -76,12 +81,13 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 
 ### Stage 7: Trend Injection
 - **Entry point**: `inject_trend_into_linear_predictor()` in `R/stan_assembly.R`
-- **Input**: Base Stan code and trend stanvars
+- **Input**: Base Stan code and trend stanvars (including mapping arrays)
 - **Processing**: 
-  - Attempts to inject trend effects into observation linear predictor
-  - The injection assumes an `obs_ind` array that maps observation indices to trend matrix positions
-- **Output**: Stan code that should pass compilation
-- **Available data structures**: All previous structures
+  - Injects trend effects into observation linear predictor
+  - Uses `obs_trend_time` and `obs_trend_series` arrays to map each observation to its trend position
+  - Replaces references to non-existent `obs_ind` with proper indexing: `trend[obs_trend_time[n], obs_trend_series[n]]`
+- **Output**: Complete Stan code ready for compilation
+- **Available data structures**: All previous structures including observation-to-trend mappings
 
 ## Critical Data Structures
 
@@ -97,6 +103,16 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 - **Available at stages**: Stages 5-7
 - **Indexing**: Uses `times_trend[i,j]` matrix for time/series to index mapping
 
+### Observation-to-Trend Mapping
+- **Purpose**: Map each observation in brms-ordered data to its corresponding position in the trend matrix
+- **Problem solved**: brms excludes NA observations but doesn't provide `obs_ind` array for mapping back to trend positions
+- **Structure**: Two integer arrays created during stanvar generation:
+  - `obs_trend_time[N]`: Time index for each of N non-missing observations
+  - `obs_trend_series[N]`: Series index for each of N non-missing observations
+- **Usage**: Access trend values via `trend[obs_trend_time[n], obs_trend_series[n]]` for observation n
+- **Creation**: `generate_obs_trend_mapping()` uses original data structure to determine correct indices
+- **Validation**: Ensures all indices are within bounds [1, n_time] and [1, n_series]
+
 ## Function Call Hierarchy
 
 ```
@@ -107,7 +123,8 @@ mvgam() →
   ├─ setup_brms_lightweight() →          [BRMS REORDERS DATA]
   ├─ generate_combined_stancode() →
   │   ├─ extract_trend_stanvars_from_setup() →
-  │   │   └─ generate_times_trend_matrices() →
-  │   └─ inject_trend_into_linear_predictor() →
-  └─ [compilation fails]
+  │   │   ├─ generate_times_trend_matrices() →
+  │   │   └─ generate_obs_trend_mapping() → [CREATES OBS-TO-TREND MAPPING]
+  │   └─ inject_trend_into_linear_predictor() → [USES MAPPING FOR TREND INJECTION]
+  └─ Stan compilation succeeds
 ```

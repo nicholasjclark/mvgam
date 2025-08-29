@@ -631,11 +631,14 @@ prepare_stanvars_for_brms <- function(stanvars) {
 #'
 #' @description
 #' Extracts trend stanvars from brms setup and generates additional trend-specific stanvars.
-#' Integrates with the trend injection system.
+#' Integrates with the trend injection system. Optionally creates observation-to-trend
+#' mapping arrays to solve the brms obs_ind problem.
 #'
 #' @param trend_setup List containing trend model setup
 #' @param trend_specs List containing trend specification with 'dimensions' field
 #' @param response_suffix Response suffix for multivariate models
+#' @param obs_data Data frame with observations for creating mappings (optional)
+#' @param response_name Name of response variable for mapping generation (optional)
 #' @return List of trend stanvars
 #'
 #' trend_specs must contain a 'dimensions' field calculated by
@@ -644,10 +647,17 @@ prepare_stanvars_for_brms <- function(stanvars) {
 #'
 #' @noRd
 extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
-                                              response_suffix = "") {
+                                              response_suffix = "",
+                                              obs_data = NULL, response_name = NULL) {
   checkmate::assert_list(trend_setup, names = "named")
   checkmate::assert_list(trend_specs, names = "named")
   checkmate::assert_string(response_suffix)
+  
+  # Validate mapping parameters - both must be provided together or both NULL
+  if (!is.null(obs_data) || !is.null(response_name)) {
+    checkmate::assert_data_frame(obs_data)
+    checkmate::assert_string(response_name)
+  }
 
   # Extract base stanvars from trend setup
   base_stanvars <- trend_setup$stanvars %||% NULL
@@ -690,11 +700,50 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
       suffix = if (response_suffix == "") "_trend" else paste0("_trend", response_suffix)
     )
     
+    # Generate observation-to-trend mapping if obs_data is provided
+    mapping_stanvars <- if (!is.null(obs_data) && !is.null(response_name)) {
+      # Validate dimensions object has required fields for mapping generation
+      checkmate::assert_list(dimensions)
+      checkmate::assert_names(names(dimensions), must.include = c("time_var", "series_var"))
+      
+      # Create mapping arrays for observation-to-trend alignment
+      mapping <- generate_obs_trend_mapping(
+        data = obs_data,
+        response_var = response_name,
+        time_var = dimensions$time_var,
+        series_var = dimensions$series_var,
+        dimensions = dimensions
+      )
+      
+      # Validate mapping result structure
+      checkmate::assert_names(names(mapping), must.include = c("obs_trend_time", "obs_trend_series"))
+      
+      # Create stanvars for the mapping arrays with proper naming
+      obs_time_stanvar <- brms::stanvar(
+        x = mapping$obs_trend_time,
+        name = paste0("obs_trend_time", response_suffix),
+        scode = paste0("array[N", response_suffix, "] int obs_trend_time", response_suffix, ";"),
+        block = "data"
+      )
+      
+      obs_series_stanvar <- brms::stanvar(
+        x = mapping$obs_trend_series,
+        name = paste0("obs_trend_series", response_suffix),
+        scode = paste0("array[N", response_suffix, "] int obs_trend_series", response_suffix, ";"),
+        block = "data"
+      )
+      
+      # Return as stanvars collection
+      c(obs_time_stanvar, obs_series_stanvar)
+    } else {
+      NULL
+    }
+    
     # Generate trend-specific stanvars (without common components)
     trend_stanvars <- generate_trend_specific_stanvars(trend_specs, data_info, response_suffix)
     
-    # Combine brms parameters with trend-specific stanvars
-    combine_stanvars(brms_stanvars, trend_stanvars)
+    # Combine all stanvars: brms parameters + mapping + trend-specific
+    combine_stanvars(brms_stanvars, mapping_stanvars, trend_stanvars)
   } else {
     NULL
   }

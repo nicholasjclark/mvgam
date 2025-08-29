@@ -1552,6 +1552,127 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   return(dimensions)
 }
 
+#' Generate Observation to Trend Mapping
+#'
+#' @description
+#' Creates mapping arrays that align each observation in brms-ordered data
+#' to its corresponding position in the trend matrix. This solves the problem
+#' where brms excludes NA observations but doesn't provide an obs_ind array.
+#'
+#' @param data Data frame with observations (may include NAs)
+#' @param response_var Name of response variable to check for missing values
+#' @param time_var Name of time variable
+#' @param series_var Name of series variable
+#' @param dimensions List from extract_time_series_dimensions with time series structure
+#' @return List containing obs_trend_time and obs_trend_series arrays for Stan
+#' @noRd
+generate_obs_trend_mapping <- function(data, response_var, time_var = "time", 
+                                      series_var = "series", dimensions = NULL) {
+  checkmate::assert_data_frame(data, min.rows = 1)
+  checkmate::assert_string(response_var)
+  checkmate::assert_string(time_var)
+  checkmate::assert_string(series_var)
+  
+  # Validate dimensions parameter when provided
+  if (!is.null(dimensions)) {
+    checkmate::assert_list(dimensions)
+    required_fields <- c("unique_times", "unique_series", "n_time", "n_series")
+    missing_fields <- setdiff(required_fields, names(dimensions))
+    if (length(missing_fields) > 0) {
+      stop(insight::format_error(
+        "Dimensions list missing required fields: {paste(missing_fields, collapse = ', ')}"
+      ), call. = FALSE)
+    }
+  }
+  
+  # Validate required columns exist
+  if (!response_var %in% colnames(data)) {
+    stop(insight::format_error(
+      "Response variable {.field {response_var}} not found in data.",
+      "Available variables: {paste(colnames(data), collapse = ', ')}"
+    ), call. = FALSE)
+  }
+  
+  if (!time_var %in% colnames(data)) {
+    stop(insight::format_error(
+      "Time variable {.field {time_var}} not found in data.",
+      "Available variables: {paste(colnames(data), collapse = ', ')}"
+    ), call. = FALSE)
+  }
+  
+  if (!series_var %in% colnames(data)) {
+    stop(insight::format_error(
+      "Series variable {.field {series_var}} not found in data.",
+      "Available variables: {paste(colnames(data), collapse = ', ')}"
+    ), call. = FALSE)
+  }
+  
+  # Extract dimensions if not provided
+  if (is.null(dimensions)) {
+    dimensions <- extract_time_series_dimensions(data, time_var, series_var)
+  }
+  
+  # Identify non-missing observations (brms will only use these)
+  non_missing_idx <- which(!is.na(data[[response_var]]))
+  
+  # Handle edge case where all observations are missing
+  if (length(non_missing_idx) == 0) {
+    stop(insight::format_error(
+      "All observations are missing for response variable {.field {response_var}}.",
+      "Cannot create observation mappings without any valid data."
+    ), call. = FALSE)
+  }
+  
+  # Extract time and series indices for non-missing observations
+  obs_data <- data[non_missing_idx, , drop = FALSE]
+  
+  # Get sorted unique values from dimensions
+  sorted_unique_times <- dimensions$unique_times
+  sorted_unique_series <- dimensions$unique_series
+  
+  # Create time and series index mappings
+  # These map each observation to its position in the trend matrix
+  obs_trend_time <- match(obs_data[[time_var]], sorted_unique_times)
+  obs_trend_series <- match(obs_data[[series_var]], sorted_unique_series)
+  
+  # Validate the mappings
+  if (any(is.na(obs_trend_time))) {
+    stop(insight::format_error(
+      "Failed to map some observations to time indices.",
+      "This indicates a data structure problem."
+    ), call. = FALSE)
+  }
+  
+  if (any(is.na(obs_trend_series))) {
+    stop(insight::format_error(
+      "Failed to map some observations to series indices.",
+      "This indicates a data structure problem."
+    ), call. = FALSE)
+  }
+  
+  # Validate bounds
+  if (any(obs_trend_time < 1 | obs_trend_time > dimensions$n_time)) {
+    stop(insight::format_error(
+      "Time indices out of bounds: must be in [1, {dimensions$n_time}].",
+      "Found indices: [{min(obs_trend_time)}, {max(obs_trend_time)}]"
+    ), call. = FALSE)
+  }
+  
+  if (any(obs_trend_series < 1 | obs_trend_series > dimensions$n_series)) {
+    stop(insight::format_error(
+      "Series indices out of bounds: must be in [1, {dimensions$n_series}].",
+      "Found indices: [{min(obs_trend_series)}, {max(obs_trend_series)}]"
+    ), call. = FALSE)
+  }
+  
+  return(list(
+    obs_trend_time = as.integer(obs_trend_time),
+    obs_trend_series = as.integer(obs_trend_series),
+    n_obs_non_missing = length(non_missing_idx),
+    has_missing = length(non_missing_idx) < nrow(data)
+  ))
+}
+
 warn_default_time_variable <- function() {
   if (!identical(Sys.getenv("TESTTHAT"), "true")) {
     rlang::warn(

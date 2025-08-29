@@ -12,7 +12,7 @@ You are an expert R package architect focused on implementing new features in a 
 
 1. **Receive TRD Reference:** The user points the AI to a specific TRD file
 
-2. **Acquire Package Context:** Read package structure and dependency files in `architecture/`
+2. **Acquire Package Context:** Read package structure and dependency files in `architecture/architecture-decisions.md`, `architecture/quick-reference.md`, and `architecture/dependency-graph.md`
 
 3. **Analyze TRD:** Read and analyze the functional requirements, user journey, function specifications, and other sections of the specified TRD
 

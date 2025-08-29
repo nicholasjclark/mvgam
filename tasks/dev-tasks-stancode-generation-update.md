@@ -47,7 +47,8 @@
   - **IMPLICATION**: Need to track `which(!is.na(y))` and map each obs to trend[time, series] position
   - **TEST CONFIRMED**: Created test scripts verifying brms behavior with missing data patterns
   
-- [ ] **Sub-task A2**: Design the mapping strategy (30 min)
+- [X] **Sub-task A2**: Design the mapping strategy (30 min)
+  - Read `architecture/stan-data-flow-pipeline.md`
   - Choose data structure: `array[N] int obs_trend_linear_idx` vs `array[N] int obs_time_idx; array[N] int obs_series_idx`
   - Decide creation point: during trend stanvar generation vs during injection function
   - Plan missing data handling: systematic missing vs random missing vs no missing
@@ -57,6 +58,7 @@
 ### **Phase 2: Implementation** (120 min)
 
 - [ ] **Sub-task B1**: Implement mapping creation infrastructure (45 min)
+  - Read `architecture/stan-data-flow-pipeline.md`
   - Create `generate_obs_trend_mapping()` function that takes observation data + trend dimensions
   - Generate mapping array: for each observation n → corresponding trend[time_idx, series_idx] position
   - Handle edge cases: single series, single time point, irregular time series
@@ -64,6 +66,7 @@
   - Update `architecture/stan-data-flow-pipeline.md` accordingly
   
 - [ ] **Sub-task B2**: Integrate mapping into stanvar generation pipeline (45 min)
+  - Read `architecture/stan-data-flow-pipeline.md`
   - Add mapping creation to `extract_trend_stanvars_from_setup()` or equivalent function
   - Ensure mapping gets included as "data" block stanvar in trend_stanvars collection
   - Pass observation data through pipeline to mapping creation point
@@ -71,6 +74,7 @@
   - Update `architecture/stan-data-flow-pipeline.md` accordingly
   
 - [ ] **Sub-task B3**: Update injection logic to use mapping (30 min)
+  - Read `architecture/stan-data-flow-pipeline.md`
   - Replace `obs_ind` references with `obs_trend_mapping` in `inject_trend_into_linear_predictor()`
   - Support both 2D matrix access `trend[time_idx, series_idx]` and linear indexing strategies
   - Add validation that mapping array exists and has correct dimensions

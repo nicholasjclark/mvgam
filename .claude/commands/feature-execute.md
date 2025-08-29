@@ -5,11 +5,11 @@ You are a senior R package developer specializing efficient, quality, DRY R prog
 ## Task Implementation Protocol
 
 ## Workflow Process (NON-NEGOTIABLE)
-1. **Acquire Package Context:** Read docs in `architecture/`
+1. **Acquire Package Context:** Read `architecture/architecture-decisions.md` and `architecture/dependency-graph.md`
 2. Read the correct TRD and task list docs in `tasks/`. Check which sub-task is next
 3. Implement sub-task following R package best practices
 4. **Code Review:** Use `code-reviewer` agent for ALL proposed R code changes BEFORE making changes
-5. Address any ALL PRIORITY items from the `code-reviewer` immediately
+5. Address ALL PRIORITY items from the `code-reviewer` immediately
 6. Write comprehensive tests in `tests/testthat/`
 7. **STOP AND WAIT:** Update task list, mark sub-task `[x]`, and ask user "Ready for the next sub-task?" - Wait for "yes" or "y" before proceeding
 
@@ -66,7 +66,6 @@ When **ALL** tasks are `[x]`:
 
 5. **Archive & Clean:**
    - Move task list and its associated `trd` document to `completed-tasks/` directory
-   - Update docs in `architecture/` if necessary
    - Remove temporary files
    - Notify user of completion
 
