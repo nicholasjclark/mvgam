@@ -1,0 +1,25 @@
+﻿{
+    "s3_methods":  {
+                       "summary":  [
+                                       "mvgam_fevd"
+                                   ],
+                       "plot":  [
+                                    "mvgam_fevd"
+                                ]
+                   },
+    "functions":  [
+                      "summary.mvgam_fevd",
+                      "plot.mvgam_fevd",
+                      "fevd_df"
+                  ],
+    "purpose":  "Class definitions and methods",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "fevd_df":  "fevd_df = function(x, ynames) {",
+                                "summary.mvgam_fevd":  "summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {",
+                                "plot.mvgam_fevd":  "plot.mvgam_fevd = function(x, ...) {"
+                            },
+    "file":  "R/mvgam_fevd-class.R"
+}

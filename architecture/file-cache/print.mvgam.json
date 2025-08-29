@@ -1,0 +1,34 @@
+﻿{
+    "s3_methods":  {
+                       "print":  [
+                                     "mvgam",
+                                     "mvgam_prefit",
+                                     "mvgamstancode"
+                                 ],
+                       "stancode":  [
+                                        "mvgam",
+                                        "mvgam_prefit"
+                                    ]
+                   },
+    "functions":  [
+                      "print_model_specification_simple",
+                      "stancode.mvgam",
+                      "stancode.mvgam_prefit",
+                      "print.mvgamstancode",
+                      "print.mvgam",
+                      "print.mvgam_prefit"
+                  ],
+    "purpose":  "Print methods for objects",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "print.mvgam":  "print.mvgam = function(x, ...) {",
+                                "print_model_specification_simple":  "print_model_specification_simple \u003c- function(model_spec) {",
+                                "stancode.mvgam_prefit":  "stancode.mvgam_prefit \u003c- function(object, ...) {",
+                                "print.mvgam_prefit":  "print.mvgam_prefit = function(x, ...) {",
+                                "stancode.mvgam":  "stancode.mvgam \u003c- function(object, ...) {",
+                                "print.mvgamstancode":  "print.mvgamstancode \u003c- function(x, ...) {"
+                            },
+    "file":  "R/print.mvgam.R"
+}

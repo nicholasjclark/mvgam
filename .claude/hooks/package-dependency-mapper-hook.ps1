@@ -2,10 +2,10 @@
 param([string]$Event, [string]$CommitHash, [string]$CommitMessage)
 
 # Configuration
-$CACHE_FILE = ".architecture/package-dependency-map.json"
+$CACHE_FILE = "architecture/package-dependency-map.json"
 $METADATA_FILE = "architecture/dependency-metadata.json"
 $VISUALIZATION_FILE = "architecture/dependency-graph.md"
-$FILE_CACHE_DIR = ".architecture/file-cache"
+$FILE_CACHE_DIR = "architecture/file-cache"
 
 # Suppress output - all Write-Host calls removed or redirected to Write-Debug
 $DebugPreference = 'SilentlyContinue'
@@ -21,15 +21,15 @@ $Script:CompiledRegex = @{
     DependsSection = [regex]::new('Depends:\s*([^:\r\n]+(?:\r?\n\s+[^:\r\n]+)*)', [System.Text.RegularExpressions.RegexOptions]::Compiled)
 }
 
-# Ensure cache directory exists
-if (!(Test-Path $FILE_CACHE_DIR)) {
-    New-Item -ItemType Directory -Path $FILE_CACHE_DIR -Force | Out-Null
-}
-
 # Ensure architecture directory exists
 $architectureDir = Split-Path $CACHE_FILE -Parent
 if (!(Test-Path $architectureDir)) {
     New-Item -ItemType Directory -Path $architectureDir -Force | Out-Null
+}
+
+# Ensure cache directory exists
+if (!(Test-Path $FILE_CACHE_DIR)) {
+    New-Item -ItemType Directory -Path $FILE_CACHE_DIR -Force | Out-Null
 }
 
 function Get-FileHash-Fast {
@@ -50,22 +50,37 @@ function Get-ChangedFiles {
     
     if (Test-Path $cacheMetaFile) {
         try {
-            $lastFileHashes = Get-Content $cacheMetaFile | ConvertFrom-Json -AsHashtable -ErrorAction SilentlyContinue
+            $jsonContent = Get-Content $cacheMetaFile -Raw
+            $lastFileHashes = $jsonContent | ConvertFrom-Json
+            # Convert PSCustomObject to hashtable for reliable lookups
+            $hashTable = @{}
+            $lastFileHashes.PSObject.Properties | ForEach-Object {
+                $hashTable[$_.Name] = $_.Value
+            }
+            $lastFileHashes = $hashTable
         } catch {
-            # If cache is corrupted, process all files
+            Write-Debug "Cache corrupted, processing all files"
             $lastFileHashes = @{}
         }
     }
+    
+    Write-Debug "Checking $($AllFiles.Count) files for changes..."
     
     foreach ($file in $AllFiles) {
         $currentHash = Get-FileHash-Fast -FilePath $file
         $lastHash = $lastFileHashes[$file]
         
-        if ($currentHash -ne $lastHash) {
+        if (!$lastHash -or ($currentHash -ne $lastHash)) {
             $changedFiles += $file
-            $lastFileHashes[$file] = $currentHash
+            Write-Debug "$file changed (was: $lastHash, now: $currentHash)"
+        } else {
+            Write-Debug "$file unchanged ($currentHash)"
         }
+        
+        $lastFileHashes[$file] = $currentHash
     }
+    
+    Write-Debug "$($changedFiles.Count) changed files detected"
     
     # Save updated file hashes
     $lastFileHashes | ConvertTo-Json -Depth 2 | Out-File -FilePath $cacheMetaFile -Encoding UTF8

@@ -1,0 +1,18 @@
+﻿{
+    "s3_methods":  {
+
+                   },
+    "functions":  [
+                      "plot_mvgam_uncertainty",
+                      "intersect_hist"
+                  ],
+    "purpose":  "Plotting and visualization",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "intersect_hist":  "intersect_hist = function(fullpreds, gampreds) {",
+                                "plot_mvgam_uncertainty":  "plot_mvgam_uncertainty = function( object, series = 1, newdata, data_test, legend_position = \u0027topleft\u0027, hide_xlabels = FALSE ) {"
+                            },
+    "file":  "R/plot_mvgam_uncertainty.R"
+}

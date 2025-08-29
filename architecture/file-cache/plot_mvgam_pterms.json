@@ -1,0 +1,16 @@
+﻿{
+    "s3_methods":  {
+
+                   },
+    "functions":  [
+                      "plot_mvgam_pterms"
+                  ],
+    "purpose":  "Plotting and visualization",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "plot_mvgam_pterms":  "plot_mvgam_pterms = function(object, trend_effects = FALSE) {"
+                            },
+    "file":  "R/plot_mvgam_pterms.R"
+}

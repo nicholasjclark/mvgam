@@ -1,0 +1,18 @@
+﻿{
+    "s3_methods":  {
+                       "variables":  [
+                                         "mvgam"
+                                     ]
+                   },
+    "functions":  [
+                      "variables.mvgam"
+                  ],
+    "purpose":  "",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "variables.mvgam":  "variables.mvgam = function(x, ...) {"
+                            },
+    "file":  "R/index-mvgam.R"
+}

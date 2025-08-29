@@ -1,0 +1,20 @@
+﻿{
+    "s3_methods":  {
+                       "plot":  [
+                                    "mvgam_forecast"
+                                ]
+                   },
+    "functions":  [
+                      "plot_mvgam_fc",
+                      "plot.mvgam_forecast"
+                  ],
+    "purpose":  "Plotting and visualization",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "plot.mvgam_forecast":  "plot.mvgam_forecast = function( x, series = 1, realisations = FALSE, n_realisations = 15, xlab, ylab, ylim, ... ) {",
+                                "plot_mvgam_fc":  "plot_mvgam_fc = function( object, series = 1, newdata, data_test, realisations = FALSE, n_realisations = 15, hide_xlabels = FALSE, xlab, ylab, ylim, n_cores = 1, return_forecasts = FALSE, return_score = FALSE, ... ) {"
+                            },
+    "file":  "R/plot_mvgam_fc.R"
+}

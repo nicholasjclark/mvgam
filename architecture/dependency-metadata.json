@@ -1,9 +1,4 @@
 ﻿{
-    "commit_hash":  "",
-    "commit_message":  "",
-    "version":  "2.0.0",
-    "exported_functions":  68,
-    "package_name":  "mvgam",
     "external_dependencies":  [
                                   "bayesplot",
                                   "brms",
@@ -26,9 +21,16 @@
                                   "rstantools",
                                   "tibble"
                               ],
-    "total_files":  57,
-    "generated":  "2025-08-28 18:52:09",
+    "generated":  "2025-08-29 11:05:47",
+    "commit_hash":  "test-debug",
+    "cached_files":  57,
+    "version":  "2.0.0",
+    "commit_message":  "Test with debug output",
+    "total_functions":  425,
+    "exported_functions":  68,
     "s3_methods_count":  44,
     "s3_classes_count":  25,
-    "total_functions":  425
+    "package_name":  "mvgam",
+    "changed_files":  0,
+    "total_files":  57
 }

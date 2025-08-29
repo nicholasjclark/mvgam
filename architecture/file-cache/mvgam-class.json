@@ -1,0 +1,16 @@
+﻿{
+    "s3_methods":  {
+
+                   },
+    "functions":  [
+
+                  ],
+    "purpose":  "Class definitions and methods",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+
+                            },
+    "file":  "R/mvgam-class.R"
+}

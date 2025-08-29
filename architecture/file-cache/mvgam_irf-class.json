@@ -1,0 +1,23 @@
+﻿{
+    "s3_methods":  {
+                       "summary":  [
+                                       "mvgam_irf"
+                                   ],
+                       "plot":  [
+                                    "mvgam_irf"
+                                ]
+                   },
+    "functions":  [
+                      "summary.mvgam_irf",
+                      "plot.mvgam_irf"
+                  ],
+    "purpose":  "Class definitions and methods",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "summary.mvgam_irf":  "summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {",
+                                "plot.mvgam_irf":  "plot.mvgam_irf = function(x, series = 1, ...) {"
+                            },
+    "file":  "R/mvgam_irf-class.R"
+}

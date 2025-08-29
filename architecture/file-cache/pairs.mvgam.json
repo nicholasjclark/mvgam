@@ -1,0 +1,18 @@
+﻿{
+    "s3_methods":  {
+                       "pairs":  [
+                                     "mvgam"
+                                 ]
+                   },
+    "functions":  [
+                      "pairs.mvgam"
+                  ],
+    "purpose":  "",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "pairs.mvgam":  "pairs.mvgam \u003c- function( x, variable = NULL, regex = FALSE, use_alias = TRUE, ... ) {"
+                            },
+    "file":  "R/pairs.mvgam.R"
+}

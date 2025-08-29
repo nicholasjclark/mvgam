@@ -1,0 +1,20 @@
+﻿{
+    "s3_methods":  {
+
+                   },
+    "functions":  [
+                      "ar3_recursC",
+                      "var1_recursC",
+                      "varma_recursC"
+                  ],
+    "purpose":  "Exported functions",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "var1_recursC":  "var1_recursC \u003c- function(A, linpreds, errors, drift, last_trends, h) {",
+                                "varma_recursC":  "varma_recursC \u003c- function(A, A2, A3, theta, linpreds, errors, drift, last_trends, h) {",
+                                "ar3_recursC":  "ar3_recursC \u003c- function(drift, ar1, ar2, ar3, linpreds, errors, last_trends, h) {"
+                            },
+    "file":  "R/RcppExports.R"
+}

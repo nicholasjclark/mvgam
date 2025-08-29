@@ -1,0 +1,26 @@
+﻿{
+    "s3_methods":  {
+
+                   },
+    "functions":  [
+                      "plot_mvgam_series",
+                      "validate_plot_data",
+                      "plot_time_series",
+                      "plot_histogram",
+                      "plot_acf",
+                      "plot_ecdf"
+                  ],
+    "purpose":  "Plotting and visualization",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "plot_acf":  "plot_acf \u003c- function(dat) {",
+                                "plot_histogram":  "plot_histogram \u003c- function(dat, ylab = \u0027y\u0027, n_bins = NULL) {",
+                                "plot_mvgam_series":  "plot_mvgam_series \u003c- function( object, data, newdata, y = \u0027y\u0027, lines = TRUE, series = 1, n_bins = NULL, log_scale = FALSE ) {",
+                                "plot_time_series":  "plot_time_series \u003c- function( dat, lines = TRUE, log_scale = FALSE, ylab = \u0027y\u0027, series = \u0027all\u0027 ) {",
+                                "validate_plot_data":  "validate_plot_data \u003c- function(data, y) {",
+                                "plot_ecdf":  "plot_ecdf \u003c- function(dat, ylab = \u0027y\u0027) {"
+                            },
+    "file":  "R/plot_mvgam_series.R"
+}
