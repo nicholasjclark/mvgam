@@ -610,16 +610,16 @@ function Get-FunctionDefinitions {
         
         # Prioritize functions based on file importance
         if ($filePath -match $priorityFilesPattern) {
-            # For priority files (Stan/brms integration, core, validations), analyze more functions
+            # For priority files (Stan/brms integration, core, validations), analyze many more functions
             $keyFunctions = $definitions[$filePath] | Where-Object { 
                 $_ -in $exportedFunctions -or 
-                $_ -match 'brms|stan|formula|prior|trend|code|data|assemble|validate|check|generate|build|mvgam|is\.'
-            } | Select-Object -First 8
+                $_ -match 'brms|stan|formula|prior|trend|code|data|assemble|validate|check|generate|build|mvgam|is\.|create|make|inject|merge|register|set_|get_|default_'
+            } | Select-Object -First 15
         } else {
-            # For other core files, standard selection
+            # For other core files, expanded selection
             $keyFunctions = $definitions[$filePath] | Where-Object { 
-                $_ -in $exportedFunctions -or $_ -match 'mvgam|plot|validate|check'
-            } | Select-Object -First 3
+                $_ -in $exportedFunctions -or $_ -match 'mvgam|plot|validate|check|create|build'
+            } | Select-Object -First 5
         }
         
         foreach ($funcName in $keyFunctions) {
@@ -860,9 +860,20 @@ function New-PackageDependencyMap {
         }
     }
     
-    # Core workflow functions
-    $coreWorkflow = @('mvgam', 'sim_mvgam', 'plot.mvgam', 'predict.mvgam', 'lfo_cv.mvgam', 'series_to_mvgam')
-    $markdown += "`n### Core Workflow Functions`n"
+    # Core workflow functions focusing on prior system, trend system, injection stanvars, stan_assembly
+    $coreWorkflow = @(
+        # Prior system
+        'mvgam_formula', 'get_prior', 'set_prior', 'validate_priors', 'default_priors',
+        # Trend system 
+        'trend_param', 'register_trend_type', 'create_mvgam_trend', 'validate_trend_formula', 'trend_system',
+        # Stan assembly system
+        'stancode', 'standata', 'make_stancode', 'make_standata', 'assemble_stancode', 'build_standata',
+        # Injection stanvars
+        'inject_stanvar', 'add_stanvar', 'validate_stanvar', 'merge_stanvars',
+        # Core entry points
+        'mvgam', 'sim_mvgam'
+    )
+    $markdown += "`n### Core Workflow Functions (Prior/Trend/Stan Assembly Systems)`n"
     
     foreach ($func in $coreWorkflow) {
         if ($dependencyMap.function_dependencies.ContainsKey($func)) {
@@ -990,12 +1001,30 @@ function New-PackageDependencyMap {
                 }
                 $markdown += "`n"
                 
-                # Show key functions in this file
-                $keyFunctions = $fileInfo.functions | Where-Object { 
-                    $_ -in $exportedFunctions -or 
-                    $_ -in $coreWorkflow -or 
-                    $dependencyMap.function_dependencies.ContainsKey($_)
-                } | Select-Object -First 5
+                # Show key functions in this file (prioritize exported, core workflow, and functions with dependencies)
+                $exportedInFile = $fileInfo.functions | Where-Object { $_ -in $exportedFunctions }
+                $coreInFile = $fileInfo.functions | Where-Object { $_ -in $coreWorkflow }
+                $functionsWithDeps = $fileInfo.functions | Where-Object { $dependencyMap.function_dependencies.ContainsKey($_) }
+                $otherImportant = $fileInfo.functions | Where-Object { 
+                    $_ -match 'validate|check|build|create|make|generate|assemble|inject|merge|stan|brms|prior|trend'
+                }
+                
+                # Combine and prioritize, removing duplicates
+                $keyFunctions = @()
+                $keyFunctions += $exportedInFile
+                $keyFunctions += $coreInFile | Where-Object { $_ -notin $keyFunctions }
+                $keyFunctions += $functionsWithDeps | Where-Object { $_ -notin $keyFunctions }
+                $keyFunctions += $otherImportant | Where-Object { $_ -notin $keyFunctions }
+                
+                # Take at least 10, preferably up to 15 functions for important files
+                $maxFunctions = if ($fileInfo.path -match $priorityFilesPattern) { 15 } else { 10 }
+                $keyFunctions = $keyFunctions | Select-Object -First $maxFunctions
+                
+                # If we still don't have enough, add remaining functions
+                if ($keyFunctions.Count -lt 10) {
+                    $remaining = $fileInfo.functions | Where-Object { $_ -notin $keyFunctions } | Select-Object -First (10 - $keyFunctions.Count)
+                    $keyFunctions += $remaining
+                }
                 
                 if ($keyFunctions.Count -gt 0) {
                     $markdown += "  - Key functions: " + ($keyFunctions -join ', ')
@@ -1065,13 +1094,75 @@ function New-PackageDependencyMap {
         }
     }
     
+    # System-specific function breakdowns
+    $markdown += "`n## System-Specific Function Breakdowns`n"
+    
+    # Prior System Functions
+    $priorSystemFuncs = $dependencyMap.functions.Keys | Where-Object { 
+        $_ -match 'prior|formula' -and $dependencyMap.functions[$_] -match 'priors|formula'
+    } | Sort-Object
+    if ($priorSystemFuncs.Count -gt 0) {
+        $markdown += "`n### Prior System Functions`n"
+        $topPriorFuncs = $priorSystemFuncs | Select-Object -First 8
+        foreach ($func in $topPriorFuncs) {
+            $file = $dependencyMap.functions[$func]
+            $markdown += "- **$func()** (``$file``)"
+            if ($dependencyMap.function_dependencies.ContainsKey($func)) {
+                $deps = $dependencyMap.function_dependencies[$func]
+                $markdown += " - calls: " + (($deps | Select-Object -First 3) -join ', ')
+                if ($deps.Count -gt 3) { $markdown += ", ..." }
+            }
+            $markdown += "`n"
+        }
+    }
+    
+    # Trend System Functions
+    $trendSystemFuncs = $dependencyMap.functions.Keys | Where-Object { 
+        $_ -match 'trend|register.*trend|create.*trend' -and $dependencyMap.functions[$_] -match 'trend_system|mvgam_core'
+    } | Sort-Object
+    if ($trendSystemFuncs.Count -gt 0) {
+        $markdown += "`n### Trend System Functions`n"
+        $topTrendFuncs = $trendSystemFuncs | Select-Object -First 8
+        foreach ($func in $topTrendFuncs) {
+            $file = $dependencyMap.functions[$func]
+            $markdown += "- **$func()** (``$file``)"
+            if ($dependencyMap.function_dependencies.ContainsKey($func)) {
+                $deps = $dependencyMap.function_dependencies[$func]
+                $markdown += " - calls: " + (($deps | Select-Object -First 3) -join ', ')
+                if ($deps.Count -gt 3) { $markdown += ", ..." }
+            }
+            $markdown += "`n"
+        }
+    }
+    
+    # Stan Assembly System Functions  
+    $stanAssemblyFuncs = $dependencyMap.functions.Keys | Where-Object { 
+        $_ -match 'stan|assemble|build.*stan|make.*stan|code|data' -and $dependencyMap.functions[$_] -match 'stan_assembly|make_stan|brms_integration'
+    } | Sort-Object
+    if ($stanAssemblyFuncs.Count -gt 0) {
+        $markdown += "`n### Stan Assembly System Functions`n"
+        $topStanFuncs = $stanAssemblyFuncs | Select-Object -First 8
+        foreach ($func in $topStanFuncs) {
+            $file = $dependencyMap.functions[$func]
+            $markdown += "- **$func()** (``$file``)"
+            if ($dependencyMap.function_dependencies.ContainsKey($func)) {
+                $deps = $dependencyMap.function_dependencies[$func]
+                $markdown += " - calls: " + (($deps | Select-Object -First 3) -join ', ')
+                if ($deps.Count -gt 3) { $markdown += ", ..." }
+            }
+            $markdown += "`n"
+        }
+    }
+    
     # LLM Agent helpful notes
     $markdown += "`n## Notes for LLM Agents`n"
-    $markdown += "- **Primary workflow**: ``mvgam()`` -> model fitting -> ``plot()``, ``predict()``, ``summary()`` methods`n"
+    $markdown += "- **Primary workflow**: ``mvgam()`` -> prior/trend system setup -> Stan assembly -> model fitting -> S3 methods`n"
+    $markdown += "- **Prior system**: ``mvgam_formula()``, ``get_prior()``, ``set_prior()`` for Bayesian prior specification`n"
+    $markdown += "- **Trend system**: ``trend_param()``, ``register_trend_type()`` for time series trend modeling`n"
+    $markdown += "- **Stan assembly**: ``stancode()``, ``standata()`` for Stan model compilation and data preparation`n"
     $markdown += "- **Stan integration**: Package heavily relies on Stan/brms for Bayesian computation`n" 
     $markdown += "- **S3 system**: Extensive use of S3 classes (``mvgam``, ``mvgam_forecast``, etc.) with method dispatch`n"
-    $markdown += "- **Time series focus**: Specialized for multivariate time series with trend modeling`n"
-    $markdown += "- **File patterns**: ``R/plot_*.R`` for visualization, ``R/*_mvgam.R`` for S3 methods, ``R/validations.R`` for input checking`n"
+    $markdown += "- **File patterns**: ``R/priors.R`` (prior system), ``R/trend_system.R`` (trends), ``R/stan_assembly.R`` (Stan code)`n"
     $markdown += "- **Core functions often call**: validation functions, Stan code generation, data preprocessing utilities`n"
     
     $markdown | Out-File -FilePath $VISUALIZATION_FILE -Encoding UTF8
