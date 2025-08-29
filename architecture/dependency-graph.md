@@ -1,8 +1,8 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-08-29 11:05:47  
+**Generated:** 2025-08-29 11:33:13  
 **Package:** mvgam v2.0.0  
-**Commit:** test-de  
+**Commit:** pending  
 
 ## Summary
 
@@ -71,12 +71,14 @@
 
 ## Function Dependencies & Architecture
 
-### Core Workflow Functions
+### Core Workflow Functions (Prior/Trend/Stan Assembly Systems)
+- **mvgam_formula()** (`R/priors.R`) - No internal dependencies tracked
+- **get_prior()** (`R/priors.R`) - No internal dependencies tracked
+- **trend_param()** (`R/trend_system.R`) - No internal dependencies tracked
+- **register_trend_type()** (`R/trend_system.R`) - No internal dependencies tracked
+- **create_mvgam_trend()** (`R/trend_system.R`) - No internal dependencies tracked
 - **mvgam()** (`R/mvgam_core.R`) - No internal dependencies tracked
 - **sim_mvgam()** (`R/sim_mvgam.R`) - No internal dependencies tracked
-- **plot.mvgam()** (`R/plot.mvgam.R`) - No internal dependencies tracked
-- **lfo_cv.mvgam()** (`R/lfo_cv.mvgam.R`) - No internal dependencies tracked
-- **series_to_mvgam()** (`R/series_to_mvgam.R`) - No internal dependencies tracked
 
 ### Most Connected Internal Functions
 
@@ -106,62 +108,81 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 
 ### Validation Files
 - **`R/validations.R`** (75 functions) - Input validation and checks
-  - Key functions: is.mvgam_trend (+ 74 more)
+  - Key functions: is.mvgam_trend, validate_nonlinear_trend_compatibility, process_trend_validation_rules, validate_trend_grouping, validate_trend_correlation, validate_trend_time_intervals, validate_trend_factor_compatibility, validate_trend_hierarchical_structure, validate_factor_compatibility, validate_grouping_arguments, validate_correlation_requirements, validate_time_variable, validate_series_variable, validate_regular_time_intervals, validate_brms_formula (+ 60 more)
 
 ### Core Files
 - **`R/mvgam_core.R`** (25 functions) - Core package functionality
-  - Key functions: mvgam (+ 24 more)
+  - Key functions: mvgam, generate_combined_stancode_and_data, create_mvgam_from_combined_fit, create_observation_brmsfit, create_trend_brmsfit, extract_trend_parameters, subset_stanfit_parameters, extract_trend_component_info, validate_multiple_imputation_datasets, validate_missing_patterns, create_pooled_mvgam (+ 14 more)
 - **`R/marginaleffects.mvgam.R`** (10 functions) - Marginal effects
+  - Key functions: get_coef.mvgam, set_coef.mvgam, get_vcov.mvgam, get_predict.mvgam, get_data.mvgam, error, get_data.mvgam_prefit, error, find_predictors.mvgam, find_predictors.mvgam_prefit
 - **`R/as.data.frame.mvgam.R`** (10 functions) - Data documentation and loading
+  - Key functions: validate_variablesas_draws.mvgam as_draws_matrix.mvgam as_draws_df.mvgam as_draws_array.mvgam as_draws_list.mvgam as_draws_rvars.mvgam as.data.frame.mvgam as.matrix.mvgam as.array.mvgam (+ 9 more)
 - **`R/lfo_cv.mvgam.R`** (7 functions)
-  - Key functions: lfo_cv, lfo_cv.mvgam (+ 5 more)
+  - Key functions: lfo_cvlog_sum_exp log_mean_exp lfo_cv.mvgam plot.mvgam_lfo cv_split sum_rows (+ 6 more)
 - **`R/loo.mvgam.R`** (6 functions)
+  - Key functions: loo.mvgam, loo_compare.mvgam, split_mod_dots, named_list, clean_ll, samp_noinf
 - **`R/print.mvgam.R`** (6 functions) - Print methods for objects
+  - Key functions: stancode.mvgam, stancode.mvgam_prefit, print.mvgamstancode, print_model_specification_simple, print.mvgam, print.mvgam_prefit
 - **`R/sim_mvgam.R`** (5 functions)
-  - Key functions: sim_mvgam (+ 4 more)
+  - Key functions: sim_mvgamperiodic_gp lkj_corr sim_seasonal random_Sigma (+ 4 more)
 - **`R/irf.mvgam.R`** (5 functions)
-  - Key functions: irf (+ 4 more)
+  - Key functions: irfirf.mvgam gen_irf var_phi var_psi (+ 4 more)
 - **`R/ppc.mvgam.R`** (5 functions)
-  - Key functions: ppc (+ 4 more)
+  - Key functions: ppc, pp_check.mvgam, ppc.mvgam, ecdf_plotdat, is_like_factor
 - **`R/fevd.mvgam.R`** (4 functions)
-  - Key functions: fevd (+ 3 more)
+  - Key functions: fevdfevd.mvgam gen_fevd var_fecov (+ 3 more)
 - **`R/interpret_mvgam.R`** (3 functions)
+  - Key functions: interpret_mvgam, dyn_to_gpspline, dyn_to_gphilbert
 - **`R/plot.mvgam.R`** (2 functions) - Plotting and visualization
-  - Key functions: plot.mvgam (+ 1 more)
+  - Key functions: plot.mvgam, plottable
 - **`R/series_to_mvgam.R`** (2 functions)
-  - Key functions: series_to_mvgam (+ 1 more)
+  - Key functions: series_to_mvgamxts.to.ts (+ 1 more)
 - **`R/pairs.mvgam.R`** (1 functions)
+  - Key functions: pairs.mvgam
 - **`R/mcmc_plot.mvgam.R`** (1 functions) - Plotting and visualization
+  - Key functions: mcmc_plot.mvgam
 - **`R/residuals.mvgam.R`** (1 functions) - Residual analysis
+  - Key functions: residuals.mvgam
 - **`R/index-mvgam.R`** (1 functions)
+  - Key functions: variables.mvgam
 
 ### Other Files
 - **`R/trend_system.R`** (70 functions) - Trend modeling
-  - Key functions: register_trend_type, list_trend_types, register_custom_trend, trend_param, is.trend_param (+ 65 more)
+  - Key functions: register_trend_type, list_trend_types, register_custom_trend, trend_param, is.trend_param, mvgam_trend_choices, custom_trend, create_mvgam_trend, RW, AR, CAR, VAR, GP, PW, ZMVN (+ 55 more)
 - **`R/priors.R`** (33 functions) - Prior specification
-  - Key functions: mvgam_formula, get_prior (+ 31 more)
+  - Key functions: mvgam_formula, get_prior, has_trend_priors, extract_trend_priors_only, extract_trend_priors_from_enhanced, extract_observation_priors_from_enhanced, extract_observation_priors_only, add_trend_component_attr, extract_observation_priors, extract_trend_priors, generate_trend_priors, generate_trend_priors_from_monitor_params, create_trend_parameter_prior, get_default_trend_parameter_prior, get_parameter_type_default_prior (+ 18 more)
 - **`R/backends.R`** (6 functions)
+  - Key functions: repair_stanfitrepair_names repair_variable_names is_equal ulapply seq_rows (+ 5 more)
 - **`R/conditional_effects.R`** (6 functions) - Conditional effects
+  - Key functions: decimalplaces, print.mvgam_conditional_effects, conditional_effects.mvgam, plot.mvgam_conditional_effects, roundlabs, split_termlabs
 - **`R/monotonic.R`** (5 functions)
+  - Key functions: smooth.construct.moi.smooth.spec, smooth.construct.mod.smooth.spec, Predict.matrix.moi.smooth, Predict.matrix.mod.smooth, add_mono_model_file
 - **`R/ensemble.R`** (4 functions)
-  - Key functions: ensemble (+ 3 more)
+  - Key functions: ensembleensemble.mvgam_forecast allsame split_fc_dots (+ 3 more)
 - **`R/mvgam_residcor-class.R`** (4 functions) - Class definitions and methods
+  - Key functions: gather_matrix, cluster_cormat, reorder_clusters, plot.mvgam_residcor
 - **`R/how_to_cite.R`** (3 functions)
-  - Key functions: how_to_cite (+ 2 more)
+  - Key functions: how_to_citeprint.how_to_cite how_to_cite.mvgam (+ 2 more)
 - **`R/residual_cor.R`** (3 functions) - Residual analysis
-  - Key functions: residual_cor (+ 2 more)
+  - Key functions: residual_corresidual_cor.mvgam residual_cor.jsdgam (+ 2 more)
 - **`R/tidier_methods.R`** (3 functions) - Method implementations
+  - Key functions: tidy.mvgam, split_hier_Sigma, augment.mvgam
 - **`R/mvgam_fevd-class.R`** (3 functions) - Class definitions and methods
+  - Key functions: summary.mvgam_fevd, plot.mvgam_fevd, fevd_df
 - **`R/RcppExports.R`** (3 functions) - Exported functions
+  - Key functions: ar3_recursC, var1_recursC, varma_recursC
 - **`R/ordinate.jsdgam.R`** (2 functions)
-  - Key functions: ordinate (+ 1 more)
+  - Key functions: ordinateordinate.jsdgam (+ 1 more)
 - **`R/mvgam_irf-class.R`** (2 functions) - Class definitions and methods
+  - Key functions: summary.mvgam_irf, plot.mvgam_irf
 - **`R/zzz.R`** (2 functions) - Package startup and attachment
+  - Key functions: core_unloaded, mvgam_attach
 - **`R/stability.R`** (2 functions)
-  - Key functions: stability (+ 1 more)
+  - Key functions: stabilitystability.mvgam (+ 1 more)
 - **`R/lv_correlations.R`** (1 functions)
   - Key functions: lv_correlations
 - **`R/mvgam_forecast-class.R`** (1 functions) - Class definitions and methods
+  - Key functions: summary.mvgam_forecast
 - **`R/dynamic.R`** (1 functions)
   - Key functions: dynamic
 - **`R/cpp_funs.R`** (0 functions)
@@ -170,20 +191,23 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 
 ### S3 Methods Files
 - **`R/add_residuals.R`** (2 functions) - Residual analysis
-  - Key functions: add_residuals (+ 1 more)
+  - Key functions: add_residualsadd_residuals.mvgam (+ 1 more)
 
 ### Stan/Modeling Files
 - **`R/stan_assembly.R`** (64 functions) - Stan model integration
+  - Key functions: apply_response_suffix_to_stanvars, apply_suffix_to_stan_code, generate_combined_stancode, generate_base_stancode_with_stanvars, prepare_mvgam_stancode, prepare_stan_data, prepare_stanvars_for_brms, extract_trend_stanvars_from_setup, inject_trend_into_linear_predictor, inject_multivariate_trends_into_linear_predictors, assemble_mvgam_stan_code, assemble_mvgam_stan_data, generate_base_brms_stancode, generate_base_brms_standata, combine_stanvars (+ 49 more)
 - **`R/brms_integration.R`** (18 functions) - brms integration
+  - Key functions: setup_brms_lightweight, extract_prior_from_setup, extract_brmsterms_from_setup, parse_multivariate_trends, extract_response_trends, create_trend_base_formula, determine_trend_injection_point, modify_stancode_for_nonlinear, is_multivariate_formula, has_mvbind_response (+ 8 more)
 - **`R/make_stan.R`** (3 functions) - Stan model integration
+  - Key functions: generate_stan_components_mvgam_formula, stancode.mvgam_formula, standata.mvgam_formula
 
 ### Plotting Files
 - **`R/plot_mvgam_series.R`** (6 functions) - Plotting and visualization
-  - Key functions: plot_mvgam_series (+ 5 more)
+  - Key functions: plot_mvgam_series, validate_plot_data, plot_time_series, plot_histogram, plot_acf, plot_ecdf
 - **`R/plot_mvgam_uncertainty.R`** (2 functions) - Plotting and visualization
-  - Key functions: plot_mvgam_uncertainty (+ 1 more)
+  - Key functions: plot_mvgam_uncertaintyintersect_hist (+ 1 more)
 - **`R/plot_mvgam_fc.R`** (2 functions) - Plotting and visualization
-  - Key functions: plot_mvgam_fc (+ 1 more)
+  - Key functions: plot_mvgam_fcplot.mvgam_forecast (+ 1 more)
 - **`R/plot_mvgam_pterms.R`** (1 functions) - Plotting and visualization
   - Key functions: plot_mvgam_pterms
 - **`R/plot_mvgam_resids.R`** (1 functions) - Plotting and visualization
@@ -260,11 +284,45 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **ggplot2**: Grammar of graphics plotting system
 - **patchwork**: Package functionality
 
+## System-Specific Function Breakdowns
+
+### Prior System Functions
+- **build_ar_prior_spec()** (`R/priors.R`)
+- **combine_obs_trend_priors()** (`R/priors.R`)
+- **create_empty_brmsprior()** (`R/priors.R`)
+- **create_trend_parameter_prior()** (`R/priors.R`)
+- **extract_observation_priors()** (`R/priors.R`)
+- **extract_observation_priors_from_enhanced()** (`R/priors.R`)
+- **extract_observation_priors_only()** (`R/priors.R`)
+- **extract_prior_string()** (`R/priors.R`)
+
+### Trend System Functions
+- **apply_mvgam_trend_defaults()** (`R/trend_system.R`)
+- **ar_trend_properties()** (`R/trend_system.R`)
+- **auto_register_trend_types()** (`R/trend_system.R`)
+- **build_trend_label()** (`R/trend_system.R`)
+- **c.trend_param()** (`R/trend_system.R`)
+- **car_trend_properties()** (`R/trend_system.R`)
+- **create_mvgam_trend()** (`R/trend_system.R`)
+- **create_trend_brmsfit()** (`R/mvgam_core.R`)
+
+### Stan Assembly System Functions
+- **apply_response_suffix_to_stanvars()** (`R/stan_assembly.R`)
+- **apply_suffix_to_stan_code()** (`R/stan_assembly.R`)
+- **assemble_mvgam_stan_code()** (`R/stan_assembly.R`)
+- **assemble_mvgam_stan_data()** (`R/stan_assembly.R`)
+- **calculate_car_time_distances()** (`R/stan_assembly.R`)
+- **combine_stanvars()** (`R/stan_assembly.R`)
+- **extract_and_rename_stan_blocks()** (`R/stan_assembly.R`)
+- **extract_and_rename_standata_objects()** (`R/stan_assembly.R`)
+
 ## Notes for LLM Agents
-- **Primary workflow**: `mvgam()` -> model fitting -> `plot()`, `predict()`, `summary()` methods
+- **Primary workflow**: `mvgam()` -> prior/trend system setup -> Stan assembly -> model fitting -> S3 methods
+- **Prior system**: `mvgam_formula()`, `get_prior()`, `set_prior()` for Bayesian prior specification
+- **Trend system**: `trend_param()`, `register_trend_type()` for time series trend modeling
+- **Stan assembly**: `stancode()`, `standata()` for Stan model compilation and data preparation
 - **Stan integration**: Package heavily relies on Stan/brms for Bayesian computation
 - **S3 system**: Extensive use of S3 classes (`mvgam`, `mvgam_forecast`, etc.) with method dispatch
-- **Time series focus**: Specialized for multivariate time series with trend modeling
-- **File patterns**: `R/plot_*.R` for visualization, `R/*_mvgam.R` for S3 methods, `R/validations.R` for input checking
+- **File patterns**: `R/priors.R` (prior system), `R/trend_system.R` (trends), `R/stan_assembly.R` (Stan code)
 - **Core functions often call**: validation functions, Stan code generation, data preprocessing utilities
 

@@ -211,9 +211,9 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-08-29 11:33:13",
+                     "generated":  "2025-08-29 11:01:26",
                      "commit_hash":  "pending",
-                     "cached_files":  57,
+                     "cached_files":  0,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "total_functions":  425,
@@ -221,11 +221,29 @@
                      "s3_methods_count":  44,
                      "s3_classes_count":  25,
                      "package_name":  "mvgam",
-                     "changed_files":  0,
+                     "changed_files":  57,
                      "total_files":  57
                  },
     "function_dependencies":  {
-
+                                  "fevd.mvgam":  [
+                                                     "gen_fevd",
+                                                     "validate_pos_integer",
+                                                     "VAR"
+                                                 ],
+                                  "as_draws_matrix.mvgam":  "validate_variables",
+                                  "as_draws_df.mvgam":  "validate_variables",
+                                  "as_draws.mvgam":  "validate_variables",
+                                  "irf.mvgam":  [
+                                                    "gen_irf",
+                                                    "validate_pos_integer",
+                                                    "VAR"
+                                                ],
+                                  "interpret_mvgam":  [
+                                                          "dyn_to_gphilbert",
+                                                          "dyn_to_gpspline",
+                                                          "dynamic",
+                                                          "gp"
+                                                      ]
                               },
     "functions":  {
                       "validate_variables":  "R/as.data.frame.mvgam.R",
