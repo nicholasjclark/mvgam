@@ -249,7 +249,22 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
 
   } else {
     # Single trend specification - backward compatible
-    trend_stanvars <- extract_trend_stanvars_from_setup(trend_setup, trend_specs)
+    # Extract actual response name from observation formula
+    response_names <- extract_response_names(obs_setup$formula)
+    if (length(response_names) == 0) {
+      stop(insight::format_error(
+        "Could not extract response variable from observation formula.",
+        "The formula must have a valid response variable on the left-hand side."
+      ), call. = FALSE)
+    }
+    response_name <- response_names[1]  # Use first response for univariate
+    
+    trend_stanvars <- extract_trend_stanvars_from_setup(
+      trend_setup = trend_setup,
+      trend_specs = trend_specs,
+      response_suffix = "",
+      response_name = response_name
+    )
     responses_with_trends <- "main"  # Mark univariate model
   }
 
@@ -653,7 +668,7 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
   checkmate::assert_list(trend_setup, names = "named")
   checkmate::assert_list(trend_specs, names = "named")
   checkmate::assert_string(response_suffix)
-  
+
   # Validate response_name parameter if provided
   if (!is.null(response_name)) {
     checkmate::assert_string(response_name)
@@ -699,7 +714,7 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
       dimensions = dimensions,
       suffix = if (response_suffix == "") "_trend" else paste0("_trend", response_suffix)
     )
-    
+
     # Extract pre-generated observation-to-trend mappings from dimensions
     # Mappings are centralized in extract_time_series_dimensions() for consistency
     mapping_stanvars <- if (!is.null(dimensions$mappings)) {
@@ -712,12 +727,12 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
       } else {
         NULL
       }
-      
+
       # Convert mapping to stanvars if we have a valid mapping
       if (!is.null(mapping)) {
         # Validate mapping structure
         checkmate::assert_names(names(mapping), must.include = c("obs_trend_time", "obs_trend_series"))
-        
+
         # Create stanvars for the mapping arrays with proper naming
         obs_time_stanvar <- brms::stanvar(
           x = mapping$obs_trend_time,
@@ -725,14 +740,14 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
           scode = paste0("array[N", response_suffix, "] int obs_trend_time", response_suffix, ";"),
           block = "data"
         )
-        
+
         obs_series_stanvar <- brms::stanvar(
           x = mapping$obs_trend_series,
           name = paste0("obs_trend_series", response_suffix),
           scode = paste0("array[N", response_suffix, "] int obs_trend_series", response_suffix, ";"),
           block = "data"
         )
-        
+
         # Return as stanvars collection
         c(obs_time_stanvar, obs_series_stanvar)
       } else {
@@ -741,10 +756,10 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
     } else {
       NULL
     }
-    
+
     # Generate trend-specific stanvars (without common components)
     trend_stanvars <- generate_trend_specific_stanvars(trend_specs, data_info, response_suffix)
-    
+
     # Combine all stanvars: brms parameters + mapping + trend-specific
     combine_stanvars(brms_stanvars, mapping_stanvars, trend_stanvars)
   } else {
@@ -778,26 +793,26 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
   # Input validation
   checkmate::assert_string(base_stancode, min.chars = 1)
   checkmate::assert_list(trend_stanvars, null.ok = TRUE)
-  
+
   # Early return if no trends to inject
   if (is.null(trend_stanvars) || length(trend_stanvars) == 0) {
     return(base_stancode)
   }
-  
+
   # Extract and validate mapping arrays
   mapping_arrays <- list(time_arrays = character(0), series_arrays = character(0))
-  
+
   for (stanvar in trend_stanvars) {
     if (is.list(stanvar) && !is.null(stanvar$name)) {
       if (grepl("obs_trend_time", stanvar$name)) {
-        mapping_arrays$time_arrays <- c(mapping_arrays$time_arrays, stanvar$name)  
+        mapping_arrays$time_arrays <- c(mapping_arrays$time_arrays, stanvar$name)
       }
       if (grepl("obs_trend_series", stanvar$name)) {
         mapping_arrays$series_arrays <- c(mapping_arrays$series_arrays, stanvar$name)
       }
     }
   }
-  
+
   # Validate mapping arrays exist
   if (length(mapping_arrays$time_arrays) == 0 || length(mapping_arrays$series_arrays) == 0) {
     stop(insight::format_error(
@@ -806,7 +821,7 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
       "This indicates a problem in the stanvar generation pipeline."
     ), call. = FALSE)
   }
-  
+
   # Validate arrays are paired
   if (length(mapping_arrays$time_arrays) != length(mapping_arrays$series_arrays)) {
     stop(insight::format_error(
@@ -815,13 +830,13 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
       "Check the stanvar generation process for consistency."
     ), call. = FALSE)
   }
-  
+
   # Parse Stan code
   code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
-  
+
   # Find transformed parameters block
   tp_start <- which(grepl("^\\s*transformed\\s+parameters\\s*\\{", code_lines))
-  
+
   if (length(tp_start) == 0) {
     # No transformed parameters block - find model block to insert before
     model_start <- which(grepl("^\\s*model\\s*\\{", code_lines))
@@ -832,11 +847,11 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
         "This may indicate a problem with brms code generation."
       ), call. = FALSE)
     }
-    
+
     # Create transformed parameters block content only
     tp_content <- generate_trend_injection_code(mapping_arrays)
     tp_block <- c("transformed parameters {", tp_content, "}")
-    
+
     # Insert before model block
     code_lines <- c(
       code_lines[1:(model_start[1] - 1)],
@@ -844,15 +859,15 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
       "",
       code_lines[model_start[1]:length(code_lines)]
     )
-    
+
   } else {
     # Transformed parameters block exists - find end and insert content
     tp_start_idx <- tp_start[1]
-    
+
     # Find matching closing brace using base R
     brace_count <- 0
     tp_end_idx <- NULL
-    
+
     for (i in tp_start_idx:length(code_lines)) {
       line <- code_lines[i]
       # Count braces using base R
@@ -861,14 +876,14 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
       # Handle case where no matches found (returns -1)
       if (open_braces == -1) open_braces <- 0
       if (close_braces == -1) close_braces <- 0
-      
+
       brace_count <- brace_count + open_braces - close_braces
       if (i > tp_start_idx && brace_count == 0) {
         tp_end_idx <- i
         break
       }
     }
-    
+
     if (is.null(tp_end_idx)) {
       stop(insight::format_error(
         "Cannot find end of transformed parameters block.",
@@ -876,53 +891,105 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
         "This may indicate a problem with brms code generation."
       ), call. = FALSE)
     }
-    
+
     # Generate and insert trend injection content before closing brace
     injection_content <- generate_trend_injection_code(mapping_arrays)
-    
+
     code_lines <- c(
       code_lines[1:(tp_end_idx - 1)],
       injection_content,
       code_lines[tp_end_idx:length(code_lines)]
     )
   }
-  
+
   return(paste(code_lines, collapse = "\n"))
-  
-  # Internal helper function for generating Stan code content
-  generate_trend_injection_code <- function(mapping_arrays) {
-    checkmate::assert_list(mapping_arrays)
-    checkmate::assert_names(names(mapping_arrays), must.include = c("time_arrays", "series_arrays"))
-    
-    injection_lines <- c("", "  // Add trend effects using mapping arrays")
-    
-    # Generate for each response (handles both univariate and multivariate)
-    for (i in seq_along(mapping_arrays$time_arrays)) {
-      time_array <- mapping_arrays$time_arrays[i]
-      series_array <- mapping_arrays$series_arrays[i] 
-      
-      # Extract response suffix using base R
-      response_suffix <- ""
-      match_result <- regexpr("_y\\d+$", time_array)
-      if (match_result != -1) {
-        response_suffix <- regmatches(time_array, match_result)
-      }
-      
-      # Generate variable names based on suffix
-      mu_var <- if (response_suffix == "") "mu" else paste0("mu", response_suffix)
-      trend_var <- if (response_suffix == "") "trend" else paste0("trend", response_suffix)
-      n_var <- if (response_suffix == "") "N" else paste0("N", response_suffix)
-      
-      # Generate direct mu modification loop
-      injection_lines <- c(injection_lines,
-        paste0("  for (n in 1:", n_var, ") {"),
-        paste0("    ", mu_var, "[n] += ", trend_var, "[", time_array, "[n], ", series_array, "[n]];"),
-        "  }"
-      )
+}
+
+#' Generate Trend Injection Code for Stan Transformed Parameters Block
+#'
+#' @description
+#' Creates Stan code lines that inject trend effects into the linear predictor
+#' mu by adding trend matrix values using observation-to-trend mapping arrays.
+#' Supports both univariate and multivariate responses with appropriate
+#' variable naming.
+#'
+#' @param mapping_arrays Named list containing mapping arrays with elements:
+#'   \itemize{
+#'     \item time_arrays: Character vector of time mapping array names
+#'     \item series_arrays: Character vector of series mapping array names  
+#'   }
+#'   Arrays must be paired (same length) with corresponding time/series mappings.
+#'
+#' @return Character vector containing Stan code lines for trend injection.
+#'   Generated code follows the pattern:
+#'   \preformatted{
+#'   for (n in 1:N) {
+#'     mu[n] += trend[obs_trend_time[n], obs_trend_series[n]];
+#'   }
+#'   }
+#'   For multivariate responses, generates response-specific variable names
+#'   (mu_count, trend_count, N_count, etc.).
+#'
+#' @details
+#' This function is called internally by \code{inject_trend_into_linear_predictor()}
+#' to generate the actual Stan code that adds trend effects to brms linear
+#' predictors. The mapping arrays must have been created by 
+#' \code{generate_obs_trend_mapping()} and included in trend stanvars.
+#'
+#' The function handles both univariate and multivariate cases by detecting
+#' response suffixes in mapping array names (e.g., "_y1", "_count") and
+#' generating appropriately named variables.
+#'
+#' @examples
+#' \dontrun{
+#' # Univariate case
+#' mapping_arrays <- list(
+#'   time_arrays = "obs_trend_time",
+#'   series_arrays = "obs_trend_series"  
+#' )
+#' code_lines <- generate_trend_injection_code(mapping_arrays)
+#'
+#' # Multivariate case  
+#' mapping_arrays <- list(
+#'   time_arrays = c("obs_trend_time_count", "obs_trend_time_biomass"),
+#'   series_arrays = c("obs_trend_series_count", "obs_trend_series_biomass")
+#' )
+#' code_lines <- generate_trend_injection_code(mapping_arrays)
+#' }
+#'
+#' @noRd
+generate_trend_injection_code <- function(mapping_arrays) {
+  checkmate::assert_list(mapping_arrays)
+  checkmate::assert_names(names(mapping_arrays), must.include = c("time_arrays", "series_arrays"))
+
+  injection_lines <- c("", "  // Add trend effects using mapping arrays")
+
+  # Generate for each response (handles both univariate and multivariate)
+  for (i in seq_along(mapping_arrays$time_arrays)) {
+    time_array <- mapping_arrays$time_arrays[i]
+    series_array <- mapping_arrays$series_arrays[i]
+
+    # Extract response suffix using base R
+    response_suffix <- ""
+    match_result <- regexpr("_y\\d+$", time_array)
+    if (match_result != -1) {
+      response_suffix <- regmatches(time_array, match_result)
     }
-    
-    return(injection_lines)
+
+    # Generate variable names based on suffix
+    mu_var <- if (response_suffix == "") "mu" else paste0("mu", response_suffix)
+    trend_var <- if (response_suffix == "") "trend" else paste0("trend", response_suffix)
+    n_var <- if (response_suffix == "") "N" else paste0("N", response_suffix)
+
+    # Generate direct mu modification loop
+    injection_lines <- c(injection_lines,
+                         paste0("  for (n in 1:", n_var, ") {"),
+                         paste0("    ", mu_var, "[n] += ", trend_var, "[", time_array, "[n], ", series_array, "[n]];"),
+                         "  }"
+    )
   }
+
+  return(injection_lines)
 }
 
 #' Inject Multivariate Trends into Linear Predictors
@@ -1484,7 +1551,7 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
 #' while maintaining proper dimensional relationships for factor vs non-factor models.
 #'
 #' @param n_obs Number of observations (will be named n_trend in Stan)
-#' @param n_series Number of observed series 
+#' @param n_series Number of observed series
 #' @param n_lv Number of latent variables (optional, determines factor model behavior)
 #' @param is_factor_model Logical indicating if this is a factor model (optional, inferred from n_lv)
 #' @return List of all dimension data block stanvars (n_trend, n_series_trend, n_lv_trend)
@@ -1492,7 +1559,7 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
 generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL, is_factor_model = NULL) {
   # Input validation
   checkmate::assert_number(n_obs, lower = 1)
-  checkmate::assert_number(n_series, lower = 1) 
+  checkmate::assert_number(n_series, lower = 1)
   checkmate::assert_number(n_lv, lower = 1, null.ok = TRUE)
   checkmate::assert_logical(is_factor_model, len = 1, null.ok = TRUE)
 
@@ -1500,7 +1567,7 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL, is_factor_m
   if (is.null(is_factor_model)) {
     is_factor_model <- !is.null(n_lv) && n_lv < n_series
   }
-  
+
   # Set n_lv default for non-factor models
   if (is.null(n_lv)) {
     n_lv <- n_series  # Non-factor model: n_lv_trend = n_series_trend
@@ -1540,7 +1607,7 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL, is_factor_m
       block = "data"
     )
   }
-  
+
   return(combine_stanvars(n_trend_stanvar, n_series_trend_stanvar, n_lv_trend_stanvar))
 }
 
@@ -1609,16 +1676,16 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv, n_serie
   checkmate::assert_logical(is_factor_model, len = 1)
   checkmate::assert_integerish(n_lv, len = 1, lower = 1)
   checkmate::assert_integerish(n_series, len = 1, lower = 1)
-  
+
   # Get Z matrix components (dimensions handled by generate_common_trend_data)
   stanvars_list <- list(
     generate_matrix_z_parameters(is_factor_model, n_lv, n_series),
     generate_matrix_z_tdata(is_factor_model, n_lv, n_series)
   )
-  
+
   # Remove NULL elements and combine
   non_null_stanvars <- Filter(Negate(is.null), stanvars_list)
-  
+
   if (length(non_null_stanvars) == 0) {
     return(NULL)
   } else if (length(non_null_stanvars) == 1) {
@@ -1876,15 +1943,15 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
   n_lv <- trend_specs$n_lv %||% n_series
   is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
   use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
-  
+
   # Cross-cutting system validation (integration between factor models and hierarchical correlations)
   validate_no_factor_hierarchical(trend_specs, n_series, trend_type)
-  
+
   # Parameter validation
   checkmate::assert_int(n_obs, lower = 1)
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_int(n_lv, lower = 1)
-  
+
   # Generate trend-specific stanvars using consistent naming convention
   # Note: Common components (dimensions, times_trend, mu_trend) handled by extract_and_rename_trend_parameters
   trend_stanvars <- generator_function(trend_specs, data_info, prior = prior)
@@ -1965,7 +2032,7 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
   has_ma <- trend_specs$ma %||% FALSE
-  
+
   # Cross-cutting validation handled by injection function
 
   # Build components list following the 3-stanvar pattern
@@ -2166,7 +2233,7 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
   has_ma <- trend_specs$ma %||% FALSE
   max_lag <- max(ar_lags)
-  
+
   # Cross-cutting validation handled by injection function
 
   # Build components list following the 3-stanvar pattern
@@ -3004,12 +3071,12 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Standard parameters: sigma_trend (L_Omega_trend handled by LKJ in model block)
   # Hierarchical hyperparameters: Amu_trend, Aomega_trend, and conditional MA/group parameters
   var_params_to_prior <- c("sigma_trend", "Amu_trend", "Aomega_trend")
-  
+
   # Add hierarchical group parameters
   if (is_hierarchical) {
     var_params_to_prior <- c(var_params_to_prior, "sigma_group_trend")
   }
-  
+
   # Add VARMA MA hyperparameters
   if (is_varma) {
     var_params_to_prior <- c(var_params_to_prior, "Dmu_trend", "Domega_trend")
@@ -3353,7 +3420,7 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # Determine if this is a factor model (n_lv < n_series)
   is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
-  
+
   # Cross-cutting validation handled by injection function
 
   # Build components list following the 3-stanvar pattern
@@ -3487,7 +3554,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   checkmate::assert_int(n_obs, lower = 1)
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_int(n_lv, lower = 1)
-  
+
   if (!trend_type %in% c("linear", "logistic")) {
     stop(insight::format_error(
       "Piecewise trend type must be 'linear' or 'logistic'.",
@@ -3679,7 +3746,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     "),
     block = "model"
   )
-  
+
   # Also check for custom priors if provided
   pw_custom_priors <- generate_trend_priors_stanvar(
     param_names = c("m_trend", "k_trend", "delta_trend"),
@@ -3901,21 +3968,21 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
   checkmate::assert_subset(c("stancode", "standata", "brmsfit"), names(trend_setup))
   checkmate::assert_list(dimensions, names = "named")
   checkmate::assert_string(suffix, pattern = "^_[a-zA-Z][a-zA-Z0-9_]*$")
-  
+
   # Extract dimensions for times_trend matrix
   n_time <- dimensions$n_time
   n_series <- dimensions$n_series
   unique_times <- dimensions$unique_times
   unique_series <- dimensions$unique_series
-  
+
   # Detect if this is a multivariate model
   brmsfit <- trend_setup$brmsfit
   is_multivariate <- is_multivariate_brmsfit(brmsfit)
   response_names <- if (is_multivariate) extract_response_names_from_brmsfit(brmsfit) else NULL
-  
+
   # Create stanvar components list
   stanvar_components <- list()
-  
+
   # Create parameter mapping for prediction compatibility
   parameter_mapping <- list(
     original_to_renamed = list(),
@@ -3923,7 +3990,7 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
     is_multivariate = is_multivariate,
     response_names = response_names
   )
-  
+
   # 1. Extract and rename Stan code blocks (extract from model block but exclude likelihood)
   stan_code_result <- extract_and_rename_stan_blocks(
     stancode = trend_setup$stancode,
@@ -3932,14 +3999,14 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
     is_multivariate = is_multivariate,
     response_names = response_names
   )
-  
+
   # Update mapping with results from Stan code renaming
   parameter_mapping <- stan_code_result$mapping
-  
+
   if (length(stan_code_result$stanvars) > 0) {
     stanvar_components <- c(stanvar_components, stan_code_result$stanvars)
   }
-  
+
   # 2. Extract and rename standata objects
   standata_stanvars <- extract_and_rename_standata_objects(
     standata = trend_setup$standata,
@@ -3948,11 +4015,11 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
     is_multivariate = is_multivariate,
     response_names = response_names
   )
-  
+
   if (length(standata_stanvars) > 0) {
     stanvar_components <- c(stanvar_components, standata_stanvars)
   }
-  
+
   # 3. Generate times_trend matrix (support both univariate and multivariate)
   times_trend_stanvars <- generate_times_trend_matrices(
     n_time = n_time,
@@ -3962,17 +4029,17 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
     is_multivariate = is_multivariate,
     response_names = response_names
   )
-  
+
   if (length(times_trend_stanvars) > 0) {
     stanvar_components <- c(stanvar_components, times_trend_stanvars)
   }
-  
+
   # Attach metadata for later use in predictions and integration
   attr(stanvar_components, "parameter_mapping") <- parameter_mapping
   attr(stanvar_components, "original_brmsfit") <- brmsfit
   attr(stanvar_components, "is_multivariate") <- is_multivariate
   attr(stanvar_components, "response_names") <- response_names
-  
+
   return(stanvar_components)
 }
 
@@ -3982,12 +4049,12 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
 #' @noRd
 is_multivariate_brmsfit <- function(brmsfit) {
   checkmate::assert_class(brmsfit, "brmsfit")
-  
+
   # Check if formula has multivariate structure
   if (!is.null(brmsfit$formula) && inherits(brmsfit$formula, "mvbrmsformula")) {
     return(TRUE)
   }
-  
+
   # Check brmsterms for multivariate structure
   if (!is.null(brmsfit$formula)) {
     terms_obj <- try(brms::brmsterms(brmsfit$formula), silent = TRUE)
@@ -3995,7 +4062,7 @@ is_multivariate_brmsfit <- function(brmsfit) {
       return(TRUE)
     }
   }
-  
+
   return(FALSE)
 }
 
@@ -4005,12 +4072,12 @@ is_multivariate_brmsfit <- function(brmsfit) {
 #' @noRd
 extract_response_names_from_brmsfit <- function(brmsfit) {
   checkmate::assert_class(brmsfit, "brmsfit")
-  
+
   if (!is.null(brmsfit$formula) && inherits(brmsfit$formula, "mvbrmsformula")) {
     # Extract from mvbrmsformula
     return(names(brmsfit$formula$forms))
   }
-  
+
   # Try extracting from brmsterms
   if (!is.null(brmsfit$formula)) {
     terms_obj <- try(brms::brmsterms(brmsfit$formula), silent = TRUE)
@@ -4018,12 +4085,12 @@ extract_response_names_from_brmsfit <- function(brmsfit) {
       return(terms_obj$responses)
     }
   }
-  
+
   return(NULL)
 }
 
 #' Extract and Rename Stan Code Blocks
-#' 
+#'
 #' Extracts data, parameters, transformed parameters, and model blocks from brms Stan code,
 #' renames parameters with suffix. For model block, extracts priors and transformations
 #' but excludes likelihood statements.
@@ -4041,12 +4108,12 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
   checkmate::assert_list(mapping)
   checkmate::assert_flag(is_multivariate)
   checkmate::assert_character(response_names, null.ok = TRUE)
-  
+
   stanvar_list <- list()
-  
+
   # Skip extracting data block declarations from Stan code
   # Data is handled via extract_and_rename_standata_objects with actual values
-  
+
   # 1. Extract parameters block content (without headers) and rename parameters
   params_block <- extract_stan_block_content(stancode, "parameters")
   if (!is.null(params_block) && nchar(params_block) > 0) {
@@ -4054,13 +4121,13 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
       params_block, suffix, mapping, "parameters", is_multivariate, response_names
     )
     mapping <- params_result$mapping  # Update mapping
-    
+
     stanvar_list[["trend_parameters"]] <- brms::stanvar(
       scode = params_result$code,
       block = "parameters"
     )
   }
-  
+
   # 2. Extract transformed parameters block content (without headers) and rename references
   tparams_block <- extract_stan_block_content(stancode, "transformed parameters")
   if (!is.null(tparams_block) && nchar(tparams_block) > 0) {
@@ -4068,27 +4135,27 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
       tparams_block, suffix, mapping, "tparameters", is_multivariate, response_names
     )
     mapping <- tparams_result$mapping  # Update mapping
-    
+
     stanvar_list[["trend_tparameters"]] <- brms::stanvar(
       scode = tparams_result$code,
       block = "tparameters"
     )
   }
-  
+
   # 3. Extract model block content (without headers) but exclude likelihood statements
   model_block <- extract_stan_block_content(stancode, "model")
   model_stanvar_created <- FALSE
-  
+
   if (!is.null(model_block) && nchar(model_block) > 0) {
     # Extract non-likelihood parts (priors, transformations)
     non_likelihood_model <- extract_non_likelihood_from_model_block(model_block)
-    
+
     if (!is.null(non_likelihood_model) && nchar(trimws(non_likelihood_model)) > 0) {
       model_result <- rename_parameters_in_block(
         non_likelihood_model, suffix, mapping, "model", is_multivariate, response_names
       )
       mapping <- model_result$mapping  # Update mapping
-      
+
       stanvar_list[["trend_model_priors"]] <- brms::stanvar(
         scode = model_result$code,
         block = "model"
@@ -4096,14 +4163,14 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
       model_stanvar_created <- TRUE
     }
   }
-  
+
   # 4. CRITICAL: Create mu_trend if mu is missing (GLM optimization case)
   # Only create if no explicit mu vector exists AND no model stanvar was created
   if (!model_stanvar_created) {
     # Check if this is a GLM optimization case (no explicit mu vector)
     has_explicit_mu <- grepl("vector\\[.*\\]\\s+mu\\s*=", stancode)
     has_glm_optimization <- grepl("normal_id_glm_lpdf", stancode)
-    
+
     if (!has_explicit_mu && has_glm_optimization) {
       # Create mu_trend from GLM linear predictor components
       # For normal_id_glm_lpdf(Y | X, intercept, beta, sigma), the linear predictor is: X * beta + intercept
@@ -4111,11 +4178,11 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
       mu_trend_code <- paste0(
         "vector[", n_param, "] mu", suffix, " = Xc", suffix, " * b", suffix, " + Intercept", suffix, ";"
       )
-      
+
       # Update parameter mapping for the created mu_trend
       mapping$original_to_renamed[["mu"]] <- paste0("mu", suffix)
       mapping$renamed_to_original[[paste0("mu", suffix)]] <- "mu"
-      
+
       stanvar_list[["trend_model_mu_creation"]] <- brms::stanvar(
         scode = mu_trend_code,
         block = "tparameters"
@@ -4123,7 +4190,7 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
       model_stanvar_created <- TRUE
     }
   }
-  
+
   return(list(
     stanvars = stanvar_list,
     mapping = mapping
@@ -4139,35 +4206,35 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
 #' @noRd
 extract_non_likelihood_from_model_block <- function(model_block) {
   checkmate::assert_string(model_block)
-  
+
   # Remove the "model {" and "}" wrapper
   block_content <- stringr::str_extract(model_block, "(?s)\\{(.*?)\\}")
   if (is.na(block_content)) return(NULL)
-  
+
   block_content <- stringr::str_replace_all(block_content, "^\\{|\\}$", "")
-  
+
   # Split into lines
   lines <- stringr::str_split(block_content, "\\n")[[1]]
   lines <- stringr::str_trim(lines)
-  
+
   # Keep non-likelihood lines - preserve linear predictor computations
   non_likelihood_lines <- character(0)
-  
+
   for (line in lines) {
     # Skip empty lines and comments
     if (nchar(line) == 0 || grepl("^\\s*//", line)) {
       next
     }
-    
+
     # Skip specific lines we don't want
     skip_line <- any(c(
       # Prior-only conditional statements (but keep their contents)
       grepl("if\\s*\\(\\s*!\\s*prior_only\\s*\\)\\s*\\{?\\s*$", line),
       grepl("if\\s*\\(\\s*prior_only\\s*\\)\\s*\\{?\\s*$", line),
-      
+
       # Standalone closing braces (likely end of prior_only blocks)
       grepl("^\\s*}\\s*$", line),
-      
+
       # Actual likelihood statements
       grepl("~\\s+normal\\s*\\(", line),
       grepl("target\\s*\\+=.*normal.*lpdf\\s*\\(", line),
@@ -4176,21 +4243,21 @@ extract_non_likelihood_from_model_block <- function(model_block) {
       grepl("target\\s*\\+=.*normal.*lpdf\\s*\\([^)]*\\|", line),
       grepl("target\\s*\\+=.*Y\\s*\\|", line)
     ))
-    
+
     if (!skip_line) {
       non_likelihood_lines <- c(non_likelihood_lines, line)
     }
   }
-  
+
   if (length(non_likelihood_lines) == 0) {
     return(NULL)
   }
-  
+
   return(paste(non_likelihood_lines, collapse = "\n"))
 }
 
 #' Extract Stan Code Block
-#' 
+#'
 #' Extracts a specific block from Stan code (data, parameters, etc.)
 #'
 #' @param stancode Character string of Stan code
@@ -4200,29 +4267,29 @@ extract_non_likelihood_from_model_block <- function(model_block) {
 extract_stan_block <- function(stancode, block_name) {
   checkmate::assert_string(stancode)
   checkmate::assert_string(block_name)
-  
+
   # Pattern to find the block (case insensitive)
   pattern <- paste0("(?i)", stringr::str_replace_all(block_name, " ", "\\\\s+"), "\\s*\\{")
   start_match <- regexpr(pattern, stancode, perl = TRUE)
-  
+
   if (start_match == -1) {
     return("Block not found")
   }
-  
+
   start_pos <- start_match[1]
-  
+
   # Find the opening brace position
   code_from_start <- substr(stancode, start_pos, nchar(stancode))
   brace_pos <- regexpr("\\{", code_from_start)
-  
+
   if (brace_pos == -1) {
     return("Block not found")
   }
-  
+
   # Count braces to find matching closing brace
   brace_count <- 0
   end_pos <- start_pos + brace_pos[1] - 1
-  
+
   for (i in (start_pos + brace_pos[1]):nchar(stancode)) {
     char <- substr(stancode, i, i)
     if (char == "{") {
@@ -4235,7 +4302,7 @@ extract_stan_block <- function(stancode, block_name) {
       }
     }
   }
-  
+
   return(substr(stancode, start_pos, end_pos))
 }
 
@@ -4253,35 +4320,35 @@ extract_stan_block <- function(stancode, block_name) {
 extract_stan_block_content <- function(stancode, block_name) {
   checkmate::assert_string(stancode, min.chars = 1)
   checkmate::assert_string(block_name, min.chars = 1)
-  
+
   # Use existing extract_stan_block for the heavy lifting
   full_block <- extract_stan_block(stancode, block_name)
-  
+
   # Handle the case where block wasn't found
   if (identical(full_block, "Block not found")) {
     stop(insight::format_error(
       "Stan block {.field {block_name}} not found in code"
     ), call. = FALSE)
   }
-  
+
   # Extract inner content safely
   opening_brace <- regexpr("\\{", full_block)
   closing_braces <- gregexpr("\\}", full_block)[[1]]
-  
+
   if (opening_brace[1] == -1 || length(closing_braces) == 0) {
     stop(insight::format_error(
       "Malformed Stan block {.field {block_name}}"
     ), call. = FALSE)
   }
-  
+
   inner_start <- opening_brace[1] + 1
   inner_end <- max(closing_braces) - 1
-  
+
   # Handle empty blocks
   if (inner_end < inner_start) {
     return("")
   }
-  
+
   inner_content <- substr(full_block, inner_start, inner_end)
   # Use base R trimws instead of stringr::str_trim
   trimws(inner_content)
@@ -4293,7 +4360,7 @@ extract_stan_block_content <- function(stancode, block_name) {
 #' Handles both univariate and multivariate parameter patterns.
 #'
 #' @param block_code Character string of Stan block code
-#' @param suffix Character suffix to append 
+#' @param suffix Character suffix to append
 #' @param mapping List to store parameter mappings
 #' @param block_type Type of block for context
 #' @param is_multivariate Logical indicating if model is multivariate
@@ -4307,36 +4374,36 @@ rename_parameters_in_block <- function(block_code, suffix, mapping, block_type, 
   checkmate::assert_string(block_type)
   checkmate::assert_flag(is_multivariate)
   checkmate::assert_character(response_names, null.ok = TRUE)
-  
+
   renamed_code <- block_code
-  
+
   # Since trend models are always univariate, use univariate renaming
   # Extract all identifiers from this block and apply comprehensive renaming
   all_identifiers <- extract_stan_identifiers(block_code)
-  
+
   if (length(all_identifiers) > 0) {
     # Filter to get identifiers that should be renamed
     renameable_identifiers <- filter_renameable_identifiers(all_identifiers)
-    
+
     # Sort by length (descending) to avoid partial replacements
     sorted_identifiers <- renameable_identifiers[order(-nchar(renameable_identifiers))]
-    
+
     for (identifier in sorted_identifiers) {
       renamed_param <- paste0(identifier, suffix)
-      
+
       # Store mapping for coordination between blocks
       mapping$original_to_renamed[[identifier]] <- renamed_param
       mapping$renamed_to_original[[renamed_param]] <- identifier
-      
+
       # Apply replacement with word boundary protection
       renamed_code <- apply_safe_parameter_replacement(
-        renamed_code, 
-        identifier, 
+        renamed_code,
+        identifier,
         renamed_param
       )
     }
   }
-  
+
   # Return both renamed code and updated mapping
   return(list(
     code = renamed_code,
@@ -4345,10 +4412,10 @@ rename_parameters_in_block <- function(block_code, suffix, mapping, block_type, 
 }
 
 #' Get comprehensive Stan reserved words list
-#' 
+#'
 #' Returns comprehensive list of Stan reserved words that should never be renamed
 #' during parameter extraction. Based on Stan language specification and testing.
-#' 
+#'
 #' @return Character vector of Stan reserved words
 #' @noRd
 get_stan_reserved_words <- function() {
@@ -4357,85 +4424,85 @@ get_stan_reserved_words <- function() {
   c(
     # Stan data types
     "int", "real", "vector", "matrix", "array", "void",
-    
+
     # Stan constraints and bounds
     "lower", "upper", "multiplier", "offset",
-    
+
     # Stan block keywords
-    "functions", "data", "transformed", "parameters", "model", 
+    "functions", "data", "transformed", "parameters", "model",
     "generated", "quantities",
-    
+
     # Stan control flow
     "if", "else", "for", "while", "in", "break", "continue", "return",
-    
+
     # Stan operators and special symbols
-    "and", "or", "not", 
-    
+    "and", "or", "not",
+
     # Stan built-in variables and functions
     "target", "increment_log_prob", "get_lp", "print", "reject",
     "size", "length", "dimensions", "rows", "cols", "num_elements",
-    
+
     # brms internal variables
     "prior_only", "lprior", "temp_intercept", "temp_Intercept",
-    
+
     # Stan mathematical functions
     "abs", "acos", "acosh", "asin", "asinh", "atan", "atan2", "atanh",
     "cos", "cosh", "sin", "sinh", "tan", "tanh", "exp", "exp2", "expm1",
-    "log", "log10", "log1p", "log2", "sqrt", "square", "pow", "inv", 
+    "log", "log10", "log1p", "log2", "sqrt", "square", "pow", "inv",
     "inv_sqrt", "inv_square", "fabs", "fdim", "fmin", "fmax", "fmod",
     "floor", "ceil", "round", "trunc", "nearbyint", "rint",
-    
-    # Stan linear algebra functions  
-    "dot_product", "columns_dot_product", "rows_dot_product", 
+
+    # Stan linear algebra functions
+    "dot_product", "columns_dot_product", "rows_dot_product",
     "dot_self", "columns_dot_self", "rows_dot_self", "tcrossprod",
     "crossprod", "quad_form", "quad_form_diag", "quad_form_sym",
     "trace", "determinant", "log_determinant", "inverse", "eigenvalues",
-    "eigenvectors", "cholesky_decompose", "singular_values", 
-    "qr_Q", "qr_R", "sort_asc", "sort_desc", "sort_indices_asc", 
+    "eigenvectors", "cholesky_decompose", "singular_values",
+    "qr_Q", "qr_R", "sort_asc", "sort_desc", "sort_indices_asc",
     "sort_indices_desc", "rank", "reverse",
-    
+
     # Stan array/vector/matrix functions
     "rep_array", "rep_vector", "rep_row_vector", "rep_matrix",
     "ones_array", "ones_vector", "ones_row_vector", "ones_matrix",
     "zeros_array", "zeros_vector", "zeros_row_vector", "zeros_matrix",
     "uniform_simplex", "unit_vector", "linspaced_array", "linspaced_vector",
-    "linspaced_row_vector", "one_hot_array", "one_hot_vector", 
-    "one_hot_row_vector", "identity_matrix", "diag_matrix", 
-    "diag_pre_multiply", "diag_post_multiply", "block", "sub_col", 
+    "linspaced_row_vector", "one_hot_array", "one_hot_vector",
+    "one_hot_row_vector", "identity_matrix", "diag_matrix",
+    "diag_pre_multiply", "diag_post_multiply", "block", "sub_col",
     "sub_row", "head", "tail", "segment", "append_array", "append_col",
     "append_row",
-    
+
     # Stan probability distributions (lpdf/lpmf)
     "normal_lpdf", "normal_id_glm_lpdf", "student_t_lpdf", "cauchy_lpdf",
-    "double_exponential_lpdf", "logistic_lpdf", "gumbel_lpdf", 
+    "double_exponential_lpdf", "logistic_lpdf", "gumbel_lpdf",
     "lognormal_lpdf", "chi_square_lpdf", "inv_chi_square_lpdf",
     "scaled_inv_chi_square_lpdf", "exponential_lpdf", "gamma_lpdf",
     "inv_gamma_lpdf", "weibull_lpdf", "frechet_lpdf", "rayleigh_lpdf",
     "wiener_lpdf", "pareto_lpdf", "pareto_type_2_lpdf", "beta_lpdf",
-    "beta_proportion_lpdf", "uniform_lpdf", "bernoulli_lpdf", 
+    "beta_proportion_lpdf", "uniform_lpdf", "bernoulli_lpdf",
     "bernoulli_logit_lpdf", "binomial_lpdf", "binomial_logit_lpdf",
     "beta_binomial_lpdf", "hypergeometric_lpdf", "categorical_lpdf",
     "categorical_logit_lpdf", "discrete_range_lpdf", "ordered_logistic_lpdf",
     "ordered_probit_lpdf", "poisson_lpdf", "poisson_log_lpdf",
     "neg_binomial_lpdf", "neg_binomial_2_lpdf", "neg_binomial_2_log_lpdf",
     "multinomial_lpdf", "dirichlet_lpdf", "multi_normal_lpdf",
-    "multi_normal_prec_lpdf", "multi_normal_cholesky_lpdf", 
+    "multi_normal_prec_lpdf", "multi_normal_cholesky_lpdf",
     "multi_student_t_lpdf", "gaussian_dlm_obs_lpdf", "wishart_lpdf",
     "inv_wishart_lpdf", "lkj_corr_lpdf", "lkj_corr_cholesky_lpdf",
-    
+
     # Stan distribution CDFs
     "normal_cdf", "normal_ccdf", "normal_lcdf", "normal_lccdf",
     "student_t_cdf", "student_t_ccdf", "student_t_lcdf", "student_t_lccdf",
     "cauchy_cdf", "cauchy_ccdf", "cauchy_lcdf", "cauchy_lccdf",
-    "double_exponential_cdf", "double_exponential_ccdf", 
+    "double_exponential_cdf", "double_exponential_ccdf",
     "double_exponential_lcdf", "double_exponential_lccdf",
     "logistic_cdf", "logistic_ccdf", "logistic_lcdf", "logistic_lccdf",
     "gumbel_cdf", "gumbel_ccdf", "gumbel_lcdf", "gumbel_lccdf",
     "lognormal_cdf", "lognormal_ccdf", "lognormal_lcdf", "lognormal_lccdf",
     "chi_square_cdf", "chi_square_ccdf", "chi_square_lcdf", "chi_square_lccdf",
-    "inv_chi_square_cdf", "inv_chi_square_ccdf", "inv_chi_square_lcdf", 
-    "inv_chi_square_lccdf", "scaled_inv_chi_square_cdf", 
-    "scaled_inv_chi_square_ccdf", "scaled_inv_chi_square_lcdf", 
+    "inv_chi_square_cdf", "inv_chi_square_ccdf", "inv_chi_square_lcdf",
+    "inv_chi_square_lccdf", "scaled_inv_chi_square_cdf",
+    "scaled_inv_chi_square_ccdf", "scaled_inv_chi_square_lcdf",
     "scaled_inv_chi_square_lccdf", "exponential_cdf", "exponential_ccdf",
     "exponential_lcdf", "exponential_lccdf", "gamma_cdf", "gamma_ccdf",
     "gamma_lcdf", "gamma_lccdf", "inv_gamma_cdf", "inv_gamma_ccdf",
@@ -4446,9 +4513,9 @@ get_stan_reserved_words <- function() {
     "pareto_lcdf", "pareto_lccdf", "pareto_type_2_cdf", "pareto_type_2_ccdf",
     "pareto_type_2_lcdf", "pareto_type_2_lccdf", "beta_cdf", "beta_ccdf",
     "beta_lcdf", "beta_lccdf", "beta_proportion_cdf", "beta_proportion_ccdf",
-    "beta_proportion_lcdf", "beta_proportion_lccdf", "uniform_cdf", 
+    "beta_proportion_lcdf", "beta_proportion_lccdf", "uniform_cdf",
     "uniform_ccdf", "uniform_lcdf", "uniform_lccdf", "bernoulli_cdf",
-    "bernoulli_ccdf", "bernoulli_lcdf", "bernoulli_lccdf", 
+    "bernoulli_ccdf", "bernoulli_lcdf", "bernoulli_lccdf",
     "bernoulli_logit_cdf", "bernoulli_logit_ccdf", "bernoulli_logit_lcdf",
     "bernoulli_logit_lccdf", "binomial_cdf", "binomial_ccdf", "binomial_lcdf",
     "binomial_lccdf", "binomial_logit_cdf", "binomial_logit_ccdf",
@@ -4460,29 +4527,29 @@ get_stan_reserved_words <- function() {
     "poisson_log_lccdf", "neg_binomial_cdf", "neg_binomial_ccdf",
     "neg_binomial_lcdf", "neg_binomial_lccdf", "neg_binomial_2_cdf",
     "neg_binomial_2_ccdf", "neg_binomial_2_lcdf", "neg_binomial_2_lccdf",
-    "neg_binomial_2_log_cdf", "neg_binomial_2_log_ccdf", 
+    "neg_binomial_2_log_cdf", "neg_binomial_2_log_ccdf",
     "neg_binomial_2_log_lcdf", "neg_binomial_2_log_lccdf",
-    
+
     # Stan random number generators
     "normal_rng", "student_t_rng", "cauchy_rng", "double_exponential_rng",
     "logistic_rng", "gumbel_rng", "lognormal_rng", "chi_square_rng",
     "inv_chi_square_rng", "scaled_inv_chi_square_rng", "exponential_rng",
-    "gamma_rng", "inv_gamma_rng", "weibull_rng", "frechet_rng", 
+    "gamma_rng", "inv_gamma_rng", "weibull_rng", "frechet_rng",
     "rayleigh_rng", "wiener_rng", "pareto_rng", "pareto_type_2_rng",
     "beta_rng", "beta_proportion_rng", "uniform_rng", "bernoulli_rng",
     "bernoulli_logit_rng", "binomial_rng", "binomial_logit_rng",
     "beta_binomial_rng", "hypergeometric_rng", "categorical_rng",
     "categorical_logit_rng", "discrete_range_rng", "ordered_logistic_rng",
-    "ordered_probit_rng", "poisson_rng", "poisson_log_rng", 
+    "ordered_probit_rng", "poisson_rng", "poisson_log_rng",
     "neg_binomial_rng", "neg_binomial_2_rng", "neg_binomial_2_log_rng",
     "multinomial_rng", "dirichlet_rng", "multi_normal_rng",
-    "multi_normal_prec_rng", "multi_normal_cholesky_rng", 
-    "multi_student_t_rng", "wishart_rng", "inv_wishart_rng", 
+    "multi_normal_prec_rng", "multi_normal_cholesky_rng",
+    "multi_student_t_rng", "wishart_rng", "inv_wishart_rng",
     "lkj_corr_rng", "lkj_corr_cholesky_rng",
-    
+
     # Special Stan functions
     "step", "is_inf", "is_nan", "positive_infinity", "negative_infinity",
-    "not_a_number", "machine_precision", "max", "min", "sum", "prod", 
+    "not_a_number", "machine_precision", "max", "min", "sum", "prod",
     "log_sum_exp", "mean", "variance", "sd", "distance", "squared_distance",
     "fma", "multiply_log", "log1m", "log1p_exp", "log1m_exp", "log_diff_exp",
     "log_mix", "log_falling_factorial", "log_rising_factorial", "lgamma",
@@ -4493,68 +4560,68 @@ get_stan_reserved_words <- function() {
 }
 
 #' Extract all identifiers from Stan code
-#' 
+#'
 #' Uses regex to find all valid Stan identifiers for comprehensive parameter
 #' renaming. Based on proven patterns from testing.
-#' 
+#'
 #' @param stan_code Character string containing Stan code
 #' @return Character vector of unique identifiers found in code
 #' @noRd
 extract_stan_identifiers <- function(stan_code) {
   checkmate::assert_character(stan_code, len = 1)
-  
+
   # Extract all identifiers using regex pattern for valid Stan identifiers
   # Pattern matches: letter or underscore, followed by letters, digits, underscores
   identifiers <- regmatches(
-    stan_code, 
+    stan_code,
     gregexpr("\\b[a-zA-Z_][a-zA-Z0-9_]*\\b", stan_code, perl = TRUE)
   )[[1]]
-  
+
   # Return unique identifiers, removing empty strings
   unique(identifiers[nchar(identifiers) > 0])
 }
 
 #' Filter identifiers to exclude Stan reserved words and response variables
-#' 
+#'
 #' Removes Stan reserved words, essential system variables, and response variables
 #' that should never be renamed during trend parameter extraction.
-#' 
+#'
 #' @param identifiers Character vector of identifiers to filter
 #' @return Character vector of identifiers that are safe to rename
 #' @noRd
 filter_renameable_identifiers <- function(identifiers) {
   checkmate::assert_character(identifiers)
-  
+
   # Get comprehensive Stan reserved words
   reserved_words <- get_stan_reserved_words()
-  
+
   # Filter out reserved words (case-sensitive comparison)
   non_reserved <- identifiers[!identifiers %in% reserved_words]
-  
+
   # Additional filtering for response variables and obvious non-parameters
   # Response variables should NOT be carried from trend to observation model
   exclude_patterns <- c(
     # Response variables (trend models are always univariate with Y only)
-    "Y", 
-    
+    "Y",
+
     # Comment words and obvious non-parameters based on comprehensive testing
-    "total", "number", "observations", "response", "variable", 
+    "total", "number", "observations", "response", "variable",
     "population", "level", "effects", "design", "after", "centering",
     "should", "the", "likelihood", "be", "ignored", "group",
     "standard", "deviations", "standardized", "actual", "temporary",
     "intercept", "centered", "predictors", "regression", "coefficients",
     "dispersion", "parameter", "prior", "contributions", "log", "posterior"
   )
-  
+
   # Return identifiers that are not reserved words, response variables, or comment words
   non_reserved[!non_reserved %in% exclude_patterns]
 }
 
 #' Apply parameter renaming with word boundary protection
-#' 
+#'
 #' Performs safe identifier replacement using word boundaries to prevent
 #' partial matches. Based on proven testing patterns.
-#' 
+#'
 #' @param code Character string to modify
 #' @param old_name Character string of identifier to rename
 #' @param new_name Character string of new identifier name
@@ -4564,7 +4631,7 @@ apply_safe_parameter_replacement <- function(code, old_name, new_name) {
   checkmate::assert_character(code, len = 1)
   checkmate::assert_character(old_name, len = 1)
   checkmate::assert_character(new_name, len = 1)
-  
+
   # Use word boundary regex to avoid partial matches
   # \b ensures we only match complete words
   pattern <- paste0("\\b", old_name, "\\b")
@@ -4572,11 +4639,11 @@ apply_safe_parameter_replacement <- function(code, old_name, new_name) {
 }
 
 #' Rename Univariate Parameters using comprehensive identifier extraction
-#' 
+#'
 #' Replaces hardcoded parameter patterns with comprehensive Stan reserved words
 #' filtering to ensure robust parameter renaming for all brms patterns.
 #' Based on extensive testing documented in dev-tasks file.
-#' 
+#'
 #' @param code Character string of Stan code
 #' @param suffix Character suffix to append
 #' @param mapping List to store parameter mappings
@@ -4586,38 +4653,38 @@ rename_univariate_parameters <- function(code, suffix, mapping) {
   checkmate::assert_character(code, len = 1)
   checkmate::assert_character(suffix, len = 1)
   checkmate::assert_list(mapping)
-  
+
   # Extract all identifiers from Stan code
   all_identifiers <- extract_stan_identifiers(code)
-  
+
   if (length(all_identifiers) == 0) {
     return(code)
   }
-  
+
   # Filter to get identifiers that should be renamed
   renameable_identifiers <- filter_renameable_identifiers(all_identifiers)
-  
+
   # Apply renaming with word boundary protection
   renamed_code <- code
-  
+
   # Sort by length (descending) to avoid partial replacements
   sorted_identifiers <- renameable_identifiers[order(-nchar(renameable_identifiers))]
-  
+
   for (identifier in sorted_identifiers) {
     renamed_param <- paste0(identifier, suffix)
-    
+
     # Store mapping for later use
     mapping$original_to_renamed[[identifier]] <- renamed_param
     mapping$renamed_to_original[[renamed_param]] <- identifier
-    
+
     # Apply replacement with word boundary protection
     renamed_code <- apply_safe_parameter_replacement(
-      renamed_code, 
-      identifier, 
+      renamed_code,
+      identifier,
       renamed_param
     )
   }
-  
+
   return(renamed_code)
 }
 
@@ -4630,7 +4697,7 @@ rename_univariate_parameters <- function(code, suffix, mapping) {
 #' @noRd
 rename_multivariate_parameters <- function(code, suffix, mapping, response_names) {
   renamed_code <- code
-  
+
   # Multivariate parameter patterns for each response
   for (resp_name in response_names) {
     # Response-specific patterns
@@ -4644,30 +4711,30 @@ rename_multivariate_parameters <- function(code, suffix, mapping, response_names
       paste0("\\bN_", resp_name, "\\b"),           # Number of observations for response
       paste0("\\bK_", resp_name, "\\b")            # Number of predictors for response
     )
-    
+
     # Apply renaming for this response
     for (param_pattern in mv_patterns) {
       # Find all matches
       matches <- gregexpr(param_pattern, renamed_code, perl = TRUE)
       match_strings <- regmatches(renamed_code, matches)[[1]]
-      
+
       # Rename each unique match
       unique_matches <- unique(match_strings)
       for (param in unique_matches) {
         if (nchar(param) > 0) {
           renamed_param <- paste0(param, suffix)
-          
+
           # Store mapping
           mapping$original_to_renamed[[param]] <- renamed_param
           mapping$renamed_to_original[[renamed_param]] <- param
-          
+
           # Replace in code (use word boundaries)
           renamed_code <- gsub(paste0("\\b", param, "\\b"), renamed_param, renamed_code, perl = TRUE)
         }
       }
     }
   }
-  
+
   return(renamed_code)
 }
 
@@ -4682,16 +4749,16 @@ rename_multivariate_parameters <- function(code, suffix, mapping, response_names
 #' @param is_multivariate Logical indicating if model is multivariate
 #' @param response_names Character vector of response names (NULL for univariate)
 #' @return List of stanvar objects with renamed data
-#' @noRd  
+#' @noRd
 extract_and_rename_standata_objects <- function(standata, suffix, mapping, is_multivariate, response_names) {
   checkmate::assert_list(standata, names = "named")
   checkmate::assert_string(suffix)
   checkmate::assert_list(mapping)
   checkmate::assert_flag(is_multivariate)
   checkmate::assert_character(response_names, null.ok = TRUE)
-  
+
   stanvar_list <- list()
-  
+
   if (is_multivariate && !is.null(response_names)) {
     # Handle multivariate data objects
     stanvar_list <- extract_multivariate_standata(standata, suffix, mapping, response_names)
@@ -4699,15 +4766,15 @@ extract_and_rename_standata_objects <- function(standata, suffix, mapping, is_mu
     # Handle univariate data objects
     stanvar_list <- extract_univariate_standata(standata, suffix, mapping)
   }
-  
+
   return(stanvar_list)
 }
 
 #' Extract Univariate Stan Data Objects using comprehensive filtering
-#' 
+#'
 #' Applies comprehensive renaming to standata objects using same Stan reserved
 #' words filtering as the code renaming to ensure consistent namespace separation.
-#' 
+#'
 #' @param standata Named list of Stan data objects
 #' @param suffix Character suffix to append
 #' @param mapping List to store parameter mappings
@@ -4717,22 +4784,22 @@ extract_univariate_standata <- function(standata, suffix, mapping) {
   checkmate::assert_list(standata, names = "named")
   checkmate::assert_character(suffix, len = 1)
   checkmate::assert_list(mapping)
-  
+
   stanvar_list <- list()
-  
+
   # Get all standata names and filter using comprehensive approach
   all_data_names <- names(standata)
   renameable_data_names <- filter_renameable_identifiers(all_data_names)
-  
+
   for (data_name in renameable_data_names) {
     if (data_name %in% names(standata)) {
       renamed_data_name <- paste0(data_name, suffix)
       data_value <- standata[[data_name]]
-      
+
       # Store mapping for coordination with Stan code renaming
       mapping$original_to_renamed[[data_name]] <- renamed_data_name
       mapping$renamed_to_original[[renamed_data_name]] <- data_name
-      
+
       # Create stanvar for renamed data (use x for actual data values)
       stanvar_list[[renamed_data_name]] <- brms::stanvar(
         x = data_value,
@@ -4741,7 +4808,7 @@ extract_univariate_standata <- function(standata, suffix, mapping) {
       )
     }
   }
-  
+
   return(stanvar_list)
 }
 
@@ -4754,7 +4821,7 @@ extract_univariate_standata <- function(standata, suffix, mapping) {
 #' @noRd
 extract_multivariate_standata <- function(standata, suffix, mapping, response_names) {
   stanvar_list <- list()
-  
+
   # Multivariate data object patterns
   for (resp_name in response_names) {
     mv_data_patterns <- c(
@@ -4764,16 +4831,16 @@ extract_multivariate_standata <- function(standata, suffix, mapping, response_na
       paste0("K_", resp_name),     # Number of predictors
       paste0("Kc_", resp_name)     # Centered predictors
     )
-    
+
     for (data_pattern in mv_data_patterns) {
       if (data_pattern %in% names(standata)) {
         renamed_data_name <- paste0(data_pattern, suffix)
         data_value <- standata[[data_pattern]]
-        
+
         # Store mapping
         mapping$original_to_renamed[[data_pattern]] <- renamed_data_name
         mapping$renamed_to_original[[renamed_data_name]] <- data_pattern
-        
+
         # Create stanvar for renamed data (use x for actual data values)
         stanvar_list[[renamed_data_name]] <- brms::stanvar(
           x = data_value,
@@ -4783,7 +4850,7 @@ extract_multivariate_standata <- function(standata, suffix, mapping, response_na
       }
     }
   }
-  
+
   return(stanvar_list)
 }
 
@@ -4792,7 +4859,7 @@ extract_multivariate_standata <- function(standata, suffix, mapping, response_na
 #' Creates time series indexing matrices for both univariate and multivariate models
 #'
 #' @param n_time Number of unique time points
-#' @param n_series Number of series  
+#' @param n_series Number of series
 #' @param unique_times Sorted vector of unique time points
 #' @param unique_series Sorted vector of unique series identifiers
 #' @param is_multivariate Logical indicating if model is multivariate
@@ -4801,21 +4868,21 @@ extract_multivariate_standata <- function(standata, suffix, mapping, response_na
 #' @noRd
 generate_times_trend_matrices <- function(n_time, n_series, unique_times, unique_series, is_multivariate, response_names) {
   checkmate::assert_integerish(n_time, lower = 1, len = 1)
-  checkmate::assert_integerish(n_series, lower = 1, len = 1) 
+  checkmate::assert_integerish(n_series, lower = 1, len = 1)
   checkmate::assert_vector(unique_times, len = n_time)
   checkmate::assert_vector(unique_series, len = n_series)
   checkmate::assert_flag(is_multivariate)
   checkmate::assert_character(response_names, null.ok = TRUE)
-  
+
   stanvar_list <- list()
-  
+
   # Create times_trend matrix using sorted dimension information from extract_time_series_dimensions()
   # Both univariate and multivariate use same structure since trend models are always univariate
   times_trend_stanvar <- create_times_trend_matrix(
     n_time, n_series, unique_times, unique_series, "times_trend"
   )
   stanvar_list[["times_trend"]] <- times_trend_stanvar
-  
+
   return(stanvar_list)
 }
 
@@ -4828,21 +4895,21 @@ generate_times_trend_matrices <- function(n_time, n_series, unique_times, unique
 #' @return Stanvar object with times_trend matrix
 #' @noRd
 create_times_trend_matrix <- function(n_time, n_series, unique_times, unique_series, matrix_name) {
-  # Create properly structured 2D integer array [n_time, n_series] 
+  # Create properly structured 2D integer array [n_time, n_series]
   # Each entry times_array[i, j] contains the time index for time i, series j
   times_array <- array(data = as.integer(0), dim = c(n_time, n_series))
-  
+
   # Fill array with time indices (proper 2D structure for Stan)
   for (i in seq_len(n_time)) {
     for (j in seq_len(n_series)) {
       times_array[i, j] <- as.integer(i)  # Time index for this time point
     }
   }
-  
+
   # Create stanvar with explicit 2D integer array declaration
   # Use both data (x) and explicit scode to override brms auto-generation
   stan_declaration <- glue::glue("int {matrix_name}[{n_time}, {n_series}];")
-  
+
   brms::stanvar(
     x = times_array,
     name = matrix_name,
@@ -4866,10 +4933,10 @@ generate_stan_array_declaration <- function(var_name, var_type, dimensions, data
   checkmate::assert_string(var_type)
   checkmate::assert_integerish(dimensions, lower = 1)
   checkmate::assert_matrix(data_matrix)
-  
+
   # Create dimension string
   dim_str <- paste(dimensions, collapse = ", ")
-  
+
   # Format data matrix for Stan
   if (length(dimensions) == 2) {
     # 2D array
@@ -4877,7 +4944,7 @@ generate_stan_array_declaration <- function(var_name, var_type, dimensions, data
   } else {
     stop("Only 2D arrays currently supported")
   }
-  
+
   # Create Stan declaration
   paste0(var_type, " ", var_name, "[", dim_str, "] = ", formatted_data, ";")
 }
@@ -4891,12 +4958,12 @@ generate_stan_array_declaration <- function(var_name, var_type, dimensions, data
 #' @noRd
 format_matrix_for_stan_array <- function(matrix) {
   checkmate::assert_matrix(matrix)
-  
+
   # Convert each row to Stan format
   row_strings <- apply(matrix, 1, function(row) {
     paste0("{", paste(row, collapse = ", "), "}")
   })
-  
+
   # Combine rows
   paste0("{", paste(row_strings, collapse = ", "), "}")
 }

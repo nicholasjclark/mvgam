@@ -1,17 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:github.com)",
-      "Bash",
-      "powershell",
-      "Read",
-      "Glob",
-      "Bash(powershell:*)",
-      "Bash(echo $?)",
-      "Bash(echo:*)",
-      "WebSearch",
-      "WebFetch(domain:paulbuerkner.com)",
-      "WebFetch(domain:paul-buerkner.github.io)"
+      "Bash(Rscript:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": [],

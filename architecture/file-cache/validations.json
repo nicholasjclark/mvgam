@@ -120,7 +120,7 @@
                                 "validate_stan_code_fragment":  "validate_stan_code_fragment \u003c- function(fragment, expected_content = NULL, expected_block = NULL) {",
                                 "get_trend_validation_patterns":  "get_trend_validation_patterns \u003c- function() {",
                                 "all_times_avail":  "all_times_avail = function(time, min_time, max_time) {",
-                                "extract_time_series_dimensions":  "extract_time_series_dimensions \u003c- function(data, time_var = \"time\", series_var = \"series\", trend_type = NULL, trend_specs = NULL) {",
+                                "extract_time_series_dimensions":  "extract_time_series_dimensions \u003c- function(data, time_var = \"time\", series_var = \"series\", trend_type = NULL, trend_specs = NULL, response_vars = NULL) {",
                                 "validate_trend_hierarchical_structure":  "validate_trend_hierarchical_structure \u003c- function(trend_spec, data) {",
                                 "are_braces_balanced":  "are_braces_balanced \u003c- function(stan_code) {",
                                 "validate_trend_parameter_class":  "validate_trend_parameter_class \u003c- function(class) {",
@@ -161,7 +161,7 @@
                                 "validate_trend_components":  "validate_trend_components \u003c- function(trend_components) {",
                                 "validate_no_multiple_trend_constructors":  "validate_no_multiple_trend_constructors \u003c- function(formula_str) {",
                                 "validate_factor_levels":  "validate_factor_levels \u003c- function(data, var_name, data_name = \"data\", auto_drop = FALSE) {",
-                                "validate_time_series_for_trends":  "validate_time_series_for_trends \u003c- function(data, trend_specs, silent = 1) {",
+                                "validate_time_series_for_trends":  "validate_time_series_for_trends \u003c- function(data, trend_specs, silent = 1, response_vars = NULL) {",
                                 "validate_trend_formula_brms":  "validate_trend_formula_brms \u003c- function(trend_formula) {"
                             },
     "file":  "R/validations.R"

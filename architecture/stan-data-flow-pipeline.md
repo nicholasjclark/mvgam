@@ -54,19 +54,19 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 
 ### Stage 5: Stanvar Generation
 - **Entry point**: `extract_trend_stanvars_from_setup()` in `R/stan_assembly.R`
-- **Input**: trend_setup, trend specifications with embedded dimensions and mappings, response_name
+- **Input**: trend_setup and trend specifications with embedded dimensions and mappings
 - **Processing**:
-  - Extracts brms trend parameters and renames with `_trend` suffix via `extract_and_rename_trend_parameters()`
+  - Extracts brms trend parameters and renames with `_trend` suffix
   - Creates `times_trend` matrix using `generate_times_trend_matrices()`
   - The `times_trend[i,j]` matrix maps time i, series j to time indices
-  - **Centralized Mapping Retrieval**: Extracts pre-generated mapping arrays from `dimensions.mappings`
-    - **Simplified Architecture**: No `obs_data` parameter needed - mappings already exist
-    - **Selection Logic**: Uses `response_name` to select correct mapping from `dimensions.mappings`
-    - **Single Response Case**: Automatically uses the only available mapping
-    - **Validation**: Verifies mapping structure contains required `obs_trend_time` and `obs_trend_series`
+  - **Simplified Mapping Integration**: Extracts pre-generated mapping arrays from `dimensions.mappings`
+    - **Architecture Benefit**: Eliminates complex parameter threading and separate mapping generation
+    - **Source**: Mappings were generated during Stage 3 alongside dimension calculation
+    - **Structure**: `dimensions.mappings` contains `obs_trend_time` and `obs_trend_series` arrays for each response
+    - **Validation**: Arrays are pre-validated during dimension extraction stage
   - Converts mapping arrays to Stan data block stanvars with appropriate response suffixes
-  - Generates trend-specific Stan variables via `generate_trend_specific_stanvars()`
-- **Output**: Complete stanvar collection ready for Stan code injection
+  - Generates trend-specific Stan variables (innovations, parameters, etc.)
+- **Output**: Comprehensive stanvar objects for trend model including mapping arrays
 - **Available data structures**:
   - `times_trend` matrix [n_time, n_series] with time indexing
   - `obs_trend_time` array [N] mapping each non-missing observation to its time index

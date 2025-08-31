@@ -115,14 +115,8 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
 
   # Validate time series structure and inject dimensions
   if (mv_spec$has_trends) {
-    # Extract response variable names for mapping generation
-    response_vars <- if (!is.null(mv_spec$response_names)) {
-      mv_spec$response_names
-    } else {
-      # Single response from univariate formula - extract response variable name
-      response_term <- all.vars(formula[[2]])
-      if (length(response_term) > 0) response_term else NULL
-    }
+    # Extract response variable names for mapping generation using enhanced function
+    response_vars <- extract_response_names(obs_formula)
     
     validation_result <- validate_time_series_for_trends(
       data, 

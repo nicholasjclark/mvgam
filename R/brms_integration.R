@@ -162,12 +162,8 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
   # Check if main formula is multivariate
   is_mv_main <- is_multivariate_formula(formula)
   
-  # Parse response names from main formula
-  response_names <- if (is_mv_main) {
-    extract_response_names(formula)
-  } else {
-    NULL
-  }
+  # Parse response names from main formula using enhanced function
+  response_names <- extract_response_names(formula)
   
   # Handle response-specific trend formulas
   if (inherits(trend_formula, "brmsformula") ||
@@ -362,41 +358,42 @@ has_mvbind_response <- function(formula) {
   return(TRUE)
 }
 
-#' Extract Response Names from Multivariate Formula
+#' Extract Response Names from Any Formula
 #'
 #' @description
-#' Extracts response variable names from all brms multivariate formula patterns:
-#' mvbind(), bf() with multiple responses, mvbf(), and combined bf() objects.
-#' Uses robust expression parsing for reliable extraction.
+#' Extracts response variable names from both univariate and multivariate brms
+#' formula objects. Handles all major multivariate patterns plus univariate cases
+#' with fail-fast error handling. Never returns NULL - always succeeds or fails.
 #' 
 #' Note: cbind() responses are NOT extracted as cbind() creates binomial trial
 #' specifications, not true multivariate models per brms standards.
 #'
 #' @param formula Formula object. Can be formula, brmsformula, mvbrmsformula, or bform
-#' @return Character vector of response variable names, or NULL for univariate formulas
+#' @return Character vector of response variable names (never NULL/empty)
 #'
 #' @details
-#' Handles all major brms multivariate patterns:
+#' Handles all brms formula patterns with fail-fast behavior:
 #' \itemize{
 #'   \item mvbrmsformula objects: extracts from $responses field
 #'   \item brmsformula with pforms: combines main response with additional responses
 #'   \item formula with mvbind(): parses expression tree safely
-#'   \item Returns NULL for univariate formulas (including cbind)
+#'   \item formula univariate: extracts single response using all.vars()
+#'   \item Fail-fast errors: throws informative errors instead of returning NULL
 #' }
 #'
 #' @examples
 #' \dontrun{
-#' # Pattern 1: mvbind formula
+#' # Multivariate patterns
 #' extract_response_names(mvbind(y1, y2) ~ x)  # c("y1", "y2")
-#' 
-#' # Pattern 2: bf with multiple responses  
 #' extract_response_names(bf(count ~ temp, biomass ~ precip))  # c("count", "biomass")
-#' 
-#' # Pattern 3: Combined bf objects
 #' extract_response_names(bf(y1 ~ x) + bf(y2 ~ z))  # c("y1", "y2")
 #' 
-#' # Pattern 4: cbind formula (returns NULL - not multivariate)
-#' extract_response_names(cbind(success, failure) ~ x)  # NULL
+#' # Univariate patterns (NEW - no longer returns NULL)
+#' extract_response_names(y ~ x)  # "y"
+#' extract_response_names(count ~ temp + precip)  # "count"
+#' 
+#' # Error cases (fail-fast behavior)
+#' extract_response_names(~ x)  # ERROR: no response variable
 #' }
 #'
 #' @seealso \code{\link{is_multivariate_formula}}, \code{\link{parse_multivariate_trends}}
@@ -429,11 +426,48 @@ extract_response_names <- function(formula) {
   # Case 3: Standard formula with mvbind binding ONLY (corrected)
   # This covers: mvbind(y1, y2) ~ x (cbind EXCLUDED - not multivariate per brms)
   if (inherits(formula, "formula")) {
-    return(extract_mvbind_responses(formula))
+    mvbind_result <- extract_mvbind_responses(formula)
+    if (!is.null(mvbind_result)) {
+      return(mvbind_result)
+    }
+    
+    # Handle univariate formula case - extract single response with fail-fast
+    if (length(formula) < 3) {
+      stop(insight::format_error(
+        "Formula has no response variable (left-hand side).",
+        "Provide a formula with the form {.code response ~ predictors}."
+      ), call. = FALSE)
+    }
+    
+    response_terms <- all.vars(formula[[2]])
+    if (length(response_terms) == 0) {
+      stop(insight::format_error(
+        "Could not extract response variable from formula left-hand side.",
+        "Ensure the response variable is a valid R variable name."
+      ), call. = FALSE)
+    }
+    
+    return(response_terms)
   }
   
-  # Default case: univariate formula
-  return(NULL)
+  # Handle brmsformula objects that aren't multivariate
+  if (inherits(formula, "brmsformula")) {
+    if (!is.null(formula$resp) && nchar(formula$resp) > 0) {
+      return(formula$resp)
+    }
+    
+    # Extract from the formula component if resp field is missing  
+    if (!is.null(formula$formula)) {
+      return(extract_response_names(formula$formula))
+    }
+  }
+  
+  # Should not reach here with proper validation, but fail fast if we do
+  stop(insight::format_error(
+    "Could not extract response variable names from formula.",
+    "Formula type {.cls {class(formula)}} may not be supported.",
+    "Supported types: formula, brmsformula, mvbrmsformula, bform."
+  ), call. = FALSE)
 }
 
 #' Extract Response Names from mvbind Expression
