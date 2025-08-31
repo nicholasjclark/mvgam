@@ -111,7 +111,20 @@ mvgam_single_dataset <- function(formula, trend_formula, data, backend,
 
   # Validate time series structure and inject dimensions if trends are specified
   if (mv_spec$has_trends) {
-    validation_result <- validate_time_series_for_trends(data, mv_spec$trend_specs)
+    # Extract response variable names for mapping generation
+    response_vars <- if (!is.null(mv_spec$response_names)) {
+      mv_spec$response_names
+    } else {
+      # Single response from univariate formula - extract response variable name
+      response_term <- all.vars(formula[[2]])
+      if (length(response_term) > 0) response_term else NULL
+    }
+    
+    validation_result <- validate_time_series_for_trends(
+      data, 
+      mv_spec$trend_specs,
+      response_vars = response_vars
+    )
     
     # Inject dimensions back into trend specifications for stanvar generation
     # Standardized structure: univariate=direct, multivariate=named list

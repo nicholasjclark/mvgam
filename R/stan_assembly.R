@@ -232,7 +232,6 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
         trend_setup,
         resp_trend_specs,
         response_suffix = paste0("_", resp_name),
-        obs_data = obs_setup$data,
         response_name = resp_name
       )
 
@@ -650,14 +649,13 @@ prepare_stanvars_for_brms <- function(stanvars) {
 #' @noRd
 extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
                                               response_suffix = "",
-                                              obs_data = NULL, response_name = NULL) {
+                                              response_name = NULL) {
   checkmate::assert_list(trend_setup, names = "named")
   checkmate::assert_list(trend_specs, names = "named")
   checkmate::assert_string(response_suffix)
   
-  # Validate mapping parameters - both must be provided together or both NULL
-  if (!is.null(obs_data) || !is.null(response_name)) {
-    checkmate::assert_data_frame(obs_data)
+  # Validate response_name parameter if provided
+  if (!is.null(response_name)) {
     checkmate::assert_string(response_name)
   }
 
@@ -702,41 +700,44 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
       suffix = if (response_suffix == "") "_trend" else paste0("_trend", response_suffix)
     )
     
-    # Generate observation-to-trend mapping if obs_data is provided
-    mapping_stanvars <- if (!is.null(obs_data) && !is.null(response_name)) {
-      # Validate dimensions object has required fields for mapping generation
-      checkmate::assert_list(dimensions)
-      checkmate::assert_names(names(dimensions), must.include = c("time_var", "series_var"))
+    # Extract pre-generated observation-to-trend mappings from dimensions
+    # Mappings are centralized in extract_time_series_dimensions() for consistency
+    mapping_stanvars <- if (!is.null(dimensions$mappings)) {
+      # Determine which mapping to use based on response_name
+      mapping <- if (!is.null(response_name) && response_name %in% names(dimensions$mappings)) {
+        dimensions$mappings[[response_name]]
+      } else if (length(dimensions$mappings) == 1) {
+        # Single response case - use the only mapping available
+        dimensions$mappings[[1]]
+      } else {
+        NULL
+      }
       
-      # Create mapping arrays for observation-to-trend alignment
-      mapping <- generate_obs_trend_mapping(
-        data = obs_data,
-        response_var = response_name,
-        time_var = dimensions$time_var,
-        series_var = dimensions$series_var,
-        dimensions = dimensions
-      )
-      
-      # Validate mapping result structure
-      checkmate::assert_names(names(mapping), must.include = c("obs_trend_time", "obs_trend_series"))
-      
-      # Create stanvars for the mapping arrays with proper naming
-      obs_time_stanvar <- brms::stanvar(
-        x = mapping$obs_trend_time,
-        name = paste0("obs_trend_time", response_suffix),
-        scode = paste0("array[N", response_suffix, "] int obs_trend_time", response_suffix, ";"),
-        block = "data"
-      )
-      
-      obs_series_stanvar <- brms::stanvar(
-        x = mapping$obs_trend_series,
-        name = paste0("obs_trend_series", response_suffix),
-        scode = paste0("array[N", response_suffix, "] int obs_trend_series", response_suffix, ";"),
-        block = "data"
-      )
-      
-      # Return as stanvars collection
-      c(obs_time_stanvar, obs_series_stanvar)
+      # Convert mapping to stanvars if we have a valid mapping
+      if (!is.null(mapping)) {
+        # Validate mapping structure
+        checkmate::assert_names(names(mapping), must.include = c("obs_trend_time", "obs_trend_series"))
+        
+        # Create stanvars for the mapping arrays with proper naming
+        obs_time_stanvar <- brms::stanvar(
+          x = mapping$obs_trend_time,
+          name = paste0("obs_trend_time", response_suffix),
+          scode = paste0("array[N", response_suffix, "] int obs_trend_time", response_suffix, ";"),
+          block = "data"
+        )
+        
+        obs_series_stanvar <- brms::stanvar(
+          x = mapping$obs_trend_series,
+          name = paste0("obs_trend_series", response_suffix),
+          scode = paste0("array[N", response_suffix, "] int obs_trend_series", response_suffix, ";"),
+          block = "data"
+        )
+        
+        # Return as stanvars collection
+        c(obs_time_stanvar, obs_series_stanvar)
+      } else {
+        NULL
+      }
     } else {
       NULL
     }
@@ -787,7 +788,7 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
   mapping_arrays <- list(time_arrays = character(0), series_arrays = character(0))
   
   for (stanvar in trend_stanvars) {
-    if (inherits(stanvar, "stanvar") && !is.null(stanvar$name)) {
+    if (is.list(stanvar) && !is.null(stanvar$name)) {
       if (grepl("obs_trend_time", stanvar$name)) {
         mapping_arrays$time_arrays <- c(mapping_arrays$time_arrays, stanvar$name)  
       }

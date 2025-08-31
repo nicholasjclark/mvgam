@@ -22,12 +22,12 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 
 ### Stage 3: Data Validation and Comprehensive Time Series Analysis
 - **Entry point**: `validate_time_series_for_trends()` in `R/validations.R`
-- **Input**: Raw data, parsed trend specifications, and response variable information
+- **Input**: Raw data, parsed trend specifications, and response variable names
 - **Processing**: 
   - **Centralized Analysis**: Calls `extract_time_series_dimensions(response_vars)` for complete time series processing
   - Creates bidirectional mappings: `stan_to_original` and `original_to_stan` indices
   - Generates time/series index mappings for trend matrix structure
-  - **Mapping Generation**: Creates observation-to-trend mapping arrays for all response variables
+  - **Mapping Generation**: Creates observation-to-trend mapping arrays for ALL response variables in one pass
   - Validates factor levels and time series structure
 - **Output**: Enhanced dimensions object with embedded mapping arrays
 - **Available data structures**: 
@@ -35,7 +35,7 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
   - `dimensions$ordering$stan_to_original` (maps Stan row index → Original row index)
   - `dimensions$ordering$original_to_stan` (maps Original row index → Stan row index)
   - `dimensions$ordering$time_indices` and `dimensions$ordering$series_indices`
-  - **`dimensions$mappings`**: Contains observation-to-trend mapping arrays for each response variable
+  - **`dimensions$mappings`**: Contains pre-generated observation-to-trend mapping arrays for each response variable
 
 ### Stage 4: brms Setup
 - **Entry point**: `setup_brms_lightweight()` in `R/brms_integration.R`
@@ -54,19 +54,19 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 
 ### Stage 5: Stanvar Generation
 - **Entry point**: `extract_trend_stanvars_from_setup()` in `R/stan_assembly.R`
-- **Input**: trend_setup and trend specifications with embedded dimensions and mappings
+- **Input**: trend_setup, trend specifications with embedded dimensions and mappings, response_name
 - **Processing**:
-  - Extracts brms trend parameters and renames with `_trend` suffix
+  - Extracts brms trend parameters and renames with `_trend` suffix via `extract_and_rename_trend_parameters()`
   - Creates `times_trend` matrix using `generate_times_trend_matrices()`
   - The `times_trend[i,j]` matrix maps time i, series j to time indices
-  - **Simplified Mapping Integration**: Extracts pre-generated mapping arrays from `dimensions.mappings`
-    - **Architecture Benefit**: Eliminates complex parameter threading and separate mapping generation
-    - **Source**: Mappings were generated during Stage 3 alongside dimension calculation
-    - **Structure**: `dimensions.mappings` contains `obs_trend_time` and `obs_trend_series` arrays for each response
-    - **Validation**: Arrays are pre-validated during dimension extraction stage
+  - **Centralized Mapping Retrieval**: Extracts pre-generated mapping arrays from `dimensions.mappings`
+    - **Simplified Architecture**: No `obs_data` parameter needed - mappings already exist
+    - **Selection Logic**: Uses `response_name` to select correct mapping from `dimensions.mappings`
+    - **Single Response Case**: Automatically uses the only available mapping
+    - **Validation**: Verifies mapping structure contains required `obs_trend_time` and `obs_trend_series`
   - Converts mapping arrays to Stan data block stanvars with appropriate response suffixes
-  - Generates trend-specific Stan variables (innovations, parameters, etc.)
-- **Output**: Comprehensive stanvar objects for trend model including mapping arrays
+  - Generates trend-specific Stan variables via `generate_trend_specific_stanvars()`
+- **Output**: Complete stanvar collection ready for Stan code injection
 - **Available data structures**:
   - `times_trend` matrix [n_time, n_series] with time indexing
   - `obs_trend_time` array [N] mapping each non-missing observation to its time index
@@ -133,18 +133,26 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 
 ```
 mvgam() →
-  ├─ parse_multivariate_trends() →
-  ├─ validate_time_series_for_trends() →
-  │   └─ extract_time_series_dimensions(response_vars) → [CENTRALIZED: DIMENSIONS + MAPPINGS]
-  │       ├─ which(!is.na(response)) →                   [IDENTIFIES NON-MISSING OBS]
-  │       ├─ match(time_vals, unique_times) →            [MAPS TO TIME INDICES]
-  │       ├─ match(series_vals, unique_series) →         [MAPS TO SERIES INDICES]
-  │       └─ returns {dimensions + mappings} →           [COMPLETE TIME SERIES ANALYSIS]
-  ├─ setup_brms_lightweight() →                          [BRMS REORDERS DATA]
+  ├─ parse_multivariate_trends() →                       [EXTRACTS response_names FROM FORMULA]
+  │   └─ returns mv_spec with response_names →
+  ├─ validate_time_series_for_trends(data, trend_specs, response_vars) →
+  │   └─ extract_time_series_dimensions(data, time_var, series_var, trend_type, response_vars) →
+  │       ├─ calculate dimensions (n_time, n_series, n_obs) →
+  │       ├─ create ordering mappings →
+  │       └─ FOR EACH response_var IN response_vars:
+  │           └─ generate_obs_trend_mapping(data, response_var, time_var, series_var, dimensions) →
+  │               ├─ which(!is.na(data[[response_var]])) →    [IDENTIFIES NON-MISSING OBS]
+  │               ├─ match(obs_times, sorted_unique_times) →   [MAPS TO TIME INDICES]
+  │               ├─ match(obs_series, sorted_unique_series) → [MAPS TO SERIES INDICES]
+  │               └─ returns {obs_trend_time, obs_trend_series} arrays →
+  ├─ setup_brms_lightweight() →                          [BRMS PROCESSES DATA INDEPENDENTLY]
   ├─ generate_combined_stancode() →
-  │   ├─ extract_trend_stanvars_from_setup() →
-  │   │   ├─ generate_times_trend_matrices() →
-  │   │   └─ extract mappings from dimensions.mappings →
+  │   ├─ extract_trend_stanvars_from_setup(trend_setup, trend_specs, response_suffix, response_name) →
+  │   │   ├─ extract_and_rename_trend_parameters() →
+  │   │   ├─ dimensions$mappings[[response_name]] →     [RETRIEVES PRE-GENERATED MAPPING]
+  │   │   ├─ create stanvar for obs_trend_time →
+  │   │   ├─ create stanvar for obs_trend_series →
+  │   │   └─ generate_trend_specific_stanvars() →
   │   └─ inject_trend_into_linear_predictor() →         [USES obs_trend_time/obs_trend_series ARRAYS]
-  └─ Stan compilation succeeds
+  └─ Stan compilation and fitting
 ```

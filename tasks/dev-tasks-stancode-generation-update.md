@@ -83,17 +83,17 @@
 
 ### **Phase 3: Architecture Refactoring and Testing** (90 min)
 
-- [ ] **Sub-task C1**: Refactor mapping generation into extract_time_series_dimensions() (45 min)
-  - Modify `extract_time_series_dimensions()` to accept `response_vars` parameter (required, not optional)
+- [x] **Sub-task C1**: Refactor mapping generation into extract_time_series_dimensions() (45 min) ✅ COMPLETED
+  - Modified `extract_time_series_dimensions()` to accept `response_vars` parameter (required, not optional)
   - Generate mappings within dimension extraction: call `generate_obs_trend_mapping()` for each response
   - Return mappings in dimensions result structure alongside existing fields
-  - Update function signature and documentation for new centralized approach
+  - Updated function signature and documentation for new centralized approach
 
-- [ ] **Sub-task C2**: Update calling code to use cleaner mapping architecture (30 min)  
-  - Update `validate_time_series_for_trends()` to pass response variables to dimension extraction
-  - Modify `extract_trend_stanvars_from_setup()` to extract mappings from dimensions.mappings instead of generating separately
-  - Remove complex parameter threading: `obs_data` and `response_name` parameters no longer needed
-  - Revert multivariate and univariate calling code to simpler structure without extra parameters
+- [x] **Sub-task C2**: Update calling code to use cleaner mapping architecture (30 min) ✅ COMPLETED  
+  - Updated `validate_time_series_for_trends()` to pass response variables to dimension extraction
+  - Modified `extract_trend_stanvars_from_setup()` to extract mappings from dimensions.mappings instead of generating separately
+  - Removed complex parameter threading: `obs_data` parameter no longer needed
+  - Updated multivariate and univariate calling code to simpler structure without extra parameters
 
 - [ ] **Sub-task C3**: Validate refactored mapping system (15 min)
   - Run all 23 tests in `test-stancode-standata.R` to validate refactored approach  

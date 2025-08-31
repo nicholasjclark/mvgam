@@ -115,7 +115,20 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
 
   # Validate time series structure and inject dimensions
   if (mv_spec$has_trends) {
-    validation_result <- validate_time_series_for_trends(data, mv_spec$trend_specs)
+    # Extract response variable names for mapping generation
+    response_vars <- if (!is.null(mv_spec$response_names)) {
+      mv_spec$response_names
+    } else {
+      # Single response from univariate formula - extract response variable name
+      response_term <- all.vars(formula[[2]])
+      if (length(response_term) > 0) response_term else NULL
+    }
+    
+    validation_result <- validate_time_series_for_trends(
+      data, 
+      mv_spec$trend_specs,
+      response_vars = response_vars
+    )
     if (is.null(validation_result) || is.null(validation_result$dimensions)) {
       insight::format_error(
         "Time series validation failed for trend specification.",

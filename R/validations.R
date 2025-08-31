@@ -1241,9 +1241,13 @@ validate_setup_components <- function(components) {
 #' @param silent Verbosity level
 #' @return Invisible TRUE if valid, stops with error if invalid
 #' @noRd
-validate_time_series_for_trends <- function(data, trend_specs, silent = 1) {
+validate_time_series_for_trends <- function(data, trend_specs, silent = 1, response_vars = NULL) {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_list(trend_specs)
+  # Validate response_vars parameter if provided
+  if (!is.null(response_vars)) {
+    checkmate::assert_character(response_vars, min.len = 1, any.missing = FALSE, null.ok = TRUE)
+  }
 
   # Extract variable names from trend specification
   # Standardized structure: univariate=direct, multivariate=named list
@@ -1260,12 +1264,13 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1) {
     trend_type <- trend_specs$trend_type %||% trend_specs$trend_model %||% trend_specs$trend
   }
 
-  # Use new dimension extraction function (validates structure + returns dimensions)
+  # Use new dimension extraction function (validates structure + returns dimensions + mappings)
   dimensions <- extract_time_series_dimensions(
     data = data,
     time_var = time_var,
     series_var = series_var,
-    trend_type = trend_type
+    trend_type = trend_type,
+    response_vars = response_vars  # Pass response variables for mapping generation
   )
 
   # Additional validation using existing mvgam infrastructure
@@ -1359,12 +1364,16 @@ validate_trend_components <- function(trend_components) {
 #' @param trend_specs Optional trend specification list for enhanced metadata
 #' @return List with time series dimensions and optional enhanced metadata
 #' @noRd
-extract_time_series_dimensions <- function(data, time_var = "time", series_var = "series", trend_type = NULL, trend_specs = NULL) {
+extract_time_series_dimensions <- function(data, time_var = "time", series_var = "series", trend_type = NULL, trend_specs = NULL, response_vars = NULL) {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_string(time_var)
   checkmate::assert_string(series_var)
   if (!is.null(trend_specs)) {
     checkmate::assert_list(trend_specs)
+  }
+  # Validate response_vars parameter if provided
+  if (!is.null(response_vars)) {
+    checkmate::assert_character(response_vars, min.len = 1, any.missing = FALSE)
   }
 
   # Validate required variables exist
@@ -1454,6 +1463,34 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     unique_times = sorted_unique_times,    # Sorted unique time points
     unique_series = sorted_unique_series   # Sorted unique series
   )
+  
+  # Generate observation-to-trend mappings if response variables provided
+  # This centralizes mapping generation with dimension calculation for consistency
+  if (!is.null(response_vars)) {
+    dimensions$mappings <- list()
+    
+    for (resp_var in response_vars) {
+      # Validate response variable exists in data
+      if (!resp_var %in% colnames(data)) {
+        stop(insight::format_error(
+          "Response variable {.field {resp_var}} not found in data.",
+          "Available variables: {paste(colnames(data), collapse = ', ')}"
+        ), call. = FALSE)
+      }
+      
+      # Generate mapping for this response variable using existing function
+      mapping <- generate_obs_trend_mapping(
+        data = data,
+        response_var = resp_var,
+        time_var = time_var,
+        series_var = series_var,
+        dimensions = dimensions  # Pass already-calculated dimensions
+      )
+      
+      # Store mapping with response variable name as key
+      dimensions$mappings[[resp_var]] <- mapping
+    }
+  }
 
   # Enhanced metadata: Comprehensive information for post-processing
   if (!is.null(trend_specs)) {
