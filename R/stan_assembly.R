@@ -1948,8 +1948,10 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_int(n_lv, lower = 1)
 
+  # Generate common dimension stanvars (needed by ALL trend types)
+  common_dimensions <- generate_common_trend_data(n_obs, n_series, n_lv, is_factor_model)
+
   # Generate trend-specific stanvars using consistent naming convention
-  # Note: Common components (dimensions, times_trend, mu_trend) handled by extract_and_rename_trend_parameters
   trend_stanvars <- generator_function(trend_specs, data_info, prior = prior)
 
   # Apply response suffix post-processing for multivariate models
@@ -1957,11 +1959,14 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
     trend_stanvars <- apply_response_suffix_to_stanvars(trend_stanvars, response_suffix)
   }
 
-  # Combine shared and trend-specific stanvars
-  if (!is.null(shared_stanvars)) {
-    return(combine_stanvars(shared_stanvars, trend_stanvars))
+  # Combine all components: common dimensions + shared innovations + trend-specific
+  all_components <- list(common_dimensions, shared_stanvars, trend_stanvars)
+  all_components <- all_components[!sapply(all_components, is.null)]
+  
+  if (length(all_components) == 1) {
+    return(all_components[[1]])
   } else {
-    return(trend_stanvars)
+    return(do.call(combine_stanvars, all_components))
   }
 }
 
@@ -3990,7 +3995,8 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
     suffix = suffix,
     mapping = parameter_mapping,
     is_multivariate = is_multivariate,
-    response_names = response_names
+    response_names = response_names,
+    standata = trend_setup$standata
   )
 
   # Update mapping with results from Stan code renaming
@@ -4090,14 +4096,16 @@ extract_response_names_from_brmsfit <- function(brmsfit) {
 #' @param mapping List to store parameter name mappings
 #' @param is_multivariate Logical indicating if model is multivariate
 #' @param response_names Character vector of response names (NULL for univariate)
+#' @param standata Named list of Stan data objects for creating data block stanvars
 #' @return List of stanvar objects with renamed Stan code blocks
 #' @noRd
-extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multivariate, response_names) {
+extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multivariate, response_names, standata = NULL) {
   checkmate::assert_string(stancode)
   checkmate::assert_string(suffix)
   checkmate::assert_list(mapping)
   checkmate::assert_flag(is_multivariate)
   checkmate::assert_character(response_names, null.ok = TRUE)
+  checkmate::assert_list(standata, names = "named", null.ok = TRUE)
 
   stanvar_list <- list()
 
@@ -4112,11 +4120,9 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
     )
     mapping <- data_result$mapping  # Update mapping
     
+    # Store declaration information for use by extract_and_rename_standata_objects
     if (!is.null(data_result$code) && nchar(trimws(data_result$code)) > 0) {
-      stanvar_list[["trend_data"]] <- brms::stanvar(
-        scode = data_result$code,
-        block = "data"
-      )
+      mapping$data_declarations <- data_result$code
     }
   }
 
@@ -4330,37 +4336,44 @@ extract_stan_block_content <- function(stancode, block_name) {
   checkmate::assert_string(stancode, min.chars = 1)
   checkmate::assert_string(block_name, min.chars = 1)
 
-  # Use existing extract_stan_block for the heavy lifting
-  full_block <- extract_stan_block(stancode, block_name)
-
-  # Handle the case where block wasn't found
-  if (identical(full_block, "Block not found")) {
+  # Use line-by-line parsing with proper boundary detection for all blocks
+  lines <- strsplit(stancode, "\n")[[1]]
+  in_block <- FALSE
+  content_lines <- c()
+  
+  # Create pattern to match block start (handle multi-word blocks like "transformed data")
+  # Use base R gsub and trimws for robustness
+  clean_block_name <- gsub("\\s+", "\\\\s+", trimws(block_name))
+  block_pattern <- paste0("^\\s*", clean_block_name, "\\s*\\{")
+  
+  for (i in seq_along(lines)) {
+    line <- lines[i]
+    
+    # Check for block start
+    if (grepl(block_pattern, line, ignore.case = TRUE)) {
+      in_block <- TRUE
+      next  # Skip the opening brace line
+    }
+    
+    # Check for block end (closing brace on its own line)
+    if (in_block && grepl("^\\s*\\}\\s*$", line)) {
+      break  # Stop at closing brace
+    }
+    
+    # Collect content lines
+    if (in_block) {
+      content_lines <- c(content_lines, line)
+    }
+  }
+  
+  # Handle case where block wasn't found
+  if (length(content_lines) == 0 && !in_block) {
     stop(insight::format_error(
       "Stan block {.field {block_name}} not found in code"
     ), call. = FALSE)
   }
-
-  # Extract inner content safely
-  opening_brace <- regexpr("\\{", full_block)
-  closing_braces <- gregexpr("\\}", full_block)[[1]]
-
-  if (opening_brace[1] == -1 || length(closing_braces) == 0) {
-    stop(insight::format_error(
-      "Malformed Stan block {.field {block_name}}"
-    ), call. = FALSE)
-  }
-
-  inner_start <- opening_brace[1] + 1
-  inner_end <- max(closing_braces) - 1
-
-  # Handle empty blocks
-  if (inner_end < inner_start) {
-    return("")
-  }
-
-  inner_content <- substr(full_block, inner_start, inner_end)
-  # Use base R trimws instead of stringr::str_trim
-  trimws(inner_content)
+  
+  return(paste(content_lines, collapse = "\n"))
 }
 
 #' Rename Parameters in Stan Code Block
@@ -4613,6 +4626,9 @@ filter_renameable_identifiers <- function(identifiers) {
     # Response variables (trend models are always univariate with Y only)
     "Y",
     
+    # Dimension variables handled by generate_common_trend_data (avoid duplication)
+    "N",  # We use n_trend instead of N_trend
+    
     # Global flags that should not be renamed
     "prior_only",
 
@@ -4813,12 +4829,26 @@ extract_univariate_standata <- function(standata, suffix, mapping) {
       mapping$original_to_renamed[[data_name]] <- renamed_data_name
       mapping$renamed_to_original[[renamed_data_name]] <- data_name
 
-      # Create stanvar for renamed data (use x for actual data values)
-      stanvar_list[[renamed_data_name]] <- brms::stanvar(
+      # Create stanvar for renamed data (use x for actual data values and scode for declaration)
+      stanvar_args <- list(
         x = data_value,
         name = renamed_data_name,
         block = "data"
       )
+      
+      # Add declaration if available in mapping
+      if (!is.null(mapping$data_declarations)) {
+        # Extract the specific declaration line for this parameter
+        declaration_lines <- strsplit(mapping$data_declarations, "\n")[[1]]
+        for (decl_line in declaration_lines) {
+          if (grepl(paste0("\\b", renamed_data_name, "\\b"), decl_line)) {
+            stanvar_args$scode <- paste0("  ", trimws(decl_line))
+            break
+          }
+        }
+      }
+      
+      stanvar_list[[renamed_data_name]] <- do.call(brms::stanvar, stanvar_args)
     }
   }
 

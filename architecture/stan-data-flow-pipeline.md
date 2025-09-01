@@ -56,7 +56,9 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 - **Entry point**: `extract_trend_stanvars_from_setup()` in `R/stan_assembly.R`
 - **Input**: trend_setup and trend specifications with embedded dimensions and mappings
 - **Processing**:
-  - Extracts brms trend parameters and renames with `_trend` suffix
+  - Extracts brms trend parameters using `extract_and_rename_stan_blocks()` with `_trend` suffix
+    - **Block Extraction**: Uses line-by-line parsing with proper boundary detection (fixed in recent updates)
+    - **Parameter Filtering**: Excludes `Y_trend`, `prior_only_trend`, and `N_trend` to avoid duplication
   - Creates `times_trend` matrix using `generate_times_trend_matrices()`
   - The `times_trend[i,j]` matrix maps time i, series j to time indices
   - **Simplified Mapping Integration**: Extracts pre-generated mapping arrays from `dimensions.mappings`
@@ -65,7 +67,11 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
     - **Structure**: `dimensions.mappings` contains `obs_trend_time` and `obs_trend_series` arrays for each response
     - **Validation**: Arrays are pre-validated during dimension extraction stage
   - Converts mapping arrays to Stan data block stanvars with appropriate response suffixes
-  - Generates trend-specific Stan variables (innovations, parameters, etc.)
+  - Generates trend-specific Stan variables via `generate_trend_specific_stanvars()`:
+    - **Common dimensions**: `n_trend`, `n_series_trend`, `n_lv_trend` (injected for all trend models)
+    - **Shared innovations**: Creates unified innovation parameters and sampling statements
+    - **Trend-specific parameters**: Generated based on trend type (AR, RW, VAR, etc.)
+    - **Parameter coordination**: Ensures no duplicate declarations across stanvar sources
 - **Output**: Comprehensive stanvar objects for trend model including mapping arrays
 - **Available data structures**:
   - `times_trend` matrix [n_time, n_series] with time indexing
@@ -73,6 +79,7 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
   - `obs_trend_series` array [N] mapping each non-missing observation to its series index
   - Trend parameters (`sigma_trend`, `Intercept_trend`, etc.)
   - Innovation matrices and state vectors
+  - Common dimension variables for trend matrix structure
 
 ### Stage 6: Stan Code Assembly
 - **Entry point**: `generate_combined_stancode()` in `R/stan_assembly.R`

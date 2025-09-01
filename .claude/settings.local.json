@@ -4,7 +4,8 @@
       "Bash(Rscript:*)",
       "Bash(git add:*)",
       "Bash(git push:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": [],

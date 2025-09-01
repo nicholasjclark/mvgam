@@ -9,195 +9,75 @@
 
 ---
 
-## 🚨 **CURRENT CRITICAL ISSUE**: Stancode Generation Failures
+## 🚨 **CURRENT CRITICAL ISSUE**: Duplicate Parameter Declarations
 
 **STATUS**: 15/23 tests failing in `tests/testthat/test-stancode-standata.R` with Stan compilation errors  
-**ROOT CAUSE**: Missing data alignment between brms observations and trend matrix positions
+**ROOT CAUSE**: Duplicate `sigma_trend` parameter declarations (scalar vs vector versions) causing Stan syntax errors
 
-### 🔍 ERROR ANALYSIS *(2025-08-28)*
+### 🔍 ERROR ANALYSIS *(2025-09-01)*
 
-**Investigation Complete**: Root cause identified through systematic debugging with `debug_stan_parameter_blocks.R`
+**Current Status**: Stan compilation failures due to duplicate parameter declarations
 
-#### **Primary Issue: Missing obs_ind Variable**
-- **Problem**: `inject_trend_into_linear_predictor()` (R/stan_assembly.R:725) references `obs_ind` that doesn't exist
-- **Cause**: brms handles missing data by **exclusion**, not indexing - never creates `obs_ind` array
-- **Impact**: Trend injection attempts `mu += trend[obs_ind]` with undefined variable
-- **Solution**: Create observation-to-trend mapping during stanvar generation
+#### **Primary Issue: Duplicate sigma_trend Parameters**
+- **Problem**: Stan code contains both `real<lower=0> sigma_trend;` and `vector<lower=0>[1] sigma_trend;` declarations
+- **Impact**: Stan compilation fails with "Identifier 'sigma_trend' is already in use" error
+- **Affected Tests**: 13/15 test failures show this exact pattern
+- **Root Cause**: Different pipeline components (shared innovations vs trend-specific stanvars) create conflicting parameter versions
 
 #### **Secondary Issues**
-- **Block placement**: Parameters correctly assigned to stanvar blocks, but text manipulation corrupts final Stan code
-- **Missing variables**: `n_trend`, `n_series_trend`, `n_lv_trend` referenced but not declared
-- **Text manipulation bugs**: `inject_trend_into_linear_predictor()` creates duplicate blocks and corrupt assignments
+- **Series Validation Error**: `series_var` NULL/empty causing zero-length argument errors in multivariate models (2 tests)
+- **Input Validation Missing**: Character string inputs not properly rejected (1 test)
 
 ---
 
-## 🚀 **NEXT IMMEDIATE TASK**: Implement obs_ind Mapping System
+## 🚀 **NEXT IMMEDIATE TASKS**: Fix Parameter Duplication
 
-**GOAL**: Create `obs_trend_mapping` during stanvar generation to properly align brms observations with trend matrix positions, eliminating dependency on non-existent `obs_ind`
+**GOAL**: Eliminate duplicate parameter declarations to restore Stan code compilation
 
 **KEY FILES TO MODIFY**:
-- `R/stan_assembly.R`: Functions `extract_trend_stanvars_from_setup()`, `inject_trend_into_linear_predictor()`  
-- `tests/testthat/test-stancode-standata.R`: Target test file with 15/23 failing tests
-- `debug_stan_parameter_blocks.R`: Debug script for systematic testing
-### **Phase 1: Investigation and Design** (90 min)
-  
-- [x] **Sub-task A1**: Analyze brms data processing behavior (30 min) ✅ COMPLETED
-  - **FINDINGS**: brms automatically excludes NA responses, preserves input ordering for non-missing obs
-  - **KEY INSIGHT**: brms does NOT create `obs_ind` array - we must create our own mapping
-  - **IMPLICATION**: Need to track `which(!is.na(y))` and map each obs to trend[time, series] position
-  - **TEST CONFIRMED**: Created test scripts verifying brms behavior with missing data patterns
-  
-- [X] **Sub-task A2**: Design the mapping strategy (30 min)
-  - Read `architecture/stan-data-flow-pipeline.md`
-  - Choose data structure: `array[N] int obs_trend_linear_idx` vs `array[N] int obs_time_idx; array[N] int obs_series_idx`
-  - Decide creation point: during trend stanvar generation vs during injection function
-  - Plan missing data handling: systematic missing vs random missing vs no missing
-  - Design validation approach to detect misaligned mappings
-  - Update `architecture/stan-data-flow-pipeline.md` accordingly
+- `R/stan_assembly.R`: Functions creating trend-specific stanvars and shared innovation stanvars
+- `R/validations.R`: Series validation functions for multivariate models
+- Input validation in stancode generation functions
 
-### **Phase 2: Implementation** (120 min)
+**A1**: Identify which component creates scalar `sigma_trend` vs vector `sigma_trend[1]`
+  - Search `R/stan_assembly.R` for all functions that create `sigma_trend` parameters
+  - Based on previous context: shared innovation system creates scalar, trend-specific stanvars create vector
+  - Examine `generate_shared_innovations_stanvar()` vs `generate_trend_specific_stanvars()`
 
-- [X] **Sub-task B1**: Implement mapping creation infrastructure (45 min)
-  - Read `architecture/stan-data-flow-pipeline.md`
-  - Create `generate_obs_trend_mapping()` function that takes observation data + trend dimensions
-  - Generate mapping array: for each observation n → corresponding trend[time_idx, series_idx] position
-  - Handle edge cases: single series, single time point, irregular time series
-  - Add comprehensive input validation and error handling
-  - Update `architecture/stan-data-flow-pipeline.md` accordingly
-  
-- [X] **Sub-task B2**: Integrate mapping into stanvar generation pipeline (45 min)
-  - Read `architecture/stan-data-flow-pipeline.md`
-  - Add mapping creation to `extract_trend_stanvars_from_setup()` or equivalent function
-  - Ensure mapping gets included as "data" block stanvar in trend_stanvars collection
-  - Pass observation data through pipeline to mapping creation point
-  - Add mapping metadata to trend specifications for downstream usage
-  - Update `architecture/stan-data-flow-pipeline.md` accordingly
-  
-- [X] **Sub-task B3**: Update injection logic to use mapping (30 min)
-  - Read `architecture/stan-data-flow-pipeline.md`
-  - Replace `obs_ind` references with `obs_trend_mapping` in `inject_trend_into_linear_predictor()`
-  - Support both 2D matrix access `trend[time_idx, series_idx]` and linear indexing strategies
-  - Add validation that mapping array exists and has correct dimensions
-  - Preserve existing injection logic structure while eliminating undefined variable dependency
-  - Update `architecture/stan-data-flow-pipeline.md` accordingly
+**A2**: Analyze parameter coordination between pipeline components  
+  - Check how different stanvar sources are combined in `extract_trend_stanvars_from_setup()`
+  - Identify where parameter conflicts should be detected and resolved
+  - Document current parameter generation flow
 
-### **Phase 3: Architecture Refactoring and Testing** (90 min)
+### **Task 2: Fix Duplicate Parameter Issue (45 min)**
 
-- [x] **Sub-task C1**: Refactor mapping generation into extract_time_series_dimensions() (45 min) ✅ COMPLETED
-  - Modified `extract_time_series_dimensions()` to accept `response_vars` parameter (required, not optional)
-  - Generate mappings within dimension extraction: call `generate_obs_trend_mapping()` for each response
-  - Return mappings in dimensions result structure alongside existing fields
-  - Updated function signature and documentation for new centralized approach
+**B1**: Eliminate scalar `sigma_trend` from shared innovation system (30 min)
+  - Based on step6_5 showing only vector version works correctly
+  - Modify shared innovation stanvar generation to use vector form consistently
+  - OR implement parameter deduplication logic during stanvar combination
 
-- [x] **Sub-task C2**: Update calling code to use cleaner mapping architecture (30 min) ✅ COMPLETED  
-  - Updated `validate_time_series_for_trends()` to pass response variables to dimension extraction
-  - Modified `extract_trend_stanvars_from_setup()` to extract mappings from dimensions.mappings instead of generating separately
-  - Removed complex parameter threading: `obs_data` parameter no longer needed
-  - Updated multivariate and univariate calling code to simpler structure without extra parameters
+**B2**: Test parameter fix with simple case (15 min)
+  - Create minimal test case to verify single `sigma_trend` declaration
+  - Ensure Stan code compiles successfully
 
-- [ ] **Sub-task C3.1**: Investigate stanvar class inheritance issues (20 min)
-  - Use `debug_stanvar_pipeline.R` script to examine why `extract_trend_stanvars_from_setup()` returns objects with `class: list` instead of proper `stanvar` objects
-  - Trace through stanvar creation pipeline to identify where class inheritance is broken
-  - Check if issue is in trend generator functions or in the collection/combination process
-  - Document specific functions that need stanvar class fixes
+### **Task 3: Fix Secondary Issues (45 min)**
 
-- [x] **Sub-task C3.2**: Fix Stan code block corruption (30 min) ✅ COMPLETED
-  - Investigated stanvar structure issues using `debug_stanvars_structure.R`
-  - Fixed `shared_stanvars$priors <- shared_priors` bug by using proper `combine_stanvars()` 
-  - Resolved missing innovations sampling (`to_vector(innovations_trend) ~ std_normal();`)
-  - Fixed unnecessary braces in scaled_innovations_trend computation
-  - **FINDINGS**: Block corruption comes from `extract_and_rename_stan_blocks` function
+**C1**: Fix series_var validation error (20 min)
+  - Add NULL checks in `validate_series_time()` function in `R/validations.R:1277`
+  - Handle multivariate models where `series_var` may be empty/NULL
 
-- [x] **Sub-task C3.3**: Fix Data Block Extraction and Renaming (45 min) ✅ INVESTIGATION COMPLETED
-  - **Issue**: Current data block extraction creates invalid Stan code with wrong types, missing constraints, and phantom variables
-  - **Root Cause**: `extract_stan_block_content` function has **fundamentally broken block boundary detection**
-  
-  **FINDINGS from comprehensive testing (`debug_block_extraction_variety.R`):**
-  - ❌ `extract_stan_block_content(stancode, "data")` extracts WAY MORE than data block
-  - ❌ **Universal Problem**: Affects ALL trend formula complexities (intercept-only, continuous, factor, interactions)
-  - ❌ Function includes transformed data, parameters blocks in "data" extraction  
-  - ✅ **Manual parsing approach** works perfectly across all complexities
-  - ✅ Manual approach preserves exact constraints: `int<lower=1> N;` → `int<lower=1> N_trend;`
-  
-  **SOLUTION IDENTIFIED**: Replace `extract_stan_block_content` with proper boundary detection
+**C2**: Fix input validation test (15 min)  
+  - Add proper input type checking to reject character strings in stancode functions
+  - Ensure expected error is thrown for invalid inputs
 
-- [ ] **Sub-task C3.4**: Implement Fixed Data Block Extraction (30 min) **CRITICAL PRIORITY**
-  - **Replace broken function**: Create `extract_data_block_properly()` using manual parsing logic
-  - **Implementation based on working approach from debug script**:
-  ```r
-  extract_data_block_properly <- function(stancode) {
-    lines <- strsplit(stancode, "\n")[[1]]
-    in_data_block <- FALSE
-    data_lines <- c()
-    
-    for (i in seq_along(lines)) {
-      line <- lines[i]
-      if (grepl("^\\s*data\\s*\\{", line)) {
-        in_data_block <- TRUE
-        next  # Skip opening brace
-      }
-      if (in_data_block && grepl("^\\s*\\}\\s*$", line)) {
-        break  # Stop at closing brace
-      }
-      if (in_data_block) {
-        data_lines <- c(data_lines, line)
-      }
-    }
-    return(paste(data_lines, collapse = "\n"))
-  }
-  ```
-  
-  **Steps:**
-  1. Create the new function in `R/stan_assembly.R`
-  2. Replace `extract_stan_block_content(stancode, "data")` call in `extract_and_rename_stan_blocks`
-  3. Apply existing filtering (`should_exclude_data_line`) to skip `Y` and `prior_only`
-  4. Apply existing renaming (`rename_parameters_in_block`) to rename identifiers
-  5. Test with all trend formula complexities
-
-- [ ] **Sub-task C3.5**: Validate Fixed Data Block Extraction (15 min)
-  - Run `debug_stanvar_pipeline.R` to verify fix resolves Stan compilation errors
-  - Confirm proper data declarations: `int<lower=1> N_trend;` (not `int N_trend;`)
-  - Ensure no phantom variables or block duplication
-  - Test across multiple trend formula complexities 
-  - Run tests in `test-stancode-standata.R` to validate complete fix
+**C3**: Final validation (10 min)
+  - Run targeted test subset to verify fixes work
 
 **SUCCESS CRITERIA**: 
 - ✅ Generated Stan code compiles without errors  
 - ✅ Trend effects correctly applied even with missing data
 - ✅ No performance regression for complete data cases
 - ✅ Robust handling of various missing data patterns
-
----
-
-## 🛠️ **DEBUG TOOLS & VALIDATION**
-
-### **Debug Script: `debug_stanvar_pipeline.R`**
-**Purpose**: Comprehensive diagnostic tool to trace stanvar generation and identify Stan code corruption issues
-
-**Key Capabilities**:
-- **Step-by-step pipeline tracing**: Follows exact test pattern from mvgam_formula → stancode generation
-- **Detailed stanvar inspection**: Analyzes each stanvar's class, block assignment, and content
-- **Stan code structure validation**: Detects duplicated blocks, parameters in wrong locations
-- **Corruption detection**: Identifies when stanvars cause brms to generate invalid Stan code
-- **Mapping array verification**: Confirms presence of `obs_trend_time`/`obs_trend_series` for injection
-
-**Current Findings**:
-- ❌ **Root Issue**: `extract_trend_stanvars_from_setup()` returns 16 objects with `class: list` instead of proper `stanvar` objects
-- ❌ **Stan Corruption**: Invalid stanvars cause brms to generate duplicate model/parameters blocks
-- ❌ **Parameter Misplacement**: Parameters like `sigma_trend` appear in model block instead of parameters block
-- ❌ **Missing Mapping Arrays**: No `obs_trend_time`/`obs_trend_series` arrays found, causing injection failure
-
-**Usage for Validation**:
-```r
-# Run after each sub-task to verify fixes
-Rscript debug_stanvar_pipeline.R
-
-# Check for success indicators:
-# ✓ All stanvars have "stanvar" class
-# ✓ Parameters only in parameters block  
-# ✓ No duplicate Stan blocks
-# ✓ Mapping arrays present
-```
 
 ---
 
