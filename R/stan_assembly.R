@@ -276,7 +276,7 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
     silent = silent
   )
 
-  # Stage 2: Modify observation linear predictor with trend injection
+  # Stage 2: Inject trends using GLM-compatible approach
   if (silent < 2) {
     message("Stage 2: Injecting trend into observation linear predictor...")
   }
@@ -779,11 +779,389 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
   }
 }
 
+#' Detect GLM Function Usage in Stan Code
+#'
+#' @description
+#' Detects which GLM functions from brms are used in Stan code based on the
+#' complete list from brms source code.
+#'
+#' @param stan_code Character string containing Stan code
+#' @return Character vector of detected GLM function base names
+#' @noRd
+detect_glm_usage <- function(stan_code) {
+  checkmate::assert_character(stan_code, min.len = 1)
+  
+  # Complete list from brms source: R/stan-likelihood.R
+  glm_patterns <- c(
+    "normal_id_glm",
+    "poisson_log_glm", 
+    "neg_binomial_2_log_glm",
+    "bernoulli_logit_glm",
+    "ordered_logistic_glm",
+    "categorical_logit_glm"
+  )
+  
+  detected <- sapply(glm_patterns, function(pattern) {
+    any(grepl(paste0(pattern, "_l(pdf|pmf)\\s*\\("), stan_code))
+  })
+  
+  return(names(detected)[detected])
+}
+
+#' Parse GLM Function Parameters
+#'
+#' @description
+#' Extracts parameter names from GLM function calls in Stan code to avoid hardcoding.
+#'
+#' @param stan_code Character string containing Stan code
+#' @param glm_type Character string specifying GLM function base name
+#' @return List with extracted parameter names
+#' @noRd
+parse_glm_parameters <- function(stan_code, glm_type) {
+  checkmate::assert_character(stan_code, min.len = 1)
+  checkmate::assert_string(glm_type)
+  
+  # Find GLM function call pattern
+  pattern <- paste0(glm_type, "_l[pm]df\\s*\\(([^\\)]+)\\)")
+  matches <- regmatches(stan_code, gregexpr(pattern, stan_code))
+  
+  if (length(matches[[1]]) == 0) {
+    return(NULL)
+  }
+  
+  # Extract parameter list from first match
+  call_content <- matches[[1]][1]
+  params_text <- gsub(paste0(".*", glm_type, "_l[pm]df\\s*\\((.+)\\).*"), "\\1", call_content)
+  
+  # Split by | to separate Y from predictors
+  parts <- strsplit(params_text, "\\|")[[1]]
+  if (length(parts) < 2) return(NULL)
+  
+  y_var <- trimws(parts[1])
+  predictor_params <- trimws(strsplit(parts[2], ",")[[1]])
+  
+  list(
+    y_var = y_var,
+    design_matrix = if (length(predictor_params) > 0) predictor_params[1] else NULL,
+    intercept = if (length(predictor_params) > 1) predictor_params[2] else NULL,
+    coefficients = if (length(predictor_params) > 2) predictor_params[3] else NULL,
+    other_params = if (length(predictor_params) > 3) predictor_params[4:length(predictor_params)] else NULL
+  )
+}
+
+#' Transform GLM Call with Combined Linear Predictor
+#'
+#' @description
+#' Transforms GLM function calls to use combined linear predictor with trends.
+#'
+#' @param stan_code Character string containing original Stan code
+#' @param glm_type Character string specifying GLM function base name  
+#' @param params List of parsed GLM parameters
+#' @return Character string with transformed Stan code
+#' @noRd
+transform_glm_call <- function(stan_code, glm_type, params) {
+  checkmate::assert_character(stan_code, min.len = 1)
+  checkmate::assert_string(glm_type)
+  checkmate::assert_list(params, names = "named")
+  
+  # Original pattern to match
+  original_pattern <- paste0(glm_type, "_l[pm]df\\s*\\([^\\)]+\\)")
+  
+  # Build replacement based on GLM type
+  if (glm_type %in% c("normal_id_glm", "poisson_log_glm", "neg_binomial_2_log_glm")) {
+    # These typically have: (Y | X, intercept, beta, ...)
+    other_params_str <- if (!is.null(params$other_params)) {
+      paste0(", ", paste(params$other_params, collapse = ", "))
+    } else {
+      ""
+    }
+    
+    replacement <- paste0(glm_type, "_lpdf(", params$y_var, " | mu, 0, 1", other_params_str, ")")
+    
+  } else if (glm_type %in% c("bernoulli_logit_glm", "ordered_logistic_glm")) {
+    # These typically have: (Y | X, intercept, beta)
+    replacement <- paste0(glm_type, "_lpmf(", params$y_var, " | mu, 0, 1)")
+    
+  } else if (glm_type == "categorical_logit_glm") {
+    # More complex structure, may need special handling
+    replacement <- paste0(glm_type, "_lpmf(", params$y_var, " | mu, 0, 1)")
+  } else {
+    insight::format_error("Unsupported GLM type for transformation: {glm_type}")
+  }
+  
+  gsub(original_pattern, replacement, stan_code)
+}
+
+#' Inject Trend into GLM Linear Predictor
+#'
+#' @description
+#' GLM-compatible trend injection that creates combined linear predictor
+#' and transforms GLM function calls.
+#'
+#' @param base_stancode Character string containing base Stan code
+#' @param trend_stanvars List of stanvars containing trend components
+#' @param glm_type Character string specifying detected GLM function type
+#' @return Modified Stan code with GLM-compatible trend injection
+#' @noRd
+inject_trend_into_glm_predictor <- function(base_stancode, trend_stanvars, glm_type) {
+  checkmate::assert_string(base_stancode, min.chars = 1)
+  checkmate::assert_list(trend_stanvars)
+  checkmate::assert_string(glm_type)
+  
+  # Extract mapping arrays for trend injection
+  mapping_arrays <- list(time_arrays = character(0), series_arrays = character(0))
+  
+  for (stanvar in trend_stanvars) {
+    if (is.list(stanvar) && !is.null(stanvar$name)) {
+      if (grepl("obs_trend_time", stanvar$name)) {
+        mapping_arrays$time_arrays <- c(mapping_arrays$time_arrays, stanvar$name)
+      }
+      if (grepl("obs_trend_series", stanvar$name)) {
+        mapping_arrays$series_arrays <- c(mapping_arrays$series_arrays, stanvar$name)
+      }
+    }
+  }
+  
+  # Validate mapping arrays exist
+  if (length(mapping_arrays$time_arrays) == 0 || length(mapping_arrays$series_arrays) == 0) {
+    stop(insight::format_error(
+      "Missing observation-to-trend mapping arrays for GLM trend injection.",
+      "Expected obs_trend_time and obs_trend_series arrays."
+    ), call. = FALSE)
+  }
+  
+  # Parse GLM parameters from existing function calls
+  params <- parse_glm_parameters(base_stancode, glm_type)
+  if (is.null(params)) {
+    stop(insight::format_error(
+      "Could not parse GLM parameters from function: {glm_type}",
+      "Unable to extract parameter structure for transformation."
+    ), call. = FALSE)
+  }
+  
+  # Generate trend injection code (same logic as standard approach)
+  trend_injection_code <- generate_trend_injection_code(mapping_arrays)
+  
+  # Create combined mu with observation + trend components
+  combined_mu_code <- paste0(
+    "  vector[N] mu;\n",
+    "  for (n in 1:N) {\n",
+    "    mu[n] = ", params$design_matrix, "[n, :] * ", params$coefficients, " + ", params$intercept, ";\n",
+    paste(trend_injection_code[grepl("mu\\[n\\]", trend_injection_code)], collapse = "\n"),
+    "  }"
+  )
+  
+  # Create stanvar for combined mu construction in transformed parameters
+  mu_stanvar_code <- paste0(combined_mu_code, collapse = "\n")
+  
+  # Insert combined mu into transformed parameters block
+  tparams_pattern <- "(transformed parameters\\s*\\{)(.*?)(\\}\\s*model)"
+  if (grepl(tparams_pattern, base_stancode)) {
+    # Add to existing transformed parameters
+    modified_code <- gsub(
+      tparams_pattern,
+      paste0("\\1\\2\n", mu_stanvar_code, "\n\\3"),
+      base_stancode
+    )
+  } else {
+    # Insert new transformed parameters block
+    model_pattern <- "(\\s*)(model\\s*\\{)"
+    modified_code <- gsub(
+      model_pattern,
+      paste0("\\1transformed parameters {\n", mu_stanvar_code, "\n}\n\\1\\2"),
+      base_stancode
+    )
+  }
+  
+  # Transform GLM function calls to use combined mu
+  final_code <- transform_glm_call(modified_code, glm_type, params)
+  
+  return(final_code)
+}
+
+#' Extract Mapping Arrays from Trend Stanvars
+#'
+#' @description
+#' Extracts observation-to-trend mapping arrays from trend stanvars.
+#' Common utility used by both standard and GLM trend injection.
+#'
+#' @param trend_stanvars List of stanvars containing trend components
+#' @return List with time_arrays and series_arrays vectors
+#' @noRd
+extract_mapping_arrays <- function(trend_stanvars) {
+  checkmate::assert_list(trend_stanvars, null.ok = TRUE)
+  
+  mapping_arrays <- list(time_arrays = character(0), series_arrays = character(0))
+  
+  for (stanvar in trend_stanvars) {
+    if (is.list(stanvar) && !is.null(stanvar$name)) {
+      if (grepl("obs_trend_time", stanvar$name)) {
+        mapping_arrays$time_arrays <- c(mapping_arrays$time_arrays, stanvar$name)
+      }
+      if (grepl("obs_trend_series", stanvar$name)) {
+        mapping_arrays$series_arrays <- c(mapping_arrays$series_arrays, stanvar$name)
+      }
+    }
+  }
+  
+  return(mapping_arrays)
+}
+
+#' Validate Mapping Arrays
+#'
+#' @description
+#' Validates that mapping arrays exist and are properly paired.
+#' Common validation used by trend injection functions.
+#'
+#' @param mapping_arrays List with time_arrays and series_arrays
+#' @noRd
+validate_mapping_arrays <- function(mapping_arrays) {
+  checkmate::assert_list(mapping_arrays, names = "named")
+  checkmate::assert_names(names(mapping_arrays), must.include = c("time_arrays", "series_arrays"))
+  
+  # Validate arrays exist
+  if (length(mapping_arrays$time_arrays) == 0 || length(mapping_arrays$series_arrays) == 0) {
+    stop(insight::format_error(
+      "Missing observation-to-trend mapping arrays in trend_stanvars.",
+      "Expected obs_trend_time and obs_trend_series arrays from generate_obs_trend_mapping().",
+      "This indicates a problem in the stanvar generation pipeline."
+    ), call. = FALSE)
+  }
+  
+  # Validate arrays are paired
+  if (length(mapping_arrays$time_arrays) != length(mapping_arrays$series_arrays)) {
+    stop(insight::format_error(
+      "Mismatched mapping arrays: {length(mapping_arrays$time_arrays)} time arrays but {length(mapping_arrays$series_arrays)} series arrays.",
+      "Each obs_trend_time array must have a corresponding obs_trend_series array.",
+      "Check the stanvar generation process for consistency."
+    ), call. = FALSE)
+  }
+  
+  return(invisible(TRUE))
+}
+
+#' Find Stan Block Boundaries
+#'
+#' @description
+#' Finds start and end line indices for Stan code blocks.
+#' Handles brace matching to locate block boundaries.
+#'
+#' @param code_lines Character vector of Stan code lines
+#' @param block_name Character string of block name (e.g., "model", "transformed parameters")
+#' @return List with start_idx and end_idx, or NULL if block not found
+#' @noRd
+find_stan_block <- function(code_lines, block_name) {
+  checkmate::assert_character(code_lines, min.len = 1)
+  checkmate::assert_string(block_name)
+  
+  # Find block start
+  block_pattern <- paste0("^\\s*", gsub(" ", "\\s+", block_name), "\\s*\\{")
+  start_idx <- which(grepl(block_pattern, code_lines))
+  
+  if (length(start_idx) == 0) {
+    return(NULL)
+  }
+  
+  start_idx <- start_idx[1]
+  
+  # Find matching closing brace
+  brace_count <- 0
+  end_idx <- NULL
+  
+  for (i in start_idx:length(code_lines)) {
+    line <- code_lines[i]
+    # Count braces using base R
+    open_braces <- lengths(gregexpr("\\{", line, fixed = TRUE))
+    close_braces <- lengths(gregexpr("\\}", line, fixed = TRUE))
+    # Handle case where no matches found (returns -1)
+    if (open_braces == -1) open_braces <- 0
+    if (close_braces == -1) close_braces <- 0
+    
+    brace_count <- brace_count + open_braces - close_braces
+    
+    # Only check for closing after we've processed the opening line
+    if (i > start_idx && brace_count == 0) {
+      end_idx <- i
+      break
+    }
+  }
+  
+  if (is.null(end_idx)) {
+    stop(insight::format_error(
+      "Cannot find end of {block_name} block.",
+      "Stan code structure is invalid or malformed."
+    ), call. = FALSE)
+  }
+  
+  return(list(start_idx = start_idx, end_idx = end_idx))
+}
+
+#' Insert Code into Stan Block
+#'
+#' @description
+#' Inserts code into existing Stan block or creates new block if it doesn't exist.
+#' Common utility for Stan code modification.
+#'
+#' @param code_lines Character vector of Stan code lines
+#' @param block_name Character string of block name
+#' @param insertion_code Character vector of code to insert
+#' @param create_if_missing Logical, whether to create block if it doesn't exist
+#' @return Modified character vector of Stan code lines
+#' @noRd
+insert_into_stan_block <- function(code_lines, block_name, insertion_code, create_if_missing = TRUE) {
+  checkmate::assert_character(code_lines, min.len = 1)
+  checkmate::assert_string(block_name)
+  checkmate::assert_character(insertion_code, min.len = 1)
+  checkmate::assert_flag(create_if_missing)
+  
+  block_info <- find_stan_block(code_lines, block_name)
+  
+  if (is.null(block_info)) {
+    if (!create_if_missing) {
+      stop(insight::format_error(
+        "Cannot find {block_name} block in Stan code.",
+        "Block creation is disabled."
+      ), call. = FALSE)
+    }
+    
+    # Create new block - insert before model block
+    model_info <- find_stan_block(code_lines, "model")
+    if (is.null(model_info)) {
+      stop(insight::format_error(
+        "Cannot find model block for {block_name} insertion.",
+        "Stan code structure is invalid."
+      ), call. = FALSE)
+    }
+    
+    # Create block content
+    new_block <- c(paste0(block_name, " {"), insertion_code, "}")
+    
+    # Insert before model block
+    modified_lines <- c(
+      code_lines[1:(model_info$start_idx - 1)],
+      new_block,
+      "",
+      code_lines[model_info$start_idx:length(code_lines)]
+    )
+    
+  } else {
+    # Insert into existing block (before closing brace)
+    # Insert content just before the closing brace line
+    modified_lines <- c(
+      code_lines[1:(block_info$end_idx - 1)],
+      insertion_code,
+      code_lines[block_info$end_idx:length(code_lines)]
+    )
+  }
+  
+  return(modified_lines)
+}
+
 #' Inject Trend into Linear Predictor
 #'
 #' @description
-#' Injects trend effects into Stan linear predictor by modifying the transformed parameters
-#' or model block to add trend components to mu.
+#' Injects trend effects into Stan linear predictor. Uses GLM-compatible approach
+#' when brms GLM optimization is detected, fallback to standard approach otherwise.
 #'
 #' @param base_stancode Character string of base Stan code
 #' @param trend_stanvars List of trend stanvars
@@ -799,110 +1177,26 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
     return(base_stancode)
   }
 
-  # Extract and validate mapping arrays
-  mapping_arrays <- list(time_arrays = character(0), series_arrays = character(0))
+  # Extract and validate mapping arrays using shared utility
+  mapping_arrays <- extract_mapping_arrays(trend_stanvars)
+  validate_mapping_arrays(mapping_arrays)
 
-  for (stanvar in trend_stanvars) {
-    if (is.list(stanvar) && !is.null(stanvar$name)) {
-      if (grepl("obs_trend_time", stanvar$name)) {
-        mapping_arrays$time_arrays <- c(mapping_arrays$time_arrays, stanvar$name)
-      }
-      if (grepl("obs_trend_series", stanvar$name)) {
-        mapping_arrays$series_arrays <- c(mapping_arrays$series_arrays, stanvar$name)
-      }
-    }
-  }
-
-  # Validate mapping arrays exist
-  if (length(mapping_arrays$time_arrays) == 0 || length(mapping_arrays$series_arrays) == 0) {
-    stop(insight::format_error(
-      "Missing observation-to-trend mapping arrays in trend_stanvars.",
-      "Expected obs_trend_time and obs_trend_series arrays from generate_obs_trend_mapping().",
-      "This indicates a problem in the stanvar generation pipeline."
-    ), call. = FALSE)
-  }
-
-  # Validate arrays are paired
-  if (length(mapping_arrays$time_arrays) != length(mapping_arrays$series_arrays)) {
-    stop(insight::format_error(
-      "Mismatched mapping arrays: {length(mapping_arrays$time_arrays)} time arrays but {length(mapping_arrays$series_arrays)} series arrays.",
-      "Each obs_trend_time array must have a corresponding obs_trend_series array.",
-      "Check the stanvar generation process for consistency."
-    ), call. = FALSE)
-  }
-
-  # Parse Stan code
+  # Generate trend injection code
+  trend_injection_code <- generate_trend_injection_code(mapping_arrays)
+  
+  # Parse Stan code into lines
   code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
-
-  # Find transformed parameters block
-  tp_start <- which(grepl("^\\s*transformed\\s+parameters\\s*\\{", code_lines))
-
-  if (length(tp_start) == 0) {
-    # No transformed parameters block - find model block to insert before
-    model_start <- which(grepl("^\\s*model\\s*\\{", code_lines))
-    if (length(model_start) == 0) {
-      stop(insight::format_error(
-        "Cannot find model block in Stan code for trend injection.",
-        "Stan code structure is invalid.",
-        "This may indicate a problem with brms code generation."
-      ), call. = FALSE)
-    }
-
-    # Create transformed parameters block content only
-    tp_content <- generate_trend_injection_code(mapping_arrays)
-    tp_block <- c("transformed parameters {", tp_content, "}")
-
-    # Insert before model block
-    code_lines <- c(
-      code_lines[1:(model_start[1] - 1)],
-      tp_block,
-      "",
-      code_lines[model_start[1]:length(code_lines)]
-    )
-
-  } else {
-    # Transformed parameters block exists - find end and insert content
-    tp_start_idx <- tp_start[1]
-
-    # Find matching closing brace using base R
-    brace_count <- 0
-    tp_end_idx <- NULL
-
-    for (i in tp_start_idx:length(code_lines)) {
-      line <- code_lines[i]
-      # Count braces using base R
-      open_braces <- lengths(gregexpr("\\{", line, fixed = TRUE))
-      close_braces <- lengths(gregexpr("\\}", line, fixed = TRUE))
-      # Handle case where no matches found (returns -1)
-      if (open_braces == -1) open_braces <- 0
-      if (close_braces == -1) close_braces <- 0
-
-      brace_count <- brace_count + open_braces - close_braces
-      if (i > tp_start_idx && brace_count == 0) {
-        tp_end_idx <- i
-        break
-      }
-    }
-
-    if (is.null(tp_end_idx)) {
-      stop(insight::format_error(
-        "Cannot find end of transformed parameters block.",
-        "Stan code structure may be invalid due to unmatched braces.",
-        "This may indicate a problem with brms code generation."
-      ), call. = FALSE)
-    }
-
-    # Generate and insert trend injection content before closing brace
-    injection_content <- generate_trend_injection_code(mapping_arrays)
-
-    code_lines <- c(
-      code_lines[1:(tp_end_idx - 1)],
-      injection_content,
-      code_lines[tp_end_idx:length(code_lines)]
-    )
-  }
-
-  return(paste(code_lines, collapse = "\n"))
+  
+  # Insert trend injection into transformed parameters block using utility
+  modified_lines <- insert_into_stan_block(
+    code_lines, 
+    "transformed parameters", 
+    trend_injection_code, 
+    create_if_missing = TRUE
+  )
+  
+  # Reconstruct Stan code
+  return(paste(modified_lines, collapse = "\n"))
 }
 
 #' Generate Trend Injection Code for Stan Transformed Parameters Block
@@ -4631,6 +4925,9 @@ filter_renameable_identifiers <- function(identifiers) {
     
     # Global flags that should not be renamed
     "prior_only",
+
+    # Innovation parameters handled by shared innovation system (avoid duplication)
+    "sigma",  # Shared innovation system provides vector sigma_trend
 
     # Comment words and obvious non-parameters based on comprehensive testing
     "total", "number", "observations", "response", "variable",

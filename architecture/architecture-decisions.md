@@ -209,6 +209,56 @@ mu_biomass += mu_trend_biomass;
 - All methods (predict, loo, etc.) work with pooled object
 - Access to individual fits preserved for diagnostics
 
+## AD-007: GLM Optimization and Trend Injection Compatibility
+
+**Status**: Accepted (Temporary Solution)  
+**Date**: 2025-01-09
+
+### Context
+brms uses GLM-optimized likelihood functions (e.g., `normal_id_glm_lpdf`, `poisson_log_glm_lpmf`) for performance when model structure allows. However, these functions don't create explicit `mu` vectors, breaking mvgam's trend injection pattern `mu[n] += trend[...]`.
+
+Analysis of brms architecture reveals:
+- GLM functions are significantly more efficient than standard likelihood + explicit mu
+- brms provides `force_standard = TRUE` to disable GLM optimization
+- GLM usage depends on family support, model complexity, and structural features
+
+### Decision
+**Short-term**: Use `force_standard = TRUE` in all brms model generation calls to ensure explicit `mu` vector creation for trend injection compatibility.
+
+**Long-term**: Implement native GLM-aware trend injection system that works directly with design matrix components (X, b, Intercept) without forcing standard likelihood.
+
+### Implementation
+```r
+# Current approach in setup_brms_lightweight()
+brms::brm(
+  formula = formula,
+  data = data, 
+  family = family,
+  force_standard = TRUE,  # Disable GLM optimization
+  ...
+)
+```
+
+### Consequences
+- **Positive**: 
+  - Solves immediate `mu` identifier scope issues
+  - Enables trend injection for all supported families
+  - Maintains compatibility with existing mvgam architecture
+  
+- **Negative**:
+  - **Performance Cost**: GLM optimizations can be 2-5x faster than standard likelihood
+  - **Technical Debt**: Suboptimal Stan code generation
+  - **Scalability**: Performance gap widens with larger datasets
+
+- **Future Architecture Work**:
+  - Design GLM-aware trend injection that modifies design matrix directly
+  - Implement GLM detection logic (pattern matching `_glm_lp[md]f`)
+  - Create trend addition via transformed parameters: `mu = X*b + Intercept + trend_effects`
+  - Benchmark performance improvements vs implementation complexity
+
+### Review Timeline
+**Target**: Q2 2025 - Evaluate GLM performance impact and plan native GLM support implementation if warranted by usage patterns and benchmarking results.
+
 ## Ecosystem Integration Principles
 
 ### 1. brms Method Compatibility

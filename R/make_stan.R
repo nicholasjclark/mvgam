@@ -8,7 +8,7 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
                                                    threads = getOption("mc.cores", 1),
                                                    normalize = TRUE, save_model = NULL,
                                                    stan_funs = NULL, silent = 1L, 
-                                                   stanvars = NULL, ...) {
+                                                   stanvars = NULL, validate = TRUE, ...) {
   
   # Input validation
   checkmate::assert_class(formula, "mvgam_formula")
@@ -146,7 +146,8 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
   combined_components <- generate_combined_stancode_and_data(
     obs_setup = obs_setup,
     trend_setup = trend_setup,
-    mv_spec = mv_spec
+    mv_spec = mv_spec,
+    validate = validate
   )
 
   # Validate result structure with specific error locations
@@ -233,7 +234,8 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
                                    backend = "rstan",
                                    threads = getOption("mc.cores", 1),
                                    normalize = TRUE, save_model = NULL,
-                                   stan_funs = NULL, silent = 1L, ...) {
+                                   stan_funs = NULL, silent = 1L,
+                                   validate = TRUE, ...) {
 
   # Generate all Stan components using shared function
   combined_components <- generate_stan_components_mvgam_formula(
@@ -242,6 +244,7 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
     knots = knots, drop_unused_levels = drop_unused_levels,
     backend = backend, threads = threads, normalize = normalize,
     save_model = save_model, stan_funs = stan_funs, silent = silent,
+    validate = validate,
     ...
   )
 

@@ -184,7 +184,7 @@ mvgam_single_dataset <- function(formula, trend_formula, data, backend,
 #' @param mv_spec Multivariate specification
 #' @return List with combined stancode and standata
 #' @noRd
-generate_combined_stancode_and_data <- function(obs_setup, trend_setup, mv_spec) {
+generate_combined_stancode_and_data <- function(obs_setup, trend_setup, mv_spec, validate = TRUE) {
 
   # Extract trend_specs from mv_spec for the new system
   trend_specs <- if (mv_spec$has_trends && !is.null(mv_spec$trend_specs)) {
@@ -199,7 +199,7 @@ generate_combined_stancode_and_data <- function(obs_setup, trend_setup, mv_spec)
     obs_setup = obs_setup,
     trend_setup = trend_setup,
     trend_specs = trend_specs,  # Updated parameter name
-    validate = TRUE,
+    validate = validate,
     silent = 1
   )
 

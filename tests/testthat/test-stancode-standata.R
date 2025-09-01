@@ -57,7 +57,7 @@ test_that("stancode.mvgam_formula returns correct class structure", {
 
   # Simple observation-only model
   mf_obs_only <- mvgam_formula(y ~ x)
-  code_obs_only <- stancode(mf_obs_only, data = data, family = poisson())
+  code_obs_only <- stancode(mf_obs_only, data = data, family = poisson(), validate = FALSE)
 
   # Check class structure follows mvgam convention with brms compatibility
   expect_s3_class(code_obs_only, "mvgamstancode")
@@ -65,9 +65,9 @@ test_that("stancode.mvgam_formula returns correct class structure", {
   expect_s3_class(code_obs_only, "character")
   expect_equal(class(code_obs_only), c("mvgamstancode", "stancode", "character"))
 
-  # Model with trends
+  # Model with trends - generate without validation first
   mf_with_trend <- mvgam_formula(y ~ x, trend_formula = ~ RW())
-  code_with_trend <- stancode(mf_with_trend, data = data, family = poisson())
+  code_with_trend <- stancode(mf_with_trend, data = data, family = poisson(), validate = FALSE)
 
   # Should have same class structure
   expect_s3_class(code_with_trend, "mvgamstancode")
@@ -76,6 +76,10 @@ test_that("stancode.mvgam_formula returns correct class structure", {
 
   # Should be longer than observation-only model
   expect_gt(nchar(code_with_trend), nchar(code_obs_only))
+  
+  # Final validation: ensure both models compile correctly
+  expect_no_error(stancode(mf_obs_only, data = data, family = poisson(), validate = TRUE))
+  expect_no_error(stancode(mf_with_trend, data = data, family = poisson(), validate = TRUE))
 })
 
 test_that("stancode handles different observation families", {
@@ -121,28 +125,62 @@ test_that("stancode handles different observation families", {
 test_that("stancode generates correct Stan blocks", {
   data <- setup_stan_test_data()$univariate
   mf <- mvgam_formula(y ~ s(x), trend_formula = ~ AR(p = 1))
-  code <- stancode(mf, data = data, family = poisson())
+  
+  # Generate Stan code without validation for structure inspection
+  code <- stancode(mf, data = data, family = poisson(), validate = FALSE)
 
-  # Check required Stan blocks are present
-  expect_match2(code, "data\\s*\\{")
-  expect_match2(code, "parameters\\s*\\{")
-  expect_match2(code, "model\\s*\\{")
-  expect_match2(code, "generated quantities\\s*\\{")
+  # Check required Stan blocks are present (exactly once each)
+  expect_equal(length(gregexpr("data\\s*\\{", code)[[1]]), 1, info = "Should have exactly one data block")
+  expect_equal(length(gregexpr("parameters\\s*\\{", code)[[1]]), 1, info = "Should have exactly one parameters block")
+  expect_equal(length(gregexpr("transformed parameters\\s*\\{", code)[[1]]), 1, info = "Should have exactly one transformed parameters block")
+  expect_equal(length(gregexpr("model\\s*\\{", code)[[1]]), 1, info = "Should have exactly one model block")
+  expect_equal(length(gregexpr("generated quantities\\s*\\{", code)[[1]]), 1, info = "Should have exactly one generated quantities block")
 
+  # Check Stan block ordering (transformed parameters should come before model)
+  tp_pos <- regexpr("transformed parameters\\s*\\{", code)
+  model_pos <- regexpr("model\\s*\\{", code)
+  expect_true(tp_pos < model_pos, info = "transformed parameters block should come before model block")
+  
   # Should contain trend-specific parameters
   expect_match2(code, "ar1_trend")
   expect_match2(code, "sigma_trend")
+  
+  # Should NOT contain duplicate parameter declarations
+  sigma_trend_matches <- gregexpr("sigma_trend", code)[[1]]
+  expect_true(length(sigma_trend_matches) >= 1, info = "Should contain sigma_trend parameter")
+  
+  # Check for proper parameter declarations in parameters block
+  expect_match2(code, "real.*ar1_trend")  # AR parameter should be declared
+  expect_match2(code, "real.*sigma_trend")  # Sigma parameter should be declared
 
   # Should contain smooth terms from mgcv
   expect_match2(code, "s_")  # mgcv smooth term prefix
-  
+
   # Mapping functionality: should contain obs_trend_time and obs_trend_series arrays
   expect_match2(code, "obs_trend_time")
   expect_match2(code, "obs_trend_series")
   
+  # Check that mapping arrays are declared as data (not parameters)
+  expect_match2(code, "array\\[.*\\]\\s+int.*obs_trend_time")
+  expect_match2(code, "array\\[.*\\]\\s+int.*obs_trend_series")
+
   # Mapping functionality: should use correct injection pattern (not obs_ind)
   expect_match2(code, "mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\]")
-  expect_false(grepl("obs_ind", code))  # Should not use old broken pattern
+  expect_false(grepl("obs_ind", code), info = "Should not use old broken obs_ind pattern")
+  
+  # Should contain trend matrix declaration
+  expect_match2(code, "matrix.*trend")
+  
+  # Should contain proper loop structure in transformed parameters
+  expect_match2(code, "for\\s*\\(\\s*n\\s+in\\s+1:N\\s*\\)")
+  
+  # Check that all blocks are properly closed
+  open_braces <- length(gregexpr("\\{", code)[[1]])
+  close_braces <- length(gregexpr("\\}", code)[[1]])
+  expect_equal(open_braces, close_braces, info = "All braces should be properly matched")
+  
+  # Final validation: ensure the generated Stan code compiles
+  expect_no_error(stancode(mf, data = data, family = poisson(), validate = TRUE))
 })
 
 test_that("stancode handles multivariate specifications", {
@@ -153,25 +191,57 @@ test_that("stancode handles multivariate specifications", {
     mvbind(count, biomass) ~ x,
     trend_formula = ~ RW(cor = TRUE)
   )
-  code_shared <- stancode(mf_shared, data = data)
+  
+  # Generate without validation first for structure inspection
+  code_shared <- stancode(mf_shared, data = data, validate = FALSE)
 
   expect_s3_class(code_shared, "stancode")
   expect_gt(nchar(code_shared), 500)
+
+  # Check for exactly one of each Stan block (no duplicates)
+  expect_equal(length(gregexpr("data\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one data block")
+  expect_equal(length(gregexpr("parameters\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one parameters block") 
+  expect_equal(length(gregexpr("transformed parameters\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one transformed parameters block")
+  expect_equal(length(gregexpr("model\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one model block")
+  expect_equal(length(gregexpr("generated quantities\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one generated quantities block")
 
   # Should contain multivariate elements
   expect_match2(code_shared, "count")
   expect_match2(code_shared, "biomass")
   expect_match2(code_shared, "L_Omega_trend")  # Correlation matrix
-  
+
   # Multivariate mapping functionality: should have response-specific arrays
   expect_match2(code_shared, "obs_trend_time_count")
   expect_match2(code_shared, "obs_trend_series_count")
   expect_match2(code_shared, "obs_trend_time_biomass")
   expect_match2(code_shared, "obs_trend_series_biomass")
   
+  # Check that response-specific arrays are declared as data arrays
+  expect_match2(code_shared, "array\\[.*\\]\\s+int.*obs_trend_time_count")
+  expect_match2(code_shared, "array\\[.*\\]\\s+int.*obs_trend_series_count")
+  expect_match2(code_shared, "array\\[.*\\]\\s+int.*obs_trend_time_biomass")
+  expect_match2(code_shared, "array\\[.*\\]\\s+int.*obs_trend_series_biomass")
+
   # Multivariate mapping: should have response-specific injection patterns
   expect_match2(code_shared, "mu_count\\[n\\] \\+= trend_count\\[obs_trend_time_count\\[n\\], obs_trend_series_count\\[n\\]\\]")
   expect_match2(code_shared, "mu_biomass\\[n\\] \\+= trend_biomass\\[obs_trend_time_biomass\\[n\\], obs_trend_series_biomass\\[n\\]\\]")
+  
+  # Should have response-specific trend matrices
+  expect_match2(code_shared, "matrix.*trend_count")
+  expect_match2(code_shared, "matrix.*trend_biomass")
+  
+  # Check proper block ordering
+  tp_pos <- regexpr("transformed parameters\\s*\\{", code_shared)
+  model_pos <- regexpr("model\\s*\\{", code_shared)
+  expect_true(tp_pos < model_pos, info = "transformed parameters should come before model block")
+  
+  # Check that all braces are properly matched
+  open_braces <- length(gregexpr("\\{", code_shared)[[1]])
+  close_braces <- length(gregexpr("\\}", code_shared)[[1]])
+  expect_equal(open_braces, close_braces, info = "All braces should be properly matched")
+  
+  # Final validation: ensure multivariate model compiles correctly
+  expect_no_error(stancode(mf_shared, data = data, validate = TRUE))
 })
 
 test_that("stancode integrates custom priors correctly", {
@@ -235,15 +305,15 @@ test_that("standata.mvgam_formula returns proper list structure", {
 
   # Should contain trend-related data
   expect_true(any(grepl("trend", names(standata_result))))
-  
+
   # Mapping functionality: should contain observation-to-trend mapping arrays
   expect_true("obs_trend_time" %in% names(standata_result))
   expect_true("obs_trend_series" %in% names(standata_result))
-  
+
   # Mapping arrays should have correct dimensions
   expect_equal(length(standata_result$obs_trend_time), standata_result$N)
   expect_equal(length(standata_result$obs_trend_series), standata_result$N)
-  
+
   # Mapping arrays should contain valid indices
   expect_true(all(standata_result$obs_trend_time >= 1))
   expect_true(all(standata_result$obs_trend_series >= 1))
@@ -280,15 +350,15 @@ test_that("standata processes missing data correctly", {
   # Exact behavior depends on mvgam's missing data handling
   expect_true("N" %in% names(standata_result))
   expect_gte(standata_result$N, 0)  # Should have some observations
-  
+
   # Missing data mapping: mapping arrays should match reduced observation count
   expect_true("obs_trend_time" %in% names(standata_result))
   expect_true("obs_trend_series" %in% names(standata_result))
-  
+
   # Mapping arrays should align with non-missing observations
   expect_equal(length(standata_result$obs_trend_time), standata_result$N)
   expect_equal(length(standata_result$obs_trend_series), standata_result$N)
-  
+
   # Should have fewer observations than original data due to missings
   original_data <- setup_stan_test_data()$univariate
   expect_lt(standata_result$N, nrow(original_data))

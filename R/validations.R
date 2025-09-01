@@ -1274,12 +1274,15 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1, respo
   )
 
   # Additional validation using existing mvgam infrastructure
+  is_multivariate <- is_multivariate_trend_specs(trend_specs)
   validated_data <- validate_series_time(
     data = data,
     name = "data",
-    trend_model = trend_specs,
+    time_var = time_var,
+    series_var = series_var,
     check_levels = TRUE,
-    check_times = (trend_type != "CAR")  # CAR doesn't need regular time checks
+    check_times = (trend_type != "CAR"),  # CAR doesn't need regular time checks
+    is_multivariate = is_multivariate
   )
 
   if (silent < 2) {
@@ -2344,39 +2347,103 @@ validate_trend_specs <- function(trend_specs) {
 validate_series_time = function(
     data,
     name = 'data',
-    trend_model,
+    time_var,
+    series_var = NULL,
     check_levels = TRUE,
-    check_times = TRUE
+    check_times = TRUE,
+    is_multivariate = FALSE
 ) {
-  # Extract variable names from the mvgam_trend object
-  time_var <- trend_model$time
-  series_var <- trend_model$series
-
-  # Now we only need the character trend type string
-  trend_model_type <- trend_model$trend
-
-  # Validate any grouping structure
-  data <- validate_grouping_structure(
-    data = data,
-    trend_model = trend_model,
-    name = name
-  )
-
-  # brms only accepts data.frames, so validate that first
+  # Input validation (NON-NEGOTIABLE per CLAUDE.md)
   checkmate::assert_data_frame(data, .var.name = name)
+  checkmate::assert_string(name)
+  checkmate::assert_string(time_var)
+  checkmate::assert_string(series_var, null.ok = is_multivariate)  # Allow NULL for multivariate
+  checkmate::assert_logical(check_levels, len = 1)
+  checkmate::assert_logical(check_times, len = 1)
+  checkmate::assert_logical(is_multivariate, len = 1)
 
   # Ungroup any grouped data
   data %>%
     dplyr::ungroup() -> data
 
+  # Common validation: time variable must exist
+  if (!time_var %in% colnames(data)) {
+    stop(insight::format_error(
+      "{.field {name}} does not contain a '{time_var}' variable."
+    ), call. = FALSE)
+  }
+
+  # Dispatch to appropriate validation strategy
+  if (is_multivariate) {
+    data <- validate_multivariate_series_time(data, name, time_var, check_times)
+  } else {
+    data <- validate_univariate_series_time(data, name, time_var, series_var, check_levels, check_times)
+  }
+
+  return(data)
+}
+
+#' Validate multivariate series time structure
+#' @param data Data frame to validate
+#' @param name Name for error messages
+#' @param time_var Time variable name
+#' @param check_times Whether to check time completeness
+#' @return Validated data frame
+#' @noRd
+validate_multivariate_series_time <- function(data, name, time_var, check_times) {
+  # Input validation
+  checkmate::assert_data_frame(data)
+  checkmate::assert_string(name)
+  checkmate::assert_string(time_var)
+  checkmate::assert_logical(check_times, len = 1)
+
+  # For multivariate models, check time completeness at global level
+  if (check_times) {
+    min_time <- as.numeric(min(data[[time_var]]))
+    max_time <- as.numeric(max(data[[time_var]]))
+    
+    unique_times_in_data <- sort(unique(data[[time_var]]))
+    expected_times <- seq.int(from = min_time, to = max_time)
+    
+    if (!identical(as.numeric(unique_times_in_data), as.numeric(expected_times))) {
+      stop(insight::format_error(
+        "Time series in {.field {name}} is missing observations for one or more timepoints.",
+        "Multivariate models require complete time sampling for all responses."
+      ), call. = FALSE)
+    }
+  }
+
+  return(data)
+}
+
+#' Validate univariate series time structure
+#' @param data Data frame to validate
+#' @param name Name for error messages
+#' @param time_var Time variable name
+#' @param series_var Series variable name
+#' @param check_levels Whether to check factor levels
+#' @param check_times Whether to check time completeness
+#' @return Validated data frame
+#' @noRd
+validate_univariate_series_time <- function(data, name, time_var, series_var, check_levels, check_times) {
+  # Input validation
+  checkmate::assert_data_frame(data)
+  checkmate::assert_string(name)
+  checkmate::assert_string(time_var)
+  checkmate::assert_string(series_var)
+  checkmate::assert_logical(check_levels, len = 1)
+  checkmate::assert_logical(check_times, len = 1)
+
   # Check that series variable exists and is a factor
   if (!series_var %in% colnames(data)) {
-    stop(glue::glue("{name} does not contain a '{series_var}' variable"), call. = FALSE)
+    stop(insight::format_error(
+      "{.field {name}} does not contain a '{series_var}' variable."
+    ), call. = FALSE)
   }
 
   if (!is.factor(data[[series_var]])) {
     stop(insight::format_error(
-      "Variable '{series_var}' must be a factor.",
+      "Variable {.field {series_var}} must be a factor.",
       "Convert to factor using: data${series_var} <- factor(data${series_var})"
     ), call. = FALSE)
   }
@@ -2384,29 +2451,17 @@ validate_series_time = function(
   # Check for unused factor levels in series variable
   data <- validate_factor_levels(data, series_var, name, auto_drop = FALSE)
 
-  # Check that time variable exists
-  if (!time_var %in% colnames(data)) {
-    stop(glue::glue("{name} does not contain a '{time_var}' variable"), call. = FALSE)
-  }
-
-  # Series factor must have all unique levels present if this is a
-  # forecast check
+  # Series factor must have all unique levels present if this is a forecast check
   if (check_levels) {
     if (!all(levels(data[[series_var]]) %in% unique(data[[series_var]]))) {
-      stop(
-        glue::glue(
-          'Mismatch between factor levels of "{series_var}" and unique values of "{series_var}"\n',
-          'Use\n  `setdiff(levels(data${series_var}), unique(data${series_var}))` \nand\n',
-          '  `intersect(levels(data${series_var}), unique(data${series_var}))`\nfor guidance'
-        ),
-        call. = FALSE
-      )
+      stop(insight::format_error(
+        "Mismatch between factor levels of {.field {series_var}} and unique values.",
+        "Use setdiff(levels(data${series_var}), unique(data${series_var})) for guidance."
+      ), call. = FALSE)
     }
   }
 
-  # Ensure each series has an observation, even if NA, for each
-  # unique timepoint (only for trend models that require discrete time with
-  # regularly spaced sampling intervals)
+  # Check time completeness for each series
   if (check_times) {
     all_times_avail = function(time, min_time, max_time) {
       identical(
@@ -2414,20 +2469,21 @@ validate_series_time = function(
         as.numeric(seq.int(from = min_time, to = max_time))
       )
     }
+    
     min_time <- as.numeric(min(data[[time_var]]))
     max_time <- as.numeric(max(data[[time_var]]))
+    
     data.frame(series = data[[series_var]], time = data[[time_var]]) %>%
       dplyr::group_by(series) %>%
       dplyr::summarise(
-        all_there = all_times_avail(time, min_time, max_time)
+        all_there = all_times_avail(time, min_time, max_time),
+        .groups = 'drop'
       ) -> checked_times
+      
     if (any(checked_times$all_there == FALSE)) {
-      stop(
-        "One or more series in ",
-        name,
-        " is missing observations for one or more timepoints",
-        call. = FALSE
-      )
+      stop(insight::format_error(
+        "One or more series in {.field {name}} is missing observations for one or more timepoints."
+      ), call. = FALSE)
     }
   }
 

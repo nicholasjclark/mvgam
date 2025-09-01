@@ -9,69 +9,67 @@
 
 ---
 
-## 🚨 **CURRENT CRITICAL ISSUE**: Duplicate Parameter Declarations
+## 🚨 **CURRENT CRITICAL ISSUE**: Stan Block Structure Problems
 
-**STATUS**: 15/23 tests failing in `tests/testthat/test-stancode-standata.R` with Stan compilation errors  
-**ROOT CAUSE**: Duplicate `sigma_trend` parameter declarations (scalar vs vector versions) causing Stan syntax errors
+**STATUS**: 1/5 tests failing in enhanced `tests/testthat/test-stancode-standata.R` with Stan compilation errors  
+**ROOT CAUSE**: Block insertion utilities creating duplicate blocks instead of using existing brms blocks
 
-### 🔍 ERROR ANALYSIS *(2025-09-01)*
+### 🔍 ERROR ANALYSIS *(2025-09-01 Updated)*
 
-**Current Status**: Stan compilation failures due to duplicate parameter declarations
+**Current Status**: Stan block structure violations after DRY utility function refactoring
 
-#### **Primary Issue: Duplicate sigma_trend Parameters**
-- **Problem**: Stan code contains both `real<lower=0> sigma_trend;` and `vector<lower=0>[1] sigma_trend;` declarations
-- **Impact**: Stan compilation fails with "Identifier 'sigma_trend' is already in use" error
-- **Affected Tests**: 13/15 test failures show this exact pattern
-- **Root Cause**: Different pipeline components (shared innovations vs trend-specific stanvars) create conflicting parameter versions
+#### **Primary Issue: Multiple Block Creation**
+- **Problem**: Stan code contains duplicate blocks - 2 data blocks, 3 parameters blocks, 2 transformed parameters blocks instead of 1 each
+- **Impact**: Stan compilation fails with block ordering violations ("model {" or "generated quantities {" expected after transformed parameters block)
+- **Root Cause**: `find_stan_block()` not detecting existing brms blocks, causing `insert_into_stan_block()` to create new blocks instead of inserting into existing ones
 
 #### **Secondary Issues**
-- **Series Validation Error**: `series_var` NULL/empty causing zero-length argument errors in multivariate models (2 tests)
-- **Input Validation Missing**: Character string inputs not properly rejected (1 test)
+- **Block Ordering**: Transformed parameters block appearing AFTER model block (line 85) violates Stan syntax requirements
+- **Pattern Matching**: Block detection regex patterns may not match brms-generated block formats
 
 ---
 
-## 🚀 **NEXT IMMEDIATE TASKS**: Fix Parameter Duplication
+## 🚀 **NEXT IMMEDIATE TASKS**: Fix Stan Block Structure Issues
 
-**GOAL**: Eliminate duplicate parameter declarations to restore Stan code compilation
+**GOAL**: Eliminate duplicate block creation to restore proper Stan syntax and compilation
 
 **KEY FILES TO MODIFY**:
-- `R/stan_assembly.R`: Functions creating trend-specific stanvars and shared innovation stanvars
-- `R/validations.R`: Series validation functions for multivariate models
-- Input validation in stancode generation functions
+- `R/stan_assembly.R`: Block detection and insertion utility functions (`find_stan_block`, `insert_into_stan_block`)
+- Enhanced test framework with `validate=FALSE` for debugging
 
-**A1**: Identify which component creates scalar `sigma_trend` vs vector `sigma_trend[1]`
-  - Search `R/stan_assembly.R` for all functions that create `sigma_trend` parameters
-  - Based on previous context: shared innovation system creates scalar, trend-specific stanvars create vector
-  - Examine `generate_shared_innovations_stanvar()` vs `generate_trend_specific_stanvars()`
+### **Task 1: Debug Block Detection (30 min)**
 
-**A2**: Analyze parameter coordination between pipeline components  
-  - Check how different stanvar sources are combined in `extract_trend_stanvars_from_setup()`
-  - Identify where parameter conflicts should be detected and resolved
-  - Document current parameter generation flow
+**C0a-fix3a**: Debug why `find_stan_block()` isn't detecting existing brms blocks ✅ *IN PROGRESS*
+  - Compare block detection regex patterns against actual brms-generated Stan code structure
+  - Test `find_stan_block()` with sample brms output to verify pattern matching
+  - Ensure patterns handle brms block formatting (spacing, comments, etc.)
 
-### **Task 2: Fix Duplicate Parameter Issue (45 min)**
+**C0a-fix3b**: Fix `insert_into_stan_block()` to use existing blocks instead of creating duplicates
+  - Modify insertion logic to properly add content to existing blocks
+  - Ensure content is inserted in correct location within existing block structure
+  - Verify braces are properly matched after insertion
 
-**B1**: Eliminate scalar `sigma_trend` from shared innovation system (30 min)
-  - Based on step6_5 showing only vector version works correctly
-  - Modify shared innovation stanvar generation to use vector form consistently
-  - OR implement parameter deduplication logic during stanvar combination
+### **Task 2: Fix Block Ordering (20 min)**
 
-**B2**: Test parameter fix with simple case (15 min)
-  - Create minimal test case to verify single `sigma_trend` declaration
-  - Ensure Stan code compiles successfully
+**C0a-fix3c**: Fix Stan block ordering (transformed parameters must come before model)
+  - Ensure block insertion respects Stan's required ordering: data → parameters → transformed parameters → model → generated quantities  
+  - Fix insertion logic that places transformed parameters after model block (line 85 issue)
 
-### **Task 3: Fix Secondary Issues (45 min)**
+### **Task 3: Complete DRY Refactoring (45 min)**
 
-**C1**: Fix series_var validation error (20 min)
-  - Add NULL checks in `validate_series_time()` function in `R/validations.R:1277`
-  - Handle multivariate models where `series_var` may be empty/NULL
+**C0b**: Complete refactoring of `inject_trend_into_linear_predictor()` to use shared utilities
+  - Remove remaining duplicate logic after utility functions are working properly
+  - Ensure univariate and multivariate trend injection uses shared block manipulation code
 
-**C2**: Fix input validation test (15 min)  
-  - Add proper input type checking to reject character strings in stancode functions
-  - Ensure expected error is thrown for invalid inputs
+**C0c**: Add GLM support as specialization of shared utilities  
+  - Implement GLM-compatible trend injection using the corrected block utilities
+  - Handle brms GLM optimization patterns (6 GLM function types from brms source)
 
-**C3**: Final validation (10 min)
-  - Run targeted test subset to verify fixes work
+### **Task 4: Final Validation (15 min)**
+
+**C4**: Final validation of all fixes
+  - Run complete test suite with enhanced block structure validation
+  - Verify no duplicate blocks, correct ordering, proper compilation
 
 **SUCCESS CRITERIA**: 
 - ✅ Generated Stan code compiles without errors  
