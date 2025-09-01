@@ -5,7 +5,9 @@
       "Bash(git add:*)",
       "Bash(git push:*)",
       "Bash(grep:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": [],

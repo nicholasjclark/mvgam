@@ -40,31 +40,46 @@
 ### **Task 1: Debug Block Detection (30 min)**
 
 **C0a-fix3a**: Debug why `find_stan_block()` isn't detecting existing brms blocks ✅ *IN PROGRESS*
+  - Read `architecture/stan-data-flow-pipeline.md`
+  - Run tests in `test-stancode-standata.R` and inspect generated Stan code vs expectations
+  - Expand tests to also include observation-level offsets and a variety of predictor effects (`s()`, `gp()`, `(1 | group)`)
   - Compare block detection regex patterns against actual brms-generated Stan code structure
   - Test `find_stan_block()` with sample brms output to verify pattern matching
   - Ensure patterns handle brms block formatting (spacing, comments, etc.)
 
 **C0a-fix3b**: Fix `insert_into_stan_block()` to use existing blocks instead of creating duplicates
   - Modify insertion logic to properly add content to existing blocks
+  - Add `real lprior = 0;` and `lprior += student_t_lpdf(sigma` to list of exclusions that should not be retained from the trend brms model
   - Ensure content is inserted in correct location within existing block structure
   - Verify braces are properly matched after insertion
+  - Ensure `architecture/stan-data-flow-pipeline.md` is accurate and up to date
 
 ### **Task 2: Fix Block Ordering (20 min)**
 
 **C0a-fix3c**: Fix Stan block ordering (transformed parameters must come before model)
+  - Read `architecture/stan-data-flow-pipeline.md`
   - Ensure block insertion respects Stan's required ordering: data → parameters → transformed parameters → model → generated quantities  
   - Fix insertion logic that places transformed parameters after model block (line 85 issue)
+  - Ensure `architecture/stan-data-flow-pipeline.md` is accurate and up to date
 
 ### **Task 3: Complete DRY Refactoring (45 min)**
 
 **C0b**: Complete refactoring of `inject_trend_into_linear_predictor()` to use shared utilities
+  - Read `architecture/stan-data-flow-pipeline.md`
   - Remove remaining duplicate logic after utility functions are working properly
   - Ensure univariate and multivariate trend injection uses shared block manipulation code
+  - Ensure `architecture/stan-data-flow-pipeline.md` is accurate and up to date
 
 **C0c**: Add GLM support as specialization of shared utilities  
+  - Read `architecture/stan-data-flow-pipeline.md`
   - Implement GLM-compatible trend injection using the corrected block utilities
   - Handle brms GLM optimization patterns (6 GLM function types from brms source)
+  - Ensure `architecture/stan-data-flow-pipeline.md` is accurate and up to date
 
+**C0d**: Remove excess messages during Stan code generation, improve readability  
+  - Remove all intermediate messages during Stan code generation
+  - Ensure consistent spacing, indentation and alignment of all generated Stan code
+  
 ### **Task 4: Final Validation (15 min)**
 
 **C4**: Final validation of all fixes

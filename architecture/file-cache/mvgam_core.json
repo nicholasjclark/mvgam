@@ -53,7 +53,7 @@
                                 "extract_observation_parameters":  "extract_observation_parameters \u003c- function(combined_fit) {",
                                 "extract_pooling_diagnostics":  "extract_pooling_diagnostics \u003c- function(pooled_estimates) {",
                                 "extract_time_information":  "extract_time_information \u003c- function(data) {",
-                                "generate_combined_stancode_and_data":  "generate_combined_stancode_and_data \u003c- function(obs_setup, trend_setup, mv_spec) {",
+                                "generate_combined_stancode_and_data":  "generate_combined_stancode_and_data \u003c- function(obs_setup, trend_setup, mv_spec, validate = TRUE) {",
                                 "extract_series_information":  "extract_series_information \u003c- function(data, mv_spec) {",
                                 "extract_fit_estimates":  "extract_fit_estimates \u003c- function(fit) {",
                                 "pool_parameter_estimates":  "pool_parameter_estimates \u003c- function(param_list) {",
