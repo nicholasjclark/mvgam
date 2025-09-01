@@ -1455,9 +1455,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     matrix[n_trend, ", effective_dim, "] scaled_innovations_trend;
 
     // Apply scaling using vectorized operations
-    {
-      scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);
-    }")
+    scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);")
   }
 
   scaled_innovations_stanvar <- brms::stanvar(
@@ -1925,15 +1923,13 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
       prior = prior
     )
 
-    shared_stanvars$priors <- shared_priors
+    # Combine shared stanvars with priors properly using combine_stanvars
+    shared_stanvars <- combine_stanvars(shared_stanvars, shared_priors)
 
     # Apply response suffix post-processing to shared stanvars for multivariate models
     if (response_suffix != "") {
-      for (name in names(shared_stanvars)) {
-        if (!is.null(shared_stanvars[[name]])) {
-          shared_stanvars[[name]] <- apply_response_suffix_to_stanvars(shared_stanvars[[name]], response_suffix)
-        }
-      }
+      # Apply suffix to the entire stanvars collection
+      shared_stanvars <- apply_response_suffix_to_stanvars(shared_stanvars, response_suffix)
     }
   }
 
@@ -3980,9 +3976,6 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
   is_multivariate <- is_multivariate_brmsfit(brmsfit)
   response_names <- if (is_multivariate) extract_response_names_from_brmsfit(brmsfit) else NULL
 
-  # Create stanvar components list
-  stanvar_components <- list()
-
   # Create parameter mapping for prediction compatibility
   parameter_mapping <- list(
     original_to_renamed = list(),
@@ -4003,10 +3996,6 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
   # Update mapping with results from Stan code renaming
   parameter_mapping <- stan_code_result$mapping
 
-  if (length(stan_code_result$stanvars) > 0) {
-    stanvar_components <- c(stanvar_components, stan_code_result$stanvars)
-  }
-
   # 2. Extract and rename standata objects
   standata_stanvars <- extract_and_rename_standata_objects(
     standata = trend_setup$standata,
@@ -4015,10 +4004,6 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
     is_multivariate = is_multivariate,
     response_names = response_names
   )
-
-  if (length(standata_stanvars) > 0) {
-    stanvar_components <- c(stanvar_components, standata_stanvars)
-  }
 
   # 3. Generate times_trend matrix (support both univariate and multivariate)
   times_trend_stanvars <- generate_times_trend_matrices(
@@ -4030,17 +4015,22 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
     response_names = response_names
   )
 
-  if (length(times_trend_stanvars) > 0) {
-    stanvar_components <- c(stanvar_components, times_trend_stanvars)
+  # Combine all stanvar components using combine_stanvars for proper class inheritance
+  combined_stanvars <- combine_stanvars(
+    stan_code_result$stanvars,
+    standata_stanvars,
+    times_trend_stanvars
+  )
+  
+  # Attach metadata for later use in predictions and integration (only if not NULL)
+  if (!is.null(combined_stanvars)) {
+    attr(combined_stanvars, "mvgam_parameter_mapping") <- parameter_mapping
+    attr(combined_stanvars, "mvgam_original_brmsfit") <- brmsfit
+    attr(combined_stanvars, "mvgam_is_multivariate") <- is_multivariate
+    attr(combined_stanvars, "mvgam_response_names") <- response_names
   }
 
-  # Attach metadata for later use in predictions and integration
-  attr(stanvar_components, "parameter_mapping") <- parameter_mapping
-  attr(stanvar_components, "original_brmsfit") <- brmsfit
-  attr(stanvar_components, "is_multivariate") <- is_multivariate
-  attr(stanvar_components, "response_names") <- response_names
-
-  return(stanvar_components)
+  return(combined_stanvars)
 }
 
 #' Check if brmsfit is Multivariate
@@ -4111,8 +4101,24 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
 
   stanvar_list <- list()
 
-  # Skip extracting data block declarations from Stan code
-  # Data is handled via extract_and_rename_standata_objects with actual values
+  # Extract data block declarations from Stan code with selective filtering
+  # This complements extract_and_rename_standata_objects by providing proper declarations
+  
+  # 0. Extract data block content with selective filtering and renaming
+  data_block <- extract_stan_block_content(stancode, "data")
+  if (!is.null(data_block) && nchar(data_block) > 0) {
+    data_result <- rename_parameters_in_block(
+      data_block, suffix, mapping, "data", is_multivariate, response_names
+    )
+    mapping <- data_result$mapping  # Update mapping
+    
+    if (!is.null(data_result$code) && nchar(trimws(data_result$code)) > 0) {
+      stanvar_list[["trend_data"]] <- brms::stanvar(
+        scode = data_result$code,
+        block = "data"
+      )
+    }
+  }
 
   # 1. Extract parameters block content (without headers) and rename parameters
   params_block <- extract_stan_block_content(stancode, "parameters")
@@ -4191,8 +4197,11 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
     }
   }
 
+  # Combine individual stanvar objects into proper stanvars collection
+  combined_stanvars <- combine_stanvars(stanvar_list)
+  
   return(list(
-    stanvars = stanvar_list,
+    stanvars = combined_stanvars,
     mapping = mapping
   ))
 }
@@ -4603,6 +4612,9 @@ filter_renameable_identifiers <- function(identifiers) {
   exclude_patterns <- c(
     # Response variables (trend models are always univariate with Y only)
     "Y",
+    
+    # Global flags that should not be renamed
+    "prior_only",
 
     # Comment words and obvious non-parameters based on comprehensive testing
     "total", "number", "observations", "response", "variable",
@@ -4767,7 +4779,8 @@ extract_and_rename_standata_objects <- function(standata, suffix, mapping, is_mu
     stanvar_list <- extract_univariate_standata(standata, suffix, mapping)
   }
 
-  return(stanvar_list)
+  # Combine individual stanvar objects into proper stanvars collection
+  return(combine_stanvars(stanvar_list))
 }
 
 #' Extract Univariate Stan Data Objects using comprehensive filtering
@@ -4809,7 +4822,7 @@ extract_univariate_standata <- function(standata, suffix, mapping) {
     }
   }
 
-  return(stanvar_list)
+  return(combine_stanvars(stanvar_list))
 }
 
 #' Extract Multivariate Stan Data Objects
@@ -4851,7 +4864,7 @@ extract_multivariate_standata <- function(standata, suffix, mapping, response_na
     }
   }
 
-  return(stanvar_list)
+  return(combine_stanvars(stanvar_list))
 }
 
 #' Generate times_trend Matrices
@@ -4883,7 +4896,7 @@ generate_times_trend_matrices <- function(n_time, n_series, unique_times, unique
   )
   stanvar_list[["times_trend"]] <- times_trend_stanvar
 
-  return(stanvar_list)
+  return(combine_stanvars(stanvar_list))
 }
 
 #' Create Single times_trend Matrix

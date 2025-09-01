@@ -96,23 +96,70 @@
   - Updated multivariate and univariate calling code to simpler structure without extra parameters
 
 - [ ] **Sub-task C3.1**: Investigate stanvar class inheritance issues (20 min)
-  - Use debug script to examine why `extract_trend_stanvars_from_setup()` returns objects with `class: list` instead of proper `stanvar` objects
+  - Use `debug_stanvar_pipeline.R` script to examine why `extract_trend_stanvars_from_setup()` returns objects with `class: list` instead of proper `stanvar` objects
   - Trace through stanvar creation pipeline to identify where class inheritance is broken
   - Check if issue is in trend generator functions or in the collection/combination process
   - Document specific functions that need stanvar class fixes
 
-- [ ] **Sub-task C3.2**: Fix Stan code block corruption (30 min)
-  - Investigate why invalid stanvars cause brms to generate duplicated model/parameters blocks
-  - Test brms stanvar processing with properly classed stanvar objects vs invalid ones
-  - Fix stanvar creation to ensure proper class inheritance and block assignment
-  - Verify fix prevents parameter declarations appearing in model block
+- [x] **Sub-task C3.2**: Fix Stan code block corruption (30 min) ✅ COMPLETED
+  - Investigated stanvar structure issues using `debug_stanvars_structure.R`
+  - Fixed `shared_stanvars$priors <- shared_priors` bug by using proper `combine_stanvars()` 
+  - Resolved missing innovations sampling (`to_vector(innovations_trend) ~ std_normal();`)
+  - Fixed unnecessary braces in scaled_innovations_trend computation
+  - **FINDINGS**: Block corruption comes from `extract_and_rename_stan_blocks` function
 
-- [ ] **Sub-task C3.3**: Validate complete stanvar pipeline (15 min)
-  - Run enhanced debug script to verify all stanvars have proper `stanvar` class
-  - Confirm parameters appear only in parameters block, not model block
-  - Ensure mapping arrays (`obs_trend_time`, `obs_trend_series`) are present for injection
-  - Test that fixed stanvars resolve both injection failures and Stan compilation errors
-  - Run all tests in `test-stancode-standata.R` to validate complete fix
+- [x] **Sub-task C3.3**: Fix Data Block Extraction and Renaming (45 min) ✅ INVESTIGATION COMPLETED
+  - **Issue**: Current data block extraction creates invalid Stan code with wrong types, missing constraints, and phantom variables
+  - **Root Cause**: `extract_stan_block_content` function has **fundamentally broken block boundary detection**
+  
+  **FINDINGS from comprehensive testing (`debug_block_extraction_variety.R`):**
+  - ❌ `extract_stan_block_content(stancode, "data")` extracts WAY MORE than data block
+  - ❌ **Universal Problem**: Affects ALL trend formula complexities (intercept-only, continuous, factor, interactions)
+  - ❌ Function includes transformed data, parameters blocks in "data" extraction  
+  - ✅ **Manual parsing approach** works perfectly across all complexities
+  - ✅ Manual approach preserves exact constraints: `int<lower=1> N;` → `int<lower=1> N_trend;`
+  
+  **SOLUTION IDENTIFIED**: Replace `extract_stan_block_content` with proper boundary detection
+
+- [ ] **Sub-task C3.4**: Implement Fixed Data Block Extraction (30 min) **CRITICAL PRIORITY**
+  - **Replace broken function**: Create `extract_data_block_properly()` using manual parsing logic
+  - **Implementation based on working approach from debug script**:
+  ```r
+  extract_data_block_properly <- function(stancode) {
+    lines <- strsplit(stancode, "\n")[[1]]
+    in_data_block <- FALSE
+    data_lines <- c()
+    
+    for (i in seq_along(lines)) {
+      line <- lines[i]
+      if (grepl("^\\s*data\\s*\\{", line)) {
+        in_data_block <- TRUE
+        next  # Skip opening brace
+      }
+      if (in_data_block && grepl("^\\s*\\}\\s*$", line)) {
+        break  # Stop at closing brace
+      }
+      if (in_data_block) {
+        data_lines <- c(data_lines, line)
+      }
+    }
+    return(paste(data_lines, collapse = "\n"))
+  }
+  ```
+  
+  **Steps:**
+  1. Create the new function in `R/stan_assembly.R`
+  2. Replace `extract_stan_block_content(stancode, "data")` call in `extract_and_rename_stan_blocks`
+  3. Apply existing filtering (`should_exclude_data_line`) to skip `Y` and `prior_only`
+  4. Apply existing renaming (`rename_parameters_in_block`) to rename identifiers
+  5. Test with all trend formula complexities
+
+- [ ] **Sub-task C3.5**: Validate Fixed Data Block Extraction (15 min)
+  - Run `debug_stanvar_pipeline.R` to verify fix resolves Stan compilation errors
+  - Confirm proper data declarations: `int<lower=1> N_trend;` (not `int N_trend;`)
+  - Ensure no phantom variables or block duplication
+  - Test across multiple trend formula complexities 
+  - Run tests in `test-stancode-standata.R` to validate complete fix
 
 **SUCCESS CRITERIA**: 
 - ✅ Generated Stan code compiles without errors  
