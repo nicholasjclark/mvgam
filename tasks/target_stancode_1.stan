@@ -35,7 +35,6 @@ parameters {
   vector[Kc] b;  // regression coefficients
   real Intercept;  // temporary intercept for centered predictors
   real Intercept_trend;  // temporary intercept for centered predictors
-  real<lower=0> sigma;  // dispersion parameter
   vector<lower=0>[1] sigma_trend;
   matrix[n_trend, n_lv_trend] innovations_trend;
 }

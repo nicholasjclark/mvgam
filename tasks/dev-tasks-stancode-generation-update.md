@@ -55,22 +55,31 @@
 **KEY FILES TO MODIFY**:
 - `R/stan_assembly.R`: Block filtering, variable creation, multivariate stanvar naming
 
-### **Task 1: Fix Duplicate Parameter Declarations (Priority 1)**
+### **Task 1: RUN ENHANCED TEST SUITE TO IDENTIFY CURRENT FAILURES (Priority 1)**
 
-**D1**: Enhance `filter_block_content()` to remove ALL duplicate declarations ⚠️ *CRITICAL*
-  - ✅ Fixed `lprior` declarations in previous work
-  - ❌ **CRITICAL**: Fix duplicate `sigma` declarations causing compilation failure  
-  - Add `sigma` parameter declarations to exclusion filter
-  - Test with gaussian() and other families that declare sigma in both models
-  - Ensure filtering works across all parameter block content
+**D1**: Execute comprehensive test-driven development cycle ⚠️ *CRITICAL*
+  - ✅ **COMPLETED**: Enhanced test suite with detailed expectations added
+    - Added RW model with GLM optimization tests (lines 55-134)
+    - Added AR(p = c(1, 12)) seasonal model tests (lines 137-212) 
+    - Added AR(p = c(2, 4), ma = TRUE) ARMA model tests (lines 214-299)
+    - Added ZMVN(n_lv = 2) factor model with lognormal tests (lines 301-398)
+    - Added hierarchical ZMVN(gr = habitat) with custom prior tests (lines 400-522)
+  - 🔄 **NEXT**: Run `Rscript -e "devtools::load_all();testthat::test_file('tests/testthat/test-stancode-standata.R')"` 
+  - **Analyze failures**: Identify specific expectation failures vs Stan compilation errors
+  - **Document patterns**: Create failure taxonomy for systematic fixes
 
-### **Task 2: Fix Missing mu Variable in Standard Path (Priority 1)**
+### **Task 2: ITERATE ON HIGHEST PRIORITY FAILURES (Priority 1)**
 
-**D2**: Create `mu` variable in standard (non-GLM) trend injection ⚠️ *CRITICAL*
-  - **Issue**: GLM path creates `mu = Xc * b`, but standard path assumes `mu` exists
-  - **Solution**: Standard path must also create `mu` vector before adding trend effects
-  - Implement consistent `mu` creation across both injection approaches
-  - Ensure both paths use efficient computation patterns
+**D2**: Use test results to guide implementation priorities ⚠️ *CRITICAL*
+  - **Test-Driven Approach**: Fix issues in order of test failure criticality
+  - **Expected failure areas** based on current architecture analysis:
+    - GLM optimization detection and mu_ones generation 
+    - AR lag parameter generation (ar1_trend, ar12_trend specific patterns)
+    - MA transformation integration with AR dynamics
+    - Factor loading constraints (Z_raw → Z matrix construction)
+    - Hierarchical correlation parameter generation (_trend suffix consistency)
+  - **Success Metrics**: Each test fix should resolve multiple related failures
+  - **Documentation**: Update architecture docs with implementation decisions
 
 ### **Task 3: Fix Duplicated Stanvar Names in Multivariate Models (Priority 2)** - *ARCHITECTURAL REDESIGN NEEDED*
 
@@ -113,14 +122,16 @@
   - Improve error messages for user-facing validation functions
 
 **SUCCESS CRITERIA**: 
-- ✅ **GLM-optimized path working correctly** (ACHIEVED)
-- 🔄 **Generated Stan code compiles without errors for all test cases** (Major progress: 17/86 → 2/86 failing)  
-- ✅ **Standard (non-GLM) path creates proper mu variable** (FIXED: trend injection in model block)
-- ✅ **No duplicate parameter declarations** (FIXED: enhanced parameter filtering) 
-- ⚠️ **Multivariate models handle unique stanvar names** (Needs architectural redesign for shared correlations)
-- ❌ **Single block structure maintained** (multiple blocks detected)
-- ✅ **Trend effects correctly applied with missing data** (architecture working)
-- ✅ **GLM performance optimization preserved** (ACHIEVED)
+- 🔄 **Enhanced test suite passes completely** (NEW PRIMARY TARGET)
+  - RW + GLM optimization test (55-134)
+  - AR seasonal model test (137-212) 
+  - ARMA model test (214-299)
+  - Factor model test (301-398)
+  - Hierarchical model test (400-522)
+- 🔄 **Generated Stan code matches expected patterns exactly** (TDD approach)
+- 🔄 **All custom prior specifications work correctly** (beta(5,5) for alpha_cor_trend)
+- 🔄 **Stan code compiles without errors for all test cases** (validation = TRUE succeeds)
+- 🔄 **Architecture implementation matches expected Stan structure** (per target expectations)
 
 **MAJOR IMPROVEMENTS ACHIEVED**:
 - Fixed duplicate sigma parameter declarations in parameters block
@@ -128,7 +139,7 @@
 - Comprehensive trend injection placement validation added to tests
 - 13/17 critical compilation errors resolved (76% improvement)
 
-**TARGET**: **0/86 test failures** - Complete Stan code generation system
+**TARGET**: **0/5 enhanced model tests failing** - Complete Stan code generation system with TDD validation
 
 ---
 
