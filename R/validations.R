@@ -1285,11 +1285,6 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1, respo
     is_multivariate = is_multivariate
   )
 
-  if (silent < 2) {
-    message("Time series structure validated for trend model: ", trend_type)
-    message("Dimensions: n_time=", dimensions$n_time, ", n_series=", dimensions$n_series,
-            ", n_obs=", dimensions$n_obs)
-  }
 
   # Return both validated data and dimensions for downstream use
   invisible(list(

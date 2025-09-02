@@ -39,24 +39,33 @@
 
 ### **Task 1: Debug Block Detection (30 min)**
 
-**C0a-fix3a**: Debug why `find_stan_block()` isn't detecting existing brms blocks ✅ *IN PROGRESS*
-  - Read `architecture/stan-data-flow-pipeline.md`
-  - Run tests in `test-stancode-standata.R` and inspect generated Stan code vs expectations
-  - Expand tests to also include observation-level offsets and a variety of predictor effects (`s()`, `gp()`, `(1 | group)`)
-  - Compare block detection regex patterns against actual brms-generated Stan code structure
-  - Test `find_stan_block()` with sample brms output to verify pattern matching
-  - Ensure patterns handle brms block formatting (spacing, comments, etc.)
-
-**C0a-fix3b**: Fix `insert_into_stan_block()` to use existing blocks instead of creating duplicates
-  - Modify insertion logic to properly add content to existing blocks
+**C0a-fix3a**: Debug why `find_stan_block()` isn't detecting existing brms blocks ✅ *MAJOR PROGRESS*
+  - ✅ Read `architecture/stan-data-flow-pipeline.md`
+  - ✅ Run tests in `test-stancode-standata.R` and inspect generated Stan code vs expectations
+  - ✅ Inspect `tasks/target_stancode_1.stan` to see what the first test SHOULD create
+  - ✅ **FIXED: Block detection now correctly finds transformed parameters block (34 lines vs 1 line)**
+  - ✅ **FIXED: Injection placement now at END of block (after trend computation)**
+  - ✅ **ROOT CAUSE RESOLVED: gregexpr() brace counting bug with fixed=TRUE**
+  - ✅ Compare block detection regex patterns against actual brms-generated Stan code structure
+  - ✅ Test `find_stan_block()` with sample brms output to verify pattern matching
+  - ✅ Ensure patterns handle brms block formatting (spacing, comments, etc.)
+  
+  **REMAINING ISSUES TO COMPLETE C0a-fix3a:**
+  - ❌ **Missing mu variable**: `mu[n] +=` references undeclared variable 
+  - ❌ **Missing mu_trend variable**: Referenced in trend computation but not declared in stanvars
+  - ❌ **Duplicate lprior declarations**: Both obs and trend models declare `real lprior = 0;`
+  - ❌ **Duplicate sigma prior**: Trend model sigma prior should be filtered out
   - Add `real lprior = 0;` and `lprior += student_t_lpdf(sigma` to list of exclusions that should not be retained from the trend brms model
+  - Fix `insert_into_stan_block()` to use existing blocks instead of creating duplicates
+  - Modify insertion logic to properly add content to existing blocks
   - Ensure content is inserted in correct location within existing block structure
   - Verify braces are properly matched after insertion
   - Ensure `architecture/stan-data-flow-pipeline.md` is accurate and up to date
+  **STATUS**: Block structure issues RESOLVED. Variable coordination issues remain.
 
 ### **Task 2: Fix Block Ordering (20 min)**
 
-**C0a-fix3c**: Fix Stan block ordering (transformed parameters must come before model)
+**C0a-fix3b**: Fix Stan block ordering (transformed parameters must come before model)
   - Read `architecture/stan-data-flow-pipeline.md`
   - Ensure block insertion respects Stan's required ordering: data → parameters → transformed parameters → model → generated quantities  
   - Fix insertion logic that places transformed parameters after model block (line 85 issue)

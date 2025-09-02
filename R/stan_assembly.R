@@ -196,18 +196,8 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
   is_multivariate <- is_multivariate_trend_specs(trend_specs)
   responses_with_trends <- c()
 
-  if (silent < 2) {
-    if (is_multivariate) {
-      message("Processing multivariate model with ", length(trend_specs), " responses")
-    } else {
-      message("Processing univariate model")
-    }
-  }
 
   # Stage 1: Extract trend stanvars from brms setup
-  if (silent < 2) {
-    message("Stage 1: Extracting trend stanvars from brms setup...")
-  }
 
   # Handle both univariate and multivariate cases
   if (is_multivariate) {
@@ -277,9 +267,6 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
   )
 
   # Stage 2: Inject trends using GLM-compatible approach
-  if (silent < 2) {
-    message("Stage 2: Injecting trend into observation linear predictor...")
-  }
 
   # Inject trends into linear predictors
   if (is_multivariate) {
@@ -1054,8 +1041,8 @@ find_stan_block <- function(code_lines, block_name) {
   checkmate::assert_character(code_lines, min.len = 1)
   checkmate::assert_string(block_name)
   
-  # Find block start
-  block_pattern <- paste0("^\\s*", gsub(" ", "\\s+", block_name), "\\s*\\{")
+  # Find block start - properly escape regex
+  block_pattern <- paste0("^\\s*", gsub(" ", "\\\\s+", block_name), "\\s*\\{")
   start_idx <- which(grepl(block_pattern, code_lines))
   
   if (length(start_idx) == 0) {
@@ -1070,14 +1057,16 @@ find_stan_block <- function(code_lines, block_name) {
   
   for (i in start_idx:length(code_lines)) {
     line <- code_lines[i]
-    # Count braces using base R
-    open_braces <- lengths(gregexpr("\\{", line, fixed = TRUE))
-    close_braces <- lengths(gregexpr("\\}", line, fixed = TRUE))
-    # Handle case where no matches found (returns -1)
-    if (open_braces == -1) open_braces <- 0
-    if (close_braces == -1) close_braces <- 0
+    # Count braces using base R - use literal braces with fixed = TRUE
+    open_matches <- gregexpr("{", line, fixed = TRUE)[[1]]
+    close_matches <- gregexpr("}", line, fixed = TRUE)[[1]]
+    
+    # Count actual matches (gregexpr returns -1 when no matches)
+    open_braces <- if (open_matches[1] == -1) 0 else length(open_matches)
+    close_braces <- if (close_matches[1] == -1) 0 else length(close_matches)
     
     brace_count <- brace_count + open_braces - close_braces
+    
     
     # Only check for closing after we've processed the opening line
     if (i > start_idx && brace_count == 0) {
@@ -1099,56 +1088,73 @@ find_stan_block <- function(code_lines, block_name) {
 #' Insert Code into Stan Block
 #'
 #' @description
-#' Inserts code into existing Stan block or creates new block if it doesn't exist.
+#' Inserts code into existing Stan block. Since brms always generates all
+#' Stan blocks (even if empty), this function never creates new blocks.
 #' Common utility for Stan code modification.
 #'
 #' @param code_lines Character vector of Stan code lines
 #' @param block_name Character string of block name
 #' @param insertion_code Character vector of code to insert
-#' @param create_if_missing Logical, whether to create block if it doesn't exist
 #' @return Modified character vector of Stan code lines
 #' @noRd
-insert_into_stan_block <- function(code_lines, block_name, insertion_code, create_if_missing = TRUE) {
+insert_into_stan_block <- function(code_lines, block_name, insertion_code) {
   checkmate::assert_character(code_lines, min.len = 1)
   checkmate::assert_string(block_name)
   checkmate::assert_character(insertion_code, min.len = 1)
-  checkmate::assert_flag(create_if_missing)
   
   block_info <- find_stan_block(code_lines, block_name)
   
   if (is.null(block_info)) {
-    if (!create_if_missing) {
-      stop(insight::format_error(
-        "Cannot find {block_name} block in Stan code.",
-        "Block creation is disabled."
-      ), call. = FALSE)
+    # Debug: show what blocks we can find
+    block_pattern <- paste0("^\\s*", gsub(" ", "\\\\s+", block_name), "\\s*\\{")
+    matching_lines <- which(grepl(block_pattern, code_lines))
+    debug_info <- if (length(matching_lines) > 0) {
+      paste("Found potential matches at lines:", paste(matching_lines, collapse = ", "),
+            "Patterns:", paste(code_lines[matching_lines], collapse = " | "))
+    } else {
+      "No matches found"
     }
     
-    # Create new block - insert before model block
-    model_info <- find_stan_block(code_lines, "model")
-    if (is.null(model_info)) {
-      stop(insight::format_error(
-        "Cannot find model block for {block_name} insertion.",
-        "Stan code structure is invalid."
-      ), call. = FALSE)
+    stop(insight::format_error(
+      paste0("Cannot find '", block_name, "' block in Stan code."),
+      paste0("Debug info: ", debug_info),
+      paste0("Pattern used: ", block_pattern),
+      "This is unexpected as brms should generate all blocks.",
+      "Please check that the Stan code is properly formed."
+    ), call. = FALSE)
+  }
+  
+  # Check if block is empty (only has opening and closing braces on same or consecutive lines)
+  is_empty_block <- (block_info$end_idx - block_info$start_idx) <= 1
+  
+  
+  if (is_empty_block) {
+    # For empty blocks, insert between the braces
+    # Handle both "block { }" and "block {\n}" formats
+    if (block_info$end_idx == block_info$start_idx) {
+      # Same line: "block { }"
+      # Replace the line with expanded block
+      modified_lines <- c(
+        if (block_info$start_idx > 1) code_lines[1:(block_info$start_idx - 1)] else character(0),
+        paste0(block_name, " {"),
+        insertion_code,
+        "}",
+        if (block_info$end_idx < length(code_lines)) code_lines[(block_info$end_idx + 1):length(code_lines)] else character(0)
+      )
+    } else {
+      # Consecutive lines: "block {\n}"
+      modified_lines <- c(
+        code_lines[1:block_info$start_idx],
+        insertion_code,
+        code_lines[block_info$end_idx:length(code_lines)]
+      )
     }
-    
-    # Create block content
-    new_block <- c(paste0(block_name, " {"), insertion_code, "}")
-    
-    # Insert before model block
-    modified_lines <- c(
-      code_lines[1:(model_info$start_idx - 1)],
-      new_block,
-      "",
-      code_lines[model_info$start_idx:length(code_lines)]
-    )
-    
   } else {
-    # Insert into existing block (before closing brace)
-    # Insert content just before the closing brace line
+    # Non-empty block: insert before closing brace (at the END of the block)
+    # This ensures trend injection happens after all necessary variables are declared
     modified_lines <- c(
       code_lines[1:(block_info$end_idx - 1)],
+      "",  # Add blank line before injection  
       insertion_code,
       code_lines[block_info$end_idx:length(code_lines)]
     )
@@ -1191,8 +1197,7 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
   modified_lines <- insert_into_stan_block(
     code_lines, 
     "transformed parameters", 
-    trend_injection_code, 
-    create_if_missing = TRUE
+    trend_injection_code
   )
   
   # Reconstruct Stan code
@@ -4528,6 +4533,7 @@ extract_non_likelihood_from_model_block <- function(model_block) {
 
   # Keep non-likelihood lines - preserve linear predictor computations
   non_likelihood_lines <- character(0)
+  prev_line_was_sigma_prior <- FALSE
 
   for (line in lines) {
     # Skip empty lines and comments
@@ -4535,6 +4541,9 @@ extract_non_likelihood_from_model_block <- function(model_block) {
       next
     }
 
+    # Check if this line is the continuation of sigma prior (lccdf part)
+    is_sigma_lccdf <- grepl("^\\s*-\\s*1\\s*\\*\\s*student_t_lccdf\\s*\\(\\s*0\\s*\\|", line)
+    
     # Skip specific lines we don't want
     skip_line <- any(c(
       # Prior-only conditional statements (but keep their contents)
@@ -4544,6 +4553,13 @@ extract_non_likelihood_from_model_block <- function(model_block) {
       # Standalone closing braces (likely end of prior_only blocks)
       grepl("^\\s*}\\s*$", line),
 
+      # lprior declarations and sigma priors (avoid duplication with observation model)
+      grepl("^\\s*real\\s+lprior\\s*=\\s*0\\s*;", line),
+      grepl("lprior\\s*\\+=\\s*student_t_lpdf\\s*\\(\\s*sigma\\s*\\|", line),
+      
+      # Skip lccdf line only if it follows sigma prior
+      (is_sigma_lccdf && prev_line_was_sigma_prior),
+
       # Actual likelihood statements
       grepl("~\\s+normal\\s*\\(", line),
       grepl("target\\s*\\+=.*normal.*lpdf\\s*\\(", line),
@@ -4552,6 +4568,9 @@ extract_non_likelihood_from_model_block <- function(model_block) {
       grepl("target\\s*\\+=.*normal.*lpdf\\s*\\([^)]*\\|", line),
       grepl("target\\s*\\+=.*Y\\s*\\|", line)
     ))
+
+    # Track if this line was a sigma prior for next iteration
+    prev_line_was_sigma_prior <- grepl("lprior\\s*\\+=\\s*student_t_lpdf\\s*\\(\\s*sigma\\s*\\|", line)
 
     if (!skip_line) {
       non_likelihood_lines <- c(non_likelihood_lines, line)
