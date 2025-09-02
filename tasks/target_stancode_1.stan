@@ -1,6 +1,4 @@
-// This is the target for:
-// data <- setup_stan_test_data()$univariate
-// mf_obs_only <- mvgam_formula(y ~ x)
+// Expected final model for the following:
 // mf_with_trend <- mvgam_formula(y ~ x, trend_formula = ~ RW())
 // code_with_trend <- stancode(mf_with_trend, data = data, family = poisson(), validate = FALSE)
 
