@@ -58,6 +58,11 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - DO NOT use `try()`, `tryCatch()` or `skip()` within tests
 - DO NOT insert placeholder functions or use `try()` / `tryCatch()` within functions to address test errors or warnings
 
+### testthat Expectations Guidelines
+- testthat expectation functions (expect_true, expect_equal, etc.) do NOT have an `info` argument
+- Use descriptive test names and comments instead of `info` for debugging context
+- For detailed error messages, use descriptive variable names and clear assertions
+
 ### Documentation
 - Use roxygen2 tags for all functions
 - Vignettes demonstrate in-depth use cases

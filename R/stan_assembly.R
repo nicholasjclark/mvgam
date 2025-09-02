@@ -36,21 +36,15 @@ apply_response_suffix_to_stanvars <- function(stanvars, response_suffix) {
     return(stanvars)
   }
 
-  # Define all trend parameter patterns that need suffixing
+  # Define trend parameter patterns that need response-specific suffixing
+  # For multivariate models, only observation mapping arrays should be response-specific
+  # Shared trend dynamics parameters (sigma_trend, L_Omega_trend, etc.) should NOT be suffixed
   trend_patterns <- c(
-    "sigma_trend",
-    "mu_trend",
-    "L_Omega_trend",
-    "Sigma_trend",
-    "innovations_trend",
-    "scaled_innovations_trend",
-    "LV",
-    "theta1_trend",
-    "ar\\d*_trend",  # ar1_trend, ar2_trend, etc.
-    "A\\d*_trend",   # A1_trend, A2_trend for VAR
-    "n_lv_trend",
-    "n_trend",
-    "trend_"
+    "obs_trend_time",
+    "obs_trend_series", 
+    "times_trend",
+    "trend",  # The computed trend matrix should be response-specific
+    "mu_ones" # GLM compatibility stanvar should be response-specific
   )
 
   # Handle both single stanvar and list of stanvars
@@ -1242,16 +1236,55 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
     # Parse Stan code into lines
     code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
     
-    # Insert trend injection into transformed parameters block using utility
-    modified_lines <- insert_into_stan_block(
-      code_lines, 
-      "transformed parameters", 
-      trend_injection_code
-    )
+    # Insert trend injection into model block after last mu += line
+    modified_lines <- insert_after_mu_lines_in_model_block(code_lines, trend_injection_code)
     
     # Reconstruct Stan code
     return(paste(modified_lines, collapse = "\n"))
   }
+}
+
+#' Insert Trend Injection Code After Last mu += Line in Model Block
+#'
+#' @description
+#' Uses existing block detection infrastructure to insert trend injection code
+#' after the last mu += line in the model block.
+#'
+#' @param code_lines Character vector of Stan code lines
+#' @param trend_injection_code Character vector of trend injection code lines
+#' @return Modified character vector with trend injection inserted
+#' @noRd
+insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_code) {
+  checkmate::assert_character(code_lines)
+  checkmate::assert_character(trend_injection_code)
+  
+  # Use existing infrastructure to find model block
+  block_info <- find_stan_block(code_lines, "model")
+  if (is.null(block_info)) {
+    insight::format_error("Model block not found in Stan code")
+  }
+  
+  # Find last mu += line within the model block
+  model_lines <- code_lines[block_info$start_idx:block_info$end_idx]
+  mu_line_indices <- which(grepl("\\s*mu\\s*\\+=", model_lines))
+  
+  if (length(mu_line_indices) == 0) {
+    insight::format_error("No mu += lines found in model block")
+  }
+  
+  # Calculate absolute position of last mu += line
+  last_mu_pos <- block_info$start_idx + mu_line_indices[length(mu_line_indices)] - 1
+  
+  # Insert trend injection after last mu += line with proper indentation
+  indented_injection <- paste0("    ", trend_injection_code)
+  
+  result_lines <- c(
+    code_lines[1:last_mu_pos],
+    indented_injection,
+    code_lines[(last_mu_pos + 1):length(code_lines)]
+  )
+  
+  return(result_lines)
 }
 
 #' Generate Trend Injection Code for Stan Transformed Parameters Block
@@ -4478,15 +4511,20 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
   # 1. Extract parameters block content (without headers) and rename parameters
   params_block <- extract_stan_block_content(stancode, "parameters")
   if (!is.null(params_block) && nchar(params_block) > 0) {
-    params_result <- rename_parameters_in_block(
-      params_block, suffix, mapping, "parameters", is_multivariate, response_names
-    )
-    mapping <- params_result$mapping  # Update mapping
+    # FILTER OUT DUPLICATE DECLARATIONS BEFORE RENAMING
+    filtered_params <- filter_block_content(params_block, "parameters")
+    
+    if (!is.null(filtered_params) && nchar(filtered_params) > 0) {
+      params_result <- rename_parameters_in_block(
+        filtered_params, suffix, mapping, "parameters", is_multivariate, response_names
+      )
+      mapping <- params_result$mapping  # Update mapping
 
-    stanvar_list[["trend_parameters"]] <- brms::stanvar(
-      scode = params_result$code,
-      block = "parameters"
-    )
+      stanvar_list[["trend_parameters"]] <- brms::stanvar(
+        scode = params_result$code,
+        block = "parameters"
+      )
+    }
   }
 
   # 2. Extract transformed parameters block content (without headers) and rename references
@@ -4641,6 +4679,16 @@ filter_block_content <- function(block_content, block_type = "model") {
       # Skip lccdf line only if it follows sigma prior
       (is_sigma_lccdf && prev_line_was_sigma_prior)
     ))
+    
+    # Additional filtering for parameters and transformed parameters blocks
+    if (block_type %in% c("parameters", "transformed_parameters")) {
+      skip_line <- skip_line || any(c(
+        # Skip duplicate sigma parameter declarations to prevent "Identifier 'sigma' is already in use" errors
+        grepl("^\\s*real\\s*<[^>]*lower\\s*=\\s*0[^>]*>\\s+sigma\\s*;", line),
+        grepl("^\\s*real<lower=0>\\s+sigma\\s*;", line),
+        grepl("^\\s*real\\s+sigma\\s*;", line)
+      ))
+    }
     
     # Additional filtering for model block only
     if (block_type == "model") {

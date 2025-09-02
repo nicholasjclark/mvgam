@@ -76,7 +76,20 @@ test_that("stancode.mvgam_formula returns correct class structure", {
 
   # Should be longer than observation-only model
   expect_gt(nchar(code_with_trend), nchar(code_obs_only))
-  
+
+  # Trend formula ~ RW() has no predictors, so should NOT contain design matrix variables
+  expect_false(grepl("int K_trend;", code_with_trend, fixed = TRUE))
+  expect_false(grepl("real Kc_trend;", code_with_trend, fixed = TRUE))
+  expect_false(grepl("X_trend", code_with_trend, fixed = TRUE))
+  expect_false(grepl("Xc_trend", code_with_trend, fixed = TRUE))
+  expect_false(grepl("matrix.*K.*X_trend", code_with_trend))
+
+  # mu needs to be created explicitly because of glm observation likelihood
+  expect_true(grepl("vector[N] mu = Xc * b;", code_with_trend, fixed = TRUE))
+
+  # brms-generated dispersion parameter should be excluded
+  expect_false(grepl("real<lower=0> sigma;", code_with_trend, fixed = TRUE))
+
   # Final validation: ensure both models compile correctly
   expect_no_error(stancode(mf_obs_only, data = data, family = poisson(), validate = TRUE))
   expect_no_error(stancode(mf_with_trend, data = data, family = poisson(), validate = TRUE))
@@ -125,7 +138,7 @@ test_that("stancode handles different observation families", {
 test_that("stancode generates correct Stan blocks", {
   data <- setup_stan_test_data()$univariate
   mf <- mvgam_formula(y ~ s(x), trend_formula = ~ AR(p = 1))
-  
+
   # Generate Stan code without validation for structure inspection
   code <- stancode(mf, data = data, family = poisson(), validate = FALSE)
 
@@ -138,11 +151,11 @@ test_that("stancode generates correct Stan blocks", {
 
   # Stan blocks should be in correct order
   data_pos <- regexpr("data\\s*\\{", code)
-  param_pos <- regexpr("parameters\\s*\\{", code)  
+  param_pos <- regexpr("parameters\\s*\\{", code)
   tp_pos <- regexpr("transformed parameters\\s*\\{", code)
   model_pos <- regexpr("model\\s*\\{", code)
   gq_pos <- regexpr("generated quantities\\s*\\{", code)
-  
+
   expect_true(data_pos < param_pos)
   expect_true(param_pos < tp_pos)
   expect_true(tp_pos < model_pos)
@@ -151,12 +164,12 @@ test_that("stancode generates correct Stan blocks", {
   # Should have exactly one lprior declaration (not duplicated)
   lprior_decls <- gregexpr("real\\s+lprior\\s*=\\s*0;", code)[[1]]
   expect_equal(length(lprior_decls), 1)
-  
+
   # Required variable declarations should be present
   expect_match2(code, "vector\\[N\\]\\s+mu")
   expect_match2(code, "vector\\[.*\\]\\s+mu_trend")
   expect_match2(code, "matrix\\[.*\\]\\s+trend;")
-  
+
   # Trend parameters should be declared in parameters block
   expect_match2(code, "real.*ar1_trend")
   expect_match2(code, "vector<lower=0>\\[.*\\]\\s+sigma_trend")
@@ -175,12 +188,80 @@ test_that("stancode generates correct Stan blocks", {
 
   # Should contain sigma_trend prior but not duplicate sigma prior
   expect_match2(code, "sigma_trend\\s*~")
-  
+
   # All braces should be properly matched
   open_braces <- length(gregexpr("\\{", code)[[1]])
   close_braces <- length(gregexpr("\\}", code)[[1]])
   expect_equal(open_braces, close_braces)
+
+  # DETAILED EXPECTATIONS: Verify trend injection placement in model block
   
+  # Split code into lines to check positioning
+  code_lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
+  
+  # Find model block boundaries
+  model_start <- which(grepl("^\\s*model\\s*\\{", code_lines))[1]
+  expect_false(is.na(model_start))  # Model block should be found
+  
+  # Find model block end by counting braces
+  brace_count <- 0
+  model_end <- model_start
+  for (i in model_start:length(code_lines)) {
+    line <- code_lines[i]
+    open_braces <- lengths(regmatches(line, gregexpr("\\{", line, perl = TRUE)))
+    close_braces <- lengths(regmatches(line, gregexpr("\\}", line, perl = TRUE)))
+    brace_count <- brace_count + open_braces - close_braces
+    if (i > model_start && brace_count == 0) {
+      model_end <- i
+      break
+    }
+  }
+  
+  # Find positions within model block
+  model_lines <- code_lines[model_start:model_end]
+  mu_plus_lines <- which(grepl("\\s*mu\\s*\\+=", model_lines))
+  trend_injection_lines <- which(grepl("Add trend effects using mapping arrays|mu\\[n\\]\\s*\\+=\\s*trend\\[", model_lines))
+  likelihood_lines <- which(grepl("target\\s*\\+=.*lpmf\\s*\\(|target\\s*\\+=.*lpdf\\s*\\(", model_lines))
+  
+  # CRITICAL: Trend injection should be in model block, not transformed parameters  
+  tp_start <- which(grepl("^\\s*transformed parameters\\s*\\{", code_lines))[1]
+  if (!is.na(tp_start)) {
+    tp_end <- tp_start
+    brace_count <- 0
+    for (i in tp_start:length(code_lines)) {
+      line <- code_lines[i]
+      open_braces <- lengths(regmatches(line, gregexpr("\\{", line, perl = TRUE)))
+      close_braces <- lengths(regmatches(line, gregexpr("\\}", line, perl = TRUE)))
+      brace_count <- brace_count + open_braces - close_braces
+      if (i > tp_start && brace_count == 0) {
+        tp_end <- i
+        break
+      }
+    }
+    tp_lines <- code_lines[tp_start:tp_end]
+    # Trend injection should NOT be in transformed parameters block
+    expect_false(any(grepl("Add trend effects using mapping arrays", tp_lines)))
+    expect_false(any(grepl("mu\\[n\\]\\s*\\+=\\s*trend\\[", tp_lines)))
+  }
+  
+  # CRITICAL: Trend injection should be AFTER last mu += line
+  if (length(mu_plus_lines) > 0 && length(trend_injection_lines) > 0) {
+    last_mu_plus <- max(mu_plus_lines)
+    first_trend_injection <- min(trend_injection_lines)
+    expect_true(first_trend_injection > last_mu_plus)
+  }
+  
+  # CRITICAL: Trend injection should be BEFORE likelihood statement  
+  if (length(trend_injection_lines) > 0 && length(likelihood_lines) > 0) {
+    last_trend_injection <- max(trend_injection_lines)
+    first_likelihood <- min(likelihood_lines)
+    expect_true(last_trend_injection < first_likelihood)
+  }
+  
+  # Verify trend injection pattern is in model block
+  expect_true(any(grepl("Add trend effects using mapping arrays", model_lines)))
+  expect_true(any(grepl("mu\\[n\\]\\s*\\+=\\s*trend\\[obs_trend_time\\[n\\],\\s*obs_trend_series\\[n\\]\\]", model_lines)))
+
   # Generated Stan code should compile without errors
   expect_no_error(stancode(mf, data = data, family = poisson(), validate = TRUE))
 })
@@ -193,7 +274,7 @@ test_that("stancode handles multivariate specifications", {
     mvbind(count, biomass) ~ x,
     trend_formula = ~ RW(cor = TRUE)
   )
-  
+
   # Generate without validation first for structure inspection
   code_shared <- stancode(mf_shared, data = data, validate = FALSE)
 
@@ -202,7 +283,7 @@ test_that("stancode handles multivariate specifications", {
 
   # Check for exactly one of each Stan block (no duplicates)
   expect_equal(length(gregexpr("data\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one data block")
-  expect_equal(length(gregexpr("parameters\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one parameters block") 
+  expect_equal(length(gregexpr("parameters\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one parameters block")
   expect_equal(length(gregexpr("transformed parameters\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one transformed parameters block")
   expect_equal(length(gregexpr("model\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one model block")
   expect_equal(length(gregexpr("generated quantities\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one generated quantities block")
@@ -217,7 +298,7 @@ test_that("stancode handles multivariate specifications", {
   expect_match2(code_shared, "obs_trend_series_count")
   expect_match2(code_shared, "obs_trend_time_biomass")
   expect_match2(code_shared, "obs_trend_series_biomass")
-  
+
   # Check that response-specific arrays are declared as data arrays
   expect_match2(code_shared, "array\\[.*\\]\\s+int.*obs_trend_time_count")
   expect_match2(code_shared, "array\\[.*\\]\\s+int.*obs_trend_series_count")
@@ -227,21 +308,21 @@ test_that("stancode handles multivariate specifications", {
   # Multivariate mapping: should have response-specific injection patterns
   expect_match2(code_shared, "mu_count\\[n\\] \\+= trend_count\\[obs_trend_time_count\\[n\\], obs_trend_series_count\\[n\\]\\]")
   expect_match2(code_shared, "mu_biomass\\[n\\] \\+= trend_biomass\\[obs_trend_time_biomass\\[n\\], obs_trend_series_biomass\\[n\\]\\]")
-  
+
   # Should have response-specific trend matrices
   expect_match2(code_shared, "matrix.*trend_count")
   expect_match2(code_shared, "matrix.*trend_biomass")
-  
+
   # Check proper block ordering
   tp_pos <- regexpr("transformed parameters\\s*\\{", code_shared)
   model_pos <- regexpr("model\\s*\\{", code_shared)
   expect_true(tp_pos < model_pos, info = "transformed parameters should come before model block")
-  
+
   # Check that all braces are properly matched
   open_braces <- length(gregexpr("\\{", code_shared)[[1]])
   close_braces <- length(gregexpr("\\}", code_shared)[[1]])
   expect_equal(open_braces, close_braces, info = "All braces should be properly matched")
-  
+
   # Final validation: ensure multivariate model compiles correctly
   expect_no_error(stancode(mf_shared, data = data, validate = TRUE))
 })
