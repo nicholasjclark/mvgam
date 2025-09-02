@@ -62,6 +62,7 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - testthat expectation functions (expect_true, expect_equal, etc.) do NOT have an `info` argument
 - Use descriptive test names and comments instead of `info` for debugging context
 - For detailed error messages, use descriptive variable names and clear assertions
+- NEVER use `info = "..."` in any expect_* function calls - add comments above the expectation instead
 
 ### Documentation
 - Use roxygen2 tags for all functions

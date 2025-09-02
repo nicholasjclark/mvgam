@@ -400,37 +400,37 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
 test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with custom prior", {
   data <- setup_stan_test_data()$multivariate
   mf_with_trend <- mvgam_formula(
-    biomass ~ 1, 
+    biomass ~ 1,
     trend_formula = ~ x + ZMVN(gr = habitat)
   )
-  
+
   # Custom prior for hierarchical mixing parameter
   custom_prior <- brms::prior("beta(5, 5)", class = "alpha_cor_trend")
-  
+
   code_with_trend <- stancode(
-    mf_with_trend, 
-    data = data, 
+    mf_with_trend,
+    data = data,
     family = lognormal(),
     prior = custom_prior,
     validate = FALSE
   )
-  
+
   # Basic structure checks
   expect_s3_class(code_with_trend, "mvgamstancode")
   expect_s3_class(code_with_trend, "stancode")
-  
+
   # Response variable should be continuous (vector, not array)
   expect_true(grepl("vector\\[N\\] Y;", code_with_trend))
   expect_false(grepl("array\\[N\\] int Y;", code_with_trend))
-  
+
   # Observation model: Only intercept (no covariates)
   expect_false(grepl("int.*K;", code_with_trend))  # No K for observation model
   expect_false(grepl("matrix\\[N,.*X;", code_with_trend))  # No X design matrix for obs
   expect_false(grepl("vector\\[.*\\] b;", code_with_trend))  # No b coefficients for obs
-  
+
   # Observation model dispersion parameter
   expect_true(grepl("real<lower=0> sigma;", code_with_trend))
-  
+
   # Trend design matrix and coefficients
   expect_true(grepl("int<lower=1> K_trend;", code_with_trend))
   expect_true(grepl("int<lower=1> Kc_trend;", code_with_trend))
@@ -438,77 +438,77 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   expect_true(grepl("matrix\\[n_trend, Kc_trend\\] Xc_trend;", code_with_trend))
   expect_true(grepl("vector\\[Kc_trend\\] b_trend;", code_with_trend))
   expect_true(grepl("vector\\[Kc_trend\\] means_X_trend;", code_with_trend))
-  
+
   # Hierarchical grouping data structures
   expect_true(grepl("int<lower=1> n_groups_trend;", code_with_trend))
   expect_true(grepl("array\\[n_series_trend\\] int.*group_inds_trend;", code_with_trend))
-  
+
   # Hierarchical correlation functions
   expect_true(grepl("matrix combine_cholesky\\(", code_with_trend))
   expect_true(grepl("real alpha", code_with_trend))
-  
+
   # Hierarchical correlation parameters with _trend suffix
   expect_true(grepl("cholesky_factor_corr\\[n_lv_trend\\] L_Omega_global_trend;", code_with_trend))
   expect_true(grepl("array\\[n_groups_trend\\] cholesky_factor_corr\\[n_lv_trend\\] L_deviation_group_trend;", code_with_trend))
   expect_true(grepl("real<lower=0, upper=1> alpha_cor_trend;", code_with_trend))
-  
+
   # Group-specific correlation matrices computation
   expect_true(grepl("array\\[n_groups_trend\\] cov_matrix\\[n_lv_trend\\] Sigma_group_trend;", code_with_trend))
   expect_true(grepl("L_Omega_group_trend = combine_cholesky\\(L_Omega_global_trend, L_deviation_group_trend\\[g\\], alpha_cor_trend\\)", code_with_trend))
-  
+
   # Group-specific innovation scaling
   expect_true(grepl("int group_idx = group_inds_trend\\[s\\];", code_with_trend))
   expect_true(grepl("L_group_trend = cholesky_decompose\\(Sigma_group_trend\\[group_idx\\]\\)", code_with_trend))
-  
+
   # ZMVN dynamics (just scaled innovations)
   expect_true(grepl("lv_trend = scaled_innovations_trend;", code_with_trend))
-  
+
   # Factor loading matrix (diagonal for non-factor ZMVN)
   expect_true(grepl("matrix\\[n_series_trend, n_lv_trend\\] Z = diag_matrix\\(rep_vector\\(1\\.0, n_lv_trend\\)\\);", code_with_trend))
-  
+
   # Trend mean with covariate effects
   expect_true(grepl("vector\\[n_trend\\] mu_trend = Xc_trend \\* b_trend \\+ Intercept_trend;", code_with_trend))
-  
+
   # Universal trend computation pattern should still be present
   expect_true(grepl("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
-  
+
   # Hierarchical correlation priors with _trend suffix
   expect_true(grepl("L_Omega_global_trend ~ lkj_corr_cholesky\\(1\\);", code_with_trend))
   expect_true(grepl("L_deviation_group_trend\\[g\\] ~ lkj_corr_cholesky\\(6\\);", code_with_trend))
-  
+
   # Custom alpha_cor_trend prior should be applied
   expect_true(grepl("alpha_cor_trend ~ beta\\(5, 5\\);", code_with_trend))
-  
+
   # Standard trend parameter priors
   expect_true(grepl("sigma_trend ~ exponential\\(2\\);", code_with_trend))
   expect_true(grepl("to_vector\\(innovations_trend\\) ~ std_normal\\(\\);", code_with_trend))
-  
+
   # No prior for b_trend (brms default flat prior)
   expect_false(grepl("b_trend ~", code_with_trend))
-  
+
   # Observation model priors (brms pattern)
   expect_true(grepl("lprior \\+= student_t_lpdf\\(Intercept \\| 3, 0\\.9, 2\\.5\\);", code_with_trend))
   expect_true(grepl("lprior \\+= student_t_lpdf\\(sigma \\| 3, 0, 2\\.5\\)", code_with_trend))
   expect_true(grepl("- 1 \\* student_t_lccdf\\(0 \\| 3, 0, 2\\.5\\);", code_with_trend))
-  
+
   # Lognormal likelihood (not GLM optimized)
   expect_true(grepl("target \\+= lognormal_lpdf\\(Y \\| mu, sigma\\);", code_with_trend))
   expect_false(grepl("lognormal.*glm", code_with_trend))
   expect_false(grepl("mu_ones", code_with_trend))
-  
+
   # Observation model likelihood structure (brms pattern)
   expect_true(grepl("vector\\[N\\] mu = rep_vector\\(0\\.0, N\\);", code_with_trend))
   expect_true(grepl("mu \\+= Intercept;", code_with_trend))
   expect_true(grepl("mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_with_trend))
-  
+
   # Generated quantities
   expect_true(grepl("real b_Intercept = Intercept;", code_with_trend))
   expect_true(grepl("real b_Intercept_trend = Intercept_trend - dot_product\\(means_X_trend, b_trend\\);", code_with_trend))
-  
+
   # Mapping arrays should still be present
   expect_true(grepl("array\\[N\\] int obs_trend_time", code_with_trend))
   expect_true(grepl("array\\[N\\] int obs_trend_series", code_with_trend))
-  
+
   # Check for no duplicated Stan blocks
   expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
   expect_equal(length(gregexpr("^\\s*transformed data\\s*\\{", code_with_trend)[[1]]), 1)
@@ -516,7 +516,7 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_with_trend)[[1]]), 1)
   expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
   expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
-  
+
   # Final validation: ensure model compiles correctly
   expect_no_error(stancode(mf_with_trend, data = data, family = lognormal(), prior = custom_prior, validate = TRUE))
 })
@@ -691,12 +691,13 @@ test_that("stancode generates correct Stan blocks", {
   expect_no_error(stancode(mf, data = data, family = poisson(), validate = TRUE))
 })
 
-test_that("stancode handles multivariate specifications", {
+test_that("stancode handles multivariate specifications with shared RW trend", {
   data <- setup_stan_test_data()$multivariate
 
-  # Multivariate with shared trend
+  # Multivariate with shared trend (explicitly set rescor = FALSE
+  # to avoid brms deprecation warnings)
   mf_shared <- mvgam_formula(
-    mvbind(count, biomass) ~ x,
+    bf(mvbind(count, biomass) ~ x) + set_rescor(FALSE),
     trend_formula = ~ RW(cor = TRUE)
   )
 
@@ -706,47 +707,186 @@ test_that("stancode handles multivariate specifications", {
   expect_s3_class(code_shared, "stancode")
   expect_gt(nchar(code_shared), 500)
 
-  # Check for exactly one of each Stan block (no duplicates)
-  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one data block")
-  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one parameters block")
-  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one transformed parameters block")
-  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one model block")
-  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_shared)[[1]]), 1, info = "Should have exactly one generated quantities block")
-
-  # Should contain multivariate elements
-  expect_match2(code_shared, "count")
-  expect_match2(code_shared, "biomass")
-  expect_match2(code_shared, "L_Omega_trend")  # Correlation matrix
-
-  # Multivariate mapping functionality: should have response-specific arrays
-  expect_match2(code_shared, "obs_trend_time_count")
-  expect_match2(code_shared, "obs_trend_series_count")
-  expect_match2(code_shared, "obs_trend_time_biomass")
-  expect_match2(code_shared, "obs_trend_series_biomass")
-
-  # Check that response-specific arrays are declared as data arrays
-  expect_match2(code_shared, "array\\[.*\\]\\s+int.*obs_trend_time_count")
-  expect_match2(code_shared, "array\\[.*\\]\\s+int.*obs_trend_series_count")
-  expect_match2(code_shared, "array\\[.*\\]\\s+int.*obs_trend_time_biomass")
-  expect_match2(code_shared, "array\\[.*\\]\\s+int.*obs_trend_series_biomass")
-
-  # Multivariate mapping: should have response-specific injection patterns
-  expect_match2(code_shared, "mu_count\\[n\\] \\+= trend_count\\[obs_trend_time_count\\[n\\], obs_trend_series_count\\[n\\]\\]")
-  expect_match2(code_shared, "mu_biomass\\[n\\] \\+= trend_biomass\\[obs_trend_time_biomass\\[n\\], obs_trend_series_biomass\\[n\\]\\]")
-
-  # Should have response-specific trend matrices
-  expect_match2(code_shared, "matrix.*trend_count")
-  expect_match2(code_shared, "matrix.*trend_biomass")
+  # ========== BLOCK STRUCTURE TESTS ==========
+  # Should have exactly one of each Stan block (no duplicates)
+  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_shared)[[1]]), 1)
+  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_shared)[[1]]), 1)
+  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_shared)[[1]]), 1)
+  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_shared)[[1]]), 1)
+  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_shared)[[1]]), 1)
 
   # Check proper block ordering
+  data_pos <- regexpr("data\\s*\\{", code_shared)
+  tdata_pos <- regexpr("transformed data\\s*\\{", code_shared)
+  params_pos <- regexpr("parameters\\s*\\{", code_shared)
   tp_pos <- regexpr("transformed parameters\\s*\\{", code_shared)
   model_pos <- regexpr("model\\s*\\{", code_shared)
-  expect_true(tp_pos < model_pos, info = "transformed parameters should come before model block")
+  gq_pos <- regexpr("generated quantities\\s*\\{", code_shared)
+  
+  # Data should come before transformed data
+  expect_true(data_pos < tdata_pos)
+  # Transformed data should come before parameters
+  expect_true(tdata_pos < params_pos)
+  # Parameters should come before transformed parameters
+  expect_true(params_pos < tp_pos)
+  # Transformed parameters should come before model
+  expect_true(tp_pos < model_pos)
+  # Model should come before generated quantities
+  expect_true(model_pos < gq_pos)
 
-  # Check that all braces are properly matched
+  # ========== DATA BLOCK TESTS ==========
+  # brms observation data declarations
+  # Should declare N_count with comment
+  expect_match2(code_shared, "int<lower=1> N_count;\\s*//\\s*number of observations")
+  # Should declare Y_count as vector
+  expect_match2(code_shared, "vector\\[N_count\\] Y_count;\\s*//\\s*response variable")
+  # Should declare X_count design matrix
+  expect_match2(code_shared, "matrix\\[N_count, K_count\\] X_count;")
+  # Should declare N_biomass with comment
+  expect_match2(code_shared, "int<lower=1> N_biomass;\\s*//\\s*number of observations")
+  # Should declare Y_biomass as vector
+  expect_match2(code_shared, "vector\\[N_biomass\\] Y_biomass;\\s*//\\s*response variable")
+  
+  # Trend dimensions
+  # Should declare n_trend
+  expect_match2(code_shared, "int<lower=1> n_trend;\\s*//\\s*number of time points")
+  # Should declare n_series_trend
+  expect_match2(code_shared, "int<lower=1> n_series_trend;\\s*//\\s*number of series")
+  # Should declare n_lv_trend
+  expect_match2(code_shared, "int<lower=1> n_lv_trend;\\s*//\\s*latent variables")
+  
+  # Observation-to-trend mapping arrays
+  # Should declare obs_trend_time_count array
+  expect_match2(code_shared, "array\\[N_count\\] int obs_trend_time_count;")
+  # Should declare obs_trend_series_count array
+  expect_match2(code_shared, "array\\[N_count\\] int obs_trend_series_count;")
+  # Should declare obs_trend_time_biomass array
+  expect_match2(code_shared, "array\\[N_biomass\\] int obs_trend_time_biomass;")
+  # Should declare obs_trend_series_biomass array
+  expect_match2(code_shared, "array\\[N_biomass\\] int obs_trend_series_biomass;")
+  
+  # Times trend matrix - Should declare times_trend 2D array
+  expect_match2(code_shared, "array\\[n_trend, n_series_trend\\] int times_trend;")
+  
+  # GLM compatibility vectors
+  # Should declare mu_ones_count for GLM
+  expect_match2(code_shared, "vector\\[1\\] mu_ones_count;\\s*//.*count")
+  # Should declare mu_ones_biomass for GLM
+  expect_match2(code_shared, "vector\\[1\\] mu_ones_biomass;\\s*//.*biomass")
+
+  # ========== TRANSFORMED DATA BLOCK TESTS ==========
+  # Should create identity matrix Z for non-factor model
+  expect_match2(code_shared, "matrix\\[n_series_trend, n_lv_trend\\] Z = diag_matrix\\(rep_vector\\(1\\.0, n_lv_trend\\)\\);")
+
+  # ========== PARAMETERS BLOCK TESTS ==========
+  # Observation model parameters
+  # Should declare b_count coefficients
+  expect_match2(code_shared, "vector\\[Kc_count\\] b_count;\\s*//\\s*regression coefficients")
+  # Should declare Intercept_count
+  expect_match2(code_shared, "real Intercept_count;\\s*//\\s*temporary intercept")
+  # Should declare sigma_count with lower bound
+  expect_match2(code_shared, "real<lower=0> sigma_count;\\s*//\\s*dispersion parameter")
+  
+  # Trend parameters with _trend suffix
+  # Should declare Intercept_trend (not vector mu_trend)
+  expect_match2(code_shared, "real Intercept_trend;\\s*//\\s*trend intercept")
+  # Should declare sigma_trend vector
+  expect_match2(code_shared, "vector<lower=0>\\[n_lv_trend\\] sigma_trend;\\s*//\\s*innovation SDs")
+  # Should declare L_Omega_trend for correlation
+  expect_match2(code_shared, "cholesky_factor_corr\\[n_lv_trend\\] L_Omega_trend;\\s*//\\s*correlation Cholesky")
+  # Should declare innovations_trend matrix
+  expect_match2(code_shared, "matrix\\[n_trend, n_lv_trend\\] innovations_trend;\\s*//\\s*raw innovations")
+
+  # ========== TRANSFORMED PARAMETERS BLOCK TESTS ==========
+  # Should initialize lprior
+  expect_match2(code_shared, "real lprior = 0;\\s*//\\s*prior contributions")
+  
+  # Should include Intercept_trend in lprior
+  expect_match2(code_shared, "lprior \\+= student_t_lpdf\\(Intercept_trend \\| 3, 0, 2\\.5\\);")
+  
+  # Should create mu_trend from Intercept_trend using rep_vector
+  expect_match2(code_shared, "vector\\[n_trend\\] mu_trend = rep_vector\\(Intercept_trend, n_trend\\);")
+  
+  # Should construct Sigma_trend covariance matrix
+  expect_match2(code_shared, "matrix\\[n_lv_trend, n_lv_trend\\] Sigma_trend\\s*=\\s*diag_pre_multiply\\(sigma_trend, L_Omega_trend\\);")
+  
+  # RW latent variables
+  # Should declare lv_trend matrix for latent variables (with _trend suffix)
+  expect_match2(code_shared, "matrix\\[n_trend, n_lv_trend\\] lv_trend;")
+  # Should declare L_Sigma_trend for scaling
+  expect_match2(code_shared, "matrix\\[n_lv_trend, n_lv_trend\\] L_Sigma_trend\\s*=")
+  # Should declare scaled_innovations_trend
+  expect_match2(code_shared, "matrix\\[n_trend, n_lv_trend\\] scaled_innovations_trend\\s*=")
+  # Should initialize first lv_trend from scaled innovations
+  expect_match2(code_shared, "lv_trend\\[1, :\\] = scaled_innovations_trend\\[1, :\\];")
+  # Should implement RW cumulative sum
+  expect_match2(code_shared, "lv_trend\\[i, :\\] = lv_trend\\[i-1, :\\] \\+ scaled_innovations_trend\\[i, :\\];")
+  
+  # Trend matrix computation (shared, not response-specific)
+  # Should declare shared trend matrix (not trend_count/trend_biomass)
+  expect_match2(code_shared, "matrix\\[n_trend, n_series_trend\\] trend;")
+  # Should compute trend using universal formula with lv_trend
+  expect_match2(code_shared, "trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\)\\s*\\+\\s*mu_trend\\[times_trend\\[i, s\\]\\];")
+  
+  # Linear predictor construction with trend injection
+  # Should initialize mu_count from design matrix
+  expect_match2(code_shared, "vector\\[N_count\\] mu_count = Xc_count \\* b_count;")
+  # Should initialize mu_biomass from design matrix
+  expect_match2(code_shared, "vector\\[N_biomass\\] mu_biomass = Xc_biomass \\* b_biomass;")
+  # Should inject trend into mu_count using mapping arrays
+  expect_match2(code_shared, "mu_count\\[n\\] \\+= Intercept_count \\+ trend\\[obs_trend_time_count\\[n\\], obs_trend_series_count\\[n\\]\\];")
+  # Should inject trend into mu_biomass using mapping arrays
+  expect_match2(code_shared, "mu_biomass\\[n\\] \\+= Intercept_biomass \\+ trend\\[obs_trend_time_biomass\\[n\\],\\s*obs_trend_series_biomass\\[n\\]\\];")
+
+  # ========== MODEL BLOCK TESTS ==========
+  # Should use GLM function with to_matrix(mu_count) and mu_ones_count
+  expect_match2(code_shared, "normal_id_glm_lpdf\\(Y_count \\| to_matrix\\(mu_count\\), 0\\.0, mu_ones_count, sigma_count\\)")
+  # Should use GLM function with to_matrix(mu_biomass) and mu_ones_biomass
+  expect_match2(code_shared, "normal_id_glm_lpdf\\(Y_biomass \\| to_matrix\\(mu_biomass\\), 0\\.0, mu_ones_biomass,\\s*sigma_biomass\\)")
+  
+  # Trend priors in model block
+  # Should NOT have prior for Intercept_trend in model block (it's in lprior)
+  expect_false(grepl("Intercept_trend\\s*~", code_shared))
+  # Should have some prior for sigma_trend (distribution may vary)
+  expect_match2(code_shared, "sigma_trend ~ ")
+  # Should have LKJ prior for correlation
+  expect_match2(code_shared, "L_Omega_trend ~ lkj_corr_cholesky")
+  # Should have standard normal prior for innovations
+  expect_match2(code_shared, "to_vector\\(innovations_trend\\) ~ std_normal\\(\\);")
+
+  # ========== GENERATED QUANTITIES BLOCK TESTS ==========
+  # Should compute actual intercept for count
+  expect_match2(code_shared, "real b_count_Intercept = Intercept_count - dot_product\\(means_X_count, b_count\\);")
+  # Should compute actual intercept for biomass
+  expect_match2(code_shared, "real b_biomass_Intercept = Intercept_biomass - dot_product\\(means_X_biomass, b_biomass\\);")
+
+  # ========== NEGATIVE TESTS - Things that should NOT appear ==========
+  # Should NOT have response-specific trend_count matrix
+  expect_false(grepl("matrix.*trend_count", code_shared))
+  # Should NOT have response-specific trend_biomass matrix
+  expect_false(grepl("matrix.*trend_biomass", code_shared))
+  
+  # Should NOT declare mu_trend as parameter vector
+  expect_false(grepl("parameters\\s*\\{[^}]*vector\\[[^]]*\\]\\s+mu_trend", code_shared))
+  
+  # Should NOT have duplicate model blocks
+  expect_false(grepl("model\\s*\\{.*model\\s*\\{", code_shared))
+  
+  # Should NOT use response-specific trend_count in injection
+  expect_false(grepl("mu_count\\[n\\] \\+= trend_count\\[", code_shared))
+  
+  # Should NOT have unsuffixed mu_ones
+  expect_false(grepl("vector\\[1\\] mu_ones;", code_shared))
+
+  # ========== SYNTAX AND STRUCTURE TESTS ==========
+  # All braces should be properly matched
   open_braces <- length(gregexpr("\\{", code_shared)[[1]])
   close_braces <- length(gregexpr("\\}", code_shared)[[1]])
-  expect_equal(open_braces, close_braces, info = "All braces should be properly matched")
+  expect_equal(open_braces, close_braces)
+  
+  # Parameters block should have multiple statements
+  params_block <- sub(".*parameters\\s*\\{([^}]*)\\}.*", "\\1", code_shared)
+  expect_gt(length(gregexpr(";", params_block)[[1]]), 5)
 
   # Final validation: ensure multivariate model compiles correctly
   expect_no_error(stancode(mf_shared, data = data, validate = TRUE))

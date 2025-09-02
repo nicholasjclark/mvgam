@@ -74,6 +74,7 @@
   - **Test-Driven Approach**: Fix issues in order of test failure criticality
   - **Expected failure areas** based on current architecture analysis:
     - GLM optimization detection and mu_ones generation 
+    - `mvgam_formula()` not handling ` + set_rescor(FALSE)` in observation formula (should work with `bf(mvbind(count, biomass) ~ x) + set_rescor(FALSE)` for example)
     - AR lag parameter generation (ar1_trend, ar12_trend specific patterns)
     - MA transformation integration with AR dynamics
     - Factor loading constraints (Z_raw → Z matrix construction)
@@ -90,7 +91,7 @@
     - Correctly suffixed: `obs_trend_time_count/_biomass`, `K_trend_count/_biomass`
   - **Architectural Challenge**: Need to distinguish shared vs response-specific components:
     - **Shared Components**: Correlation matrices, innovation parameters, factor loadings
-    - **Response-Specific**: Observation mappings, computed trend matrices, GLM compatibility
+    - **Response-Specific**: Observation mappings, computed trend matrices, GLM compatibility, `mu_ones_*`
   - **Required Solution**: 
     - Detect shared correlation models in multivariate processing
     - Generate shared components only once (no suffix)
@@ -99,24 +100,16 @@
   - **Current Workaround**: Simple suffix patterns insufficient for shared correlation architecture
   - **Estimated Effort**: 8-12 hours for full architectural redesign
 
-### **Task 4: Fix Multiple Block Structure Issues (Priority 3)**
+### **Task 4: VAR Trend Constructor Bug (Priority 3)**  
 
-**D4**: Ensure single block creation instead of duplicates
-  - **Issue**: Test detection of 2 data blocks, 2+ parameters blocks instead of 1 each
-  - **Root Cause**: Block insertion creating new blocks instead of merging
-  - Fix block detection and merging logic in `insert_into_stan_block()`
-  - Ensure consistent block structure validation
-
-### **Task 5: VAR Trend Constructor Bug (Priority 3)**  
-
-**D5**: Fix VAR constructor argument parsing 
+**D4**: Fix VAR constructor argument parsing 
   - **Error**: `unused argument (cor = TRUE)` in VAR trend constructor
   - **Issue**: Interface mismatch in VAR() function call
   - Update VAR trend constructor to handle correlation argument correctly
 
-### **Task 6: Input Validation Enhancement (Priority 4)**
+### **Task 5: Input Validation Enhancement (Priority 4)**
 
-**D6**: Strengthen input validation for edge cases
+**D5**: Strengthen input validation for edge cases
   - **Issues**: Several validation tests failing with unexpected behavior
   - Add robust error handling for malformed inputs
   - Improve error messages for user-facing validation functions
