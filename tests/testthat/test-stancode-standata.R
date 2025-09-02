@@ -129,57 +129,59 @@ test_that("stancode generates correct Stan blocks", {
   # Generate Stan code without validation for structure inspection
   code <- stancode(mf, data = data, family = poisson(), validate = FALSE)
 
-  # Check required Stan blocks are present (exactly once each)
-  expect_equal(length(gregexpr("data\\s*\\{", code)[[1]]), 1, info = "Should have exactly one data block")
-  expect_equal(length(gregexpr("parameters\\s*\\{", code)[[1]]), 1, info = "Should have exactly one parameters block")
-  expect_equal(length(gregexpr("transformed parameters\\s*\\{", code)[[1]]), 1, info = "Should have exactly one transformed parameters block")
-  expect_equal(length(gregexpr("model\\s*\\{", code)[[1]]), 1, info = "Should have exactly one model block")
-  expect_equal(length(gregexpr("generated quantities\\s*\\{", code)[[1]]), 1, info = "Should have exactly one generated quantities block")
+  # Each Stan block should appear exactly once
+  expect_equal(length(gregexpr("data\\s*\\{", code)[[1]]), 1)
+  expect_equal(length(gregexpr("parameters\\s*\\{", code)[[1]]), 1)
+  expect_equal(length(gregexpr("transformed parameters\\s*\\{", code)[[1]]), 1)
+  expect_equal(length(gregexpr("model\\s*\\{", code)[[1]]), 1)
+  expect_equal(length(gregexpr("generated quantities\\s*\\{", code)[[1]]), 1)
 
-  # Check Stan block ordering (transformed parameters should come before model)
+  # Stan blocks should be in correct order
+  data_pos <- regexpr("data\\s*\\{", code)
+  param_pos <- regexpr("parameters\\s*\\{", code)  
   tp_pos <- regexpr("transformed parameters\\s*\\{", code)
   model_pos <- regexpr("model\\s*\\{", code)
-  expect_true(tp_pos < model_pos, info = "transformed parameters block should come before model block")
+  gq_pos <- regexpr("generated quantities\\s*\\{", code)
   
-  # Should contain trend-specific parameters
-  expect_match2(code, "ar1_trend")
-  expect_match2(code, "sigma_trend")
-  
-  # Should NOT contain duplicate parameter declarations
-  sigma_trend_matches <- gregexpr("sigma_trend", code)[[1]]
-  expect_true(length(sigma_trend_matches) >= 1, info = "Should contain sigma_trend parameter")
-  
-  # Check for proper parameter declarations in parameters block
-  expect_match2(code, "real.*ar1_trend")  # AR parameter should be declared
-  expect_match2(code, "real.*sigma_trend")  # Sigma parameter should be declared
+  expect_true(data_pos < param_pos)
+  expect_true(param_pos < tp_pos)
+  expect_true(tp_pos < model_pos)
+  expect_true(model_pos < gq_pos)
 
-  # Should contain smooth terms from mgcv
-  expect_match2(code, "s_")  # mgcv smooth term prefix
+  # Should have exactly one lprior declaration (not duplicated)
+  lprior_decls <- gregexpr("real\\s+lprior\\s*=\\s*0;", code)[[1]]
+  expect_equal(length(lprior_decls), 1)
+  
+  # Required variable declarations should be present
+  expect_match2(code, "vector\\[N\\]\\s+mu")
+  expect_match2(code, "vector\\[.*\\]\\s+mu_trend")
+  expect_match2(code, "matrix\\[.*\\]\\s+trend;")
+  
+  # Trend parameters should be declared in parameters block
+  expect_match2(code, "real.*ar1_trend")
+  expect_match2(code, "vector<lower=0>\\[.*\\]\\s+sigma_trend")
 
-  # Mapping functionality: should contain obs_trend_time and obs_trend_series arrays
-  expect_match2(code, "obs_trend_time")
-  expect_match2(code, "obs_trend_series")
-  
-  # Check that mapping arrays are declared as data (not parameters)
-  expect_match2(code, "array\\[.*\\]\\s+int.*obs_trend_time")
-  expect_match2(code, "array\\[.*\\]\\s+int.*obs_trend_series")
+  # Data block should contain mapping arrays
+  expect_match2(code, "array\\[N\\]\\s+int\\s+obs_trend_time")
+  expect_match2(code, "array\\[N\\]\\s+int\\s+obs_trend_series")
 
-  # Mapping functionality: should use correct injection pattern (not obs_ind)
-  expect_match2(code, "mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\]")
-  expect_false(grepl("obs_ind", code), info = "Should not use old broken obs_ind pattern")
+  # Trend injection should use correct pattern
+  expect_match2(code, "mu\\[n\\]\\s*\\+=\\s*trend\\[obs_trend_time\\[n\\],\\s*obs_trend_series\\[n\\]\\]")
+  expect_false(grepl("obs_ind", code))
+
+  # Universal trend computation pattern should be present
+  expect_match2(code, "for\\s*\\(\\s*i\\s+in\\s+1:n_trend\\s*\\)")
+  expect_match2(code, "trend\\[i,\\s*s\\]\\s*=.*dot_product")
+
+  # Should contain sigma_trend prior but not duplicate sigma prior
+  expect_match2(code, "sigma_trend\\s*~")
   
-  # Should contain trend matrix declaration
-  expect_match2(code, "matrix.*trend")
-  
-  # Should contain proper loop structure in transformed parameters
-  expect_match2(code, "for\\s*\\(\\s*n\\s+in\\s+1:N\\s*\\)")
-  
-  # Check that all blocks are properly closed
+  # All braces should be properly matched
   open_braces <- length(gregexpr("\\{", code)[[1]])
   close_braces <- length(gregexpr("\\}", code)[[1]])
-  expect_equal(open_braces, close_braces, info = "All braces should be properly matched")
+  expect_equal(open_braces, close_braces)
   
-  # Final validation: ensure the generated Stan code compiles
+  # Generated Stan code should compile without errors
   expect_no_error(stancode(mf, data = data, family = poisson(), validate = TRUE))
 })
 

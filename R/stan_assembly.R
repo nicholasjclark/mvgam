@@ -222,7 +222,8 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
         trend_setup,
         resp_trend_specs,
         response_suffix = paste0("_", resp_name),
-        response_name = resp_name
+        response_name = resp_name,
+        obs_setup = obs_setup
       )
 
       if (!is.null(resp_stanvars)) {
@@ -253,7 +254,8 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
       trend_setup = trend_setup,
       trend_specs = trend_specs,
       response_suffix = "",
-      response_name = response_name
+      response_name = response_name,
+      obs_setup = obs_setup
     )
     responses_with_trends <- "main"  # Mark univariate model
   }
@@ -651,7 +653,8 @@ prepare_stanvars_for_brms <- function(stanvars) {
 #' @noRd
 extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
                                               response_suffix = "",
-                                              response_name = NULL) {
+                                              response_name = NULL,
+                                              obs_setup = NULL) {
   checkmate::assert_list(trend_setup, names = "named")
   checkmate::assert_list(trend_specs, names = "named")
   checkmate::assert_string(response_suffix)
@@ -753,17 +756,39 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
     NULL
   }
 
-  # Combine base and trend-specific stanvars using proper method
-  if (is.null(base_stanvars) && is.null(trend_stanvars)) {
-    return(NULL)
+  # Check for GLM usage in observation model and add mu_ones if needed
+  combined_stanvars <- if (is.null(base_stanvars) && is.null(trend_stanvars)) {
+    NULL
   } else if (is.null(base_stanvars)) {
-    return(trend_stanvars)
+    trend_stanvars
   } else if (is.null(trend_stanvars)) {
-    return(base_stanvars)
+    base_stanvars
   } else {
     # Use c() to properly combine stanvars objects
-    return(c(base_stanvars, trend_stanvars))
+    c(base_stanvars, trend_stanvars)
   }
+  
+  # Add mu_ones stanvar if GLM optimization is detected in observation model
+  if (!is.null(obs_setup) && !is.null(obs_setup$stancode)) {
+    detected_glm_types <- detect_glm_usage(obs_setup$stancode)
+    if (length(detected_glm_types) > 0) {
+      # Create mu_ones data stanvar for GLM beta parameter
+      mu_ones_stanvar <- stanvar(
+        x = 1, 
+        name = "mu_ones", 
+        scode = "vector[1] mu_ones;"
+      )
+      
+      # Add to combined stanvars
+      if (is.null(combined_stanvars)) {
+        combined_stanvars <- mu_ones_stanvar
+      } else {
+        combined_stanvars <- c(combined_stanvars, mu_ones_stanvar)
+      }
+    }
+  }
+  
+  return(combined_stanvars)
 }
 
 #' Detect GLM Function Usage in Stan Code
@@ -808,17 +833,32 @@ parse_glm_parameters <- function(stan_code, glm_type) {
   checkmate::assert_character(stan_code, min.len = 1)
   checkmate::assert_string(glm_type)
   
-  # Find GLM function call pattern
-  pattern <- paste0(glm_type, "_l[pm]df\\s*\\(([^\\)]+)\\)")
-  matches <- regmatches(stan_code, gregexpr(pattern, stan_code))
+  # CRITICAL FIX: Split into lines first, then search for GLM call
+  code_lines <- strsplit(stan_code, "\n", fixed = TRUE)[[1]]
   
-  if (length(matches[[1]]) == 0) {
+  # Find the line containing the GLM function call - use same pattern as detect_glm_usage
+  glm_pattern <- paste0(glm_type, "_l(pdf|pmf)")
+  glm_line_idx <- grep(glm_pattern, code_lines)[1]
+  
+  if (is.na(glm_line_idx)) {
     return(NULL)
   }
   
-  # Extract parameter list from first match
-  call_content <- matches[[1]][1]
-  params_text <- gsub(paste0(".*", glm_type, "_l[pm]df\\s*\\((.+)\\).*"), "\\1", call_content)
+  glm_line <- code_lines[glm_line_idx]
+  
+  # Extract the GLM function call from the line - use same pattern as detect_glm_usage
+  pattern <- paste0(glm_type, "_l(pdf|pmf)\\([^)]+\\)")
+  matches <- regmatches(glm_line, regexpr(pattern, glm_line))
+  
+  if (length(matches) == 0) {
+    return(NULL)
+  }
+  
+  # Extract content between parentheses
+  call_content <- matches[1]
+  paren_start <- regexpr("\\(", call_content) + 1
+  paren_end <- nchar(call_content) - 1
+  params_text <- substr(call_content, paren_start, paren_end)
   
   # Split by | to separate Y from predictors
   parts <- strsplit(params_text, "\\|")[[1]]
@@ -851,27 +891,26 @@ transform_glm_call <- function(stan_code, glm_type, params) {
   checkmate::assert_string(glm_type)
   checkmate::assert_list(params, names = "named")
   
-  # Original pattern to match
-  original_pattern <- paste0(glm_type, "_l[pm]df\\s*\\([^\\)]+\\)")
+  # Original pattern to match - use same pattern as detect_glm_usage
+  original_pattern <- paste0(glm_type, "_l(pdf|pmf)\\s*\\([^\\)]+\\)")
   
-  # Build replacement based on GLM type
-  if (glm_type %in% c("normal_id_glm", "poisson_log_glm", "neg_binomial_2_log_glm")) {
-    # These typically have: (Y | X, intercept, beta, ...)
-    other_params_str <- if (!is.null(params$other_params)) {
-      paste0(", ", paste(params$other_params, collapse = ", "))
-    } else {
-      ""
-    }
+  # Build replacement using GLM structure: glm_function(Y | mu_matrix, 0.0, mu_ones, ...)
+  # This preserves GLM optimization while allowing trend injection into mu
+  other_params_str <- if (!is.null(params$other_params)) {
+    paste0(", ", paste(params$other_params, collapse = ", "))
+  } else {
+    ""
+  }
+  
+  if (glm_type == "normal_id_glm") {
+    # normal_id_glm_lpdf(Y | mu_matrix, alpha_real, beta_vector, sigma)
+    replacement <- paste0(glm_type, "_lpdf(", params$y_var, " | to_matrix(mu), 0.0, mu_ones", other_params_str, ")")
     
-    replacement <- paste0(glm_type, "_lpdf(", params$y_var, " | mu, 0, 1", other_params_str, ")")
+  } else if (glm_type %in% c("poisson_log_glm", "neg_binomial_2_log_glm", 
+                            "bernoulli_logit_glm", "ordered_logistic_glm", "categorical_logit_glm")) {
+    # GLM_lpmf(Y | mu_matrix, alpha_real, beta_vector, ...)
+    replacement <- paste0(glm_type, "_lpmf(", params$y_var, " | to_matrix(mu), 0.0, mu_ones", other_params_str, ")")
     
-  } else if (glm_type %in% c("bernoulli_logit_glm", "ordered_logistic_glm")) {
-    # These typically have: (Y | X, intercept, beta)
-    replacement <- paste0(glm_type, "_lpmf(", params$y_var, " | mu, 0, 1)")
-    
-  } else if (glm_type == "categorical_logit_glm") {
-    # More complex structure, may need special handling
-    replacement <- paste0(glm_type, "_lpmf(", params$y_var, " | mu, 0, 1)")
   } else {
     insight::format_error("Unsupported GLM type for transformation: {glm_type}")
   }
@@ -929,12 +968,13 @@ inject_trend_into_glm_predictor <- function(base_stancode, trend_stanvars, glm_t
   # Generate trend injection code (same logic as standard approach)
   trend_injection_code <- generate_trend_injection_code(mapping_arrays)
   
-  # Create combined mu with observation + trend components
+  # Create combined mu with observation + trend components using efficient matrix multiplication
   combined_mu_code <- paste0(
-    "  vector[N] mu;\n",
+    "  // Efficient matrix multiplication for linear predictor\n",
+    "  vector[N] mu = ", params$design_matrix, " * ", params$coefficients, ";\n",
+    "  // Add intercept and trend components\n",
     "  for (n in 1:N) {\n",
-    "    mu[n] = ", params$design_matrix, "[n, :] * ", params$coefficients, " + ", params$intercept, ";\n",
-    paste(trend_injection_code[grepl("mu\\[n\\]", trend_injection_code)], collapse = "\n"),
+    "    mu[n] += ", params$intercept, " + trend[obs_trend_time[n], obs_trend_series[n]];\n",
     "  }"
   )
   
@@ -1183,25 +1223,35 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
     return(base_stancode)
   }
 
-  # Extract and validate mapping arrays using shared utility
-  mapping_arrays <- extract_mapping_arrays(trend_stanvars)
-  validate_mapping_arrays(mapping_arrays)
+  # Detect GLM usage using existing detection system
+  detected_glm_types <- detect_glm_usage(base_stancode)
+  
+  if (length(detected_glm_types) > 0) {
+    # Use GLM-compatible approach when GLM optimization is detected
+    glm_type <- detected_glm_types[1]  # Use first detected GLM type
+    return(inject_trend_into_glm_predictor(base_stancode, trend_stanvars, glm_type))
+  } else {
+    # Use standard approach when no GLM optimization
+    # Extract and validate mapping arrays using shared utility
+    mapping_arrays <- extract_mapping_arrays(trend_stanvars)
+    validate_mapping_arrays(mapping_arrays)
 
-  # Generate trend injection code
-  trend_injection_code <- generate_trend_injection_code(mapping_arrays)
-  
-  # Parse Stan code into lines
-  code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
-  
-  # Insert trend injection into transformed parameters block using utility
-  modified_lines <- insert_into_stan_block(
-    code_lines, 
-    "transformed parameters", 
-    trend_injection_code
-  )
-  
-  # Reconstruct Stan code
-  return(paste(modified_lines, collapse = "\n"))
+    # Generate trend injection code
+    trend_injection_code <- generate_trend_injection_code(mapping_arrays)
+    
+    # Parse Stan code into lines
+    code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
+    
+    # Insert trend injection into transformed parameters block using utility
+    modified_lines <- insert_into_stan_block(
+      code_lines, 
+      "transformed parameters", 
+      trend_injection_code
+    )
+    
+    # Reconstruct Stan code
+    return(paste(modified_lines, collapse = "\n"))
+  }
 }
 
 #' Generate Trend Injection Code for Stan Transformed Parameters Block
@@ -4442,15 +4492,20 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
   # 2. Extract transformed parameters block content (without headers) and rename references
   tparams_block <- extract_stan_block_content(stancode, "transformed parameters")
   if (!is.null(tparams_block) && nchar(tparams_block) > 0) {
-    tparams_result <- rename_parameters_in_block(
-      tparams_block, suffix, mapping, "tparameters", is_multivariate, response_names
-    )
-    mapping <- tparams_result$mapping  # Update mapping
+    # FILTER OUT DUPLICATE DECLARATIONS BEFORE RENAMING
+    filtered_tparams <- filter_block_content(tparams_block, "transformed_parameters")
+    
+    if (!is.null(filtered_tparams) && nchar(filtered_tparams) > 0) {
+      tparams_result <- rename_parameters_in_block(
+        filtered_tparams, suffix, mapping, "tparameters", is_multivariate, response_names
+      )
+      mapping <- tparams_result$mapping  # Update mapping
 
-    stanvar_list[["trend_tparameters"]] <- brms::stanvar(
-      scode = tparams_result$code,
-      block = "tparameters"
-    )
+      stanvar_list[["trend_tparameters"]] <- brms::stanvar(
+        scode = tparams_result$code,
+        block = "tparameters"
+      )
+    }
   }
 
   # 3. Extract model block content (without headers) but exclude likelihood statements
@@ -4475,31 +4530,39 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
     }
   }
 
-  # 4. CRITICAL: Create mu_trend if mu is missing (GLM optimization case)
-  # Only create if no explicit mu vector exists AND no model stanvar was created
+  # 4. CRITICAL: Create mu_trend if needed for trend computation
+  # Create when no model stanvar was created (no extracted priors/transformations from model block)
   if (!model_stanvar_created) {
-    # Check if this is a GLM optimization case (no explicit mu vector)
-    has_explicit_mu <- grepl("vector\\[.*\\]\\s+mu\\s*=", stancode)
-    has_glm_optimization <- grepl("normal_id_glm_lpdf", stancode)
-
-    if (!has_explicit_mu && has_glm_optimization) {
-      # Create mu_trend from GLM linear predictor components
-      # For normal_id_glm_lpdf(Y | X, intercept, beta, sigma), the linear predictor is: X * beta + intercept
+    # Always create mu_trend for trend computation - it's needed by generate_trend_computation_tparameters
+    # Check if this is an intercept-only model (common pattern in brms trend models)
+    has_coefficients <- grepl(paste0("vector\\[.*\\]\\s+b", suffix), stancode) && 
+                        grepl(paste0("matrix\\[.*\\]\\s+Xc", suffix), stancode)
+    
+    if (has_coefficients) {
+      # Model with coefficients: create from linear predictor components
       n_param <- paste0("N", suffix)  # Will be N_trend
       mu_trend_code <- paste0(
         "vector[", n_param, "] mu", suffix, " = Xc", suffix, " * b", suffix, " + Intercept", suffix, ";"
       )
-
-      # Update parameter mapping for the created mu_trend
-      mapping$original_to_renamed[["mu"]] <- paste0("mu", suffix)
-      mapping$renamed_to_original[[paste0("mu", suffix)]] <- "mu"
-
-      stanvar_list[["trend_model_mu_creation"]] <- brms::stanvar(
-        scode = mu_trend_code,
-        block = "tparameters"
+    } else {
+      # Intercept-only model: create from intercept (most common case for trend models)
+      # Transform brms pattern: vector[N] mu = rep_vector(0.0, N); mu += Intercept;
+      # Into: vector[n_trend] mu_trend = rep_vector(Intercept_trend, n_trend);
+      time_param <- "n_trend"
+      mu_trend_code <- paste0(
+        "vector[", time_param, "] mu", suffix, " = rep_vector(Intercept", suffix, ", ", time_param, ");"
       )
-      model_stanvar_created <- TRUE
     }
+
+    # Update parameter mapping for the created mu_trend
+    mapping$original_to_renamed[["mu"]] <- paste0("mu", suffix)
+    mapping$renamed_to_original[[paste0("mu", suffix)]] <- "mu"
+
+    stanvar_list[["trend_model_mu_creation"]] <- brms::stanvar(
+      scode = mu_trend_code,
+      block = "tparameters"
+    )
+    model_stanvar_created <- TRUE
   }
 
   # Combine individual stanvar objects into proper stanvars collection
@@ -4518,33 +4581,51 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
 #' @param model_block Character string of model block code
 #' @return Character string with non-likelihood code or NULL
 #' @noRd
-extract_non_likelihood_from_model_block <- function(model_block) {
-  checkmate::assert_string(model_block)
+#' Filter Block Content
+#'
+#' Generic function to filter out unwanted patterns from any Stan block content.
+#' Removes duplicate declarations, likelihood statements, and other patterns that
+#' should not be duplicated between observation and trend models.
+#'
+#' @param block_content Character string of block content (without block headers)
+#' @param block_type Character string indicating block type ("model", "transformed_parameters", etc.)
+#' @return Filtered block content or NULL if nothing remains
+#' @noRd
+filter_block_content <- function(block_content, block_type = "model") {
+  checkmate::assert_string(block_content, min.chars = 1)
+  checkmate::assert_string(block_type)
+  
+  # Handle both abbreviated and full block type names
+  block_type <- switch(block_type,
+    "tparameters" = "transformed_parameters",
+    block_type
+  )
+  checkmate::assert_choice(block_type, 
+    choices = c("model", "transformed_parameters", "data", "parameters"))
+  
+  # Split into lines using base R
+  lines <- strsplit(block_content, "\n", fixed = TRUE)[[1]]
+  lines <- trimws(lines)
 
-  # Remove the "model {" and "}" wrapper
-  block_content <- stringr::str_extract(model_block, "(?s)\\{(.*?)\\}")
-  if (is.na(block_content)) return(NULL)
-
-  block_content <- stringr::str_replace_all(block_content, "^\\{|\\}$", "")
-
-  # Split into lines
-  lines <- stringr::str_split(block_content, "\\n")[[1]]
-  lines <- stringr::str_trim(lines)
-
-  # Keep non-likelihood lines - preserve linear predictor computations
-  non_likelihood_lines <- character(0)
+  # Keep filtered lines
+  filtered_lines <- character(0)
   prev_line_was_sigma_prior <- FALSE
 
   for (line in lines) {
-    # Skip empty lines and comments
-    if (nchar(line) == 0 || grepl("^\\s*//", line)) {
+    # Skip empty lines first (optimization)
+    if (nchar(line) == 0) {
+      next
+    }
+    
+    # Skip comments
+    if (grepl("^\\s*//", line)) {
       next
     }
 
     # Check if this line is the continuation of sigma prior (lccdf part)
     is_sigma_lccdf <- grepl("^\\s*-\\s*1\\s*\\*\\s*student_t_lccdf\\s*\\(\\s*0\\s*\\|", line)
     
-    # Skip specific lines we don't want
+    # Skip specific lines we don't want (applies to all block types)
     skip_line <- any(c(
       # Prior-only conditional statements (but keep their contents)
       grepl("if\\s*\\(\\s*!\\s*prior_only\\s*\\)\\s*\\{?\\s*$", line),
@@ -4553,35 +4634,53 @@ extract_non_likelihood_from_model_block <- function(model_block) {
       # Standalone closing braces (likely end of prior_only blocks)
       grepl("^\\s*}\\s*$", line),
 
-      # lprior declarations and sigma priors (avoid duplication with observation model)
+      # CRITICAL: lprior declarations and sigma priors (avoid duplication with observation model)
       grepl("^\\s*real\\s+lprior\\s*=\\s*0\\s*;", line),
       grepl("lprior\\s*\\+=\\s*student_t_lpdf\\s*\\(\\s*sigma\\s*\\|", line),
       
       # Skip lccdf line only if it follows sigma prior
-      (is_sigma_lccdf && prev_line_was_sigma_prior),
-
-      # Actual likelihood statements
-      grepl("~\\s+normal\\s*\\(", line),
-      grepl("target\\s*\\+=.*normal.*lpdf\\s*\\(", line),
-      grepl("target\\s*\\+=.*normal.*glm.*lpdf\\s*\\(", line),
-      grepl("target\\s*\\+=.*multi_normal.*lpdf\\s*\\(", line),
-      grepl("target\\s*\\+=.*normal.*lpdf\\s*\\([^)]*\\|", line),
-      grepl("target\\s*\\+=.*Y\\s*\\|", line)
+      (is_sigma_lccdf && prev_line_was_sigma_prior)
     ))
+    
+    # Additional filtering for model block only
+    if (block_type == "model") {
+      skip_line <- skip_line || any(c(
+        # Actual likelihood statements
+        grepl("~\\s+normal\\s*\\(", line),
+        grepl("target\\s*\\+=.*normal.*lpdf\\s*\\(", line),
+        grepl("target\\s*\\+=.*normal.*glm.*lpdf\\s*\\(", line),
+        grepl("target\\s*\\+=.*multi_normal.*lpdf\\s*\\(", line),
+        grepl("target\\s*\\+=.*normal.*lpdf\\s*\\([^)]*\\|", line),
+        grepl("target\\s*\\+=.*Y\\s*\\|", line)
+      ))
+    }
 
     # Track if this line was a sigma prior for next iteration
     prev_line_was_sigma_prior <- grepl("lprior\\s*\\+=\\s*student_t_lpdf\\s*\\(\\s*sigma\\s*\\|", line)
 
     if (!skip_line) {
-      non_likelihood_lines <- c(non_likelihood_lines, line)
+      filtered_lines <- c(filtered_lines, line)
     }
   }
 
-  if (length(non_likelihood_lines) == 0) {
+  if (length(filtered_lines) == 0) {
     return(NULL)
   }
 
-  return(paste(non_likelihood_lines, collapse = "\n"))
+  return(paste(filtered_lines, collapse = "\n"))
+}
+
+extract_non_likelihood_from_model_block <- function(model_block) {
+  checkmate::assert_string(model_block)
+
+  # Remove the "model {" and "}" wrapper using base R
+  block_match <- regmatches(model_block, regexpr("\\{.*\\}", model_block))
+  if (length(block_match) == 0) return(NULL)
+  
+  block_content <- gsub("^\\{|\\}$", "", block_match)
+  
+  # Use general filtering function for model blocks
+  return(filter_block_content(block_content, "model"))
 }
 
 #' Extract Stan Code Block

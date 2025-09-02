@@ -20,6 +20,7 @@ data {
   matrix times_trend[n_trend, n_series_trend];  // temporal order of latent states
   array[N] int obs_trend_time;  // idx to map latent states to observations
   array[N] int obs_trend_series;  // idx to map latent states to observations
+  vector[1] mu_ones = 1;  // Column of ones for glm means
 }
 transformed data {
   matrix[N, Kc] Xc;  // centered version of X without an intercept
@@ -29,9 +30,6 @@ transformed data {
     means_X[i - 1] = mean(X[, i]);
     Xc[, i - 1] = X[, i] - means_X[i - 1];
   }
-
-  // Column of ones for glm means
-  vector[N] mu_ones = rep_vector(1, N);
 }
 parameters {
   vector[Kc] b;  // regression coefficients
@@ -76,9 +74,9 @@ transformed parameters {
   }
 
   // Observation means
-  vector[N] mu = Intercept + Xc * b;
+  vector[N] mu = Xc * b;
   for (n in 1:N) {
-    mu[n] += trend[obs_trend_time[n], obs_trend_series[n]];
+    mu[n] += Intercept + trend[obs_trend_time[n], obs_trend_series[n]];
   }
 }
 
