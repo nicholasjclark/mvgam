@@ -211,12 +211,12 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-09-02 12:10:50",
-                     "commit_hash":  "pending",
+                     "generated":  "2025-09-03 08:01:14",
+                     "commit_hash":  "",
                      "cached_files":  57,
                      "version":  "2.0.0",
-                     "commit_message":  "pre-commit analysis",
-                     "total_functions":  438,
+                     "commit_message":  "",
+                     "total_functions":  439,
                      "exported_functions":  68,
                      "s3_methods_count":  44,
                      "s3_classes_count":  25,
@@ -325,6 +325,7 @@
                       "extract_trend_component_info":  "R/mvgam_core.R",
                       "is_nonlinear_formula":  "R/validations.R",
                       "filter_ar_forecast_params":  "R/trend_system.R",
+                      "get_mvgam_trend_defaults":  "R/trend_system.R",
                       "stability":  "R/stability.R",
                       "plot_mvgam_series":  "R/plot_mvgam_series.R",
                       "find_matching_brace":  "R/stan_assembly.R",
@@ -550,7 +551,7 @@
                       "stancode.mvgam":  "R/print.mvgam.R",
                       "smooth.construct.mod.smooth.spec":  "R/monotonic.R",
                       "inject_trend_into_linear_predictor":  "R/stan_assembly.R",
-                      "get_mvgam_trend_defaults":  "R/trend_system.R",
+                      "insert_after_mu_lines_in_model_block":  "R/stan_assembly.R",
                       "ar_trend_properties":  "R/trend_system.R",
                       "calculate_car_time_distances":  "R/stan_assembly.R",
                       "generate_ar_trend_stanvars":  "R/stan_assembly.R",
@@ -876,6 +877,7 @@
                                 "extract_trend_component_info":  "extract_trend_component_info \u003c- function(combined_fit, mv_spec) {",
                                 "is_nonlinear_formula":  "is_nonlinear_formula \u003c- function(formula) {",
                                 "filter_ar_forecast_params":  "filter_ar_forecast_params \u003c- function(monitor_params, trend_spec) {",
+                                "get_mvgam_trend_defaults":  "get_mvgam_trend_defaults \u003c- function() {",
                                 "stability":  "stability \u003c- function(object, ...) {",
                                 "plot_mvgam_series":  "plot_mvgam_series \u003c- function( object, data, newdata, y = \u0027y\u0027, lines = TRUE, series = 1, n_bins = NULL, log_scale = FALSE ) {",
                                 "find_matching_brace":  "find_matching_brace \u003c- function(code_lines, start_line) {",
@@ -1101,7 +1103,7 @@
                                 "stancode.mvgam":  "stancode.mvgam \u003c- function(object, ...) {",
                                 "smooth.construct.mod.smooth.spec":  "smooth.construct.mod.smooth.spec \u003c- function(object, data, knots) {",
                                 "inject_trend_into_linear_predictor":  "inject_trend_into_linear_predictor \u003c- function(base_stancode, trend_stanvars) {",
-                                "get_mvgam_trend_defaults":  "get_mvgam_trend_defaults \u003c- function() {",
+                                "insert_after_mu_lines_in_model_block":  "insert_after_mu_lines_in_model_block \u003c- function(code_lines, trend_injection_code) {",
                                 "ar_trend_properties":  "ar_trend_properties \u003c- function() {",
                                 "calculate_car_time_distances":  "calculate_car_time_distances \u003c- function(data_info) {",
                                 "generate_ar_trend_stanvars":  "generate_ar_trend_stanvars \u003c- function(trend_specs, data_info, prior = NULL) {",
@@ -1809,16 +1811,6 @@
                                                           "is_s3_method":  false,
                                                           "arguments":  "formula"
                                                       },
-                              "find_predictors.mvgam_prefit":  {
-                                                                   "s3_class":  "mvgam_prefit",
-                                                                   "s3_method":  "find_predictors",
-                                                                   "signature":  "find_predictors.mvgam_prefit = function( x, effects = c(\u0027fixed\u0027, \u0027random\u0027, \u0027all\u0027), component = c( \u0027all\u0027, \u0027conditional\u0027, \u0027zi\u0027, \u0027zero_inflated\u0027, \u0027dispersion\u0027, \u0027instruments\u0027, \u0027correlation\u0027, \u0027smooth_terms\u0027 ), flatten = FALSE, verbose = TRUE, ... ) {",
-                                                                   "is_s3_method":  true,
-                                                                   "arguments":  [
-                                                                                     "x",
-                                                                                     "effects"
-                                                                                 ]
-                                                               },
                               "map_prior_to_stan_string":  {
                                                                "s3_class":  "",
                                                                "s3_method":  "",
@@ -2782,6 +2774,16 @@
                                                                   "ylab"
                                                               ]
                                             },
+                              "insert_after_mu_lines_in_model_block":  {
+                                                                           "s3_class":  "",
+                                                                           "s3_method":  "",
+                                                                           "signature":  "insert_after_mu_lines_in_model_block \u003c- function(code_lines, trend_injection_code) {",
+                                                                           "is_s3_method":  false,
+                                                                           "arguments":  [
+                                                                                             "code_lines",
+                                                                                             "trend_injection_code"
+                                                                                         ]
+                                                                       },
                               "generate_parameter_label":  {
                                                                "s3_class":  "",
                                                                "s3_method":  "",
@@ -3106,13 +3108,16 @@
                                                                   "h"
                                                               ]
                                             },
-                              "extract_response_names":  {
-                                                             "s3_class":  "",
-                                                             "s3_method":  "",
-                                                             "signature":  "extract_response_names \u003c- function(formula) {",
-                                                             "is_s3_method":  false,
-                                                             "arguments":  "formula"
-                                                         },
+                              "find_predictors.mvgam_prefit":  {
+                                                                   "s3_class":  "mvgam_prefit",
+                                                                   "s3_method":  "find_predictors",
+                                                                   "signature":  "find_predictors.mvgam_prefit = function( x, effects = c(\u0027fixed\u0027, \u0027random\u0027, \u0027all\u0027), component = c( \u0027all\u0027, \u0027conditional\u0027, \u0027zi\u0027, \u0027zero_inflated\u0027, \u0027dispersion\u0027, \u0027instruments\u0027, \u0027correlation\u0027, \u0027smooth_terms\u0027 ), flatten = FALSE, verbose = TRUE, ... ) {",
+                                                                   "is_s3_method":  true,
+                                                                   "arguments":  [
+                                                                                     "x",
+                                                                                     "effects"
+                                                                                 ]
+                                                               },
                               "samp_noinf":  {
                                                  "s3_class":  "",
                                                  "s3_method":  "",
@@ -5313,6 +5318,13 @@
                                                           "is_s3_method":  false,
                                                           "arguments":  null
                                                       },
+                              "extract_response_names":  {
+                                                             "s3_class":  "",
+                                                             "s3_method":  "",
+                                                             "signature":  "extract_response_names \u003c- function(formula) {",
+                                                             "is_s3_method":  false,
+                                                             "arguments":  "formula"
+                                                         },
                               "cv_split":  {
                                                "s3_class":  "",
                                                "s3_method":  "",
@@ -5546,6 +5558,7 @@
                                                   "find_stan_block",
                                                   "insert_into_stan_block",
                                                   "inject_trend_into_linear_predictor",
+                                                  "insert_after_mu_lines_in_model_block",
                                                   "generate_trend_injection_code",
                                                   "inject_multivariate_trends_into_linear_predictors",
                                                   "assemble_mvgam_stan_code",

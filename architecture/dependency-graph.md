@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-09-02 12:10:50  
+**Generated:** 2025-09-03 08:01:14  
 **Package:** mvgam v2.0.0  
-**Commit:** pending  
+**Commit:**   
 
 ## Summary
 
 - **Total Files:** 57
-- **Total Functions:** 438
+- **Total Functions:** 439
 - **Exported Functions:** 68
-- **Internal Functions:** 396
+- **Internal Functions:** 397
 - **S3 Methods:** 44
 - **S3 Classes:** 25
 
@@ -194,8 +194,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: add_residualsadd_residuals.mvgam (+ 1 more)
 
 ### Stan/Modeling Files
-- **`R/stan_assembly.R`** (74 functions) - Stan model integration
-  - Key functions: apply_response_suffix_to_stanvars, apply_suffix_to_stan_code, generate_combined_stancode, generate_base_stancode_with_stanvars, prepare_mvgam_stancode, prepare_stan_data, prepare_stanvars_for_brms, extract_trend_stanvars_from_setup, inject_trend_into_glm_predictor, validate_mapping_arrays, find_stan_block, insert_into_stan_block, inject_trend_into_linear_predictor, generate_trend_injection_code, inject_multivariate_trends_into_linear_predictors (+ 59 more)
+- **`R/stan_assembly.R`** (75 functions) - Stan model integration
+  - Key functions: apply_response_suffix_to_stanvars, apply_suffix_to_stan_code, generate_combined_stancode, generate_base_stancode_with_stanvars, prepare_mvgam_stancode, prepare_stan_data, prepare_stanvars_for_brms, extract_trend_stanvars_from_setup, inject_trend_into_glm_predictor, validate_mapping_arrays, find_stan_block, insert_into_stan_block, inject_trend_into_linear_predictor, generate_trend_injection_code, inject_multivariate_trends_into_linear_predictors (+ 60 more)
 - **`R/brms_integration.R`** (18 functions) - brms integration
   - Key functions: setup_brms_lightweight, extract_prior_from_setup, extract_brmsterms_from_setup, parse_multivariate_trends, extract_response_trends, create_trend_base_formula, determine_trend_injection_point, modify_stancode_for_nonlinear, is_multivariate_formula, has_mvbind_response (+ 8 more)
 - **`R/make_stan.R`** (3 functions) - Stan model integration
