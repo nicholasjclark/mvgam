@@ -1,7 +1,7 @@
 Package: mvgam
 Title: Multivariate (Dynamic) Generalized Additive Models
 Version: 1.1.593
-Date: 2025-07-23
+Date: 2025-09-03
 Authors@R: c(person("Nicholas J", "Clark", email = "nicholas.j.clark1214@gmail.com", 
                     role = c("aut", "cre"), comment = c(ORCID = "0000-0001-7131-3301")),
              person("KANK", "Karunarathna", role = c("ctb"),
@@ -23,7 +23,7 @@ Imports:
     methods,
     mgcv (>= 1.8-13),
     insight (>= 0.19.1),
-    marginaleffects (>= 0.16.0),
+    marginaleffects (>= 0.29.0),
     Rcpp (>= 0.12.0),
     rstan (>= 2.29.0),
     posterior (>= 1.0.0),

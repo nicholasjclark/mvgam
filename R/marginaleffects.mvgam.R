@@ -12,6 +12,11 @@
 #' @inheritParams insight::get_data
 #' @inheritParams insight::find_predictors
 #'
+#' @param mfx Ignored
+#' @param newparams Ignored
+#' @param ndraws Ignored
+#' @param se.fit Ignored
+#'
 #' @param trend_effects `logical`, extract from the process model component
 #' (only applicable if a `trend_formula` was specified in the model)
 #'
@@ -128,6 +133,10 @@ get_predict.mvgam <- function(
   model,
   newdata,
   type = 'response',
+  mfx,
+  newparams,
+  ndraws,
+  se.fit,
   process_error = FALSE,
   ...
 ) {

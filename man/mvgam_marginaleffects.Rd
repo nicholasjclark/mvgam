@@ -18,7 +18,17 @@
 
 \method{get_vcov}{mvgam}(model, vcov = NULL, ...)
 
-\method{get_predict}{mvgam}(model, newdata, type = "response", process_error = FALSE, ...)
+\method{get_predict}{mvgam}(
+  model,
+  newdata,
+  type = "response",
+  mfx,
+  newparams,
+  ndraws,
+  se.fit,
+  process_error = FALSE,
+  ...
+)
 
 \method{get_data}{mvgam}(x, source = "environment", verbose = TRUE, ...)
 
@@ -71,6 +81,7 @@ arguments.}
 \item Heteroskedasticity and autocorrelation consistent: \code{"HAC"}
 \item Mixed-Models degrees of freedom: "satterthwaite", "kenward-roger"
 \item Other: \code{"NeweyWest"}, \code{"KernHAC"}, \code{"OPG"}. See the \code{sandwich} package documentation.
+\item "rsample", "boot", "fwb", and "simulation" are passed to the \code{method} argument of the \code{inferences()} function. To customize the bootstrap or simulation process, call \code{inferences()} directly.
 }
 \item One-sided formula which indicates the name of cluster variables (e.g., \code{~unit_id}). This formula is passed to the \code{cluster} argument of the \code{sandwich::vcovCL} function.
 \item Square covariance matrix
@@ -104,6 +115,14 @@ type, but will typically be a string such as: "response", "link", "probs",
 or "zero". When an unsupported string is entered, the model-specific list of
 acceptable values is returned in an error message. When \code{type} is \code{NULL}, the
 first entry in the error message is used by default.}
+
+\item{mfx}{Ignored}
+
+\item{newparams}{Ignored}
+
+\item{ndraws}{Ignored}
+
+\item{se.fit}{Ignored}
 
 \item{process_error}{\code{logical}. If \code{TRUE}, uncertainty in the latent
 process (or trend) model is incorporated in predictions}

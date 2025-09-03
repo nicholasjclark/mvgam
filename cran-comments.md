@@ -1,7 +1,7 @@
-## Version 1.1.51
+## Version 1.1.53
 
 ## Summary of changes
-This version brings efficiency updates and added functionality to enhance the user interface. There are no major structural changes or modifications that would break pre-existing workflows
+This version brings efficiency updates and added functionality to enhance the user interface. It also addresses a minor warning about S3 method consistency from a recent CRAN check (https://cran.r-project.org/web/checks/check_results_mvgam.html). There are no major structural changes or modifications that would break pre-existing workflows
 
 ## Test environments
 * Windows install: R 4.4.2

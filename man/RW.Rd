@@ -228,7 +228,6 @@ mod <- mvgam(
 
 # Check standard outputs
 summary(mod)
-conditional_effects(mod, type = 'link')
 
 # Inspect posterior estimates for the correlation weighting parameter
 mcmc_plot(mod, variable = 'alpha_cor', type = 'hist')
