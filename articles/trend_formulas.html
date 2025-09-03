@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-08-01</h4>
+            <h4 data-toc-skip class="date">2025-09-03</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/trend_formulas.Rmd" class="external-link"><code>vignettes/trend_formulas.Rmd</code></a></small>
       <div class="d-none name"><code>trend_formulas.Rmd</code></div>
@@ -699,11 +699,11 @@ posterior median process error correlations:</p>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">median_correlations</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="co">#&gt;             Bluegreens Diatoms Greens Other.algae Unicells</span></span>
-<span><span class="co">#&gt; Bluegreens        1.00   -0.20  -0.03        0.17     0.50</span></span>
-<span><span class="co">#&gt; Diatoms          -0.20    1.00   0.19        0.46     0.19</span></span>
-<span><span class="co">#&gt; Greens           -0.03    0.19   1.00        0.35    -0.04</span></span>
-<span><span class="co">#&gt; Other.algae       0.17    0.46   0.35        1.00     0.27</span></span>
-<span><span class="co">#&gt; Unicells          0.50    0.19  -0.04        0.27     1.00</span></span></code></pre></div>
+<span><span class="co">#&gt; Bluegreens        1.00   -0.21  -0.05        0.17     0.49</span></span>
+<span><span class="co">#&gt; Diatoms          -0.21    1.00   0.14        0.44     0.17</span></span>
+<span><span class="co">#&gt; Greens           -0.05    0.14   1.00        0.28    -0.04</span></span>
+<span><span class="co">#&gt; Other.algae       0.17    0.44   0.28        1.00     0.27</span></span>
+<span><span class="co">#&gt; Unicells          0.49    0.17  -0.04        0.27     1.00</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="impulse-response-functions">Impulse response functions<a class="anchor" aria-label="anchor" href="#impulse-response-functions"></a>
@@ -734,16 +734,16 @@ timesteps:</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 300 × 5</span></span></span>
 <span><span class="co">#&gt;    shock                  horizon irfQ50 irfQ2.5 irfQ97.5</span></span>
 <span><span class="co">#&gt;    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> Process_1 -&gt; Process_1       1 0.353   0.270     0.446</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> Process_1 -&gt; Process_1       2 0.298   0.236     0.371</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> Process_1 -&gt; Process_1       3 0.252   0.196     0.318</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> Process_1 -&gt; Process_1       4 0.214   0.159     0.280</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> Process_1 -&gt; Process_1       5 0.181   0.126     0.250</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> Process_1 -&gt; Process_1       6 0.153   0.097<span style="text-decoration: underline;">1</span>    0.227</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> Process_1 -&gt; Process_1       7 0.130   0.073<span style="text-decoration: underline;">4</span>    0.204</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> Process_1 -&gt; Process_1       8 0.111   0.054<span style="text-decoration: underline;">1</span>    0.184</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> Process_1 -&gt; Process_1       9 0.095<span style="text-decoration: underline;">1</span>  0.039<span style="text-decoration: underline;">6</span>    0.169</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> Process_1 -&gt; Process_1      10 0.080<span style="text-decoration: underline;">8</span>  0.028<span style="text-decoration: underline;">8</span>    0.155</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> Process_1 -&gt; Process_1       1 0.348   0.259     0.455</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> Process_1 -&gt; Process_1       2 0.295   0.221     0.374</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> Process_1 -&gt; Process_1       3 0.251   0.186     0.321</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> Process_1 -&gt; Process_1       4 0.212   0.155     0.281</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> Process_1 -&gt; Process_1       5 0.181   0.123     0.252</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> Process_1 -&gt; Process_1       6 0.155   0.095<span style="text-decoration: underline;">4</span>    0.227</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> Process_1 -&gt; Process_1       7 0.132   0.074<span style="text-decoration: underline;">5</span>    0.205</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> Process_1 -&gt; Process_1       8 0.114   0.054<span style="text-decoration: underline;">5</span>    0.185</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> Process_1 -&gt; Process_1       9 0.098<span style="text-decoration: underline;">1</span>  0.040<span style="text-decoration: underline;">5</span>    0.169</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> Process_1 -&gt; Process_1      10 0.084<span style="text-decoration: underline;">4</span>  0.029<span style="text-decoration: underline;">4</span>    0.155</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># ℹ 290 more rows</span></span></span></code></pre></div>
 <p>But it is easier to understand these responses using plots. For
 example, we can plot the expected responses of the remaining series to a
@@ -843,7 +843,7 @@ stationary:</p>
 <span><span class="co">#&gt;   Autoregressive process following methods described by Heaps (2023) and</span></span>
 <span><span class="co">#&gt;   Clark et al. (2025). The mvgam-constructed model and observed data were</span></span>
 <span><span class="co">#&gt;   passed to the probabilistic programming environment Stan (version</span></span>
-<span><span class="co">#&gt;   2.36.0; Carpenter et al. 2017, Stan Development Team 2025), specifically</span></span>
+<span><span class="co">#&gt;   2.37.0; Carpenter et al. 2017, Stan Development Team 2025), specifically</span></span>
 <span><span class="co">#&gt;   through the cmdstanr interface (Gabry &amp; Cesnovar, 2021). We ran 4</span></span>
 <span><span class="co">#&gt;   Hamiltonian Monte Carlo chains for 1000 warmup iterations and 500</span></span>
 <span><span class="co">#&gt;   sampling iterations for joint posterior estimation. Rank normalized</span></span>

@@ -144,23 +144,23 @@ to fit the model in Stan.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(season)...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[2 : 10] ~ multi_normal_prec(zero[2 : 10],</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                     S1[1 : 9, 1 : 9] * lambda[1]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                     + S1[1 : 9, 10 : 18] * lambda[2]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                     S1[1 : 9, 1 : 9] * lambda[1]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                     + S1[1 : 9, 10 : 18] * lambda[2]);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(time):seriesseries_1...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[11 : 19] ~ multi_normal_prec(zero[11 : 19],</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                      S2[1 : 9, 1 : 9] * lambda[3]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                      + S2[1 : 9, 10 : 18] * lambda[4]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                      S2[1 : 9, 1 : 9] * lambda[3]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                      + S2[1 : 9, 10 : 18] * lambda[4]);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(time):seriesseries_2...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[20 : 28] ~ multi_normal_prec(zero[20 : 28],</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                      S3[1 : 9, 1 : 9] * lambda[5]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                      + S3[1 : 9, 10 : 18] * lambda[6]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                      S3[1 : 9, 1 : 9] * lambda[5]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                      + S3[1 : 9, 10 : 18] * lambda[6]);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(time):seriesseries_3...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[29 : 37] ~ multi_normal_prec(zero[29 : 37],</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                      S4[1 : 9, 1 : 9] * lambda[7]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                      + S4[1 : 9, 10 : 18] * lambda[8]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                      S4[1 : 9, 1 : 9] * lambda[7]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                      + S4[1 : 9, 10 : 18] * lambda[8]);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for smoothing parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(5, 30);</span>

@@ -388,7 +388,8 @@ bounds, for example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[1, 1 : n_series] ~ normal(0, sigma);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[2, 1 : n_series] ~ normal(trend[1, 1 : n_series] * ar1, sigma);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   for (s in 1 : n_series) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     trend[3 : n, s] ~ normal(ar1[s] * trend[2 : (n - 1), s]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     trend[3 : n, s] ~ normal(</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                              ar1[s] * trend[2 : (n - 1), s]</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                              + ar2[s] * trend[1 : (n - 2), s], sigma[s]);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   {</span>
@@ -397,7 +398,9 @@ bounds, for example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     array[n_nonmissing] real flat_phis;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     flat_trends = to_vector(trend)[obs_ind];</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     flat_phis = to_array_1d(rep_each(phi_inv, n)[obs_ind]);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     flat_ys ~ neg_binomial_2(exp(append_col(flat_xs, flat_trends)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     flat_ys ~ neg_binomial_2(</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                              exp(</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                  append_col(flat_xs, flat_trends)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                  * append_row(b, 1.0)),</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                              inv(flat_phis));</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
@@ -454,13 +457,13 @@ bounds, for example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ inv_gamma(1.418, 0.452);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion      phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1     lambda ~ exponential(0.6);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  mu_raw ~ normal(-0.07, 0.61);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.22);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4     ar1 ~ normal(-0.92, 0.66);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5         ar2 ~ normal(0, 0.23);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.47);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(-0.24, 0.4);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.44);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2   mu_raw ~ normal(0.87, 0.28);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.58);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(0.55, 0.21);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5     ar2 ~ normal(-0.67, 0.19);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.02);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.82, 0.17);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># ========================================================================</span></span></span>
 <span class="r-in"><span><span class="co"># Example 2: Modify priors manually</span></span></span>
@@ -579,7 +582,8 @@ bounds, for example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[1, 1 : n_series] ~ normal(0, sigma);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[2, 1 : n_series] ~ normal(trend[1, 1 : n_series] * ar1, sigma);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   for (s in 1 : n_series) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     trend[3 : n, s] ~ normal(ar1[s] * trend[2 : (n - 1), s]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     trend[3 : n, s] ~ normal(</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                              ar1[s] * trend[2 : (n - 1), s]</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                              + ar2[s] * trend[1 : (n - 2), s], sigma[s]);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   {</span>
@@ -588,7 +592,9 @@ bounds, for example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     array[n_nonmissing] real flat_phis;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     flat_trends = to_vector(trend)[obs_ind];</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     flat_phis = to_array_1d(rep_each(phi_inv, n)[obs_ind]);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     flat_ys ~ neg_binomial_2(exp(append_col(flat_xs, flat_trends)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     flat_ys ~ neg_binomial_2(</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                              exp(</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                  append_col(flat_xs, flat_trends)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                  * append_row(b, 1.0)),</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                              inv(flat_phis));</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
@@ -746,7 +752,8 @@ bounds, for example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[1, 1 : n_series] ~ normal(0, sigma);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[2, 1 : n_series] ~ normal(trend[1, 1 : n_series] * ar1, sigma);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   for (s in 1 : n_series) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     trend[3 : n, s] ~ normal(ar1[s] * trend[2 : (n - 1), s]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     trend[3 : n, s] ~ normal(</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                              ar1[s] * trend[2 : (n - 1), s]</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                              + ar2[s] * trend[1 : (n - 2), s], sigma[s]);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   {</span>
@@ -755,7 +762,9 @@ bounds, for example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     array[n_nonmissing] real flat_phis;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     flat_trends = to_vector(trend)[obs_ind];</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     flat_phis = to_array_1d(rep_each(phi_inv, n)[obs_ind]);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     flat_ys ~ neg_binomial_2(exp(append_col(flat_xs, flat_trends)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     flat_ys ~ neg_binomial_2(</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                              exp(</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                  append_col(flat_xs, flat_trends)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                  * append_row(b, 1.0)),</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                              inv(flat_phis));</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
@@ -898,7 +907,8 @@ bounds, for example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[1, 1 : n_series] ~ normal(0, sigma);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[2, 1 : n_series] ~ normal(trend[1, 1 : n_series] * ar1, sigma);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   for (s in 1 : n_series) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     trend[3 : n, s] ~ normal(ar1[s] * trend[2 : (n - 1), s]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     trend[3 : n, s] ~ normal(</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                              ar1[s] * trend[2 : (n - 1), s]</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                              + ar2[s] * trend[1 : (n - 2), s], sigma[s]);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   {</span>
@@ -907,7 +917,9 @@ bounds, for example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     array[n_nonmissing] real flat_phis;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     flat_trends = to_vector(trend)[obs_ind];</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     flat_phis = to_array_1d(rep_each(phi_inv, n)[obs_ind]);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     flat_ys ~ neg_binomial_2(exp(append_col(flat_xs, flat_trends)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     flat_ys ~ neg_binomial_2(</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                              exp(</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                  append_col(flat_xs, flat_trends)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                  * append_row(b, 1.0)),</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                              inv(flat_phis));</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
@@ -1015,8 +1027,8 @@ bounds, for example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(season)...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[3 : 11] ~ multi_normal_prec(zero[3 : 11],</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                     S1[1 : 9, 1 : 9] * lambda[1]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                     + S1[1 : 9, 10 : 18] * lambda[2]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                     S1[1 : 9, 1 : 9] * lambda[1]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                     + S1[1 : 9, 10 : 18] * lambda[2]);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for AR parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ar1 ~ std_normal();</span>
@@ -1132,8 +1144,8 @@ bounds, for example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(season)...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[3 : 11] ~ multi_normal_prec(zero[3 : 11],</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                     S1[1 : 9, 1 : 9] * lambda[1]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                     + S1[1 : 9, 10 : 18] * lambda[2]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                     S1[1 : 9, 1 : 9] * lambda[1]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                     + S1[1 : 9, 10 : 18] * lambda[2]);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for AR parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ar1 ~ std_normal();</span>
@@ -1254,13 +1266,13 @@ bounds, for example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(x2)...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[4 : 12] ~ multi_normal_prec(zero[4 : 12],</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                     S1[1 : 9, 1 : 9] * lambda[1]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                     + S1[1 : 9, 10 : 18] * lambda[2]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                     S1[1 : 9, 1 : 9] * lambda[1]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                     + S1[1 : 9, 10 : 18] * lambda[2]);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(x3)...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[13 : 21] ~ multi_normal_prec(zero[13 : 21],</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                      S2[1 : 9, 1 : 9] * lambda[3]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                      + S2[1 : 9, 10 : 18] * lambda[4]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                      S2[1 : 9, 1 : 9] * lambda[3]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                      + S2[1 : 9, 10 : 18] * lambda[4]);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for smoothing parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(5, 30);</span>

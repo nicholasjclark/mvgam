@@ -179,7 +179,7 @@ Statistical Association</em>, 102(477), 359-378.
 <span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample CRPS:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> 977.664779999974</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 977.664398999974</span>
 <span class="r-plt img"><img src="score.mvgam_forecast-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Compute Discrete Rank Probability Scores and 0.90 interval coverages</span></span></span>
@@ -226,7 +226,7 @@ Statistical Association</em>, 102(477), 359-378.
 <span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'expected'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample Brier:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> 6.66187425943614</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 6.78596418285705</span>
 <span class="r-plt img"><img src="score.mvgam_forecast-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Compute Brier scores</span></span></span>
@@ -234,25 +234,25 @@ Statistical Association</em>, 102(477), 359-378.
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">fc_scores</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 4</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ series_1  :'data.frame':	25 obs. of  5 variables:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ score         : num [1:25] 0.4105 0.2884 0.174 0.1043 0.0827 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ score         : num [1:25] 0.4181 0.2841 0.1781 0.096 0.0741 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ in_interval   : num [1:25] NA NA NA NA NA NA NA NA NA NA ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ interval_width: num [1:25] 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ eval_horizon  : int [1:25] 1 2 3 4 5 6 7 8 9 10 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ score_type    : chr [1:25] "brier" "brier" "brier" "brier" ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ series_2  :'data.frame':	25 obs. of  5 variables:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ score         : num [1:25] 0.1921 0.2022 0.5269 0.6893 0.0238 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ score         : num [1:25] 0.1987 0.2175 0.5301 0.6816 0.0332 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ in_interval   : num [1:25] NA NA NA NA NA NA NA NA NA NA ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ interval_width: num [1:25] 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ eval_horizon  : int [1:25] 1 2 3 4 5 6 7 8 9 10 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ score_type    : chr [1:25] "brier" "brier" "brier" "brier" ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ series_3  :'data.frame':	25 obs. of  5 variables:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ score         : num [1:25] 0.2025 0.3412 0.5218 0.0454 0.0337 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ score         : num [1:25] 0.199 0.3382 0.53 0.0394 0.0263 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ in_interval   : num [1:25] NA NA NA NA NA NA NA NA NA NA ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ interval_width: num [1:25] 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ eval_horizon  : int [1:25] 1 2 3 4 5 6 7 8 9 10 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ score_type    : chr [1:25] "brier" "brier" "brier" "brier" ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ all_series:'data.frame':	25 obs. of  3 variables:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ score       : num [1:25] 0.805 0.832 1.223 0.839 0.14 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ score       : num [1:25] 0.816 0.84 1.238 0.817 0.134 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ eval_horizon: int [1:25] 1 2 3 4 5 6 7 8 9 10 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ score_type  : chr [1:25] "sum_brier" "sum_brier" "sum_brier" "sum_brier" ...</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

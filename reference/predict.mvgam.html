@@ -243,12 +243,12 @@ at the actual time points supplied in <code>data</code> and <code>newdata</code>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">preds</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>        Estimate  Est.Error       Q2.5      Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] -0.6045639 0.09099837 -0.8057763 -0.4569066</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] -0.6045639 0.09099837 -0.8057763 -0.4569066</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.6045639 0.09099837 -0.8057763 -0.4569066</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -0.6704094 0.08656685 -0.8493741 -0.5218970</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,] -0.6704094 0.08656685 -0.8493741 -0.5218970</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,] -0.6704094 0.08656685 -0.8493741 -0.5218970</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] -0.6334763 0.09349808 -0.8096942 -0.4295295</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] -0.6334763 0.09349808 -0.8096942 -0.4295295</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.6334763 0.09349808 -0.8096942 -0.4295295</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -0.6939103 0.09055841 -0.8721786 -0.5170424</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,] -0.6939103 0.09055841 -0.8721786 -0.5170424</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,] -0.6939103 0.09055841 -0.8721786 -0.5170424</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Generate predictions against test data</span></span></span>
 <span class="r-in"><span><span class="va">preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span></span></span>
@@ -257,13 +257,13 @@ at the actual time points supplied in <code>data</code> and <code>newdata</code>
 <span class="r-in"><span>  summary <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">preds</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>        Estimate  Est.Error       Q2.5      Q97.5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] -0.6332487 0.09290099 -0.7851056 -0.4265016</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] -0.6332487 0.09290099 -0.7851056 -0.4265016</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.6332487 0.09290099 -0.7851056 -0.4265016</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -0.5037656 0.10884677 -0.6931148 -0.2800567</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [5,] -0.5037656 0.10884677 -0.6931148 -0.2800567</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [6,] -0.5037656 0.10884677 -0.6931148 -0.2800567</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>        Estimate Est.Error       Q2.5      Q97.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1,] -0.6128726 0.1032278 -0.8126983 -0.4229781</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [2,] -0.6128726 0.1032278 -0.8126983 -0.4229781</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [3,] -0.6128726 0.1032278 -0.8126983 -0.4229781</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4,] -0.4635102 0.1112113 -0.6812183 -0.2475180</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [5,] -0.4635102 0.1112113 -0.6812183 -0.2475180</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [6,] -0.4635102 0.1112113 -0.6812183 -0.2475180</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Use plot_predictions(), which relies on predict()</span></span></span>
 <span class="r-in"><span><span class="co"># to more easily see how the latent AR(1) dynamics are</span></span></span>

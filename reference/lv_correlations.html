@@ -112,7 +112,7 @@ among the time series.</p>
 <span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/Rtmpyvz0kA/model_fd0fdfeaee023a8e623b5071c6b9ec02.stan', line 20, column 31: Found</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/Rtmp7JWLcN/model_fd0fdfeaee023a8e623b5071c6b9ec02.stan', line 20, column 31: Found</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     int division:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     Values will be rounded towards zero. If rounding is not desired you can</span>
@@ -120,7 +120,7 @@ among the time series.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     the division as</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2.0</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     If rounding is intended please use the integer division operator %/%.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/Rtmpyvz0kA/model-23c016fd9584.stan', line 20, column 33: Found</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning in '/tmp/Rtmp7JWLcN/model-26104cb0f492.stan', line 20, column 33: Found</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     int division:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>       n_lv * (n_lv - 1) / 2</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>     Values will be rounded towards zero. If rounding is not desired you can</span>
@@ -135,8 +135,8 @@ among the time series.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 2 × 2</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Factor   Contribution</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>           <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> Factor 1        0.527</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> Factor 2        0.473</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> Factor 1        0.534</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> Factor 2        0.466</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Calculate correlations among the series</span></span></span>
 <span class="r-in"><span><span class="va">lvcors</span> <span class="op">&lt;-</span> <span class="fu">lv_correlations</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
@@ -156,11 +156,11 @@ among the time series.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [1] "cor"        "cor_lower"  "cor_upper"  "sig_cor"    "cov"       </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [6] "prec"       "prec_lower" "prec_upper" "sig_prec"   "trace"     </span>
 <span class="r-in"><span><span class="va">lvcors</span><span class="op">$</span><span class="va">cor</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            DM           DO         PB            PP</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> DM  1.0000000 5.518870e-01 -0.4884034 -8.069210e-01</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> DO  0.5518870 1.000000e+00  0.4143197  2.716395e-05</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> PB -0.4884034 4.143197e-01  1.0000000  8.930669e-01</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> PP -0.8069210 2.716395e-05  0.8930669  1.000000e+00</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            DM         DO         PB          PP</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> DM  1.0000000 0.54925545 -0.4794042 -0.79837885</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> DO  0.5492555 1.00000000  0.4290647  0.01890233</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> PB -0.4794042 0.42906470  1.0000000  0.89413740</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> PP -0.7983788 0.01890233  0.8941374  1.00000000</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot credible correlations as a matrix</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">lvcors</span>, cluster <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>

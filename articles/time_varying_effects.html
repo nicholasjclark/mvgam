@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-08-01</h4>
+            <h4 data-toc-skip class="date">2025-09-03</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/time_varying_effects.Rmd" class="external-link"><code>vignettes/time_varying_effects.Rmd</code></a></small>
       <div class="d-none name"><code>time_varying_effects.Rmd</code></div>
@@ -334,16 +334,16 @@ function:</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Observation error parameter estimates:</span></span>
 <span><span class="co">#&gt;              2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; sigma_obs[1] 0.24 0.26   0.3    1  2916</span></span>
+<span><span class="co">#&gt; sigma_obs[1] 0.24 0.26  0.29    1  1917</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM coefficient (beta) estimates:</span></span>
 <span><span class="co">#&gt;             2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; (Intercept)    4   4   4.1    1  4300</span></span>
+<span><span class="co">#&gt; (Intercept)    4   4   4.1    1  2962</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM gp term marginal deviation (alpha) and length scale (rho) estimates:</span></span>
-<span><span class="co">#&gt;                     2.5%   50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; alpha_gp(time):temp 0.63 0.900 1.400    1   749</span></span>
-<span><span class="co">#&gt; rho_gp(time):temp   0.02 0.051 0.069    1   661</span></span>
+<span><span class="co">#&gt;                      2.5%   50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; alpha_gp(time):temp 0.620 0.880 1.400 1.00   677</span></span>
+<span><span class="co">#&gt; rho_gp(time):temp   0.022 0.051 0.068 1.01   605</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
 <span><span class="co">#&gt; ✔ No issues with effective samples per iteration</span></span>
@@ -472,23 +472,23 @@ observation model parameters:</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Observation precision parameter estimates:</span></span>
 <span><span class="co">#&gt;        2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; phi[1]   83 220   550 1.03   188</span></span>
+<span><span class="co">#&gt; phi[1]   83 220   560 1.01   327</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM coefficient (beta) estimates:</span></span>
 <span><span class="co">#&gt;             2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; (Intercept) -4.6 -4.3    -4 1.01   716</span></span>
+<span><span class="co">#&gt; (Intercept) -4.6 -4.3    -4    1  1037</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; standard deviation:</span></span>
-<span><span class="co">#&gt;          2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; sigma[1] 0.11 0.39  0.64 1.03   181</span></span>
+<span><span class="co">#&gt;          2.5% 50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; sigma[1] 0.12 0.4  0.65 1.01   299</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; precision parameter:</span></span>
 <span><span class="co">#&gt;        2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; tau[1]  2.4 6.4    77 1.01   380</span></span>
+<span><span class="co">#&gt; tau[1]  2.4 6.2    64    1   498</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; autoregressive coef 1:</span></span>
-<span><span class="co">#&gt;        2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; ar1[1] -0.3 0.68  0.98 1.01   525</span></span>
+<span><span class="co">#&gt;         2.5%  50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; ar1[1] -0.25 0.69  0.98    1   769</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
 <span><span class="co">#&gt; ✔ No issues with effective samples per iteration</span></span>
@@ -564,24 +564,24 @@ time-varying GP parameters:</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Observation precision parameter estimates:</span></span>
 <span><span class="co">#&gt;        2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; phi[1]  170 350   670    1   744</span></span>
+<span><span class="co">#&gt; phi[1]  160 340   670 1.01   650</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
 <span><span class="co">#&gt;             2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; (Intercept) -4.4 -3.7  -2.9 1.01   869</span></span>
+<span><span class="co">#&gt; (Intercept) -4.4 -3.8    -3    1   597</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; standard deviation:</span></span>
 <span><span class="co">#&gt;          2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; sigma[1] 0.18 0.32  0.52    1   753</span></span>
+<span><span class="co">#&gt; sigma[1] 0.17 0.32  0.53    1   681</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; autoregressive coef 1:</span></span>
 <span><span class="co">#&gt;        2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; ar1[1] 0.59 0.93     1 1.01   764</span></span>
+<span><span class="co">#&gt; ar1[1] 0.58 0.92     1    1   435</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM process model gp term marginal deviation (alpha) and length scale (rho) estimates:</span></span>
 <span><span class="co">#&gt;                         2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; alpha_gp(time):CUI.apr 0.013 0.31   1.3    1   900</span></span>
-<span><span class="co">#&gt; rho_gp(time):CUI.apr   1.300 5.70  42.0    1   659</span></span>
+<span><span class="co">#&gt; alpha_gp(time):CUI.apr 0.038 0.32   1.7    1   605</span></span>
+<span><span class="co">#&gt; rho_gp(time):CUI.apr   1.400 5.90  49.0    1   394</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
 <span><span class="co">#&gt; ✔ No issues with effective samples per iteration</span></span>
@@ -639,7 +639,7 @@ leave-one-out cross-validation as implemented in the popular
 <code class="sourceCode R"><span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo_compare</a></span><span class="op">(</span><span class="va">mod0</span>, <span class="va">mod1</span><span class="op">)</span></span>
 <span><span class="co">#&gt;      elpd_diff se_diff</span></span>
 <span><span class="co">#&gt; mod0     0.0       0.0</span></span>
-<span><span class="co">#&gt; mod1 -1401.8     148.0</span></span></code></pre></div>
+<span><span class="co">#&gt; mod1 -1267.7     135.4</span></span></code></pre></div>
 <p>The second model has the larger Expected Log Predictive Density
 (ELPD), meaning that it is slightly favoured over the simpler model that
 did not include the time-varying upwelling effect. However, the two
@@ -661,9 +661,9 @@ more about how this process works in Bürkner et al. 2020).</p>
 better 1-step ahead forecasts, with a higher total forecast ELPD</p>
 <div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">lfo_mod0</span><span class="op">$</span><span class="va">elpds</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 35.65626</span></span>
+<span><span class="co">#&gt; [1] 35.57256</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">lfo_mod1</span><span class="op">$</span><span class="va">elpds</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 37.10818</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 37.2354</span></span></code></pre></div>
 <p>We can also plot the ELPDs for each model as a contrast. Here, values
 less than zero suggest the time-varying predictor model (Mod1) gives
 better 1-step ahead forecasts:</p>

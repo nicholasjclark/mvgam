@@ -302,27 +302,27 @@ using <code>Stan</code>.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 5.9 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 5.8 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 6.0 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 6.4 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 5.9 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 6.0 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 6.2 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 6.5 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The usual diagnostics</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM observation formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> obs ~ species - 1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x558345751ce8&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x5646d1916108&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM process formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ~s(time, by = trend, k = 4) + species</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x558345751ce8&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x5646d1916108&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> nmix</span>
@@ -349,24 +349,24 @@ using <code>Stan</code>.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM observation model coefficient (beta) estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>              2.5%   50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> speciessp_1 -0.21 0.710  1.40    1   395</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> speciessp_2 -1.20 0.048  0.92    1   417</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> speciessp_1 -0.37 0.710  1.40    1   400</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> speciessp_2 -1.10 0.055  0.86    1   421</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM process model coefficient (beta) estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                               2.5%     50%  97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)_trend            2.700  3.0000  3.400 1.00   355</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> speciessp_2_trend           -1.200 -0.6300  0.110 1.00   403</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend1.1_trend -0.070  0.0140  0.180 1.01   284</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend1.2_trend -0.240  0.0038  0.240 1.00   502</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend1.3_trend -0.440 -0.2500 -0.036 1.01   522</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend2.1_trend -0.250 -0.0150  0.079 1.01   117</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend2.2_trend -0.220  0.0220  0.480 1.01   162</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend2.3_trend  0.045  0.3200  0.600 1.00   396</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)_trend            2.700  3.0000  3.500 1.00   401</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> speciessp_2_trend           -1.300 -0.6400  0.140 1.00   401</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend1.1_trend -0.064  0.0150  0.220 1.01   112</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend1.2_trend -0.250  0.0061  0.310 1.00   389</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend1.3_trend -0.450 -0.2500 -0.021 1.01   230</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend2.1_trend -0.280 -0.0140  0.087 1.00   197</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend2.2_trend -0.160  0.0350  0.430 1.01   220</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend2.3_trend  0.051  0.3300  0.640 1.00   541</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM process smooths:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                         edf Ref.df Chi.sq p-value</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):seriestrend1 0.9337      3  1.932   0.884</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):seriestrend2 1.0373      3  1.135   0.898</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                        edf Ref.df Chi.sq p-value</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):seriestrend1 1.208      3  2.713   0.726</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):seriestrend2 1.807      3  1.453   0.371</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ✔ No issues with effective samples per iteration</span>
@@ -441,60 +441,60 @@ using <code>Stan</code>.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 1.3 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 1.4 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 finished in 1.9 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 2.2 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 2.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 finished in 2.2 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 finished in 1.4 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 finished in 1.5 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> All 4 chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 1.7 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 1.8 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 3.0 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> cbind(y, ntrials) ~ series + s(x, by = series)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x558345751ce8&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x5646d1916108&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> binomial</span>
@@ -518,31 +518,31 @@ using <code>Stan</code>.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                        2.5%      50%  97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)          -0.650 -0.52000 -0.390 1.00  1204</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> seriesseries2         0.190  0.39000  0.570 1.00  1206</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.1 -0.210 -0.00350  0.200 1.00   867</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.2 -0.200  0.00360  0.270 1.00   633</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.3 -0.079  0.00430  0.120 1.00   680</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.4 -0.120  0.00330  0.120 1.00   691</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.5 -0.050  0.00015  0.059 1.00   679</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.6 -0.120 -0.00370  0.130 1.00   649</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.7 -0.079 -0.00230  0.090 1.00   685</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.8 -0.570 -0.01800  0.580 1.00   653</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.9  0.670  0.95000  1.200 1.00  1085</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.1 -0.620 -0.06200  0.120 1.00   225</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.2 -0.390 -0.01800  0.220 1.00   444</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.3 -0.170 -0.00560  0.087 1.00   414</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.4 -0.120  0.00670  0.220 1.00   442</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.5 -0.110 -0.00380  0.051 1.00   412</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.6 -0.200 -0.00510  0.120 1.00   379</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.7 -0.140 -0.00360  0.081 1.00   373</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.8 -0.780  0.00250  0.580 1.00   416</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.9 -1.000 -0.75000 -0.190 1.01   266</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)          -0.440 -0.31000 -0.170 1.01  1077</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> seriesseries2        -0.066  0.13000  0.310 1.00  1090</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.1 -0.300 -0.00910  0.330 1.01   375</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.2 -0.950 -0.02900  0.200 1.04    77</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.3 -0.640 -0.01400  0.082 1.04    75</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.4 -0.300 -0.00210  0.100 1.04    84</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.5 -0.230 -0.00098  0.067 1.04    86</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.6 -0.200 -0.00044  0.078 1.03    97</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.7 -0.310 -0.00210  0.100 1.04    85</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.8 -2.400  0.00110  0.900 1.04    83</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.9  0.100  0.77000  1.200 1.01   148</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.1 -0.210  0.03800  0.420 1.00   771</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.2 -0.260  0.02000  0.490 1.00   386</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.3 -0.130 -0.00740  0.160 1.00   466</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.4 -0.120 -0.01000  0.120 1.00   439</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.5 -0.088 -0.01100  0.078 1.00   494</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.6 -0.096 -0.01100  0.085 1.00   440</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.7 -0.120 -0.01400  0.120 1.00   426</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.8 -1.200 -0.16000  0.980 1.00   428</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.9 -1.100 -0.62000 -0.280 1.00   738</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM smooths:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                      edf Ref.df Chi.sq p-value    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1 1.411      9  51.30  &lt;2e-16 ***</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2 1.847      9  38.66  &lt;2e-16 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                      edf Ref.df Chi.sq p-value   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1 1.534      9  33.91 0.03272 * </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2 1.631      9  18.06 0.00133 **</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
