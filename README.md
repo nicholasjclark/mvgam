@@ -246,13 +246,13 @@ scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.28157175
+    #> 8.2029645
     #> Out of sample DRPS:
-    #> 5.44869075
+    #> 5.2327845
     #> Out of sample DRPS:
-    #> 8.40920375
+    #> 8.54444325
     #> Out of sample DRPS:
-    #> 3.60213325
+    #> 3.8400025
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
@@ -330,7 +330,7 @@ details in scientific communications
     description
 
     #> Methods text skeleton
-    #> We used the R package mvgam (version 1.1.592; Clark & Wells, 2023) to
+    #> We used the R package mvgam (version 1.1.593; Clark & Wells, 2023) to
     #>   construct, fit and interrogate the model. mvgam fits Bayesian
     #>   State-Space models that can include flexible predictor effects in both
     #>   the process and observation components by incorporating functionalities
@@ -466,7 +466,6 @@ estimates for the `Beta` precision parameters *ϕ*.
     #> Trend model:
     #> GP()
     #> 
-    #> 
     #> N series:
     #> 3 
     #> 
@@ -477,7 +476,6 @@ estimates for the `Beta` precision parameters *ϕ*.
     #> Fitted using Stan 
     #> 4 chains, each with iter = 1000; warmup = 500; thin = 1 
     #> Total post-warmup draws = 2000
-    #> 
     #> 
     #> Observation precision parameter estimates:
     #>        2.5%  50% 97.5% Rhat n_eff
@@ -490,20 +488,23 @@ estimates for the `Beta` precision parameters *ϕ*.
     #> (Intercept) 0.11 0.45  0.68 1.01   882
     #> 
     #> Approximate significance of GAM smooths:
-    #>                           edf Ref.df Chi.sq p-value
-    #> s(season)                4.34      5   6.89    0.10
-    #> s(season):seriesseries_1 1.48      4   7.38    0.21
-    #> s(season):seriesseries_2 1.02      4   6.61    0.63
-    #> s(season):seriesseries_3 1.14      4   4.71    0.48
+    #>                            edf Ref.df Chi.sq p-value
+    #> s(season)                4.345      5  6.892   0.104
+    #> s(season):seriesseries_1 1.481      4  7.378   0.207
+    #> s(season):seriesseries_2 1.023      4  6.610   0.626
+    #> s(season):seriesseries_3 1.136      4  4.712   0.475
     #> 
-    #> Latent trend marginal deviation (alpha) and length scale (rho) estimates:
-    #>              2.5%   50% 97.5% Rhat n_eff
-    #> alpha_gp[1] 0.110  0.40  0.86 1.01   596
-    #> alpha_gp[2] 0.550  0.91  1.50 1.00  1257
-    #> alpha_gp[3] 0.072  0.40  0.91 1.01   894
-    #> rho_gp[1]   1.200  3.90 12.00 1.00  1832
-    #> rho_gp[2]   3.400 13.00 32.00 1.01   350
-    #> rho_gp[3]   1.200  4.90 23.00 1.01   515
+    #> marginal deviation:
+    #>              2.5%  50% 97.5% Rhat n_eff
+    #> alpha_gp[1] 0.110 0.40  0.86 1.01   596
+    #> alpha_gp[2] 0.550 0.91  1.50 1.00  1257
+    #> alpha_gp[3] 0.072 0.40  0.91 1.01   894
+    #> 
+    #> length scale:
+    #>           2.5%  50% 97.5% Rhat n_eff
+    #> rho_gp[1]  1.2  3.9    12 1.00  1832
+    #> rho_gp[2]  3.4 13.0    32 1.01   350
+    #> rho_gp[3]  1.2  4.9    23 1.01   515
     #> 
     #> Stan MCMC diagnostics:
     #> ✔ No issues with effective samples per iteration
