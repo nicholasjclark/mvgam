@@ -102,12 +102,14 @@ transformed parameters {
 
   // Factor loading matrix with identifiability constraints
   matrix[n_series_trend, n_lv_trend] Z = rep_matrix(0, n_series_trend, n_lv_trend);
-  int index = 1;
   // constraints allow identifiability of loadings
-  for (j in 1 : n_lv_trend) {
-    for (i in j : n_series_trend) {
-      Z[i, j] = Z_raw[index];
-      index += 1;
+  {
+    int index = 1;
+    for (j in 1 : n_lv_trend) {
+      for (i in j : n_series_trend) {
+        Z[i, j] = Z_raw[index];
+        index += 1;
+      }
     }
   }
 

@@ -116,10 +116,7 @@ mvgam(
 
 ## Stan Code Design Patterns
 
-### 1. Non-Vectorized Likelihood with Missing Data
-**Pattern**: Follow brms non-vectorized likelihood handling for missing observations
-
-### 2. Response-Specific Parameter Naming
+### 1. Response-Specific Parameter Naming
 **Pattern**: Follow brms multivariate naming conventions
 ```r
 // Multivariate responses generate response-specific parameters
@@ -135,7 +132,7 @@ mu_count += mu_trend_count;
 mu_biomass += mu_trend_biomass;
 ```
 
-### 3. Factor Model Architecture: Matrix Z Patterns
+### 2. Factor Model Architecture: Matrix Z Patterns
 **Design Principle**: Factor models are a capability of compatible trend types
 
 **Factor Model Detection Logic**:
@@ -154,11 +151,11 @@ mu_biomass += mu_trend_biomass;
 6. **Code Deduplication**: Shared utility functions ensure consistent patterns across trend types
 7. **Registration**: New trend types must explicitly declare factor compatibility in registry
 
-### 4. Code Deduplication for User Extensibility
+### 3. Code Deduplication for User Extensibility
 
 **Design Principle**: Eliminate redundant code to simplify custom trend development
 
-### 5. Hierarchical Correlation Architecture
+### 4. Hierarchical Correlation Architecture
 
 **Design Principle**: Some trends (AR, VAR, CAR, ZMVN) support hierarchical correlations with groups and subgroups
 

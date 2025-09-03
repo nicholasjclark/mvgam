@@ -48,9 +48,15 @@ functions {
   * @param Sigma Innovation covariance matrix
   * @return Array containing phi coefficients and Gamma matrices [2, p]
   */
-    array[,] matrix[,] rev_mapping(array[] matrix[,] P, matrix Sigma) {
+    array[,] matrix rev_mapping(array[] matrix P, matrix Sigma) {
       int p = size(P);
       int m = rows(Sigma);
+
+      if (p == 0) {
+        array[2, 0] matrix[m, m] empty_result;
+        return empty_result;
+      }
+
       array[p, p] matrix[m, m] phi_for;
       array[p, p] matrix[m, m] phi_rev;
       array[p + 1] matrix[m, m] Sigma_for;
@@ -90,6 +96,25 @@ functions {
       return phiGamma;
     }
 
+  /* Function to compute Kronecker product */
+  matrix kronecker_prod(matrix A, matrix B) {
+    matrix[rows(A) * rows(B), cols(A) * cols(B)] C;
+    int m = rows(A);
+    int n = cols(A);
+    int p = rows(B);
+    int q = cols(B);
+    for (i in 1:m) {
+      for (j in 1:n) {
+        int row_start = (i - 1) * p + 1;
+        int row_end = (i - 1) * p + p;
+        int col_start = (j - 1) * q + 1;
+        int col_end = (j - 1) * q + q;
+        C[row_start:row_end, col_start:col_end] = A[i, j] * B;
+      }
+    }
+    return C;
+  }
+
   /**
     * Compute joint stationary covariance for VARMA(p,q) initialization
   * Heaps 2022 companion matrix approach for stationary distribution
@@ -98,48 +123,66 @@ functions {
   * @param theta Array of stationary MA coefficient matrices
   * @return Joint covariance matrix Omega for initial distribution
   */
-    matrix initial_joint_var(matrix Sigma, array[] matrix[,] phi, array[] matrix[,]
-                             theta) {
-      int p = size(phi);
-      int q = size(theta);
-      int m = rows(Sigma);
-      matrix[(p + q) * m, (p + q) * m] companion_mat = rep_matrix(0.0, (p + q) * m, (p + q) * m);
-      matrix[(p + q) * m, (p + q) * m] companion_var = rep_matrix(0.0, (p + q) * m, (p + q) * m);
+   matrix initial_joint_var(matrix Sigma, array[] matrix phi, array[] matrix theta) {
+    int p = size(phi);
+    int q = size(theta);
+    int m = rows(Sigma);
+    matrix[(p + q) * m, (p + q) * m] companion_mat = rep_matrix(0.0, (p + q) * m,
+   (p + q) * m);
+    matrix[(p + q) * m, (p + q) * m] companion_var = rep_matrix(0.0, (p + q) * m,
+   (p + q) * m);
+    matrix[(p + q) * m * (p + q) * m, (p + q) * m * (p + q) * m] tmp;
+    matrix[(p + q) * m, (p + q) * m] Omega;
 
-      // Construct companion matrix following Heaps 2022
-      // VAR component: phi matrices in top-left block
-      for (i in 1:p) {
-        companion_mat[1:m, ((i - 1) * m + 1):(i * m)] = phi[i];
-        if (i > 1) {
-          // Identity blocks for VAR lags
-          for (j in 1:m) {
-            companion_mat[(i - 1) * m + j, (i - 2) * m + j] = 1.0;
-          }
+    // Construct companion matrix (phi_tilde) following Heaps 2022
+    // VAR component: phi matrices in top-left block
+    for (i in 1:p) {
+      companion_mat[1:m, ((i - 1) * m + 1):(i * m)] = phi[i];
+      if (i > 1) {
+        // Identity blocks for VAR lags
+        for (j in 1:m) {
+          companion_mat[(i - 1) * m + j, (i - 2) * m + j] = 1.0;
         }
       }
-
-      // MA component: theta matrices
-      for (i in 1:q) {
-        companion_mat[1:m, (p * m + (i - 1) * m + 1):(p * m + i * m)] = theta[i];
-        if (i > 1) {
-          for (j in 1:m) {
-            companion_mat[(p + i - 1) * m + j, (p + i - 2) * m + j] = 1.0;
-          }
-        }
-      }
-
-      // Innovation covariance structure
-      companion_var[1:m, 1:m] = Sigma;
-      if (q > 0) {
-        companion_var[(p * m + 1):((p + 1) * m), (p * m + 1):((p + 1) * m)] = Sigma;
-      }
-
-      // Solve discrete Lyapunov equation for stationary covariance
-      matrix[(p + q) * m * (p + q) * m, (p + q) * m * (p + q) * m] kron_companion = kronecker_prod(companion_mat, companion_mat);
-      matrix[(p + q) * m, (p + q) * m] eye = diag_matrix(rep_vector(1.0, (p + q) * m));
-      matrix[(p + q) * m * (p + q) * m, (p + q) * m * (p + q) * m] lhs = eye - kron_companion;
-      return matrix_solve_left_tri_low(lhs, to_vector(companion_var));
     }
+
+    // MA component: theta matrices in top-right block
+    for (i in 1:q) {
+      companion_mat[1:m, ((p + i - 1) * m + 1):((p + i) * m)] = theta[i];
+    }
+
+    // Identity blocks for MA lags (if q > 1)
+    if (q > 1) {
+      for (i in 2:q) {
+        for (j in 1:m) {
+          companion_mat[(p + i - 1) * m + j, (p + i - 2) * m + j] = 1.0;
+        }
+      }
+    }
+
+    // Construct innovation covariance matrix (Sigma_tilde)
+    // Innovations affect y_t and eps_t simultaneously
+    companion_var[1:m, 1:m] = Sigma;  // For y_t innovations
+    companion_var[(p * m + 1):((p + 1) * m), (p * m + 1):((p + 1) * m)] = Sigma;
+   // For eps_t innovations
+    companion_var[1:m, (p * m + 1):((p + 1) * m)] = Sigma;  // Cross-covariance
+    companion_var[(p * m + 1):((p + 1) * m), 1:m] = Sigma;  // Symmetric cross-covariance
+
+    // Solve Lyapunov equation: Omega = Sigma_tilde + Phi_tilde * Omega * Phi_tilde'
+    // Vectorized form: vec(Omega) = (I - Phi_tilde ⊗ Phi_tilde)^{-1}vec(Sigma_tilde)
+    tmp = diag_matrix(rep_vector(1.0, (p + q) * m * (p + q) * m)) - kronecker_prod(companion_mat, companion_mat);
+
+    Omega = to_matrix(tmp \ to_vector(companion_var), (p + q) * m, (p + q) * m);
+
+    // Ensure numerical symmetry of result
+    for (i in 1:(rows(Omega) - 1)) {
+      for (j in (i + 1):rows(Omega)) {
+        Omega[j, i] = Omega[i, j];
+      }
+    }
+
+    return Omega;
+  }
 }
 data {
   int<lower=1> N;  // total number of observations

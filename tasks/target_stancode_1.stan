@@ -15,10 +15,10 @@ data {
   int<lower=1> n_trend;  // number of timepoints
   int<lower=1> n_series_trend;  // number of observed time series
   int<lower=1> n_lv_trend;  // number of latent states
-  matrix times_trend[n_trend, n_series_trend];  // temporal order of latent states
+  array[n_trend, n_series_trend] int times_trend;  // temporal order of latent states
   array[N] int obs_trend_time;  // idx to map latent states to observations
   array[N] int obs_trend_series;  // idx to map latent states to observations
-  vector[1] mu_ones = 1;  // Column of ones for glm means
+  vector[1] mu_ones;  // Column of ones for glm means
 }
 transformed data {
   matrix[N, Kc] Xc;  // centered version of X without an intercept
@@ -84,7 +84,7 @@ model {
 
   // likelihood including constants
   if (!prior_only) {
-    target += poisson_log_glm_lpmf(Y | mu, 0.0, mu_ones);
+    target += poisson_log_glm_lpmf(Y | to_matrix(mu), 0.0, mu_ones);
   }
 
   // priors including constants
