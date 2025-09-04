@@ -22,7 +22,14 @@
 setup_brms_lightweight <- function(formula, data, family = gaussian(),
                                    trend_formula = NULL, stanvars = NULL, 
                                    ...) {
-  checkmate::assert_formula(formula)
+  # Accept both regular formulas and brms formula objects
+  checkmate::assert(
+    checkmate::check_formula(formula),
+    checkmate::check_class(formula, "mvbrmsformula"),
+    checkmate::check_class(formula, "bform"),
+    checkmate::check_class(formula, "brmsformula"),
+    combine = "or"
+  )
   checkmate::assert_data_frame(data, min.rows = 1)
   if (!is.null(trend_formula)) {
     checkmate::assert(
@@ -35,21 +42,24 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   }
 
   # Handle trend formulas without response variables
-  # Check if formula lacks response variable (e.g., ~ 1, ~ x + y) 
-  formula_chr <- deparse(formula)
-  if (!grepl("~.*~", formula_chr) && grepl("^\\s*~", formula_chr)) {
-    # This is a trend formula without response variable
-    # Add fake trend_y response variable following mvgam pattern
-    data <- data
-    data$trend_y <- rnorm(nrow(data))
-    
-    # Update formula to include trend_y response
-    if (attr(terms(formula), 'intercept') == 1) {
-      # Has intercept: keep intercept to get Intercept_trend prior
-      formula <- update(formula, trend_y ~ .)
-    } else {
-      # No intercept: explicitly remove intercept
-      formula <- update(formula, trend_y ~ . - 1)
+  # Only apply this logic to regular formula objects, not brms formula objects
+  if (inherits(formula, "formula") && !inherits(formula, c("brmsformula", "mvbrmsformula", "bform"))) {
+    # Check if formula lacks response variable (e.g., ~ 1, ~ x + y) 
+    formula_chr <- deparse(formula)
+    if (!grepl("~.*~", formula_chr) && grepl("^\\s*~", formula_chr)) {
+      # This is a trend formula without response variable
+      # Add fake trend_y response variable following mvgam pattern
+      data <- data
+      data$trend_y <- rnorm(nrow(data))
+      
+      # Update formula to include trend_y response
+      if (attr(terms(formula), 'intercept') == 1) {
+        # Has intercept: keep intercept to get Intercept_trend prior
+        formula <- update(formula, trend_y ~ .)
+      } else {
+        # No intercept: explicitly remove intercept
+        formula <- update(formula, trend_y ~ . - 1)
+      }
     }
   }
 
@@ -143,7 +153,16 @@ extract_brmsterms_from_setup <- function(setup_object) {
 # flexible trend specifications while maintaining brms compatibility for
 # multivariate response families and distributional modeling.#' @noRd
 parse_multivariate_trends <- function(formula, trend_formula = NULL) {
-  checkmate::assert_formula(formula)
+  # Validate inputs - accept either regular formula or brms formula objects
+  # Note: We don't extract underlying formulas as the helper functions
+  # (is_multivariate_formula, extract_response_names) already handle all types
+  checkmate::assert(
+    checkmate::check_formula(formula),
+    checkmate::check_class(formula, "mvbrmsformula"),
+    checkmate::check_class(formula, "bform"),
+    checkmate::check_class(formula, "brmsformula"),
+    combine = "or"
+  )
   
   # Handle missing trend formula
   if (is.null(trend_formula)) {
