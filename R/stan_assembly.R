@@ -254,6 +254,9 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
     responses_with_trends <- "main"  # Mark univariate model
   }
 
+  # Reorder trend stanvars to ensure proper variable declaration order
+  trend_stanvars <- sort_stanvars(trend_stanvars)
+  
   # Generate base observation Stan code with trend stanvars
   base_stancode <- generate_base_stancode_with_stanvars(
     obs_setup,
@@ -1953,42 +1956,112 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL, is_factor_m
     n_lv <- n_series  # Non-factor model: n_lv_trend = n_series_trend
   }
 
-  # Create n_trend stanvar - always needed
-  n_trend_stanvar <- brms::stanvar(
-    x = n_obs,
-    name = "n_trend",
-    scode = "int<lower=1> n_trend;",
-    block = "data"
+  # Create consolidated dimensions stanvar - ensures all dimensions declared together first
+  dimensions_scode <- paste(
+    "int<lower=1> n_trend;",
+    "int<lower=1> n_series_trend;", 
+    "int<lower=1> n_lv_trend;",
+    sep = "\n  "
+  )
+  
+  # Prepare data list with all dimension values
+  dimensions_data <- list(
+    n_trend = n_obs,
+    n_series_trend = n_series,
+    n_lv_trend = if (is_factor_model) n_lv else n_series
+  )
+  
+  dimensions_stanvar <- brms::stanvar(
+    x = dimensions_data,
+    name = "trend_dimensions",
+    scode = dimensions_scode,
+    block = "data",
+    position = "start"  # Ensure all dimensions declared first
   )
 
-  # Create n_series_trend stanvar - always needed
-  n_series_trend_stanvar <- brms::stanvar(
-    x = n_series,
-    name = "n_series_trend",
-    scode = "int<lower=1> n_series_trend;",
-    block = "data"
-  )
+  return(dimensions_stanvar)
+}
 
-  # Create n_lv_trend stanvar - always needed for consistent parameter indexing
-  if (is_factor_model) {
-    # Factor model: n_lv_trend < n_series_trend (true latent factors)
-    n_lv_trend_stanvar <- brms::stanvar(
-      x = n_lv,
-      name = "n_lv_trend",
-      scode = "int<lower=1> n_lv_trend;",
-      block = "data"
-    )
-  } else {
-    # Non-factor model: n_lv_trend = n_series_trend for consistent indexing
-    n_lv_trend_stanvar <- brms::stanvar(
-      x = n_series,  # Use n_series for consistency, not n_lv
-      name = "n_lv_trend",
-      scode = "int<lower=1> n_lv_trend;",
-      block = "data"
-    )
+#' Sort stanvars by dependency priority
+#'
+#' Reorders stanvars to ensure proper Stan variable declaration order,
+#' preventing "identifier not in scope" compilation errors.
+#'
+#' @param stanvars A named list of stanvar objects, typically from brms
+#' @return A reordered list of stanvars with same class and structure
+#' @details 
+#' Priority levels:
+#' - Level 1: Dimension variables (n_trend, n_series_trend, etc.)
+#' - Level 2: Arrays referencing dimensions (times_trend, obs_trend)  
+#' - Level 3: All other stanvars
+#' 
+#' Within each priority level, original order is preserved for stability.
+#' @noRd
+sort_stanvars <- function(stanvars) {
+  # Validate input
+  checkmate::assert_list(stanvars, null.ok = TRUE)
+  
+  if (is.null(stanvars) || length(stanvars) == 0) {
+    return(stanvars)
   }
-
-  return(combine_stanvars(n_trend_stanvar, n_series_trend_stanvar, n_lv_trend_stanvar))
+  
+  # Priority constants
+  DIMENSION_PRIORITY <- 1L
+  ARRAY_PRIORITY <- 2L  
+  DEFAULT_PRIORITY <- 3L
+  
+  # Define ordering priority (lower number = comes first)
+  get_priority <- function(name, scode) {
+    # Validate stanvar structure
+    if (is.null(name) || !is.character(name)) {
+      return(DEFAULT_PRIORITY)
+    }
+    
+    # Dimension variables must come first
+    if (grepl("^(n_trend|n_series_trend|n_lv_trend)$", name) || 
+        grepl("trend_dimensions", name)) {
+      return(DIMENSION_PRIORITY)
+    }
+    
+    # Arrays that reference dimensions come after
+    if (!is.null(scode) && is.character(scode)) {
+      if (grepl("times_trend|obs_trend", name) || 
+          grepl("array\\[.*n_(trend|series_trend|lv_trend)", scode)) {
+        return(ARRAY_PRIORITY)
+      }
+    }
+    
+    return(DEFAULT_PRIORITY)
+  }
+  
+  # Get names safely
+  names_list <- names(stanvars)
+  if (is.null(names_list)) {
+    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+      rlang::warn("Cannot sort unnamed stanvars", .frequency = "once")
+    }
+    return(stanvars)
+  }
+  
+  # Calculate priority for each stanvar with error handling
+  priorities <- vapply(names_list, function(name) {
+    stanvar <- stanvars[[name]]
+    scode <- if (is.list(stanvar) && !is.null(stanvar$scode)) {
+      as.character(stanvar$scode)
+    } else {
+      ""
+    }
+    get_priority(name, scode)
+  }, integer(1), USE.NAMES = FALSE)
+  
+  # Sort by priority, preserving original order within same priority
+  sort_order <- order(priorities, seq_along(priorities))
+  
+  # Reorder stanvars
+  sorted_stanvars <- stanvars[sort_order]
+  class(sorted_stanvars) <- class(stanvars)
+  
+  return(sorted_stanvars)
 }
 
 # Function removed - dimension stanvars now handled by generate_common_trend_data()
@@ -5439,9 +5512,10 @@ create_times_trend_matrix <- function(n_time, n_series, unique_times, unique_ser
     }
   }
 
-  # Create stanvar with explicit 2D integer array declaration
+  # Create stanvar with explicit 2D integer array declaration using new Stan syntax
   # Use both data (x) and explicit scode to override brms auto-generation
-  stan_declaration <- glue::glue("int {matrix_name}[{n_time}, {n_series}];")
+  # Reference dimension variables with _trend suffix (n_trend, n_series_trend)
+  stan_declaration <- glue::glue("array[n_trend, n_series_trend] int {matrix_name};")
 
   brms::stanvar(
     x = times_array,

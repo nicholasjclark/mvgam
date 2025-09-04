@@ -87,15 +87,20 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
   - Innovation matrices and state vectors
   - Common dimension variables for trend matrix structure
 
-### Stage 6: Stan Code Assembly
+### Stage 6: Stan Code Assembly with Dependency Ordering
 - **Entry point**: `generate_combined_stancode()` in `R/stan_assembly.R`
 - **Input**: obs_setup, trend_setup, and generated stanvars
 - **Processing**:
+  - **🏆 CRITICAL**: Calls `sort_stanvars()` to reorder stanvars by dependency priority before injection
+  - **Dependency Resolution**: Ensures Stan variables declared before use:
+    - **Priority 1**: Dimension variables (`n_trend`, `n_series_trend`, `n_lv_trend`)
+    - **Priority 2**: Arrays referencing dimensions (`times_trend`, `obs_trend_time`, etc.)
+    - **Priority 3**: All other stanvars
   - Combines brms observation code with trend stanvars using `generate_base_stancode_with_stanvars()`
   - Merges Stan data from both models
   - Validates combined code structure
-- **Output**: Base Stan code with embedded trend variables but no trend injection yet
-- **Available data structures**: Combined Stan code with both observation and trend components
+- **Output**: Base Stan code with properly ordered trend variables ready for injection
+- **Available data structures**: Combined Stan code with both observation and trend components in correct declaration order
 
 ### Stage 7: GLM-Compatible Trend Injection
 - **Entry point**: `inject_trend_into_linear_predictor()` in `R/stan_assembly.R`
@@ -203,6 +208,7 @@ mvgam() →
   │   │   ├─ create stanvar for obs_trend_time →
   │   │   ├─ create stanvar for obs_trend_series →
   │   │   └─ generate_trend_specific_stanvars() →
+  │   ├─ sort_stanvars() →                              [🏆 CRITICAL: DEPENDENCY-BASED REORDERING]
   │   └─ inject_trend_into_linear_predictor() →         [GLM-COMPATIBLE TREND INJECTION]
   │       ├─ detect_glm_usage() →                       [DETERMINES INJECTION APPROACH]
   │       ├─ inject_trend_into_glm_predictor() →        [GLM-OPTIMIZED PATH]
