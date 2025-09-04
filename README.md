@@ -246,13 +246,13 @@ scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.2029645
+    #> 8.40559
     #> Out of sample DRPS:
-    #> 5.2327845
+    #> 5.25875275
     #> Out of sample DRPS:
-    #> 8.54444325
+    #> 8.77930325
     #> Out of sample DRPS:
-    #> 3.8400025
+    #> 3.47124075
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
@@ -340,7 +340,7 @@ details in scientific communications
     #>   Autoregressive process following methods described by Heaps (2023) and
     #>   Clark et al. (2025). The mvgam-constructed model and observed data were
     #>   passed to the probabilistic programming environment Stan (version
-    #>   2.36.0; Carpenter et al. 2017, Stan Development Team 2025), specifically
+    #>   2.37.0; Carpenter et al. 2017, Stan Development Team 2025), specifically
     #>   through the cmdstanr interface (Gabry & Cesnovar, 2021). We ran 4
     #>   Hamiltonian Monte Carlo chains for 1500 warmup iterations and 500
     #>   sampling iterations for joint posterior estimation. Rank normalized
@@ -479,32 +479,34 @@ estimates for the `Beta` precision parameters *ϕ*.
     #> 
     #> Observation precision parameter estimates:
     #>        2.5%  50% 97.5% Rhat n_eff
-    #> phi[1]  8.1 12.0  18.0    1  1402
-    #> phi[2]  5.5  8.6  13.0    1  1205
-    #> phi[3]  4.1  6.0   8.5    1  1630
+    #> phi[1]  7.8 12.0  18.0    1  1829
+    #> phi[2]  5.6  8.6  13.0    1  1023
+    #> phi[3]  4.1  6.0   8.7    1  1404
     #> 
     #> GAM coefficient (beta) estimates:
     #>             2.5%  50% 97.5% Rhat n_eff
-    #> (Intercept) 0.11 0.45  0.68 1.01   882
+    #> (Intercept) 0.11 0.45   0.7 1.01   602
     #> 
     #> Approximate significance of GAM smooths:
-    #>                            edf Ref.df Chi.sq p-value
-    #> s(season)                4.345      5  6.892   0.104
-    #> s(season):seriesseries_1 1.481      4  7.378   0.207
-    #> s(season):seriesseries_2 1.023      4  6.610   0.626
-    #> s(season):seriesseries_3 1.136      4  4.712   0.475
+    #>                             edf Ref.df Chi.sq p-value  
+    #> s(season)                3.9071      5  9.792  0.0653 .
+    #> s(season):seriesseries_1 1.0934      4 11.307  0.2695  
+    #> s(season):seriesseries_2 2.5629      4  2.227  0.4544  
+    #> s(season):seriesseries_3 0.8565      4  6.556  0.5358  
+    #> ---
+    #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     #> 
     #> marginal deviation:
     #>              2.5%  50% 97.5% Rhat n_eff
-    #> alpha_gp[1] 0.110 0.40  0.86 1.01   596
-    #> alpha_gp[2] 0.550 0.91  1.50 1.00  1257
-    #> alpha_gp[3] 0.072 0.40  0.91 1.01   894
+    #> alpha_gp[1] 0.150 0.40  0.88 1.00   828
+    #> alpha_gp[2] 0.570 0.93  1.50 1.00  1018
+    #> alpha_gp[3] 0.052 0.40  0.92 1.01   672
     #> 
     #> length scale:
     #>           2.5%  50% 97.5% Rhat n_eff
-    #> rho_gp[1]  1.2  3.9    12 1.00  1832
-    #> rho_gp[2]  3.4 13.0    32 1.01   350
-    #> rho_gp[3]  1.2  4.9    23 1.01   515
+    #> rho_gp[1]  1.2  3.6    11 1.00  1482
+    #> rho_gp[2]  3.0 12.0    30 1.01   367
+    #> rho_gp[3]  1.3  4.9    26 1.00   532
     #> 
     #> Stan MCMC diagnostics:
     #> ✔ No issues with effective samples per iteration
