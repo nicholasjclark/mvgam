@@ -532,7 +532,7 @@ get_parameter_type_default_prior <- function(param_name) {
   # Pattern matching for common parameter types
   if (grepl("^ar[0-9]+_trend$", param_name)) {
     # AR coefficients: typically bounded [-1, 1] for stationarity
-    return(list(prior = "", lb = "", ub = ""))
+    return(list(prior = "normal(0, 0.5)", lb = "-1", ub = "1"))
   } else if (grepl("sigma.*_trend$", param_name)) {
     # Variance parameters: positive with lower bound
     return(list(prior = "", lb = "0", ub = ""))
@@ -1253,7 +1253,13 @@ get_trend_parameter_prior <- function(prior = NULL, param_name) {
     return(default_spec$default)
   }
 
-  # Strategy 3: Empty string fallback (Stan will use its defaults)
+  # Strategy 3: Pattern-based defaults for parameter types
+  pattern_default <- get_parameter_type_default_prior(param_name)
+  if (pattern_default$prior != "") {
+    return(pattern_default$prior)
+  }
+  
+  # Strategy 4: Empty string fallback (Stan will use its defaults)
   return("")
 }
 

@@ -5,13 +5,16 @@
       "Bash(git add:*)",
       "Bash(git push:*)",
       "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
       "Bash(timeout:*)",
       "WebFetch(domain:github.com)",
       "Bash(git commit:*)",
-      "Bash(rg:*)"
+      "Read(*)",
+      "Search(*)"
     ],
     "deny": [],
     "ask": [],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "plan"
   }
 }

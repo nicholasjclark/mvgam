@@ -2672,18 +2672,17 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # Extract dimensions and configuration
   n_lv <- trend_specs$n_lv %||% 1
-  lags <- trend_specs$lags %||% 1
+  p <- trend_specs$p %||% 1
   n_series <- data_info$n_series %||% 1
   n_obs <- data_info$n_obs
 
   # Validate dimensions
   checkmate::assert_int(n_lv, lower = 1)
   checkmate::assert_int(n_series, lower = 1)
-  checkmate::assert_int(lags, lower = 1)
   checkmate::assert_int(n_obs, lower = 1)
 
-  # Convert lags to ar_lags if needed
-  ar_lags <- if (!is.null(trend_specs$ar_lags)) trend_specs$ar_lags else (1:lags)
+  # Convert p parameter to ar_lags vector
+  ar_lags <- if (!is.null(trend_specs$ar_lags)) trend_specs$ar_lags else p
   checkmate::assert_integerish(ar_lags, lower = 1, any.missing = FALSE)
 
   is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series

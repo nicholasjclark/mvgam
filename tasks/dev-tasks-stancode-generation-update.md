@@ -66,12 +66,12 @@
 
 ### **Task 2: Fix AR Trend Specific Issues (Priority 1)** ⚠️ *15-min tasks*
 
-**D2.1**: Fix AR lag parameter generation for seasonal models
+**D2.1**: ✅ **COMPLETED**:  Fix AR lag parameter generation for seasonal models
   - **TDD Approach**: Tests expect `ar1_trend` and `ar12_trend` for AR(p=c(1,12))
   - **Gold Standard**: Compare generated code against expected AR patterns in tests
   - **Current**: May be generating incorrect parameter names or missing parameters
   - **Fix**: Update AR trend generator to handle vector p values correctly
-  - **File**: `R/trend_generators/ar_trend.R`
+  - **Files**: `R/trend_system.R`, `R/stan_assembly.R`
   - **TDD Validation**: `expect_true(grepl("ar1_trend", code))` and `ar12_trend` should pass
 
 **D2.2**: Fix AR initialization patterns for seasonal models
