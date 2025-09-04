@@ -1722,8 +1722,8 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
                                                factor_model = FALSE,
                                                hierarchical_info = NULL) {
 
-  # Determine effective dimension for innovations
-  effective_dim <- if (factor_model) n_lv else n_series
+  # Determine effective dimension for innovations using symbolic names
+  effective_dim <- "n_lv_trend"
 
   # Check for hierarchical structure
   is_hierarchical <- !is.null(hierarchical_info) && hierarchical_info$has_groups
@@ -2368,7 +2368,7 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
     )
 
     # Add shared priors
-    effective_dim <- if (factor_model) n_lv else n_series
+    effective_dim <- "n_lv_trend"
     is_hierarchical <- !is.null(hierarchical_info) && hierarchical_info$has_groups
 
     shared_priors <- generate_innovation_model(

@@ -107,7 +107,7 @@ test_that("stancode.mvgam_formula returns correct class structure", {
 
   # RW-specific innovation structure
   expect_true(grepl("matrix\\[n_trend, n_lv_trend\\] innovations_trend;", code_with_trend))
-  expect_true(grepl("vector<lower=0>\\[1\\] sigma_trend;", code_with_trend))
+  expect_true(grepl("vector<lower=0>\\[n_lv_trend\\] sigma_trend;", code_with_trend))
   expect_true(grepl("scaled_innovations_trend = innovations_trend \\* diag_matrix\\(sigma_trend\\)", code_with_trend))
 
   # 6. RW Dynamics Implementation
@@ -182,7 +182,7 @@ test_that("stancode generates correct AR(p = c(1, 12)) seasonal model structure"
 
   # Should still have standard trend components
   expect_true(grepl("matrix\\[n_trend, n_lv_trend\\] innovations_trend;", code_with_trend))
-  expect_true(grepl("vector<lower=0>\\[1\\] sigma_trend;", code_with_trend))
+  expect_true(grepl("vector<lower=0>\\[n_lv_trend\\] sigma_trend;", code_with_trend))
   expect_true(grepl("matrix\\[n_trend, n_lv_trend\\] lv_trend;", code_with_trend))
 
   # mu construction and trend addition in transformed parameters
@@ -272,7 +272,7 @@ test_that("stancode generates correct AR(p = c(2, 4), ma = TRUE) ARMA model stru
 
   # Should still have standard trend components
   expect_true(grepl("matrix\\[n_trend, n_lv_trend\\] innovations_trend;", code_with_trend))
-  expect_true(grepl("vector<lower=0>\\[1\\] sigma_trend;", code_with_trend))
+  expect_true(grepl("vector<lower=0>\\[n_lv_trend\\] sigma_trend;", code_with_trend))
   expect_true(grepl("matrix\\[n_trend, n_lv_trend\\] lv_trend;", code_with_trend))
 
   # Universal trend computation pattern should still be present
