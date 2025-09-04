@@ -1,8 +1,5 @@
 # TRD-stancode-generation-update Development Tasks
 
-## Overview
-**CRITICAL PRIORITY**: Fix stancode generation failures that cause 15/23 tests to fail with Stan compilation errors. Root cause: missing data handling system needs obs_ind mapping that brms doesn't provide.
-
 ## 📋 COMPLETED FOUNDATION WORK ✅
 
 **Summary**: Complete prior system, parameter extraction, trend generators, and inspection functions (Steps 1-9) with 346+ tests passing across `R/priors.R`, `R/validations.R`, `R/brms_integration.R`, `R/stan_assembly.R`. Key achievements: standardized 3-stanvar pattern, mvgam_formula() interface, centralized prior resolution, and parameter extraction system.
@@ -66,13 +63,12 @@
 
 ### **Task 1: Fix Core RW Trend Generation Issues (Priority 1)** ⚠️ *15-min tasks*
 
-**D1.1**: Fix trend formula parsing to exclude design matrix when no predictors
-  - **TDD Approach**: Tests expect `~ RW()` to NOT generate `K_trend`, `X_trend`, `Xc_trend` 
-  - **Gold Standard**: Check `tasks/target_stancode_1.stan` - RW model has NO design matrix variables
-  - **Current**: Generating design matrix variables even for intercept-only trends
-  - **Fix**: Modify trend formula parsing to detect intercept-only case
-  - **File**: `R/brms_integration.R` - add logic in trend processing
-  - **TDD Validation**: Run tests after fix - `expect_false(grepl("K_trend", code))` should pass
+**D1.1**: ✅ **COMPLETED**: Fix trend formula parsing to exclude design matrix when no predictors
+  - **Solution**: Modified `extract_univariate_standata()` to only include data objects with stancode declarations
+  - **Root Cause**: brms generates K, Kc, X, Xc in standata but NOT in stancode for intercept-only models
+  - **Fix Applied**: Added declaration checking in `R/stan_assembly.R:5275` with code reviewer approval
+  - **Validation**: Tests 81-85 now pass - design matrix variables properly excluded from intercept-only models
+  - **Enhanced Coverage**: Added comprehensive design matrix checks to VARMA test for positive validation
 
 **D1.2**: Fix times_trend array structure in generated stanvars  
   - ✅ **COMPLETED**: Updated test expectations from matrix to array

@@ -355,6 +355,13 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   # Times trend matrix (2D integer array)
   expect_true(grepl("array\\[n_trend, n_series_trend\\] int times_trend;", code_with_trend))
 
+  # Trend formula design matrix variables (presence covariate)
+  expect_true(grepl("int<lower=1> K_trend;", code_with_trend))
+  expect_true(grepl("int<lower=1> Kc_trend;", code_with_trend))
+  expect_true(grepl("matrix\\[n_trend, K_trend\\] X_trend;", code_with_trend))
+  expect_true(grepl("matrix\\[n_trend, Kc_trend\\] Xc_trend;", code_with_trend))
+  expect_true(grepl("vector\\[Kc_trend\\] means_X_trend;", code_with_trend))
+
   # VAR initialization constants in transformed data
   expect_true(grepl("vector\\[n_lv_trend\\] trend_zeros = rep_vector\\(0\\.0, n_lv_trend\\);", code_with_trend))
   expect_true(grepl("Zero mean vector for VARMA process.*following Heaps 2022", code_with_trend))
@@ -388,6 +395,9 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   # Innovation parameters
   expect_true(grepl("vector<lower=0>\\[n_lv_trend\\] sigma_trend;.*innovation SDs", code_with_trend))
   expect_true(grepl("cholesky_factor_corr\\[n_lv_trend\\] L_Omega_trend;.*innovation correlations", code_with_trend))
+
+  # Trend coefficients for presence covariate
+  expect_true(grepl("vector\\[Kc_trend\\] b_trend;.*trend coefficients", code_with_trend))
 
   # Joint initialization for stationary distribution
   expect_true(grepl("vector\\[3 \\* n_lv_trend\\] init_trend;.*2 VAR lags \\+ 1 MA lag", code_with_trend))

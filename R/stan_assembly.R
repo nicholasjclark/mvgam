@@ -5275,37 +5275,64 @@ extract_and_rename_standata_objects <- function(standata, suffix, mapping, is_mu
 extract_univariate_standata <- function(standata, suffix, mapping) {
   checkmate::assert_list(standata, names = "named")
   checkmate::assert_character(suffix, len = 1)
-  checkmate::assert_list(mapping)
+  checkmate::assert_list(mapping, names = "named")
+  
+  # Validate mapping structure if data_declarations is present
+  if (!is.null(mapping$data_declarations)) {
+    checkmate::assert_character(mapping$data_declarations, len = 1)
+  }
 
   stanvar_list <- list()
 
   # Get all standata names and filter using comprehensive approach
   all_data_names <- names(standata)
   renameable_data_names <- filter_renameable_identifiers(all_data_names)
+  
+  # Pre-parse declaration lines for efficiency
+  declaration_lines <- NULL
+  if (!is.null(mapping$data_declarations) && nzchar(mapping$data_declarations)) {
+    declaration_lines <- strsplit(mapping$data_declarations, "\n")[[1]]
+    declaration_lines <- trimws(declaration_lines)
+    declaration_lines <- declaration_lines[nzchar(declaration_lines)]
+  }
 
   for (data_name in renameable_data_names) {
     if (data_name %in% names(standata)) {
       renamed_data_name <- paste0(data_name, suffix)
+      
+      # Only include data objects that would be declared in the stancode
+      # Check if the renamed version appears in declarations
+      has_declaration <- FALSE
+      if (!is.null(declaration_lines) && length(declaration_lines) > 0) {
+        has_declaration <- any(grepl(paste0("\\b", renamed_data_name, "\\b"), declaration_lines))
+      }
+      
+      # Skip data objects that have no declaration in stancode
+      if (!has_declaration) {
+        next
+      }
+      
       data_value <- standata[[data_name]]
 
       # Store mapping for coordination with Stan code renaming
+      if (is.null(mapping$original_to_renamed)) mapping$original_to_renamed <- list()
+      if (is.null(mapping$renamed_to_original)) mapping$renamed_to_original <- list()
+      
       mapping$original_to_renamed[[data_name]] <- renamed_data_name
       mapping$renamed_to_original[[renamed_data_name]] <- data_name
 
-      # Create stanvar for renamed data (use x for actual data values and scode for declaration)
+      # Create stanvar for renamed data
       stanvar_args <- list(
         x = data_value,
         name = renamed_data_name,
         block = "data"
       )
       
-      # Add declaration if available in mapping
-      if (!is.null(mapping$data_declarations)) {
-        # Extract the specific declaration line for this parameter
-        declaration_lines <- strsplit(mapping$data_declarations, "\n")[[1]]
+      # Add declaration if available
+      if (!is.null(declaration_lines)) {
         for (decl_line in declaration_lines) {
           if (grepl(paste0("\\b", renamed_data_name, "\\b"), decl_line)) {
-            stanvar_args$scode <- paste0("  ", trimws(decl_line))
+            stanvar_args$scode <- paste0("  ", decl_line)
             break
           }
         }
