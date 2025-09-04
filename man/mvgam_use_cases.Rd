@@ -47,7 +47,6 @@ This help page provides external links to example applications and discussions r
   \item \href{https://stats.stackexchange.com/questions/612312}{Fitting a GAM with double seasonality to a daily time series}
   \item \href{https://stats.stackexchange.com/questions/648143}{Simulating time series with different seasonal effects}
   \item \href{https://discourse.mc-stan.org/t/adding-time-as-monotne-predictor/37109}{Adding time as a monotone predictor}
-  \item \href{https://discourse.mc-stan.org/t/accounting-for-non-independence-and-autocorrelation-in-hgam/658383}{Accounting for non-independence and autocorrelation in HGAM}
   \item \href{https://ecogambler.netlify.app/blog/time-varying-seasonality/}{Blog post: Incorporating time-varying seasonality in forecast models}
   \item \href{https://nicholasjclark.github.io/mvgam/articles/time_varying_effects.html}{Vignette: Time-varying effects in \code{mvgam}}
   \item \href{https://www.youtube.com/watch?v=fzPJUW8x6DU}{Video tutorial: Time series in R and Stan using the \code{mvgam} package: an introduction}
@@ -56,4 +55,3 @@ This help page provides external links to example applications and discussions r
 \author{
 Nicholas J Clark
 }
-

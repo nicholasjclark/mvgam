@@ -178,7 +178,8 @@ test_that("hierarchical cors are set up correctly", {
     formula = y ~ species,
     trend_model = RW(gr = region, subgr = species),
     data = all_dat,
-    run_model = FALSE
+    run_model = FALSE,
+    autoformat = FALSE
   )
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(any(grepl(
@@ -197,7 +198,8 @@ test_that("hierarchical cors are set up correctly", {
     trend_formula = ~species,
     trend_model = RW(gr = region, subgr = species),
     data = all_dat,
-    run_model = FALSE
+    run_model = FALSE,
+    autoformat = FALSE
   )
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(any(grepl(
@@ -216,7 +218,8 @@ test_that("hierarchical cors are set up correctly", {
     formula = y ~ species,
     trend_model = AR(gr = region, subgr = species, p = 2),
     data = all_dat,
-    run_model = FALSE
+    run_model = FALSE,
+    autoformat = FALSE
   )
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(any(grepl(
@@ -235,7 +238,8 @@ test_that("hierarchical cors are set up correctly", {
     trend_formula = ~species,
     trend_model = AR(gr = region, subgr = species, p = 3),
     data = all_dat,
-    run_model = FALSE
+    run_model = FALSE,
+    autoformat = FALSE
   )
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(any(grepl(
@@ -254,7 +258,8 @@ test_that("hierarchical cors are set up correctly", {
     formula = y ~ species,
     trend_model = VAR(gr = region, subgr = species),
     data = all_dat,
-    run_model = FALSE
+    run_model = FALSE,
+    autoformat = FALSE
   )
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(any(grepl(
@@ -273,7 +278,8 @@ test_that("hierarchical cors are set up correctly", {
     trend_formula = ~species,
     trend_model = VAR(gr = region, subgr = species),
     data = all_dat,
-    run_model = FALSE
+    run_model = FALSE,
+    autoformat = FALSE
   )
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(any(grepl(

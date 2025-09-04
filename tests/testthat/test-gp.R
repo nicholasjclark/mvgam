@@ -127,7 +127,8 @@ test_that("unidimensional gp for observation models working properly", {
         year:season,
     data = gaus_data$data_train,
     family = gaussian(),
-    run_model = FALSE
+    run_model = FALSE,
+    autoformat = FALSE
   )
 
   expect_true(
@@ -211,7 +212,8 @@ test_that("multidimensional gp for observation models working properly", {
         gp(time, year, k = 4, cov = 'matern32'),
     data = gaus_data$data_train,
     family = gaussian(),
-    run_model = FALSE
+    run_model = FALSE,
+    autoformat = FALSE
   )
 
   expect_true(
@@ -317,7 +319,8 @@ test_that("unidimensional gp for process models working properly", {
     data = beta_data$data_train,
     family = betar(),
     trend_model = AR(),
-    run_model = FALSE
+    run_model = FALSE,
+    autoformat = FALSE
   )
 
   # Model file should have prior lines for gp terms
@@ -396,7 +399,8 @@ test_that("multidimensional gp for process models working properly", {
     data = beta_data$data_train,
     family = betar(),
     trend_model = AR(),
-    run_model = FALSE
+    run_model = FALSE,
+    autoformat = FALSE
   )
 
   # Model file should have prior lines for gp terms

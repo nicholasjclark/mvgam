@@ -30,3 +30,4 @@
 ^.*-requirements\.md$
 ^.*-design\.md$
 ^.*-implementation\.md$
+claude.exe

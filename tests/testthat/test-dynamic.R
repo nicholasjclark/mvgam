@@ -155,14 +155,15 @@ test_that("dynamic to spline works for trend_formulas", {
 
 test_that("dynamic to Hilbert works for trend_formulas", {
   beta_data$data_train$random <- rnorm(NROW(beta_data$data_train))
-  mod <- mvgam(
+  mod <- suppressWarnings(mvgam(
     y ~ dynamic(random),
     trend_formula = ~ dynamic(random, k = 22),
     trend_model = RW(),
     data = beta_data$data_train,
     family = betar(),
-    run_model = FALSE
-  )
+    run_model = FALSE,
+    autoformat = FALSE
+  ))
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_no_error(code(mod))
 

@@ -1,7 +1,7 @@
 params <-
-  list(EVAL = TRUE)
+list(EVAL = TRUE)
 
-## ----echo = FALSE----------------------------------------------------------------------------
+## ----echo = FALSE-------------------------------------------------------
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
@@ -11,7 +11,7 @@ knitr::opts_chunk$set(
 )
 
 
-## ----setup, include=FALSE--------------------------------------------------------------------
+## ----setup, include=FALSE-----------------------------------------------
 knitr::opts_chunk$set(
   echo = TRUE,
   dpi = 100,
@@ -25,30 +25,27 @@ library(ggplot2)
 theme_set(theme_bw(base_size = 12, base_family = "serif"))
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 load(url("https://github.com/atsa-es/MARSS/raw/master/data/lakeWAplankton.rda"))
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 outcomes <- c("Greens", "Bluegreens", "Diatoms", "Unicells", "Other.algae")
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 # loop across each plankton group to create the long datframe
-plankton_data <- do.call(
-  rbind,
-  lapply(outcomes, function(x) {
-    # create a group-specific dataframe with counts labelled 'y'
-    # and the group name in the 'series' variable
-    data.frame(
-      year = lakeWAplanktonTrans[, "Year"],
-      month = lakeWAplanktonTrans[, "Month"],
-      y = lakeWAplanktonTrans[, x],
-      series = x,
-      temp = lakeWAplanktonTrans[, "Temp"]
-    )
-  })
-) %>%
+plankton_data <- do.call(rbind, lapply(outcomes, function(x) {
+  # create a group-specific dataframe with counts labelled 'y'
+  # and the group name in the 'series' variable
+  data.frame(
+    year = lakeWAplanktonTrans[, "Year"],
+    month = lakeWAplanktonTrans[, "Month"],
+    y = lakeWAplanktonTrans[, x],
+    series = x,
+    temp = lakeWAplanktonTrans[, "Temp"]
+  )
+})) %>%
   # change the 'series' label to a factor
   dplyr::mutate(series = factor(series)) %>%
   # filter to only include some years in the data
@@ -62,55 +59,66 @@ plankton_data <- do.call(
   dplyr::ungroup()
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 head(plankton_data)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 dplyr::glimpse(plankton_data)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 plot_mvgam_series(data = plankton_data, series = "all")
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 plankton_data %>%
   dplyr::filter(series == "Other.algae") %>%
   ggplot(aes(x = time, y = temp)) +
   geom_line(size = 1.1) +
-  geom_line(aes(y = y), col = "white", size = 1.3) +
-  geom_line(aes(y = y), col = "darkred", size = 1.1) +
+  geom_line(aes(y = y),
+    col = "white",
+    size = 1.3
+  ) +
+  geom_line(aes(y = y),
+    col = "darkred",
+    size = 1.1
+  ) +
   ylab("z-score") +
   xlab("Time") +
   ggtitle("Temperature (black) vs Other algae (red)")
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 plankton_data %>%
   dplyr::filter(series == "Diatoms") %>%
   ggplot(aes(x = time, y = temp)) +
   geom_line(size = 1.1) +
-  geom_line(aes(y = y), col = "white", size = 1.3) +
-  geom_line(aes(y = y), col = "darkred", size = 1.1) +
+  geom_line(aes(y = y),
+    col = "white",
+    size = 1.3
+  ) +
+  geom_line(aes(y = y),
+    col = "darkred",
+    size = 1.1
+  ) +
   ylab("z-score") +
   xlab("Time") +
   ggtitle("Temperature (black) vs Diatoms (red)")
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 plankton_train <- plankton_data %>%
   dplyr::filter(time <= 112)
 plankton_test <- plankton_data %>%
   dplyr::filter(time > 112)
 
 
-## ----notrend_mod, include = FALSE, results='hide'--------------------------------------------
+## ----notrend_mod, include = FALSE, results='hide'-----------------------
 notrend_mod <- mvgam(
   y ~
     te(temp, month, k = c(4, 4)) +
-      te(temp, month, k = c(4, 4), by = series) -
-      1,
+    te(temp, month, k = c(4, 4), by = series) - 1,
   family = gaussian(),
   data = plankton_train,
   newdata = plankton_test,
@@ -118,13 +126,13 @@ notrend_mod <- mvgam(
 )
 
 
-## ----eval=FALSE------------------------------------------------------------------------------
+## ----eval=FALSE---------------------------------------------------------
 # notrend_mod <- mvgam(
 #   y ~
 #     # tensor of temp and month to capture
 #     # "global" seasonality
 #     te(temp, month, k = c(4, 4)) +
-#
+# 
 #     # series-specific deviation tensor products
 #     te(temp, month, k = c(4, 4), by = series) - 1,
 #   family = gaussian(),
@@ -133,47 +141,47 @@ notrend_mod <- mvgam(
 #   trend_model = "None"
 # )
 
-## --------------------------------------------------------------------------------------------
+
+## -----------------------------------------------------------------------
 plot_mvgam_smooth(notrend_mod, smooth = 1)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 plot_mvgam_smooth(notrend_mod, smooth = 2)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 plot_mvgam_smooth(notrend_mod, smooth = 3)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 plot(notrend_mod, type = "forecast", series = 1)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 plot(notrend_mod, type = "forecast", series = 2)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 plot(notrend_mod, type = "forecast", series = 3)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 plot(notrend_mod, type = "residuals", series = 1)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 plot(notrend_mod, type = "residuals", series = 3)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 priors <- get_mvgam_priors(
   # observation formula, which has no terms in it
   y ~ -1,
 
   # process model formula, which includes the smooth functions
   trend_formula = ~ te(temp, month, k = c(4, 4)) +
-    te(temp, month, k = c(4, 4), by = trend) -
-    1,
+    te(temp, month, k = c(4, 4), by = trend) - 1,
 
   # VAR1 model with uncorrelated process errors
   trend_model = VAR(),
@@ -182,33 +190,30 @@ priors <- get_mvgam_priors(
 )
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 priors[, 3]
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 priors[, 4]
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 priors <- c(
   prior(normal(0.5, 0.1), class = sigma_obs, lb = 0.2),
   prior(normal(0.5, 0.25), class = sigma)
 )
 
 
-## ----var_mod, include = FALSE, results='hide'------------------------------------------------
-var_mod <- mvgam(
-  y ~ -1,
+## ----var_mod, include = FALSE, results='hide'---------------------------
+var_mod <- mvgam(y ~ -1,
   trend_formula = ~
     # tensor of temp and month should capture
     # seasonality
     te(temp, month, k = c(4, 4)) +
       # need to use 'trend' rather than series
       # here
-      te(temp, month, k = c(4, 4), by = trend) -
-      1
-  ,
+      te(temp, month, k = c(4, 4), by = trend) - 1,
   family = gaussian(),
   data = plankton_train,
   newdata = plankton_test,
@@ -219,77 +224,75 @@ var_mod <- mvgam(
 )
 
 
-## ----eval=FALSE------------------------------------------------------------------------------
+## ----eval=FALSE---------------------------------------------------------
 # var_mod <- mvgam(
 #   # observation formula, which is empty
-#   y ~ -1,
-#
+#   forumla = y ~ -1,
+# 
 #   # process model formula, which includes the smooth functions
 #   trend_formula = ~ te(temp, month, k = c(4, 4)) +
 #     te(temp, month, k = c(4, 4), by = trend) - 1,
-#
+# 
 #   # VAR1 model with uncorrelated process errors
 #   trend_model = VAR(),
 #   family = gaussian(),
 #   data = plankton_train,
 #   newdata = plankton_test,
-#
+# 
 #   # include the updated priors
 #   priors = priors,
 #   silent = 2
 # )
 
-## --------------------------------------------------------------------------------------------
+
+## -----------------------------------------------------------------------
 summary(var_mod, include_betas = FALSE)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 plot(var_mod, "smooths", trend_effects = TRUE)
 
 
-## ----warning=FALSE, message=FALSE------------------------------------------------------------
-A_pars <- matrix(NA, nrow = 5, ncol = 5)
-for (i in 1:5) {
-  for (j in 1:5) {
-    A_pars[i, j] <- paste0("A[", i, ",", j, "]")
-  }
-}
-mcmc_plot(var_mod, variable = as.vector(t(A_pars)), type = "hist")
+## ----warning=FALSE, message=FALSE---------------------------------------
+mcmc_plot(
+  var_mod,
+  variable = 'A',
+  regex = TRUE,
+  type = 'hist',
+  facet_args = list(dir = 'v')
+)
 
 
-## ----warning=FALSE, message=FALSE------------------------------------------------------------
-Sigma_pars <- matrix(NA, nrow = 5, ncol = 5)
-for (i in 1:5) {
-  for (j in 1:5) {
-    Sigma_pars[i, j] <- paste0("Sigma[", i, ",", j, "]")
-  }
-}
-mcmc_plot(var_mod, variable = as.vector(t(Sigma_pars)), type = "hist")
+## ----warning=FALSE, message=FALSE---------------------------------------
+mcmc_plot(
+  var_mod,
+  variable = 'Sigma',
+  regex = TRUE,
+  type = 'hist',
+  facet_args = list(dir = 'v')
+)
 
 
-## ----warning=FALSE, message=FALSE------------------------------------------------------------
+## ----warning=FALSE, message=FALSE---------------------------------------
 mcmc_plot(var_mod, variable = "sigma_obs", regex = TRUE, type = "hist")
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 priors <- c(
   prior(normal(0.5, 0.1), class = sigma_obs, lb = 0.2),
   prior(normal(0.5, 0.25), class = sigma)
 )
 
 
-## ----varcor_mod, include = FALSE, results='hide'---------------------------------------------
-varcor_mod <- mvgam(
-  y ~ -1,
+## ----varcor_mod, include = FALSE, results='hide'------------------------
+varcor_mod <- mvgam(y ~ -1,
   trend_formula = ~
     # tensor of temp and month should capture
     # seasonality
     te(temp, month, k = c(4, 4)) +
       # need to use 'trend' rather than series
       # here
-      te(temp, month, k = c(4, 4), by = trend) -
-      1
-  ,
+      te(temp, month, k = c(4, 4), by = trend) - 1,
   family = gaussian(),
   data = plankton_train,
   newdata = plankton_test,
@@ -300,68 +303,74 @@ varcor_mod <- mvgam(
 )
 
 
-## ----eval=FALSE------------------------------------------------------------------------------
+## ----eval=FALSE---------------------------------------------------------
 # varcor_mod <- mvgam(
 #   # observation formula, which remains empty
-#   y ~ -1,
-#
+#   formula = y ~ -1,
+# 
 #   # process model formula, which includes the smooth functions
 #   trend_formula = ~ te(temp, month, k = c(4, 4)) +
 #     te(temp, month, k = c(4, 4), by = trend) - 1,
-#
+# 
 #   # VAR1 model with correlated process errors
 #   trend_model = VAR(cor = TRUE),
 #   family = gaussian(),
 #   data = plankton_train,
 #   newdata = plankton_test,
-#
+# 
 #   # include the updated priors
 #   priors = priors,
 #   silent = 2
 # )
 
-## ----warning=FALSE, message=FALSE------------------------------------------------------------
-Sigma_pars <- matrix(NA, nrow = 5, ncol = 5)
-for (i in 1:5) {
-  for (j in 1:5) {
-    Sigma_pars[i, j] <- paste0("Sigma[", i, ",", j, "]")
-  }
-}
-mcmc_plot(varcor_mod, variable = as.vector(t(Sigma_pars)), type = "hist")
 
-
-## --------------------------------------------------------------------------------------------
-Sigma_post <- as.matrix(varcor_mod, variable = "Sigma", regex = TRUE)
-median_correlations <- cov2cor(matrix(
-  apply(Sigma_post, 2, median),
-  nrow = 5,
-  ncol = 5
-))
-rownames(median_correlations) <- colnames(median_correlations) <- levels(
-  plankton_train$series
+## ----warning=FALSE, message=FALSE---------------------------------------
+mcmc_plot(
+  varcor_mod,
+  variable = 'Sigma',
+  regex = TRUE,
+  type = 'hist',
+  facet_args = list(dir = 'v')
 )
+
+
+## -----------------------------------------------------------------------
+Sigma_post <- as.matrix(
+  varcor_mod, 
+  variable = "Sigma", 
+  regex = TRUE
+)
+median_correlations <- cov2cor(
+  matrix(apply(Sigma_post, 2, median),
+         nrow = 5, 
+         ncol = 5
+  )
+)
+rownames(median_correlations) <- 
+  colnames(median_correlations) <- 
+  levels(plankton_train$series)
 
 round(median_correlations, 2)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 irfs <- irf(varcor_mod, h = 12)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 summary(irfs)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 plot(irfs, series = 3)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 fevds <- fevd(varcor_mod, h = 12)
 plot(fevds)
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 # create forecast objects for each model
 fcvar <- forecast(var_mod)
 fcvarcor <- forecast(varcor_mod)
@@ -369,11 +378,8 @@ fcvarcor <- forecast(varcor_mod)
 # plot the difference in variogram scores; a negative value means the VAR1cor model is better, while a positive value means the VAR1 model is better
 diff_scores <- score(fcvarcor, score = "variogram")$all_series$score -
   score(fcvar, score = "variogram")$all_series$score
-plot(
-  diff_scores,
-  pch = 16,
-  cex = 1.25,
-  col = "darkred",
+plot(diff_scores,
+  pch = 16, cex = 1.25, col = "darkred",
   ylim = c(
     -1 * max(abs(diff_scores), na.rm = TRUE),
     max(abs(diff_scores), na.rm = TRUE)
@@ -385,15 +391,12 @@ plot(
 abline(h = 0, lty = "dashed")
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 # plot the difference in energy scores; a negative value means the VAR1cor model is better, while a positive value means the VAR1 model is better
 diff_scores <- score(fcvarcor, score = "energy")$all_series$score -
   score(fcvar, score = "energy")$all_series$score
-plot(
-  diff_scores,
-  pch = 16,
-  cex = 1.25,
-  col = "darkred",
+plot(diff_scores,
+  pch = 16, cex = 1.25, col = "darkred",
   ylim = c(
     -1 * max(abs(diff_scores), na.rm = TRUE),
     max(abs(diff_scores), na.rm = TRUE)
@@ -405,19 +408,20 @@ plot(
 abline(h = 0, lty = "dashed")
 
 
-## --------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------
 description <- how_to_cite(varcor_mod)
 
 
-## ----eval = FALSE----------------------------------------------------------------------------
+## ----eval = FALSE-------------------------------------------------------
 # description
 
-## ----echo=FALSE------------------------------------------------------------------------------
+
+## ----echo=FALSE---------------------------------------------------------
 cat("Methods text skeleton\n")
 cat(insight::format_message(description$methods_text))
 
 
-## ----echo=FALSE------------------------------------------------------------------------------
+## ----echo=FALSE---------------------------------------------------------
 cat("\nPrimary references\n")
 for (i in seq_along(description$citations)) {
   cat(insight::format_message(description$citations[[i]]))
@@ -428,3 +432,4 @@ for (i in seq_along(description$other_citations)) {
   cat(insight::format_message(description$other_citations[[i]]))
   cat('\n')
 }
+
