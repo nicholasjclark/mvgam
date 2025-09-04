@@ -106,7 +106,7 @@
 #' matrix using \eqn{\Theta \Theta'} (see the example below and
 #' [residual_cor()] for details). The latent factors are further modelled using:
 #'\deqn{
-#'u_i \sim \text{Normal}(Q_i\beta_{factor}, 1) \quad
+#'u_i \sim \text{Normal}(Q_i\beta_{factor}, 1)
 #'}
 #'where the second design matrix \eqn{Q} and associated \eqn{\beta_{factor}}
 #'coefficients are constructed and modelled using `factor_formula`. Again, the

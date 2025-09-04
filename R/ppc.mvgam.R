@@ -55,7 +55,8 @@
 #'   'data_test' in the original model fit and supplied here. Rootograms are
 #'   currently only plotted using the 'hanging' style.
 #'
-#'   \cr Note that the predictions used for these plots are *conditional on
+#'   
+#'   Note that the predictions used for these plots are *conditional on
 #'   the observed data*, i.e. they are those predictions that have been
 #'   generated directly within the `mvgam()` model. They can be misleading if
 #'   the model included flexible dynamic trend components. For a broader range
