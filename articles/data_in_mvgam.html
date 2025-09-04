@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-09-03</h4>
+            <h4 data-toc-skip class="date">2025-09-04</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/data_in_mvgam.Rmd" class="external-link"><code>vignettes/data_in_mvgam.Rmd</code></a></small>
       <div class="d-none name"><code>data_in_mvgam.Rmd</code></div>
@@ -585,10 +585,10 @@ values:</p>
 <span><span class="co">#&gt; 3             NA             NA</span></span></code></pre></div>
 <p>Just like with the <code>mgcv</code> package, <code>mvgam</code> can
 also accept data as a <code>list</code> object. This is useful if you
-want to set up <a href="https://rdrr.io/cran/mgcv/man/linear.functional.terms.html" class="external-link">linear
-functional predictors</a> or even distributed lag predictors. The checks
-run by <code>mvgam</code> should still work on these data. Here we
-change the <code>cov</code> predictor to be a <code>matrix</code>:</p>
+want to set up linear functional predictors or even distributed lag
+predictors. The checks run by <code>mvgam</code> should still work on
+these data. Here we change the <code>cov</code> predictor to be a
+<code>matrix</code>:</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">miss_dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  outcome <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">10</span><span class="op">)</span>,</span>
