@@ -260,7 +260,7 @@ get_mvgam_priors(
 )
 ```
 
-Just like with the `mgcv` package, `mvgam` can also accept data as a `list` object. This is useful if you want to set up [linear functional predictors](https://rdrr.io/cran/mgcv/man/linear.functional.terms.html) or even distributed lag predictors. The checks run by `mvgam` should still work on these data. Here we change the `cov` predictor to be a `matrix`:
+Just like with the `mgcv` package, `mvgam` can also accept data as a `list` object. This is useful if you want to set up linear functional predictors or even distributed lag predictors. The checks run by `mvgam` should still work on these data. Here we change the `cov` predictor to be a `matrix`:
 ```{r}
 miss_dat <- list(
   outcome = rnorm(10),
