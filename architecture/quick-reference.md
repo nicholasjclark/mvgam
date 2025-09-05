@@ -188,7 +188,7 @@ mvgam(
 )
 ```
 
-## Trend Registry System ✅ **COMPLETE**
+## Trend Registry System
 
 ### Registry Architecture (R/trend_system.R)
 
@@ -267,11 +267,6 @@ stan_code <- glue("
 1. **User specification first**: Check brmsprior object for custom prior
 2. **Common default fallback**: Use `common_trend_priors` defaults  
 3. **Empty string fallback**: Let Stan use built-in defaults
-
-### Benefits
-- **DRY**: Eliminates hardcoded "exponential(1)" across generators
-- **Extensible**: New parameters automatically work everywhere
-- **Future-proof**: New trend types inherit prior support
 
 ## Stan Code Validation Framework (R/validations.R)
 ```r

@@ -119,17 +119,13 @@ mvgam(
 ### 1. Response-Specific Parameter Naming
 **Pattern**: Follow brms multivariate naming conventions
 ```r
-// Multivariate responses generate response-specific parameters
-vector[N_count] mu_count = rep_vector(0.0, N_count);
-vector[N_biomass] mu_biomass = rep_vector(0.0, N_biomass);
-
 // Trend effects with matching names
-vector[N_count] mu_trend_count;
-vector[N_biomass] mu_trend_biomass;
+vector[N_count] mu_count_trend;
+vector[N_biomass] mu_biomass_trend;
 
 // Combined effects
-mu_count += mu_trend_count;
-mu_biomass += mu_trend_biomass;
+mu_count += mu_count_trend;
+mu_biomass += mu_biomass_trend;
 ```
 
 ### 2. Factor Model Architecture: Matrix Z Patterns
@@ -491,16 +487,16 @@ valid_blocks <- c("tparameters", "transformed_parameters", "tdata", "transformed
 
 ## Stan Code Data Flow Architecture
 
-### **CRITICAL: Complete Stan Code Flow**
+### **Complete Stan Code Flow**
 
 **Purpose**: Define exactly how trend values are computed and combined with brms observation models in Stan code.
 
 **Stage 1: Trend Value Computation** (in transformed parameters block):
 ```r
 // Universal computation for ALL trend models:
-for (i in 1:n_time) {
-  for (s in 1:n_series) {
-    trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[times_trend[i, s]];
+for (i in 1:n_trend) {
+  for (s in 1:n_lv_trend) {
+    trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
   }
 }
 ```
@@ -515,13 +511,13 @@ for (n in 1:N) {
 ```
 
 **Key Data Structures**:
-- `trend[n_time, n_series]`: Matrix of computed trend values over time and series  
-- `times_trend[n_time, n_series]`: Maps trend positions to time indices for mu_trend access
+- `trend[n_trend, n_lv_trend]`: Matrix of computed trend values over time and series  
+- `times_trend[n_trend, n_lv_trend]`: Maps trend positions to time indices for mu_trend access
 - `obs_trend_time[N]`, `obs_trend_series[N]`: Map each brms observation to trend matrix position
 - `mu[N]`: brms linear predictor, extended with trend effects
 - `mu_trend[...]`: Trend intercepts/means from brms trend model
-- `Z[n_series, n_lv]`: Factor loadings matrix
-- `LV[n_time, n_lv]`: Latent variable matrix (dynamic states)
+- `Z[n_series_trend, n_lv_trend]`: Factor loadings matrix
+- `lv_trend[n_trend, n_lv_trend]`: Latent variable matrix (dynamic states)
 
 **Critical Design Decision**: The `trend` matrix contains the **final computed trend values** that get added to `mu`. The `mu_trend` array contains **trend intercepts** used during trend computation. Both components are essential for all trend models.
 

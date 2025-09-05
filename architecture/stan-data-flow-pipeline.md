@@ -208,12 +208,12 @@ mvgam() →
   │   │   ├─ create stanvar for obs_trend_time →
   │   │   ├─ create stanvar for obs_trend_series →
   │   │   └─ generate_trend_specific_stanvars() →
-  │   ├─ sort_stanvars() →                              [🏆 CRITICAL: DEPENDENCY-BASED REORDERING]
+  │   ├─ sort_stanvars() →                              [DEPENDENCY-BASED REORDERING]
   │   └─ inject_trend_into_linear_predictor() →         [GLM-COMPATIBLE TREND INJECTION]
   │       ├─ detect_glm_usage() →                       [DETERMINES INJECTION APPROACH]
   │       ├─ inject_trend_into_glm_predictor() →        [GLM-OPTIMIZED PATH]
   │       │   ├─ parse_glm_parameters() →               [EXTRACTS GLM FUNCTION PARAMETERS]
-  │       │   ├─ generate efficient mu construction →    [MATRIX MULTIPLICATION + LOOP]
+  │       │   ├─ generate efficient mu construction →   [MATRIX MULTIPLICATION + LOOP]
   │       │   └─ transform_glm_call() →                 [GLM FUNCTION TRANSFORMATION]
   │       └─ standard trend injection →                 [TRADITIONAL PATH FOR NON-GLM]
   └─ Stan compilation and fitting

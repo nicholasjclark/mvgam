@@ -5,13 +5,12 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 ## Development Commands
 
 ### Testing
-- YOU MUST load all functions prior to testing. Use `Rscript -e "devtools::load_all();testthat::test_file(path/to/test)"` to run specific tests during development
+- YOU MUST load all functions prior to testing. Use `Rscript -e "devtools::load_all();testthat::test_file(path/to/test)"` to run specific tests
 - You CANNOT use filter calls in `testthat::test_file()` for selective execution (use the `desc` argument for this instead)
 - No test errors or warnings are allowed. This is NON-NEGOTIABLE
 
 ### Building and Documentation
 - `Rscript -e "devtools::document()"` - Generate roxygen2 documentation
-- `Rscript -e "pkgdown::build_site()"` - Build package website
 - `R CMD INSTALL --preclean --no-multiarch` - Install package locally
 
 ### Documentation Memory
@@ -27,7 +26,6 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - Tests in `tests/testthat/`
 
 ### Key Design Patterns
-
 **S3 Type System**: Uses S3 for structured objects to support method inheritance and specialization
 
 **Layered Architecture Pattern**:
@@ -38,10 +36,10 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - Post-processing Layer: S3 methods for analysis, diagnostics, and visualization
 
 **Bayesian Workflow Integration**:
-- Model Building: Formula specification, prior setup, trend model selection, observation family
+- Model Building: Formula specification, priors, trend model selection, observation family
 - Fitting: MCMC sampling with convergence monitoring
 - Checking: Posterior predictive checks, residual analysis, diagnostic plots
-- Inference: Parameter summarization, uncertainty quantification
+- Inference: Parameter summaries, uncertainty quantification
 - Prediction: Forecasting with proper uncertainty propagation
 - Evaluation: Cross-validation, scoring rules, model comparison
   
@@ -52,7 +50,6 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 
 ### Testing Strategy
 - After updating any logic, check whether existing unit tests need to be updated. If so, update them
-- **Test File Organization**: Always add new tests to existing test files rather than creating separate files, unless absolutely necessary for clarity
 - When proposing new tests, first check existing test file names and add to the most appropriate existing file
 - DO NOT write wrapper functions to fix failing tests
 - DO NOT use `try()`, `tryCatch()` or `skip()` within tests
@@ -60,8 +57,7 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 
 ### testthat Expectations Guidelines
 - testthat expectation functions (expect_true, expect_equal, etc.) do NOT have an `info` argument
-- Use descriptive test names and comments instead of `info` for debugging context
-- For detailed error messages, use descriptive variable names and clear assertions
+- Use descriptive variable names and clear assertions
 - NEVER use `info = "..."` in any expect_* function calls - add comments above the expectation instead
 
 ### Documentation
@@ -72,7 +68,7 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - roxygen2 examples demonstrate simpler use cases
 
 ### Code Style and Formatting
-- Apply tidyverse styling (https://style.tidyverse.org/) for all R and roxygen code
+- Apply tidyverse styling for all R and roxygen code
 - **Line Length**: Maximum 80 characters per line
 - **Roxygen Documentation**: Use 2-space indentation for continuation lines
 - When commenting complex logic, add above line `# Reason` comment explaining the why, not just the what
@@ -96,12 +92,6 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 ### Export Guidelines
 - Only export functions that users directly need
 - Keep validation and utility functions internal (`@noRd`)
-
-### .Rbuildignore Management
-- Update `.Rbuildignore` immediately when creating new spec files:
-  - `*-requirements.md`, `*-design.md`, `*-implementation.md`
-  - `*-plan.md` files
-  - Any temporary development documentation files
 
 ## Git Workflow
 
