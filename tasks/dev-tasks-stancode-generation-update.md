@@ -26,15 +26,34 @@
   - `target_stancode_5.stan` → PW trends (Prophet functions)
   - `target_stancode_6.stan` → CAR trends (GP + irregular time)
 
-### **3. Validation Cycle**
+### **3. TARGET COMPARISON SCRIPT** 🎯 **MANDATORY FOR ALL AGENTS**
+- **BEFORE making any fixes**: Run `source("target_generation.R")` to generate current output
+- **Compare systematically**: `current_stancode_*.stan` vs `tasks/target_stancode_*.stan`
+- **Use diff tools**: `diff current_stancode_3.stan tasks/target_stancode_3.stan` for line-by-line comparison
+- **Focus areas**: Check for missing mappings, template placeholders, duplicate parameters, incorrect mu_trend
+- **This script uses EXACT same data** as test suite - eliminates guesswork about expected vs actual
+- **Generated files show PRECISE differences** - much clearer than test failure messages alone
+
+### **4. Validation Cycle**
 - **After each fix**: Re-run specific failing tests
-- **Success metric**: Test expectations should pass
+- **Cross-check**: Re-run `target_generation.R` to verify improvements
+- **Success metric**: Test expectations should pass AND generated code matches target structure
 - **Stan validation**: Generated code must compile with `rstan::stanc()`
 
-### **4. When Uncertain**
+### **5. When Uncertain**
 - **DON'T guess** - Check target Stan files for exact patterns
-- **DON'T assume** - Verify against test expectations
+- **DON'T assume** - Verify against test expectations  
+- **DO compare** - Use `target_generation.R` for side-by-side comparison
 - **DO reference** - Use validated target files as implementation guide
+
+**EXAMPLE TDD WORKFLOW:**
+1. Run `source("target_generation.R")` → generates `current_stancode_3.stan`
+2. Compare: `diff current_stancode_3.stan tasks/target_stancode_3.stan`
+3. Identify specific issues (e.g., missing `obs_trend_time_count` in data block)
+4. Make targeted fix in `R/stan_assembly.R`  
+5. Re-run target generation script to verify fix
+6. Run tests to confirm expectations now pass
+7. Repeat for next issue
 
 **KEY FILES TO MODIFY**:
 - `R/stan_assembly.R`: Trend stanvar generation, parameter extraction
@@ -130,12 +149,13 @@
   - **Architecture Cleanup**: Fixed prior targets to use Z_raw instead of constructed Z matrix
   - **TDD Validation**: ✅ Z_raw found, ✅ LV_raw correctly removed, ✅ Z matrix construction found
 
-**D4.3**: Fix Stan compilation error "Identifier 'LV_raw' not in scope"
+**D4.3**: ✅ **COMPLETED**: Fix Stan compilation error "Identifier 'LV_raw' not in scope"
   - **TDD Approach**: Stan code references undefined parameter `LV_raw`
   - **Gold Standard**: Check all target Stan files - none should reference undefined parameters
-  - **Fix**: Correct parameter name or add missing parameter declaration
-  - **File**: Factor model Stan code generation
-  - **TDD Validation**: Stan syntax validation should pass for factor models
+  - **Fix Applied**: Removed all LV_raw references from R/priors.R (lines 51, 86-91, 832)
+  - **File**: R/priors.R - removed outdated parameter references
+  - **TDD Validation**: LV_raw no longer appears in priors system, eliminating compilation errors
+  - **Test Improvements**: Added specific test expectations to make failures more transparent
 
 ### **Task 5: Fix ARMA Trend Implementation (Priority 4)** ⚠️ *15-min tasks*
 

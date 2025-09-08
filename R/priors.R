@@ -48,7 +48,6 @@
 #'   \item{sigma_trend}{Innovation standard deviation (RW, AR, CAR trends)}
 #'   \item{LV}{Latent variables (all trends with state-space structure)}
 #'   \item{ar1_trend}{AR(1) coefficient (AR, CAR trends)}
-#'   \item{LV_raw}{Raw latent variables for non-centered parameterization}
 #'   \item{Z}{Factor loadings matrix for factor models}
 #' }
 #'
@@ -83,12 +82,6 @@ common_trend_priors <- list(
     dimension = "vector"
   ),
 
-  LV_raw = list(
-    default = "std_normal()",
-    bounds = c(NA, NA),
-    description = "Raw latent variables (non-centered)",
-    dimension = "matrix"
-  ),
 
   Z = list(
     default = "std_normal()",
@@ -829,7 +822,6 @@ build_ar_prior_spec <- function(lags, ar_prior_base = NULL,
   # Add common trend parameters if requested
   if (include_common) {
     result$LV <- common_trend_priors$LV
-    result$LV_raw <- common_trend_priors$LV_raw
   }
 
   return(result)

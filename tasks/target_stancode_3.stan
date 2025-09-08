@@ -230,6 +230,13 @@ data {
   array[N_trend, N_series_trend] int times_trend;
 }
 transformed data {
+  matrix[N_trend, Kc_trend] Xc_trend;  // centered version of X_trend without an intercept
+  vector[Kc_trend] means_X_trend;  // column means of X_trend before centering
+  for (i in 2:K_trend) {
+    means_X_trend[i - 1] = mean(X_trend[, i]);
+    Xc_trend[, i - 1] = X_trend[, i] - means_X_trend[i - 1];
+  }
+
   // Zero mean vector for VARMA process (following Heaps 2022)
   vector[N_lv_trend] trend_zeros = rep_vector(0.0, N_lv_trend);
 

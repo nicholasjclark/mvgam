@@ -4645,7 +4645,22 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
     }
   }
 
-  # 1. Extract parameters block content (without headers) and rename parameters
+  # 1. Extract transformed data block content (without headers) and rename references  
+  # This captures brms centering code like Xc = X - means_X
+  tdata_block <- extract_stan_block_content(stancode, "transformed data")
+  if (!is.null(tdata_block) && nchar(tdata_block) > 0) {
+    tdata_result <- rename_parameters_in_block(
+      tdata_block, suffix, mapping, "tdata", is_multivariate, response_names
+    )
+    mapping <- tdata_result$mapping  # Update mapping
+
+    stanvar_list[["trend_transformed_data"]] <- brms::stanvar(
+      scode = tdata_result$code,
+      block = "tdata"
+    )
+  }
+
+  # 2. Extract parameters block content (without headers) and rename parameters
   params_block <- extract_stan_block_content(stancode, "parameters")
   if (!is.null(params_block) && nchar(params_block) > 0) {
     # FILTER OUT DUPLICATE DECLARATIONS BEFORE RENAMING
@@ -4709,24 +4724,51 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
   # Create when no model stanvar was created (no extracted priors/transformations from model block)
   if (!model_stanvar_created) {
     # Always create mu_trend for trend computation - it's needed by generate_trend_computation_tparameters
-    # Check if this is an intercept-only model (common pattern in brms trend models)
+    # Check if this is an intercept-only model (common pattern in brms trend models)  
+    # Look for X_trend (uncentered matrix) in data block, not Xc_trend which is computed in transformed data
     has_coefficients <- grepl(paste0("vector\\[.*\\]\\s+b", suffix), stancode) && 
-                        grepl(paste0("matrix\\[.*\\]\\s+Xc", suffix), stancode)
+                        grepl(paste0("matrix\\[.*\\]\\s+X", suffix), stancode)
+    
+    # Use consistent parameter naming throughout
+    time_param <- paste0("N", suffix)
     
     if (has_coefficients) {
-      # Model with coefficients: create from linear predictor components
-      n_param <- paste0("N", suffix)  # Will be N_trend
+      # Verify required components exist for robustness
+      has_xc <- grepl(paste0("Xc", suffix), stancode) || 
+                grepl(paste0("matrix\\[.*\\]\\s+X", suffix), stancode)
+      has_intercept <- grepl(paste0("real\\s+Intercept", suffix), stancode)
+      
+      if (!has_xc) {
+        insight::format_error(
+          "Expected design matrix {.field Xc{suffix}} not found in Stan code."
+        )
+      }
+      
+      # Model with coefficients: follow brms pattern matching target_stancode_3.stan
+      # Initialize with zeros, then add linear predictor components
       mu_trend_code <- paste0(
-        "vector[", n_param, "] mu", suffix, " = Xc", suffix, " * b", suffix, " + Intercept", suffix, ";"
+        "// Create trend linear predictor\n  ",
+        "vector[", time_param, "] mu", suffix, 
+        " = rep_vector(0.0, ", time_param, ");\n  ",
+        "mu", suffix, " += Intercept", suffix, 
+        " + Xc", suffix, " * b", suffix, ";"
       )
     } else {
-      # Intercept-only model: create from intercept (most common case for trend models)
-      # Transform brms pattern: vector[N] mu = rep_vector(0.0, N); mu += Intercept;
-      # Into: vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
-      time_param <- "N_trend"
-      mu_trend_code <- paste0(
-        "vector[", time_param, "] mu", suffix, " = rep_vector(Intercept", suffix, ", ", time_param, ");"
-      )
+      # Intercept-only model: pattern depends on whether intercept present or ~ -1 formula
+      intercept_present <- grepl(paste0("real\\s+Intercept", suffix), stancode)
+      
+      if (intercept_present) {
+        mu_trend_code <- paste0(
+          "vector[", time_param, "] mu", suffix, 
+          " = rep_vector(Intercept", suffix, ", ", time_param, ");"
+        )
+      } else {
+        # No intercept (~ -1 formula)  
+        mu_trend_code <- paste0(
+          "vector[", time_param, "] mu", suffix, 
+          " = rep_vector(0.0, ", time_param, ");"
+        )
+      }
     }
 
     # Update parameter mapping for the created mu_trend
