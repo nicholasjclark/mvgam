@@ -6,209 +6,253 @@
 
 ---
 
-## 📋 **CRITICAL TDD DEVELOPMENT PROTOCOL** ⚠️
+## 📋 **SYSTEMATIC INSPECTION & DEVELOPMENT PROTOCOL** 🎯
 
-**ALL developers and agents MUST follow these TDD principles for every task:**
+**ALL agents MUST follow this systematic analysis approach:**
 
-### **1. Test-First Development**
-- **BEFORE coding**: Run failing tests to understand exact expectations
-- **Command**: `Rscript -e "devtools::load_all(); testthat::test_file('tests/testthat/test-stancode-standata.R')"`
-- **Focus**: Target specific failing test patterns, not general implementation
+### **STEP 1: Generate Current Stan Code** 🏗️
+**ALWAYS start here before making any changes:**
+```bash
+# Generate current Stan files for comparison
+source("target_generation.R")
+```
+**Output**: Creates `tasks/current_stancode_1.stan` through `tasks/current_stancode_6.stan`
 
-### **2. Gold Standard Reference** 🏆
-- **ALWAYS check**: `tasks/target_stancode_*.stan` files for uncertainty resolution
-- **These files are VALIDATED**: All 6 target files pass `rstan::stanc()` syntax checks
-- **Reference mapping**:
-  - `target_stancode_1.stan` → RW trends (basic structure)
-  - `target_stancode_2.stan` → Shared RW trends (multivariate)
-  - `target_stancode_3.stan` → VARMA trends (complex functions)
-  - `target_stancode_4.stan` → Factor AR trends (Z matrix patterns)
-  - `target_stancode_5.stan` → PW trends (Prophet functions)
-  - `target_stancode_6.stan` → CAR trends (GP + irregular time)
+### **STEP 2: Systematic Analysis of All Files** 📊  
+**Run these commands to identify patterns across all files:**
 
-### **3. TARGET COMPARISON SCRIPT** 🎯 **MANDATORY FOR ALL AGENTS**
-- **BEFORE making any fixes**: Run `source("target_generation.R")` to generate current output
-- **Compare systematically**: `tasks/current_stancode_*.stan` vs `tasks/target_stancode_*.stan`
-- **Use diff tools**: `diff tasks/current_stancode_3.stan tasks/target_stancode_3.stan` for line-by-line comparison
-- **Focus areas**: Check for missing mappings, template placeholders, duplicate parameters, incorrect mu_trend
-- **This script uses EXACT same data** as test suite - eliminates guesswork about expected vs actual
-- **Generated files show PRECISE differences** - much clearer than test failure messages alone
+```bash
+# Check for missing observation-to-trend mapping arrays (Critical Issue #1)
+for i in 1 2 3 4 5 6; do
+  echo "File $i:"
+  grep -c "obs_trend_time" current_stancode_$i.stan || echo "  MISSING obs_trend_time arrays"
+  grep -c "obs_trend_time" target_stancode_$i.stan || echo "  Target expects obs_trend_time arrays"
+done
 
-### **4. Validation Cycle**
-- **After each fix**: Re-run specific failing tests
-- **Cross-check**: Re-run `target_generation.R` to verify improvements
-- **Success metric**: Test expectations should pass AND generated code matches target structure
-- **Stan validation**: Generated code must compile with `rstan::stanc()`
+# Check GLM compatibility vectors (Critical Issue #2)
+for i in 1 2 3 4 5 6; do
+  echo "File $i:"
+  echo "  Current mu_ones:"; grep -c "mu_ones" current_stancode_$i.stan || echo "    NONE"
+  echo "  Target mu_ones:"; grep -c "mu_ones" target_stancode_$i.stan || echo "    NONE"
+done
 
-### **5. When Uncertain**
-- **DON'T guess** - Check target Stan files for exact patterns
-- **DON'T assume** - Verify against test expectations  
-- **DO compare** - Use `target_generation.R` for side-by-side comparison
-- **DO reference** - Use validated target files as implementation guide
+# Check trend injection patterns (Critical Issue #3)
+for i in 1 2 3 4 5 6; do
+  echo "File $i:"
+  grep -c "mu.*+.*trend\|trend\[obs_trend" current_stancode_$i.stan || echo "  MISSING trend injection"
+  grep -c "mu.*+.*trend\|trend\[obs_trend" target_stancode_$i.stan || echo "  Expected trend injection"
+done
+```
 
-**EXAMPLE TDD WORKFLOW:**
-1. Run `source("target_generation.R")` → generates `current_stancode_3.stan`
-2. Compare: `diff current_stancode_3.stan tasks/target_stancode_3.stan`
-3. Identify specific issues (e.g., missing `obs_trend_time_count` in data block)
-4. Make targeted fix in `R/stan_assembly.R`  
-5. Re-run target generation script to verify fix
-6. Run tests to confirm expectations now pass
-7. Repeat for next issue
+### **STEP 3: Target File Reference** 🏆
+**VALIDATED target files (all pass `rstan::stanc()` checks):**
+- `target_stancode_1.stan` → RW trends (univariate baseline)
+- `target_stancode_2.stan` → Shared RW trends (multivariate) 
+- `target_stancode_3.stan` → VARMA trends (complex multivariate)
+- `target_stancode_4.stan` → Factor AR trends (Z matrix + multivariate)
+- `target_stancode_5.stan` → PW trends (Prophet univariate)
+- `target_stancode_6.stan` → CAR trends (GP + irregular time)
 
-**KEY FILES TO MODIFY**:
-- `R/stan_assembly.R`: Trend stanvar generation, parameter extraction
-- `R/brms_integration.R`: Formula parsing for multivariate models  
-- `R/trend_system.R`: Individual trend type implementations
-- `R/validations.R`: Validation and data preparation functions
+### **STEP 4: Focused Diff Analysis** 🔍
+**For each problematic file, run detailed comparison:**
+```bash
+# Compare specific files showing major differences
+diff current_stancode_2.stan target_stancode_2.stan  # Multivariate issues
+diff current_stancode_3.stan target_stancode_3.stan  # VARMA issues  
+diff current_stancode_4.stan target_stancode_4.stan  # Factor model issues
+```
 
-### **Task 1: Fix Core RW Trend Generation Issues (Priority 1)** ⚠️ *15-min tasks*
+### **STEP 5: Test-Driven Validation** ✅
+**After making changes:**
+```bash
+# Re-generate current files
+source("target_generation.R")
 
-**D1.1**: ✅ **COMPLETED**: Fix trend formula parsing to exclude design matrix when no predictors
-  - **Solution**: Modified `extract_univariate_standata()` to only include data objects with stancode declarations
-  - **Root Cause**: brms generates K, Kc, X, Xc in standata but NOT in stancode for intercept-only models
-  - **Fix Applied**: Added declaration checking in `R/stan_assembly.R:5275` with code reviewer approval
-  - **Validation**: Tests 81-85 now pass - design matrix variables properly excluded from intercept-only models
-  - **Enhanced Coverage**: Added comprehensive design matrix checks to VARMA test for positive validation
+# Re-run systematic analysis (Step 2 commands)
+# Verify improvements in problematic patterns
 
-**D1.2**: ✅ **COMPLETED**:  Fix times_trend array structure in generated stanvars  
-  - Updated test expectations from matrix to array
-  - **Gold Standard**: `tasks/target_stancode_1.stan:18` shows `array[n_trend, n_series_trend] int times_trend`
-  - **TDD Validation**: Pattern matching should work correctly
+# Run failing tests
+Rscript -e "devtools::load_all(); testthat::test_file('tests/testthat/test-stancode-standata.R')"
+```
 
-**D1.3**: ✅ **COMPLETED**:  FFix innovations_trend matrix parameter declaration
-  - **TDD Approach**: Tests expect `matrix[n_trend, n_lv_trend] innovations_trend;`
-  - **Gold Standard**: See `tasks/target_stancode_1.stan:37` for exact parameter declaration
-  - **Current**: May be declaring as different type or missing entirely
-  - **Fix**: Ensure proper matrix parameter in RW trend generator
-  - **File**: `R/trend_generators/rw_trend.R` or equivalent
-  - **TDD Validation**: Run failing tests - parameter block should contain correct declaration
+### **KEY INSIGHT: Pattern-Based Failures** 💡
+**Analysis reveals three systematic issues affecting multiple files:**
+1. **Multivariate Data Block Generation** (Files 2,3,4) 
+2. **Trend Injection Integration** (Files 2,3,4,6)
+3. **Stan Code Structure** (All files)
 
-### **Task 2: Fix AR Trend Specific Issues (Priority 1)** ⚠️ *15-min tasks*
+**Files Working:** 1,5,6 (mostly univariate)
+**Files Failing:** 2,3,4 (all multivariate)
+**Root Cause:** Multivariate model handling in Stan assembly
 
-**D2.1**: ✅ **COMPLETED**:  Fix AR lag parameter generation for seasonal models
-  - **TDD Approach**: Tests expect `ar1_trend` and `ar12_trend` for AR(p=c(1,12))
-  - **Gold Standard**: Compare generated code against expected AR patterns in tests
-  - **Current**: May be generating incorrect parameter names or missing parameters
-  - **Fix**: Update AR trend generator to handle vector p values correctly
-  - **Files**: `R/trend_system.R`, `R/stan_assembly.R`
-  - **TDD Validation**: `expect_true(grepl("ar1_trend", code))` and `ar12_trend` should pass
+## 🚨 **CURRENT PRIORITY OBJECTIVES** (Systematic Analysis Based)
 
-**D2.2**: ✅ **COMPLETED**: Fix AR initialization patterns for seasonal models
-  - **TDD Approach**: Tests expect "// Initialize first 12 time points" and `for (i in 1:12)`
-  - **Gold Standard**: When uncertain about AR patterns, reference similar structures in target Stan files
-  - **Fix Applied**: AR trend generator already correctly implemented initialization patterns 
-  - **File**: `R/stan_assembly.R:2795-2798` - initialization code working correctly
-  - **TDD Validation**: Tests show initialization comments and loops are present and working
-
-**D2.3**: ✅ **COMPLETED**: Fix AR dynamics starting point calculation
-  - **TDD Approach**: Tests expect `for (i in 13:n_trend)` for AR(p=c(1,12))
-  - **Gold Standard**: Check target files for similar dynamic loop patterns
-  - **Fix Applied**: AR dynamics correctly start at max(p) + 1 (line 2801: `for (i in {max_lag + 1}:n_trend)`)
-  - **File**: `R/stan_assembly.R:2800-2805` - dynamics calculation working correctly
-  - **TDD Validation**: Generated Stan code shows correct dynamics loop starting at time point 13
-
-### **Task 3: Fix Multivariate Formula Parsing Issues (Priority 2)** ✅ **COMPLETED**
-
-**D3.1**: ✅ **COMPLETED**: Fix mvbrmsformula parsing in multivariate trends
-  - **TDD Approach**: Error `Assertion on 'formula' failed: Must be a formula, not mvbrmsformula/bform`
-  - **Gold Standard**: Check `tasks/target_stancode_3.stan` for multivariate VARMA structure
-  - **Tests failing**: All multivariate tests with `bf(mvbind(...)) + set_rescor(FALSE)`
-  - **Fix Applied**: Updated `parse_multivariate_trends()` to accept mvbrmsformula objects directly
-  - **File**: `R/brms_integration.R:145-155` - simplified validation logic
-  - **TDD Validation**: Multivariate tests no longer error during parsing
-
-**D3.2**: ✅ **COMPLETED**: Extract observation formula from mvbrmsformula objects
-  - **TDD Approach**: Need to extract base formula from brms formula wrappers
-  - **Gold Standard**: Reference multivariate target files for expected structure
-  - **Fix Applied**: Removed incorrect extraction logic; helper functions handle mvbrmsformula directly
-  - **File**: `R/brms_integration.R` 
-  - **TDD Validation**: Can process `bf(mvbind(count, biomass) ~ x)` correctly
-
-**D3.3**: ✅ **COMPLETED**: Handle set_rescor(FALSE) in observation models
-  - **TDD Approach**: Tests use `+ set_rescor(FALSE)` which needs parsing
-  - **Gold Standard**: When uncertain about brms integration, check target Stan files for expected patterns
-  - **Fix Applied**: Updated `setup_brms_lightweight()` to accept brms formula objects
-  - **File**: `R/brms_integration.R:25-32`
-  - **TDD Validation**: Formulas with rescor settings now work correctly
-
-### **Task 4: Fix Factor Model Structure Issues (Priority 3)** ⚠️ *15-min tasks*
-
-**D4.1**: Fix ZMVN factor model trend data generation
-  - **TDD Approach**: Tests expect `matrix[n_trend, K_trend] X_trend` for trend covariates
-  - **Gold Standard**: Check `tasks/target_stancode_4.stan` for factor AR model structure
-  - **Current**: Missing trend design matrix variables in ZMVN models
-  - **Fix**: Ensure trend formula processing includes design matrix for factor models
-  - **File**: `R/trend_generators/zmvn_trend.R` or equivalent
-  - **TDD Validation**: Factor model tests should find trend design matrix
-
-**D4.2**: ✅ **COMPLETED**: Fix Z factor loading matrix construction
-  - **TDD Approach**: Tests expect `vector[n_series_trend * n_lv_trend] Z_raw` and constrainted construction
-  - **Gold Standard**: See `tasks/target_stancode_4.stan:91` for exact Z_raw and constraint patterns
-  - **Fix Applied**: Completely rewrote `generate_factor_model()` in `R/stan_assembly.R:2207-2245`
-  - **Key Changes**: Added Z_raw parameter declaration, identifiability constraint construction, removed outdated LV_raw references
-  - **Architecture Cleanup**: Fixed prior targets to use Z_raw instead of constructed Z matrix
-  - **TDD Validation**: ✅ Z_raw found, ✅ LV_raw correctly removed, ✅ Z matrix construction found
-
-**D4.3**: ✅ **COMPLETED**: Fix Stan compilation error "Identifier 'LV_raw' not in scope"
-  - **TDD Approach**: Stan code references undefined parameter `LV_raw`
-  - **Gold Standard**: Check all target Stan files - none should reference undefined parameters
-  - **Fix Applied**: Removed all LV_raw references from R/priors.R (lines 51, 86-91, 832)
-  - **File**: R/priors.R - removed outdated parameter references
-  - **TDD Validation**: LV_raw no longer appears in priors system, eliminating compilation errors
-  - **Test Improvements**: Added specific test expectations to make failures more transparent
-
-### **Task 5: Fix ARMA Trend Implementation (Priority 4)** ⚠️ *15-min tasks*
-
-**D5.1**: Fix ARMA parameter generation for complex lag patterns
-  - **TDD Approach**: Tests expect `ar2_trend`, `ar4_trend`, `theta1_trend` for AR(p=c(2,4), ma=TRUE)
-  - **Gold Standard**: When uncertain about ARMA patterns, reference similar MA/AR structures in target Stan files
-  - **Current**: May be generating ar1_trend instead of correct lag parameters
-  - **Fix**: ARMA trend generator should handle non-consecutive AR lags correctly
-  - **File**: `R/trend_generators/arma_trend.R`
-  - **TDD Validation**: Run ARMA tests - correct AR lag parameters should be generated
-
-**D5.2**: Fix MA transformation integration with AR dynamics  
-  - **TDD Approach**: Tests expect `ma_innovations_trend` matrix and MA transformation loop
-  - **Gold Standard**: Check target Stan files for MA transformation patterns and integration
-  - **Current**: Missing MA processing in ARMA models
-  - **Fix**: Add MA innovation transformation before AR dynamics
-  - **File**: ARMA transformed parameters block generation
-  - **TDD Validation**: Run ARMA tests - MA transformation patterns should be present
-
-**SUCCESS CRITERIA (Test-Driven Development)**: 
-- 🎉 **MAJOR PROGRESS ACHIEVED**: Reduced from ~201 to 135 test failures (66+ tests fixed!)
-- ✅ **Fixed Test Infrastructure**: Syntax errors and regex patterns corrected  
-- ✅ **D1.1-D1.3 COMPLETED**: RW trend generation working correctly
-- ✅ **D2.1-D2.3 COMPLETED**: AR seasonal patterns working (initialization, dynamics, parameter naming)
-- ✅ **D3.1-D3.3 COMPLETED**: Multivariate formula parsing fixed  
-- ✅ **D4.2 COMPLETED**: Factor model Z_raw construction implemented, LV_raw removed
-- ✅ **Architecture Cleanup**: Removed outdated parameter references and improved Stan generation
-- 🔄 **Remaining Work**: 135 failures still to address (mainly ARMA models and remaining factor patterns)
-- 🔄 **Stan Syntax Validation**: Most generated code compiles with rstan::stanc()
-
-**IMPLEMENTATION APPROACH**:
-1. **Follow TDD Strictly**: Each 15-minute task targets specific test failures
-2. **Verify Against Target Stan Files**: Use tasks/target_stancode_*.stan as reference
-3. **Incremental Validation**: Run tests after each task to verify progress
-4. **Pattern Consistency**: Ensure universal patterns work across all trend types
-
-**CURRENT STATUS UPDATE**:
-- 🎉 **Major Progress**: 328 tests passing, 135 failures remaining (was ~201)
-- ✅ **Target Stan Files Validated**: All 6 target files pass rstan::stanc() syntax checks
-- ✅ **Key Architecture Issues Resolved**: Factor model Z_raw generation, AR trend patterns, formula parsing
-- 🎯 **Next Priority**: ARMA model implementation and remaining factor model edge cases
-- 📈 **Success Rate**: ~71% test pass rate achieved (328 pass / 463 total)
+**Based on systematic analysis of all 6 current vs target Stan file comparisons, three critical systemic issues identified:**
 
 ---
 
-## 🔄 **FUTURE WORK AFTER CRITICAL FIXES**
+### **🎯 PRIORITY 1: Fix Multivariate Data Block Generation** 
 
-### **Enhanced Testing & Validation** 
-- Expand test coverage for edge cases and family combinations
-- Performance benchmarking against brms-only models
-- Systematic validation across all supported trend types
+**Impact:** Files 2, 3, 4 (all multivariate models) - ~50% of total failures
 
-### **Advanced Features**
-- Prior specification system completion for remaining trend types
-- Enhanced multivariate support with complex trend sharing patterns  
-- Integration testing with full mvgam workflow
+**Problem Analysis:**
+- **Missing obs-to-trend mappings:** Files 2,3,4 have 0 `obs_trend_time_*` arrays vs targets expecting 4-6
+- **Wrong GLM vectors:** Files 2,4 have 1 generic `mu_ones` vs targets expecting 4-5 response-specific vectors
+- **Incomplete multivariate data:** Files 2,3,4 have ~50% fewer `N_count`/`N_biomass` references than targets
+
+**Specific Missing Elements:**
+```stan
+// Expected in data block for multivariate models:
+array[N_count] int obs_trend_time_count;
+array[N_count] int obs_trend_series_count;
+array[N_biomass] int obs_trend_time_biomass;
+array[N_biomass] int obs_trend_series_biomass;
+// etc. for each response
+
+vector[1] mu_ones_count;      // not generic mu_ones
+vector[1] mu_ones_biomass;    // response-specific GLM vectors
+```
+
+**Target Functions:** 
+- `extract_multivariate_standata()` in `R/stan_assembly.R`
+- `generate_obs_trend_mapping()` functions
+- Multivariate stanvar generation pipeline
+
+**Validation Command:**
+```bash
+# Before fix: Files 2,3,4 should show 0 obs_trend_time arrays
+# After fix: Should match target counts (4-6 arrays per file)
+grep -c "obs_trend_time" current_stancode_2.stan  # Should go from 0 → 4
+```
+
+---
+
+### **🎯 PRIORITY 2: Fix Trend Injection Integration** 
+
+**Impact:** Files 2, 3, 4, 6 - trend effects not properly integrated into linear predictors
+
+**Problem Analysis:**
+- **File 2:** 0 trend injections vs target expecting 2
+- **File 3:** 4 vs target expecting 7 trend injections 
+- **File 4:** 1 vs target expecting 3 trend injections
+- **File 6:** 1 vs target expecting 2 trend injections
+
+**Expected Pattern in Target Files:**
+```stan
+// In transformed parameters:
+vector[N_count] mu_count = Xc_count * b_count;
+vector[N_biomass] mu_biomass = Xc_biomass * b_biomass;
+
+// Inject trends:
+for (n in 1:N_count) {
+  mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
+}
+for (n in 1:N_biomass) {
+  mu_biomass[n] += trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
+}
+```
+
+**Target Functions:**
+- `inject_multivariate_trends_into_linear_predictors()` or similar
+- `inject_trend_into_linear_predictor()` for multivariate models
+- Linear predictor setup in transformed parameters
+
+**Validation Command:**
+```bash
+# Count trend injection patterns - should match target expectations
+grep -c "mu.*+=.*trend\[obs_trend" current_stancode_3.stan  # Should go from 4 → 7
+```
+
+---
+
+### **🎯 PRIORITY 3: Standardize Stan Code Structure**
+
+**Impact:** All files - inconsistent code organization and headers
+
+**Problem Analysis:**
+- Wrong model headers ("generated with brms" vs "generated with mvgam")
+- Parameter block organization differs from targets
+- Transformed parameters computation approaches inconsistent
+- Model block structure varies from expected patterns
+
+**Target Pattern Example:**
+```stan
+// generated with mvgam 2.0.0  // NOT "generated with brms"
+
+// Consistent parameter organization
+parameters {
+  // AR coefficients with correlation
+  vector<lower=-1,upper=1>[N_lv_trend] ar1_trend;
+  
+  // Innovation parameters  
+  vector<lower=0>[N_lv_trend] sigma_trend;
+  cholesky_factor_corr[N_lv_trend] L_Omega_trend;
+}
+```
+
+**Target Functions:**
+- Stan code header generation
+- Parameter block formatting functions
+- Overall code structure templates
+
+---
+
+## 📈 **IMPLEMENTATION STRATEGY**
+
+### **Phase 1: Multivariate Data Foundation** (Highest Impact)
+1. Fix `extract_multivariate_standata()` to generate complete observation-to-trend mappings
+2. Fix GLM vector generation for multiple responses
+3. Validate using Files 2,3,4 - should see immediate improvement in systematic analysis
+
+### **Phase 2: Trend Integration** (Medium Impact) 
+1. Fix trend injection for multivariate linear predictors
+2. Ensure proper transformed parameters structure
+3. Validate trend effects properly applied to each response
+
+### **Phase 3: Code Standardization** (Polish)
+1. Standardize headers and code structure
+2. Ensure consistent parameter organization
+3. Final validation against all target files
+
+## 🎯 **SUCCESS METRICS**
+- **Priority 1 Success:** Files 2,3,4 systematic analysis shows obs_trend arrays match target counts
+- **Priority 2 Success:** Files 2,3,4,6 show proper trend injection pattern counts  
+- **Priority 3 Success:** All files have consistent structure matching targets
+- **Overall Success:** Systematic analysis shows minimal differences vs targets
+
+## 🔧 **KEY DEVELOPMENT FILES**
+- `R/stan_assembly.R`: Core Stan generation and multivariate handling
+- `R/brms_integration.R`: Multivariate formula processing
+- `R/validations.R`: Data structure validation and preparation
+- `R/trend_system.R`: Individual trend type implementations
+
+---
+
+## ✅ **COMPLETED FOUNDATION WORK** (Reference Only)
+
+**Individual task completions from previous development phases:**
+
+- ✅ **D1.1-D1.3**: RW trend generation (univariate models working)
+- ✅ **D2.1-D2.3**: AR seasonal patterns (parameter naming, initialization, dynamics)
+- ✅ **D3.1-D3.3**: Multivariate formula parsing (mvbrmsformula support)
+- ✅ **D4.2-D4.3**: Factor model Z_raw construction (LV_raw removed)
+- ✅ **Test Infrastructure**: Syntax errors and regex patterns corrected
+- ✅ **Architecture Cleanup**: Removed outdated parameter references
+
+**Current Status:** ~328 tests passing, ~135 failures remaining (~71% pass rate)
+**Key Insight:** Individual fixes helped but **systematic multivariate issues** need coordinated approach
+
+---
+
+## 🔄 **NEXT STEPS FOR AGENTS**
+
+1. **Start with systematic analysis** (Step 1-2 of protocol above)
+2. **Focus on Priority 1** (multivariate data block generation) 
+3. **Use diff analysis** to validate improvements after each change
+4. **Move to Priority 2** only after Priority 1 shows systematic improvement
+
+**Agent Handoff Protocol:**
+- Run `source("target_generation.R")` and systematic analysis commands
+- Document which priority objective you're working on
+- Show before/after systematic analysis results
+- Update todo list with specific functions being modified
