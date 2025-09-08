@@ -195,41 +195,82 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
 
   # Handle both univariate and multivariate cases
   if (is_multivariate) {
+    # Validate multivariate trend_specs structure
+    checkmate::assert_list(trend_specs, names = "named")
+    
     # Extract response names from the trend_specs
     response_names <- names(trend_specs)
-
-    # Generate stanvars for each response
-    trend_stanvars_list <- list()
-    for (resp_name in response_names) {
-      resp_trend_specs <- trend_specs[[resp_name]]
-
-      # Skip if no trend for this response
-      if (is.null(resp_trend_specs)) {
-        next
-      }
-
-      # Track this response as having a trend
-      responses_with_trends <- c(responses_with_trends, resp_name)
-
-      # Extract stanvars for this response with response suffix
-      resp_stanvars <- extract_trend_stanvars_from_setup(
+    
+    # Helper function to detect shared trends across responses
+    # Shared trends occur when parse_multivariate_trends replicates identical
+    # trend specifications for multiple responses, causing duplicate stanvars
+    detect_shared_trends <- function(specs) {
+      # Get non-NULL trend specifications for comparison
+      non_null_specs <- specs[!sapply(specs, is.null)]
+      if (length(non_null_specs) <= 1) return(FALSE)
+      
+      # Use identical() for robust deep comparison of trend objects
+      first_spec <- non_null_specs[[1]]
+      all(sapply(non_null_specs[-1], function(x) {
+        identical(x, first_spec, ignore.environment = TRUE)
+      }))
+    }
+    
+    # Check if all responses share identical trend specifications
+    is_shared_trend <- detect_shared_trends(trend_specs)
+    
+    if (is_shared_trend) {
+      # Shared trend case: generate stanvars only once to avoid duplicates
+      # This handles cases like trend_formula = ~ RW() applied to multiple responses
+      first_response <- names(trend_specs)[!sapply(trend_specs, is.null)][1]
+      shared_trend_spec <- trend_specs[[first_response]]
+      
+      # Track all responses as having the shared trend
+      responses_with_trends <- names(trend_specs)[!sapply(trend_specs, is.null)]
+      
+      # Generate shared trend stanvars without response suffix
+      trend_stanvars <- extract_trend_stanvars_from_setup(
         trend_setup,
-        resp_trend_specs,
-        response_suffix = paste0("_", resp_name),
-        response_name = resp_name,
+        shared_trend_spec,
+        response_suffix = "",  # No suffix for shared trends
+        response_name = NULL,  # Shared across all responses
         obs_setup = obs_setup
       )
-
-      if (!is.null(resp_stanvars)) {
-        trend_stanvars_list[[resp_name]] <- resp_stanvars
-      }
-    }
-
-    # Combine all response-specific stanvars
-    if (length(trend_stanvars_list) > 0) {
-      trend_stanvars <- do.call(combine_stanvars, trend_stanvars_list)
     } else {
-      trend_stanvars <- NULL
+      # Response-specific trends: generate stanvars for each response separately
+      # This handles cases like list(count = ~ AR(), biomass = ~ RW())
+      trend_stanvars_list <- list()
+      for (resp_name in response_names) {
+        resp_trend_specs <- trend_specs[[resp_name]]
+
+        # Skip if no trend for this response
+        if (is.null(resp_trend_specs)) {
+          next
+        }
+
+        # Track this response as having a trend
+        responses_with_trends <- c(responses_with_trends, resp_name)
+
+        # Extract stanvars for this response with response suffix
+        resp_stanvars <- extract_trend_stanvars_from_setup(
+          trend_setup,
+          resp_trend_specs,
+          response_suffix = paste0("_", resp_name),
+          response_name = resp_name,
+          obs_setup = obs_setup
+        )
+
+        if (!is.null(resp_stanvars)) {
+          trend_stanvars_list[[resp_name]] <- resp_stanvars
+        }
+      }
+
+      # Combine all response-specific stanvars
+      if (length(trend_stanvars_list) > 0) {
+        trend_stanvars <- do.call(combine_stanvars, trend_stanvars_list)
+      } else {
+        trend_stanvars <- NULL
+      }
     }
 
   } else {
@@ -1579,7 +1620,12 @@ generate_base_brms_stancode <- function(formula, data, family = gaussian(),
 #' @noRd
 generate_base_brms_standata <- function(formula, data, family = gaussian(),
                                        stanvars = NULL) {
-  checkmate::assert_class(formula, "formula")
+  # Accept both regular formulas and brms multivariate formulas
+  checkmate::assert(
+    checkmate::check_class(formula, "formula"),
+    checkmate::check_class(formula, c("mvbrmsformula", "bform")),
+    .var.name = "formula"
+  )
   checkmate::assert_data_frame(data)
 
   # Use brms to generate Stan data
@@ -2159,24 +2205,43 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv, n_serie
 #' @return List of stanvars for factor model priors
 #' @noRd
 generate_factor_model <- function(is_factor_model, n_lv) {
+  # Input validation
+  checkmate::assert_logical(is_factor_model, len = 1)
+  checkmate::assert_integerish(n_lv, lower = 1, any.missing = FALSE)
+  
   if (!is_factor_model) {
     return(NULL)
   }
 
-  # Factor model: fixed variance=1 for identifiability, priors for Z
-  factor_lv_priors <- brms::stanvar(
-    name = "factor_lv_priors",
-    scode = "to_vector(LV_raw) ~ std_normal();",
-    block = "model"
-  )
+  components <- list()
 
+  # 1. PARAMETERS block - Z_raw factor loadings parameter
+  z_raw_parameters <- brms::stanvar(
+    name = "z_raw_parameters",
+    scode = "// Factor loading matrix (estimated for factor model)\nvector[n_series_trend * n_lv_trend] Z_raw;  // raw factor loadings",
+    block = "parameters"
+  )
+  components <- append(components, list(z_raw_parameters))
+
+  # 2. TPARAMETERS block - Z matrix construction with identifiability constraints
+  z_construction <- brms::stanvar(
+    name = "z_construction",
+    scode = "// Factor loading matrix with identifiability constraints\n  matrix[n_series_trend, n_lv_trend] Z = rep_matrix(0, n_series_trend, n_lv_trend);\n  // constraints allow identifiability of loadings\n  {\n    int index = 1;\n    for (j in 1 : n_lv_trend) {\n      for (i in j : n_series_trend) {\n        Z[i, j] = Z_raw[index];\n        index += 1;\n      }\n    }\n  }",
+    block = "tparameters"
+  )
+  components <- append(components, list(z_construction))
+
+  # 3. MODEL block - Z_raw factor loading priors
+  # Note: innovations_trend priors are handled by shared innovation system
+  # Note: LV_raw no longer exists - was outdated parameter name
   factor_z_priors <- brms::stanvar(
     name = "factor_z_priors",
-    scode = "to_vector(Z) ~ normal(0, 1);",
+    scode = "Z_raw ~ student_t(3, 0, 1);",
     block = "model"
   )
+  components <- append(components, list(factor_z_priors))
 
-  return(combine_stanvars(factor_lv_priors, factor_z_priors))
+  return(combine_stanvars(z_raw_parameters, z_construction, factor_z_priors))
 }
 
 #' Generate Transformed Parameters Block Injections for Trend Computation

@@ -20,6 +20,7 @@
   save_model = NULL,
   stan_funs = NULL,
   silent = 1L,
+  validate = TRUE,
   ...
 )
 }
