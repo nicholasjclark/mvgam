@@ -733,7 +733,8 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
       time_var = dimensions$time_var,
       series_var = dimensions$series_var,
       unique_times = dimensions$unique_times,
-      unique_series = dimensions$unique_series
+      unique_series = dimensions$unique_series,
+      data = trend_setup$data  # Add actual data for CAR time distance calculations
     )
 
     # Extract brms parameters (handles mu_trend creation/extraction) + generate trend stanvars

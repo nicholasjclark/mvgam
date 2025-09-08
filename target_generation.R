@@ -58,7 +58,7 @@ cat("Generating current_stancode_1.stan (RW trends)...\n")
 tryCatch({
   mf1 <- mvgam_formula(y ~ x, trend_formula = ~ RW())
   code1 <- stancode(mf1, data = test_data$univariate, family = poisson(), validate = FALSE)
-  writeLines(code1, 'current_stancode_1.stan')
+  writeLines(code1, 'tasks/current_stancode_1.stan')
   cat("✓ current_stancode_1.stan created\n")
 }, error = function(e) {
   cat("✗ Error generating target 1:", conditionMessage(e), "\n")
@@ -71,10 +71,10 @@ cat("Generating current_stancode_2.stan (Shared RW trends)...\n")
 tryCatch({
   mf2 <- mvgam_formula(
     bf(mvbind(count, biomass) ~ x) + set_rescor(FALSE),
-    trend_formula = ~ RW(n_lv = 2)
+    trend_formula = ~ RW(cor = TRUE)
   )
   code2 <- stancode(mf2, data = test_data$multivariate, validate = FALSE)
-  writeLines(code2, 'current_stancode_2.stan')
+  writeLines(code2, 'tasks/current_stancode_2.stan')
   cat("✓ current_stancode_2.stan created\n")
 }, error = function(e) {
   cat("✗ Error generating target 2:", conditionMessage(e), "\n")
@@ -90,7 +90,7 @@ tryCatch({
     trend_formula = ~ presence + VAR(p = 2, ma = TRUE)
   )
   code3 <- stancode(mf3, data = test_data$multivariate, validate = FALSE)
-  writeLines(code3, 'current_stancode_3.stan')
+  writeLines(code3, 'tasks/current_stancode_3.stan')
   cat("✓ current_stancode_3.stan created\n")
 }, error = function(e) {
   cat("✗ Error generating target 3:", conditionMessage(e), "\n")
@@ -101,19 +101,22 @@ tryCatch({
 # ============================================================================
 cat("Generating current_stancode_4.stan (Factor AR trends)...\n")
 tryCatch({
+
   mf4 <- mvgam_formula(
-    bf(mvbind(count, biomass) ~ x) + set_rescor(FALSE),
-    trend_formula = ~ AR(p = 1, cor = TRUE, n_lv = 2)
+    formula = bf(count ~ x, family = poisson()) +
+      bf(presence ~ x, family = bernoulli()) +
+      bf(biomass ~ x, family = Gamma()),
+    trend_formula = ~ -1 + AR(p = 1, n_lv = 2, cor = TRUE)
   )
   code4 <- stancode(mf4, data = test_data$multivariate, validate = FALSE)
-  writeLines(code4, 'current_stancode_4.stan')
+  writeLines(code4, 'tasks/current_stancode_4.stan')
   cat("✓ current_stancode_4.stan created\n")
 }, error = function(e) {
   cat("✗ Error generating target 4:", conditionMessage(e), "\n")
 })
 
 # ============================================================================
-# TARGET 5: PW trends (Prophet functions)  
+# TARGET 5: PW trends (Prophet functions)
 # ============================================================================
 cat("Generating current_stancode_5.stan (PW trends)...\n")
 tryCatch({
@@ -122,7 +125,7 @@ tryCatch({
     trend_formula = ~ PW(n_changepoints = 10)
   )
   code5 <- stancode(mf5, data = test_data$univariate, family = poisson(), validate = FALSE)
-  writeLines(code5, 'current_stancode_5.stan')
+  writeLines(code5, 'tasks/current_stancode_5.stan')
   cat("✓ current_stancode_5.stan created\n")
 }, error = function(e) {
   cat("✗ Error generating target 5:", conditionMessage(e), "\n")
@@ -133,17 +136,10 @@ tryCatch({
 # ============================================================================
 cat("Generating current_stancode_6.stan (CAR trends)...\n")
 tryCatch({
-  # Create irregular time data for CAR model
-  irregular_data <- test_data$univariate
-  irregular_data$time <- c(1, 3, 4, 7, 8, 9, 12, 15, 16, 18, 19, 20, 21, 23, 24, 
-                          26, 28, 30, 31, 33, 35, 37, 38, 40)
-  
-  mf6 <- mvgam_formula(
-    y ~ x,
-    trend_formula = ~ CAR(rho = 0.8, n_knots = 10)
-  )
-  code6 <- stancode(mf6, data = irregular_data, family = poisson(), validate = FALSE)
-  writeLines(code6, 'current_stancode_6.stan')
+
+  mf6 <- mvgam_formula(y ~ gp(x) + (1 | series), trend_formula = ~ CAR())
+  code6 <- stancode(mf6, data = test_data$univariate, family = poisson(), validate = FALSE)
+  writeLines(code6, 'tasks/current_stancode_6.stan')
   cat("✓ current_stancode_6.stan created\n")
 }, error = function(e) {
   cat("✗ Error generating target 6:", conditionMessage(e), "\n")
@@ -157,7 +153,7 @@ cat("TARGET GENERATION COMPLETE\n")
 cat(strrep("=", 70), "\n")
 
 cat("\nGenerated files for comparison:\n")
-generated_files <- paste0("current_stancode_", 1:6, ".stan")
+generated_files <- paste0("tasks/current_stancode_", 1:6, ".stan")
 for (file in generated_files) {
   if (file.exists(file)) {
     cat("✓", file, "\n")
@@ -182,7 +178,7 @@ cat("   - Factor model code in non-factor models\n")
 cat("\nEXAMPLE COMPARISON:\n")
 cat("# Quick check for major issues in target 3 (VARMA):\n")
 cat("grep -n 'obs_trend_time_count' current_stancode_3.stan\n")
-cat("grep -n '{lags}' current_stancode_3.stan\n") 
+cat("grep -n '{lags}' current_stancode_3.stan\n")
 cat("grep -n 'mu_trend +=' current_stancode_3.stan\n")
 cat("grep -n 'D_raw_trend' current_stancode_3.stan\n")
 

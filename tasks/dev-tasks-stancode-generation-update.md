@@ -28,8 +28,8 @@
 
 ### **3. TARGET COMPARISON SCRIPT** 🎯 **MANDATORY FOR ALL AGENTS**
 - **BEFORE making any fixes**: Run `source("target_generation.R")` to generate current output
-- **Compare systematically**: `current_stancode_*.stan` vs `tasks/target_stancode_*.stan`
-- **Use diff tools**: `diff current_stancode_3.stan tasks/target_stancode_3.stan` for line-by-line comparison
+- **Compare systematically**: `tasks/current_stancode_*.stan` vs `tasks/target_stancode_*.stan`
+- **Use diff tools**: `diff tasks/current_stancode_3.stan tasks/target_stancode_3.stan` for line-by-line comparison
 - **Focus areas**: Check for missing mappings, template placeholders, duplicate parameters, incorrect mu_trend
 - **This script uses EXACT same data** as test suite - eliminates guesswork about expected vs actual
 - **Generated files show PRECISE differences** - much clearer than test failure messages alone
