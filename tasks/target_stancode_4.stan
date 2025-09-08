@@ -31,9 +31,9 @@ data {
   int prior_only;  // should the likelihood be ignored?
 
   // Trend dimensions (injected by mvgam)
-  int<lower=1> n_trend;  // number of time points
-  int<lower=1> n_series_trend;  // number of series
-  int<lower=1> n_lv_trend;  // latent variables
+  int<lower=1> N_trend;  // number of time points
+  int<lower=1> N_series_trend;  // number of series
+  int<lower=1> N_lv_trend;  // latent variables
 
   // Observation-to-trend mappings
   array[N_count] int obs_trend_time_count;
@@ -44,7 +44,7 @@ data {
   array[N_biomass] int obs_trend_series_biomass;
 
   // Times trend matrix
-  array[n_trend, n_series_trend] int times_trend;
+  array[N_trend, N_series_trend] int times_trend;
 
   // GLM compatibility vectors
   vector[1] mu_ones_count;  // for GLM count
@@ -81,17 +81,17 @@ parameters {
 
   // Trend parameters (injected by mvgam)
   // AR(1) coefficients with correlation
-  vector<lower=-1,upper=1>[n_lv_trend] ar1_trend;  // AR coefficients
+  vector<lower=-1,upper=1>[N_lv_trend] ar1_trend;  // AR coefficients
 
   // Innovation parameters
-  vector<lower=0>[n_lv_trend] sigma_trend;  // innovation SDs
-  cholesky_factor_corr[n_lv_trend] L_Omega_trend;  // innovation correlations
+  vector<lower=0>[N_lv_trend] sigma_trend;  // innovation SDs
+  cholesky_factor_corr[N_lv_trend] L_Omega_trend;  // innovation correlations
 
   // Factor loading matrix (estimated for factor model)
-  vector[n_series_trend * n_lv_trend] Z_raw;  // raw factor loadings
+  vector[N_series_trend * N_lv_trend] Z_raw;  // raw factor loadings
 
   // Latent variable innovations
-  matrix[n_trend, n_lv_trend] innovations_trend;
+  matrix[N_trend, N_lv_trend] innovations_trend;
 }
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
@@ -101,12 +101,12 @@ transformed parameters {
   lprior += gamma_lpdf(shape_biomass | 0.01, 0.01);
 
   // Factor loading matrix with identifiability constraints
-  matrix[n_series_trend, n_lv_trend] Z = rep_matrix(0, n_series_trend, n_lv_trend);
+  matrix[N_series_trend, N_lv_trend] Z = rep_matrix(0, N_series_trend, N_lv_trend);
   // constraints allow identifiability of loadings
   {
     int index = 1;
-    for (j in 1 : n_lv_trend) {
-      for (i in j : n_series_trend) {
+    for (j in 1 : N_lv_trend) {
+      for (i in j : N_series_trend) {
         Z[i, j] = Z_raw[index];
         index += 1;
       }
@@ -114,25 +114,25 @@ transformed parameters {
   }
 
   // Innovation covariance matrix
-  matrix[n_lv_trend, n_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
-  matrix[n_trend, n_lv_trend] scaled_innovations_trend = innovations_trend * L_Sigma_trend';
+  matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
+  matrix[N_trend, N_lv_trend] scaled_innovations_trend = innovations_trend * L_Sigma_trend';
 
   // AR(1) latent variable dynamics
-  matrix[n_trend, n_lv_trend] lv_trend;
+  matrix[N_trend, N_lv_trend] lv_trend;
   lv_trend[1, :] = scaled_innovations_trend[1, :];
-  for (i in 2:n_trend) {
-    for (j in 1:n_lv_trend) {
+  for (i in 2:N_trend) {
+    for (j in 1:N_lv_trend) {
       lv_trend[i, j] = ar1_trend[j] * lv_trend[i-1, j] + scaled_innovations_trend[i, j];
     }
   }
 
   // Trend mean vector (zero for ~ -1, but needed for prediction compatibility)
-  vector[n_trend] mu_trend = rep_vector(0.0, n_trend);
+  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
 
   // Compute trend matrix using factor model with universal pattern
-  matrix[n_trend, n_series_trend] trend;
-   for (i in 1:n_trend) {
-    for (s in 1:n_series_trend) {
+  matrix[N_trend, N_series_trend] trend;
+   for (i in 1:N_trend) {
+    for (s in 1:N_series_trend) {
       trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
     }
   }

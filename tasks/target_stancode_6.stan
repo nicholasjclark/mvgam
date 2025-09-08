@@ -54,20 +54,20 @@ data {
   int prior_only;  // should the likelihood be ignored?
   
   // Trend dimensions (injected by mvgam)
-  int<lower=1> n_trend;  // number of timepoints
-  int<lower=1> n_series_trend;  // number of observed time series
-  int<lower=1> n_lv_trend;  // number of latent states
-  array[n_trend, n_series_trend] int times_trend;  // temporal order
+  int<lower=1> N_trend;  // number of timepoints
+  int<lower=1> N_series_trend;  // number of observed time series
+  int<lower=1> N_lv_trend;  // number of latent states
+  array[N_trend, N_series_trend] int times_trend;  // temporal order
   array[N] int obs_trend_time;  // idx to map latent states to observations
   array[N] int obs_trend_series;  // idx to map latent states to observations
   vector[1] mu_ones;  // Column of ones for glm means
   
   // CAR-specific data
-  array[n_trend, n_series_trend] real<lower=0> time_dis;  // time distances for continuous AR
+  array[N_trend, N_series_trend] real<lower=0> time_dis;  // time distances for continuous AR
 }
 transformed data {
   // Factor loading matrix (diagonal for CAR - no factor model support)
-  matrix[n_series_trend, n_lv_trend] Z = diag_matrix(rep_vector(1.0, n_lv_trend));
+  matrix[N_series_trend, N_lv_trend] Z = diag_matrix(rep_vector(1.0, N_lv_trend));
 }
 parameters {
   real Intercept;  // temporary intercept for centered predictors
@@ -79,9 +79,9 @@ parameters {
   
   // Trend parameters (injected by mvgam)
   real Intercept_trend;  // trend intercept
-  vector<lower=-1,upper=1>[n_lv_trend] ar1_trend;  // CAR AR1 coefficients
-  vector<lower=0>[n_lv_trend] sigma_trend;  // innovation SDs
-  matrix[n_trend, n_lv_trend] innovations_trend;  // raw innovations
+  vector<lower=-1,upper=1>[N_lv_trend] ar1_trend;  // CAR AR1 coefficients
+  vector<lower=0>[N_lv_trend] sigma_trend;  // innovation SDs
+  matrix[N_trend, N_lv_trend] innovations_trend;  // raw innovations
 }
 transformed parameters {
   vector[N_1] r_1_1;  // actual group-level effects
@@ -98,34 +98,34 @@ transformed parameters {
   
   // CAR trend computation (injected by mvgam)
   // Scaled innovations
-  matrix[n_trend, n_lv_trend] scaled_innovations_trend;
+  matrix[N_trend, N_lv_trend] scaled_innovations_trend;
   scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);
   
   // CAR latent variables with continuous-time evolution
-  matrix[n_trend, n_lv_trend] lv_trend;
+  matrix[N_trend, N_lv_trend] lv_trend;
   
   // Initialize first time point with innovations
-  for (j in 1:n_lv_trend) {
+  for (j in 1:N_lv_trend) {
     lv_trend[1, j] = scaled_innovations_trend[1, j];
   }
   
   // Apply continuous-time AR evolution for subsequent time points
-  for (j in 1:n_lv_trend) {
-    for (i in 2:n_trend) {
+  for (j in 1:N_lv_trend) {
+    for (i in 2:N_trend) {
       lv_trend[i, j] = pow(ar1_trend[j], time_dis[i, j]) * lv_trend[i - 1, j]
                      + scaled_innovations_trend[i, j];
     }
   }
   
   // Derived latent trends using universal computation pattern
-  matrix[n_trend, n_series_trend] trend;
+  matrix[N_trend, N_series_trend] trend;
   
   // Latent state means
-  vector[n_trend] mu_trend = rep_vector(Intercept_trend, n_trend);
+  vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
   
   // Universal trend computation: state-space dynamics + linear predictors
-  for (i in 1:n_trend) {
-    for (s in 1:n_series_trend) {
+  for (i in 1:N_trend) {
+    for (s in 1:N_series_trend) {
       trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
     }
   }

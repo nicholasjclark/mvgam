@@ -209,15 +209,15 @@ data {
   int prior_only;  // should the likelihood be ignored?
 
   // Trend dimensions (injected by mvgam)
-  int<lower=1> n_trend;  // number of time points
-  int<lower=1> n_series_trend;  // number of series
-  int<lower=1> n_lv_trend;  // latent variables
+  int<lower=1> N_trend;  // number of time points
+  int<lower=1> N_series_trend;  // number of series
+  int<lower=1> N_lv_trend;  // latent variables
 
   // Trend formula design matrix for covariates
   int<lower=1> K_trend;  // number of trend coefficients
   int<lower=1> Kc_trend;  // number of trend coefficients after centering
-  matrix[n_trend, K_trend] X_trend;  // trend design matrix
-  matrix[n_trend, Kc_trend] Xc_trend;  // centered trend design matrix
+  matrix[N_trend, K_trend] X_trend;  // trend design matrix
+  matrix[N_trend, Kc_trend] Xc_trend;  // centered trend design matrix
   vector[Kc_trend] means_X_trend;  // column means of X_trend
 
   // Observation-to-trend mappings
@@ -227,14 +227,14 @@ data {
   array[N_biomass] int obs_trend_series_biomass;
 
   // Times trend matrix
-  array[n_trend, n_series_trend] int times_trend;
+  array[N_trend, N_series_trend] int times_trend;
 }
 transformed data {
   // Zero mean vector for VARMA process (following Heaps 2022)
-  vector[n_lv_trend] trend_zeros = rep_vector(0.0, n_lv_trend);
+  vector[N_lv_trend] trend_zeros = rep_vector(0.0, N_lv_trend);
 
   // Factor loading matrix (identity for non-factor VAR)
-  matrix[n_series_trend, n_lv_trend] Z = diag_matrix(rep_vector(1.0, n_lv_trend));
+  matrix[N_series_trend, N_lv_trend] Z = diag_matrix(rep_vector(1.0, N_lv_trend));
 }
 parameters {
   real Intercept_count;  // temporary intercept for centered predictors
@@ -257,10 +257,10 @@ parameters {
   vector[Kc_trend] b_trend;  // trend coefficients for presence covariate
 
   // VAR coefficient matrices (raw/unconstrained for stationarity)
-  array[2] matrix[n_lv_trend, n_lv_trend] A_raw_trend;  // lag-1, lag-2 raw coefficients
+  array[2] matrix[N_lv_trend, N_lv_trend] A_raw_trend;  // lag-1, lag-2 raw coefficients
 
   // MA coefficient matrices (raw/unconstrained for stationarity)
-  array[1] matrix[n_lv_trend, n_lv_trend] D_raw_trend;  // ma=TRUE -> 1 MA lag
+  array[1] matrix[N_lv_trend, N_lv_trend] D_raw_trend;  // ma=TRUE -> 1 MA lag
 
   // Hierarchical hyperparameters following Heaps 2022
   array[2] vector[2] Amu_trend;     // Shared means [diag, off-diag][lag1, lag2]
@@ -269,14 +269,14 @@ parameters {
   array[2] vector<lower=0>[1] Domega_trend;  // MA precisions [diag, off-diag][ma1]
 
   // Innovation parameters
-  vector<lower=0>[n_lv_trend] sigma_trend;  // innovation SDs
-  cholesky_factor_corr[n_lv_trend] L_Omega_trend;  // innovation correlations
+  vector<lower=0>[N_lv_trend] sigma_trend;  // innovation SDs
+  cholesky_factor_corr[N_lv_trend] L_Omega_trend;  // innovation correlations
 
   // Joint initialization vector for stationary distribution
-  vector[3 * n_lv_trend] init_trend;  // (2 VAR lags + 1 MA lag) * n_lv_trend
+  vector[3 * N_lv_trend] init_trend;  // (2 VAR lags + 1 MA lag) * N_lv_trend
 
   // Standard latent variable trends
-  matrix[n_trend, n_lv_trend] lv_trend;
+  matrix[N_trend, N_lv_trend] lv_trend;
 }
 transformed parameters {
   // penalized spline coefficients
@@ -306,21 +306,21 @@ transformed parameters {
   lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
 
   // Create trend linear predictor
-  vector[n_trend] mu_trend = rep_vector(0.0, n_trend);
+  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   mu_trend += Intercept_trend + Xc_trend * b_trend;
 
   // Innovation covariance matrix
-  matrix[n_lv_trend, n_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend,
+  matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend,
                                                                    L_Omega_trend);
-  cov_matrix[n_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
+  cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
 
   // Transform raw parameters to stationary coefficients using Heaps 2022
-  array[2] matrix[n_lv_trend, n_lv_trend] A_trend;
-  array[1] matrix[n_lv_trend, n_lv_trend] D_trend;
+  array[2] matrix[N_lv_trend, N_lv_trend] A_trend;
+  array[1] matrix[N_lv_trend, N_lv_trend] D_trend;
 
   // Working arrays for stationarity transformation
-  array[2] matrix[n_lv_trend, n_lv_trend] P_var;
-  array[2, 2] matrix[n_lv_trend, n_lv_trend] result_var;
+  array[2] matrix[N_lv_trend, N_lv_trend] P_var;
+  array[2, 2] matrix[N_lv_trend, N_lv_trend] result_var;
 
   // Transform A_raw_trend to stationary A_trend using AtoP + rev_mapping
   for (i in 1:2) {
@@ -332,23 +332,23 @@ transformed parameters {
   }
 
   // Transform D_raw_trend to stationary D_trend (MA coefficients)
-  array[1] matrix[n_lv_trend, n_lv_trend] P_ma;
-  array[2, 1] matrix[n_lv_trend, n_lv_trend] result_ma;
+  array[1] matrix[N_lv_trend, N_lv_trend] P_ma;
+  array[2, 1] matrix[N_lv_trend, N_lv_trend] result_ma;
 
   P_ma[1] = AtoP(D_raw_trend[1]);
   result_ma = rev_mapping(P_ma, Sigma_trend);
   D_trend[1] = -result_ma[1, 1];
 
   // Compute initial joint covariance matrix using companion matrix approach
-  cov_matrix[3 * n_lv_trend] Omega_trend = initial_joint_var(Sigma_trend, A_trend, D_trend);
+  cov_matrix[3 * N_lv_trend] Omega_trend = initial_joint_var(Sigma_trend, A_trend, D_trend);
 
   // Initialize MA error terms from init_trend
-  vector[n_lv_trend] ma_init_trend = init_trend[(2 * n_lv_trend + 1):(3 * n_lv_trend)];
+  vector[N_lv_trend] ma_init_trend = init_trend[(2 * N_lv_trend + 1):(3 * N_lv_trend)];
 
   // Compute trend matrix
-  matrix[n_trend, n_series_trend] trend;
-  for (i in 1:n_trend) {
-    for (s in 1:n_series_trend) {
+  matrix[N_trend, N_series_trend] trend;
+  for (i in 1:N_trend) {
+    for (s in 1:N_series_trend) {
       trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) +
         mu_trend[times_trend[i, s]];
     }
@@ -384,16 +384,16 @@ model {
   // VARMA likelihood implementation following Heaps 2022 methodology
 
   // Initial joint distribution for stationary VARMA initialization
-  vector[3 * n_lv_trend] mu_init_trend = rep_vector(0.0, 3 * n_lv_trend);
+  vector[3 * N_lv_trend] mu_init_trend = rep_vector(0.0, 3 * N_lv_trend);
   init_trend ~ multi_normal(mu_init_trend, Omega_trend);
 
   // Conditional means for VARMA dynamics
-  vector[n_lv_trend] mu_t_trend[n_trend];
-  vector[n_lv_trend] ma_error_trend[n_trend];  // MA error terms
+  vector[N_lv_trend] mu_t_trend[N_trend];
+  vector[N_lv_trend] ma_error_trend[N_trend];  // MA error terms
 
   // Compute conditional means for all time points
-  for (t in 1:n_trend) {
-    mu_t_trend[t] = rep_vector(0.0, n_lv_trend);
+  for (t in 1:N_trend) {
+    mu_t_trend[t] = rep_vector(0.0, N_lv_trend);
 
     // VAR component: Add autoregressive terms
     for (i in 1:2) {  // 2 VAR lags
@@ -401,9 +401,9 @@ model {
         // Use values from earlier than series start (from init_trend)
         int init_idx = 2 - (t - i) + 1;
         if (init_idx > 0 && init_idx <= 2) {
-          vector[n_lv_trend] lagged_lv;
-          int start_idx = (init_idx - 1) * n_lv_trend + 1;
-          int end_idx = init_idx * n_lv_trend;
+          vector[N_lv_trend] lagged_lv;
+          int start_idx = (init_idx - 1) * N_lv_trend + 1;
+          int end_idx = init_idx * N_lv_trend;
           lagged_lv = init_trend[start_idx:end_idx];
           mu_t_trend[t] += A_trend[i] * lagged_lv;
         }
@@ -424,7 +424,7 @@ model {
     }
 
     // Latent time series
-    for (t in 1:n_trend) {
+    for (t in 1:N_trend) {
       lv_trend[t, :]' ~ multi_normal(mu_t_trend[t], Sigma_trend);
         // Compute MA error for next iteration
         ma_error_trend[t] = lv_trend[t, :]' - mu_t_trend[t];
@@ -456,8 +456,8 @@ model {
 
     // Structured priors for raw coefficient matrices
     for (i in 1:2) {
-      for (j in 1:n_lv_trend) {
-        for (k in 1:n_lv_trend) {
+      for (j in 1:N_lv_trend) {
+        for (k in 1:N_lv_trend) {
           if (j == k) {
             // Diagonal elements
             A_raw_trend[i, j, k] ~ normal(Amu_trend[1, i], inv_sqrt(Aomega_trend[1, i]));
@@ -470,8 +470,8 @@ model {
     }
 
     // MA raw coefficient priors
-    for (j in 1:n_lv_trend) {
-      for (k in 1:n_lv_trend) {
+    for (j in 1:N_lv_trend) {
+      for (k in 1:N_lv_trend) {
         if (j == k) {
           D_raw_trend[1, j, k] ~ normal(Dmu_trend[1, 1], inv_sqrt(Domega_trend[1, 1]));
         } else {

@@ -1769,7 +1769,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
                                                hierarchical_info = NULL) {
 
   # Determine effective dimension for innovations using symbolic names
-  effective_dim <- "n_lv_trend"
+  effective_dim <- "N_lv_trend"
 
   # Check for hierarchical structure
   is_hierarchical <- !is.null(hierarchical_info) && hierarchical_info$has_groups
@@ -1844,7 +1844,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
   # 4. Raw innovations parameter (Stan will sample these with std_normal prior)
   innovations_trend_stanvar <- brms::stanvar(
     name = "innovations_trend",
-    scode = paste0("matrix[n_trend, ", effective_dim, "] innovations_trend;"),
+    scode = paste0("matrix[N_trend, ", effective_dim, "] innovations_trend;"),
     block = "parameters"
   )
   stanvar_components <- append(stanvar_components, list(innovations_trend_stanvar))
@@ -1854,7 +1854,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     # Hierarchical case: innovations depend on group structure
     final_innovations_code <- paste0("
     // Scaled innovations after applying hierarchical correlations
-    matrix[n_trend, ", effective_dim, "] scaled_innovations_trend;
+    matrix[N_trend, ", effective_dim, "] scaled_innovations_trend;
 
     // Apply group-specific correlations to raw innovations
     for (g in 1:n_groups) {
@@ -1872,7 +1872,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     # Simple correlated case
     final_innovations_code <- paste0("
     // Scaled innovations after applying correlations
-    matrix[n_trend, ", effective_dim, "] scaled_innovations_trend;
+    matrix[N_trend, ", effective_dim, "] scaled_innovations_trend;
 
     // Apply correlation transformation using efficient non-centered parameterization
     {
@@ -1883,7 +1883,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     # Uncorrelated case
     final_innovations_code <- paste0("
     // Scaled innovations (uncorrelated case)
-    matrix[n_trend, ", effective_dim, "] scaled_innovations_trend;
+    matrix[N_trend, ", effective_dim, "] scaled_innovations_trend;
 
     // Apply scaling using vectorized operations
     scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);")
@@ -1979,11 +1979,11 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
 #' across multiple functions, ensuring consistent dimension parameter generation
 #' while maintaining proper dimensional relationships for factor vs non-factor models.
 #'
-#' @param n_obs Number of observations (will be named n_trend in Stan)
+#' @param n_obs Number of observations (will be named N_trend in Stan)
 #' @param n_series Number of observed series
 #' @param n_lv Number of latent variables (optional, determines factor model behavior)
 #' @param is_factor_model Logical indicating if this is a factor model (optional, inferred from n_lv)
-#' @return List of all dimension data block stanvars (n_trend, n_series_trend, n_lv_trend)
+#' @return List of all dimension data block stanvars (N_trend, N_series_trend, N_lv_trend)
 #' @noRd
 generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL, is_factor_model = NULL) {
   # Input validation
@@ -1999,22 +1999,22 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL, is_factor_m
 
   # Set n_lv default for non-factor models
   if (is.null(n_lv)) {
-    n_lv <- n_series  # Non-factor model: n_lv_trend = n_series_trend
+    n_lv <- n_series  # Non-factor model: N_lv_trend = N_series_trend
   }
 
   # Create consolidated dimensions stanvar - ensures all dimensions declared together first
   dimensions_scode <- paste(
-    "int<lower=1> n_trend;",
-    "int<lower=1> n_series_trend;", 
-    "int<lower=1> n_lv_trend;",
+    "int<lower=1> N_trend;",
+    "int<lower=1> N_series_trend;", 
+    "int<lower=1> N_lv_trend;",
     sep = "\n  "
   )
   
   # Prepare data list with all dimension values
   dimensions_data <- list(
-    n_trend = n_obs,
-    n_series_trend = n_series,
-    n_lv_trend = if (is_factor_model) n_lv else n_series
+    N_trend = n_obs,
+    N_series_trend = n_series,
+    N_lv_trend = if (is_factor_model) n_lv else n_series
   )
   
   dimensions_stanvar <- brms::stanvar(
@@ -2037,7 +2037,7 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL, is_factor_m
 #' @return A reordered list of stanvars with same class and structure
 #' @details 
 #' Priority levels:
-#' - Level 1: Dimension variables (n_trend, n_series_trend, etc.)
+#' - Level 1: Dimension variables (N_trend, N_series_trend, etc.)
 #' - Level 2: Arrays referencing dimensions (times_trend, obs_trend)  
 #' - Level 3: All other stanvars
 #' 
@@ -2064,7 +2064,7 @@ sort_stanvars <- function(stanvars) {
     }
     
     # Dimension variables must come first
-    if (grepl("^(n_trend|n_series_trend|n_lv_trend)$", name) || 
+    if (grepl("^(N_trend|N_series_trend|N_lv_trend)$", name) || 
         grepl("trend_dimensions", name)) {
       return(DIMENSION_PRIORITY)
     }
@@ -2126,7 +2126,7 @@ generate_matrix_z_parameters <- function(is_factor_model, n_lv, n_series) {
     # Factor model: estimate Z in parameters for dimensionality reduction
     z_matrix_stanvar <- brms::stanvar(
       name = "Z",
-      scode = glue::glue("matrix[n_series_trend, n_lv_trend] Z;"),
+      scode = glue::glue("matrix[N_series_trend, N_lv_trend] Z;"),
       block = "parameters"
     )
     return(z_matrix_stanvar)
@@ -2149,7 +2149,7 @@ generate_matrix_z_tdata <- function(is_factor_model, n_lv, n_series) {
     # Non-factor model: diagonal Z in transformed data
     z_matrix_stanvar <- brms::stanvar(
       name = "Z",
-      scode = glue::glue("matrix[n_series_trend, n_lv_trend] Z = diag_matrix(rep_vector(1.0, n_lv_trend));"),
+      scode = glue::glue("matrix[N_series_trend, N_lv_trend] Z = diag_matrix(rep_vector(1.0, N_lv_trend));"),
       block = "tdata"
     )
     return(z_matrix_stanvar)
@@ -2218,7 +2218,7 @@ generate_factor_model <- function(is_factor_model, n_lv) {
   # 1. PARAMETERS block - Z_raw factor loadings parameter
   z_raw_parameters <- brms::stanvar(
     name = "z_raw_parameters",
-    scode = "// Factor loading matrix (estimated for factor model)\nvector[n_series_trend * n_lv_trend] Z_raw;  // raw factor loadings",
+    scode = "// Factor loading matrix (estimated for factor model)\nvector[N_series_trend * N_lv_trend] Z_raw;  // raw factor loadings",
     block = "parameters"
   )
   components <- append(components, list(z_raw_parameters))
@@ -2226,7 +2226,7 @@ generate_factor_model <- function(is_factor_model, n_lv) {
   # 2. TPARAMETERS block - Z matrix construction with identifiability constraints
   z_construction <- brms::stanvar(
     name = "z_construction",
-    scode = "// Factor loading matrix with identifiability constraints\n  matrix[n_series_trend, n_lv_trend] Z = rep_matrix(0, n_series_trend, n_lv_trend);\n  // constraints allow identifiability of loadings\n  {\n    int index = 1;\n    for (j in 1 : n_lv_trend) {\n      for (i in j : n_series_trend) {\n        Z[i, j] = Z_raw[index];\n        index += 1;\n      }\n    }\n  }",
+    scode = "// Factor loading matrix with identifiability constraints\n  matrix[N_series_trend, N_lv_trend] Z = rep_matrix(0, N_series_trend, N_lv_trend);\n  // constraints allow identifiability of loadings\n  {\n    int index = 1;\n    for (j in 1 : N_lv_trend) {\n      for (i in j : N_series_trend) {\n        Z[i, j] = Z_raw[index];\n        index += 1;\n      }\n    }\n  }",
     block = "tparameters"
   )
   components <- append(components, list(z_construction))
@@ -2260,12 +2260,12 @@ generate_trend_computation_tparameters <- function(n_lv, n_series) {
     name = "trend",
     scode = glue::glue("
       // Derived latent trends using universal computation pattern
-      matrix[n_trend, n_series_trend] trend;
+      matrix[N_trend, N_series_trend] trend;
 
       // Universal trend computation: state-space dynamics + linear predictors
       // dot_product captures dynamic component, mu_trend captures trend_formula
-      for (i in 1:n_trend) {{
-        for (s in 1:n_series_trend) {{
+      for (i in 1:N_trend) {{
+        for (s in 1:N_series_trend) {{
           trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
         }}
       }}
@@ -2433,7 +2433,7 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
     )
 
     # Add shared priors
-    effective_dim <- "n_lv_trend"
+    effective_dim <- "N_lv_trend"
     is_hierarchical <- !is.null(hierarchical_info) && hierarchical_info$has_groups
 
     shared_priors <- generate_innovation_model(
@@ -2569,7 +2569,7 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   if (has_ma) {
     rw_parameters_stanvar <- brms::stanvar(
       name = "rw_parameters",
-      scode = "vector<lower=-1,upper=1>[n_lv_trend] theta1_trend;",
+      scode = "vector<lower=-1,upper=1>[N_lv_trend] theta1_trend;",
       block = "parameters"
     )
     components <- append(components, list(rw_parameters_stanvar))
@@ -2580,19 +2580,19 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     name = "rw_tparameters",
     scode = glue::glue("
       // Latent states with RW dynamics
-      matrix[n_trend, n_lv_trend] lv_trend;
-      {if(has_ma) 'matrix[n_trend, n_lv_trend] ma_innovations_trend = scaled_innovations_trend;' else ''}
+      matrix[N_trend, N_lv_trend] lv_trend;
+      {if(has_ma) 'matrix[N_trend, N_lv_trend] ma_innovations_trend = scaled_innovations_trend;' else ''}
 
       {if(has_ma) '// Apply MA(1) transformation
-      for (i in 2:n_trend) {{
-        for (j in 1:n_lv_trend) {{
+      for (i in 2:N_trend) {{
+        for (j in 1:N_lv_trend) {{
           ma_innovations_trend[i, j] += theta1_trend[j] * ma_innovations_trend[i-1, j];
         }}
       }}' else ''}
 
       // Apply RW dynamics
       lv_trend[1, :] = {if(has_ma) 'ma_innovations_trend' else 'scaled_innovations_trend'}[1, :];
-      for (i in 2:n_trend) {{
+      for (i in 2:N_trend) {{
         lv_trend[i, :] = lv_trend[i-1, :] + {if(has_ma) 'ma_innovations_trend' else 'scaled_innovations_trend'}[i, :];
       }}
     "),
@@ -2767,7 +2767,7 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # 1. PARAMETERS block - AR trend-specific parameters
   ar_param_declarations <- sapply(ar_lags, function(lag) {
-    glue::glue("vector<lower=-1,upper=1>[n_lv_trend] ar{lag}_trend;")
+    glue::glue("vector<lower=-1,upper=1>[N_lv_trend] ar{lag}_trend;")
   })
 
   ar_parameters_stanvar <- brms::stanvar(
@@ -2784,7 +2784,7 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   if (has_ma) {
     ma_parameters_stanvar <- brms::stanvar(
       name = "ar_ma_parameters",
-      scode = "vector<lower=-1,upper=1>[n_lv_trend] theta1_trend;",
+      scode = "vector<lower=-1,upper=1>[N_lv_trend] theta1_trend;",
       block = "parameters"
     )
     components <- append(components, list(ma_parameters_stanvar))
@@ -2801,12 +2801,12 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     name = "ar_tparameters",
     scode = glue::glue("
       // Latent states with AR dynamics
-      matrix[n_trend, n_lv_trend] lv_trend;
-      {if(has_ma) 'matrix[n_trend, n_lv_trend] ma_innovations_trend = scaled_innovations_trend;' else ''}
+      matrix[N_trend, N_lv_trend] lv_trend;
+      {if(has_ma) 'matrix[N_trend, N_lv_trend] ma_innovations_trend = scaled_innovations_trend;' else ''}
 
       {if(has_ma) '// Apply MA(1) transformation
-      for (i in 2:n_trend) {{
-        for (j in 1:n_lv_trend) {{
+      for (i in 2:N_trend) {{
+        for (j in 1:N_lv_trend) {{
           ma_innovations_trend[i, j] += theta1_trend[j] * ma_innovations_trend[i-1, j];
         }}
       }}' else ''}
@@ -2817,8 +2817,8 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       }}
 
       // Apply AR dynamics
-      for (i in {max_lag + 1}:n_trend) {{
-        for (j in 1:n_lv_trend) {{
+      for (i in {max_lag + 1}:N_trend) {{
+        for (j in 1:N_lv_trend) {{
           lv_trend[i, j] = {ar_sum} + {if(has_ma) 'ma_innovations_trend' else 'scaled_innovations_trend'}[i, j];
         }}
       }}
@@ -3277,11 +3277,11 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       array[{n_groups}] vector<lower=0>[{n_subgroups}] sigma_group_trend;
       ') else '
       // Standard VAR: single raw matrix
-      array[{lags}] matrix[n_lv_trend, n_lv_trend] A_raw_trend;
+      array[{lags}] matrix[N_lv_trend, N_lv_trend] A_raw_trend;
 
       // Standard variance and correlation parameters
-      vector<lower=0>[n_lv_trend] sigma_trend;
-      cholesky_factor_corr[n_lv_trend] L_Omega_trend;
+      vector<lower=0>[N_lv_trend] sigma_trend;
+      cholesky_factor_corr[N_lv_trend] L_Omega_trend;
       '}
 
       // Shared hierarchical hyperparameters for A_raw coefficients (across all groups)
@@ -3290,10 +3290,10 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       array[2] vector<lower=0>[{lags}] Aomega_trend;  // Shared precisions
 
       // Joint initialization vector for stationary distribution
-      vector[{if(is_varma) paste0('(', lags, ' + ', ma_lags, ') * n_lv_trend') else paste0(lags, ' * n_lv_trend')}] init_trend;
+      vector[{if(is_varma) paste0('(', lags, ' + ', ma_lags, ') * N_lv_trend') else paste0(lags, ' * N_lv_trend')}] init_trend;
 
       // Standard latent variable trends - consistent with other trend generators
-      matrix[n_trend, n_lv_trend] lv_trend;
+      matrix[N_trend, N_lv_trend] lv_trend;
     "),
     block = "parameters"
   )
@@ -3307,7 +3307,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       scode = glue::glue("
       // Raw MA partial autocorrelation matrices (unconstrained for stationarity)
       // D_raw_trend gets transformed to D_trend (stationary MA coefficients)
-      array[{ma_lags}] matrix[n_lv_trend, n_lv_trend] D_raw_trend;
+      array[{ma_lags}] matrix[N_lv_trend, N_lv_trend] D_raw_trend;
 
       // Hierarchical hyperparameters for D_raw_trend (MA) coefficients
       // Mirrors A_raw_trend hyperparameter structure for consistency
@@ -3350,10 +3350,10 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       }}
 
       // Build block-structured full matrices (groups do not interact)
-      cov_matrix[n_lv_trend] Sigma_trend = rep_matrix(0, n_lv_trend, n_lv_trend);
-      array[{lags}] matrix[n_lv_trend, n_lv_trend] A_trend;
+      cov_matrix[N_lv_trend] Sigma_trend = rep_matrix(0, N_lv_trend, N_lv_trend);
+      array[{lags}] matrix[N_lv_trend, N_lv_trend] A_trend;
       for (lag in 1:{lags}) {{
-        A_trend[lag] = rep_matrix(0, n_lv_trend, n_lv_trend);
+        A_trend[lag] = rep_matrix(0, N_lv_trend, N_lv_trend);
       }}
 
       for (g in 1:{n_groups}) {{
@@ -3364,15 +3364,15 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       }}
       ') else '
       // Standard VAR: single covariance matrix and transformation
-      matrix[n_lv_trend, n_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
-      cov_matrix[n_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
+      matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
+      cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
 
       // Transform raw parameters to stationary coefficients
-      array[{lags}] matrix[n_lv_trend, n_lv_trend] A_trend;
+      array[{lags}] matrix[N_lv_trend, N_lv_trend] A_trend;
 
       // Working arrays for stationarity transformation
-      array[{lags}] matrix[n_lv_trend, n_lv_trend] P_var;
-      array[2, {lags}] matrix[n_lv_trend, n_lv_trend] result_var;
+      array[{lags}] matrix[N_lv_trend, N_lv_trend] P_var;
+      array[2, {lags}] matrix[N_lv_trend, N_lv_trend] result_var;
 
       for (i in 1:{lags}) {{
         P_var[i] = AtoP(A_raw_trend[i]);
@@ -3385,16 +3385,16 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       }}
       '}
 
-      {if(is_varma) glue::glue('array[{ma_lags}] matrix[n_lv_trend, n_lv_trend] D_trend;') else ''}
+      {if(is_varma) glue::glue('array[{ma_lags}] matrix[N_lv_trend, N_lv_trend] D_trend;') else ''}
 
       // Joint covariance matrix for stationary initialization
-      cov_matrix[{if(is_varma) paste0('(', lags, ' + ', ma_lags, ') * n_lv_trend') else paste0(lags, ' * n_lv_trend')}] Omega_trend;
+      cov_matrix[{if(is_varma) paste0('(', lags, ' + ', ma_lags, ') * N_lv_trend') else paste0(lags, ' * N_lv_trend')}] Omega_trend;
 
-      {if(is_varma) glue::glue('vector[n_lv_trend] ma_init_trend[{ma_lags}];  // Initial MA errors') else ''}
+      {if(is_varma) glue::glue('vector[N_lv_trend] ma_init_trend[{ma_lags}];  // Initial MA errors') else ''}
 
       // Working arrays for stationarity transformation
-      array[{lags}] matrix[n_lv_trend, n_lv_trend] P_var;
-      array[2, {lags}] matrix[n_lv_trend, n_lv_trend] result_var;
+      array[{lags}] matrix[N_lv_trend, N_lv_trend] P_var;
+      array[2, {lags}] matrix[N_lv_trend, N_lv_trend] result_var;
 
       // Transform A_raw_trend to stationary A_trend using Heaps methodology
       for (i in 1:{lags}) {{
@@ -3411,8 +3411,8 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
       {if(is_varma) glue::glue('
       // Transform D_raw_trend to stationary D_trend (VARMA only)
-      array[{ma_lags}] matrix[n_lv_trend, n_lv_trend] P_ma;
-      array[2, {ma_lags}] matrix[n_lv_trend, n_lv_trend] result_ma;
+      array[{ma_lags}] matrix[N_lv_trend, N_lv_trend] P_ma;
+      array[2, {ma_lags}] matrix[N_lv_trend, N_lv_trend] result_ma;
 
       // Transform D_raw_trend matrices using AtoP transformation
       for (i in 1:{ma_lags}) {{
@@ -3429,13 +3429,13 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       ') else ''}
 
       // Compute initial joint covariance matrix using companion matrix approach
-      {if(is_varma) 'Omega_trend = initial_joint_var(Sigma_trend, A_trend, D_trend);' else 'array[1] matrix[n_lv_trend, n_lv_trend] empty_theta; empty_theta[1] = rep_matrix(0.0, n_lv_trend, n_lv_trend); Omega_trend = initial_joint_var(Sigma_trend, A_trend, empty_theta[1:0]);'}
+      {if(is_varma) 'Omega_trend = initial_joint_var(Sigma_trend, A_trend, D_trend);' else 'array[1] matrix[N_lv_trend, N_lv_trend] empty_theta; empty_theta[1] = rep_matrix(0.0, N_lv_trend, N_lv_trend); Omega_trend = initial_joint_var(Sigma_trend, A_trend, empty_theta[1:0]);'}
 
       {if(is_varma) glue::glue('
       // Initialize MA error terms from init_trend (VARMA specific)
       for (i in 1:{ma_lags}) {{
-        int start_idx = {lags} * n_lv_trend + (i - 1) * n_lv_trend + 1;
-        int end_idx = {lags} * n_lv_trend + i * n_lv_trend;
+        int start_idx = {lags} * N_lv_trend + (i - 1) * N_lv_trend + 1;
+        int end_idx = {lags} * N_lv_trend + i * N_lv_trend;
         ma_init_trend[i] = init_trend[start_idx:end_idx];
       }}
       ') else ''}
@@ -3452,8 +3452,8 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     checkmate::assert_int(ma_lags, lower = 1)
   }
 
-  # Calculate initialization vector dimension: lags*n_lv_trend for VAR, (lags+ma_lags)*n_lv_trend for VARMA
-  init_dim_expr <- if (is_varma) glue::glue('({lags} + {ma_lags}) * n_lv_trend') else glue::glue('{lags} * n_lv_trend')
+  # Calculate initialization vector dimension: lags*N_lv_trend for VAR, (lags+ma_lags)*N_lv_trend for VARMA
+  init_dim_expr <- if (is_varma) glue::glue('({lags} + {ma_lags}) * N_lv_trend') else glue::glue('{lags} * N_lv_trend')
 
   var_model_stanvar <- brms::stanvar(
     name = "var_model",
@@ -3465,12 +3465,12 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       init_trend ~ multi_normal(mu_init_trend, Omega_trend);
 
       // Conditional means for VARMA dynamics
-      vector[n_lv_trend] mu_t_trend[n_trend];
-      {if(is_varma) glue::glue('vector[n_lv_trend] ma_error_trend[n_trend];  // MA error terms') else ''}
+      vector[N_lv_trend] mu_t_trend[N_trend];
+      {if(is_varma) glue::glue('vector[N_lv_trend] ma_error_trend[N_trend];  // MA error terms') else ''}
 
       // Compute conditional means for all time points
-      for (t in 1:n_trend) {{
-        mu_t_trend[t] = rep_vector(0.0, n_lv_trend);
+      for (t in 1:N_trend) {{
+        mu_t_trend[t] = rep_vector(0.0, N_lv_trend);
 
         // VAR component: Add autoregressive terms
         for (i in 1:{lags}) {{
@@ -3478,9 +3478,9 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
             // Use values from earlier than series start (from init_trend)
             int init_idx = {lags} - (t - i) + 1;
             if (init_idx > 0 && init_idx <= {lags}) {{
-              vector[n_lv_trend] lagged_lv;
-              int start_idx = (init_idx - 1) * n_lv_trend + 1;
-              int end_idx = init_idx * n_lv_trend;
+              vector[N_lv_trend] lagged_lv;
+              int start_idx = (init_idx - 1) * N_lv_trend + 1;
+              int end_idx = init_idx * N_lv_trend;
               lagged_lv = init_trend[start_idx:end_idx];
               mu_t_trend[t] += A_trend[i] * lagged_lv;
             }}
@@ -3507,7 +3507,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       }}
 
       // Observation likelihood for time series
-      for (t in 1:n_trend) {{
+      for (t in 1:N_trend) {{
         lv_trend[t, :] ~ multi_normal(mu_t_trend[t], Sigma_trend);
         {if(is_varma) '// Compute MA error for next iteration\n        ma_error_trend[t] = lv_trend[t, :] - mu_t_trend[t];' else ''}
       }}
@@ -3536,8 +3536,8 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         diagonal(A_raw_trend[lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));
 
         // Off-diagonal elements prior
-        for (i in 1:n_lv_trend) {{
-          for (j in 1:n_lv_trend) {{
+        for (i in 1:N_lv_trend) {{
+          for (j in 1:N_lv_trend) {{
             if (i != j) {{
               A_raw_trend[lag, i, j] ~ normal(Amu_trend[2, lag], 1 / sqrt(Aomega_trend[2, lag]));
             }}
@@ -3554,8 +3554,8 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         diagonal(D_raw_trend[ma_lag]) ~ normal(Dmu_trend[1, ma_lag], 1 / sqrt(Domega_trend[1, ma_lag]));
 
         // Off-diagonal elements prior for MA coefficients
-        for (i in 1:n_lv_trend) {{
-          for (j in 1:n_lv_trend) {{
+        for (i in 1:N_lv_trend) {{
+          for (j in 1:N_lv_trend) {{
             if (i != j) {{
               D_raw_trend[ma_lag, i, j] ~ normal(Dmu_trend[2, ma_lag], 1 / sqrt(Domega_trend[2, ma_lag]));
             }}
@@ -3806,7 +3806,7 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   time_dis_data_stanvar <- brms::stanvar(
     x = time_dis,
     name = "time_dis",
-    scode = glue::glue("array[n, n_series_trend] real<lower=0> time_dis;"),
+    scode = glue::glue("array[n, N_series_trend] real<lower=0> time_dis;"),
     block = "data"
   )
   components <- append(components, list(time_dis_data_stanvar))
@@ -3814,7 +3814,7 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # 1. PARAMETERS block - CAR trend-specific parameters
   car_parameters_stanvar <- brms::stanvar(
     name = "car_parameters",
-    scode = "// CAR AR1 parameters\nvector<lower=-1,upper=1>[n_lv_trend] ar1_trend;",
+    scode = "// CAR AR1 parameters\nvector<lower=-1,upper=1>[N_lv_trend] ar1_trend;",
     block = "parameters"
   )
   components <- append(components, list(car_parameters_stanvar))
@@ -3824,16 +3824,16 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     name = "car_tparameters",
     scode = glue::glue("
       // CAR latent variable evolution using shared innovation system
-      matrix[n_trend, n_lv_trend] lv_trend;
+      matrix[N_trend, N_lv_trend] lv_trend;
 
       // Initialize first time point with innovations
-      for (j in 1:n_lv_trend) {{
+      for (j in 1:N_lv_trend) {{
         lv_trend[1, j] = scaled_innovations_trend[1, j];
       }}
 
       // Apply continuous-time AR evolution for subsequent time points
-      for (j in 1:n_lv_trend) {{
-        for (i in 2:n_trend) {{
+      for (j in 1:N_lv_trend) {{
+        for (i in 2:N_trend) {{
           lv_trend[i, j] = pow(ar1_trend[j], time_dis[i, j]) * lv_trend[i - 1, j]
                          + scaled_innovations_trend[i, j];
         }}
@@ -3964,7 +3964,7 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # ZMVN transformed parameters - direct transformation from scaled_innovations_trend
   zmvn_tparameters_stanvar <- brms::stanvar(
     name = "zmvn_tparameters",
-    scode = "matrix[n_trend, n_lv_trend] lv_trend;\nlv_trend = scaled_innovations_trend;",
+    scode = "matrix[N_trend, N_lv_trend] lv_trend;\nlv_trend = scaled_innovations_trend;",
     block = "tparameters"
   )
 
@@ -4180,7 +4180,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     pw_logistic_data_stanvar <- brms::stanvar(
       x = matrix(10, nrow = n_obs, ncol = n_series),  # Default carrying capacity
       name = "pw_logistic_data",
-      scode = glue::glue("matrix[n_trend, n_lv_trend] cap_trend; // carrying capacities"),
+      scode = glue::glue("matrix[N_trend, N_lv_trend] cap_trend; // carrying capacities"),
       block = "data"
     )
   }
@@ -4190,10 +4190,10 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     name = "pw_transformed_data",
     scode = glue::glue("
       // time vector for changepoint calculations
-      vector[n_trend] time_trend;
-      for (i in 1:n_trend) time_trend[i] = i;
+      vector[N_trend] time_trend;
+      for (i in 1:N_trend) time_trend[i] = i;
       // sorted changepoint matrix
-      matrix[n_trend, n_change_trend] Kappa_trend = get_changepoint_matrix(time_trend, t_change_trend, n_trend, n_change_trend);
+      matrix[N_trend, n_change_trend] Kappa_trend = get_changepoint_matrix(time_trend, t_change_trend, N_trend, n_change_trend);
     "),
     block = "tdata"
   )
@@ -4203,13 +4203,13 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     name = "pw_parameters",
     scode = glue::glue("
       // base trend growth rates
-      vector[n_lv_trend] k_trend;
+      vector[N_lv_trend] k_trend;
 
       // trend offset parameters
-      vector[n_lv_trend] m_trend;
+      vector[N_lv_trend] m_trend;
 
       // trend rate adjustments per series
-      matrix[n_change_trend, n_lv_trend] delta_trend;
+      matrix[n_change_trend, N_lv_trend] delta_trend;
     "),
     block = "parameters"
   )
@@ -4220,11 +4220,11 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
       name = "pw_transformed_parameters",
       scode = glue::glue("
         // Standardized latent trend matrix (logistic piecewise trends)
-        matrix[n_trend, n_lv_trend] lv_trend;
+        matrix[N_trend, N_lv_trend] lv_trend;
 
         // logistic trend estimates
-        for (s in 1 : n_lv_trend) {{
-          lv_trend[1 : n_trend, s] = logistic_trend(k_trend[s], m_trend[s],
+        for (s in 1 : N_lv_trend) {{
+          lv_trend[1 : N_trend, s] = logistic_trend(k_trend[s], m_trend[s],
                                         to_vector(delta_trend[ : , s]), time_trend,
                                         to_vector(cap_trend[ : , s]), Kappa_trend, t_change_trend,
                                         n_change_trend);
@@ -4238,11 +4238,11 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
       name = "pw_transformed_parameters",
       scode = glue::glue("
         // Standardized latent trend matrix (linear piecewise trends)
-        matrix[n_trend, n_lv_trend] lv_trend;
+        matrix[N_trend, N_lv_trend] lv_trend;
 
         // linear trend estimates
-        for (s in 1 : n_lv_trend) {{
-          lv_trend[1 : n_trend, s] = linear_trend(k_trend[s], m_trend[s],
+        for (s in 1 : N_lv_trend) {{
+          lv_trend[1 : N_trend, s] = linear_trend(k_trend[s], m_trend[s],
                                       to_vector(delta_trend[ : , s]), time_trend, Kappa_trend,
                                       t_change_trend);
         }}
@@ -4722,8 +4722,8 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
     } else {
       # Intercept-only model: create from intercept (most common case for trend models)
       # Transform brms pattern: vector[N] mu = rep_vector(0.0, N); mu += Intercept;
-      # Into: vector[n_trend] mu_trend = rep_vector(Intercept_trend, n_trend);
-      time_param <- "n_trend"
+      # Into: vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
+      time_param <- "N_trend"
       mu_trend_code <- paste0(
         "vector[", time_param, "] mu", suffix, " = rep_vector(Intercept", suffix, ", ", time_param, ");"
       )
@@ -5224,7 +5224,7 @@ filter_renameable_identifiers <- function(identifiers) {
     "Y",
     
     # Dimension variables handled by generate_common_trend_data (avoid duplication)
-    "N",  # We use n_trend instead of N_trend
+    # "N",  # REMOVED: N must be renamed to N_trend in data block declarations for proper design matrix dimensions
     
     # Global flags that should not be renamed
     "prior_only",
@@ -5578,8 +5578,8 @@ create_times_trend_matrix <- function(n_time, n_series, unique_times, unique_ser
 
   # Create stanvar with explicit 2D integer array declaration using new Stan syntax
   # Use both data (x) and explicit scode to override brms auto-generation
-  # Reference dimension variables with _trend suffix (n_trend, n_series_trend)
-  stan_declaration <- glue::glue("array[n_trend, n_series_trend] int {matrix_name};")
+  # Reference dimension variables with _trend suffix (N_trend, N_series_trend)
+  stan_declaration <- glue::glue("array[N_trend, N_series_trend] int {matrix_name};")
 
   brms::stanvar(
     x = times_array,

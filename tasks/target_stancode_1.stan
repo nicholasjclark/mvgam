@@ -12,10 +12,10 @@ data {
   matrix[N, K] X;  // population-level design matrix
   int<lower=1> Kc;  // number of population-level effects after centering
   int prior_only;  // should the likelihood be ignored?
-  int<lower=1> n_trend;  // number of timepoints
-  int<lower=1> n_series_trend;  // number of observed time series
-  int<lower=1> n_lv_trend;  // number of latent states
-  array[n_trend, n_series_trend] int times_trend;  // temporal order of latent states
+  int<lower=1> N_trend;  // number of timepoints
+  int<lower=1> N_series_trend;  // number of observed time series
+  int<lower=1> N_lv_trend;  // number of latent states
+  array[N_trend, N_series_trend] int times_trend;  // temporal order of latent states
   array[N] int obs_trend_time;  // idx to map latent states to observations
   array[N] int obs_trend_series;  // idx to map latent states to observations
   vector[1] mu_ones;  // Column of ones for glm means
@@ -23,7 +23,7 @@ data {
 transformed data {
   matrix[N, Kc] Xc;  // centered version of X without an intercept
   vector[Kc] means_X;  // column means of X before centering
-  matrix[n_series_trend, n_lv_trend] Z = diag_matrix(rep_vector(1.0, n_lv_trend));
+  matrix[N_series_trend, N_lv_trend] Z = diag_matrix(rep_vector(1.0, N_lv_trend));
   for (i in 2:K) {
     means_X[i - 1] = mean(X[, i]);
     Xc[, i - 1] = X[, i] - means_X[i - 1];
@@ -33,8 +33,8 @@ parameters {
   vector[Kc] b;  // regression coefficients
   real Intercept;  // temporary intercept for centered predictors
   real Intercept_trend;  // temporary intercept for centered predictors
-  vector<lower=0>[n_lv_trend] sigma_trend;
-  matrix[n_trend, n_lv_trend] innovations_trend;
+  vector<lower=0>[N_lv_trend] sigma_trend;
+  matrix[N_trend, N_lv_trend] innovations_trend;
 }
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
@@ -42,30 +42,30 @@ transformed parameters {
   lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
 
   // Scaled innovations (uncorrelated case)
-  matrix[n_trend, 1] scaled_innovations_trend;
+  matrix[N_trend, 1] scaled_innovations_trend;
 
   // Apply scaling using vectorized operations
   scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);
 
   // Latent states with RW dynamics
-  matrix[n_trend, n_lv_trend] lv_trend;
+  matrix[N_trend, N_lv_trend] lv_trend;
 
   // Apply RW dynamics
   lv_trend[1, :] = scaled_innovations_trend[1, :];
-  for (i in 2:n_trend) {
+  for (i in 2:N_trend) {
     lv_trend[i, :] = lv_trend[i-1, :] + scaled_innovations_trend[i, :];
   }
 
   // Derived latent trends using universal computation pattern
-  matrix[n_trend, n_series_trend] trend;
+  matrix[N_trend, N_series_trend] trend;
 
   // Latent state means
-  vector[n_trend] mu_trend = rep_vector(Intercept_trend, n_trend);
+  vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
 
   // Universal trend computation: state-space dynamics + linear predictors
   // dot_product captures dynamic component, mu_trend captures trend_formula
-  for (i in 1:n_trend) {
-    for (s in 1:n_series_trend) {
+  for (i in 1:N_trend) {
+    for (s in 1:N_series_trend) {
       trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
     }
   }

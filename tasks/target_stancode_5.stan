@@ -40,10 +40,10 @@ data {
   int prior_only;  // should the likelihood be ignored?
 
   // Trend dimensions (injected by mvgam)
-  int<lower=1> n_trend;  // number of timepoints
-  int<lower=1> n_series_trend;  // number of observed time series
-  int<lower=1> n_lv_trend;  // number of latent states
-  array[n_trend, n_series_trend] int times_trend;  // temporal order
+  int<lower=1> N_trend;  // number of timepoints
+  int<lower=1> N_series_trend;  // number of observed time series
+  int<lower=1> N_lv_trend;  // number of latent states
+  array[N_trend, N_series_trend] int times_trend;  // temporal order
   array[N] int obs_trend_time;  // idx to map latent states to observations
   array[N] int obs_trend_series;  // idx to map latent states to observations
   vector[1] mu_ones;  // Column of ones for glm means
@@ -62,14 +62,14 @@ transformed data {
   }
 
   // Factor loading matrix (diagonal for PW trends - no factor model support)
-  matrix[n_series_trend, n_lv_trend] Z = diag_matrix(rep_vector(1.0, n_lv_trend));
+  matrix[N_series_trend, N_lv_trend] Z = diag_matrix(rep_vector(1.0, N_lv_trend));
 
   // time vector for changepoint calculations
-  vector[n_trend] time_trend;
-  for (i in 1:n_trend) time_trend[i] = i;
+  vector[N_trend] time_trend;
+  for (i in 1:N_trend) time_trend[i] = i;
 
   // sorted changepoint matrix
-  matrix[n_trend, n_change_trend] Kappa_trend = get_changepoint_matrix(time_trend, t_change_trend, n_trend, n_change_trend);
+  matrix[N_trend, n_change_trend] Kappa_trend = get_changepoint_matrix(time_trend, t_change_trend, N_trend, n_change_trend);
 }
 parameters {
   vector[Kc] b;  // regression coefficients
@@ -77,13 +77,13 @@ parameters {
   real Intercept_trend;  // temporary intercept for centered predictors
 
   // base trend growth rates
-  vector[n_lv_trend] k_trend;
+  vector[N_lv_trend] k_trend;
 
   // trend offset parameters
-  vector[n_lv_trend] m_trend;
+  vector[N_lv_trend] m_trend;
 
   // trend rate adjustments per series
-  matrix[n_change_trend, n_lv_trend] delta_trend;
+  matrix[n_change_trend, N_lv_trend] delta_trend;
 }
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
@@ -91,25 +91,25 @@ transformed parameters {
   lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
 
   // Standardized latent trend matrix (linear piecewise trends)
-  matrix[n_trend, n_lv_trend] lv_trend;
+  matrix[N_trend, N_lv_trend] lv_trend;
 
   // linear trend estimates
-  for (s in 1 : n_lv_trend) {
-    lv_trend[1 : n_trend, s] = linear_trend(k_trend[s], m_trend[s],
+  for (s in 1 : N_lv_trend) {
+    lv_trend[1 : N_trend, s] = linear_trend(k_trend[s], m_trend[s],
                                             to_vector(delta_trend[ : , s]), time_trend,
                                             Kappa_trend,
                                             t_change_trend);
   }
 
   // Derived latent trends using universal computation pattern
-  matrix[n_trend, n_series_trend] trend;
+  matrix[N_trend, N_series_trend] trend;
 
   // Latent state means
-  vector[n_trend] mu_trend = rep_vector(Intercept_trend, n_trend);
+  vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
 
   // Universal trend computation: state-space dynamics + linear predictors
-  for (i in 1:n_trend) {
-    for (s in 1:n_series_trend) {
+  for (i in 1:N_trend) {
+    for (s in 1:N_series_trend) {
       trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
     }
   }
