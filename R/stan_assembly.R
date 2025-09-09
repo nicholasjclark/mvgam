@@ -3471,23 +3471,28 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   )
 
   # Core VAR parameters block with conditional VARMA extensions
+  # Pre-compute string literals to avoid nested glue::glue() scoping issues
+  var_specific_params <- if(is_hierarchical) {
+    paste0(
+      "      // Hierarchical VAR: group-specific raw matrices with shared hyperpriors\n",
+      "      array[", n_groups, ", ", lags, "] matrix[", n_subgroups, ", ", n_subgroups, "] A_raw_group_trend;\n\n",
+      "      // Group-specific variance parameters (for hierarchical correlations)\n",
+      "      array[", n_groups, "] vector<lower=0>[", n_subgroups, "] sigma_group_trend;"
+    )
+  } else {
+    paste0(
+      "      // Standard VAR: single raw matrix\n",
+      "      array[", lags, "] matrix[N_lv_trend, N_lv_trend] A_raw_trend;\n\n",
+      "      // Standard variance and correlation parameters\n",
+      "      vector<lower=0>[N_lv_trend] sigma_trend;\n",
+      "      cholesky_factor_corr[N_lv_trend] L_Omega_trend;"
+    )
+  }
+  
   var_parameters_stanvar <- brms::stanvar(
     name = "var_parameters",
     scode = glue::glue("
-      {if(is_hierarchical) glue::glue('
-      // Hierarchical VAR: group-specific raw matrices with shared hyperpriors
-      array[{n_groups}, {lags}] matrix[{n_subgroups}, {n_subgroups}] A_raw_group_trend;
-
-      // Group-specific variance parameters (for hierarchical correlations)
-      array[{n_groups}] vector<lower=0>[{n_subgroups}] sigma_group_trend;
-      ') else '
-      // Standard VAR: single raw matrix
-      array[{lags}] matrix[N_lv_trend, N_lv_trend] A_raw_trend;
-
-      // Standard variance and correlation parameters
-      vector<lower=0>[N_lv_trend] sigma_trend;
-      cholesky_factor_corr[N_lv_trend] L_Omega_trend;
-      '}
+      {var_specific_params}
 
       // Shared hierarchical hyperparameters for A_raw coefficients (across all groups)
       // [1] = diagonal elements, [2] = off-diagonal elements
@@ -3525,77 +3530,78 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   }
 
   # VAR/VARMA transformed parameters - compute stationary coefficients
+  # Pre-compute string literals to avoid nested glue::glue() scoping issues
+  var_tparams_main <- if(is_hierarchical) {
+    paste0(
+      "      // Hierarchical VAR: group-specific computations then block assembly\n\n",
+      "      // Group-specific hierarchical correlations and covariances\n",
+      "      array[", n_groups, "] cov_matrix[", n_subgroups, "] Sigma_group_trend;\n",
+      "      array[", n_groups, ", ", lags, "] matrix[", n_subgroups, ", ", n_subgroups, "] A_group_trend;\n\n",
+      "      // Compute group-specific covariances using hierarchical correlation structure\n",
+      "      for (g in 1:", n_groups, ") {\n",
+      "        // Combine global and local correlations using existing hierarchical infrastructure\n",
+      "        matrix[", n_subgroups, ", ", n_subgroups, "] L_Omega_group =\n",
+      "          cholesky_compose(alpha_cor * multiply_lower_tri_self_transpose(L_Omega_global) +\n",
+      "                           (1 - alpha_cor) * multiply_lower_tri_self_transpose(L_deviation_group[g]));\n",
+      "        Sigma_group_trend[g] = multiply_lower_tri_self_transpose(\n",
+      "          diag_pre_multiply(sigma_group_trend[g], L_Omega_group));\n\n",
+      "        // Apply Heaps transformation per group\n",
+      "        for (lag in 1:", lags, ") {\n",
+      "          array[1] matrix[", n_subgroups, ", ", n_subgroups, "] P_group;\n",
+      "          P_group[1] = AtoP(A_raw_group_trend[g, lag]);\n",
+      "          array[2, 1] matrix[", n_subgroups, ", ", n_subgroups, "] result_group =\n",
+      "            rev_mapping(P_group, Sigma_group_trend[g]);\n",
+      "          A_group_trend[g, lag] = result_group[1, 1];\n",
+      "        }\n",
+      "      }\n\n",
+      "      // Build block-structured full matrices (groups do not interact)\n",
+      "      cov_matrix[N_lv_trend] Sigma_trend = rep_matrix(0, N_lv_trend, N_lv_trend);\n",
+      "      array[", lags, "] matrix[N_lv_trend, N_lv_trend] A_trend;\n",
+      "      for (lag in 1:", lags, ") {\n",
+      "        A_trend[lag] = rep_matrix(0, N_lv_trend, N_lv_trend);\n",
+      "      }\n\n",
+      "      for (g in 1:", n_groups, ") {\n",
+      "        Sigma_trend[group_inds_trend[g], group_inds_trend[g]] = Sigma_group_trend[g];\n",
+      "        for (lag in 1:", lags, ") {\n",
+      "          A_trend[lag][group_inds_trend[g], group_inds_trend[g]] = A_group_trend[g, lag];\n",
+      "        }\n",
+      "      }"
+    )
+  } else {
+    paste0(
+      "      // Standard VAR: single covariance matrix and transformation\n",
+      "      matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);\n",
+      "      cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);\n\n",
+      "      // Transform raw parameters to stationary coefficients\n",
+      "      array[", lags, "] matrix[N_lv_trend, N_lv_trend] A_trend;\n\n",
+      "      // Working arrays for stationarity transformation\n",
+      "      array[", lags, "] matrix[N_lv_trend, N_lv_trend] P_var;\n",
+      "      array[2, ", lags, "] matrix[N_lv_trend, N_lv_trend] result_var;\n\n",
+      "      for (i in 1:", lags, ") {\n",
+      "        P_var[i] = AtoP(A_raw_trend[i]);\n",
+      "      }\n\n",
+      "      result_var = rev_mapping(P_var, Sigma_trend);\n\n",
+      "      for (i in 1:", lags, ") {\n",
+      "        A_trend[i] = result_var[1, i];\n",
+      "      }"
+    )
+  }
+  
+  # Pre-compute VARMA-specific additions
+  varma_d_trend <- if(is_varma) paste0("array[", ma_lags, "] matrix[N_lv_trend, N_lv_trend] D_trend;") else ""
+  varma_ma_init <- if(is_varma) paste0("vector[N_lv_trend] ma_init_trend[", ma_lags, "];  // Initial MA errors") else ""
+  
   var_tparameters_stanvar <- brms::stanvar(
     name = "var_tparameters",
     scode = glue::glue("
-      {if(is_hierarchical) glue::glue('
-      // Hierarchical VAR: group-specific computations then block assembly
+      {var_tparams_main}
 
-      // Group-specific hierarchical correlations and covariances
-      array[{n_groups}] cov_matrix[{n_subgroups}] Sigma_group_trend;
-      array[{n_groups}, {lags}] matrix[{n_subgroups}, {n_subgroups}] A_group_trend;
-
-      // Compute group-specific covariances using hierarchical correlation structure
-      for (g in 1:{n_groups}) {{
-        // Combine global and local correlations using existing hierarchical infrastructure
-        matrix[{n_subgroups}, {n_subgroups}] L_Omega_group =
-          cholesky_compose(alpha_cor * multiply_lower_tri_self_transpose(L_Omega_global) +
-                           (1 - alpha_cor) * multiply_lower_tri_self_transpose(L_deviation_group[g]));
-        Sigma_group_trend[g] = multiply_lower_tri_self_transpose(
-          diag_pre_multiply(sigma_group_trend[g], L_Omega_group));
-
-        // Apply Heaps transformation per group
-        for (lag in 1:{lags}) {{
-          array[1] matrix[{n_subgroups}, {n_subgroups}] P_group;
-          P_group[1] = AtoP(A_raw_group_trend[g, lag]);
-          array[2, 1] matrix[{n_subgroups}, {n_subgroups}] result_group =
-            rev_mapping(P_group, Sigma_group_trend[g]);
-          A_group_trend[g, lag] = result_group[1, 1];
-        }}
-      }}
-
-      // Build block-structured full matrices (groups do not interact)
-      cov_matrix[N_lv_trend] Sigma_trend = rep_matrix(0, N_lv_trend, N_lv_trend);
-      array[{lags}] matrix[N_lv_trend, N_lv_trend] A_trend;
-      for (lag in 1:{lags}) {{
-        A_trend[lag] = rep_matrix(0, N_lv_trend, N_lv_trend);
-      }}
-
-      for (g in 1:{n_groups}) {{
-        Sigma_trend[group_inds_trend[g], group_inds_trend[g]] = Sigma_group_trend[g];
-        for (lag in 1:{lags}) {{
-          A_trend[lag][group_inds_trend[g], group_inds_trend[g]] = A_group_trend[g, lag];
-        }}
-      }}
-      ') else '
-      // Standard VAR: single covariance matrix and transformation
-      matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
-      cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
-
-      // Transform raw parameters to stationary coefficients
-      array[{lags}] matrix[N_lv_trend, N_lv_trend] A_trend;
-
-      // Working arrays for stationarity transformation
-      array[{lags}] matrix[N_lv_trend, N_lv_trend] P_var;
-      array[2, {lags}] matrix[N_lv_trend, N_lv_trend] result_var;
-
-      for (i in 1:{lags}) {{
-        P_var[i] = AtoP(A_raw_trend[i]);
-      }}
-
-      result_var = rev_mapping(P_var, Sigma_trend);
-
-      for (i in 1:{lags}) {{
-        A_trend[i] = result_var[1, i];
-      }}
-      '}
-
-      {if(is_varma) glue::glue('array[{ma_lags}] matrix[N_lv_trend, N_lv_trend] D_trend;') else ''}
+      {varma_d_trend}
 
       // Joint covariance matrix for stationary initialization
       cov_matrix[{if(is_varma) paste0('(', lags, ' + ', ma_lags, ') * N_lv_trend') else paste0(lags, ' * N_lv_trend')}] Omega_trend;
 
-      {if(is_varma) glue::glue('vector[N_lv_trend] ma_init_trend[{ma_lags}];  // Initial MA errors') else ''}
+      {varma_ma_init}
 
       // Working arrays for stationarity transformation
       array[{lags}] matrix[N_lv_trend, N_lv_trend] P_var;
@@ -3660,6 +3666,68 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Calculate initialization vector dimension: lags*N_lv_trend for VAR, (lags+ma_lags)*N_lv_trend for VARMA
   init_dim_expr <- if (is_varma) glue::glue('({lags} + {ma_lags}) * N_lv_trend') else glue::glue('{lags} * N_lv_trend')
 
+  # Pre-compute VAR priors to avoid nested glue::glue() scoping issues
+  var_priors_block <- if(is_hierarchical) {
+    paste0(
+      "      // Hierarchical VAR: group-specific priors with shared hyperpriors\n",
+      "      for (g in 1:", n_groups, ") {\n",
+      "        for (lag in 1:", lags, ") {\n",
+      "          // Diagonal elements prior (shared across all groups)\n",
+      "          diagonal(A_raw_group_trend[g, lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));\n\n",
+      "          // Off-diagonal elements prior (shared across all groups)\n",
+      "          for (i in 1:", n_subgroups, ") {\n",
+      "            for (j in 1:", n_subgroups, ") {\n",
+      "              if (i != j) {\n",
+      "                A_raw_group_trend[g, lag, i, j] ~ normal(Amu_trend[2, lag], 1 / sqrt(Aomega_trend[2, lag]));\n",
+      "              }\n",
+      "            }\n",
+      "          }\n",
+      "        }\n",
+      "      }"
+    )
+  } else {
+    paste0(
+      "      // Standard VAR: single matrix priors\n",
+      "      for (lag in 1:", lags, ") {\n",
+      "        // Diagonal elements prior\n",
+      "        diagonal(A_raw_trend[lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));\n\n",
+      "        // Off-diagonal elements prior\n",
+      "        for (i in 1:N_lv_trend) {\n",
+      "          for (j in 1:N_lv_trend) {\n",
+      "            if (i != j) {\n",
+      "              A_raw_trend[lag, i, j] ~ normal(Amu_trend[2, lag], 1 / sqrt(Aomega_trend[2, lag]));\n",
+      "            }\n",
+      "          }\n",
+      "        }\n",
+      "      }"
+    )
+  }
+  
+  # Pre-compute VARMA MA priors to avoid nested glue::glue() scoping issues
+  varma_ma_priors <- if(is_varma) {
+    paste0(
+      "      // Hierarchical priors for VARMA MA coefficient matrices (D_raw_trend)\n",
+      "      // Following same structure as VAR coefficients but conditional on ma_lags > 0\n",
+      "      for (ma_lag in 1:", ma_lags, ") {\n",
+      "        // Diagonal elements prior for MA coefficients\n",
+      "        diagonal(D_raw_trend[ma_lag]) ~ normal(Dmu_trend[1, ma_lag], 1 / sqrt(Domega_trend[1, ma_lag]));\n\n",
+      "        // Off-diagonal elements prior for MA coefficients\n",
+      "        for (i in 1:N_lv_trend) {\n",
+      "          for (j in 1:N_lv_trend) {\n",
+      "            if (i != j) {\n",
+      "              D_raw_trend[ma_lag, i, j] ~ normal(Dmu_trend[2, ma_lag], 1 / sqrt(Domega_trend[2, ma_lag]));\n",
+      "            }\n",
+      "          }\n",
+      "        }\n",
+      "      }\n\n",
+      "      // Hyperpriors for hierarchical MA coefficient means and precisions\n",
+      "      for (component in 1:2) {  // [1] diagonal, [2] off-diagonal\n",
+      "        Dmu_trend[component] ~ normal(es_ma_trend[component], fs_ma_trend[component]);\n",
+      "        Domega_trend[component] ~ gamma(gs_ma_trend[component], hs_ma_trend[component]);\n",
+      "      }"
+    )
+  } else ""
+
   var_model_stanvar <- brms::stanvar(
     name = "var_model",
     scode = glue::glue("
@@ -3717,63 +3785,9 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         {if(is_varma) '// Compute MA error for next iteration\n        ma_error_trend[t] = lv_trend[t, :] - mu_t_trend[t];' else ''}
       }}
 
-      {if(is_hierarchical) glue::glue('
-      // Hierarchical VAR: group-specific priors with shared hyperpriors
-      for (g in 1:{n_groups}) {{
-        for (lag in 1:{lags}) {{
-          // Diagonal elements prior (shared across all groups)
-          diagonal(A_raw_group_trend[g, lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));
+      {var_priors_block}
 
-          // Off-diagonal elements prior (shared across all groups)
-          for (i in 1:{n_subgroups}) {{
-            for (j in 1:{n_subgroups}) {{
-              if (i != j) {{
-                A_raw_group_trend[g, lag, i, j] ~ normal(Amu_trend[2, lag], 1 / sqrt(Aomega_trend[2, lag]));
-              }}
-            }}
-          }}
-        }}
-      }}
-      ') else '
-      // Standard VAR: single matrix priors
-      for (lag in 1:{lags}) {{
-        // Diagonal elements prior
-        diagonal(A_raw_trend[lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));
-
-        // Off-diagonal elements prior
-        for (i in 1:N_lv_trend) {{
-          for (j in 1:N_lv_trend) {{
-            if (i != j) {{
-              A_raw_trend[lag, i, j] ~ normal(Amu_trend[2, lag], 1 / sqrt(Aomega_trend[2, lag]));
-            }}
-          }}
-        }}
-      }}
-      '}
-
-      {if(is_varma) glue::glue('
-      // Hierarchical priors for VARMA MA coefficient matrices (D_raw_trend)
-      // Following same structure as VAR coefficients but conditional on ma_lags > 0
-      for (ma_lag in 1:{ma_lags}) {{
-        // Diagonal elements prior for MA coefficients
-        diagonal(D_raw_trend[ma_lag]) ~ normal(Dmu_trend[1, ma_lag], 1 / sqrt(Domega_trend[1, ma_lag]));
-
-        // Off-diagonal elements prior for MA coefficients
-        for (i in 1:N_lv_trend) {{
-          for (j in 1:N_lv_trend) {{
-            if (i != j) {{
-              D_raw_trend[ma_lag, i, j] ~ normal(Dmu_trend[2, ma_lag], 1 / sqrt(Domega_trend[2, ma_lag]));
-            }}
-          }}
-        }}
-      }}
-
-      // Hyperpriors for hierarchical MA coefficient means and precisions
-      for (component in 1:2) {{  // [1] diagonal, [2] off-diagonal
-        Dmu_trend[component] ~ normal(es_ma_trend[component], fs_ma_trend[component]);
-        Domega_trend[component] ~ gamma(gs_ma_trend[component], hs_ma_trend[component]);
-      }}
-      ') else ''}
+      {varma_ma_priors}
 
       // Innovation variance and correlation priors (consistent with other trend generators)
       // Variance parameters using inverse gamma (equivalent to existing patterns)

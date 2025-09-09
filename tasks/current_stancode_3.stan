@@ -310,14 +310,12 @@ real Intercept_trend;  // temporary intercept for centered predictors
   cholesky_factor_corr[N_lv_trend] L_Omega_trend;
   matrix[N_trend, N_lv_trend] innovations_trend;
   matrix[N_series_trend, N_lv_trend] Z;
-    
-  // Standard VAR: single raw matrix
-  array[{lags}] matrix[N_lv_trend, N_lv_trend] A_raw_trend;
+          // Standard VAR: single raw matrix
+      array[1] matrix[N_lv_trend, N_lv_trend] A_raw_trend;
 
-  // Standard variance and correlation parameters
-  vector<lower=0>[N_lv_trend] sigma_trend;
-  cholesky_factor_corr[N_lv_trend] L_Omega_trend;
-  
+      // Standard variance and correlation parameters
+      vector<lower=0>[N_lv_trend] sigma_trend;
+      cholesky_factor_corr[N_lv_trend] L_Omega_trend;
 
   // Shared hierarchical hyperparameters for A_raw coefficients (across all groups)
   // [1] = diagonal elements, [2] = off-diagonal elements
@@ -360,28 +358,26 @@ transformed parameters {
       matrix[N_lv_trend, N_lv_trend] L_Sigma = diag_pre_multiply(sigma_trend, L_Omega_trend);
       scaled_innovations_trend = innovations_trend * L_Sigma';
     }
-    
-  // Standard VAR: single covariance matrix and transformation
-  matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
-  cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
+          // Standard VAR: single covariance matrix and transformation
+      matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
+      cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
 
-  // Transform raw parameters to stationary coefficients
-  array[{lags}] matrix[N_lv_trend, N_lv_trend] A_trend;
+      // Transform raw parameters to stationary coefficients
+      array[1] matrix[N_lv_trend, N_lv_trend] A_trend;
 
-  // Working arrays for stationarity transformation
-  array[{lags}] matrix[N_lv_trend, N_lv_trend] P_var;
-  array[2, {lags}] matrix[N_lv_trend, N_lv_trend] result_var;
+      // Working arrays for stationarity transformation
+      array[1] matrix[N_lv_trend, N_lv_trend] P_var;
+      array[2, 1] matrix[N_lv_trend, N_lv_trend] result_var;
 
-  for (i in 1:{lags}) {{
-    P_var[i] = AtoP(A_raw_trend[i]);
-  }}
+      for (i in 1:1) {
+        P_var[i] = AtoP(A_raw_trend[i]);
+      }
 
-  result_var = rev_mapping(P_var, Sigma_trend);
+      result_var = rev_mapping(P_var, Sigma_trend);
 
-  for (i in 1:{lags}) {{
-    A_trend[i] = result_var[1, i];
-  }}
-  
+      for (i in 1:1) {
+        A_trend[i] = result_var[1, i];
+      }
 
   array[1] matrix[N_lv_trend, N_lv_trend] D_trend;
 
@@ -528,44 +524,42 @@ for (i in 1:1) {
     ma_error_trend[t] = lv_trend[t, :] - mu_t_trend[t];
   }
 
-  
-  // Standard VAR: single matrix priors
-  for (lag in 1:{lags}) {{
-    // Diagonal elements prior
-    diagonal(A_raw_trend[lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));
+        // Standard VAR: single matrix priors
+      for (lag in 1:1) {
+        // Diagonal elements prior
+        diagonal(A_raw_trend[lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));
 
-    // Off-diagonal elements prior
-    for (i in 1:N_lv_trend) {{
-      for (j in 1:N_lv_trend) {{
-        if (i != j) {{
-          A_raw_trend[lag, i, j] ~ normal(Amu_trend[2, lag], 1 / sqrt(Aomega_trend[2, lag]));
-        }}
-      }}
-    }}
-  }}
-  
-
-  // Hierarchical priors for VARMA MA coefficient matrices (D_raw_trend)
-// Following same structure as VAR coefficients but conditional on ma_lags > 0
-for (ma_lag in 1:1) {
-  // Diagonal elements prior for MA coefficients
-  diagonal(D_raw_trend[ma_lag]) ~ normal(Dmu_trend[1, ma_lag], 1 / sqrt(Domega_trend[1, ma_lag]));
-
-  // Off-diagonal elements prior for MA coefficients
-  for (i in 1:N_lv_trend) {
-    for (j in 1:N_lv_trend) {
-      if (i != j) {
-        D_raw_trend[ma_lag, i, j] ~ normal(Dmu_trend[2, ma_lag], 1 / sqrt(Domega_trend[2, ma_lag]));
+        // Off-diagonal elements prior
+        for (i in 1:N_lv_trend) {
+          for (j in 1:N_lv_trend) {
+            if (i != j) {
+              A_raw_trend[lag, i, j] ~ normal(Amu_trend[2, lag], 1 / sqrt(Aomega_trend[2, lag]));
+            }
+          }
+        }
       }
-    }
-  }
-}
 
-// Hyperpriors for hierarchical MA coefficient means and precisions
-for (component in 1:2) {  // [1] diagonal, [2] off-diagonal
-  Dmu_trend[component] ~ normal(es_ma_trend[component], fs_ma_trend[component]);
-  Domega_trend[component] ~ gamma(gs_ma_trend[component], hs_ma_trend[component]);
-}
+        // Hierarchical priors for VARMA MA coefficient matrices (D_raw_trend)
+      // Following same structure as VAR coefficients but conditional on ma_lags > 0
+      for (ma_lag in 1:1) {
+        // Diagonal elements prior for MA coefficients
+        diagonal(D_raw_trend[ma_lag]) ~ normal(Dmu_trend[1, ma_lag], 1 / sqrt(Domega_trend[1, ma_lag]));
+
+        // Off-diagonal elements prior for MA coefficients
+        for (i in 1:N_lv_trend) {
+          for (j in 1:N_lv_trend) {
+            if (i != j) {
+              D_raw_trend[ma_lag, i, j] ~ normal(Dmu_trend[2, ma_lag], 1 / sqrt(Domega_trend[2, ma_lag]));
+            }
+          }
+        }
+      }
+
+      // Hyperpriors for hierarchical MA coefficient means and precisions
+      for (component in 1:2) {  // [1] diagonal, [2] off-diagonal
+        Dmu_trend[component] ~ normal(es_ma_trend[component], fs_ma_trend[component]);
+        Domega_trend[component] ~ gamma(gs_ma_trend[component], hs_ma_trend[component]);
+      }
 
   // Innovation variance and correlation priors (consistent with other trend generators)
   // Variance parameters using inverse gamma (equivalent to existing patterns)

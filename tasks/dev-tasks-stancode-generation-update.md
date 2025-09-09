@@ -1,17 +1,15 @@
 # TRD-stancode-generation-update Development Tasks
 
-## 🎯 **CURRENT STATUS: 4 CRITICAL COMPILATION FAILURES** 
+## 🎯 **CURRENT STATUS: 3 CRITICAL COMPILATION FAILURES** 
 
-**Status After mu_trend Fix - 2025-09-09**:
-- **✅ PASSING**: Files 1, 5 (RW and PW trends - minor cosmetic differences)
-- **🚨 CRITICAL**: Files 2, 3, 4, 6 (compilation/structural failures)
-- **✅ FOUNDATION**: mu_trend detection logic fixed and verified
+**Status After Priority 1 Fix - 2025-09-09**:
+- **✅ PASSING**: Files 1, 3, 5 (RW, VARMA, and PW trends)
+- **🚨 CRITICAL**: Files 2, 4, 6 (compilation/structural failures)
 
-**4 Critical Issues Preventing Stan Compilation**:
-1. **File 3 (VARMA)**: Template placeholders `{lags}` not replaced with `2` 
-2. **File 2 (Shared RW)**: Variable order - `trend` used before declaration
-3. **File 4 (Factor AR)**: Linear predictor computation in wrong Stan block
-4. **File 6 (CAR+GP)**: Missing GP functions and computation completely
+**3 Remaining Critical Issues Preventing Stan Compilation**:
+1. **File 2 (Shared RW)**: Variable order - `trend` used before declaration
+2. **File 4 (Factor AR)**: Linear predictor computation in wrong Stan block
+3. **File 6 (CAR+GP)**: Missing GP functions and computation completely
 
 ---
 
@@ -70,27 +68,7 @@ mvgam:::generate_var_trend_stanvars <- function(...) {
 
 ## 🚨 **PRIORITY ISSUES (IN ORDER OF CRITICALITY)**
 
-### **Priority 1: Template System Failure (File 3 - CRITICAL)**
-**Problem**: `{lags}` placeholders not replaced with actual values
-```stan
-// BROKEN (Current)
-array[{lags}] matrix[N_lv_trend, N_lv_trend] A_raw_trend;
-for (i in 1:{lags}) {{  // Double braces also wrong
-
-// CORRECT (Target)  
-array[2] matrix[N_lv_trend, N_lv_trend] A_raw_trend;
-for (i in 1:2) {  // Single braces
-```
-
-**Investigation Steps**:
-1. **Use general-purpose agent** to examine `generate_var_trend_stanvars()` 
-2. **Monkey patch** template replacement functions to trace execution
-3. **Check** if `glue::glue()` receiving correct `lags = trend_spec$p` context
-4. **Verify** template files have correct placeholder syntax
-
-**Success Criteria**: File 3 compiles without template errors
-
-**Regression Test**: Verify Files 1, 2, 4, 5, 6 still generate correctly
+### **✅ Priority 1: Template System Failure (File 3 - COMPLETED)**
 
 ---
 
