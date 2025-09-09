@@ -747,44 +747,86 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
     # Extract pre-generated observation-to-trend mappings from dimensions
     # Mappings are centralized in extract_time_series_dimensions() for consistency
     mapping_stanvars <- if (!is.null(dimensions$mappings)) {
-      # Determine which mapping to use based on response_name
-      mapping <- if (!is.null(response_name) && response_name %in% names(dimensions$mappings)) {
-        # Response-specific mapping for multivariate models
-        dimensions$mappings[[response_name]]
-      } else if (length(dimensions$mappings) == 1) {
-        # Single response case - use the only mapping available
-        dimensions$mappings[[1]]
-      } else if (is.null(response_name) && length(dimensions$mappings) > 1) {
-        # SHARED TRENDS: Use first mapping since all responses share same trend structure
-        dimensions$mappings[[1]]
+      # Handle different mapping scenarios
+      if (is.null(response_name) && length(dimensions$mappings) > 1) {
+        # SHARED TRENDS: Generate response-specific mapping arrays for all responses
+        # Each response gets its own obs_trend_time_{resp} and obs_trend_series_{resp} arrays
+        
+        # Validate mappings structure for shared trends
+        checkmate::assert_list(dimensions$mappings, min.len = 1, names = "named")
+        
+        all_mapping_stanvars <- list()
+        
+        for (resp_name in names(dimensions$mappings)) {
+          mapping <- dimensions$mappings[[resp_name]]
+          resp_suffix <- paste0("_", resp_name)
+          
+          # Validate this response's mapping structure
+          if (!all(c("obs_trend_time", "obs_trend_series") %in% names(mapping))) {
+            stop(insight::format_error(
+              "Mapping for response {.field {resp_name}} missing required fields.",
+              "Expected fields: {.field obs_trend_time}, {.field obs_trend_series}."
+            ), call. = FALSE)
+          }
+          
+          # Create stanvars for this response's mapping arrays
+          obs_time_stanvar <- brms::stanvar(
+            x = mapping$obs_trend_time,
+            name = paste0("obs_trend_time", resp_suffix),
+            scode = paste0("array[N", resp_suffix, "] int obs_trend_time", resp_suffix, ";"),
+            block = "data"
+          )
+          
+          obs_series_stanvar <- brms::stanvar(
+            x = mapping$obs_trend_series,
+            name = paste0("obs_trend_series", resp_suffix),
+            scode = paste0("array[N", resp_suffix, "] int obs_trend_series", resp_suffix, ";"),
+            block = "data"
+          )
+          
+          all_mapping_stanvars <- c(all_mapping_stanvars, list(obs_time_stanvar, obs_series_stanvar))
+        }
+        
+        # Convert list to stanvars collection and return
+        do.call(c, all_mapping_stanvars)
+        
       } else {
-        NULL
-      }
+        # All other cases: get single mapping and process
+        mapping <- if (!is.null(response_name) && response_name %in% names(dimensions$mappings)) {
+          # Response-specific mapping for multivariate models
+          dimensions$mappings[[response_name]]
+        } else if (length(dimensions$mappings) == 1) {
+          # Single response case - use the only mapping available
+          dimensions$mappings[[1]]
+        } else {
+          NULL
+        }
 
-      # Convert mapping to stanvars if we have a valid mapping
-      if (!is.null(mapping)) {
-        # Validate mapping structure
-        checkmate::assert_names(names(mapping), must.include = c("obs_trend_time", "obs_trend_series"))
+        # Convert single mapping to stanvars if we have a valid mapping
+        if (!is.null(mapping)) {
+          # Validate mapping structure
+          checkmate::assert_names(names(mapping), must.include = c("obs_trend_time", "obs_trend_series"))
 
-        # Create stanvars for the mapping arrays with proper naming
-        obs_time_stanvar <- brms::stanvar(
-          x = mapping$obs_trend_time,
-          name = paste0("obs_trend_time", response_suffix),
-          scode = paste0("array[N", response_suffix, "] int obs_trend_time", response_suffix, ";"),
-          block = "data"
-        )
+          # Create stanvars for the mapping arrays with proper naming
+          obs_time_stanvar <- brms::stanvar(
+            x = mapping$obs_trend_time,
+            name = paste0("obs_trend_time", response_suffix),
+            scode = paste0("array[N", response_suffix, "] int obs_trend_time", response_suffix, ";"),
+            block = "data"
+          )
 
-        obs_series_stanvar <- brms::stanvar(
-          x = mapping$obs_trend_series,
-          name = paste0("obs_trend_series", response_suffix),
-          scode = paste0("array[N", response_suffix, "] int obs_trend_series", response_suffix, ";"),
-          block = "data"
-        )
+          obs_series_stanvar <- brms::stanvar(
+            x = mapping$obs_trend_series,
+            name = paste0("obs_trend_series", response_suffix),
+            scode = paste0("array[N", response_suffix, "] int obs_trend_series", response_suffix, ";"),
+            block = "data"
+          )
 
-        # Return as stanvars collection
-        c(obs_time_stanvar, obs_series_stanvar)
-      } else {
-        NULL
+          # Return as stanvars collection
+          c(obs_time_stanvar, obs_series_stanvar)
+        } else {
+          NULL
+        }
       }
     } else {
       NULL
@@ -1510,57 +1552,132 @@ inject_multivariate_trends_into_linear_predictors <- function(
 ) {
   checkmate::assert_string(base_stancode)
   checkmate::assert_character(responses_with_trends, min.len = 1)
+  checkmate::assert_list(trend_stanvars, null.ok = TRUE)
+
+  # Detect GLM usage for each response
+  detected_glm_types <- detect_glm_usage(base_stancode, responses_with_trends)
 
   # If no trends, return unchanged
   if (is.null(trend_stanvars) || length(trend_stanvars) == 0) {
     return(base_stancode)
   }
 
-  # Split code into lines
-  code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
-
-  # For each response with a trend, inject the trend addition
-  for (resp_name in responses_with_trends) {
-    # Find where mu_<resp> is computed in model block
-    mu_pattern <- paste0("mu_", resp_name, "\\s*=")
-    mu_lines <- which(grepl(mu_pattern, code_lines))
-
-    if (length(mu_lines) > 0) {
-      # Find the last line where mu_<resp> is modified
-      last_mu_line <- max(mu_lines)
-
-      # Look for the end of mu computation (before likelihood)
-      # Usually before target += or before the next mu_ declaration
-      insert_point <- last_mu_line
-      for (i in (last_mu_line + 1):length(code_lines)) {
-        if (grepl("target\\s*\\+=", code_lines[i]) ||
-            grepl("mu_[a-zA-Z0-9]+\\s*=", code_lines[i])) {
-          insert_point <- i - 1
-          break
-        }
-        # Also check if we're still modifying mu_<resp>
-        if (grepl(paste0("mu_", resp_name), code_lines[i])) {
-          insert_point <- i
+  # Separate responses by GLM usage
+  glm_responses <- names(detected_glm_types[detected_glm_types])
+  non_glm_responses <- setdiff(responses_with_trends, glm_responses)
+  
+  # Handle GLM responses with response-specific transformations
+  if (length(glm_responses) > 0) {
+    code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
+    
+    for (resp_name in glm_responses) {
+      # Transform GLM function call to use to_matrix(mu_<resp>)
+      glm_pattern <- paste0("target \\+= [a-z_]+_glm_l(pdf|pmf)\\(Y_", resp_name, " \\|")
+      glm_lines <- which(grepl(glm_pattern, code_lines))
+      
+      if (length(glm_lines) > 0) {
+        for (line_idx in glm_lines) {
+          # Replace GLM call pattern
+          old_line <- code_lines[line_idx]
+          
+          # Pattern to find and replace GLM call structure
+          # Match: target += normal_id_glm_lpdf(Y_resp | Xc_resp, Intercept_resp, b_resp, sigma_resp);
+          # Replace: target += normal_id_glm_lpdf(Y_resp | to_matrix(mu_resp), 0.0, mu_ones_resp, sigma_resp);
+          
+          if (grepl("normal_id_glm_lpdf", old_line)) {
+            # Normal GLM: has sigma parameter
+            new_line <- gsub(
+              "(target \\+= normal_id_glm_lpdf\\(Y_[a-z_]+ \\|) [^,]+, [^,]+, [^,]+, ([^)]+\\);)",
+              paste0("\\1 to_matrix(mu_", resp_name, "), 0.0, mu_ones_", resp_name, ", \\2"),
+              old_line
+            )
+          } else {
+            # Other GLM types: no sigma parameter
+            new_line <- gsub(
+              "(target \\+= [a-z_]+_glm_l(pdf|pmf)\\(Y_[a-z_]+ \\|) [^,]+, [^,]+, [^,;]+;",
+              paste0("\\1 to_matrix(mu_", resp_name, "), 0.0, mu_ones_", resp_name, ");"),
+              old_line
+            )
+          }
+          
+          code_lines[line_idx] <- new_line
         }
       }
-
-      # Insert trend addition after mu computation
-      trend_addition <- c(
-        paste0("    // Add trend effects for response ", resp_name),
-        paste0("    if (size(trend_", resp_name, ") > 0) {"),
-        paste0("      mu_", resp_name, " += trend_", resp_name, "[obs_ind_", resp_name, "];"),
-        "    }"
-      )
-
-      code_lines <- c(
-        code_lines[1:insert_point],
-        trend_addition,
-        code_lines[(insert_point + 1):length(code_lines)]
-      )
+      
+      # Add mu_<resp> computation in transformed parameters
+      tparams_start <- which(grepl("^\\s*transformed parameters\\s*\\{", code_lines))
+      if (length(tparams_start) > 0) {
+        # Find insertion point after opening brace
+        insert_point <- tparams_start[1]
+        
+        # Create mu computation code
+        mu_computation <- c(
+          paste0("  vector[N_", resp_name, "] mu_", resp_name, " = Xc_", resp_name, " * b_", resp_name, ";"),
+          paste0("  for (n in 1:N_", resp_name, ") {"),
+          paste0("    mu_", resp_name, "[n] += Intercept_", resp_name, " + trend[obs_trend_time_", resp_name, "[n], obs_trend_series_", resp_name, "[n]];"),
+          paste0("  }")
+        )
+        
+        # Insert mu computation
+        code_lines <- c(
+          code_lines[1:insert_point],
+          mu_computation,
+          code_lines[(insert_point + 1):length(code_lines)]
+        )
+      }
     }
+    
+    base_stancode <- paste(code_lines, collapse = "\n")
+  }
+  
+  # Handle non-GLM responses with current logic
+  if (length(non_glm_responses) > 0) {
+    code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
+    
+    for (resp_name in non_glm_responses) {
+      # Find where mu_<resp> is computed in model block
+      mu_pattern <- paste0("mu_", resp_name, "\\s*=")
+      mu_lines <- which(grepl(mu_pattern, code_lines))
+
+      if (length(mu_lines) > 0) {
+        # Find the last line where mu_<resp> is modified
+        last_mu_line <- max(mu_lines)
+
+        # Look for the end of mu computation (before likelihood)
+        # Usually before target += or before the next mu_ declaration
+        insert_point <- last_mu_line
+        for (i in (last_mu_line + 1):length(code_lines)) {
+          if (grepl("target\\s*\\+=", code_lines[i]) ||
+              grepl("mu_[a-zA-Z0-9]+\\s*=", code_lines[i])) {
+            insert_point <- i - 1
+            break
+          }
+          # Also check if we're still modifying mu_<resp>
+          if (grepl(paste0("mu_", resp_name), code_lines[i])) {
+            insert_point <- i
+          }
+        }
+
+        # Insert trend addition after mu computation
+        trend_addition <- c(
+          paste0("    // Add trend effects for response ", resp_name),
+          paste0("    if (size(trend_", resp_name, ") > 0) {"),
+          paste0("      mu_", resp_name, " += trend_", resp_name, "[obs_ind_", resp_name, "];"),
+          "    }"
+        )
+
+        code_lines <- c(
+          code_lines[1:insert_point],
+          trend_addition,
+          code_lines[(insert_point + 1):length(code_lines)]
+        )
+      }
+    }
+    
+    base_stancode <- paste(code_lines, collapse = "\n")
   }
 
-  return(paste(code_lines, collapse = "\n"))
+  return(base_stancode)
 }
 
 # Main Assembly Functions
