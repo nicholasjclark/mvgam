@@ -24,8 +24,12 @@ data {
   int<lower=1> N_series_trend;
   int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
-  array[N] int obs_trend_time;
-  array[N] int obs_trend_series;
+  array[N_count] int obs_trend_time_count;
+  array[N_count] int obs_trend_series_count;
+  array[N_presence] int obs_trend_time_presence;
+  array[N_presence] int obs_trend_series_presence;
+  array[N_biomass] int obs_trend_time_biomass;
+  array[N_biomass] int obs_trend_series_biomass;
   vector[1] mu_ones_count;
   vector[1] mu_ones_presence;
 }
@@ -67,6 +71,17 @@ vector<lower=-1,upper=1>[N_lv_trend] ar1_trend;
 vector[N_series_trend * N_lv_trend] Z_raw;  // raw factor loadings
 }
 transformed parameters {
+  // Create trend linear predictor
+  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+  mu_trend += Intercept_trend + Xc_trend * b_trend;
+  vector[N_presence] mu_presence = Xc_presence * b_presence;
+  for (n in 1:N_presence) {
+    mu_presence[n] += Intercept_presence + trend[obs_trend_time_presence[n], obs_trend_series_presence[n]];
+  }
+  vector[N_count] mu_count = Xc_count * b_count;
+  for (n in 1:N_count) {
+    mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
+  }
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   matrix[N_lv_trend, N_lv_trend] Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
@@ -136,12 +151,12 @@ model {
     vector[N_biomass] mu_biomass = rep_vector(0.0, N_biomass);
     mu_biomass += Intercept_biomass + Xc_biomass * b_biomass;
     mu_biomass = inv(mu_biomass);
-    // Add trend effects for response biomass
-    if (size(trend_biomass) > 0) {
-      mu_biomass += trend_biomass[obs_ind_biomass];
-    }
-    target += poisson_log_glm_lpmf(Y_count | Xc_count, Intercept_count, b_count);
-    target += bernoulli_logit_glm_lpmf(Y_presence | Xc_presence, Intercept_presence, b_presence);
+  // Add trend effects for response biomass
+  for (n in 1:N_biomass) {
+    mu_biomass[n] += trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
+  }
+    target += poisson_log_glm_lpmf(Y_count | to_matrix(mu_count), 0.0, mu_ones_count);
+    target += bernoulli_logit_glm_lpmf(Y_presence | to_matrix(mu_presence), 0.0, mu_ones_presence);
     target += gamma_lpdf(Y_biomass | shape_biomass, shape_biomass ./ mu_biomass);
   }
   // priors including constants

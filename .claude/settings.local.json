@@ -16,7 +16,12 @@
       "Bash(do echo \"File $i:\")",
       "Bash(done)",
       "Bash(for i in 2 3 4)",
-      "Bash(do:*)"
+      "Bash(do:*)",
+      "Bash(sed:*)",
+      "Bash(for i in 2 4)",
+      "Bash(for i in 1 2 4 5)",
+      "Bash(for i in 3 6)",
+      "Bash(/dev/null)"
     ],
     "deny": [],
     "ask": [],

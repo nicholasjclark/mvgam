@@ -111,7 +111,7 @@
                                 "generate_factor_model":  "generate_factor_model \u003c- function(is_factor_model, n_lv) {",
                                 "extract_and_rename_trend_parameters":  "extract_and_rename_trend_parameters \u003c- function(trend_setup, dimensions, suffix = \"_trend\") {",
                                 "extract_trend_stanvars_from_setup":  "extract_trend_stanvars_from_setup \u003c- function(trend_setup, trend_specs, response_suffix = \"\", response_name = NULL, obs_setup = NULL) {",
-                                "detect_glm_usage":  "detect_glm_usage \u003c- function(stan_code) {",
+                                "detect_glm_usage":  "detect_glm_usage \u003c- function(stan_code, response_names = NULL) {",
                                 "inject_trend_into_linear_predictor":  "inject_trend_into_linear_predictor \u003c- function(base_stancode, trend_stanvars) {",
                                 "generate_stan_array_declaration":  "generate_stan_array_declaration \u003c- function(var_name, var_type, dimensions, data_matrix) {",
                                 "extract_stan_block_content":  "extract_stan_block_content \u003c- function(stancode, block_name) {",

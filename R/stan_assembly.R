@@ -1630,12 +1630,39 @@ inject_multivariate_trends_into_linear_predictors <- function(
     base_stancode <- paste(code_lines, collapse = "\n")
   }
   
-  # Handle non-GLM responses with current logic
+  # Detect VARMA components for enhanced trend injection
+  checkmate::assert_string(base_stancode)
+  has_varma_components <- any(grepl("D_trend|ma_.*_trend", base_stancode))
+  
+  # Handle non-GLM responses with enhanced logic
   if (length(non_glm_responses) > 0) {
     code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
     
+    # Add mu_trend intercept injection for VARMA models
+    if (has_varma_components) {
+      tparams_start <- which(grepl("^\\s*transformed parameters\\s*\\{", code_lines))
+      if (length(tparams_start) > 0) {
+        # Find insertion point after opening brace
+        insert_point <- tparams_start[1]
+        
+        # Add mu_trend intercept computation
+        mu_trend_intercept <- c(
+          "  // Create trend linear predictor",
+          "  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);",
+          "  mu_trend += Intercept_trend + Xc_trend * b_trend;"
+        )
+        
+        # Insert mu_trend computation
+        code_lines <- c(
+          code_lines[1:insert_point],
+          mu_trend_intercept,
+          code_lines[(insert_point + 1):length(code_lines)]
+        )
+      }
+    }
+    
     for (resp_name in non_glm_responses) {
-      # Find where mu_<resp> is computed in model block
+      # Find where mu_<resp> is computed in transformed parameters block
       mu_pattern <- paste0("mu_", resp_name, "\\s*=")
       mu_lines <- which(grepl(mu_pattern, code_lines))
 
@@ -1643,12 +1670,11 @@ inject_multivariate_trends_into_linear_predictors <- function(
         # Find the last line where mu_<resp> is modified
         last_mu_line <- max(mu_lines)
 
-        # Look for the end of mu computation (before likelihood)
-        # Usually before target += or before the next mu_ declaration
+        # Look for the end of mu computation (before next variable or block end)
         insert_point <- last_mu_line
         for (i in (last_mu_line + 1):length(code_lines)) {
-          if (grepl("target\\s*\\+=", code_lines[i]) ||
-              grepl("mu_[a-zA-Z0-9]+\\s*=", code_lines[i])) {
+          if (grepl("^\\s*}", code_lines[i]) ||
+              grepl("^\\s*[a-zA-Z_].*=", code_lines[i])) {
             insert_point <- i - 1
             break
           }
@@ -1658,12 +1684,12 @@ inject_multivariate_trends_into_linear_predictors <- function(
           }
         }
 
-        # Insert trend addition after mu computation
+        # Insert trend addition using correct mapping pattern (like GLM path)
         trend_addition <- c(
-          paste0("    // Add trend effects for response ", resp_name),
-          paste0("    if (size(trend_", resp_name, ") > 0) {"),
-          paste0("      mu_", resp_name, " += trend_", resp_name, "[obs_ind_", resp_name, "];"),
-          "    }"
+          paste0("  // Add trend effects for response ", resp_name),
+          paste0("  for (n in 1:N_", resp_name, ") {"),
+          paste0("    mu_", resp_name, "[n] += trend[obs_trend_time_", resp_name, "[n], obs_trend_series_", resp_name, "[n]];"),
+          "  }"
         )
 
         code_lines <- c(
@@ -2193,17 +2219,16 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL, is_factor_m
     n_lv <- n_series  # Non-factor model: N_lv_trend = N_series_trend
   }
 
-  # Create consolidated dimensions stanvar - ensures all dimensions declared together first
+  # Create consolidated dimensions stanvar - N_trend comes from parameter extraction
+  # Only create N_series_trend and N_lv_trend here
   dimensions_scode <- paste(
-    "int<lower=1> N_trend;",
     "int<lower=1> N_series_trend;", 
     "int<lower=1> N_lv_trend;",
     sep = "\n  "
   )
   
-  # Prepare data list with all dimension values
+  # Prepare data list - N_trend comes from parameter extraction
   dimensions_data <- list(
-    N_trend = n_obs,
     N_series_trend = n_series,
     N_lv_trend = if (is_factor_model) n_lv else n_series
   )
@@ -2661,6 +2686,15 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
 
   # Generate common dimension stanvars (needed by ALL trend types)
   common_dimensions <- generate_common_trend_data(n_obs, n_series, n_lv, is_factor_model)
+
+  # Convert VAR ma parameter to ma_lags for compatibility with generate_var_trend_stanvars
+  if (trend_type == "VAR") {
+    if (!is.null(trend_specs$ma) && trend_specs$ma && is.null(trend_specs$ma_lags)) {
+      trend_specs$ma_lags <- 1
+    } else if (is.null(trend_specs$ma_lags)) {
+      trend_specs$ma_lags <- 0
+    }
+  }
 
   # Generate trend-specific stanvars using consistent naming convention
   trend_stanvars <- generator_function(trend_specs, data_info, prior = prior)
@@ -3997,7 +4031,7 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   time_dis_data_stanvar <- brms::stanvar(
     x = time_dis,
     name = "time_dis",
-    scode = glue::glue("array[n, N_series_trend] real<lower=0> time_dis;"),
+    scode = glue::glue("array[N_trend, N_series_trend] real<lower=0> time_dis;"),
     block = "data"
   )
   components <- append(components, list(time_dis_data_stanvar))

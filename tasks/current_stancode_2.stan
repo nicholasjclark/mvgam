@@ -19,8 +19,10 @@ data {
   int<lower=1> N_series_trend;
   int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
-  array[N] int obs_trend_time;
-  array[N] int obs_trend_series;
+  array[N_count] int obs_trend_time_count;
+  array[N_count] int obs_trend_series_count;
+  array[N_biomass] int obs_trend_time_biomass;
+  array[N_biomass] int obs_trend_series_biomass;
   vector[1] mu_ones_count;
   vector[1] mu_ones_biomass;
 }
@@ -52,6 +54,14 @@ parameters {
   matrix[N_trend, N_lv_trend] innovations_trend;
 }
 transformed parameters {
+  vector[N_biomass] mu_biomass = Xc_biomass * b_biomass;
+  for (n in 1:N_biomass) {
+    mu_biomass[n] += Intercept_biomass + trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
+  }
+  vector[N_count] mu_count = Xc_count * b_count;
+  for (n in 1:N_count) {
+    mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
+  }
   real lprior = 0;  // prior contributions to the log posterior
   lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
@@ -100,8 +110,8 @@ model {
   to_vector(innovations_trend) ~ std_normal();
   // likelihood including constants
   if (!prior_only) {
-    target += normal_id_glm_lpdf(Y_count | Xc_count, Intercept_count, b_count, sigma_count);
-    target += normal_id_glm_lpdf(Y_biomass | Xc_biomass, Intercept_biomass, b_biomass, sigma_biomass);
+    target += normal_id_glm_lpdf(Y_count | to_matrix(mu_count), 0.0, mu_ones_count, sigma_count);
+    target += normal_id_glm_lpdf(Y_biomass | to_matrix(mu_biomass), 0.0, mu_ones_biomass, sigma_biomass);
   }
   // priors including constants
   target += lprior;

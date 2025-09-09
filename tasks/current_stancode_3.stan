@@ -232,8 +232,10 @@ data {
   int<lower=1> N_series_trend;
   int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
-  array[N] int obs_trend_time;
-  array[N] int obs_trend_series;
+  array[N_count] int obs_trend_time_count;
+  array[N_count] int obs_trend_series_count;
+  array[N_biomass] int obs_trend_time_biomass;
+  array[N_biomass] int obs_trend_series_biomass;
     int<lower=1> K_trend;  // number of_trend population-level effects
     int<lower=1> Kc_trend;  // number of_trend population-level effects after centering
     matrix[N_trend, K_trend] X_trend;  // population-level design matrix
@@ -268,6 +270,24 @@ transformed data {
     {1.0, 1.0}     // Gamma rate parameters for off-diagonal precision
   };
 
+  
+  // Additional hyperparameters for D_trend (MA coefficient matrices) when ma_lags > 0
+  array[2] vector[2] es_ma_trend = {{
+    {{0.0, 0.0}},    // Means for MA diagonal elements
+    {{0.0, 0.0}}     // Means for MA off-diagonal elements
+  }};
+  array[2] vector[2] fs_ma_trend = {{
+    {{1.0, 1.0}},    // Standard deviations for MA diagonal elements
+    {{1.0, 1.0}}     // Standard deviations for MA off-diagonal elements
+  }};
+  array[2] vector[2] gs_ma_trend = {{
+    {{2.0, 2.0}},    // Gamma shape for MA diagonal precision
+    {{2.0, 2.0}}     // Gamma shape for MA off-diagonal precision
+  }};
+  array[2] vector[2] hs_ma_trend = {{
+    {{1.0, 1.0}},    // Gamma rate for MA diagonal precision
+    {{1.0, 1.0}}     // Gamma rate for MA off-diagonal precision
+  }};
   
 }
 parameters {
@@ -306,14 +326,26 @@ real Intercept_trend;  // temporary intercept for centered predictors
   array[2] vector<lower=0>[1] Aomega_trend;  // Shared precisions
 
   // Joint initialization vector for stationary distribution
-  vector[1 * N_lv_trend] init_trend;
+  vector[(1 + 1) * N_lv_trend] init_trend;
 
   // Standard latent variable trends - consistent with other trend generators
   matrix[N_trend, N_lv_trend] lv_trend;
+  // Raw MA partial autocorrelation matrices (unconstrained for stationarity)
+// D_raw_trend gets transformed to D_trend (stationary MA coefficients)
+array[1] matrix[N_lv_trend, N_lv_trend] D_raw_trend;
+
+// Hierarchical hyperparameters for D_raw_trend (MA) coefficients
+// Mirrors A_raw_trend hyperparameter structure for consistency
+// [1] = diagonal elements, [2] = off-diagonal elements
+array[2] vector[1] Dmu_trend;           // Means for D_raw_trend elements
+array[2] vector<lower=0>[1] Domega_trend;  // Precisions for D_raw_trend elements
   // Factor loading matrix (estimated for factor model)
 vector[N_series_trend * N_lv_trend] Z_raw;  // raw factor loadings
 }
 transformed parameters {
+  // Create trend linear predictor
+  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+  mu_trend += Intercept_trend + Xc_trend * b_trend;
   // penalized spline coefficients
   vector[knots_count_1[1]] s_count_1_1;
   // penalized spline coefficients
@@ -354,12 +386,12 @@ transformed parameters {
   }}
   
 
-  
+  array[1] matrix[N_lv_trend, N_lv_trend] D_trend;
 
   // Joint covariance matrix for stationary initialization
-  cov_matrix[1 * N_lv_trend] Omega_trend;
+  cov_matrix[(1 + 1) * N_lv_trend] Omega_trend;
 
-  
+  vector[N_lv_trend] ma_init_trend[1];  // Initial MA errors
 
   // Working arrays for stationarity transformation
   array[1] matrix[N_lv_trend, N_lv_trend] P_var;
@@ -378,12 +410,32 @@ transformed parameters {
     A_trend[i] = result_var[1, i];
   }
 
-  
+  // Transform D_raw_trend to stationary D_trend (VARMA only)
+array[1] matrix[N_lv_trend, N_lv_trend] P_ma;
+array[2, 1] matrix[N_lv_trend, N_lv_trend] result_ma;
+
+// Transform D_raw_trend matrices using AtoP transformation
+for (i in 1:1) {
+  P_ma[i] = AtoP(D_raw_trend[i]);
+}
+
+// Apply reverse mapping to get stationary MA coefficients
+result_ma = rev_mapping(P_ma, Sigma_trend);
+
+// Extract stationary MA coefficients (negative sign per Heaps 2022)
+for (i in 1:1) {
+  D_trend[i] = -result_ma[1, i];
+}
 
   // Compute initial joint covariance matrix using companion matrix approach
-  array[1] matrix[N_lv_trend, N_lv_trend] empty_theta; empty_theta[1] = rep_matrix(0.0, N_lv_trend, N_lv_trend); Omega_trend = initial_joint_var(Sigma_trend, A_trend, empty_theta[1:0]);
+  Omega_trend = initial_joint_var(Sigma_trend, A_trend, D_trend);
 
-  
+  // Initialize MA error terms from init_trend (VARMA specific)
+for (i in 1:1) {
+  int start_idx = 1 * N_lv_trend + (i - 1) * N_lv_trend + 1;
+  int end_idx = 1 * N_lv_trend + i * N_lv_trend;
+  ma_init_trend[i] = init_trend[start_idx:end_idx];
+}
     // Derived latent trends using universal computation pattern
   matrix[N_trend, N_series_trend] trend;
 
@@ -429,12 +481,12 @@ model {
     // VARMA likelihood implementation following Heaps 2022 methodology
 
   // Initial joint distribution for stationary VARMA initialization
-  vector[1 * N_lv_trend] mu_init_trend = rep_vector(0.0, 1 * N_lv_trend);
+  vector[(1 + 1) * N_lv_trend] mu_init_trend = rep_vector(0.0, (1 + 1) * N_lv_trend);
   init_trend ~ multi_normal(mu_init_trend, Omega_trend);
 
   // Conditional means for VARMA dynamics
   vector[N_lv_trend] mu_t_trend[N_trend];
-  
+  vector[N_lv_trend] ma_error_trend[N_trend];  // MA error terms
 
   // Compute conditional means for all time points
   for (t in 1:N_trend) {
@@ -458,13 +510,25 @@ model {
       }
     }
 
-    
+    // MA component: Add moving average terms for VARMA
+for (i in 1:1) {
+  if (t - i <= 0) {
+    // Use initial MA errors for early time points
+    if (i <= 1) {
+      mu_t_trend[t] += D_trend[i] * ma_init_trend[i];
+    }
+  } else {
+    // Use computed MA errors from previous time points
+    mu_t_trend[t] += D_trend[i] * ma_error_trend[t - i];
+  }
+}
   }
 
   // Observation likelihood for time series
   for (t in 1:N_trend) {
     lv_trend[t, :] ~ multi_normal(mu_t_trend[t], Sigma_trend);
-    
+    // Compute MA error for next iteration
+    ma_error_trend[t] = lv_trend[t, :] - mu_t_trend[t];
   }
 
   
@@ -484,7 +548,27 @@ model {
   }}
   
 
-  
+  // Hierarchical priors for VARMA MA coefficient matrices (D_raw_trend)
+// Following same structure as VAR coefficients but conditional on ma_lags > 0
+for (ma_lag in 1:1) {
+  // Diagonal elements prior for MA coefficients
+  diagonal(D_raw_trend[ma_lag]) ~ normal(Dmu_trend[1, ma_lag], 1 / sqrt(Domega_trend[1, ma_lag]));
+
+  // Off-diagonal elements prior for MA coefficients
+  for (i in 1:N_lv_trend) {
+    for (j in 1:N_lv_trend) {
+      if (i != j) {
+        D_raw_trend[ma_lag, i, j] ~ normal(Dmu_trend[2, ma_lag], 1 / sqrt(Domega_trend[2, ma_lag]));
+      }
+    }
+  }
+}
+
+// Hyperpriors for hierarchical MA coefficient means and precisions
+for (component in 1:2) {  // [1] diagonal, [2] off-diagonal
+  Dmu_trend[component] ~ normal(es_ma_trend[component], fs_ma_trend[component]);
+  Domega_trend[component] ~ gamma(gs_ma_trend[component], hs_ma_trend[component]);
+}
 
   // Innovation variance and correlation priors (consistent with other trend generators)
   // Variance parameters using inverse gamma (equivalent to existing patterns)
@@ -506,17 +590,17 @@ model {
     // initialize linear predictor term
     vector[N_count] mu_count = rep_vector(0.0, N_count);
     // initialize linear predictor term
-    // Add trend effects for response count
-    if (size(trend_count) > 0) {
-      mu_count += trend_count[obs_ind_count];
-    }
+  // Add trend effects for response count
+  for (n in 1:N_count) {
+    mu_count[n] += trend[obs_trend_time_count[n], obs_trend_series_count[n]];
+  }
     vector[N_biomass] mu_biomass = rep_vector(0.0, N_biomass);
+  // Add trend effects for response biomass
+  for (n in 1:N_biomass) {
+    mu_biomass[n] += trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
+  }
     mu_count += Intercept_count + Xs_count * bs_count + Zs_count_1_1 * s_count_1_1;
     mu_biomass += Intercept_biomass + Xs_biomass * bs_biomass + Zs_biomass_1_1 * s_biomass_1_1;
-    // Add trend effects for response biomass
-    if (size(trend_biomass) > 0) {
-      mu_biomass += trend_biomass[obs_ind_biomass];
-    }
     target += normal_lpdf(Y_count | mu_count, sigma_count);
     target += normal_lpdf(Y_biomass | mu_biomass, sigma_biomass);
   }
