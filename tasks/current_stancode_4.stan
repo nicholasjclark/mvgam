@@ -20,7 +20,6 @@ data {
   int<lower=1> Kc_biomass;  // number of population-level effects after centering
   int prior_only;  // should the likelihood be ignored?
     int<lower=1> N_trend;  // total number of_trend observations
-  int<lower=1> N_trend;
   int<lower=1> N_series_trend;
   int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
@@ -71,9 +70,6 @@ vector<lower=-1,upper=1>[N_lv_trend] ar1_trend;
 vector[N_series_trend * N_lv_trend] Z_raw;  // raw factor loadings
 }
 transformed parameters {
-  // Create trend linear predictor
-  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
-  mu_trend += Intercept_trend + Xc_trend * b_trend;
   vector[N_presence] mu_presence = Xc_presence * b_presence;
   for (n in 1:N_presence) {
     mu_presence[n] += Intercept_presence + trend[obs_trend_time_presence[n], obs_trend_series_presence[n]];

@@ -1,22 +1,6 @@
 // generated with brms 2.22.9
 functions {
   
-      /* Function to compute a partially pooled correlation matrix
-       * Combines global correlation structure with group-specific deviations
-       * alpha controls mixing: 1 = pure global, 0 = pure local
-       */
-      matrix combine_cholesky(matrix global_chol_cor, matrix local_chol_cor,
-                              real alpha) {
-        int dim = rows(local_chol_cor);
-        matrix[dim, dim] global_cor = multiply_lower_tri_self_transpose(global_chol_cor);
-        matrix[dim, dim] local_cor = multiply_lower_tri_self_transpose(local_chol_cor);
-        matrix[dim, dim] combined_chol_cor;
-        combined_chol_cor = cholesky_decompose(alpha * global_cor
-                                               + (1 - alpha) * local_cor);
-        return combined_chol_cor;
-      }
-    
-  
       matrix get_changepoint_matrix(vector t, vector t_change_trend, int T, int S) {
         /* Function to sort changepoints */
 
@@ -80,7 +64,6 @@ data {
   int<lower=1> Kc;  // number of population-level effects after centering
   int prior_only;  // should the likelihood be ignored?
     int<lower=1> N_trend;  // total number of_trend observations
-  int<lower=1> N_trend;
   int<lower=1> N_series_trend;
   int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
@@ -109,9 +92,6 @@ parameters {
   vector[Kc] b;  // regression coefficients
   real Intercept;  // temporary intercept for centered predictors
   real Intercept_trend;  // temporary intercept for centered predictors
-  cholesky_factor_corr[N_lv_trend] L_Omega_global;
-  array[1] cholesky_factor_corr[N_lv_trend] L_deviation_group;
-  real<lower=0, upper=1> alpha_cor;
   vector<lower=0>[N_lv_trend] sigma_trend;
   matrix[N_trend, N_lv_trend] innovations_trend;
     // base trend growth rates
@@ -126,23 +106,13 @@ parameters {
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
   lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);
-  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+  vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
   
-    // Scaled innovations after applying hierarchical correlations
+    // Scaled innovations (uncorrelated case)
     matrix[N_trend, N_lv_trend] scaled_innovations_trend;
 
-    // Apply group-specific correlations to raw innovations
-    for (g in 1:n_groups) {
-      // Derived group-specific correlation matrices (using existing combine_cholesky)
-      array[n_groups] cholesky_factor_corr[N_lv_trend] L_Omega_group;
-      for (g_idx in 1:n_groups) {
-        L_Omega_group[g_idx] = combine_cholesky(L_Omega_global, L_deviation_group[g_idx], alpha_cor);
-      }
-
-      // Transform raw innovations using group correlations
-      matrix[N_lv_trend, N_lv_trend] Sigma_group = diag_pre_multiply(sigma_trend, L_Omega_group[g]);
-      // Apply to group time points (individual generators will specify the indexing)
-    }
+    // Apply scaling using vectorized operations
+    scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);
     // Standardized latent trend matrix (linear piecewise trends)
   matrix[N_trend, N_lv_trend] lv_trend;
 
@@ -172,10 +142,8 @@ transformed parameters {
   }
 }
 model {
-  alpha_cor ~ beta(3, 2);
-  L_Omega_global ~ lkj_corr_cholesky(1);
-  for (g in 1:1) { L_deviation_group[g] ~ lkj_corr_cholesky(6); }
-  // Raw innovations prior
+  // Shared Gaussian innovation priors
+  sigma_trend ~ exponential(2);
   to_vector(innovations_trend) ~ std_normal();
     // PW trend default priors
   m_trend ~ student_t(3, 0, 2.5);

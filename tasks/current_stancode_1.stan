@@ -9,7 +9,6 @@ data {
   int<lower=1> Kc;  // number of population-level effects after centering
   int prior_only;  // should the likelihood be ignored?
     int<lower=1> N_trend;  // total number of_trend observations
-  int<lower=1> N_trend;
   int<lower=1> N_series_trend;
   int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
@@ -36,7 +35,7 @@ parameters {
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
   lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
-  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+  vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
   
     // Scaled innovations (uncorrelated case)
     matrix[N_trend, N_lv_trend] scaled_innovations_trend;
