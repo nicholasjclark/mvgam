@@ -137,7 +137,7 @@ tryCatch({
 cat("Generating current_stancode_6.stan (CAR trends)...\n")
 tryCatch({
 
-  mf6 <- mvgam_formula(y ~ gp(x) + (1 | series), trend_formula = ~ CAR())
+  mf6 <- mvgam_formula(y ~ (1 | series), trend_formula = ~ gp(x) + CAR())
   code6 <- stancode(mf6, data = test_data$univariate, family = poisson(), validate = FALSE)
   writeLines(code6, 'tasks/current_stancode_6.stan')
   cat("✓ current_stancode_6.stan created\n")

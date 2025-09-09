@@ -143,7 +143,7 @@
                                 "register_trend_type":  "register_trend_type \u003c- function(name, supports_factors = FALSE, generator_func, incompatibility_reason = NULL, prior_spec = NULL) {",
                                 "generate_rw_monitor_params":  "generate_rw_monitor_params \u003c- function(trend_spec) {",
                                 "find_trend_terms":  "find_trend_terms \u003c- function(x) {",
-                                "create_mvgam_trend":  "create_mvgam_trend \u003c- function(trend_type, ..., .time = substitute(time), .series = substitute(series), .gr = substitute(gr), .subgr = substitute(subgr), .cap = substitute(cap), .validation_rules = NULL) {",
+                                "create_mvgam_trend":  "create_mvgam_trend \u003c- function(trend_type, ..., .time = NULL, .series = NULL, .gr = NULL, .subgr = NULL, .cap = NULL, .validation_rules = NULL) {",
                                 "get_trend_info":  "get_trend_info \u003c- function(name) {",
                                 "list_trend_types":  "list_trend_types \u003c- function() {",
                                 "GP":  "GP = function(time = NA, series = NA, ...) {",

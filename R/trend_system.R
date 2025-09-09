@@ -2505,7 +2505,7 @@ CAR = function(time = NA, series = NA) {
     "CAR",  # Base trend type used for ALL dispatch
     .time = substitute(time),
     .series = substitute(series),
-    # CAR doesn't support gr, subgr, or n_lv - omitting them from function signature
+    # CAR doesn't support gr, subgr, or n_lv - leave them as NULL
     # Store parameters as-is
     p = 1,        # CAR is always first-order
     ma = FALSE,   # CAR doesn't support MA
@@ -3148,21 +3148,26 @@ get_default_validation_rules <- function(trend_type) {
 #' @return mvgam_trend object
 #' @export
 create_mvgam_trend <- function(trend_type, ...,
-                               .time = substitute(time),
-                               .series = substitute(series),
-                               .gr = substitute(gr),
-                               .subgr = substitute(subgr),
-                               .cap = substitute(cap),
+                               .time = NULL,
+                               .series = NULL,
+                               .gr = NULL,
+                               .subgr = NULL,
+                               .cap = NULL,
                                .validation_rules = NULL) {
   checkmate::assert_string(trend_type, min.chars = 1)
 
   # Helper to process substituted arguments - handles both quoted and unquoted
   process_arg <- function(x) {
+    if (is.null(x)) return("NA")  # Return "NA" for missing arguments
     if (is.character(x)) return(x)
     deparsed <- deparse0(x)
     # Remove surrounding quotes if present (from quoted strings)
     if (grepl('^".*"$', deparsed)) {
       return(substr(deparsed, 2, nchar(deparsed) - 1))
+    }
+    # Check if it's an undefined symbol (like when substitute(gr) returns 'gr' symbol)
+    if (deparsed %in% c("gr", "subgr", "time", "series", "cap")) {
+      return("NA")  # These are undefined symbols, not actual values
     }
     deparsed
   }

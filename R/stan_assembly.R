@@ -1638,28 +1638,8 @@ inject_multivariate_trends_into_linear_predictors <- function(
   if (length(non_glm_responses) > 0) {
     code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
     
-    # Add mu_trend intercept injection for VARMA models
-    if (has_varma_components) {
-      tparams_start <- which(grepl("^\\s*transformed parameters\\s*\\{", code_lines))
-      if (length(tparams_start) > 0) {
-        # Find insertion point after opening brace
-        insert_point <- tparams_start[1]
-        
-        # Add mu_trend intercept computation
-        mu_trend_intercept <- c(
-          "  // Create trend linear predictor",
-          "  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);",
-          "  mu_trend += Intercept_trend + Xc_trend * b_trend;"
-        )
-        
-        # Insert mu_trend computation
-        code_lines <- c(
-          code_lines[1:insert_point],
-          mu_trend_intercept,
-          code_lines[(insert_point + 1):length(code_lines)]
-        )
-      }
-    }
+    # mu_trend initialization is now handled uniformly by extract_and_rename_stan_blocks()
+    # This eliminates code duplication and ensures consistent behavior across all trend types
     
     for (resp_name in non_glm_responses) {
       # Find where mu_<resp> is computed in transformed parameters block
@@ -2628,7 +2608,7 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
 
   # Determine if this trend uses shared Gaussian innovations
   uses_shared_innovations <- trend_specs$shared_innovations %||%
-                            (!trend_type %in% c("PW", "VAR"))  # PW and VAR opt out of shared innovations
+                            (!trend_type %in% c("PW", "VAR", "CAR"))  # PW, VAR, and CAR opt out of shared innovations
 
   # Generate shared innovation stanvars if needed
   shared_stanvars <- NULL
@@ -4946,22 +4926,29 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
   }
 
   # 4. CRITICAL: Create mu_trend if needed for trend computation
-  # Create when no model stanvar was created (no extracted priors/transformations from model block)
-  if (!model_stanvar_created) {
+  # Check if mu_trend declaration already exists in stancode (from complex brms predictors)
+  mu_trend_pattern <- paste0("vector\\[.*?\\]\\s+mu", gsub("_", "\\_", suffix, fixed=TRUE))
+  mu_trend_exists <- any(grepl(mu_trend_pattern, 
+                              strsplit(stancode, "\n")[[1]], 
+                              perl = TRUE))
+  
+  if (!mu_trend_exists) {
     # Always create mu_trend for trend computation - it's needed by generate_trend_computation_tparameters
     # Check if this is an intercept-only model (common pattern in brms trend models)  
-    # Look for X_trend (uncentered matrix) in data block, not Xc_trend which is computed in transformed data
-    has_coefficients <- grepl(paste0("vector\\[.*\\]\\s+b", suffix), stancode) && 
-                        grepl(paste0("matrix\\[.*\\]\\s+X", suffix), stancode)
+    # Look for unsuffixed b and X parameters in brms code (before renaming)
+    # The [^_] ensures we don't match already-suffixed parameters
+    has_coefficients <- grepl("vector\\[.*\\]\\s+b[^_]", stancode) && 
+                        grepl("matrix\\[.*\\]\\s+X[^_]", stancode)
     
     # Use consistent parameter naming throughout
     time_param <- paste0("N", suffix)
     
     if (has_coefficients) {
       # Verify required components exist for robustness
-      has_xc <- grepl(paste0("Xc", suffix), stancode) || 
-                grepl(paste0("matrix\\[.*\\]\\s+X", suffix), stancode)
-      has_intercept <- grepl(paste0("real\\s+Intercept", suffix), stancode)
+      # Check for unsuffixed versions since we haven't renamed yet
+      has_xc <- grepl("matrix\\[.*\\]\\s+Xc[^_]", stancode) || 
+                grepl("matrix\\[.*\\]\\s+X[^_]", stancode)
+      has_intercept <- grepl("real\\s+Intercept[^_]", stancode)
       
       if (!has_xc) {
         insight::format_error(
@@ -4972,15 +4959,13 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
       # Model with coefficients: follow brms pattern matching target_stancode_3.stan
       # Initialize with zeros, then add linear predictor components
       mu_trend_code <- paste0(
-        "// Create trend linear predictor\n  ",
-        "vector[", time_param, "] mu", suffix, 
-        " = rep_vector(0.0, ", time_param, ");\n  ",
-        "mu", suffix, " += Intercept", suffix, 
-        " + Xc", suffix, " * b", suffix, ";"
+        "vector[", time_param, "] mu", suffix, " = rep_vector(0.0, ", time_param, ");\n",
+        "  mu", suffix, " += Intercept", suffix, " + Xc", suffix, " * b", suffix, ";"
       )
     } else {
       # Intercept-only model: pattern depends on whether intercept present or ~ -1 formula
-      intercept_present <- grepl(paste0("real\\s+Intercept", suffix), stancode)
+      # Look for base Intercept parameter (without suffix) since trend parameters get renamed later
+      intercept_present <- grepl("real.*Intercept[^_]", stancode)
       
       if (intercept_present) {
         mu_trend_code <- paste0(

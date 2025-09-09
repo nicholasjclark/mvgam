@@ -1,301 +1,257 @@
 # TRD-stancode-generation-update Development Tasks
 
-## 🎯 **CURRENT STATUS: 95% COMPLETE - CRITICAL BUG DISCOVERED** 
+## 🎯 **CURRENT STATUS: 4 CRITICAL COMPILATION FAILURES** 
 
-**✅ COMPLETED**: Files 1, 2, 4, 5 (perfect Stan code matches)
-**🔄 CRITICAL ISSUE**: File 3 & 6 affected by `mu_trend` initialization bug
-**⚠️ BREAKING CHANGE**: Intercept-only models fixed, but coefficient models broken by syntax errors
+**Status After mu_trend Fix - 2025-09-09**:
+- **✅ PASSING**: Files 1, 5 (RW and PW trends - minor cosmetic differences)
+- **🚨 CRITICAL**: Files 2, 3, 4, 6 (compilation/structural failures)
+- **✅ FOUNDATION**: mu_trend detection logic fixed and verified
+
+**4 Critical Issues Preventing Stan Compilation**:
+1. **File 3 (VARMA)**: Template placeholders `{lags}` not replaced with `2` 
+2. **File 2 (Shared RW)**: Variable order - `trend` used before declaration
+3. **File 4 (Factor AR)**: Linear predictor computation in wrong Stan block
+4. **File 6 (CAR+GP)**: Missing GP functions and computation completely
 
 ---
 
-## 🔧 **DEVELOPMENT PROTOCOL**
+## 🔧 **MANDATORY DEVELOPMENT PROTOCOL**
 
-### **STEP 1: Generate Current Stan Code** 
+### **STEP 1: Generate Fresh Stan Code (Before ANY Changes)**
+**ALWAYS run this first to get baseline**:
 ```bash
-# Generate current Stan files for comparison
+# Use general-purpose agent to generate all 6 files
 Rscript target_generation.R
 ```
 
-### **STEP 2: SYSTEMATIC FILE ANALYSIS - MANDATORY TDD APPROACH**
-⚠️ **CRITICAL**: Agents MUST read complete files for systematic comparison. NO grep/diff shortcuts allowed.
+### **STEP 2: Complete File Analysis (MANDATORY After Every Fix)**
+⚠️ **CRITICAL**: Use **general-purpose agent** to read ALL 6 complete files systematically. 
 
-**Required Analysis Method**:
+**Required Analysis Protocol**:
 ```r
-# Read complete files for direct comparison
-current_content <- readLines("tasks/current_stancode_3.stan") 
-target_content <- readLines("tasks/target_stancode_3.stan")
-
-# Systematic line-by-line analysis to identify:
-# 1. Missing trend injection patterns
-# 2. Incorrect parameter usage  
-# 3. Structural differences in blocks
+# NEVER use grep/diff shortcuts - read complete files
+for (i in 1:6) {
+  current <- readLines(paste0("tasks/current_stancode_", i, ".stan"))
+  target <- readLines(paste0("tasks/target_stancode_", i, ".stan"))
+  
+  # Compare every section:
+  # 1. Functions block completeness
+  # 2. Data block parameter presence  
+  # 3. Parameters block declarations
+  # 4. Transformed parameters variable order
+  # 5. Model block statement placement
+  # 6. Generated quantities consistency
+}
 ```
 
-### **STEP 3: Target Files**
-- `target_stancode_3.stan` → VARMA trends (complex multivariate)
-- `target_stancode_6.stan` → CAR trends (GP + irregular time)
-
----
-
-## 🎯 **CURRENT PROGRESS: Linear Predictor Fixes Applied**
-
-### ✅ **COMPLETED Linear Predictor Enhancements**:
-1. **mu_trend Intercept Injection**: Added `mu_trend += Intercept_trend + Xc_trend * b_trend`
-2. **Response Mapping Fix**: Corrected to use `obs_trend_time_{resp}[n], obs_trend_series_{resp}[n]` pattern
-3. **VARMA Detection**: Added automatic detection via `grepl("D_trend|ma_.*_trend", base_stancode)`
-4. **Enhanced Validation**: Added proper `checkmate::assert_string()` validation
-
-### 🔄 **File 3 VARMA Status**: 5/7 patterns (improved from 4/7)
-**✅ Fixed Patterns**:
-- `mu_trend += Intercept_trend + Xc_trend * b_trend`
-- `mu_count[n] += trend[obs_trend_time_count[n], obs_trend_series_count[n]]`
-- `mu_biomass[n] += trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]]`
-
-**⏳ Remaining Gaps (NOT in linear predictor system)**:
-- Missing MA component: `mu_t_trend[t] += D_trend[1] * ma_init_trend`
-- Missing MA component: `mu_t_trend[t] += D_trend[1] * ma_error_trend[t - 1]`
-
-**Root Cause**: These are in the trend system's VAR loop, not linear predictor injection
-
-### 🔄 **File 6 CAR Status**: Requires Full File Analysis
-**Current Known**: 1 trend injection pattern exists  
-**Assessment Required**: Full file reading needed to identify exact gaps
-
----
-
-## ✅ **COMPLETED: VARMA Trend System (File 3)**
-
-**Status**: All 7/7 patterns implemented and verified
-**Fix Applied**: VAR parameter conversion bug fixed in `R/stan_assembly.R`
-- Fixed `ma = TRUE` → `ma_lags = 1` conversion in `generate_trend_specific_stanvars`
-- All MA components now properly generated: `D_trend`, `ma_init_trend`, `ma_error_trend`
-- VARMA dynamics fully operational with correct MA patterns
-
-**Verification**: Current vs target comparison shows complete match
-
----
-
-## 🚨 **CRITICAL BUG: mu_trend Initialization System**
-
-### **Root Cause Identified - 2025-09-09**
-A critical bug in `R/stan_assembly.R` line ~4930 affects `mu_trend` initialization across ALL trend types:
-
-**✅ FIXED: Intercept-only models** (`trend_formula = ~ CAR()`, `~ AR()`, etc.)
-- Now correctly generate: `mu_trend = rep_vector(Intercept_trend, N_trend)`
-- Fixed regex timing issue where `Intercept_trend` wasn't available during detection
-
-**❌ BROKEN: Models with predictors** (`trend_formula = ~ x + CAR()`, `~ presence + VAR()`, `~ s(x) + AR()`, etc.)
-- Linear predictors should generate: `mu_trend = rep_vector(0.0, N_trend); mu_trend += Intercept_trend + Xc_trend * b_trend`
-- Spline predictors should generate: `mu_trend = rep_vector(0.0, N_trend); mu_trend += Intercept_trend + Xs_trend * bs_trend + Zs_trend_* * s_trend_*`
-- Currently cause Stan syntax errors in parameters block for ALL predictor types
-
-### **Evidence**
-- **File 3 (VARMA)**: Uses `trend_formula = ~ presence + VAR(p=2, ma=TRUE)` → should use coefficient path
-- **File 6 (CAR)**: Uses `trend_formula = ~ CAR()` → correctly uses intercept path  
-- **Debug scripts**: `debug_mu_trend.R` confirms intercept-only models work, coefficient models fail
-
-### **⚠️ MANDATORY DEBUGGING PROTOCOL FOR FUTURE AGENTS**
-
-**CRITICAL**: Agents MUST use comprehensive debugging scripts that test VARIETY of combinations:
-
-1. **Trend Types**: CAR, AR, RW, VAR, VARMA
-2. **Formula Patterns**: 
-   - Intercept-only: `~ CAR()`, `~ AR()`, `~ VAR()`
-   - With predictors: `~ x + CAR()`, `~ presence + VAR()`, `~ z * w + AR()`
-   - No intercept: `~ -1 + x + CAR()`
-3. **Response Types**: Single vs multivariate, different families
-
-**Required Testing Matrix** (MUST test ALL combinations):
+### **STEP 3: Internal Debugging with Monkey Patching**
+**When root causes unclear, use comprehensive internal tracing**:
 ```r
-# Test cases that MUST all work:
-trend_formulas <- list(
-  "~ CAR()",              # intercept-only CAR
-  "~ x + CAR()",          # CAR with linear predictor  
-  "~ s(x) + CAR()",       # CAR with smooth term (splines - different pattern!)
-  "~ AR()",               # intercept-only AR
-  "~ presence + VAR()",   # VAR with binary predictor
-  "~ s(time_var) + AR()", # AR with spline (creates different Stan structures)
-  "~ x * z + RW()",       # RW with interaction
-  "~ -1 + z + CAR()",     # no-intercept CAR
-  "~ -1 + s(x) + VAR()"   # no-intercept with spline
-)
-
-families <- list(poisson(), gaussian(), nbinom2())
-response_types <- c("single", "multivariate")
-
-# CRITICAL: s(x) terms create different parameter patterns:
-# - Generate spline basis matrices (Zs_trend_*)
-# - Create penalized coefficients (zs_trend_*, sds_trend_*)
-# - Different Stan block structures vs linear predictors
-# MUST verify correct mu_trend generation for each combination
+# Example: Monkey patch stan generation functions
+original_func <- mvgam:::generate_var_trend_stanvars
+mvgam:::generate_var_trend_stanvars <- function(...) {
+  cat("=== TRACING VAR GENERATION ===\n")
+  cat("Template data:", list(...), "\n")
+  result <- original_func(...)
+  cat("Generated code first 10 lines:\n")
+  print(head(strsplit(result$code, "\n")[[1]], 10))
+  return(result)
+}
 ```
 
-**⚠️ USE EXISTING TEST INFRASTRUCTURE**:
-- **`tests/testthat/test-stancode-standata.R`** - Already contains comprehensive tests covering:
-  - **Intercept-only**: `~ RW()`, `~ AR()`, `~ CAR()` 
-  - **With predictors**: `~ presence + VAR()`, `~ x + ZMVN()`, `~ x + AR()`
-  - **With splines**: `~ s(x)` (via observation model patterns)
-  - **No intercept**: `~ -1 + AR()`
-  - **Complex multivariate**: Various combinations with different families
-- **MUST run existing tests**: `Rscript -e "devtools::load_all();testthat::test_file('tests/testthat/test-stancode-standata.R')"`
-- **DO NOT create new debugging scripts** - use existing test framework to verify fixes
-- **Expected after fix**: ALL tests should pass without Stan syntax errors
-
-**⚠️ SPLINE DETECTION COMPLEXITY**:
-Current coefficient detection logic in `R/stan_assembly.R:4940` only checks for:
-```r
-has_coefficients <- grepl("vector.*b_trend", stancode) && grepl("matrix.*X_trend", stancode)
-```
-
-But spline models create DIFFERENT parameter patterns:
-- `vector[Ks_trend] bs_trend` (unpenalized spline coefficients)
-- `vector[knots_*] zs_trend_*` (penalized spline coefficients) 
-- `matrix[N_trend, Ks_trend] Xs_trend` (spline design matrices)
-- `matrix[N_trend, knots_*] Zs_trend_*` (spline basis matrices)
-
-**MUST update detection logic to handle ALL coefficient types!**
+### **STEP 4: Regression Testing (NON-NEGOTIABLE)**
+**After EVERY proposed fix**:
+1. **Generate all 6 files** with `Rscript target_generation.R`  
+2. **Analyze all 6 comparisons** with general-purpose agent
+3. **Verify no regressions** - previously passing files must still pass
+4. **Document exact changes** in each file before/after
 
 ---
 
-## 🎯 **ROOT CAUSE IDENTIFIED - 2025-09-09**
+## 🚨 **PRIORITY ISSUES (IN ORDER OF CRITICALITY)**
 
-**BREAKTHROUGH**: Comprehensive internal tracing via monkey-patched `extract_and_rename_stan_blocks` function revealed the exact root cause.
+### **Priority 1: Template System Failure (File 3 - CRITICAL)**
+**Problem**: `{lags}` placeholders not replaced with actual values
+```stan
+// BROKEN (Current)
+array[{lags}] matrix[N_lv_trend, N_lv_trend] A_raw_trend;
+for (i in 1:{lags}) {{  // Double braces also wrong
 
-### **The Problem**
-
-The `has_coefficients` detection logic (lines 4939-4940) is **fundamentally broken**:
-
-```r
-# CURRENT (BROKEN) - looks for SUFFIXED parameters in UNSUFFIXED brms code
-has_coefficients <- grepl(paste0("vector\\[.*\\]\\s+b", suffix), stancode) && 
-                    grepl(paste0("matrix\\[.*\\]\\s+X", suffix), stancode)
+// CORRECT (Target)  
+array[2] matrix[N_lv_trend, N_lv_trend] A_raw_trend;
+for (i in 1:2) {  // Single braces
 ```
 
-**What it looks for**: `b_trend`, `X_trend` (with `_trend` suffix)
-**What actually exists**: `vector[Kc] b;`, `matrix[N, K] X;` (no suffix)
-**Result**: `has_coefficients` is **always FALSE**, even when coefficients exist
+**Investigation Steps**:
+1. **Use general-purpose agent** to examine `generate_var_trend_stanvars()` 
+2. **Monkey patch** template replacement functions to trace execution
+3. **Check** if `glue::glue()` receiving correct `lags = trend_spec$p` context
+4. **Verify** template files have correct placeholder syntax
 
-### **The Evidence**
+**Success Criteria**: File 3 compiles without template errors
 
-From `debug_mu_trend_internal.R` comprehensive tracing:
-
-**Scenario 2**: `trend_formula = ~ -1 + z + CAR()` (should use coefficients branch)
-- **Expected**: `rep_vector(0.0, N_trend) + Xc_trend * b_trend`
-- **Actual**: `rep_vector(0.0, N_trend)` (missing components)
-- **Cause**: `has_coefficients=FALSE` despite coefficients existing
-
-**Scenario 3**: `trend_formula = ~ z + CAR()` (should use coefficients branch) 
-- **Expected**: `rep_vector(0.0, N_trend) + Xc_trend * b_trend`
-- **Actual**: `rep_vector(Intercept_trend, N_trend)` (wrong pattern)
-- **Cause**: `has_coefficients=FALSE`, falls back to intercept-only
-
-### **The Fix**
-
-```r
-# FIXED VERSION - looks for UNSUFFIXED parameters in brms code
-has_coefficients <- grepl("vector\\[.*\\]\\s+b[^_]", stancode) && 
-                    grepl("matrix\\[.*\\]\\s+X[^_]", stancode)
-```
-
-**Location**: `R/stan_assembly.R` lines 4939-4940
+**Regression Test**: Verify Files 1, 2, 4, 5, 6 still generate correctly
 
 ---
 
-## 🔧 **DEBUGGING PROTOCOL FOR FUTURE AGENTS**
+### **Priority 2: Variable Declaration Order (File 2 - CRITICAL)**
+**Problem**: `trend` matrix used before definition
+```stan
+// BROKEN - Line 58 uses 'trend' before it's defined
+mu_biomass[n] += trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
+// But 'trend' not declared until line 93!
 
-**MANDATORY**: Use the comprehensive internal tracing script before attempting fixes:
-
-```bash
-Rscript debug_mu_trend_internal.R
+// CORRECT - Target has proper order:
+// 1. lprior, 2. mu_trend, 3. trend computation, 4. THEN linear predictors
 ```
 
-This script:
-1. ✅ **Monkey-patches** `extract_and_rename_stan_blocks` with internal tracing
-2. ✅ **Shows exact intermediate Stan code** when detection runs (not just final output)
-3. ✅ **Traces actual execution path** through conditional logic branches
-4. ✅ **Reveals validation check results** and whether they pass/fail
-5. ✅ **Shows exact mu_trend_code generation** inside the function
-6. ✅ **Tracks stanvar creation process** and any failures
+**Investigation Steps**:
+1. **Use general-purpose agent** to trace multivariate response + shared trend assembly
+2. **Examine** variable dependency graph in shared trend generation  
+3. **Compare** target file structure vs current generation order
+4. **Monkey patch** block assembly functions to see ordering decisions
 
-**WARNING**: Do NOT guess at fixes without running this script first. The issue was not what it appeared to be from external analysis.
+**Success Criteria**: File 2 compiles with proper variable order
+
+**Regression Test**: Verify Files 1, 3, 4, 5, 6 maintain correct ordering
 
 ---
 
-## 🚨 **PRIORITY: Fix mu_trend Detection Logic (Critical)**
+### **Priority 3: Block Placement Error (File 4 - CRITICAL)**
+**Problem**: Linear predictor computation in model block instead of transformed parameters
+```stan
+// BROKEN - In model block (line 149)
+vector[N_biomass] mu_biomass = rep_vector(0.0, N_biomass);
+mu_biomass += Intercept_biomass + Xc_biomass * b_biomass;
+mu_biomass = inv(mu_biomass);  // This is wrong!
 
-**Status**: Root cause identified, fix location confirmed
-**Priority**: Critical (affects ALL trend models with predictors)
-**Estimated Time**: 2 minutes (simple regex change)
-**Files**: `R/stan_assembly.R` - Lines 4939-4940
+// CORRECT - Should be in transformed parameters block
+```
 
-### **Sub-Tasks for CAR Fix:**
+**Investigation Steps**:
+1. **Use general-purpose agent** to examine factor model + multivariate response handling
+2. **Trace** where `mu_biomass = inv(mu_biomass)` statement originates
+3. **Compare** transformed parameters vs model block contents in target
+4. **Check** if this affects other multivariate factor models
 
-### [x] T3.1: Fix Data Block Syntax Errors ✅ **COMPLETED**
-**Priority**: Critical (prevents compilation)
-**Estimated Time**: 5 minutes
-**Status**: ✅ **FIXED** - 2025-09-09
-**Action Items Completed**:
-- ✅ Fixed line 4035: Changed `array[n, N_series_trend]` to `array[N_trend, N_series_trend]` in `generate_car_trend_stanvars`
-- ✅ Fixed duplicate N_trend declaration: Removed N_trend creation from `generate_common_trend_data` since N_trend comes from brms parameter extraction
-- ✅ Root cause identified: N_trend is created by renaming `N` from brms trend model, not by dimension generation
-**Files**: `R/stan_assembly.R` - Lines 4035 (time_dis declaration) and 2224 (dimension generation)
+**Success Criteria**: File 4 has linear predictors in transformed parameters block
 
-### [ ] T3.2: Simplify Parameter Architecture  
-**Priority**: High (removes unnecessary complexity)
-**Estimated Time**: 10 minutes
-**Action Items**:
-- Remove hierarchical parameters: `L_Omega_global`, `L_deviation_group`, `alpha_cor`
-- Keep only essential CAR parameters: `ar1_trend`, `sigma_trend`, `innovations_trend`
-- Remove unnecessary `combine_cholesky` function usage
-- Match target parameter structure exactly
-**Files**: `R/stan_assembly.R` (generate_car_trend_stanvars function)
+**Regression Test**: All other multivariate models (Files 2, 3) maintain correct structure
 
-### [ ] T3.3: Fix Transformed Parameters Logic
-**Priority**: High (incorrect computation)  
-**Estimated Time**: 10 minutes
-**Action Items**:
-- Fix mu_trend initialization: `rep_vector(Intercept_trend, N_trend)` instead of `rep_vector(0.0, N_trend)`
-- Simplify scaled_innovations: `innovations_trend * diag_matrix(sigma_trend)` 
-- Remove complex hierarchical correlation application (lines 105-115)
-- Implement clean CAR evolution: `pow(ar1_trend[j], time_dis[i, j]) * lv_trend[i-1, j] + scaled_innovations_trend[i, j]`
-**Files**: `R/stan_assembly.R` (CAR transformed parameters block)
+---
 
-### [ ] T3.4: Clean Up Model Block Structure
-**Priority**: Medium (code clarity)
-**Estimated Time**: 5 minutes  
-**Action Items**:
-- Remove hierarchical correlation priors: `alpha_cor`, `L_Omega_global`, `L_deviation_group`
-- Keep core CAR priors: `ar1_trend ~ normal(0, 0.5)`, `sigma_trend ~ exponential(2)`, `innovations_trend ~ std_normal()`
-- Ensure likelihood structure matches target
-- Remove unnecessary complexity from model block
-**Files**: `R/stan_assembly.R` (CAR model block generation)
+### **Priority 4: Missing GP Integration (File 6 - CRITICAL)**
+**Problem**: GP functions and computation completely absent
+```stan
+// MISSING - Functions block should have:
+vector gp_exp_quad(data array[] vector x, real sdgp, vector lscale, vector zgp)
+
+// MISSING - Model block should have:
+vector[Nsubgp_1_trend] gp_pred_1_trend = gp_exp_quad(Xgp_1_trend, ...);
+```
+
+**Investigation Steps**:
+1. **Use general-purpose agent** to compare functions blocks current vs target
+2. **Examine** CAR trend generation for GP smooth integration
+3. **Check** if GP functions are being excluded during assembly
+4. **Trace** GP parameter flow from data through to computation
+
+**Success Criteria**: File 6 has complete GP functions and computation
+
+**Regression Test**: Non-GP models (Files 1-5) don't gain unwanted GP components
+
+---
+
+## 🔧 **DEBUGGING TOOLKIT**
+
+### **Monkey Patching Examples**
+```r
+# Template replacement debugging
+debug_templates <- function() {
+  original <- mvgam:::apply_trend_templates
+  mvgam:::apply_trend_templates <- function(template, data, ...) {
+    cat("TEMPLATE:", substr(template, 1, 100), "...\n")
+    cat("DATA:", str(data), "\n") 
+    result <- original(template, data, ...)
+    cat("RESULT:", substr(result, 1, 100), "...\n")
+    return(result)
+  }
+}
+
+# Block assembly debugging  
+debug_assembly <- function() {
+  original <- mvgam:::assemble_stan_blocks
+  mvgam:::assemble_stan_blocks <- function(blocks, ...) {
+    cat("ASSEMBLING BLOCKS:", names(blocks), "\n")
+    lapply(names(blocks), function(name) {
+      cat("BLOCK", name, "length:", nchar(blocks[[name]]), "\n")
+      cat("First 5 lines:\n")
+      print(head(strsplit(blocks[[name]], "\n")[[1]], 5))
+    })
+    return(original(blocks, ...))
+  }
+}
+```
+
+### **Complete File Analysis Protocol**
+**MANDATORY**: Use general-purpose agent to read and analyze ALL 6 file pairs completely.
+
+**For each file pair (current_stancode_X.stan vs target_stancode_X.stan)**:
+1. **Read ENTIRE current file contents** using Read tool
+2. **Read ENTIRE target file contents** using Read tool  
+3. **Compare every single section systematically**:
+   - Functions block: What functions are missing/different?
+   - Data block: What parameters are missing/different?
+   - Transformed data: What computations are missing/different?
+   - Parameters: What declarations are missing/different?
+   - Transformed parameters: What variables are missing/different? What order differences?
+   - Model block: What statements are missing/different? What placement errors?
+   - Generated quantities: What computations are missing/different?
+
+4. **Report exact discrepancies** with line numbers and specific missing content
+5. **Identify structural issues** like variable order, block placement, incomplete functions
+
+**NO AUTOMATED PATTERN MATCHING** - This must be human-like analysis of complete file contents.
+
+**Example Analysis Format**:
+```
+File 3 Analysis:
+- Current functions block: Missing rev_mapping function (lines 50-80 in target)
+- Current parameters block: Has {lags} placeholders instead of actual "2" (lines 315, 369, 373)  
+- Current transformed parameters: Missing proper D_trend computation (lines 325-350 in target)
+- Status: BROKEN - Template replacement failed
+```
 
 ---
 
 ## 📊 **SUCCESS METRICS**
 
-- ✅ **Priority 1**: File 3 shows 7/7 patterns through full file reading
-- ✅ **Priority 2**: File 6 shows complete match through full file reading  
-- ✅ **Overall**: All 6 target Stan files match current generation
+**Phase 1 Complete When**:
+- All 6 files compile without syntax errors
+- Files 1, 5 maintain current near-perfect status  
+- Files 2, 3, 4, 6 match their targets structurally
 
-## 🔧 **AGENT HANDOFF PROTOCOL**
+**Regression Prevention**:
+- Every fix must be validated against all 6 files
+- No previously working functionality may break
+- All changes documented with before/after comparisons
 
-1. **MANDATORY**: Run `Rscript target_generation.R` before starting
-2. **MANDATORY**: Use `Read` tool for complete file analysis - NO grep/diff shortcuts
-3. **Focus**: Complete trend system enhancements (not linear predictor fixes)
-4. **TDD Approach**: Direct file comparison for accurate gap identification
+**Quality Gates**:
+1. ✅ **Generate**: `Rscript target_generation.R` succeeds
+2. ✅ **Parse**: All 6 files parse as valid Stan code
+3. ✅ **Compare**: General-purpose agent analysis shows matches
+4. ✅ **Compile**: All 6 files compile with test data
 
-**Example Proper Analysis**:
-```r
-# Correct approach
-current_lines <- readLines("tasks/current_stancode_3.stan")
-target_lines <- readLines("tasks/target_stancode_3.stan") 
-# Compare systematically to identify exact gaps
-```
+---
 
-**❌ Forbidden Shortcuts**:
-```bash
-# WRONG - no pattern matching shortcuts
-grep "pattern" current_stancode_3.stan
-diff current_stancode_3.stan target_stancode_3.stan
-```
+## 🔄 **AGENT HANDOFF PROTOCOL**
+
+1. **MANDATORY START**: Use general-purpose agent to run `Rscript target_generation.R`
+2. **MANDATORY ANALYSIS**: Use general-purpose agent for complete file analysis - NO shortcuts
+3. **FOCUS**: Work on ONE priority issue at a time  
+4. **VALIDATE**: After every change, analyze all 6 files for regressions
+5. **DOCUMENT**: Record exact changes made and their effects
+6. **DEBUG**: Use monkey patching when root causes are unclear
+7. **STOP**: After each priority fix, get user approval before next issue
+
+**Golden Rule**: Better to fix one issue perfectly with no regressions than to fix multiple issues with side effects.

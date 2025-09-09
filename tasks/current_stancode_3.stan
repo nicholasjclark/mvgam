@@ -348,7 +348,8 @@ transformed parameters {
   vector[knots_biomass_1[1]] s_biomass_1_1;
   real lprior = 0;  // prior contributions to the log posterior
   lprior += student_t_lpdf(Intercept_trend | 3, -0.2, 2.5);
-  vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
+  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+  mu_trend += Intercept_trend + Xc_trend * b_trend;
   matrix[N_lv_trend, N_lv_trend] Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
   
     // Scaled innovations after applying correlations
