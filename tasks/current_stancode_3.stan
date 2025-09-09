@@ -232,6 +232,8 @@ data {
   int<lower=1> N_series_trend;
   int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
+  array[N] int obs_trend_time;
+  array[N] int obs_trend_series;
     int<lower=1> K_trend;  // number of_trend population-level effects
     int<lower=1> Kc_trend;  // number of_trend population-level effects after centering
     matrix[N_trend, K_trend] X_trend;  // population-level design matrix

@@ -19,7 +19,10 @@ data {
   int<lower=1> N_series_trend;
   int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
-  vector[1] mu_ones;
+  array[N] int obs_trend_time;
+  array[N] int obs_trend_series;
+  vector[1] mu_ones_count;
+  vector[1] mu_ones_biomass;
 }
 transformed data {
   matrix[N_count, Kc_count] Xc_count;  // centered version of X_count without an intercept

@@ -749,9 +749,13 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
     mapping_stanvars <- if (!is.null(dimensions$mappings)) {
       # Determine which mapping to use based on response_name
       mapping <- if (!is.null(response_name) && response_name %in% names(dimensions$mappings)) {
+        # Response-specific mapping for multivariate models
         dimensions$mappings[[response_name]]
       } else if (length(dimensions$mappings) == 1) {
         # Single response case - use the only mapping available
+        dimensions$mappings[[1]]
+      } else if (is.null(response_name) && length(dimensions$mappings) > 1) {
+        # SHARED TRENDS: Use first mapping since all responses share same trend structure
         dimensions$mappings[[1]]
       } else {
         NULL
@@ -809,20 +813,50 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
   
   # Add mu_ones stanvar if GLM optimization is detected in observation model
   if (!is.null(obs_setup) && !is.null(obs_setup$stancode)) {
-    detected_glm_types <- detect_glm_usage(obs_setup$stancode)
-    if (length(detected_glm_types) > 0) {
-      # Create mu_ones data stanvar for GLM beta parameter
-      mu_ones_stanvar <- stanvar(
-        x = 1, 
-        name = "mu_ones", 
-        scode = "vector[1] mu_ones;"
-      )
+    # Check if this is a multivariate case requiring response-specific GLM vectors
+    is_multivariate <- !is.null(dimensions) && !is.null(dimensions$mappings) && 
+                      length(dimensions$mappings) > 1 && is.null(response_name)
+    
+    if (is_multivariate) {
+      # MULTIVARIATE: Generate response-specific GLM vectors
+      response_names <- names(dimensions$mappings)
+      response_glm_usage <- detect_glm_usage(obs_setup$stancode, response_names)
       
-      # Add to combined stanvars
-      if (is.null(combined_stanvars)) {
-        combined_stanvars <- mu_ones_stanvar
-      } else {
-        combined_stanvars <- c(combined_stanvars, mu_ones_stanvar)
+      # Create mu_ones stanvars only for responses that use GLM
+      for (resp_name in names(response_glm_usage)) {
+        if (isTRUE(response_glm_usage[[resp_name]])) {
+          mu_ones_name <- paste0("mu_ones_", resp_name)
+          mu_ones_stanvar <- stanvar(
+            x = 1,
+            name = mu_ones_name,
+            scode = paste0("vector[1] ", mu_ones_name, ";")
+          )
+          
+          # Add to combined stanvars
+          if (is.null(combined_stanvars)) {
+            combined_stanvars <- mu_ones_stanvar
+          } else {
+            combined_stanvars <- c(combined_stanvars, mu_ones_stanvar)
+          }
+        }
+      }
+    } else {
+      # UNIVARIATE: Use original logic with generic mu_ones
+      detected_glm_types <- detect_glm_usage(obs_setup$stancode)
+      if (length(detected_glm_types) > 0) {
+        # Create mu_ones data stanvar for GLM beta parameter
+        mu_ones_stanvar <- stanvar(
+          x = 1, 
+          name = "mu_ones", 
+          scode = "vector[1] mu_ones;"
+        )
+        
+        # Add to combined stanvars
+        if (is.null(combined_stanvars)) {
+          combined_stanvars <- mu_ones_stanvar
+        } else {
+          combined_stanvars <- c(combined_stanvars, mu_ones_stanvar)
+        }
       }
     }
   }
@@ -833,16 +867,16 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
 #' Detect GLM Function Usage in Stan Code
 #'
 #' @description
-#' Detects which GLM functions from brms are used in Stan code based on the
-#' complete list from brms source code.
+#' Detects GLM function usage in Stan code
 #'
 #' @param stan_code Character string containing Stan code
-#' @return Character vector of detected GLM function base names
+#' @param response_names Character vector of response names for response-specific detection (optional)
+#' @return Character vector of GLM types (if response_names = NULL) or named list of GLM usage per response
 #' @noRd
-detect_glm_usage <- function(stan_code) {
+detect_glm_usage <- function(stan_code, response_names = NULL) {
   checkmate::assert_character(stan_code, min.len = 1)
+  checkmate::assert_character(response_names, null.ok = TRUE)
   
-  # Complete list from brms source: R/stan-likelihood.R
   glm_patterns <- c(
     "normal_id_glm",
     "poisson_log_glm", 
@@ -852,11 +886,50 @@ detect_glm_usage <- function(stan_code) {
     "categorical_logit_glm"
   )
   
-  detected <- sapply(glm_patterns, function(pattern) {
-    any(grepl(paste0(pattern, "_l(pdf|pmf)\\s*\\("), stan_code))
-  })
+  if (is.null(response_names)) {
+    detected <- sapply(glm_patterns, function(pattern) {
+      any(grepl(paste0(pattern, "_l(pdf|pmf)\\s*\\("), stan_code))
+    })
+    return(names(detected)[detected])
+  }
   
-  return(names(detected)[detected])
+  # Parse model block for response-specific GLM usage
+  lines <- strsplit(stan_code, "\n")[[1]]
+  model_start <- grep("^\\s*model\\s*\\{", lines)
+  if (length(model_start) == 0) {
+    return(setNames(rep(FALSE, length(response_names)), response_names))
+  }
+  
+  # Find model block end
+  brace_count <- 1
+  model_end <- model_start[1]
+  for (i in (model_start[1] + 1):length(lines)) {
+    line <- lines[i]
+    open_braces <- lengths(regmatches(line, gregexpr("\\{", line)))
+    close_braces <- lengths(regmatches(line, gregexpr("\\}", line)))
+    brace_count <- brace_count + open_braces - close_braces
+    if (brace_count == 0) {
+      model_end <- i
+      break
+    }
+  }
+  
+  model_lines <- lines[(model_start[1] + 1):(model_end - 1)]
+  result <- setNames(rep(FALSE, length(response_names)), response_names)
+  
+  likelihood_lines <- grep("target \\+=.*_l(pdf|pmf)", model_lines, value = TRUE)
+  
+  for (line in likelihood_lines) {
+    response_matches <- regmatches(line, regexpr("Y_\\w+", line))
+    if (length(response_matches) > 0) {
+      response_name <- gsub("Y_", "", response_matches[1])
+      if (response_name %in% response_names) {
+        result[[response_name]] <- grepl("_glm_l(pdf|pmf)", line)
+      }
+    }
+  }
+  
+  return(result)
 }
 
 #' Parse GLM Function Parameters

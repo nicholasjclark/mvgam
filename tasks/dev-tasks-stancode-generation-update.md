@@ -244,15 +244,116 @@ parameters {
 
 ---
 
+## 🎯 **CURRENT STATUS: PRIORITY 1 PARTIALLY COMPLETE** ✅⚠️
+
+**COMPLETED**: Response-specific GLM vector generation 
+- ✅ Enhanced `detect_glm_usage()` function with response-specific analysis
+- ✅ Implemented multivariate GLM stanvar creation in `R/stan_assembly.R` lines 814-862
+- ✅ Files 2,4 now generate correct response-specific GLM vectors:
+  - File 2: `mu_ones_count`, `mu_ones_biomass` ✅
+  - File 4: `mu_ones_count`, `mu_ones_presence` ✅ (correctly omits `mu_ones_biomass` for `gamma_lpdf`)
+
+**REMAINING ISSUE**: Response-specific observation-to-trend mapping arrays
+- ❌ Files 2,3,4 have generic `obs_trend_time`, `obs_trend_series` arrays
+- ❌ Targets expect response-specific arrays: `obs_trend_time_count`, `obs_trend_time_presence`, etc.
+- ❌ Current: 2 generic arrays vs Target: 4-6 response-specific arrays per file
+
+**ROOT CAUSE IDENTIFIED**: Multivariate mapping generation not response-specific
+- **Current Problem**: System generates `array[N] int obs_trend_time` instead of `array[N_count] int obs_trend_time_count`
+- **Critical Gap**: Need response-specific mapping arrays for each response variable in multivariate models
+
+---
+
+## 🚀 **IMMEDIATE IMPLEMENTATION PLAN: Response-Specific Observation-to-Trend Mapping** 
+
+**OBJECTIVE**: Complete Priority 1 by implementing response-specific observation-to-trend mapping arrays for multivariate models
+
+### **📋 Step 1: Fix Multivariate Mapping Array Generation** ⏳
+**Location**: `R/stan_assembly.R` lines 749-791 (shared trends logic)
+**Objective**: Generate response-specific mapping arrays instead of generic ones
+
+**Current Issue**:
+```stan
+// Current (wrong):
+array[N] int obs_trend_time;
+array[N] int obs_trend_series;
+
+// Target (correct):
+array[N_count] int obs_trend_time_count;
+array[N_count] int obs_trend_series_count;
+array[N_biomass] int obs_trend_time_biomass;
+array[N_biomass] int obs_trend_series_biomass;
+```
+
+**Root Cause**: Shared trends logic at lines 757-759 uses generic mapping instead of generating response-specific arrays
+
+**Implementation Strategy**:
+1. **Enhance shared trends case**: Modify lines 757-791 to generate response-specific mapping stanvars
+2. **Generate per-response arrays**: Create `obs_trend_time_{response}` and `obs_trend_series_{response}` for each response
+3. **Use existing infrastructure**: Leverage `dimensions$mappings` structure that already contains per-response mapping data
+
+### **📋 Step 2: Update Shared Trends Logic for Response-Specific Arrays** ⏳
+**Target Code Location**: `R/stan_assembly.R` lines 757-759 (shared trends case)
+**Change Required**: Generate separate stanvars for each response instead of using first mapping only
+
+**Implementation**:
+```r
+# Current (line 757-759):
+} else if (is.null(response_name) && length(dimensions$mappings) > 1) {
+  # SHARED TRENDS: Use first mapping since all responses share same trend structure
+  dimensions$mappings[[1]]
+
+# Target (enhanced):
+} else if (is.null(response_name) && length(dimensions$mappings) > 1) {
+  # SHARED TRENDS: Generate response-specific mapping arrays for all responses
+  # Each response gets its own obs_trend_time_{resp} and obs_trend_series_{resp} arrays
+```
+
+### **📋 Step 3: Validation Commands** ✅
+**Before Implementation**: Check current mapping array counts
+```bash
+cd tasks/
+# Current status (should show generic arrays):
+grep -c "obs_trend_time" current_stancode_2.stan  # Should be 1 (generic)
+grep -c "obs_trend_time_" current_stancode_2.stan  # Should be 0 (no response-specific)
+
+# Target status (what we want to achieve):
+grep -c "obs_trend_time_" target_stancode_2.stan  # Should be 2 (count, biomass)
+```
+
+**After Implementation**: Verify response-specific arrays generated
+```bash
+# Success criteria - should match target counts:
+grep -c "obs_trend_time_" current_stancode_2.stan  # Should be 2
+grep -c "obs_trend_time_" current_stancode_4.stan  # Should be 3
+```
+
+---
+
+## 🎯 **NEXT STEPS AFTER COMPLETION**
+
+**Once mapping arrays are fixed, Priority 1 will be COMPLETE**
+- ✅ GLM vectors: Response-specific generation working
+- ✅ Mapping arrays: Response-specific generation (target)
+
+**Next Priority**: Priority 2 - Fix Trend Injection Integration
+- Focus on trend injection patterns in transformed parameters block
+- Target: Proper `mu_* += trend[obs_trend_time_*[n], obs_trend_series_*[n]]` patterns
+
+---
+
 ## 🔄 **NEXT STEPS FOR AGENTS**
 
-1. **Start with systematic analysis** (Step 1-2 of protocol above)
-2. **Focus on Priority 1** (multivariate data block generation) 
-3. **Use diff analysis** to validate improvements after each change
-4. **Move to Priority 2** only after Priority 1 shows systematic improvement
+**IMMEDIATE PRIORITY**: Complete Steps 1-4 above to finish Priority 1 objective
+
+1. **Implement Step 1**: Add `detect_response_glm_usage()` function
+2. **Implement Step 2**: Enhance shared trend logic in `extract_trend_stanvars_from_setup()`
+3. **Implement Step 3**: Add `find_matching_brace()` helper function  
+4. **Validate Step 4**: Run systematic analysis to confirm response-specific GLM vectors
+5. **Move to Priority 2**: Trend injection integration (only after Priority 1 complete)
 
 **Agent Handoff Protocol:**
-- Run `source("target_generation.R")` and systematic analysis commands
-- Document which priority objective you're working on
-- Show before/after systematic analysis results
-- Update todo list with specific functions being modified
+- Run `source("target_generation.R")` and systematic analysis commands BEFORE starting
+- Implement steps in order (dependencies: Step 2 needs Step 1)
+- Show before/after GLM vector counts for validation
+- Update completion status in this document
