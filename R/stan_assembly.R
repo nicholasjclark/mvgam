@@ -2247,59 +2247,51 @@ sort_stanvars <- function(stanvars) {
     return(stanvars)
   }
   
-  # Priority constants
-  DIMENSION_PRIORITY <- 1L
-  ARRAY_PRIORITY <- 2L  
-  DEFAULT_PRIORITY <- 3L
+  # Specific regex patterns for trend dependency variables
+  LV_TREND_PATTERN <- "\\bmatrix\\s*\\[[^]]*\\]\\s+lv_trend\\s*[;=]"
+  MU_TREND_PATTERN <- "\\bvector\\s*\\[[^]]*\\]\\s+mu_trend\\s*[;=]"
+  Z_PATTERN <- "\\bmatrix\\s*\\[[^]]*\\]\\s+Z\\s*[;=]"
+  SCALED_INNOVATIONS_PATTERN <- "\\bmatrix\\s*\\[[^]]*\\]\\s+scaled_innovations_trend\\s*[;=]"
+  TREND_COMPUTATION_PATTERN <- "trend\\s*\\[\\s*i\\s*,\\s*s\\s*\\]\\s*=.*dot_product"
+  USAGE_PATTERN <- "\\b(lv_trend|scaled_innovations_trend)\\s*\\["
   
-  # Define ordering priority (lower number = comes first)
-  get_priority <- function(name, scode) {
-    # Validate stanvar structure
-    if (is.null(name) || !is.character(name)) {
-      return(DEFAULT_PRIORITY)
+  # Initialize category vectors
+  declarers <- integer(0)
+  computations <- integer(0)
+  
+  # Analyze each stanvar for specific dependency patterns
+  for (i in seq_along(stanvars)) {
+    sv <- stanvars[[i]]
+    
+    # Skip stanvars without analyzable code
+    if (is.null(sv$scode) || !is.character(sv$scode) || nchar(sv$scode) == 0) {
+      next
     }
     
-    # Dimension variables must come first
-    if (grepl("^(N_trend|N_series_trend|N_lv_trend)$", name) || 
-        grepl("trend_dimensions", name)) {
-      return(DIMENSION_PRIORITY)
+    scode <- as.character(sv$scode)
+    
+    # Check if this stanvar declares trend dependency variables
+    if (grepl(LV_TREND_PATTERN, scode) || 
+        grepl(MU_TREND_PATTERN, scode) || 
+        grepl(Z_PATTERN, scode) ||
+        grepl(SCALED_INNOVATIONS_PATTERN, scode)) {
+      declarers <- c(declarers, i)
     }
     
-    # Arrays that reference dimensions come after
-    if (!is.null(scode) && is.character(scode)) {
-      if (grepl("times_trend|obs_trend", name) || 
-          grepl("array\\[.*n_(trend|series_trend|lv_trend)", scode)) {
-        return(ARRAY_PRIORITY)
-      }
+    # Check if this stanvar contains trend computation or usage patterns
+    if (grepl(TREND_COMPUTATION_PATTERN, scode) || 
+        grepl(USAGE_PATTERN, scode)) {
+      computations <- c(computations, i)
     }
-    
-    return(DEFAULT_PRIORITY)
   }
   
-  # Get names safely
-  names_list <- names(stanvars)
-  if (is.null(names_list)) {
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      rlang::warn("Cannot sort unnamed stanvars", .frequency = "once")
-    }
-    return(stanvars)
-  }
+  # All other stanvars (dimensions, arrays, etc.)
+  others <- setdiff(seq_along(stanvars), c(declarers, computations))
   
-  # Calculate priority for each stanvar with error handling
-  priorities <- vapply(names_list, function(name) {
-    stanvar <- stanvars[[name]]
-    scode <- if (is.list(stanvar) && !is.null(stanvar$scode)) {
-      as.character(stanvar$scode)
-    } else {
-      ""
-    }
-    get_priority(name, scode)
-  }, integer(1), USE.NAMES = FALSE)
+  # Order: declarers first, others, then computations
+  sort_order <- c(declarers, others, computations)
   
-  # Sort by priority, preserving original order within same priority
-  sort_order <- order(priorities, seq_along(priorities))
-  
-  # Reorder stanvars
+  # Reorder stanvars maintaining class
   sorted_stanvars <- stanvars[sort_order]
   class(sorted_stanvars) <- class(stanvars)
   
@@ -2684,8 +2676,15 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
     trend_stanvars <- apply_response_suffix_to_stanvars(trend_stanvars, response_suffix)
   }
 
-  # Combine all components: common dimensions + shared innovations + trend-specific
-  all_components <- list(common_dimensions, shared_stanvars, trend_stanvars)
+  # Add shared lv_trend matrix declaration (used by all trend types)
+  lv_trend_stanvar <- brms::stanvar(
+    name = "shared_lv_trend",
+    scode = "matrix[N_trend, N_lv_trend] lv_trend;",
+    block = "tparameters"
+  )
+
+  # Combine all components: common dimensions + shared innovations + lv_trend + trend-specific
+  all_components <- list(common_dimensions, shared_stanvars, lv_trend_stanvar, trend_stanvars)
   all_components <- all_components[!sapply(all_components, is.null)]
   
   if (length(all_components) == 1) {
@@ -2785,7 +2784,6 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     name = "rw_tparameters",
     scode = glue::glue("
       // Latent states with RW dynamics
-      matrix[N_trend, N_lv_trend] lv_trend;
       {if(has_ma) 'matrix[N_trend, N_lv_trend] ma_innovations_trend = scaled_innovations_trend;' else ''}
 
       {if(has_ma) '// Apply MA(1) transformation
@@ -3006,7 +3004,6 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     name = "ar_tparameters",
     scode = glue::glue("
       // Latent states with AR dynamics
-      matrix[N_trend, N_lv_trend] lv_trend;
       {if(has_ma) 'matrix[N_trend, N_lv_trend] ma_innovations_trend = scaled_innovations_trend;' else ''}
 
       {if(has_ma) '// Apply MA(1) transformation
@@ -3502,8 +3499,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       // Joint initialization vector for stationary distribution
       vector[{if(is_varma) paste0('(', lags, ' + ', ma_lags, ') * N_lv_trend') else paste0(lags, ' * N_lv_trend')}] init_trend;
 
-      // Standard latent variable trends - consistent with other trend generators
-      matrix[N_trend, N_lv_trend] lv_trend;
+      // VAR dynamics
     "),
     block = "parameters"
   )
@@ -4043,7 +4039,6 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     name = "car_tparameters",
     scode = glue::glue("
       // CAR latent variable evolution using shared innovation system
-      matrix[N_trend, N_lv_trend] lv_trend;
 
       // Initialize first time point with innovations
       for (j in 1:N_lv_trend) {{
@@ -4183,7 +4178,7 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # ZMVN transformed parameters - direct transformation from scaled_innovations_trend
   zmvn_tparameters_stanvar <- brms::stanvar(
     name = "zmvn_tparameters",
-    scode = "matrix[N_trend, N_lv_trend] lv_trend;\nlv_trend = scaled_innovations_trend;",
+    scode = "lv_trend = scaled_innovations_trend;",
     block = "tparameters"
   )
 
@@ -4438,8 +4433,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     pw_transformed_parameters_stanvar <- brms::stanvar(
       name = "pw_transformed_parameters",
       scode = glue::glue("
-        // Standardized latent trend matrix (logistic piecewise trends)
-        matrix[N_trend, N_lv_trend] lv_trend;
+        // Logistic piecewise trends
 
         // logistic trend estimates
         for (s in 1 : N_lv_trend) {{
@@ -4456,8 +4450,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     pw_transformed_parameters_stanvar <- brms::stanvar(
       name = "pw_transformed_parameters",
       scode = glue::glue("
-        // Standardized latent trend matrix (linear piecewise trends)
-        matrix[N_trend, N_lv_trend] lv_trend;
+        // Linear piecewise trends
 
         // linear trend estimates
         for (s in 1 : N_lv_trend) {{

@@ -64,11 +64,11 @@ data {
   int<lower=1> Kc;  // number of population-level effects after centering
   int prior_only;  // should the likelihood be ignored?
     int<lower=1> N_trend;  // total number of_trend observations
-  int<lower=1> N_series_trend;
-  int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
   array[N] int obs_trend_time;
   array[N] int obs_trend_series;
+  int<lower=1> N_series_trend;
+  int<lower=1> N_lv_trend;
     int<lower=0> n_change_trend; // number of potential trend changepoints
   vector[n_change_trend] t_change_trend; // times of potential changepoints
   real<lower=0> change_scale_trend; // scale of changepoint shock prior
@@ -105,7 +105,6 @@ parameters {
 }
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
-  lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);
   vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
   
     // Scaled innovations (uncorrelated case)
@@ -113,8 +112,9 @@ transformed parameters {
 
     // Apply scaling using vectorized operations
     scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);
-    // Standardized latent trend matrix (linear piecewise trends)
   matrix[N_trend, N_lv_trend] lv_trend;
+  lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);
+    // Linear piecewise trends
 
   // linear trend estimates
   for (s in 1 : N_lv_trend) {

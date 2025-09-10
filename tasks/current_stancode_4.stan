@@ -20,8 +20,6 @@ data {
   int<lower=1> Kc_biomass;  // number of population-level effects after centering
   int prior_only;  // should the likelihood be ignored?
     int<lower=1> N_trend;  // total number of_trend observations
-  int<lower=1> N_series_trend;
-  int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
   array[N_count] int obs_trend_time_count;
   array[N_count] int obs_trend_series_count;
@@ -29,6 +27,8 @@ data {
   array[N_presence] int obs_trend_series_presence;
   array[N_biomass] int obs_trend_time_biomass;
   array[N_biomass] int obs_trend_series_biomass;
+  int<lower=1> N_series_trend;
+  int<lower=1> N_lv_trend;
   vector[1] mu_ones_count;
   vector[1] mu_ones_presence;
 }
@@ -60,10 +60,10 @@ parameters {
   vector[Kc_biomass] b_biomass;  // regression coefficients
   real Intercept_biomass;  // temporary intercept for centered predictors
   real<lower=0> shape_biomass;  // shape parameter
+  matrix[N_series_trend, N_lv_trend] Z;
   vector<lower=0>[N_lv_trend] sigma_trend;
   cholesky_factor_corr[N_lv_trend] L_Omega_trend;
   matrix[N_trend, N_lv_trend] innovations_trend;
-  matrix[N_series_trend, N_lv_trend] Z;
   // AR coefficient parameters
 vector<lower=-1,upper=1>[N_lv_trend] ar1_trend;
   // Factor loading matrix (estimated for factor model)
@@ -80,7 +80,6 @@ transformed parameters {
   }
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
-  matrix[N_lv_trend, N_lv_trend] Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
   
     // Scaled innovations after applying correlations
     matrix[N_trend, N_lv_trend] scaled_innovations_trend;
@@ -90,8 +89,21 @@ transformed parameters {
       matrix[N_lv_trend, N_lv_trend] L_Sigma = diag_pre_multiply(sigma_trend, L_Omega_trend);
       scaled_innovations_trend = innovations_trend * L_Sigma';
     }
-    // Latent states with AR dynamics
   matrix[N_trend, N_lv_trend] lv_trend;
+  // Factor loading matrix with identifiability constraints
+  matrix[N_series_trend, N_lv_trend] Z = rep_matrix(0, N_series_trend, N_lv_trend);
+  // constraints allow identifiability of loadings
+  {
+    int index = 1;
+    for (j in 1 : N_lv_trend) {
+      for (i in j : N_series_trend) {
+        Z[i, j] = Z_raw[index];
+        index += 1;
+      }
+    }
+  }
+  matrix[N_lv_trend, N_lv_trend] Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
+    // Latent states with AR dynamics
   
 
   
@@ -115,18 +127,6 @@ transformed parameters {
   for (i in 1:N_trend) {
     for (s in 1:N_series_trend) {
       trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
-    }
-  }
-  // Factor loading matrix with identifiability constraints
-  matrix[N_series_trend, N_lv_trend] Z = rep_matrix(0, N_series_trend, N_lv_trend);
-  // constraints allow identifiability of loadings
-  {
-    int index = 1;
-    for (j in 1 : N_lv_trend) {
-      for (i in j : N_series_trend) {
-        Z[i, j] = Z_raw[index];
-        index += 1;
-      }
     }
   }
   lprior += student_t_lpdf(Intercept_count | 3, 1.4, 2.5);

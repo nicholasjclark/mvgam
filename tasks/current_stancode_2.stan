@@ -15,13 +15,13 @@ data {
   int<lower=1> Kc_biomass;  // number of population-level effects after centering
   int prior_only;  // should the likelihood be ignored?
     int<lower=1> N_trend;  // total number of_trend observations
-  int<lower=1> N_series_trend;
-  int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
   array[N_count] int obs_trend_time_count;
   array[N_count] int obs_trend_series_count;
   array[N_biomass] int obs_trend_time_biomass;
   array[N_biomass] int obs_trend_series_biomass;
+  int<lower=1> N_series_trend;
+  int<lower=1> N_lv_trend;
   vector[1] mu_ones_count;
   vector[1] mu_ones_biomass;
 }
@@ -62,9 +62,7 @@ transformed parameters {
     mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
   }
   real lprior = 0;  // prior contributions to the log posterior
-  lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);
   vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
-  matrix[N_lv_trend, N_lv_trend] Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
   
     // Scaled innovations after applying correlations
     matrix[N_trend, N_lv_trend] scaled_innovations_trend;
@@ -74,8 +72,10 @@ transformed parameters {
       matrix[N_lv_trend, N_lv_trend] L_Sigma = diag_pre_multiply(sigma_trend, L_Omega_trend);
       scaled_innovations_trend = innovations_trend * L_Sigma';
     }
-    // Latent states with RW dynamics
   matrix[N_trend, N_lv_trend] lv_trend;
+  lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);
+  matrix[N_lv_trend, N_lv_trend] Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
+    // Latent states with RW dynamics
   
 
   

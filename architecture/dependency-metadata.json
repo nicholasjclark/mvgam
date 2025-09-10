@@ -21,9 +21,9 @@
                                   "rstantools",
                                   "tibble"
                               ],
-    "generated":  "2025-09-10 08:40:26",
+    "generated":  "2025-09-10 09:13:17",
     "commit_hash":  "pending",
-    "cached_files":  56,
+    "cached_files":  57,
     "version":  "2.0.0",
     "commit_message":  "pre-commit analysis",
     "total_functions":  442,
@@ -31,6 +31,6 @@
     "s3_methods_count":  44,
     "s3_classes_count":  25,
     "package_name":  "mvgam",
-    "changed_files":  1,
+    "changed_files":  0,
     "total_files":  57
 }

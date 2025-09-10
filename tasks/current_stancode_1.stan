@@ -9,11 +9,11 @@ data {
   int<lower=1> Kc;  // number of population-level effects after centering
   int prior_only;  // should the likelihood be ignored?
     int<lower=1> N_trend;  // total number of_trend observations
-  int<lower=1> N_series_trend;
-  int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
   array[N] int obs_trend_time;
   array[N] int obs_trend_series;
+  int<lower=1> N_series_trend;
+  int<lower=1> N_lv_trend;
   vector[1] mu_ones;
 }
 transformed data {
@@ -34,7 +34,6 @@ parameters {
 }
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
-  lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
   vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
   
     // Scaled innovations (uncorrelated case)
@@ -42,8 +41,9 @@ transformed parameters {
 
     // Apply scaling using vectorized operations
     scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);
-    // Latent states with RW dynamics
   matrix[N_trend, N_lv_trend] lv_trend;
+  lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
+    // Latent states with RW dynamics
   
 
   

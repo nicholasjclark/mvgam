@@ -228,16 +228,16 @@ data {
   matrix[N_biomass, knots_biomass_1[1]] Zs_biomass_1_1;
   int prior_only;  // should the likelihood be ignored?
     int<lower=1> N_trend;  // total number of_trend observations
-  int<lower=1> N_series_trend;
-  int<lower=1> N_lv_trend;
+    int<lower=1> K_trend;  // number of_trend population-level effects
+    int<lower=1> Kc_trend;  // number of_trend population-level effects after centering
+    matrix[N_trend, K_trend] X_trend;  // population-level design matrix
   array[N_trend, N_series_trend] int times_trend;
   array[N_count] int obs_trend_time_count;
   array[N_count] int obs_trend_series_count;
   array[N_biomass] int obs_trend_time_biomass;
   array[N_biomass] int obs_trend_series_biomass;
-    int<lower=1> K_trend;  // number of_trend population-level effects
-    int<lower=1> Kc_trend;  // number of_trend population-level effects after centering
-    matrix[N_trend, K_trend] X_trend;  // population-level design matrix
+  int<lower=1> N_series_trend;
+  int<lower=1> N_lv_trend;
 }
 transformed data {
     matrix[N_trend, Kc_trend] Xc_trend;  // centered version_trend of_trend X_trend without_trend an_trend intercept
@@ -304,12 +304,12 @@ parameters {
   vector[knots_biomass_1[1]] zs_biomass_1_1;
   vector<lower=0>[nb_biomass_1] sds_biomass_1;  // SDs of penalized spline coefficients
   real<lower=0> sigma_biomass;  // dispersion parameter
+  matrix[N_series_trend, N_lv_trend] Z;
   vector[Kc_trend] b_trend;  // regression coefficients
 real Intercept_trend;  // temporary intercept for centered predictors
   vector<lower=0>[N_lv_trend] sigma_trend;
   cholesky_factor_corr[N_lv_trend] L_Omega_trend;
   matrix[N_trend, N_lv_trend] innovations_trend;
-  matrix[N_series_trend, N_lv_trend] Z;
           // Standard VAR: single raw matrix
       array[1] matrix[N_lv_trend, N_lv_trend] A_raw_trend;
 
@@ -325,8 +325,7 @@ real Intercept_trend;  // temporary intercept for centered predictors
   // Joint initialization vector for stationary distribution
   vector[(1 + 1) * N_lv_trend] init_trend;
 
-  // Standard latent variable trends - consistent with other trend generators
-  matrix[N_trend, N_lv_trend] lv_trend;
+  // VAR dynamics
   // Raw MA partial autocorrelation matrices (unconstrained for stationarity)
 // D_raw_trend gets transformed to D_trend (stationary MA coefficients)
 array[1] matrix[N_lv_trend, N_lv_trend] D_raw_trend;
@@ -345,10 +344,8 @@ transformed parameters {
   // penalized spline coefficients
   vector[knots_biomass_1[1]] s_biomass_1_1;
   real lprior = 0;  // prior contributions to the log posterior
-  lprior += student_t_lpdf(Intercept_trend | 3, -0.2, 2.5);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   mu_trend += Intercept_trend + Xc_trend * b_trend;
-  matrix[N_lv_trend, N_lv_trend] Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
   
     // Scaled innovations after applying correlations
     matrix[N_trend, N_lv_trend] scaled_innovations_trend;
@@ -358,6 +355,21 @@ transformed parameters {
       matrix[N_lv_trend, N_lv_trend] L_Sigma = diag_pre_multiply(sigma_trend, L_Omega_trend);
       scaled_innovations_trend = innovations_trend * L_Sigma';
     }
+  matrix[N_trend, N_lv_trend] lv_trend;
+  // Factor loading matrix with identifiability constraints
+  matrix[N_series_trend, N_lv_trend] Z = rep_matrix(0, N_series_trend, N_lv_trend);
+  // constraints allow identifiability of loadings
+  {
+    int index = 1;
+    for (j in 1 : N_lv_trend) {
+      for (i in j : N_series_trend) {
+        Z[i, j] = Z_raw[index];
+        index += 1;
+      }
+    }
+  }
+  lprior += student_t_lpdf(Intercept_trend | 3, -0.2, 2.5);
+  matrix[N_lv_trend, N_lv_trend] Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
           // Standard VAR: single covariance matrix and transformation
       matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
       cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
@@ -439,18 +451,6 @@ for (i in 1:1) {
       trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
     }
   }
-  // Factor loading matrix with identifiability constraints
-  matrix[N_series_trend, N_lv_trend] Z = rep_matrix(0, N_series_trend, N_lv_trend);
-  // constraints allow identifiability of loadings
-  {
-    int index = 1;
-    for (j in 1 : N_lv_trend) {
-      for (i in j : N_series_trend) {
-        Z[i, j] = Z_raw[index];
-        index += 1;
-      }
-    }
-  }
   // compute penalized spline coefficients
   s_count_1_1 = sds_count_1[1] * zs_count_1_1;
   // compute penalized spline coefficients
@@ -471,6 +471,8 @@ model {
   sigma_trend ~ exponential(2);
   L_Omega_trend ~ lkj_corr_cholesky(2);
   to_vector(innovations_trend) ~ std_normal();
+  Z_raw ~ student_t(3, 0, 1);
+  sigma_trend ~ exponential(2);
     // VARMA likelihood implementation following Heaps 2022 methodology
 
   // Initial joint distribution for stationary VARMA initialization
@@ -574,8 +576,6 @@ for (i in 1:1) {
     Amu_trend[component] ~ normal(es_trend[component], fs_trend[component]);
     Aomega_trend[component] ~ gamma(gs_trend[component], hs_trend[component]);
   }
-  Z_raw ~ student_t(3, 0, 1);
-  sigma_trend ~ exponential(2);
   // likelihood including constants
   if (!prior_only) {
     // initialize linear predictor term

@@ -12,16 +12,16 @@ data {
   vector[N] Z_1_1;
   int prior_only;  // should the likelihood be ignored?
     int<lower=1> N_trend;  // total number of_trend observations
-  int<lower=1> N_series_trend;
-  int<lower=1> N_lv_trend;
-  array[N_trend, N_series_trend] int times_trend;
-  array[N] int obs_trend_time;
-  array[N] int obs_trend_series;
     int<lower=1> Dgp_1_trend;  // GP_trend dimension_trend
     int<lower=1> Kgp_1_trend;  // number of_trend sub_trend-GPs_trend (equal_trend to_trend 1 unless_trend 'by_trend' was_trend used_trend)
     int<lower=1> Nsubgp_1_trend;
     array[N_trend] int<lower=1> Jgp_1_trend;
     array[Nsubgp_1_trend] vector[Dgp_1_trend] Xgp_1_trend;  // covariates_trend of_trend the GP_trend
+  array[N_trend, N_series_trend] int times_trend;
+  array[N] int obs_trend_time;
+  array[N] int obs_trend_series;
+  int<lower=1> N_series_trend;
+  int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] real<lower=0> time_dis;
 }
 transformed data {
@@ -43,10 +43,6 @@ vector<lower=-1,upper=1>[N_lv_trend] ar1_trend;
 transformed parameters {
   vector[N_1] r_1_1;  // actual group-level effects
   real lprior = 0;  // prior contributions to the log posterior
-  lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
-lprior += student_t_lpdf(sdgp_1_trend | 3, 0, 2.5)
-- 1 * student_t_lccdf(0 | 3, 0, 2.5);
-lprior += inv_gamma_lpdf(lscale_1_trend[1][1] | 1.494197, 0.056607);
   vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
   
     // Scaled innovations (uncorrelated case)
@@ -54,8 +50,12 @@ lprior += inv_gamma_lpdf(lscale_1_trend[1][1] | 1.494197, 0.056607);
 
     // Apply scaling using vectorized operations
     scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);
-    // CAR latent variable evolution using shared innovation system
   matrix[N_trend, N_lv_trend] lv_trend;
+  lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
+lprior += student_t_lpdf(sdgp_1_trend | 3, 0, 2.5)
+- 1 * student_t_lccdf(0 | 3, 0, 2.5);
+lprior += inv_gamma_lpdf(lscale_1_trend[1][1] | 1.494197, 0.056607);
+    // CAR latent variable evolution using shared innovation system
 
   // Initialize first time point with innovations
   for (j in 1:N_lv_trend) {
