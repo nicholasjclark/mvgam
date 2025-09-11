@@ -227,9 +227,9 @@ data {
   // basis function matrices
   matrix[N_biomass, knots_biomass_1[1]] Zs_biomass_1_1;
   int prior_only;  // should the likelihood be ignored?
-    int<lower=1> N_trend;  // total number of_trend observations
-    int<lower=1> K_trend;  // number of_trend population-level effects
-    int<lower=1> Kc_trend;  // number of_trend population-level effects after centering
+    int<lower=1> N_trend;  // total number of observations
+    int<lower=1> K_trend;  // number of population-level effects
+    int<lower=1> Kc_trend;  // number of population-level effects after centering
     matrix[N_trend, K_trend] X_trend;  // population-level design matrix
   array[N_trend, N_series_trend] int times_trend;
   array[N_count] int obs_trend_time_count;
@@ -240,8 +240,8 @@ data {
   int<lower=1> N_lv_trend;
 }
 transformed data {
-    matrix[N_trend, Kc_trend] Xc_trend;  // centered version_trend of_trend X_trend without_trend an_trend intercept
-  vector[Kc_trend] means_X_trend;  // column_trend means_trend of_trend X_trend before_trend centering
+    matrix[N_trend, Kc_trend] Xc_trend;  // centered version of X_trend without an intercept
+  vector[Kc_trend] means_X_trend;  // column means of X_trend before centering
   for (i_trend in 2:K_trend) {
     means_X_trend[i_trend - 1] = mean(X_trend[, i_trend]);
     Xc_trend[, i_trend - 1] = X_trend[, i_trend] - means_X_trend[i_trend - 1];

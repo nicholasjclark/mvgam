@@ -11,12 +11,12 @@ data {
   // group-level predictor values
   vector[N] Z_1_1;
   int prior_only;  // should the likelihood be ignored?
-    int<lower=1> N_trend;  // total number of_trend observations
-    int<lower=1> Dgp_1_trend;  // GP_trend dimension_trend
-    int<lower=1> Kgp_1_trend;  // number of_trend sub_trend-GPs_trend (equal_trend to_trend 1 unless_trend 'by_trend' was_trend used_trend)
+    int<lower=1> N_trend;  // total number of observations
+    int<lower=1> Dgp_1_trend;  // GP dimension
+    int<lower=1> Kgp_1_trend;  // number of sub-GPs (equal to 1 unless 'by' was used)
     int<lower=1> Nsubgp_1_trend;
     array[N_trend] int<lower=1> Jgp_1_trend;
-    array[Nsubgp_1_trend] vector[Dgp_1_trend] Xgp_1_trend;  // covariates_trend of_trend the GP_trend
+    array[Nsubgp_1_trend] vector[Dgp_1_trend] Xgp_1_trend;  // covariates of the GP
   array[N_trend, N_series_trend] int times_trend;
   array[N] int obs_trend_time;
   array[N] int obs_trend_series;
@@ -32,9 +32,9 @@ parameters {
   vector<lower=0>[M_1] sd_1;  // group-level standard deviations
   array[M_1] vector[N_1] z_1;  // standardized group-level effects
   real Intercept_trend;  // temporary intercept for centered predictors
-vector<lower=0>[Kgp_1_trend] sdgp_1_trend;  // GP_trend standard deviation_trend parameters
-array[Kgp_1_trend] vector<lower=0>[1] lscale_1_trend;  // GP_trend length-scale_trend parameters
-vector[Nsubgp_1_trend] zgp_1_trend;  // latent_trend variables_trend of_trend the GP_trend
+vector<lower=0>[Kgp_1_trend] sdgp_1_trend;  // GP standard deviation parameters
+array[Kgp_1_trend] vector<lower=0>[1] lscale_1_trend;  // GP length-scale parameters
+vector[Nsubgp_1_trend] zgp_1_trend;  // latent variables of the GP
   vector<lower=0>[N_lv_trend] sigma_trend;
   matrix[N_trend, N_lv_trend] innovations_trend;
   // CAR AR1 parameters

@@ -8,7 +8,7 @@ data {
   matrix[N, K] X;  // population-level design matrix
   int<lower=1> Kc;  // number of population-level effects after centering
   int prior_only;  // should the likelihood be ignored?
-    int<lower=1> N_trend;  // total number of_trend observations
+    int<lower=1> N_trend;  // total number of observations
   array[N_trend, N_series_trend] int times_trend;
   array[N] int obs_trend_time;
   array[N] int obs_trend_series;

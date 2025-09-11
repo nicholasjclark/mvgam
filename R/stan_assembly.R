@@ -43,7 +43,7 @@ apply_response_suffix_to_stanvars <- function(stanvars, response_suffix) {
     "obs_trend_time",
     "obs_trend_series", 
     "times_trend",
-    "trend",  # The computed trend matrix should be response-specific
+    "trend(?!_)",  # The computed trend matrix should be response-specific (negative lookahead to avoid matching *_trend)
     "mu_ones" # GLM compatibility stanvar should be response-specific
   )
 
@@ -97,10 +97,18 @@ apply_suffix_to_name <- function(name, patterns, suffix) {
 #' @noRd
 apply_suffix_to_stan_code <- function(stan_code, patterns, suffix) {
   for (pattern in patterns) {
-    # Handle word boundaries to avoid partial matches
-    # Match pattern as whole word (not part of another identifier)
-    regex_pattern <- paste0("\\b", pattern, "\\b")
-    replacement <- paste0(pattern, suffix)
+    # Check if pattern already contains regex special characters (lookahead/lookbehind)
+    if (grepl("\\?[=!]|\\(\\?", pattern)) {
+      # Pattern already contains lookahead/lookbehind, use as-is with word boundary only at start
+      regex_pattern <- paste0("\\b", pattern)
+      # For negative lookahead patterns, extract the base pattern for replacement
+      base_pattern <- gsub("\\(\\?[^)]*\\)", "", pattern)
+      replacement <- paste0(base_pattern, suffix)
+    } else {
+      # Standard pattern, add word boundaries on both sides
+      regex_pattern <- paste0("\\b", pattern, "\\b")
+      replacement <- paste0(pattern, suffix)
+    }
 
     # Use perl = TRUE for better regex support
     stan_code <- gsub(regex_pattern, replacement, stan_code, perl = TRUE)
@@ -5550,11 +5558,20 @@ get_stan_reserved_words <- function() {
 extract_stan_identifiers <- function(stan_code) {
   checkmate::assert_character(stan_code, len = 1)
 
+  # Remove comment portions from each line to avoid renaming words in comments
+  # This preserves code but removes // comments that contain English words
+  lines <- strsplit(stan_code, "\n")[[1]]
+  code_only_lines <- gsub("//.*$", "", lines)
+  code_without_comments <- paste(code_only_lines, collapse = "\n")
+  
+  # Also remove multi-line comments (/* ... */) 
+  code_without_comments <- gsub("/\\*.*?\\*/", "", code_without_comments, perl = TRUE)
+
   # Extract all identifiers using regex pattern for valid Stan identifiers
   # Pattern matches: letter or underscore, followed by letters, digits, underscores
   identifiers <- regmatches(
-    stan_code,
-    gregexpr("\\b[a-zA-Z_][a-zA-Z0-9_]*\\b", stan_code, perl = TRUE)
+    code_without_comments,
+    gregexpr("\\b[a-zA-Z_][a-zA-Z0-9_]*\\b", code_without_comments, perl = TRUE)
   )[[1]]
 
   # Return unique identifiers, removing empty strings

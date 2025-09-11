@@ -9,70 +9,61 @@
 functions {
 }
 data {
-  int<lower=1> N;  // total number of observations
-  int<lower=1> N_count;  // number of observations
-  vector[N_count] Y_count;  // response variable
-  int<lower=1> K_count;  // number of population-level effects
-  matrix[N_count, K_count] X_count;  // population-level design matrix
-  int<lower=1> Kc_count;  // number of population-level effects after centering
-  int<lower=1> N_biomass;  // number of observations
-  vector[N_biomass] Y_biomass;  // response variable
-  int<lower=1> K_biomass;  // number of population-level effects
-  matrix[N_biomass, K_biomass] X_biomass;  // population-level design matrix
-  int<lower=1> Kc_biomass;  // number of population-level effects after centering
-  int prior_only;  // should the likelihood be ignored?
-
-  // Trend dimensions (injected by mvgam)
-  int<lower=1> N_trend;  // number of time points
-  int<lower=1> N_series_trend;  // number of series
-  int<lower=1> N_lv_trend;  // latent variables
-
-  // Observation-to-trend mappings
+  int<lower=1> N;
+  int<lower=1> N_count;
+  vector[N_count] Y_count;
+  int<lower=1> K_count;
+  matrix[N_count, K_count] X_count;
+  int<lower=1> Kc_count;
+  int<lower=1> N_biomass;
+  vector[N_biomass] Y_biomass;
+  int<lower=1> K_biomass;
+  matrix[N_biomass, K_biomass] X_biomass;
+  int<lower=1> Kc_biomass;
+  int prior_only;
+  int<lower=1> N_trend;
+  int<lower=1> N_series_trend;
+  int<lower=1> N_lv_trend;
   array[N_count] int obs_trend_time_count;
   array[N_count] int obs_trend_series_count;
   array[N_biomass] int obs_trend_time_biomass;
   array[N_biomass] int obs_trend_series_biomass;
-
-  // Time indexing for trend linear predictors
   array[N_trend, N_series_trend] int times_trend;
-
-  // GLM compatibility (response-specific for safety)
-  vector[1] mu_ones_count;  // contains value 1.0 for count response
-  vector[1] mu_ones_biomass;  // contains value 1.0 for biomass response
+  vector[1] mu_ones_count;
+  vector[1] mu_ones_biomass;
 }
 transformed data {
-  matrix[N_count, Kc_count] Xc_count;  // centered version of X_count without an intercept
-  vector[Kc_count] means_X_count;  // column means of X_count before centering
-  matrix[N_biomass, Kc_biomass] Xc_biomass;  // centered version of X_biomass without an intercept
-  vector[Kc_biomass] means_X_biomass;  // column means of X_biomass before centering
+  matrix[N_count, Kc_count] Xc_count;
+  vector[Kc_count] means_X_count;
+  matrix[N_biomass, Kc_biomass] Xc_biomass;
+  vector[Kc_biomass] means_X_biomass;
+
   for (i in 2:K_count) {
     means_X_count[i - 1] = mean(X_count[, i]);
     Xc_count[, i - 1] = X_count[, i] - means_X_count[i - 1];
   }
+
   for (i in 2:K_biomass) {
     means_X_biomass[i - 1] = mean(X_biomass[, i]);
     Xc_biomass[, i - 1] = X_biomass[, i] - means_X_biomass[i - 1];
   }
 
-  // Factor loading matrix (identity for non-factor shared trend)
   matrix[N_series_trend, N_lv_trend] Z = diag_matrix(rep_vector(1.0, N_lv_trend));
 }
 parameters {
-  vector[Kc_count] b_count;  // regression coefficients
-  real Intercept_count;  // temporary intercept for centered predictors
-  real<lower=0> sigma_count;  // dispersion parameter
-  vector[Kc_biomass] b_biomass;  // regression coefficients
-  real Intercept_biomass;  // temporary intercept for centered predictors
-  real<lower=0> sigma_biomass;  // dispersion parameter
-
-  // Trend parameters (injected by mvgam)
-  real Intercept_trend;  // trend intercept
-  vector<lower=0>[N_lv_trend] sigma_trend;  // innovation SDs
-  cholesky_factor_corr[N_lv_trend] L_Omega_trend;  // correlation Cholesky
-  matrix[N_trend, N_lv_trend] innovations_trend;  // raw innovations
+  vector[Kc_count] b_count;
+  real Intercept_count;
+  real<lower=0> sigma_count;
+  vector[Kc_biomass] b_biomass;
+  real Intercept_biomass;
+  real<lower=0> sigma_biomass;
+  real Intercept_trend;
+  vector<lower=0>[N_lv_trend] sigma_trend;
+  cholesky_factor_corr[N_lv_trend] L_Omega_trend;
+  matrix[N_trend, N_lv_trend] innovations_trend;
 }
 transformed parameters {
-  real lprior = 0;  // prior contributions to the log posterior
+  real lprior = 0;
   lprior += student_t_lpdf(Intercept_count | 3, 4, 2.5);
   lprior += student_t_lpdf(sigma_count | 3, 0, 2.5)
   - 1 * student_t_lccdf(0 | 3, 0, 2.5);
@@ -81,67 +72,49 @@ transformed parameters {
   - 1 * student_t_lccdf(0 | 3, 0, 2.5);
   lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
 
-  // Create mu_trend from Intercept_trend (intercept-only trend model)
   vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
-
-  // Trend computation (injected by mvgam)
-  matrix[N_lv_trend, N_lv_trend] Sigma_trend =
-    diag_pre_multiply(sigma_trend, L_Omega_trend);
-
-  // RW latent variables with correlation
   matrix[N_trend, N_lv_trend] lv_trend;
-  {
-    matrix[N_lv_trend, N_lv_trend] L_Sigma_trend =
-      diag_pre_multiply(sigma_trend, L_Omega_trend);
-    matrix[N_trend, N_lv_trend] scaled_innovations_trend =
-      innovations_trend * L_Sigma_trend';
+  matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
+  matrix[N_trend, N_lv_trend] scaled_innovations_trend = innovations_trend * L_Sigma_trend';
+  lv_trend[1, :] = scaled_innovations_trend[1, :];
 
-      lv_trend[1, :] = scaled_innovations_trend[1, :];
-      for (i in 2:N_trend) {
-        lv_trend[i, :] = lv_trend[i-1, :] + scaled_innovations_trend[i, :];
-      }
-    }
+  for (i in 2:N_trend) {
+    lv_trend[i, :] = lv_trend[i-1, :] + scaled_innovations_trend[i, :];
+  }
 
-    // Compute trend matrix
-    matrix[N_trend, N_series_trend] trend;
-    for (i in 1:N_trend) {
-      for (s in 1:N_series_trend) {
-        trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) +
-                      mu_trend[times_trend[i, s]];
-      }
-    }
+  matrix[N_trend, N_series_trend] trend;
 
-    // GLM-compatible linear predictors with trend injection
-    vector[N_count] mu_count = Xc_count * b_count;
-    vector[N_biomass] mu_biomass = Xc_biomass * b_biomass;
-
-    for (n in 1:N_count) {
-      mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
-    }
-    for (n in 1:N_biomass) {
-      mu_biomass[n] += Intercept_biomass + trend[obs_trend_time_biomass[n],
-  obs_trend_series_biomass[n]];
+  for (i in 1:N_trend) {
+    for (s in 1:N_series_trend) {
+      trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) +
+      mu_trend[times_trend[i, s]];
     }
   }
-  model {
-    // likelihood including constants
-    if (!prior_only) {
-      // GLM functions transformed to use mu with trends (response-specific mu_ones)
-      target += normal_id_glm_lpdf(Y_count | to_matrix(mu_count), 0.0, mu_ones_count, sigma_count);
-      target += normal_id_glm_lpdf(Y_biomass | to_matrix(mu_biomass), 0.0, mu_ones_biomass,
-  sigma_biomass);
-    }
-    // priors including constants
-    target += lprior;
 
-    // Trend priors (injected by mvgam)
-    sigma_trend ~ exponential(2);
-    L_Omega_trend ~ lkj_corr_cholesky(2);
-    to_vector(innovations_trend) ~ std_normal();
+  vector[N_count] mu_count = Xc_count * b_count;
+  vector[N_biomass] mu_biomass = Xc_biomass * b_biomass;
+
+  for (n in 1:N_count) {
+    mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
   }
-  generated quantities {
-    // actual population-level intercept
-    real b_count_Intercept = Intercept_count - dot_product(means_X_count, b_count);
-    // actual population-level intercept
-    real b_biomass_Intercept = Intercept_biomass - dot_product(means_X_biomass, b_biomass);
+
+  for (n in 1:N_biomass) {
+    mu_biomass[n] += Intercept_biomass + trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
   }
+}
+model {
+  if (!prior_only) {
+    target += normal_id_glm_lpdf(Y_count | to_matrix(mu_count), 0.0, mu_ones_count, sigma_count);
+    target += normal_id_glm_lpdf(Y_biomass | to_matrix(mu_biomass), 0.0, mu_ones_biomass, sigma_biomass);
+  }
+
+  target += lprior;
+
+  sigma_trend ~ exponential(2);
+  L_Omega_trend ~ lkj_corr_cholesky(2);
+  to_vector(innovations_trend) ~ std_normal();
+}
+generated quantities {
+  real b_count_Intercept = Intercept_count - dot_product(means_X_count, b_count);
+  real b_biomass_Intercept = Intercept_biomass - dot_product(means_X_biomass, b_biomass);
+}

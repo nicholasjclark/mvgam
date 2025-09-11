@@ -14,7 +14,7 @@ data {
   matrix[N_biomass, K_biomass] X_biomass;  // population-level design matrix
   int<lower=1> Kc_biomass;  // number of population-level effects after centering
   int prior_only;  // should the likelihood be ignored?
-    int<lower=1> N_trend;  // total number of_trend observations
+    int<lower=1> N_trend;  // total number of observations
   array[N_trend, N_series_trend] int times_trend;
   array[N_count] int obs_trend_time_count;
   array[N_count] int obs_trend_series_count;

@@ -180,78 +180,6 @@ mu_biomass += mu_biomass_trend;
 **Principle**: Validate during model setup, not Stan compilation
 **Implementation**: Check trend compatibility, formula conflicts, data structure early
 
-## Performance Requirements
-
-### 1. brms Setup Optimization
-**Decision**: Use `backend = "mock"` for lightweight brms setup
-**Application**: All internal brms calls for stancode/standata generation
-
-### 2. Memory Optimization Targets
-- Efficient missing data handling without redundant copies
-- Shared parameter storage across dual objects
-
-## Multiple Imputation Architecture
-
-### 1. Native Support Decision
-**Decision**: Build multiple imputation into core mvgam rather than external wrapper
-
-### 2. Pooling Strategy
-**Approach**: Pool at parameter level using Rubin's rules
-**Implementation**: 
-- Individual fits stored with pooled summary object
-- All methods (predict, loo, etc.) work with pooled object
-- Access to individual fits preserved for diagnostics
-
-## AD-007: GLM Optimization and Trend Injection Compatibility
-
-**Status**: Accepted (Temporary Solution)  
-**Date**: 2025-01-09
-
-### Context
-brms uses GLM-optimized likelihood functions (e.g., `normal_id_glm_lpdf`, `poisson_log_glm_lpmf`) for performance when model structure allows. However, these functions don't create explicit `mu` vectors, breaking mvgam's trend injection pattern `mu[n] += trend[...]`.
-
-Analysis of brms architecture reveals:
-- GLM functions are significantly more efficient than standard likelihood + explicit mu
-- brms provides `force_standard = TRUE` to disable GLM optimization
-- GLM usage depends on family support, model complexity, and structural features
-
-### Decision
-**Short-term**: Use `force_standard = TRUE` in all brms model generation calls to ensure explicit `mu` vector creation for trend injection compatibility.
-
-**Long-term**: Implement native GLM-aware trend injection system that works directly with design matrix components (X, b, Intercept) without forcing standard likelihood.
-
-### Implementation
-```r
-# Current approach in setup_brms_lightweight()
-brms::brm(
-  formula = formula,
-  data = data, 
-  family = family,
-  force_standard = TRUE,  # Disable GLM optimization
-  ...
-)
-```
-
-### Consequences
-- **Positive**: 
-  - Solves immediate `mu` identifier scope issues
-  - Enables trend injection for all supported families
-  - Maintains compatibility with existing mvgam architecture
-  
-- **Negative**:
-  - **Performance Cost**: GLM optimizations can be 2-5x faster than standard likelihood
-  - **Technical Debt**: Suboptimal Stan code generation
-  - **Scalability**: Performance gap widens with larger datasets
-
-- **Future Architecture Work**:
-  - Design GLM-aware trend injection that modifies design matrix directly
-  - Implement GLM detection logic (pattern matching `_glm_lp[md]f`)
-  - Create trend addition via transformed parameters: `mu = X*b + Intercept + trend_effects`
-  - Benchmark performance improvements vs implementation complexity
-
-### Review Timeline
-**Target**: Q2 2025 - Evaluate GLM performance impact and plan native GLM support implementation if warranted by usage patterns and benchmarking results.
-
 ## Ecosystem Integration Principles
 
 ### 1. brms Method Compatibility
@@ -604,28 +532,6 @@ trend_specs = list(
 
 **Design Principle**: Single source of truth for all time series dimensions, eliminating circular dependencies
 
-**Critical Data Flow**:
-```r
-# Stage 1: Early validation and dimension extraction
-data + trend_specs -> validate_time_series_for_trends() -> dimensions
-                         |
-                         v
-                  extract_time_series_dimensions()
-                         |
-                         v
-                    dimensions = {
-                      n_time, n_series, n_obs,
-                      time_var, series_var,
-                      time_range, unique_times
-                    }
-
-# Stage 2: Dimension injection into trend specifications  
-trend_specs$dimensions <- dimensions
-
-# Stage 3: Trend stanvar generation (no circular dependency)
-extract_trend_stanvars_from_setup() -> uses trend_specs$dimensions
-```
-
 **Key Architecture Decisions**:
 
 1. **Early Dimension Calculation**: `extract_time_series_dimensions()` calculates all timing information directly from data during validation
@@ -638,28 +544,9 @@ extract_trend_stanvars_from_setup() -> uses trend_specs$dimensions
 - **CAR trends**: Allow irregular intervals, can calculate time distances dynamically in `calculate_car_time_distances()`
 - **All trends**: Must have consistent series and time variable identification
 
-**Implementation Functions**:
-```r
-# Core dimension extraction (R/validations.R)
-extract_time_series_dimensions(data, time_var, series_var, trend_type)
-
-# Validation with dimension return (R/validations.R) 
-validate_time_series_for_trends(data, trend_specs) -> list(data, dimensions)
-
-# Trend stanvar generation expecting pre-calculated dimensions (R/stan_assembly.R)
-extract_trend_stanvars_from_setup(trend_setup, trend_specs) # trend_specs$dimensions required
-```
-
 ### 14. Prior Specification Using Native brms Classes
 
 **Critical Design Decision**: Use `brmsprior` class throughout rather than creating custom mvgamprior class
-
-**Rationale**:
-1. **Direct Compatibility**: Seamless integration with flexible brms prior functions (`prior()`, `prior_string()`, `prior_()`)
-2. **Zero Conversion Overhead**: No translation layer between mvgam and brms prior systems
-3. **Automatic Updates**: Benefits from brms bug fixes and enhancements
-4. **User Familiarity**: Leverages existing brms knowledge and documentation
-5. **Ecosystem Integration**: Works with all packages that extend brms
 
 **Implementation Strategy**:
 - Use existing `brmsprior` data frame structure with standard columns
