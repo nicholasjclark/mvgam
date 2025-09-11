@@ -544,6 +544,9 @@ for (i in 1:1) {
         Domega_trend[component] ~ gamma(gs_ma_trend[component], hs_ma_trend[component]);
       }
 
+  // LKJ correlation prior on Cholesky factor
+  L_Omega_trend ~ lkj_corr_cholesky(2);
+
   // Hyperpriors for hierarchical VAR coefficient means and precisions
   // Following Heaps 2022 exchangeable hyperprior structure
   for (component in 1:2) {  // [1] diagonal, [2] off-diagonal

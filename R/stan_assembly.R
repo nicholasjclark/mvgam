@@ -1203,6 +1203,56 @@ extract_mapping_arrays <- function(trend_stanvars) {
   return(mapping_arrays)
 }
 
+#' Find Trend Computation End Using Semantic Structure Detection
+#'
+#' @description
+#' Finds the end of nested trend computation loops using semantic understanding
+#' of Stan code structure. Replaces flawed brace counting with pattern detection.
+#'
+#' @param stan_code_lines Character vector of Stan code lines
+#' @return Integer line number where trend computation ends, or NULL if not found
+#' @noRd
+find_trend_computation_end <- function(stan_code_lines) {
+  checkmate::assert_character(stan_code_lines)
+  
+  # Look for the start of nested trend computation loops
+  trend_loop_start <- grep("for\\s*\\(\\s*i\\s+in\\s+1:N_trend\\s*\\)", stan_code_lines)
+  
+  if (length(trend_loop_start) == 0) {
+    return(NULL)
+  }
+  
+  # From trend loop start, find the matching closing brace
+  start_line <- trend_loop_start[1]
+  brace_depth <- 0
+  in_trend_block <- FALSE
+  
+  for (i in start_line:length(stan_code_lines)) {
+    line <- stan_code_lines[i]
+    
+    # Count opening braces
+    open_braces <- lengths(regmatches(line, gregexpr("\\{", line)))
+    # Count closing braces  
+    close_braces <- lengths(regmatches(line, gregexpr("\\}", line)))
+    
+    if (i == start_line && open_braces > 0) {
+      # Start tracking when we enter the trend computation block
+      in_trend_block <- TRUE
+      brace_depth <- open_braces
+    } else if (in_trend_block) {
+      # Update depth as we go through the nested structure
+      brace_depth <- brace_depth + open_braces - close_braces
+      
+      # When we've closed all braces from the trend computation
+      if (brace_depth == 0) {
+        return(i + 1)  # Return line after the closing brace
+      }
+    }
+  }
+  
+  return(NULL)  # Could not find end
+}
+
 #' Validate Mapping Arrays
 #'
 #' @description
@@ -1629,79 +1679,61 @@ inject_multivariate_trends_into_linear_predictors <- function(
         
         insert_point <- tparams_start[1]
         
-        # Strategy 1: Look for universal trend computation pattern
-        trend_pattern <- "trend\\[\\s*i\\s*,\\s*s\\s*\\]\\s*=.*dot_product"
-        trend_lines <- which(grepl(trend_pattern, code_lines))
+        # Strategy 1: Look for nested trend computation loops with semantic understanding
+        trend_computation_end <- find_trend_computation_end(code_lines)
         
-        if (length(trend_lines) > 0) {
-          # Validate pattern match results
-          checkmate::assert_integerish(trend_lines, lower = 1, 
-                                      upper = length(code_lines))
-          
-          # Find the closing brace of trend computation using safe brace counting
-          trend_start <- trend_lines[1]
-          brace_count <- 0
-          found_end <- FALSE
-          max_search <- min(length(code_lines), trend_start + 100)
-          
-          # Safe iteration with bounds checking
-          for (i in trend_start:max_search) {
-            line <- code_lines[i]
-            checkmate::assert_string(line)
-            
-            # Count braces safely using regex
-            open_braces <- lengths(regmatches(line, gregexpr("\\{", line)))
-            close_braces <- lengths(regmatches(line, gregexpr("\\}", line)))
-            brace_count <- brace_count + open_braces - close_braces
-            
-            # For nested loops, we need brace_count to become 0 after opening
-            # This ensures we've closed all nested structures
-            if (brace_count == 0 && i > trend_start) {
-              insert_point <- i
-              found_end <- TRUE
-              break
-            }
-          }
-          
-          # Validation: ensure we found a valid end point
-          if (!found_end) {
-            insight::format_warning(
-              "Could not find end of trend computation loop, using fallback"
-            )
-            # Fallback: look for closing braces after trend computation
-            # Look for lines with only closing braces near the trend computation
-            fallback_start <- max(trend_lines) + 1
-            fallback_end <- min(length(code_lines), fallback_start + 10)
-            
-            closing_brace_lines <- which(grepl("^\\s*}\\s*$", code_lines[fallback_start:fallback_end]))
-            if (length(closing_brace_lines) > 0) {
-              # Use the last closing brace found as insertion point
-              insert_point <- fallback_start + max(closing_brace_lines) - 1
-            } else {
-              # Ultimate fallback: insert after last trend computation line
-              insert_point <- max(trend_lines)
-            }
-          }
-          
+        if (!is.null(trend_computation_end)) {
+          # Use the detected end point
+          insert_point <- trend_computation_end
         } else {
-          # Strategy 2: Fallback for edge cases (CAR without standard loop)
-          matrix_pattern <- "matrix\\[\\s*N_trend\\s*,\\s*N_series_trend\\s*\\]\\s+trend"
-          matrix_lines <- which(grepl(matrix_pattern, code_lines))
+          # Fallback: Look for any trend computation pattern
+          trend_pattern <- "trend\\[\\s*i\\s*,\\s*s\\s*\\]\\s*=.*dot_product"
+          trend_lines <- which(grepl(trend_pattern, code_lines))
           
-          if (length(matrix_lines) > 0) {
-            checkmate::assert_integerish(matrix_lines, lower = 1, 
-                                        upper = length(code_lines))
-            # Insert after the last trend matrix declaration
-            insert_point <- max(matrix_lines)
-          } else {
-            # Strategy 3: Final fallback for any trend reference
-            any_trend_pattern <- "\\btrend\\b"
-            any_trend_lines <- which(grepl(any_trend_pattern, code_lines))
+          if (length(trend_lines) > 0) {
+            # Strategy 2: Find the outermost closing brace after trend computation
+            trend_start <- trend_lines[1]
             
-            if (length(any_trend_lines) > 0) {
-              insert_point <- max(any_trend_lines)
+            # Look for the trend computation nested loop start
+            loop_start <- grep("for\\s*\\(\\s*i\\s+in\\s+1:N_trend\\s*\\)", code_lines)
+            if (length(loop_start) > 0 && loop_start[1] <= trend_start) {
+              # Found the outer trend loop - look for its closing brace
+              outer_loop_line <- loop_start[1]
+              
+              # Simple approach: find line with only closing brace after the trend computation
+              search_start <- max(trend_lines) + 1
+              search_end <- min(length(code_lines), search_start + 20)
+              
+              for (j in search_start:search_end) {
+                if (grepl("^\\s*}\\s*$", code_lines[j])) {
+                  insert_point <- j + 1  # Insert after the closing brace
+                  break
+                }
+              }
+            } else {
+              # Strategy 3: Simple fallback - insert after last trend line
+              insert_point <- max(trend_lines) + 1
             }
-            # If no trend patterns found, use original behavior
+          } else {
+            # Strategy 2: Fallback for edge cases (CAR without standard loop)
+            matrix_pattern <- "matrix\\[\\s*N_trend\\s*,\\s*N_series_trend\\s*\\]\\s+trend"
+            matrix_lines <- which(grepl(matrix_pattern, code_lines))
+            
+            if (length(matrix_lines) > 0) {
+              checkmate::assert_integerish(matrix_lines, lower = 1, 
+                                          upper = length(code_lines))
+              # Insert after the last trend matrix declaration
+              insert_point <- max(matrix_lines)
+            } else {
+              # Strategy 3: Final fallback for any trend reference
+              any_trend_pattern <- "\\btrend\\b"
+              any_trend_lines <- which(grepl(any_trend_pattern, code_lines))
+              
+              if (length(any_trend_lines) > 0) {
+                insert_point <- max(any_trend_lines)
+              }
+              # If no trend patterns found, use original behavior
+            }
           }
         }
         

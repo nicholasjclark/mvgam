@@ -20,8 +20,9 @@ functions {
       reject("Matrix must be positive definite for square root computation");
     }
 
-    matrix[m, m] eigenvecs = eigenvectors_sym(A);
-    matrix[m, m] eprod = diag_post_multiply(eigenvecs, sqrt(eigenvals));
+    vector[m] root_root_evals = sqrt(sqrt(eigenvalues_sym(A)));
+    matrix[m, m] evecs = eigenvectors_sym(A);
+    matrix[m, m] eprod = diag_post_multiply(evecs, root_root_evals);
     return tcrossprod(eprod);
   }
 
