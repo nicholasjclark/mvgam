@@ -471,8 +471,6 @@ model {
   sigma_trend ~ exponential(2);
   L_Omega_trend ~ lkj_corr_cholesky(2);
   to_vector(innovations_trend) ~ std_normal();
-  Z_raw ~ student_t(3, 0, 1);
-  sigma_trend ~ exponential(2);
     // VARMA likelihood implementation following Heaps 2022 methodology
 
   // Initial joint distribution for stationary VARMA initialization
@@ -576,6 +574,8 @@ for (i in 1:1) {
     Amu_trend[component] ~ normal(es_trend[component], fs_trend[component]);
     Aomega_trend[component] ~ gamma(gs_trend[component], hs_trend[component]);
   }
+  Z_raw ~ student_t(3, 0, 1);
+  sigma_trend ~ exponential(2);
   // likelihood including constants
   if (!prior_only) {
     // initialize linear predictor term

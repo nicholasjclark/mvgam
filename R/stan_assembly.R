@@ -401,6 +401,10 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
       # Use c() to properly combine stanvars objects
       all_stanvars <- c(all_stanvars, trend_stanvars)
     }
+    
+    # Sort ALL stanvars to ensure proper dependency order
+    # This ensures mu injection code comes after trend computation
+    all_stanvars <- sort_stanvars(all_stanvars)
   }
 
   # Return NULL for empty stanvars (brms expectation)
@@ -1607,8 +1611,79 @@ inject_multivariate_trends_into_linear_predictors <- function(
       # Add mu_<resp> computation in transformed parameters
       tparams_start <- which(grepl("^\\s*transformed parameters\\s*\\{", code_lines))
       if (length(tparams_start) > 0) {
-        # Find insertion point after opening brace
+        # Find insertion point AFTER trend computation to respect dependencies
+        # Validate tparams_start exists before proceeding
+        checkmate::assert_integerish(tparams_start, len = 1, lower = 1, 
+                                    upper = length(code_lines))
+        
         insert_point <- tparams_start[1]
+        
+        # Strategy 1: Look for universal trend computation pattern
+        trend_pattern <- "trend\\[\\s*i\\s*,\\s*s\\s*\\]\\s*=.*dot_product"
+        trend_lines <- which(grepl(trend_pattern, code_lines))
+        
+        if (length(trend_lines) > 0) {
+          # Validate pattern match results
+          checkmate::assert_integerish(trend_lines, lower = 1, 
+                                      upper = length(code_lines))
+          
+          # Find the closing brace of trend computation using safe brace counting
+          trend_start <- trend_lines[1]
+          brace_count <- 0
+          found_end <- FALSE
+          max_search <- min(length(code_lines), trend_start + 100)
+          
+          # Safe iteration with bounds checking
+          for (i in trend_start:max_search) {
+            line <- code_lines[i]
+            checkmate::assert_string(line)
+            
+            # Count braces safely using regex
+            open_braces <- lengths(regmatches(line, gregexpr("\\{", line)))
+            close_braces <- lengths(regmatches(line, gregexpr("\\}", line)))
+            brace_count <- brace_count + open_braces - close_braces
+            
+            # When brace_count <= 0, we found end of trend computation
+            if (brace_count <= 0 && i > trend_start) {
+              insert_point <- i
+              found_end <- TRUE
+              break
+            }
+          }
+          
+          # Validation: ensure we found a valid end point
+          if (!found_end) {
+            insight::format_warning(
+              "Could not find end of trend computation loop, using fallback"
+            )
+            # Fallback: insert after last trend computation line
+            insert_point <- max(trend_lines)
+          }
+          
+        } else {
+          # Strategy 2: Fallback for edge cases (CAR without standard loop)
+          matrix_pattern <- "matrix\\[\\s*N_trend\\s*,\\s*N_series_trend\\s*\\]\\s+trend"
+          matrix_lines <- which(grepl(matrix_pattern, code_lines))
+          
+          if (length(matrix_lines) > 0) {
+            checkmate::assert_integerish(matrix_lines, lower = 1, 
+                                        upper = length(code_lines))
+            # Insert after the last trend matrix declaration
+            insert_point <- max(matrix_lines)
+          } else {
+            # Strategy 3: Final fallback for any trend reference
+            any_trend_pattern <- "\\btrend\\b"
+            any_trend_lines <- which(grepl(any_trend_pattern, code_lines))
+            
+            if (length(any_trend_lines) > 0) {
+              insert_point <- max(any_trend_lines)
+            }
+            # If no trend patterns found, use original behavior
+          }
+        }
+        
+        # Final validation of insert point
+        checkmate::assert_int(insert_point, lower = 1, upper = length(code_lines))
         
         # Create mu computation code
         mu_computation <- c(
@@ -2240,58 +2315,85 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL, is_factor_m
 #' Within each priority level, original order is preserved for stability.
 #' @noRd
 sort_stanvars <- function(stanvars) {
-  # Validate input
+  # Validate input per CLAUDE.md standards
   checkmate::assert_list(stanvars, null.ok = TRUE)
   
   if (is.null(stanvars) || length(stanvars) == 0) {
     return(stanvars)
   }
   
-  # Specific regex patterns for trend dependency variables
-  LV_TREND_PATTERN <- "\\bmatrix\\s*\\[[^]]*\\]\\s+lv_trend\\s*[;=]"
-  MU_TREND_PATTERN <- "\\bvector\\s*\\[[^]]*\\]\\s+mu_trend\\s*[;=]"
-  Z_PATTERN <- "\\bmatrix\\s*\\[[^]]*\\]\\s+Z\\s*[;=]"
-  SCALED_INNOVATIONS_PATTERN <- "\\bmatrix\\s*\\[[^]]*\\]\\s+scaled_innovations_trend\\s*[;=]"
-  TREND_COMPUTATION_PATTERN <- "trend\\s*\\[\\s*i\\s*,\\s*s\\s*\\]\\s*=.*dot_product"
-  USAGE_PATTERN <- "\\b(lv_trend|scaled_innovations_trend)\\s*\\["
+  # Enhanced validation for stanvar structure
+  if (length(stanvars) > 0) {
+    for (i in seq_along(stanvars)) {
+      if (!is.null(stanvars[[i]])) {
+        checkmate::assert_list(stanvars[[i]], names = "named")
+        if (!is.null(stanvars[[i]]$scode)) {
+          checkmate::assert_string(stanvars[[i]]$scode, min.chars = 1)
+        }
+      }
+    }
+  }
   
-  # Initialize category vectors
-  declarers <- integer(0)
-  computations <- integer(0)
+  # Evidence-based patterns from actual Stan compilation failures
+  # Level 1: mu_trend declarations (must come first)
+  mu_trend_decl_pattern <- "vector\\s*\\[\\s*N_trend\\s*\\]\\s+mu_trend\\s*="
   
-  # Analyze each stanvar for specific dependency patterns
+  # Level 2: Foundation variables (no dependencies on trend)
+  lv_trend_pattern <- "matrix\\s*\\[\\s*N_trend\\s*,\\s*N_lv_trend\\s*\\]\\s+lv_trend\\s*[;=]"
+  scaled_innov_pattern <- "matrix\\s*\\[\\s*N_trend\\s*,\\s*N_lv_trend\\s*\\]\\s+scaled_innovations_trend\\s*[;=]"
+  z_pattern <- "\\bmatrix\\s*\\[[^]]*\\]\\s+Z\\s*[;=]"
+  
+  # Level 3: trend matrix computation (depends on mu_trend and lv_trend)
+  trend_matrix_decl_pattern <- "matrix\\s*\\[\\s*N_trend\\s*,\\s*N_series_trend\\s*\\]\\s+trend\\s*;"
+  trend_computation_pattern <- "trend\\s*\\[\\s*i\\s*,\\s*s\\s*\\]\\s*=.*dot_product"
+  
+  # Level 4: mu linear predictor injections (depends on trend)
+  mu_injection_pattern <- "mu_\\w+\\s*\\[\\s*n\\s*\\]\\s*\\+=.*trend\\s*\\["
+  
+  # Initialize level collections
+  level1_mu_trend <- integer(0)
+  level2_foundation <- integer(0)
+  level3_trend_comp <- integer(0)
+  level4_mu_inject <- integer(0)
+  
+  # Categorize stanvars by actual dependency patterns
   for (i in seq_along(stanvars)) {
     sv <- stanvars[[i]]
     
     # Skip stanvars without analyzable code
-    if (is.null(sv$scode) || !is.character(sv$scode) || nchar(sv$scode) == 0) {
+    if (is.null(sv) || is.null(sv$scode) || !is.character(sv$scode) || nchar(sv$scode) == 0) {
       next
     }
     
     scode <- as.character(sv$scode)
     
-    # Check if this stanvar declares trend dependency variables
-    if (grepl(LV_TREND_PATTERN, scode) || 
-        grepl(MU_TREND_PATTERN, scode) || 
-        grepl(Z_PATTERN, scode) ||
-        grepl(SCALED_INNOVATIONS_PATTERN, scode)) {
-      declarers <- c(declarers, i)
-    }
-    
-    # Check if this stanvar contains trend computation or usage patterns
-    if (grepl(TREND_COMPUTATION_PATTERN, scode) || 
-        grepl(USAGE_PATTERN, scode)) {
-      computations <- c(computations, i)
+    # Use if-else chain to prevent double-categorization
+    if (grepl(mu_trend_decl_pattern, scode)) {
+      level1_mu_trend <- c(level1_mu_trend, i)
+    } else if (grepl(lv_trend_pattern, scode) || 
+               grepl(scaled_innov_pattern, scode) ||
+               grepl(z_pattern, scode)) {
+      level2_foundation <- c(level2_foundation, i)
+    } else if (grepl(trend_matrix_decl_pattern, scode) || 
+               grepl(trend_computation_pattern, scode)) {
+      level3_trend_comp <- c(level3_trend_comp, i)
+    } else if (grepl(mu_injection_pattern, scode)) {
+      level4_mu_inject <- c(level4_mu_inject, i)
     }
   }
   
-  # All other stanvars (dimensions, arrays, etc.)
-  others <- setdiff(seq_along(stanvars), c(declarers, computations))
+  # All other stanvars (dimensions, priors, etc.)
+  categorized <- c(level1_mu_trend, level2_foundation, level3_trend_comp, level4_mu_inject)
+  others <- setdiff(seq_along(stanvars), categorized)
   
-  # Order: declarers first, others, then computations
-  sort_order <- c(declarers, others, computations)
+  # Critical: Dependency-respecting order
+  sort_order <- c(level1_mu_trend, level2_foundation, others, level3_trend_comp, level4_mu_inject)
   
-  # Reorder stanvars maintaining class
+  # Validate sort_order indices are within bounds
+  checkmate::assert_integerish(sort_order, lower = 1, upper = length(stanvars), 
+                              unique = TRUE, len = length(stanvars))
+  
+  # Maintain stanvars class structure
   sorted_stanvars <- stanvars[sort_order]
   class(sorted_stanvars) <- class(stanvars)
   

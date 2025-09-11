@@ -53,14 +53,6 @@ parameters {
   matrix[N_trend, N_lv_trend] innovations_trend;
 }
 transformed parameters {
-  vector[N_biomass] mu_biomass = Xc_biomass * b_biomass;
-  for (n in 1:N_biomass) {
-    mu_biomass[n] += Intercept_biomass + trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
-  }
-  vector[N_count] mu_count = Xc_count * b_count;
-  for (n in 1:N_count) {
-    mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
-  }
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
   
@@ -94,6 +86,14 @@ transformed parameters {
     for (s in 1:N_series_trend) {
       trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
     }
+  vector[N_biomass] mu_biomass = Xc_biomass * b_biomass;
+  for (n in 1:N_biomass) {
+    mu_biomass[n] += Intercept_biomass + trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
+  }
+  vector[N_count] mu_count = Xc_count * b_count;
+  for (n in 1:N_count) {
+    mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
+  }
   }
   lprior += student_t_lpdf(Intercept_count | 3, 4, 2.5);
   lprior += student_t_lpdf(sigma_count | 3, 0, 2.5)

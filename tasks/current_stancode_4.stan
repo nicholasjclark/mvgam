@@ -70,14 +70,6 @@ vector<lower=-1,upper=1>[N_lv_trend] ar1_trend;
 vector[N_series_trend * N_lv_trend] Z_raw;  // raw factor loadings
 }
 transformed parameters {
-  vector[N_presence] mu_presence = Xc_presence * b_presence;
-  for (n in 1:N_presence) {
-    mu_presence[n] += Intercept_presence + trend[obs_trend_time_presence[n], obs_trend_series_presence[n]];
-  }
-  vector[N_count] mu_count = Xc_count * b_count;
-  for (n in 1:N_count) {
-    mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
-  }
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   
@@ -128,6 +120,14 @@ transformed parameters {
     for (s in 1:N_series_trend) {
       trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
     }
+  vector[N_presence] mu_presence = Xc_presence * b_presence;
+  for (n in 1:N_presence) {
+    mu_presence[n] += Intercept_presence + trend[obs_trend_time_presence[n], obs_trend_series_presence[n]];
+  }
+  vector[N_count] mu_count = Xc_count * b_count;
+  for (n in 1:N_count) {
+    mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
+  }
   }
   lprior += student_t_lpdf(Intercept_count | 3, 1.4, 2.5);
   lprior += student_t_lpdf(Intercept_presence | 3, 0, 2.5);
