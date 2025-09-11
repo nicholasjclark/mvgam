@@ -3019,8 +3019,8 @@ get_mvgam_trend_defaults <- function() {
     cor = FALSE,
     n_lv = NULL,
 
-    # Universal metadata defaults
-    shared_innovations = TRUE,
+    # Universal metadata defaults (NULL allows trend-specific exclusion logic to determine)
+    shared_innovations = NULL,
 
     # Placeholder validation rules (to be auto-assigned by trend type)
     validation_rules = character(0),

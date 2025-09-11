@@ -35,8 +35,6 @@ parameters {
 vector<lower=0>[Kgp_1_trend] sdgp_1_trend;  // GP standard deviation parameters
 array[Kgp_1_trend] vector<lower=0>[1] lscale_1_trend;  // GP length-scale parameters
 vector[Nsubgp_1_trend] zgp_1_trend;  // latent variables of the GP
-  vector<lower=0>[N_lv_trend] sigma_trend;
-  matrix[N_trend, N_lv_trend] innovations_trend;
   // CAR AR1 parameters
 vector<lower=-1,upper=1>[N_lv_trend] ar1_trend;
 }
@@ -44,12 +42,6 @@ transformed parameters {
   vector[N_1] r_1_1;  // actual group-level effects
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
-  
-    // Scaled innovations (uncorrelated case)
-    matrix[N_trend, N_lv_trend] scaled_innovations_trend;
-
-    // Apply scaling using vectorized operations
-    scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);
   matrix[N_trend, N_lv_trend] lv_trend;
   lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
 lprior += student_t_lpdf(sdgp_1_trend | 3, 0, 2.5)
@@ -85,9 +77,6 @@ lprior += inv_gamma_lpdf(lscale_1_trend[1][1] | 1.494197, 0.056607);
     - 1 * student_t_lccdf(0 | 3, 0, 2.5);
 }
 model {
-  // Shared Gaussian innovation priors
-  sigma_trend ~ exponential(2);
-  to_vector(innovations_trend) ~ std_normal();
   ar1_trend ~ normal(0, 0.5);
   // likelihood including constants
   if (!prior_only) {

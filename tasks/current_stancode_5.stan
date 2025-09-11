@@ -92,8 +92,6 @@ parameters {
   vector[Kc] b;  // regression coefficients
   real Intercept;  // temporary intercept for centered predictors
   real Intercept_trend;  // temporary intercept for centered predictors
-  vector<lower=0>[N_lv_trend] sigma_trend;
-  matrix[N_trend, N_lv_trend] innovations_trend;
     // base trend growth rates
   vector[N_lv_trend] k_trend;
 
@@ -106,12 +104,6 @@ parameters {
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
-  
-    // Scaled innovations (uncorrelated case)
-    matrix[N_trend, N_lv_trend] scaled_innovations_trend;
-
-    // Apply scaling using vectorized operations
-    scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);
   matrix[N_trend, N_lv_trend] lv_trend;
   lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);
     // Linear piecewise trends
@@ -142,9 +134,6 @@ transformed parameters {
   }
 }
 model {
-  // Shared Gaussian innovation priors
-  sigma_trend ~ exponential(2);
-  to_vector(innovations_trend) ~ std_normal();
     // PW trend default priors
   m_trend ~ student_t(3, 0, 2.5);
   k_trend ~ std_normal();

@@ -307,9 +307,6 @@ parameters {
   matrix[N_series_trend, N_lv_trend] Z;
   vector[Kc_trend] b_trend;  // regression coefficients
 real Intercept_trend;  // temporary intercept for centered predictors
-  vector<lower=0>[N_lv_trend] sigma_trend;
-  cholesky_factor_corr[N_lv_trend] L_Omega_trend;
-  matrix[N_trend, N_lv_trend] innovations_trend;
           // Standard VAR: single raw matrix
       array[1] matrix[N_lv_trend, N_lv_trend] A_raw_trend;
 
@@ -346,15 +343,6 @@ transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   mu_trend += Intercept_trend + Xc_trend * b_trend;
-  
-    // Scaled innovations after applying correlations
-    matrix[N_trend, N_lv_trend] scaled_innovations_trend;
-
-    // Apply correlation transformation using efficient non-centered parameterization
-    {
-      matrix[N_lv_trend, N_lv_trend] L_Sigma = diag_pre_multiply(sigma_trend, L_Omega_trend);
-      scaled_innovations_trend = innovations_trend * L_Sigma';
-    }
   matrix[N_trend, N_lv_trend] lv_trend;
   // Factor loading matrix with identifiability constraints
   matrix[N_series_trend, N_lv_trend] Z = rep_matrix(0, N_series_trend, N_lv_trend);
@@ -369,7 +357,6 @@ transformed parameters {
     }
   }
   lprior += student_t_lpdf(Intercept_trend | 3, -0.2, 2.5);
-  matrix[N_lv_trend, N_lv_trend] Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
           // Standard VAR: single covariance matrix and transformation
       matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
       cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
@@ -467,10 +454,6 @@ for (i in 1:1) {
     - 1 * student_t_lccdf(0 | 3, 0, 2.5);
 }
 model {
-  // Shared Gaussian innovation priors
-  sigma_trend ~ exponential(2);
-  L_Omega_trend ~ lkj_corr_cholesky(2);
-  to_vector(innovations_trend) ~ std_normal();
     // VARMA likelihood implementation following Heaps 2022 methodology
 
   // Initial joint distribution for stationary VARMA initialization
@@ -560,13 +543,6 @@ for (i in 1:1) {
         Dmu_trend[component] ~ normal(es_ma_trend[component], fs_ma_trend[component]);
         Domega_trend[component] ~ gamma(gs_ma_trend[component], hs_ma_trend[component]);
       }
-
-  // Innovation variance and correlation priors (consistent with other trend generators)
-  // Variance parameters using inverse gamma (equivalent to existing patterns)
-  sigma_trend ~ inv_gamma(1.418, 0.452);
-
-  // LKJ correlation prior on Cholesky factor
-  L_Omega_trend ~ lkj_corr_cholesky(2);
 
   // Hyperpriors for hierarchical VAR coefficient means and precisions
   // Following Heaps 2022 exchangeable hyperprior structure

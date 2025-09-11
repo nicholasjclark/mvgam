@@ -451,7 +451,10 @@ prepare_mvgam_stancode <- function(obs_setup, trend_setup, trend_specs,
 
   # Validate time series structure if data provided and trends specified
   if (!is.null(data) && !is.null(trend_specs)) {
-    validate_time_series_for_trends(data, trend_specs, silent = silent)
+    # Extract response variable names for mapping generation (matching make_stan.R approach)
+    response_vars <- extract_response_names_from_brmsfit(obs_setup$brmsfit)
+    
+    validate_time_series_for_trends(data, trend_specs, silent = silent, response_vars = response_vars)
   }
 
   # Generate combined Stan code and data
@@ -1651,8 +1654,9 @@ inject_multivariate_trends_into_linear_predictors <- function(
             close_braces <- lengths(regmatches(line, gregexpr("\\}", line)))
             brace_count <- brace_count + open_braces - close_braces
             
-            # When brace_count <= 0, we found end of trend computation
-            if (brace_count <= 0 && i > trend_start) {
+            # For nested loops, we need brace_count to become 0 after opening
+            # This ensures we've closed all nested structures
+            if (brace_count == 0 && i > trend_start) {
               insert_point <- i
               found_end <- TRUE
               break
@@ -1664,8 +1668,19 @@ inject_multivariate_trends_into_linear_predictors <- function(
             insight::format_warning(
               "Could not find end of trend computation loop, using fallback"
             )
-            # Fallback: insert after last trend computation line
-            insert_point <- max(trend_lines)
+            # Fallback: look for closing braces after trend computation
+            # Look for lines with only closing braces near the trend computation
+            fallback_start <- max(trend_lines) + 1
+            fallback_end <- min(length(code_lines), fallback_start + 10)
+            
+            closing_brace_lines <- which(grepl("^\\s*}\\s*$", code_lines[fallback_start:fallback_end]))
+            if (length(closing_brace_lines) > 0) {
+              # Use the last closing brace found as insertion point
+              insert_point <- fallback_start + max(closing_brace_lines) - 1
+            } else {
+              # Ultimate fallback: insert after last trend computation line
+              insert_point <- max(trend_lines)
+            }
           }
           
         } else {
@@ -1701,11 +1716,11 @@ inject_multivariate_trends_into_linear_predictors <- function(
           paste0("  }")
         )
         
-        # Insert mu computation
+        # Insert mu computation before the closing brace
         code_lines <- c(
-          code_lines[1:insert_point],
+          code_lines[1:(insert_point - 1)],
           mu_computation,
-          code_lines[(insert_point + 1):length(code_lines)]
+          code_lines[insert_point:length(code_lines)]
         )
       }
     }
@@ -3894,10 +3909,6 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       {var_priors_block}
 
       {varma_ma_priors}
-
-      // Innovation variance and correlation priors (consistent with other trend generators)
-      // Variance parameters using inverse gamma (equivalent to existing patterns)
-      sigma_trend ~ inv_gamma(1.418, 0.452);
 
       // LKJ correlation prior on Cholesky factor
       L_Omega_trend ~ lkj_corr_cholesky(2);

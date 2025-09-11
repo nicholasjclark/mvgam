@@ -90,10 +90,6 @@ transformed parameters {
   for (n in 1:N_biomass) {
     mu_biomass[n] += Intercept_biomass + trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
   }
-  vector[N_count] mu_count = Xc_count * b_count;
-  for (n in 1:N_count) {
-    mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
-  }
   }
   lprior += student_t_lpdf(Intercept_count | 3, 4, 2.5);
   lprior += student_t_lpdf(sigma_count | 3, 0, 2.5)
@@ -101,6 +97,10 @@ transformed parameters {
   lprior += student_t_lpdf(Intercept_biomass | 3, 2.4, 2.5);
   lprior += student_t_lpdf(sigma_biomass | 3, 0, 2.5)
     - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+  vector[N_count] mu_count = Xc_count * b_count;
+  for (n in 1:N_count) {
+    mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
+  }
 }
 model {
   // Shared Gaussian innovation priors
