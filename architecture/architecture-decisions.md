@@ -449,6 +449,32 @@ for (n in 1:N) {
 
 **Critical Design Decision**: The `trend` matrix contains the **final computed trend values** that get added to `mu`. The `mu_trend` array contains **trend intercepts** used during trend computation. Both components are essential for all trend models.
 
+### Enhanced mu_trend Construction System
+
+**Architecture**: Enhanced variable-tracing system that extracts actual brms model block patterns instead of hardcoded simple patterns.
+
+**Two-Path Approach**:
+1. **Enhanced Path**: Detects and integrates complex patterns from brms trend_formula (GP predictions, random effects, splines, mixed patterns)
+2. **Fallback Path**: Creates simple intercept + coefficient patterns for basic cases
+
+**Pattern Categories**:
+- **Declared Parameters**: Variables declared in parameters/data blocks (e.g., `Intercept`, `b`, `Xs`) - mapped during block processing
+- **Computed Variables**: Variables computed in transformed parameters blocks (e.g., `gp_pred_1 = gp_exp_quad(...)`, `r_1_1 = sd_1 * z_1`) - require special mapping handling
+
+**Examples**:
+```stan
+// Simple pattern (fallback path):
+mu_trend = rep_vector(Intercept_trend, N_trend);
+
+// Complex pattern (enhanced path):
+mu_trend = rep_vector(0.0, N_trend);
+mu_trend += Intercept_trend + Xs_trend * bs_trend + Zs_1_1_trend * s_1_1_trend;  // Splines
+mu_trend += Intercept_trend + gp_pred_1_trend[Jgp_1_trend];  // GP predictions
+mu_trend += Intercept_trend + r_1_1_trend[J_1_trend[n]] * Z_1_1_trend[n];  // Random effects
+```
+
+**Implementation**: `extract_and_rename_stan_blocks()` uses variable-tracing to extract mu construction patterns from brms model blocks, then renames variables with `_trend` suffix for proper integration.
+
 ## Critical Integration Points
 
 ### Centralized Mapping Generation Architecture

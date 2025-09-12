@@ -5029,6 +5029,11 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
   checkmate::assert_character(response_names, null.ok = TRUE)
   checkmate::assert_list(standata, names = "named", null.ok = TRUE)
 
+  # Ensure stancode is a plain character string (handle brmsmodel class)
+  if (inherits(stancode, "brmsmodel")) {
+    stancode <- as.character(stancode)
+  }
+
   stanvar_list <- list()
 
   # Extract data block declarations from Stan code with selective filtering
@@ -5123,63 +5128,73 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
     }
   }
 
-  # 4. CRITICAL: Create mu_trend if needed for trend computation
-  # Check if mu_trend declaration already exists in stancode (from complex brms predictors)
-  mu_trend_pattern <- paste0("vector\\[.*?\\]\\s+mu", gsub("_", "\\_", suffix, fixed=TRUE))
+  # 4. ENHANCED: Create mu_trend using variable-tracing system for complex patterns
+  # Check if mu_trend declaration already exists in stancode
+  mu_trend_pattern <- paste0("vector\\[.*?\\]\\s+mu", gsub("_", "\\_", suffix))
   mu_trend_exists <- any(grepl(mu_trend_pattern, 
                               strsplit(stancode, "\n")[[1]], 
                               perl = TRUE))
   
   if (!mu_trend_exists) {
-    # Always create mu_trend for trend computation - it's needed by generate_trend_computation_tparameters
-    # Check if this is an intercept-only model (common pattern in brms trend models)  
-    # Look for unsuffixed b and X parameters in brms code (before renaming)
-    # The [^_] ensures we don't match already-suffixed parameters
-    has_coefficients <- grepl("vector\\[.*\\]\\s+b[^_]", stancode) && 
-                        grepl("matrix\\[.*\\]\\s+X[^_]", stancode)
+    checkmate::assert_character(stancode, len = 1, min.chars = 1)
+    checkmate::assert_list(mapping, names = "named")
+    checkmate::assert_character(suffix, len = 1, min.chars = 1)
     
-    # Use consistent parameter naming throughout
     time_param <- paste0("N", suffix)
     
-    if (has_coefficients) {
-      # Verify required components exist for robustness
-      # Check for unsuffixed versions since we haven't renamed yet
-      has_xc <- grepl("matrix\\[.*\\]\\s+Xc[^_]", stancode) || 
-                grepl("matrix\\[.*\\]\\s+X[^_]", stancode)
-      has_intercept <- grepl("real\\s+Intercept[^_]", stancode)
+    mu_construction_result <- extract_mu_construction_from_model_block(stancode)
+    
+    if (length(mu_construction_result$mu_construction) > 0) {
+      required_vars <- mu_construction_result$referenced_variables
+      missing_vars <- setdiff(required_vars, names(mapping$original_to_renamed))
       
-      if (!has_xc) {
+      if (length(missing_vars) > 0) {
         insight::format_error(
-          "Expected design matrix {.field Xc{suffix}} not found in Stan code."
+          "Variable mapping missing required variables: {.field {missing_vars}}. These variables were referenced in mu construction but not found in parameter mapping."
         )
       }
       
-      # Model with coefficients: follow brms pattern matching target_stancode_3.stan
-      # Initialize with zeros, then add linear predictor components
-      mu_trend_code <- paste0(
-        "vector[", time_param, "] mu", suffix, " = rep_vector(0.0, ", time_param, ");\n",
-        "  mu", suffix, " += Intercept", suffix, " + Xc", suffix, " * b", suffix, ";"
+      mu_trend_code_lines <- reconstruct_mu_trend_with_renamed_vars(
+        mu_construction = mu_construction_result$mu_construction,
+        supporting_declarations = mu_construction_result$supporting_declarations,
+        variable_mapping = mapping$original_to_renamed,
+        time_param = time_param
       )
-    } else {
-      # Intercept-only model: pattern depends on whether intercept present or ~ -1 formula
-      # Look for base Intercept parameter (without suffix) since trend parameters get renamed later
-      intercept_present <- grepl("real.*Intercept[^_]", stancode)
       
-      if (intercept_present) {
+      mu_trend_code <- paste(mu_trend_code_lines, collapse = "\n  ")
+      
+    } else {
+      has_coefficients <- grepl("vector\\[.*\\]\\s+b[^_]", stancode) && 
+                          grepl("matrix\\[.*\\]\\s+X[^_]", stancode)
+      
+      if (has_coefficients) {
+        has_xc <- grepl("matrix\\[.*\\]\\s+Xc[^_]", stancode) || 
+                  grepl("matrix\\[.*\\]\\s+X[^_]", stancode)
+        
+        if (!has_xc) {
+          insight::format_error(
+            "Expected design matrix {.field Xc{suffix}} not found in Stan code."
+          )
+        }
+        
         mu_trend_code <- paste0(
-          "vector[", time_param, "] mu", suffix, 
-          " = rep_vector(Intercept", suffix, ", ", time_param, ");"
+          "vector[", time_param, "] mu", suffix, " = rep_vector(0.0, ", 
+          time_param, ");\n  mu", suffix, " += Intercept", suffix, 
+          " + Xc", suffix, " * b", suffix, ";"
         )
       } else {
-        # No intercept (~ -1 formula)  
-        mu_trend_code <- paste0(
-          "vector[", time_param, "] mu", suffix, 
-          " = rep_vector(0.0, ", time_param, ");"
-        )
+        intercept_present <- grepl("real.*Intercept[^_]", stancode)
+        if (intercept_present) {
+          mu_trend_code <- paste0("vector[", time_param, "] mu", suffix, 
+                                 " = rep_vector(Intercept", suffix, ", ", 
+                                 time_param, ");")
+        } else {
+          mu_trend_code <- paste0("vector[", time_param, "] mu", suffix, 
+                                 " = rep_vector(0.0, ", time_param, ");")
+        }
       }
     }
 
-    # Update parameter mapping for the created mu_trend
     mapping$original_to_renamed[["mu"]] <- paste0("mu", suffix)
     mapping$renamed_to_original[[paste0("mu", suffix)]] <- "mu"
 
@@ -5187,7 +5202,6 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
       scode = mu_trend_code,
       block = "tparameters"
     )
-    model_stanvar_created <- TRUE
   }
 
   # Combine individual stanvar objects into proper stanvars collection
@@ -5197,6 +5211,266 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
     stanvars = combined_stanvars,
     mapping = mapping
   ))
+}
+
+#' Extract mu Assignment Lines from Model Block
+#'
+#' Extracts all mu construction patterns (mu =, mu +=, mu[n] +=) from model block content
+#'
+#' @param model_block Character string of model block content (without headers)
+#' @return Character vector of mu assignment lines, empty if none found
+#' @noRd
+extract_mu_assignment_lines <- function(model_block) {
+  checkmate::assert_string(model_block, null.ok = TRUE)
+  
+  if (is.null(model_block) || nchar(trimws(model_block)) == 0) {
+    return(character(0))
+  }
+  
+  # Split into lines and clean
+  lines <- strsplit(model_block, "\n")[[1]]
+  lines <- trimws(lines)
+  lines <- lines[nchar(lines) > 0]  # Remove empty lines
+  
+  # Define mu construction patterns
+  mu_patterns <- c(
+    "mu\\s*=\\s*[^;]+;",                    # mu = ...;
+    "mu\\s*\\+=\\s*[^;]+;",                 # mu += ...;  
+    "mu\\[[^\\]]+\\]\\s*\\+=\\s*[^;]+;"     # mu[n] += ...;
+  )
+  
+  mu_lines <- character(0)
+  
+  # Extract lines matching any mu pattern
+  for (pattern in mu_patterns) {
+    matches <- grep(pattern, lines, value = TRUE, perl = TRUE)
+    mu_lines <- c(mu_lines, matches)
+  }
+  
+  return(unique(mu_lines))
+}
+
+#' Parse Variable References from mu Expressions
+#'
+#' Extracts all variable identifiers referenced in mu construction lines
+#'
+#' @param mu_lines Character vector of mu assignment expressions
+#' @return Character vector of unique variable names referenced in expressions
+#' @noRd
+parse_variable_references <- function(mu_lines) {
+  checkmate::assert_character(mu_lines)
+  
+  if (length(mu_lines) == 0) {
+    return(character(0))
+  }
+  
+  all_variables <- character(0)
+  
+  # Extract all identifier patterns from each mu line
+  for (line in mu_lines) {
+    # Match valid Stan identifiers: letter followed by letters/digits/underscores
+    identifiers <- regmatches(line, gregexpr("[a-zA-Z][a-zA-Z0-9_]*", line, perl = TRUE))[[1]]
+    all_variables <- c(all_variables, identifiers)
+  }
+  
+  # Remove duplicates and Stan keywords that shouldn't be renamed
+  stan_keywords <- c("vector", "matrix", "real", "int", "array", "if", "for", "while", 
+                     "target", "mu", "rep_vector", "dot_product", "gp_exp_quad",
+                     "normal", "student_t", "exponential", "gamma", "beta",
+                     "log", "exp", "sqrt", "pow", "fabs", "min", "max")
+  
+  all_variables <- unique(all_variables)
+  all_variables <- all_variables[!all_variables %in% stan_keywords]
+  
+  return(all_variables)
+}
+
+#' Find Variable Declarations Across All Stan Blocks
+#'
+#' Scans all Stan blocks to find declarations for referenced variables
+#'
+#' @param stancode Character string containing complete Stan model code
+#' @param referenced_vars Character vector of variable names to find declarations for
+#' @return Character vector of variable declaration lines
+#' @noRd
+find_variable_declarations <- function(stancode, referenced_vars) {
+  if (length(referenced_vars) == 0) {
+    return(character(0))
+  }
+  
+  checkmate::assert_string(stancode)
+  checkmate::assert_character(referenced_vars)
+  
+  # Stan blocks to search for variable declarations
+  blocks_to_search <- c("data", "transformed data", "parameters", "transformed parameters")
+  
+  all_declarations <- character(0)
+  
+  # Search each block for variable declarations
+  for (block_name in blocks_to_search) {
+    block_content <- extract_stan_block_content(stancode, block_name)
+    
+    if (is.null(block_content) || nchar(trimws(block_content)) == 0) {
+      next
+    }
+    
+    # Split into lines and clean
+    lines <- strsplit(block_content, "\n")[[1]]
+    lines <- trimws(lines)
+    lines <- lines[nchar(lines) > 0]
+    
+    # Find declarations for each referenced variable
+    for (var_name in referenced_vars) {
+      # Pattern to match variable declarations:
+      # - type[dims] variable_name = expression; (variable with assignment)
+      # - type[dims] variable_name; (variable declaration only)
+      # Handle both simple and array types
+      
+      var_pattern <- paste0("^\\s*(real|int|vector|matrix|array).*?\\b", 
+                           gsub("([.^$*+?{}\\[\\]()\\\\|])", "\\\\\\1", var_name),
+                           "\\b.*?[;=]")
+      
+      matches <- grep(var_pattern, lines, value = TRUE, perl = TRUE)
+      all_declarations <- c(all_declarations, matches)
+    }
+  }
+  
+  return(unique(all_declarations))
+}
+
+#' Extract mu Construction from Model Block
+#'
+#' Extracts all mu construction patterns and supporting variable declarations 
+#' from brms trend model blocks for enhanced mu_trend creation.
+#' 
+#' Uses variable-tracing approach to identify complex brms patterns like GP 
+#' predictions, random effects, and splines without hardcoding pattern types.
+#'
+#' @param stancode Character string containing complete Stan model code
+#' @return List with components:
+#'   - mu_construction: Vector of mu construction expressions (mu =, mu +=, mu[n] +=)
+#'   - supporting_declarations: Vector of variable declarations that create dependencies
+#'   - referenced_variables: Vector of unique variable identifiers used in expressions
+#' @noRd
+extract_mu_construction_from_model_block <- function(stancode) {
+  checkmate::assert_string(stancode, min.chars = 1)
+  
+  # Step 1: Extract model block content
+  model_block <- extract_stan_block_content(stancode, "model")
+  
+  if (is.null(model_block) || nchar(trimws(model_block)) == 0) {
+    return(list(
+      mu_construction = character(0),
+      supporting_declarations = character(0), 
+      referenced_variables = character(0)
+    ))
+  }
+  
+  # Step 2: Extract mu construction lines
+  mu_lines <- extract_mu_assignment_lines(model_block)
+  
+  if (length(mu_lines) == 0) {
+    return(list(
+      mu_construction = character(0),
+      supporting_declarations = character(0), 
+      referenced_variables = character(0)
+    ))
+  }
+  
+  # Step 3: Parse variable references from mu construction
+  referenced_vars <- parse_variable_references(mu_lines)
+  
+  # Step 4: Find declarations for referenced variables across all blocks
+  supporting_declarations <- find_variable_declarations(stancode, referenced_vars)
+  
+  return(list(
+    mu_construction = mu_lines,
+    supporting_declarations = supporting_declarations,
+    referenced_variables = referenced_vars
+  ))
+}
+
+#' Reconstruct mu_trend with Renamed Variables
+#'
+#' Transforms brms mu construction patterns into mu_trend patterns by applying
+#' variable renaming with _trend suffixes. Handles complex expressions including
+#' GP predictions, random effects, and splines.
+#'
+#' @param mu_construction Character vector of mu assignment expressions from extract_mu_construction_from_model_block()
+#' @param supporting_declarations Character vector of variable declarations that support mu expressions  
+#' @param variable_mapping Named list mapping original variable names to renamed versions (original -> renamed_trend)
+#' @param time_param Character string specifying time dimension parameter name (default: "N_trend")
+#' @return Character vector of Stan code lines for mu_trend construction
+#' @examples
+#' \dontrun{
+#' mu_exprs <- c("mu += Intercept + gp_pred_1[Jgp_1];")
+#' support_decls <- c("vector[Nsubgp_1] gp_pred_1 = gp_exp_quad(Xgp_1, sdgp_1, lscale_1, zgp_1);")
+#' var_map <- list("Intercept" = "Intercept_trend", "gp_pred_1" = "gp_pred_1_trend", "Jgp_1" = "Jgp_1_trend")
+#' reconstruct_mu_trend_with_renamed_vars(mu_exprs, support_decls, var_map)
+#' }
+#' @noRd
+reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_declarations, variable_mapping, time_param = "N_trend") {
+  # Enhanced validation following project standards
+  checkmate::assert_character(mu_construction)
+  checkmate::assert_character(supporting_declarations) 
+  checkmate::assert_list(variable_mapping, types = "character", names = "named", min.len = 1)
+  checkmate::assert_string(time_param, pattern = "^[A-Za-z][A-Za-z0-9_]*$")
+  
+  if (length(mu_construction) == 0) {
+    return(character(0))
+  }
+  
+  # Validate consistent input - if mu_construction exists, we should have mapping
+  if (length(variable_mapping) == 0) {
+    insight::format_error(
+      "mu construction expressions found but no {.field variable_mapping} provided. Variable mapping is required for renaming."
+    )
+  }
+  
+  # Sort variable names by length (descending) to prevent partial replacements
+  sorted_var_names <- names(variable_mapping)[order(-nchar(names(variable_mapping)))]
+  
+  # Apply variable renaming to supporting declarations
+  renamed_supporting_decls <- character(0)
+  for (decl in supporting_declarations) {
+    if (nchar(trimws(decl)) == 0) {  # Skip empty declarations
+      next
+    }
+    
+    renamed_decl <- decl
+    for (original_var in sorted_var_names) {
+      renamed_var <- variable_mapping[[original_var]]
+      renamed_decl <- gsub(paste0("\\b", original_var, "\\b"), renamed_var, renamed_decl)
+    }
+    renamed_supporting_decls <- c(renamed_supporting_decls, renamed_decl)
+  }
+  
+  # Transform mu expressions to mu_trend expressions
+  mu_trend_expressions <- character(0)
+  for (expr in mu_construction) {
+    if (nchar(trimws(expr)) == 0) {  # Skip empty expressions
+      next
+    }
+    
+    # Replace 'mu' with 'mu_trend'
+    trend_expr <- gsub("\\bmu\\b", "mu_trend", expr)
+    
+    # Apply variable renaming in sorted order
+    for (original_var in sorted_var_names) {
+      renamed_var <- variable_mapping[[original_var]]
+      trend_expr <- gsub(paste0("\\b", original_var, "\\b"), renamed_var, trend_expr)
+    }
+    
+    mu_trend_expressions <- c(mu_trend_expressions, trend_expr)
+  }
+  
+  # Create complete mu_trend construction code
+  init_code <- paste0("vector[", time_param, "] mu_trend = rep_vector(0.0, ", time_param, ");")
+  
+  # Combine all components
+  complete_code <- c(init_code, renamed_supporting_decls, mu_trend_expressions)
+  
+  return(complete_code)
 }
 
 #' Extract Non-Likelihood Parts from Model Block

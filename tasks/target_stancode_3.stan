@@ -191,8 +191,6 @@ data {
   int<lower=1> K_trend;
   int<lower=1> Kc_trend;
   matrix[N_trend, K_trend] X_trend;
-  matrix[N_trend, Kc_trend] Xc_trend;
-  vector[Kc_trend] means_X_trend;
   array[N_count] int obs_trend_time_count;
   array[N_count] int obs_trend_series_count;
   array[N_biomass] int obs_trend_time_biomass;

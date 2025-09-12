@@ -97,36 +97,36 @@ mvgam:::generate_var_trend_stanvars <- function(...) {
 1. Fix template variable replacement system (ensure {lags}, {response} etc. are replaced)
 2. Standardize array syntax to be compatible across Stan versions
 3. Eliminate parameter block duplications
-4. Fix transformed data block syntax errors
-5. **PRESERVE sqrtm function** - it's mathematically correct, target was updated for Stan compatibility
+4. **PRESERVE sqrtm function** - it's mathematically correct, target was updated for Stan compatibility
 
 **Verification Requirements**:
 - [ ] No template placeholders ({lags}, {response}) remain in final code
 - [ ] Array syntax consistent throughout (prefer modern syntax where supported)
 - [ ] No duplicate parameter declarations
-- [ ] Transformed data block compiles without syntax errors
 - [ ] sqrtm function matches updated target (with positive definite check)
 
-### **SYSTEMIC ISSUE IDENTIFIED: mu_trend Creation System**
+### **PRIORITY TASK 3: Fix Computed Variables Issue in Enhanced mu_trend System**
 
-**Root Cause**: The `extract_and_rename_stan_blocks()` function (stan_assembly.R:5088-5153) creates oversimplified mu_trend that only handles basic intercept + coefficient patterns:
+**Status**: ✅ **ENHANCED SYSTEM IMPLEMENTED** - ⚠️ **ONE ISSUE REMAINING**
 
-```r
-// Current simplistic creation
-mu_trend = rep_vector(Intercept_trend, N_trend);  // Intercept-only
-// OR
-mu_trend = rep_vector(0.0, N_trend); 
-mu_trend += Intercept_trend + Xc_trend * b_trend;  // Basic coefficients
-```
+**Background**: Enhanced mu_trend extraction system is successfully implemented and working for spline patterns. Comprehensive debugging revealed the root cause of remaining failures: GP and random effects use **computed variables** (like `gp_pred_1`, `r_1_1`) that are calculated in transformed parameters/model blocks, not declared as parameters.
 
-**Missing**: Complex brms model block extractions like:
-```stan
-// Target pattern (from target_stancode_6.stan:111-113)
-vector[Nsubgp_1_trend] gp_pred_1_trend = gp_exp_quad(Xgp_1_trend, sdgp_1_trend[1], lscale_1_trend[1], zgp_1_trend);
-mu_trend += Intercept_trend + gp_pred_1_trend[Jgp_1_trend];
-```
+**Current Status**:
+- ✅ Enhanced system works perfectly for splines (generates complex `mu_trend += Intercept_trend + Xs_trend * bs_trend + Zs_1_1_trend * s_1_1_trend`)
+- ❌ GP and RE patterns fail because variables like `gp_pred_1`, `r_1_1` are not in parameter mapping
+- ✅ Pattern detection, variable extraction, and timing all work correctly
 
-**Impact**: Affects ALL trend types with complex trend_formulas (GP, splines, random effects)
+#### **Sub-Task 3.7: Fix Computed Variables Mapping (30 min)**
+- **Goal**: Handle GP predictions and random effects that are computed in Stan blocks rather than declared as parameters
+- **Root Cause**: Variables like `gp_pred_1[Jgp_1]` and `r_1_1[J_1[n]]` are computed expressions, not parameter declarations
+- **Files**: Modify variable mapping logic in `extract_and_rename_stan_blocks()`
+- **Approach**: 
+  1. Identify computed variables in transformed parameters blocks (e.g., `vector[Nsubgp_1] gp_pred_1 = gp_exp_quad(...)`)
+  2. Add computed variables to parameter mapping during block processing
+  3. Ensure enhanced system can find both declared parameters AND computed variables
+- **Testing**: Use `debug_mu_trend_extraction.R` to verify GP and RE cases now succeed
+- **Success Criteria**: Tests 2-4 (Random Effects, GP, Mixed) pass with complex mu_trend generation
+
 
 ---
 

@@ -86,8 +86,7 @@ transformed parameters {
 
   for (i in 1:N_trend) {
     for (s in 1:N_series_trend) {
-      trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) +
-      mu_trend[times_trend[i, s]];
+      trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
     }
   }
 
