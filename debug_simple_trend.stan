@@ -28,31 +28,26 @@ transformed data {
 parameters {
   vector[Kc] b;  // regression coefficients
   real Intercept;  // temporary intercept for centered predictors
-  real Intercept_trend;  // temporary intercept for centered predictors
   vector<lower=0>[N_lv_trend] sigma_trend;
+  cholesky_factor_corr[N_lv_trend] L_Omega_trend;
   matrix[N_trend, N_lv_trend] innovations_trend;
+  
 }
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
-  vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
+  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   
-    // Scaled innovations (uncorrelated case)
+    // Scaled innovations after applying correlations
     matrix[N_trend, N_lv_trend] scaled_innovations_trend;
 
-    // Apply scaling using vectorized operations
-    scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);
+    // Apply correlation transformation using efficient non-centered parameterization
+    {
+      matrix[N_lv_trend, N_lv_trend] L_Sigma = diag_pre_multiply(sigma_trend, L_Omega_trend);
+      scaled_innovations_trend = innovations_trend * L_Sigma';
+    }
   matrix[N_trend, N_lv_trend] lv_trend;
-  lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
-    // Latent states with RW dynamics
-  
-
-  
-
-  // Apply RW dynamics
-  lv_trend[1, :] = scaled_innovations_trend[1, :];
-  for (i in 2:N_trend) {
-    lv_trend[i, :] = lv_trend[i-1, :] + scaled_innovations_trend[i, :];
-  }
+  matrix[N_lv_trend, N_lv_trend] Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
+  lv_trend = scaled_innovations_trend;
     // Derived latent trends using universal computation pattern
   matrix[N_trend, N_series_trend] trend;
 
@@ -63,7 +58,7 @@ transformed parameters {
       trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
     }
   }
-  lprior += student_t_lpdf(Intercept | 3, 1.8, 2.5);
+  lprior += student_t_lpdf(Intercept | 3, 1.1, 2.5);
 
   // Efficient matrix multiplication for linear predictor
   vector[N] mu = Xc * b;
@@ -75,7 +70,9 @@ transformed parameters {
 model {
   // Shared Gaussian innovation priors
   sigma_trend ~ exponential(2);
+  L_Omega_trend ~ lkj_corr_cholesky(2);
   to_vector(innovations_trend) ~ std_normal();
+  
   // likelihood including constants
   if (!prior_only) {
     target += poisson_log_glm_lpmf(Y | to_matrix(mu), 0.0, mu_ones);

@@ -36,17 +36,17 @@ functions {
 data {
   int<lower=1> N;
   array[N] int Y;
-  int<lower=1> Kgp_1_trend;
-  int<lower=1> Dgp_1_trend;
-  int<lower=1> Nsubgp_1_trend;
-  array[N] int<lower=1> Jgp_1;
-  array[Nsubgp_1] vector[Dgp_1] Xgp_1;
   int<lower=1> N_1;
   int<lower=1> M_1;
   array[N] int<lower=1> J_1;
   vector[N] Z_1_1;
-  int prior_only;
   int<lower=1> N_trend;
+  int<lower=1> Kgp_1_trend;
+  int<lower=1> Dgp_1_trend;
+  int<lower=1> Nsubgp_1_trend;
+  array[N_trend] int<lower=1> Jgp_1_trend;
+  array[Nsubgp_1_trend] vector[Dgp_1_trend] Xgp_1_trend;
+  int prior_only;
   int<lower=1> N_series_trend;
   int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
@@ -96,6 +96,9 @@ transformed parameters {
     }
   }
 
+  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+  vector[Nsubgp_1_trend] gp_pred_1_trend = gp_exp_quad(Xgp_1_trend, sdgp_1_trend[1], lscale_1_trend[1], zgp_1_trend);
+  mu_trend += Intercept_trend + gp_pred_1_trend[Jgp_1_trend];
   matrix[N_trend, N_series_trend] trend;
 
   for (i in 1:N_trend) {
@@ -106,11 +109,9 @@ transformed parameters {
 }
 model {
   if (!prior_only) {
-    vector[Nsubgp_1_trend] gp_pred_1_trend = gp_exp_quad(Xgp_1_trend, sdgp_1_trend[1], lscale_1_trend[1], zgp_1_trend;
     vector[N] mu = rep_vector(0.0, N);
-    vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+
     mu += Intercept;
-    mu_trend += Intercept_trend + gp_pred_1_trend[Jgp_1_trend];
 
     for (n in 1:N) {
       mu[n] += r_1_1[J_1[n]] * Z_1_1[n];
@@ -121,7 +122,7 @@ model {
   }
 
   target += lprior;
-  target += std_normal_lpdf(zgp_1);
+  target += std_normal_lpdf(zgp_1_trend);
   target += std_normal_lpdf(z_1[1]);
   ar1_trend ~ normal(0, 0.5);
   sigma_trend ~ exponential(2);

@@ -64,11 +64,11 @@ data {
   int<lower=1> Kc;  // number of population-level effects after centering
   int prior_only;  // should the likelihood be ignored?
     int<lower=1> N_trend;  // total number of observations
+  int<lower=1> N_series_trend;
+  int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
   array[N] int obs_trend_time;
   array[N] int obs_trend_series;
-  int<lower=1> N_series_trend;
-  int<lower=1> N_lv_trend;
     int<lower=0> n_change_trend; // number of potential trend changepoints
   vector[n_change_trend] t_change_trend; // times of potential changepoints
   real<lower=0> change_scale_trend; // scale of changepoint shock prior

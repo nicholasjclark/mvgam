@@ -2383,7 +2383,18 @@ sort_stanvars <- function(stanvars) {
       if (!is.null(stanvars[[i]])) {
         checkmate::assert_list(stanvars[[i]], names = "named")
         if (!is.null(stanvars[[i]]$scode)) {
-          checkmate::assert_string(stanvars[[i]]$scode, min.chars = 1)
+          # Allow empty scode for ZMVN stanvars that intentionally delegate to shared systems
+          # ZMVN parameters and model blocks are empty by design (architectural decision)
+          stanvar_name <- stanvars[[i]]$name %||% ""
+          allows_empty_scode <- grepl("zmvn_parameters|zmvn_model", stanvar_name)
+          
+          if (allows_empty_scode) {
+            # ZMVN stanvars can have empty scode - they delegate to shared systems
+            checkmate::assert_string(stanvars[[i]]$scode)
+          } else {
+            # All other stanvars must have non-empty scode
+            checkmate::assert_string(stanvars[[i]]$scode, min.chars = 1)
+          }
         }
       }
     }
@@ -2405,11 +2416,19 @@ sort_stanvars <- function(stanvars) {
   # Level 4: mu linear predictor injections (depends on trend)
   mu_injection_pattern <- "mu_\\w+\\s*\\[\\s*n\\s*\\]\\s*\\+=.*trend\\s*\\["
   
+  # Dimension ordering patterns
+  dimension_pattern <- "^\\s*int<lower=1>\\s+(N_series_trend|N_lv_trend|N_trend)\\s*;"
+  array_with_dims_pattern <- "^\\s*array\\[.*\\b(N_series_trend|N_lv_trend)\\b.*\\]"
+  
   # Initialize level collections
   level1_mu_trend <- integer(0)
   level2_foundation <- integer(0)
   level3_trend_comp <- integer(0)
   level4_mu_inject <- integer(0)
+  
+  # Add dimension-specific categories to fix Stan compilation ordering bugs
+  dimensions <- integer(0)         # N_series_trend, N_lv_trend declarations (must come first)
+  dimension_arrays <- integer(0)   # Arrays that reference dimensions (must come after)
   
   # Categorize stanvars by actual dependency patterns
   for (i in seq_along(stanvars)) {
@@ -2423,7 +2442,11 @@ sort_stanvars <- function(stanvars) {
     scode <- as.character(sv$scode)
     
     # Use if-else chain to prevent double-categorization
-    if (grepl(mu_trend_decl_pattern, scode)) {
+    if (grepl(dimension_pattern, scode)) {
+      dimensions <- c(dimensions, i)
+    } else if (grepl(array_with_dims_pattern, scode)) {
+      dimension_arrays <- c(dimension_arrays, i)
+    } else if (grepl(mu_trend_decl_pattern, scode)) {
       level1_mu_trend <- c(level1_mu_trend, i)
     } else if (grepl(lv_trend_pattern, scode) || 
                grepl(scaled_innov_pattern, scode) ||
@@ -2437,12 +2460,12 @@ sort_stanvars <- function(stanvars) {
     }
   }
   
-  # All other stanvars (dimensions, priors, etc.)
-  categorized <- c(level1_mu_trend, level2_foundation, level3_trend_comp, level4_mu_inject)
+  # All other stanvars (priors, etc.)
+  categorized <- c(dimensions, dimension_arrays, level1_mu_trend, level2_foundation, level3_trend_comp, level4_mu_inject)
   others <- setdiff(seq_along(stanvars), categorized)
   
   # Critical: Dependency-respecting order
-  sort_order <- c(level1_mu_trend, level2_foundation, others, level3_trend_comp, level4_mu_inject)
+  sort_order <- c(dimensions, level1_mu_trend, level2_foundation, dimension_arrays, others, level3_trend_comp, level4_mu_inject)
   
   # Validate sort_order indices are within bounds
   checkmate::assert_integerish(sort_order, lower = 1, upper = length(stanvars), 
@@ -4187,6 +4210,22 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   )
   components <- append(components, list(car_parameters_stanvar))
 
+  # CAR trends require dedicated innovation parameters since they opt out of the shared system
+  car_innovation_parameters_stanvar <- brms::stanvar(
+    name = "car_innovation_parameters",
+    scode = "vector<lower=0>[N_lv_trend] sigma_trend;\n  matrix[N_trend, N_lv_trend] innovations_trend;",
+    block = "parameters"
+  )
+  components <- append(components, list(car_innovation_parameters_stanvar))
+
+  # CAR innovation computation in transformed parameters  
+  car_innovation_computation_stanvar <- brms::stanvar(
+    name = "car_innovation_computation",
+    scode = "matrix[N_trend, N_lv_trend] scaled_innovations_trend;\n  scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);",
+    block = "tparameters"
+  )
+  components <- append(components, list(car_innovation_computation_stanvar))
+
   # 2. TPARAMETERS block - CAR dynamics computation (always needed)
   car_tparameters_stanvar <- brms::stanvar(
     name = "car_tparameters",
@@ -4212,9 +4251,8 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # 3. MODEL block - CAR priors (ar1_trend, but not sigma_trend)
   # Build list of parameters that need priors
-  car_params_to_prior <- c("ar1_trend")
-  # Note: sigma_trend priors are handled by the shared innovation system
-  # The trend generator shouldn't duplicate them
+  car_params_to_prior <- c("ar1_trend", "sigma_trend")
+  # CAR trends use their own innovation system with sigma_trend priors
 
   if (length(car_params_to_prior) > 0) {
     car_model_stanvar <- generate_trend_priors_stanvar(

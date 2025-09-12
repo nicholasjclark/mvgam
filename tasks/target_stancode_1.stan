@@ -40,7 +40,7 @@ transformed parameters {
   lprior += student_t_lpdf(Intercept | 3, 1.8, 2.5);
   lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
 
-  matrix[N_trend, 1] scaled_innovations_trend;
+  matrix[N_trend, N_lv_trend] scaled_innovations_trend;
   scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);
   matrix[N_trend, N_lv_trend] lv_trend;
 
