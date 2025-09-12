@@ -3311,11 +3311,11 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   checkmate::assert_int(data_info$n_series %||% 1, lower = 1)
 
   # Extract key parameters with validation
-  n_lv <- trend_specs$n_lv %||% 1
+  n_series <- data_info$n_series %||% 1
+  n_lv <- trend_specs$n_lv %||% n_series
   lags <- trend_specs$lags %||% 1
   ma_lags <- trend_specs$ma_lags %||% 0
   n <- data_info$n_obs
-  n_series <- data_info$n_series %||% 1
 
   # VAR/VARMA constraint validation
   if (lags < 1) {

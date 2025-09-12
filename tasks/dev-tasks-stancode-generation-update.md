@@ -62,7 +62,46 @@ mvgam:::generate_var_trend_stanvars <- function(...) {
 
 ---
 
-## 🎯 **PRIORITY TASKS (Next Two High-Priority Fixes)**
+## 🎯 **UPDATED PRIORITY TASKS (Post-Comprehensive Analysis)**
+
+### **IMMEDIATE PRIORITY: File 6 Compilation Blocker** ⚠️ **CRITICAL**
+
+**Status**: NEWLY IDENTIFIED CRITICAL ISSUE
+
+**Issue**: Variable `gp_pred_1_trend` used before declaration (lines 47-48)
+- Line 47: `mu_trend += Intercept_trend + gp_pred_1_trend[Jgp_1_trend];`  
+- Line 48: `vector[Nsubgp_1_trend] gp_pred_1_trend = gp_exp_quad(...);`
+
+**Impact**: Complete compilation failure for File 6 (GP+CAR model)
+
+**Fix**: Simple reordering - declare `gp_pred_1_trend` before using it in `mu_trend` computation
+
+**Priority Level**: IMMEDIATE (30-minute fix for compilation success)
+
+### **COMPREHENSIVE PRIORITY RANKING (All Files)**
+
+Based on systematic analysis of all current vs target Stan files:
+
+**🚨 CRITICAL COMPILATION BLOCKERS**:
+1. **File 6** - Variable declaration order (IMMEDIATE FIX NEEDED)
+2. **File 4** - Duplicate Z declarations, malformed operations (2-hour fix)
+3. **File 3** - VARMA structural chaos (multi-session reconstruction)
+
+**⚠️ MAJOR STRUCTURAL ISSUES**:
+4. **File 2** - Unused Sigma_trend, parameter organization (1-hour fix)
+
+**✅ MINOR REFINEMENTS NEEDED**:
+5. **File 1** - mu_trend computation pattern (30-minute alignment)
+6. **File 5** - Prior specification differences (15-minute adjustment)
+
+**COMPLETION STATUS**:
+- **Ready/Near-Ready**: Files 1 (90%), 5 (95%)
+- **Moderate Work**: Files 2 (70%), 6 (75% after critical fix)  
+- **Major Reconstruction**: Files 3 (15%), 4 (40%)
+
+---
+
+## 🎯 **PREVIOUS PRIORITY TASKS (Historical Reference)**
 
 ### **PRIORITY TASK 1: Fix File 6 (CAR trends) - Missing Critical Variables**
 

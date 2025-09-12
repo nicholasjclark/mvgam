@@ -240,13 +240,14 @@ data {
   array[N_biomass] int obs_trend_series_biomass;
 }
 transformed data {
+  matrix[N_series_trend, N_lv_trend] Z = diag_matrix(rep_vector(1.0, N_lv_trend));
     matrix[N_trend, Kc_trend] Xc_trend;  // centered version of X_trend without an intercept
   vector[Kc_trend] means_X_trend;  // column means of X_trend before centering
   for (i_trend in 2:K_trend) {
     means_X_trend[i_trend - 1] = mean(X_trend[, i_trend]);
     Xc_trend[, i_trend - 1] = X_trend[, i_trend] - means_X_trend[i_trend - 1];
     // Zero mean vector for VARMA process (following Heaps 2022)
-  vector[1] trend_zeros = rep_vector(0.0, 1);
+  vector[3] trend_zeros = rep_vector(0.0, 3);
 
   
 
@@ -304,7 +305,6 @@ parameters {
   vector[knots_biomass_1[1]] zs_biomass_1_1;
   vector<lower=0>[nb_biomass_1] sds_biomass_1;  // SDs of penalized spline coefficients
   real<lower=0> sigma_biomass;  // dispersion parameter
-  matrix[N_series_trend, N_lv_trend] Z;
   vector[Kc_trend] b_trend;  // regression coefficients
 real Intercept_trend;  // temporary intercept for centered predictors
           // Standard VAR: single raw matrix
@@ -332,8 +332,6 @@ array[1] matrix[N_lv_trend, N_lv_trend] D_raw_trend;
 // [1] = diagonal elements, [2] = off-diagonal elements
 array[2] vector[1] Dmu_trend;           // Means for D_raw_trend elements
 array[2] vector<lower=0>[1] Domega_trend;  // Precisions for D_raw_trend elements
-  // Factor loading matrix (estimated for factor model)
-vector[N_series_trend * N_lv_trend] Z_raw;  // raw factor loadings
 }
 transformed parameters {
   // penalized spline coefficients
@@ -344,18 +342,6 @@ transformed parameters {
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   mu_trend += Intercept_trend + Xc_trend * b_trend;
   matrix[N_trend, N_lv_trend] lv_trend;
-  // Factor loading matrix with identifiability constraints
-  matrix[N_series_trend, N_lv_trend] Z = rep_matrix(0, N_series_trend, N_lv_trend);
-  // constraints allow identifiability of loadings
-  {
-    int index = 1;
-    for (j in 1 : N_lv_trend) {
-      for (i in j : N_series_trend) {
-        Z[i, j] = Z_raw[index];
-        index += 1;
-      }
-    }
-  }
   lprior += student_t_lpdf(Intercept_trend | 3, -0.2, 2.5);
           // Standard VAR: single covariance matrix and transformation
       matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
@@ -553,7 +539,6 @@ for (i in 1:1) {
     Amu_trend[component] ~ normal(es_trend[component], fs_trend[component]);
     Aomega_trend[component] ~ gamma(gs_trend[component], hs_trend[component]);
   }
-  Z_raw ~ student_t(3, 0, 1);
   sigma_trend ~ exponential(2);
   // likelihood including constants
   if (!prior_only) {
