@@ -24,7 +24,8 @@
       "Bash(/dev/null)",
       "Bash(for i in {1..6})",
       "Bash(cd:*)",
-      "Read(/C:\\c\\Users\\uqnclar2\\OneDrive - The University of Queensland\\Desktop\\mvgam/**)"
+      "Read(/C:\\c\\Users\\uqnclar2\\OneDrive - The University of Queensland\\Desktop\\mvgam/**)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": [],

@@ -103,7 +103,8 @@ parameters {
 }
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
-  vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
+  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+mu_trend += Intercept_trend;
   matrix[N_trend, N_lv_trend] lv_trend;
   lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);
     // Linear piecewise trends

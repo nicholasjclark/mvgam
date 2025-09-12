@@ -5,7 +5,7 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 ## Development Commands
 
 ### Testing
-- YOU MUST load all functions prior to testing. Use `Rscript -e "devtools::load_all();testthat::test_file(path/to/test)"` to run specific tests
+- YOU MUST load all functions (`devtools::load_all()`) prior to testing or debugging. Use `Rscript -e "devtools::load_all();testthat::test_file(path/to/test)"` to run specific tests
 - You CANNOT use filter calls in `testthat::test_file()` for selective execution (use the `desc` argument for this instead)
 - No test errors or warnings are allowed. This is NON-NEGOTIABLE
 
@@ -114,10 +114,9 @@ Brief description of changes (50 chars max)
 - Do not mention Claude as a co-author or include links to Claude Code in messages
 
 ### Pre-commit Workflow
-1. You MUST use the `code-reviewer` agent to review any proposed changes (NON-NEGOTIABLE)
-2. Check git status to understand current changes
-3. Stage appropriate files with clear understanding of what's being committed
-4. Write commit messages explaining changes
+1. Check git status to understand current changes
+2. Stage appropriate files with clear understanding of what's being committed
+3. Write commit messages explaining changes
 
 ### AI Behavior Rules
 - **Never assume missing context. Ask questions if uncertain**

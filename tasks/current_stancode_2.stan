@@ -54,7 +54,8 @@ parameters {
 }
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
-  vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
+  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+mu_trend += Intercept_trend;
   
     // Scaled innovations after applying correlations
     matrix[N_trend, N_lv_trend] scaled_innovations_trend;
