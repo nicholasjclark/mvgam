@@ -113,13 +113,13 @@ mvgam_single_dataset <- function(formula, trend_formula, data, backend,
   if (mv_spec$has_trends) {
     # Extract response variable names for mapping generation using enhanced function
     response_vars <- extract_response_names(formula)
-    
+
     validation_result <- validate_time_series_for_trends(
-      data, 
+      data,
       mv_spec$trend_specs,
       response_vars = response_vars
     )
-    
+
     # Inject dimensions back into trend specifications for stanvar generation
     # Standardized structure: univariate=direct, multivariate=named list
     if (is_multivariate_trend_specs(mv_spec$trend_specs)) {
@@ -194,11 +194,11 @@ generate_combined_stancode_and_data <- function(obs_setup, trend_setup, mv_spec,
     NULL
   }
 
-  # Use the enhanced two-stage assembly system from stan_assembly.R
+  # Use the enhanced two-stage assembly system
   result <- generate_combined_stancode(
     obs_setup = obs_setup,
     trend_setup = trend_setup,
-    trend_specs = trend_specs,  # Updated parameter name
+    trend_specs = trend_specs,
     validate = validate,
     silent = 1
   )

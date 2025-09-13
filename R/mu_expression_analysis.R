@@ -445,16 +445,30 @@ analyze_variable_relationships_comprehensive <- function(expr) {
 extract_all_identifiers <- function(expr) {
   checkmate::assert_string(expr)
   
-  # Match identifiers: letter/underscore followed by alphanumeric/underscore
-  # But not followed by opening parenthesis (to exclude functions)
-  id_pattern <- "\\b[a-zA-Z_][a-zA-Z0-9_]*(?!\\s*\\()"
+  # Extract all valid Stan identifiers (simpler pattern without negative lookahead)
+  id_pattern <- "\\b[a-zA-Z_][a-zA-Z0-9_]*"
   matches <- gregexpr(id_pattern, expr, perl = TRUE)
   
   if (length(matches[[1]]) == 1 && matches[[1]] == -1) {
     return(character(0))
   }
   
-  return(regmatches(expr, matches)[[1]])
+  all_identifiers <- regmatches(expr, matches)[[1]]
+  
+  # Remove identifiers that are followed by parentheses (functions)
+  # Use a separate check for functions
+  functions_pattern <- "\\b[a-zA-Z_][a-zA-Z0-9_]*\\s*\\("
+  function_matches <- gregexpr(functions_pattern, expr, perl = TRUE)
+  
+  if (length(function_matches[[1]]) > 1 || function_matches[[1]][1] != -1) {
+    function_names <- regmatches(expr, function_matches)[[1]]
+    # Extract just the function names (remove the parenthesis part)
+    function_names <- gsub("\\s*\\($", "", function_names)
+    # Remove functions from the identifier list
+    all_identifiers <- setdiff(all_identifiers, function_names)
+  }
+  
+  return(all_identifiers)
 }
 
 #' Calculate variable complexity score

@@ -72,7 +72,8 @@ transformed parameters {
   - 1 * student_t_lccdf(0 | 3, 0, 2.5);
   lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
 
-  vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
+  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+  mu_trend += Intercept_trend;
   matrix[N_trend, N_lv_trend] lv_trend;
   matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
   matrix[N_trend, N_lv_trend] scaled_innovations_trend = innovations_trend * L_Sigma_trend';

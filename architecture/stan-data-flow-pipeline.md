@@ -102,10 +102,15 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 - **Output**: Base Stan code with properly ordered trend variables ready for injection
 - **Available data structures**: Combined Stan code with both observation and trend components in correct declaration order
 
-### Stage 7: GLM-Compatible Trend Injection
+### Stage 7: GLM-Compatible Trend Injection with Enhanced Mu Analysis
 - **Entry point**: `inject_trend_into_linear_predictor()` in `R/stan_assembly.R`
 - **Input**: Base Stan code and trend stanvars (including mapping arrays and GLM compatibility stanvars)
 - **Processing**: 
+  - **Enhanced Mu Analysis System**: Uses comprehensive mu pattern recognition from `R/mu_expression_analysis.R`:
+    - **Function**: `extract_mu_construction_with_classification()` provides structural analysis of brms mu expressions
+    - **Classification**: Handles 11+ different brms patterns (GP, splines, monotonic, random effects, etc.)
+    - **Execution Planning**: Analyzes variable dependencies and generates proper execution ordering
+    - **Replaces**: Legacy regex-based pattern matching with robust structural analysis
   - **Adaptive Approach**: Automatically selects optimal trend injection method based on GLM detection
   - **GLM-Optimized Path**: When GLM functions detected (e.g., `poisson_log_glm_lpmf`):
     - **Parameter Parsing**: Uses `parse_glm_parameters()` with regex patterns to extract Y variable, design matrix, intercept, and coefficients

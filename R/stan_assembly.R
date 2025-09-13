@@ -5150,9 +5150,9 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
 
       # COMPREHENSIVE FIX: Search all Stan blocks for missing variables
       if (length(missing_vars) > 0) {
-        # Extract computed variables from entire stancode  
+        # Extract computed variables from entire stancode
         all_computed_vars <- extract_computed_variables(stancode)
-        
+
         # Find declared variables in all Stan blocks (data, parameters, etc.)
         all_declared_vars <- find_variable_declarations(stancode, missing_vars)
 
@@ -5248,74 +5248,7 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
   ))
 }
 
-#' Extract mu Assignment Lines from Model Block
-#'
-#' Extracts all mu construction patterns (mu =, mu +=, mu[n] +=) from model block content
-#'
-#' @param model_block Character string of model block content (without headers)
-#' @return Character vector of mu assignment lines, empty if none found
-#' @noRd
-extract_mu_assignment_lines <- function(model_block) {
-  checkmate::assert_string(model_block, null.ok = TRUE)
 
-  if (is.null(model_block) || nchar(trimws(model_block)) == 0) {
-    return(character(0))
-  }
-
-  # Split into lines and clean
-  lines <- strsplit(model_block, "\n")[[1]]
-  lines <- trimws(lines)
-  lines <- lines[nchar(lines) > 0]  # Remove empty lines
-
-  # Define mu construction patterns
-  mu_patterns <- c(
-    "mu\\s*=\\s*[^;]+;",                    # mu = ...;
-    "mu\\s*\\+=\\s*[^;]+;",                 # mu += ...;
-    "mu\\[[^\\]]+\\]\\s*\\+=\\s*[^;]+;"     # mu[n] += ...;
-  )
-
-  mu_lines <- character(0)
-
-  # Extract lines matching any mu pattern
-  for (pattern in mu_patterns) {
-    matches <- grep(pattern, lines, value = TRUE, perl = TRUE)
-    mu_lines <- c(mu_lines, matches)
-  }
-
-  # ENHANCED: Extract supporting computed variables from MODEL BLOCK only
-  if (length(mu_lines) > 0) {
-    referenced_vars <- extract_referenced_variables_from_mu_lines(mu_lines)
-    model_computed_vars <- extract_model_block_computed_variables(lines, referenced_vars)
-    mu_lines <- c(mu_lines, model_computed_vars)
-  }
-
-  return(unique(mu_lines))
-}
-
-#' Extract Referenced Variables from mu Lines
-#'
-#' Extracts variable names referenced in mu construction lines for dependency tracking
-#'
-#' @param mu_lines Character vector of mu assignment expressions
-#' @return Character vector of unique variable names referenced in expressions
-#' @noRd
-extract_referenced_variables_from_mu_lines <- function(mu_lines) {
-  checkmate::assert_character(mu_lines, min.len = 1, any.missing = FALSE)
-
-  referenced_vars <- character(0)
-  stan_keywords <- c("rep_vector", "Intercept", "target", "normal_lpdf", "mu", "vector", "real", "int")
-
-  for (mu_line in mu_lines) {
-    var_matches <- gregexpr("\\b[a-zA-Z_][a-zA-Z0-9_]*", mu_line, perl = TRUE)[[1]]
-    if (var_matches[1] != -1) {
-      vars <- regmatches(mu_line, list(var_matches))[[1]]
-      vars <- vars[!vars %in% stan_keywords]
-      referenced_vars <- c(referenced_vars, vars)
-    }
-  }
-
-  return(unique(referenced_vars))
-}
 
 #' Extract Model Block Computed Variables
 #'
@@ -5454,40 +5387,6 @@ should_include_in_transformed_parameters <- function(declaration) {
   return(FALSE)
 }
 
-#' Parse Variable References from mu Expressions
-#'
-#' Extracts all variable identifiers referenced in mu construction lines
-#'
-#' @param mu_lines Character vector of mu assignment expressions
-#' @return Character vector of unique variable names referenced in expressions
-#' @noRd
-parse_variable_references <- function(mu_lines) {
-  checkmate::assert_character(mu_lines)
-
-  if (length(mu_lines) == 0) {
-    return(character(0))
-  }
-
-  all_variables <- character(0)
-
-  # Extract all identifier patterns from each mu line
-  for (line in mu_lines) {
-    # Match valid Stan identifiers: letter followed by letters/digits/underscores
-    identifiers <- regmatches(line, gregexpr("[a-zA-Z][a-zA-Z0-9_]*", line, perl = TRUE))[[1]]
-    all_variables <- c(all_variables, identifiers)
-  }
-
-  # Remove duplicates and Stan keywords that shouldn't be renamed
-  stan_keywords <- c("vector", "matrix", "real", "int", "array", "if", "for", "while",
-                     "target", "mu", "rep_vector", "dot_product", "gp_exp_quad",
-                     "normal", "student_t", "exponential", "gamma", "beta",
-                     "log", "exp", "sqrt", "pow", "fabs", "min", "max")
-
-  all_variables <- unique(all_variables)
-  all_variables <- all_variables[!all_variables %in% stan_keywords]
-
-  return(all_variables)
-}
 
 #' Find Variable Declarations Across All Stan Blocks
 #'
@@ -5505,8 +5404,8 @@ find_variable_declarations <- function(stancode, referenced_vars) {
   checkmate::assert_string(stancode)
   checkmate::assert_character(referenced_vars)
 
-  # Stan blocks to search for variable declarations
-  blocks_to_search <- c("data", "transformed data", "parameters", "transformed parameters")
+  # Stan blocks to search for variable declarations  
+  blocks_to_search <- c("data", "transformed data", "parameters", "transformed parameters", "model")
 
   all_declarations <- character(0)
 
@@ -5542,57 +5441,6 @@ find_variable_declarations <- function(stancode, referenced_vars) {
   return(unique(all_declarations))
 }
 
-#' Extract mu Construction from Model Block
-#'
-#' Extracts all mu construction patterns and supporting variable declarations
-#' from brms trend model blocks for enhanced mu_trend creation.
-#'
-#' Uses variable-tracing approach to identify complex brms patterns like GP
-#' predictions, random effects, and splines without hardcoding pattern types.
-#'
-#' @param stancode Character string containing complete Stan model code
-#' @return List with components:
-#'   - mu_construction: Vector of mu construction expressions (mu =, mu +=, mu[n] +=)
-#'   - supporting_declarations: Vector of variable declarations that create dependencies
-#'   - referenced_variables: Vector of unique variable identifiers used in expressions
-#' @noRd
-extract_mu_construction_from_model_block <- function(stancode) {
-  checkmate::assert_string(stancode, min.chars = 1)
-
-  # Step 1: Extract model block content
-  model_block <- extract_stan_block_content(stancode, "model")
-
-  if (is.null(model_block) || nchar(trimws(model_block)) == 0) {
-    return(list(
-      mu_construction = character(0),
-      supporting_declarations = character(0),
-      referenced_variables = character(0)
-    ))
-  }
-
-  # Step 2: Extract mu construction lines
-  mu_lines <- extract_mu_assignment_lines(model_block)
-
-  if (length(mu_lines) == 0) {
-    return(list(
-      mu_construction = character(0),
-      supporting_declarations = character(0),
-      referenced_variables = character(0)
-    ))
-  }
-
-  # Step 3: Parse variable references from mu construction
-  referenced_vars <- parse_variable_references(mu_lines)
-
-  # Step 4: Find declarations for referenced variables across all blocks
-  supporting_declarations <- find_variable_declarations(stancode, referenced_vars)
-
-  return(list(
-    mu_construction = mu_lines,
-    supporting_declarations = supporting_declarations,
-    referenced_variables = referenced_vars
-  ))
-}
 
 #' Reconstruct mu_trend with Renamed Variables
 #'
@@ -5655,7 +5503,7 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
   # Transform mu expressions to mu_trend expressions with loop structure preservation
   mu_trend_expressions <- character(0)
   loop_expressions <- character(0)
-  
+
   for (expr in mu_construction) {
     if (nchar(trimws(expr)) == 0) {  # Skip empty expressions
       next
@@ -5663,20 +5511,20 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
 
     # Check if this expression requires a loop (has mu[n] pattern)
     requires_loop <- grepl("\\bmu\\[n\\]", expr)
-    
+
     if (requires_loop) {
       # Transform mu[n] to mu_trend[n] and apply variable renaming
       trend_expr <- gsub("\\bmu\\[n\\]", "mu_trend[n]", expr)
-      
+
       # Apply variable renaming in sorted order
       for (original_var in sorted_var_names) {
         renamed_var <- variable_mapping[[original_var]]
         trend_expr <- gsub(paste0("\\b", original_var, "\\b"), renamed_var, trend_expr)
       }
-      
+
       # Store as loop expression (will be wrapped in for loop later)
       loop_expressions <- c(loop_expressions, paste0("  ", trend_expr))
-      
+
     } else {
       # Simple assignment - replace 'mu' with 'mu_trend'
       trend_expr <- gsub("\\bmu\\b", "mu_trend", expr)
@@ -5692,13 +5540,13 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
   }
 
   # Create complete mu_trend construction code
-  # Check if initialization already exists in ORIGINAL mu_construction 
+  # Check if initialization already exists in ORIGINAL mu_construction
   # to avoid duplication
-  has_mu_initialization <- any(grepl("vector\\[.*\\]\\s+mu\\s*=\\s*rep_vector", 
+  has_mu_initialization <- any(grepl("vector\\[.*\\]\\s+mu\\s*=\\s*rep_vector",
                                    mu_construction))
 
   # Define patterns for computed variable declarations that must come first
-  # These patterns identify Stan computed variables that need declaration 
+  # These patterns identify Stan computed variables that need declaration
   # before usage
   gp_pattern <- "^\\s*vector\\[.*\\]\\s+gp_pred_[0-9]+_trend\\s*="
   spline_pattern <- "^\\s*vector\\[.*\\]\\s+s_[0-9]+_[0-9]+_trend\\s*="
@@ -5713,7 +5561,7 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
   # Computed vars must come BEFORE mu_trend usage for Stan compilation
   computed_var_declarations <- character(0)
   mu_only_expressions <- character(0)
-  
+
   for (expr in mu_trend_expressions) {
     # Check if this expression is a computed variable declaration
     is_computed_declaration <- (
@@ -5722,7 +5570,7 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
       grepl(mono_pattern, expr, perl = TRUE) ||
       grepl(general_decl_pattern, expr, perl = TRUE)
     )
-    
+
     if (is_computed_declaration) {
       computed_var_declarations <- c(computed_var_declarations, expr)
     } else {
@@ -5732,21 +5580,21 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
 
   # Assemble final code with proper dependency ordering and loop structure
   base_code <- character(0)
-  
+
   if (!has_mu_initialization) {
     # No initialization in input, add one
-    init_code <- paste0("vector[", time_param, 
+    init_code <- paste0("vector[", time_param,
                        "] mu_trend = rep_vector(0.0, ", time_param, ");")
     # Order: initialization, computed vars, other supporting decls, mu expressions
-    base_code <- c(init_code, computed_var_declarations, 
+    base_code <- c(init_code, computed_var_declarations,
                   renamed_supporting_decls, mu_only_expressions)
   } else {
     # Initialization already exists in transformed expressions
-    # Order: computed vars, other supporting decls, mu expressions  
-    base_code <- c(computed_var_declarations, renamed_supporting_decls, 
+    # Order: computed vars, other supporting decls, mu expressions
+    base_code <- c(computed_var_declarations, renamed_supporting_decls,
                   mu_only_expressions)
   }
-  
+
   # Add loop structure if there are loop expressions
   if (length(loop_expressions) > 0) {
     # Create for loop with proper indentation
@@ -6052,10 +5900,11 @@ rename_parameters_in_block <- function(block_code, suffix, mapping, block_type, 
 #' @noRd
 get_stan_reserved_words <- function() {
   # Comprehensive Stan reserved words based on Stan language specification
-  # and extensive testing documented in dev-tasks-stancode-generation-update.md
   c(
     # Stan data types
-    "int", "real", "vector", "matrix", "array", "void",
+    "int", "real", "vector", "row_vector", "matrix", "array", "void",
+    "simplex", "unit_vector", "ordered", "positive_ordered",
+    "corr_matrix", "cov_matrix", "cholesky_factor_corr", "cholesky_factor_cov",
 
     # Stan constraints and bounds
     "lower", "upper", "multiplier", "offset",

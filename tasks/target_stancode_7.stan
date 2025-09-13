@@ -107,7 +107,6 @@ model {
   }
 
   target += lprior;
-  target += std_normal_lpdf(zgp_1_trend);
   target += std_normal_lpdf(z_1[1]);
   ar1_trend ~ normal(0, 0.5);
   sigma_trend ~ exponential(2);

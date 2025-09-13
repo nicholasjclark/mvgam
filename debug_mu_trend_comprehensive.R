@@ -20,15 +20,18 @@ cat("====================================================================\n\n")
 # MONKEY PATCHING SETUP - Trace All Key Functions
 # ==============================================================================
 
-# Store original functions with correct references
-original_extract_mu_construction <- get("extract_mu_construction_from_model_block", envir = asNamespace("mvgam"))
+# Store original functions with correct references (updated for new mu analysis system)
+original_extract_mu_construction <- get("extract_mu_construction_with_classification", envir = asNamespace("mvgam"))
 original_reconstruct_mu_trend <- get("reconstruct_mu_trend_with_renamed_vars", envir = asNamespace("mvgam"))
 original_extract_and_rename <- get("extract_and_rename_stan_blocks", envir = asNamespace("mvgam"))
-original_extract_computed_vars <- get("extract_computed_variables", envir = asNamespace("mvgam"))
 
 # Also hook into GLM bypass functions that skip Enhanced system
 original_inject_glm_predictor <- get("inject_trend_into_glm_predictor", envir = asNamespace("mvgam"))
 original_inject_linear_predictor <- get("inject_trend_into_linear_predictor", envir = asNamespace("mvgam"))
+
+# Hook into variable declaration functions to trace resolution issues
+original_find_variable_declarations <- get("find_variable_declarations", envir = asNamespace("mvgam"))
+original_extract_computed_variables <- get("extract_computed_variables", envir = asNamespace("mvgam"))
 
 # Global debugging state
 debug_state <- list(
@@ -62,8 +65,8 @@ debug_log <- function(title, content, level = 1) {
   cat("\n")
 }
 
-# Monkey patch extract_mu_construction_from_model_block
-assignInNamespace("extract_mu_construction_from_model_block", function(stancode) {
+# Monkey patch extract_mu_construction_with_classification (new mu analysis system)
+assignInNamespace("extract_mu_construction_with_classification", function(stancode) {
   debug_log("EXTRACT_MU_CONSTRUCTION INPUT", list(
     scenario = debug_state$current_scenario,
     stancode_length = nchar(stancode),
@@ -187,12 +190,46 @@ assignInNamespace("extract_and_rename_stan_blocks", function(stancode, suffix, m
 
 # Monkey patch extract_computed_variables (CORRECT PARAMETER NAME)
 assignInNamespace("extract_computed_variables", function(stan_code) {
-  result <- original_extract_computed_vars(stan_code)
+  result <- original_extract_computed_variables(stan_code)
   
   debug_log("EXTRACT_COMPUTED_VARIABLES", list(
     scenario = debug_state$current_scenario,
     found_variables = if (length(result) > 0) result else "NONE FOUND"
   ), 2)
+  
+  return(result)
+}, "mvgam")
+
+# Monkey patch find_variable_declarations for variable resolution tracing
+assignInNamespace("find_variable_declarations", function(stancode, referenced_vars) {
+  debug_log("FIND_VARIABLE_DECLARATIONS INPUT", list(
+    scenario = debug_state$current_scenario,
+    stancode_length = nchar(stancode),
+    referenced_vars_count = length(referenced_vars),
+    referenced_vars = if (length(referenced_vars) > 0) paste(referenced_vars, collapse = ", ") else "EMPTY"
+  ), 2)
+  
+  result <- original_find_variable_declarations(stancode, referenced_vars)
+  
+  debug_log("FIND_VARIABLE_DECLARATIONS OUTPUT", list(
+    found_declarations_count = length(result),
+    found_declarations = if (length(result) > 0) result else "NONE FOUND",
+    missing_vars = if (length(referenced_vars) > 0) {
+      # Try to extract declared variables from found declarations
+      declared_vars <- sapply(result, function(x) {
+        # Extract variable name from declaration line  
+        matches <- regmatches(x, regexpr("\\b[a-zA-Z_][a-zA-Z0-9_]*", x, perl = TRUE))
+        if (length(matches) > 0) matches[1] else ""
+      })
+      paste(setdiff(referenced_vars, declared_vars), collapse = ", ")
+    } else "NONE"
+  ), 2)
+  
+  # Store in global state
+  debug_state$results[[debug_state$current_scenario]][["find_variable_declarations"]] <- list(
+    input_vars = referenced_vars,
+    found_declarations = result
+  )
   
   return(result)
 }, "mvgam")
@@ -534,10 +571,11 @@ cat("   4. All scenarios should result in proper mu_trend declaration via ONE pa
 cat("   5. Fix GLM bypass to include mu_trend or disable GLM optimization\n\n")
 
 # Restore original functions
-assignInNamespace("extract_mu_construction_from_model_block", original_extract_mu_construction, "mvgam")
+assignInNamespace("extract_mu_construction_with_classification", original_extract_mu_construction, "mvgam")
 assignInNamespace("reconstruct_mu_trend_with_renamed_vars", original_reconstruct_mu_trend, "mvgam")
 assignInNamespace("extract_and_rename_stan_blocks", original_extract_and_rename, "mvgam") 
-assignInNamespace("extract_computed_variables", original_extract_computed_vars, "mvgam")
+assignInNamespace("extract_computed_variables", original_extract_computed_variables, "mvgam")
+assignInNamespace("find_variable_declarations", original_find_variable_declarations, "mvgam")
 assignInNamespace("inject_trend_into_glm_predictor", original_inject_glm_predictor, "mvgam")
 assignInNamespace("inject_trend_into_linear_predictor", original_inject_linear_predictor, "mvgam")
 

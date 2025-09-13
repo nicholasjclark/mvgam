@@ -83,7 +83,8 @@ transformed parameters {
   }
 
   matrix[N_trend, N_series_trend] trend;
-  vector[N_trend] mu_trend = rep_vector(Intercept_trend, N_trend);
+  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+  mu_trend += Intercept_trend;
 
   for (i in 1:N_trend) {
     for (s in 1:N_series_trend) {
