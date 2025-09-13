@@ -330,6 +330,9 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
     )
   }
 
+  # Deduplicate functions (GP models may have identical functions in both models)
+  combined_stancode <- deduplicate_stan_functions(combined_stancode)
+
   # Generate complete standata using brms with trend stanvars included
   # This follows the same pattern as assemble_mvgam_stan_data()
   combined_standata <- generate_base_brms_standata(
@@ -1862,6 +1865,9 @@ assemble_mvgam_stan_code <- function(obs_formula, trend_stanvars = NULL, data,
     base_stancode,
     trend_stanvars
   )
+
+  # Deduplicate any duplicate functions in the combined Stan code
+  final_stancode <- deduplicate_stan_functions(final_stancode)
 
   # Validate final code if requested
   if (validate) {
@@ -5020,10 +5026,21 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
 
   stanvar_list <- list()
 
+  # 0. Extract functions block content (without headers) and store for later combination
+  # Functions block doesn't need parameter renaming since functions are global
+  # Position: Must be first to satisfy Stan's requirement that functions be declared before use
+  functions_block <- extract_stan_block_content(stancode, "functions")
+  if (!is.null(functions_block) && nchar(functions_block) > 0) {
+    stanvar_list[["trend_functions"]] <- brms::stanvar(
+      scode = functions_block,
+      block = "functions"
+    )
+  }
+
   # Extract data block declarations from Stan code with selective filtering
   # This complements extract_and_rename_standata_objects by providing proper declarations
 
-  # 0. Extract data block content with selective filtering and renaming
+  # 1. Extract data block content with selective filtering and renaming
   data_block <- extract_stan_block_content(stancode, "data")
   if (!is.null(data_block) && nchar(data_block) > 0) {
     data_result <- rename_parameters_in_block(
@@ -5776,46 +5793,118 @@ extract_stan_block <- function(stancode, block_name) {
 #' @param block_name Name of block to extract ("parameters", "data", etc.)
 #' @return Character string with inner block content (trimmed)
 #' @noRd
+#' Extract Stan Block Content with Improved Functions Block Handling
+#'
+#' @description
+#' Extracts content from Stan code blocks. Uses specialized handling for functions 
+#' blocks to avoid brace counting issues with nested function definitions.
+#'
+#' @param stancode Character string containing full Stan code
+#' @param block_name Name of block to extract ("functions", "data", "parameters", etc.)
+#' @return Character string with inner block content (trimmed), or NULL if block not found
+#' @details
+#' For functions blocks, uses block boundary detection to avoid issues with nested braces.
+#' For other blocks, uses the existing line-by-line parsing approach.
+#' @noRd
 extract_stan_block_content <- function(stancode, block_name) {
   checkmate::assert_string(stancode, min.chars = 1)
   checkmate::assert_string(block_name, min.chars = 1)
-
-  # Use line-by-line parsing with proper boundary detection for all blocks
-  lines <- strsplit(stancode, "\n")[[1]]
-  in_block <- FALSE
-  content_lines <- c()
-
-  # Create pattern to match block start (handle multi-word blocks like "transformed data")
-  # Use base R gsub and trimws for robustness
-  clean_block_name <- gsub("\\s+", "\\\\s+", trimws(block_name))
-  block_pattern <- paste0("^\\s*", clean_block_name, "\\s*\\{")
-
-  for (i in seq_along(lines)) {
-    line <- lines[i]
-
-    # Check for block start
-    if (grepl(block_pattern, line, ignore.case = TRUE)) {
-      in_block <- TRUE
-      next  # Skip the opening brace line
-    }
-
-    # Check for block end (closing brace on its own line)
-    if (in_block && grepl("^\\s*\\}\\s*$", line)) {
-      break  # Stop at closing brace
-    }
-
-    # Collect content lines
-    if (in_block) {
-      content_lines <- c(content_lines, line)
-    }
+  
+  # Validate basic Stan code structure
+  if (!grepl("\\{", stancode)) {
+    stop(insight::format_error(
+      "Invalid Stan code: no block structure found in provided code."
+    ), call. = FALSE)
   }
 
-  # Handle case where block wasn't found
-  if (length(content_lines) == 0 && !in_block) {
-    stop(paste("Stan block", block_name, "not found in code"), call. = FALSE)
+  if (block_name == "functions") {
+    # Special handling for functions block to avoid nested brace issues
+    lines <- strsplit(stancode, "\n")[[1]]
+    
+    # Find functions block start with comprehensive pattern
+    functions_start <- which(grepl("^\\s*functions\\s*\\{", lines, ignore.case = TRUE))
+    if (length(functions_start) == 0) {
+      return(NULL)  # Block not found - consistent with other blocks
+    }
+    
+    # Find next Stan block start (comprehensive pattern for all valid blocks)
+    next_block_pattern <- paste0("^\\s*(data|parameters|transformed\\s+data|",
+                                "transformed\\s+parameters|model|generated\\s+quantities)\\s*\\{")
+    next_block <- which(grepl(next_block_pattern, lines, ignore.case = TRUE))
+    next_block <- next_block[next_block > functions_start[1]]
+    
+    if (length(next_block) == 0) {
+      # Functions block is last - find end of file or closing brace
+      end_line <- length(lines)
+      # Look for closing brace from end backwards
+      for (i in length(lines):functions_start[1]) {
+        if (grepl("^\\s*\\}\\s*$", lines[i])) {
+          end_line <- i - 1
+          break
+        }
+      }
+      content_lines <- lines[(functions_start[1] + 1):end_line]
+    } else {
+      # Extract content between functions { and next block
+      content_lines <- lines[(functions_start[1] + 1):(next_block[1] - 1)]
+    }
+    
+    # Validate extracted content
+    if (length(content_lines) == 0) {
+      return("")  # Empty functions block
+    }
+    
+    # Remove trailing closing brace if present
+    last_line <- content_lines[length(content_lines)]
+    if (grepl("^\\s*\\}\\s*$", last_line)) {
+      content_lines <- content_lines[-length(content_lines)]
+    }
+    
+    # Final validation - ensure we have actual content
+    result <- paste(content_lines, collapse = "\n")
+    if (nchar(trimws(result)) == 0) {
+      return("")  # Empty after cleaning
+    }
+    
+    return(result)
+    
+  } else {
+    # Existing logic for other blocks (preserved exactly)
+    lines <- strsplit(stancode, "\n")[[1]]
+    in_block <- FALSE
+    content_lines <- c()
+    
+    # Create pattern to match block start (handle multi-word blocks like "transformed data")
+    clean_block_name <- gsub("\\s+", "\\\\s+", trimws(block_name))
+    block_pattern <- paste0("^\\s*", clean_block_name, "\\s*\\{")
+    
+    for (i in seq_along(lines)) {
+      line <- lines[i]
+      
+      # Check for block start
+      if (grepl(block_pattern, line, ignore.case = TRUE)) {
+        in_block <- TRUE
+        next  # Skip the opening brace line
+      }
+      
+      # Check for block end (closing brace on its own line)
+      if (in_block && grepl("^\\s*\\}\\s*$", line)) {
+        break  # Stop at closing brace
+      }
+      
+      # Collect content lines
+      if (in_block) {
+        content_lines <- c(content_lines, line)
+      }
+    }
+    
+    # Handle case where block wasn't found
+    if (length(content_lines) == 0 && !in_block) {
+      return(NULL)  # Block not found
+    }
+    
+    return(paste(content_lines, collapse = "\n"))
   }
-
-  return(paste(content_lines, collapse = "\n"))
 }
 
 #' Rename Parameters in Stan Code Block
@@ -6557,4 +6646,360 @@ format_matrix_for_stan_array <- function(matrix) {
 
   # Combine rows
   paste0("{", paste(row_strings, collapse = ", "), "}")
+}
+
+# =============================================================================
+# SECTION 7: STAN FUNCTIONS DEDUPLICATION SYSTEM
+# =============================================================================
+# WHY: When combining observation and trend Stan models, both may contain
+# identical functions (e.g., gp_exp_quad for Gaussian processes), causing
+# Stan compilation failures. This system safely removes duplicates while
+# preserving functionality and documentation.
+
+#' Deduplicate Functions in Stan Code
+#'
+#' @description
+#' Removes duplicate function definitions from Stan code while preserving
+#' the first occurrence and merging unique documentation.
+#'
+#' @param stan_code Character string containing complete Stan model code
+#' @return Character string with deduplicated functions block
+#' @noRd
+deduplicate_stan_functions <- function(stan_code) {
+  checkmate::assert_character(stan_code, len = 1, any.missing = FALSE)
+  
+  if (nchar(trimws(stan_code)) == 0) {
+    return(stan_code)
+  }
+  
+  # Extract functions block
+  functions_content <- extract_stan_functions_block(stan_code)
+  if (is.null(functions_content) || nchar(trimws(functions_content)) == 0) {
+    return(stan_code)  # No functions block to deduplicate
+  }
+  
+  # Parse individual functions
+  functions_list <- parse_stan_functions(functions_content)
+  if (length(functions_list) <= 1) {
+    return(stan_code)  # No potential duplicates
+  }
+  
+  # Detect and remove duplicates
+  unique_functions <- remove_duplicate_functions(functions_list)
+  
+  # Reconstruct Stan code with deduplicated functions
+  new_functions_block <- reconstruct_functions_block(unique_functions)
+  final_code <- replace_stan_functions_block(stan_code, new_functions_block)
+  
+  return(final_code)
+}
+
+#' Extract Functions Block from Stan Code
+#'
+#' @param stan_code Character string containing Stan code
+#' @return Character string of functions block content (without "functions { }")
+#' @noRd
+extract_stan_functions_block <- function(stan_code) {
+  checkmate::assert_character(stan_code, len = 1, any.missing = FALSE)
+  
+  lines <- strsplit(stan_code, "\n", fixed = TRUE)[[1]]
+  
+  # Find functions block start
+  functions_start <- grep("^\\s*functions\\s*\\{", lines, ignore.case = TRUE)
+  if (length(functions_start) == 0) {
+    return(NULL)  # No functions block
+  }
+  
+  # Find next block start (data, transformed data, etc.)
+  block_patterns <- c("^\\s*data\\s*\\{", "^\\s*transformed\\s+data\\s*\\{",
+                     "^\\s*parameters\\s*\\{", "^\\s*transformed\\s+parameters\\s*\\{",
+                     "^\\s*model\\s*\\{", "^\\s*generated\\s+quantities\\s*\\{")
+  
+  next_block_lines <- c()
+  for (pattern in block_patterns) {
+    matches <- grep(pattern, lines, ignore.case = TRUE)
+    if (length(matches) > 0) {
+      next_block_lines <- c(next_block_lines, matches[matches > functions_start[1]])
+    }
+  }
+  
+  if (length(next_block_lines) == 0) {
+    # Functions block extends to end of file
+    content_lines <- lines[(functions_start[1] + 1):length(lines)]
+  } else {
+    # Functions block ends before next block
+    next_block <- min(next_block_lines)
+    content_lines <- lines[(functions_start[1] + 1):(next_block - 1)]
+  }
+  
+  # Remove only the final closing brace of the functions block (if it exists)
+  if (length(content_lines) > 0 && grepl("^\\s*}\\s*$", content_lines[length(content_lines)])) {
+    content_lines <- content_lines[-length(content_lines)]
+  }
+  
+  return(paste(content_lines, collapse = "\n"))
+}
+
+#' Parse Individual Functions from Functions Block
+#'
+#' @param functions_content Character string of functions block content
+#' @return List of function objects with name, signature, body, and line info
+#' @noRd
+parse_stan_functions <- function(functions_content) {
+  checkmate::assert_character(functions_content, len = 1, any.missing = FALSE)
+  
+  if (nchar(trimws(functions_content)) == 0) {
+    return(list())
+  }
+  
+  lines <- strsplit(functions_content, "\n", fixed = TRUE)[[1]]
+  functions_list <- list()
+  i <- 1
+  
+  while (i <= length(lines)) {
+    line <- lines[i]
+    
+    # Skip empty lines, comments, and closing braces
+    if (grepl("^\\s*$", line) || grepl("^\\s*//", line) || 
+        grepl("^\\s*/\\*", line) || grepl("^\\s*}\\s*$", line)) {
+      i <- i + 1
+      next
+    }
+    
+    # Check for function start (handle multi-line signatures)
+    # First check if this line starts a function signature
+    if (grepl("^\\s*[a-zA-Z_].*\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s*\\(", line)) {
+      # Accumulate lines until we find the opening brace
+      signature_lines <- c(line)
+      j <- i + 1
+      
+      # Keep reading until we find the opening brace
+      while (j <= length(lines) && !grepl("\\{", paste(signature_lines, collapse = " "))) {
+        signature_lines <- c(signature_lines, lines[j])
+        j <- j + 1
+      }
+      
+      # Join all signature lines into one
+      full_signature <- paste(signature_lines, collapse = " ")
+      
+      # Now match the complete signature
+      func_match <- regexpr("^\\s*([a-zA-Z_][a-zA-Z0-9_<>,\\[\\]\\s]*?)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{", full_signature, perl = TRUE)
+      
+      if (func_match[1] > 0) {
+        # Set i to the line after the opening brace for body parsing
+        i <- j
+        
+        # Extract function components
+        captures <- attr(func_match, "capture.start")
+        capture_lengths <- attr(func_match, "capture.length")
+        
+        return_type <- trimws(substr(full_signature, captures[1], captures[1] + capture_lengths[1] - 1))
+        function_name <- trimws(substr(full_signature, captures[2], captures[2] + capture_lengths[2] - 1))
+        parameters <- trimws(substr(full_signature, captures[3], captures[3] + capture_lengths[3] - 1))
+        
+        # Find the end of this function by counting braces
+        start_line <- i - length(signature_lines) + 1  # Start line of original signature
+        function_lines <- c(full_signature)  # Use joined signature as first line
+        brace_count <- 1  # Start with 1 for the opening brace we just found
+      
+        # Continue until braces balance
+        while (i <= length(lines) && brace_count > 0) {
+          current_line <- lines[i]
+          function_lines <- c(function_lines, current_line)
+          
+          # Count braces in current line using robust method
+          open_braces <- nchar(gsub("[^{]", "", current_line))
+          close_braces <- nchar(gsub("[^}]", "", current_line))
+          
+          brace_count <- brace_count + open_braces - close_braces
+          
+          i <- i + 1
+        }
+      
+        
+        # Create function object
+        current_function <- list(
+          name = function_name,
+          return_type = return_type,
+          parameters = parameters,
+          signature = paste0(return_type, " ", function_name, "(", parameters, ")"),
+          start_line = start_line,
+          end_line = i - 1,
+          full_lines = function_lines,
+          body_lines = if (length(function_lines) > 1) function_lines[-1] else character(0)
+        )
+        
+        functions_list[[length(functions_list) + 1]] <- current_function
+      } else {
+        i <- i + 1
+      }
+    } else {
+      i <- i + 1
+    }
+  }
+  
+  return(functions_list)
+}
+
+#' Remove Duplicate Functions from Function List
+#'
+#' @param functions_list List of function objects from parse_stan_functions
+#' @return List of unique function objects
+#' @noRd
+remove_duplicate_functions <- function(functions_list) {
+  checkmate::assert_list(functions_list, min.len = 1)
+  
+  if (length(functions_list) <= 1) {
+    return(functions_list)
+  }
+  
+  # Create signature-based grouping
+  signatures <- sapply(functions_list, function(f) normalize_function_signature(f$signature))
+  unique_signatures <- unique(signatures)
+  
+  unique_functions <- list()
+  
+  for (sig in unique_signatures) {
+    matching_functions <- functions_list[signatures == sig]
+    
+    if (length(matching_functions) == 1) {
+      # No duplicates for this signature
+      unique_functions[[length(unique_functions) + 1]] <- matching_functions[[1]]
+    } else {
+      # Multiple functions with same signature - verify they're true duplicates
+      first_func <- matching_functions[[1]]
+      
+      # Check if all functions with this signature have identical normalized bodies
+      normalized_bodies <- sapply(matching_functions, function(f) normalize_function_body(f$body_lines))
+      
+      if (length(unique(normalized_bodies)) == 1) {
+        # True duplicates - keep first occurrence
+        unique_functions[[length(unique_functions) + 1]] <- first_func
+      } else {
+        # Different implementations - error
+        insight::format_error(paste(
+          "Functions with identical signatures but different implementations detected:",
+          "{.field", first_func$name, "}",
+          "This suggests a serious error in code generation."
+        ))
+      }
+    }
+  }
+  
+  return(unique_functions)
+}
+
+#' Normalize Function Signature for Comparison
+#'
+#' @param signature Character string of function signature
+#' @return Normalized signature string
+#' @noRd
+normalize_function_signature <- function(signature) {
+  checkmate::assert_character(signature, len = 1, any.missing = FALSE)
+  
+  # Remove extra whitespace
+  normalized <- gsub("\\s+", " ", trimws(signature))
+  
+  # Standardize constraint formatting
+  normalized <- gsub("< ", "<", normalized)
+  normalized <- gsub(" >", ">", normalized)
+  normalized <- gsub(" ,", ",", normalized)
+  normalized <- gsub(", ", ",", normalized)
+  
+  return(normalized)
+}
+
+#' Normalize Function Body for Comparison
+#'
+#' @param body_lines Character vector of function body lines
+#' @return Single normalized string
+#' @noRd
+normalize_function_body <- function(body_lines) {
+  checkmate::assert_character(body_lines, any.missing = FALSE)
+  
+  # Remove comments
+  body_lines <- gsub("//.*$", "", body_lines)
+  body_lines <- gsub("/\\*.*?\\*/", "", body_lines, perl = TRUE)
+  
+  # Remove empty lines and trim whitespace
+  body_lines <- trimws(body_lines)
+  body_lines <- body_lines[nchar(body_lines) > 0]
+  
+  # Normalize whitespace
+  body_lines <- gsub("\\s+", " ", body_lines)
+  
+  # Join into single string
+  return(paste(body_lines, collapse = " "))
+}
+
+#' Reconstruct Functions Block from Unique Functions
+#'
+#' @param unique_functions List of unique function objects
+#' @return Character string of reconstructed functions block
+#' @noRd
+reconstruct_functions_block <- function(unique_functions) {
+  checkmate::assert_list(unique_functions, any.missing = FALSE)
+  
+  if (length(unique_functions) == 0) {
+    return("")
+  }
+  
+  function_strings <- sapply(unique_functions, function(f) {
+    paste(f$full_lines, collapse = "\n")
+  })
+  
+  return(paste(function_strings, collapse = "\n\n"))
+}
+
+#' Replace Functions Block in Stan Code
+#'
+#' @param stan_code Original Stan code
+#' @param new_functions_content New functions block content
+#' @return Stan code with replaced functions block
+#' @noRd
+replace_stan_functions_block <- function(stan_code, new_functions_content) {
+  checkmate::assert_character(stan_code, len = 1, any.missing = FALSE)
+  checkmate::assert_character(new_functions_content, len = 1, any.missing = FALSE)
+  
+  lines <- strsplit(stan_code, "\n", fixed = TRUE)[[1]]
+  
+  # Find functions block boundaries
+  functions_start <- grep("^\\s*functions\\s*\\{", lines, ignore.case = TRUE)
+  if (length(functions_start) == 0) {
+    return(stan_code)  # No functions block to replace
+  }
+  
+  # Find next block start
+  block_patterns <- c("^\\s*data\\s*\\{", "^\\s*transformed\\s+data\\s*\\{",
+                     "^\\s*parameters\\s*\\{", "^\\s*transformed\\s+parameters\\s*\\{",
+                     "^\\s*model\\s*\\{", "^\\s*generated\\s+quantities\\s*\\{")
+  
+  next_block_lines <- c()
+  for (pattern in block_patterns) {
+    matches <- grep(pattern, lines, ignore.case = TRUE)
+    if (length(matches) > 0) {
+      next_block_lines <- c(next_block_lines, matches[matches > functions_start[1]])
+    }
+  }
+  
+  if (length(next_block_lines) == 0) {
+    functions_end <- length(lines)
+  } else {
+    functions_end <- min(next_block_lines) - 1
+  }
+  
+  # Reconstruct Stan code
+  before_functions <- if (functions_start[1] > 1) lines[1:(functions_start[1] - 1)] else character(0)
+  after_functions <- if (functions_end < length(lines)) lines[(functions_end + 1):length(lines)] else character(0)
+  
+  # Create new functions block
+  if (nchar(trimws(new_functions_content)) == 0) {
+    # Remove functions block entirely if empty
+    new_lines <- c(before_functions, after_functions)
+  } else {
+    new_functions_block <- c("functions {", new_functions_content, "}")
+    new_lines <- c(before_functions, new_functions_block, after_functions)
+  }
+  
+  return(paste(new_lines, collapse = "\n"))
 }

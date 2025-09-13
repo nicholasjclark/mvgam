@@ -1,12 +1,5 @@
 // generated with brms 2.22.9
 functions {
-  
-      /**
-       * Compute matrix square root using eigendecomposition
-       * Following Heaps 2022 methodology for stationary VAR/VARMA
-       * @param A Symmetric positive definite matrix (m x m)
-       * @return Matrix square root of A
-       */
       matrix sqrtm(matrix A) {
         int m = rows(A);
         vector[m] eigenvals = eigenvalues_sym(A);
@@ -22,12 +15,6 @@ functions {
         return tcrossprod(eprod);
       }
 
-      /**
-       * Transform P_real to P matrix using partial autocorrelation approach
-       * Heaps 2022 transformation for stationarity constraints
-       * @param P_real Real-valued unconstrained matrix
-       * @return Constrained P matrix for stationary VAR coefficients
-       */
       matrix AtoP(matrix P_real) {
         int m = rows(P_real);
         matrix[m, m] B = tcrossprod(P_real);
@@ -37,13 +24,6 @@ functions {
         return mdivide_left_spd(sqrtm(B), P_real);
       }
 
-      /**
-       * Compute Kronecker product of two matrices
-       * Used in companion matrix approach for VARMA initialization
-       * @param A First matrix (m x n)
-       * @param B Second matrix (p x q)
-       * @return Kronecker product A ⊗ B (mp x nq)
-       */
       matrix kronecker_prod(matrix A, matrix B) {
         int m = rows(A);
         int n = cols(A);
@@ -63,13 +43,6 @@ functions {
         return C;
       }
 
-      /**
-       * Perform reverse mapping from partial autocorrelations to stationary coefficients
-       * Heaps 2022 Algorithm for computing phi coefficients from P matrices
-       * @param P Array of partial autocorrelation matrices (modern syntax)
-       * @param Sigma Innovation covariance matrix
-       * @return Array containing phi coefficients and Gamma matrices [2, p]
-       */
       array[,] matrix[,] rev_mapping(array[] matrix[,] P, matrix Sigma) {
         int p = size(P);
         int m = rows(Sigma);
@@ -136,14 +109,6 @@ functions {
         return phiGamma;
       }
 
-      /**
-       * Compute joint stationary covariance for VARMA(p,q) initialization
-       * Heaps 2022 companion matrix approach for stationary distribution
-       * @param Sigma Innovation covariance matrix (m x m)
-       * @param phi Array of stationary VAR coefficient matrices
-       * @param theta Array of stationary MA coefficient matrices
-       * @return Joint covariance matrix Omega for (y_0,...,y_{1-p},eps_0,...,eps_{1-q})
-       */
       matrix initial_joint_var(matrix Sigma, array[] matrix[,] phi, array[] matrix[,] theta) {
         int p = size(phi);
         int q = size(theta);
@@ -202,7 +167,6 @@ functions {
 
         return Omega;
       }
-    
 }
 data {
   int<lower=1> N;  // total number of observations

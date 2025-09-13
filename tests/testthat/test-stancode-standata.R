@@ -1,9 +1,7 @@
 # stancode and standata Tests
 #
-# Comprehensive integrated tests for stancode.mvgam_formula() and
-# standata.mvgam_formula().
-# Tests cover model specification validation, Stan code generation,
-# data preparation, class assignment, and integration with trend systems.
+# Integrated tests for stancode.mvgam_formula() and
+# standata.mvgam_formula()
 
 # Test Data Setup ----
 
@@ -120,11 +118,11 @@ test_that("stancode.mvgam_formula returns correct class structure", {
 
   # mu construction and trend addition in transformed parameters
   expect_true(grepl("mu\\[n\\] \\+= Intercept \\+ trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_with_trend))
-  
+
   # Verify observation-to-trend mappings exist in data block
   expect_true(grepl("array\\[N\\] int obs_trend_time;", code_with_trend))
   expect_true(grepl("array\\[N\\] int obs_trend_series;", code_with_trend))
-  
+
   # mu_trend should be just zeros for RW model (no trend predictors)
   expect_true(grepl("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
   expect_false(grepl("mu_trend \\+= Intercept_trend", code_with_trend))
@@ -162,7 +160,7 @@ test_that("stancode generates correct AR(p = c(1, 12)) seasonal model structure"
   # Should have ar1_trend and ar12_trend, NOT ar2_trend through ar11_trend
   expect_true(grepl("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;", code_with_trend))
   expect_true(grepl("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar12_trend;", code_with_trend))
-  
+
   # Check no template placeholders
   expect_false(grepl("\\{max_lag\\}", code_with_trend))
   expect_false(grepl("\\{lags\\}", code_with_trend))
@@ -463,31 +461,31 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   # Trend injection using response-specific mapping arrays
   expect_true(grepl("mu_count\\[n\\] \\+= trend\\[obs_trend_time_count\\[n\\], obs_trend_series_count\\[n\\]\\];", code_with_trend))
   expect_true(grepl("mu_biomass\\[n\\] \\+= trend\\[obs_trend_time_biomass\\[n\\], obs_trend_series_biomass\\[n\\]\\];", code_with_trend))
-  
+
   # Check observation-to-trend mappings are in data block
-  data_block <- substr(code_with_trend, 
-                       regexpr("^data \\{", code_with_trend), 
+  data_block <- substr(code_with_trend,
+                       regexpr("^data \\{", code_with_trend),
                        regexpr("^\\}", code_with_trend))
   expect_true(grepl("array\\[N_count\\] int obs_trend_time_count;", data_block))
   expect_true(grepl("array\\[N_count\\] int obs_trend_series_count;", data_block))
   expect_true(grepl("array\\[N_biomass\\] int obs_trend_time_biomass;", data_block))
   expect_true(grepl("array\\[N_biomass\\] int obs_trend_series_biomass;", data_block))
-  
+
   # Verify mu_trend is computed from trend formula
   expect_true(grepl("mu_trend \\+= Intercept_trend \\+ Xc_trend \\* b_trend;", code_with_trend))
-  
+
   # Check no template placeholders remain
   expect_false(grepl("\\{lags\\}", code_with_trend))
   expect_false(grepl("\\{n_lags\\}", code_with_trend))
   expect_false(grepl("\\{response\\}", code_with_trend))
-  
+
   # Check for duplicate parameter declarations
   sigma_trend_count <- length(gregexpr("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend)[[1]])
   expect_equal(sigma_trend_count, 1)
-  
+
   L_Omega_count <- length(gregexpr("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;", code_with_trend)[[1]])
   expect_equal(L_Omega_count, 1)
-  
+
   # Verify trend injection happens in a loop
   expect_true(grepl("for \\(n in 1:N_count\\) \\{[^}]*mu_count\\[n\\] \\+= trend", code_with_trend))
   expect_true(grepl("for \\(n in 1:N_biomass\\) \\{[^}]*mu_biomass\\[n\\] \\+= trend", code_with_trend))
@@ -519,13 +517,13 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   expect_true(grepl("Use initial MA errors for early time points", code_with_trend))
   expect_true(grepl("mu_t_trend\\[t\\] \\+= D_trend\\[1\\] \\* ma_init_trend;", code_with_trend))
   expect_true(grepl("mu_t_trend\\[t\\] \\+= D_trend\\[1\\] \\* ma_error_trend\\[t - 1\\];", code_with_trend))
-  
+
   # MA specific parameters must exist for VARMA model
   expect_true(grepl("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_raw_trend;", code_with_trend))
   expect_true(grepl("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_trend;", code_with_trend))
   expect_true(grepl("vector\\[N_lv_trend\\] ma_error_trend\\[N_trend\\];", code_with_trend))
   expect_true(grepl("vector\\[N_lv_trend\\] ma_init_trend", code_with_trend))
-  
+
   # MA transformation must occur
   expect_true(grepl("D_trend\\[1\\] = -result_ma\\[1, 1\\];", code_with_trend))
 

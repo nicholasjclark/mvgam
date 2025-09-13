@@ -1,14 +1,5 @@
 // generated with brms 2.22.9
 functions {
-  /* Spectral density function of a Gaussian process
-   * with squared exponential covariance kernel
-   * Args:
-   *   x: array of numeric values of dimension NB x D
-   *   sdgp: marginal SD parameter
-   *   lscale: vector of length-scale parameters
-   * Returns:
-   *   numeric vector of length NB of the SPD evaluated at 'x'
-   */
   vector spd_gp_exp_quad(data array[] vector x, real sdgp, vector lscale) {
     int NB = dims(x)[1];
     int D = dims(x)[2];

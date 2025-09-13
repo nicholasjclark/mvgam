@@ -1,6 +1,5 @@
 // generated with brms 2.22.9
 functions {
-  
       matrix get_changepoint_matrix(vector t, vector t_change_trend, int T, int S) {
         /* Function to sort changepoints */
 
@@ -37,8 +36,7 @@ functions {
         return gamma;
       }
 
-      vector logistic_trend(real k, real m, vector delta, vector t, vector cap_trend,
-                            matrix Kappa_trend, vector t_change_trend, int S) {
+      vector logistic_trend(real k, real m, vector delta, vector t, vector cap_trend,                             matrix Kappa_trend, vector t_change_trend, int S) {
         /* Function to adjust a logistic trend using a carrying capacity */
 
         /* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/
@@ -47,14 +45,12 @@ functions {
         return cap_trend .* inv_logit((k + Kappa_trend * delta) .* (t - (m + Kappa_trend * gamma)));
       }
 
-      vector linear_trend(real k, real m, vector delta, vector t, matrix Kappa_trend,
-                          vector t_change_trend) {
+      vector linear_trend(real k, real m, vector delta, vector t, matrix Kappa_trend,                           vector t_change_trend) {
         /* Function to compute a linear trend with changepoints */
 
         /* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/
         return (k + Kappa_trend * delta) .* t + (m + Kappa_trend * (-t_change_trend .* delta));
       }
-    
 }
 data {
   int<lower=1> N;  // total number of observations
@@ -150,4 +146,3 @@ generated quantities {
   // actual population-level intercept
   real b_Intercept = Intercept - dot_product(means_X, b);
 }
-
