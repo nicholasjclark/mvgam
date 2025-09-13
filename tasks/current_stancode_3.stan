@@ -371,23 +371,6 @@ transformed parameters {
 
   vector[N_lv_trend] ma_init_trend[1];  // Initial MA errors
 
-  // Working arrays for stationarity transformation
-  array[1] matrix[N_lv_trend, N_lv_trend] P_var;
-  array[2, 1] matrix[N_lv_trend, N_lv_trend] result_var;
-
-  // Transform A_raw_trend to stationary A_trend using Heaps methodology
-  for (i in 1:1) {
-    P_var[i] = AtoP(A_raw_trend[i]);
-  }
-
-  // Apply reverse mapping to get stationary coefficients
-  result_var = rev_mapping(P_var, Sigma_trend);
-
-  // Extract stationary VAR coefficients (these become our final A_trend)
-  for (i in 1:1) {
-    A_trend[i] = result_var[1, i];
-  }
-
   // Transform D_raw_trend to stationary D_trend (VARMA only)
 array[1] matrix[N_lv_trend, N_lv_trend] P_ma;
 array[2, 1] matrix[N_lv_trend, N_lv_trend] result_ma;

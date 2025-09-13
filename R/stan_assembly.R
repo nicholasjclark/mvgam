@@ -2545,8 +2545,9 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv, n_serie
   checkmate::assert_integerish(n_series, len = 1, lower = 1)
 
   # Get Z matrix components (dimensions handled by generate_common_trend_data)
+  # For factor models, skip parameters (handled by generate_factor_model)
   stanvars_list <- list(
-    generate_matrix_z_parameters(is_factor_model, n_lv, n_series),
+    if (!is_factor_model) generate_matrix_z_parameters(is_factor_model, n_lv, n_series) else NULL,
     generate_matrix_z_tdata(is_factor_model, n_lv, n_series)
   )
 
@@ -3778,23 +3779,6 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       cov_matrix[{if(is_varma) paste0('(', lags, ' + ', ma_lags, ') * N_lv_trend') else paste0(lags, ' * N_lv_trend')}] Omega_trend;
 
       {varma_ma_init}
-
-      // Working arrays for stationarity transformation
-      array[{lags}] matrix[N_lv_trend, N_lv_trend] P_var;
-      array[2, {lags}] matrix[N_lv_trend, N_lv_trend] result_var;
-
-      // Transform A_raw_trend to stationary A_trend using Heaps methodology
-      for (i in 1:{lags}) {{
-        P_var[i] = AtoP(A_raw_trend[i]);
-      }}
-
-      // Apply reverse mapping to get stationary coefficients
-      result_var = rev_mapping(P_var, Sigma_trend);
-
-      // Extract stationary VAR coefficients (these become our final A_trend)
-      for (i in 1:{lags}) {{
-        A_trend[i] = result_var[1, i];
-      }}
 
       {if(is_varma) glue::glue('
       // Transform D_raw_trend to stationary D_trend (VARMA only)

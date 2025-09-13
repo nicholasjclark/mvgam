@@ -255,32 +255,39 @@ transformed parameters {
   cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
   array[2] matrix[N_lv_trend, N_lv_trend] A_trend;
   array[1] matrix[N_lv_trend, N_lv_trend] D_trend;
-  array[2] matrix[N_lv_trend, N_lv_trend] P_var;
-  array[2, 2] matrix[N_lv_trend, N_lv_trend] result_var;
+  array[2] matrix[N_lv_trend, N_lv_trend] P_var_trend;
+  array[2, 2] matrix[N_lv_trend, N_lv_trend] result_var_trend;
 
   for (i in 1:2) {
-    P_var[i] = AtoP(A_raw_trend[i]);
+    P_var_trend[i] = AtoP(A_raw_trend[i]);
   }
 
-  result_var = rev_mapping(P_var, Sigma_trend);
+  result_var_trend = rev_mapping(P_var_trend, Sigma_trend);
 
   for (i in 1:2) {
-    A_trend[i] = result_var[1, i];
+    A_trend[i] = result_var_trend[1, i];
   }
 
-  array[1] matrix[N_lv_trend, N_lv_trend] P_ma;
-  array[2, 1] matrix[N_lv_trend, N_lv_trend] result_ma;
-  P_ma[1] = AtoP(D_raw_trend[1]);
-  result_ma = rev_mapping(P_ma, Sigma_trend);
-  D_trend[1] = -result_ma[1, 1];
+  array[1] matrix[N_lv_trend, N_lv_trend] P_ma_trend;
+  array[2, 1] matrix[N_lv_trend, N_lv_trend] result_ma_trend;
+
+  for (i in 1:1) {
+    P_ma_trend[i] = AtoP(D_raw_trend[i]);
+  }
+
+  result_ma_trend = rev_mapping(P_ma_trend, Sigma_trend);
+
+  for (i in 1:1) {
+    D_trend[i] = -result_ma_trend[1, i];
+  }
+
   cov_matrix[3 * N_lv_trend] Omega_trend = initial_joint_var(Sigma_trend, A_trend, D_trend);
   vector[N_lv_trend] ma_init_trend = init_trend[(2 * N_lv_trend + 1):(3 * N_lv_trend)];
   matrix[N_trend, N_series_trend] trend;
 
   for (i in 1:N_trend) {
     for (s in 1:N_series_trend) {
-      trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) +
-      mu_trend[times_trend[i, s]];
+      trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
     }
   }
 

@@ -164,6 +164,23 @@ tryCatch({
 })
 
 # ============================================================================
+# TARGET 8: Seasonal AR trends
+# ============================================================================
+cat("Generating current_stancode_8.stan (Seasonal AR trends)...\n")
+tryCatch({
+
+  mf8 <- mvgam_formula(
+    formula = y ~ gp(x, k = 5),
+    trend_formula = ~ -1 + gp(temperature, k = 6) + AR(p = c(1, 12))
+  )
+  code8 <- stancode(mf8, data = test_data$univariate, validate = FALSE)
+  writeLines(code8, 'tasks/current_stancode_8.stan')
+  cat("✓ current_stancode_8.stan created\n")
+}, error = function(e) {
+  cat("✗ Error generating target 8:", conditionMessage(e), "\n")
+})
+
+# ============================================================================
 # Summary and Comparison Instructions
 # ============================================================================
 cat("\n", strrep("=", 70), "\n")
@@ -171,7 +188,7 @@ cat("TARGET GENERATION COMPLETE\n")
 cat(strrep("=", 70), "\n")
 
 cat("\nGenerated files for comparison:\n")
-generated_files <- paste0("tasks/current_stancode_", 1:7, ".stan")
+generated_files <- paste0("tasks/current_stancode_", 1:8, ".stan")
 for (file in generated_files) {
   if (file.exists(file)) {
     cat("✓", file, "\n")

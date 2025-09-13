@@ -60,7 +60,6 @@ parameters {
   vector[Kc_biomass] b_biomass;  // regression coefficients
   real Intercept_biomass;  // temporary intercept for centered predictors
   real<lower=0> shape_biomass;  // shape parameter
-  matrix[N_series_trend, N_lv_trend] Z;
   vector<lower=0>[N_lv_trend] sigma_trend;
   cholesky_factor_corr[N_lv_trend] L_Omega_trend;
   matrix[N_trend, N_lv_trend] innovations_trend;
