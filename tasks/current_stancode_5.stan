@@ -100,6 +100,7 @@ parameters {
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+int<lower=1> N_trend;  // total number of observations
 mu_trend += Intercept_trend;
   matrix[N_trend, N_lv_trend] lv_trend;
   lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);

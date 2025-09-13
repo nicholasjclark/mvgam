@@ -71,6 +71,7 @@ vector[N_series_trend * N_lv_trend] Z_raw;  // raw factor loadings
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+int<lower=1> N_trend;  // total number of observations
   
     // Scaled innovations after applying correlations
     matrix[N_trend, N_lv_trend] scaled_innovations_trend;

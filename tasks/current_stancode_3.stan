@@ -210,49 +210,45 @@ transformed data {
   for (i_trend in 2:K_trend) {
     means_X_trend[i_trend - 1] = mean(X_trend[, i_trend]);
     Xc_trend[, i_trend - 1] = X_trend[, i_trend] - means_X_trend[i_trend - 1];
-    // Zero mean vector for VARMA process (following Heaps 2022)
-  vector[3] trend_zeros = rep_vector(0.0, 3);
+      // Zero mean vector for VARMA process (following Heaps 2022)
+    vector[3] trend_zeros = rep_vector(0.0, 3);
 
-  
-
-  // Hyperparameter constants for hierarchical priors (as constants, not user inputs)
-  // For A_trend coefficient matrices: diagonal and off-diagonal elements
-  array[2] vector[2] es_trend = {
-    {0.0, 0.0},    // Means for diagonal elements [lag 1, lag 2, ...]
-    {0.0, 0.0}     // Means for off-diagonal elements [lag 1, lag 2, ...]
-  };
-  array[2] vector[2] fs_trend = {
-    {1.0, 1.0},    // Standard deviations for diagonal elements
-    {1.0, 1.0}     // Standard deviations for off-diagonal elements
-  };
-  array[2] vector[2] gs_trend = {
-    {2.0, 2.0},    // Gamma shape parameters for diagonal precision
-    {2.0, 2.0}     // Gamma shape parameters for off-diagonal precision
-  };
-  array[2] vector[2] hs_trend = {
-    {1.0, 1.0},    // Gamma rate parameters for diagonal precision
-    {1.0, 1.0}     // Gamma rate parameters for off-diagonal precision
-  };
-
-  
-  // Additional hyperparameters for D_trend (MA coefficient matrices) when ma_lags > 0
-  array[2] vector[2] es_ma_trend = {{
-    {{0.0, 0.0}},    // Means for MA diagonal elements
-    {{0.0, 0.0}}     // Means for MA off-diagonal elements
-  }};
-  array[2] vector[2] fs_ma_trend = {{
-    {{1.0, 1.0}},    // Standard deviations for MA diagonal elements
-    {{1.0, 1.0}}     // Standard deviations for MA off-diagonal elements
-  }};
-  array[2] vector[2] gs_ma_trend = {{
-    {{2.0, 2.0}},    // Gamma shape for MA diagonal precision
-    {{2.0, 2.0}}     // Gamma shape for MA off-diagonal precision
-  }};
-  array[2] vector[2] hs_ma_trend = {{
-    {{1.0, 1.0}},    // Gamma rate for MA diagonal precision
-    {{1.0, 1.0}}     // Gamma rate for MA off-diagonal precision
-  }};
-  
+    
+      // Hyperparameter constants for hierarchical priors (as constants, not user inputs)
+      // For A_trend coefficient matrices: diagonal and off-diagonal elements
+      array[2] vector[2] es_trend = {
+        {0.0, 0.0},    // Means for diagonal elements [lag 1, lag 2, ...]
+        {0.0, 0.0}     // Means for off-diagonal elements [lag 1, lag 2, ...]
+      };
+      array[2] vector[2] fs_trend = {
+        {1.0, 1.0},    // Standard deviations for diagonal elements
+        {1.0, 1.0}     // Standard deviations for off-diagonal elements
+      };
+      array[2] vector[2] gs_trend = {
+        {2.0, 2.0},    // Gamma shape parameters for diagonal precision
+        {2.0, 2.0}     // Gamma shape parameters for off-diagonal precision
+      };
+      array[2] vector[2] hs_trend = {
+        {1.0, 1.0},    // Gamma rate parameters for diagonal precision
+        {1.0, 1.0}     // Gamma rate parameters for off-diagonal precision
+      };
+      // Additional hyperparameters for D_trend (MA coefficient matrices) when ma_lags > 0
+      array[2] vector[2] es_ma_trend = {
+        {0.0, 0.0},    // Means for MA diagonal elements
+        {0.0, 0.0}     // Means for MA off-diagonal elements
+      };
+      array[2] vector[2] fs_ma_trend = {
+        {1.0, 1.0},    // Standard deviations for MA diagonal elements
+        {1.0, 1.0}     // Standard deviations for MA off-diagonal elements
+      };
+      array[2] vector[2] gs_ma_trend = {
+        {2.0, 2.0},    // Gamma shape for MA diagonal precision
+        {2.0, 2.0}     // Gamma shape for MA off-diagonal precision
+      };
+      array[2] vector[2] hs_ma_trend = {
+        {1.0, 1.0},    // Gamma rate for MA diagonal precision
+        {1.0, 1.0}     // Gamma rate for MA off-diagonal precision
+      };
 }
 parameters {
   real Intercept_count;  // temporary intercept for centered predictors

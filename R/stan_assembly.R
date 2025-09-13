@@ -334,7 +334,6 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
   combined_stancode <- deduplicate_stan_functions(combined_stancode)
 
   # Generate complete standata using brms with trend stanvars included
-  # This follows the same pattern as assemble_mvgam_stan_data()
   combined_standata <- generate_base_brms_standata(
     formula = obs_setup$formula,
     data = obs_setup$data,
@@ -1822,123 +1821,8 @@ inject_multivariate_trends_into_linear_predictors <- function(
 # Main Assembly Functions
 # =======================
 
-#' Assemble Complete mvgam Stan Code
-#'
-#' @description
-#' Main orchestrator function that assembles complete Stan code for mvgam models
-#' by combining observation and trend components.
-#'
-#' @param obs_formula Formula for observation model
-#' @param trend_stanvars List of trend stanvars
-#' @param data Data for the model
-#' @param family Family specification
-#' @param backend Stan backend ("rstan" or "cmdstanr")
-#' @param validate Whether to validate final Stan code
-#' @return Character string of complete Stan code
-#' @noRd
-assemble_mvgam_stan_code <- function(obs_formula, trend_stanvars = NULL, data,
-                                    family = gaussian(), backend = "rstan",
-                                    validate = TRUE) {
-  checkmate::assert_class(obs_formula, "formula")
-  checkmate::assert_list(trend_stanvars, null.ok = TRUE)
-  checkmate::assert_data_frame(data)
 
-  # Generate base brms Stan code
-  base_stancode <- generate_base_brms_stancode(
-    formula = obs_formula,
-    data = data,
-    family = family,
-    stanvars = trend_stanvars,
-    backend = backend
-  )
 
-  # If no trend stanvars, return base code
-  if (is.null(trend_stanvars) || length(trend_stanvars) == 0) {
-    if (validate) {
-      validate_stan_code(base_stancode, backend = backend)
-    }
-    return(base_stancode)
-  }
-
-  # Inject trend effects into linear predictor
-  final_stancode <- inject_trend_into_linear_predictor(
-    base_stancode,
-    trend_stanvars
-  )
-
-  # Deduplicate any duplicate functions in the combined Stan code
-  final_stancode <- deduplicate_stan_functions(final_stancode)
-
-  # Validate final code if requested
-  if (validate) {
-    validate_stan_code(final_stancode, backend = backend)
-  }
-
-  return(final_stancode)
-}
-
-#' Assemble Complete mvgam Stan Data
-#'
-#' @description
-#' Assembles complete Stan data for mvgam models by combining observation
-#' and trend data components.
-#'
-#' @param obs_formula Formula for observation model
-#' @param trend_stanvars List of trend stanvars
-#' @param data Data for the model
-#' @param family Family specification
-#' @return List of complete Stan data
-#' @noRd
-assemble_mvgam_stan_data <- function(obs_formula, trend_stanvars = NULL, data,
-                                    family = gaussian()) {
-  checkmate::assert_class(obs_formula, "formula")
-  checkmate::assert_list(trend_stanvars, null.ok = TRUE)
-  checkmate::assert_data_frame(data)
-
-  # Generate complete Stan data including trend stanvars
-  # brms automatically incorporates stanvar data when provided
-  standata <- generate_base_brms_standata(
-    formula = obs_formula,
-    data = data,
-    family = family,
-    stanvars = trend_stanvars
-  )
-
-  # Validate final data structure
-  validate_stan_data_structure(standata)
-
-  return(standata)
-}
-
-#' Generate Base brms Stan Code
-#'
-#' @description
-#' Generates base Stan code using brms with optional stanvars injection.
-#'
-#' @param formula Formula for the model
-#' @param data Data for the model
-#' @param family Family specification
-#' @param stanvars Optional stanvars to inject
-#' @param backend Stan backend
-#' @return Character string of Stan code
-#' @noRd
-generate_base_brms_stancode <- function(formula, data, family = gaussian(),
-                                       stanvars = NULL, backend = "rstan") {
-  checkmate::assert_class(formula, "formula")
-  checkmate::assert_data_frame(data)
-
-  # Use brms to generate Stan code
-  stancode <-
-    brms::make_stancode(
-      formula = formula,
-      data = data,
-      family = family,
-      stanvars = stanvars,
-      backend = backend
-    )
-
-  return(stancode)
-}
 
 #' Generate Base brms Stan Data
 #'
@@ -3593,9 +3477,9 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   )
 
   # VAR/VARMA transformed data with hyperparameter constants and utility arrays
-  var_tdata_stanvar <- brms::stanvar(
-    name = "var_tdata",
-    scode = glue::glue("
+  
+  # Dynamic parts that need variable interpolation
+  dynamic_part <- glue::glue("
       // Zero mean vector for VARMA process (following Heaps 2022)
       vector[{n_lv}] trend_zeros = rep_vector(0.0, {n_lv});
 
@@ -3611,46 +3495,56 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         {group_inds_code}
       }}
       ') else ''}
-
+  ")
+  
+  # Static array initializations (no glue needed)
+  static_arrays <- "
       // Hyperparameter constants for hierarchical priors (as constants, not user inputs)
       // For A_trend coefficient matrices: diagonal and off-diagonal elements
-      array[2] vector[2] es_trend = {{
-        {{0.0, 0.0}},    // Means for diagonal elements [lag 1, lag 2, ...]
-        {{0.0, 0.0}}     // Means for off-diagonal elements [lag 1, lag 2, ...]
-      }};
-      array[2] vector[2] fs_trend = {{
-        {{1.0, 1.0}},    // Standard deviations for diagonal elements
-        {{1.0, 1.0}}     // Standard deviations for off-diagonal elements
-      }};
-      array[2] vector[2] gs_trend = {{
-        {{2.0, 2.0}},    // Gamma shape parameters for diagonal precision
-        {{2.0, 2.0}}     // Gamma shape parameters for off-diagonal precision
-      }};
-      array[2] vector[2] hs_trend = {{
-        {{1.0, 1.0}},    // Gamma rate parameters for diagonal precision
-        {{1.0, 1.0}}     // Gamma rate parameters for off-diagonal precision
-      }};
-
-      {if(is_varma) paste0('
+      array[2] vector[2] es_trend = {
+        {0.0, 0.0},    // Means for diagonal elements [lag 1, lag 2, ...]
+        {0.0, 0.0}     // Means for off-diagonal elements [lag 1, lag 2, ...]
+      };
+      array[2] vector[2] fs_trend = {
+        {1.0, 1.0},    // Standard deviations for diagonal elements
+        {1.0, 1.0}     // Standard deviations for off-diagonal elements
+      };
+      array[2] vector[2] gs_trend = {
+        {2.0, 2.0},    // Gamma shape parameters for diagonal precision
+        {2.0, 2.0}     // Gamma shape parameters for off-diagonal precision
+      };
+      array[2] vector[2] hs_trend = {
+        {1.0, 1.0},    // Gamma rate parameters for diagonal precision
+        {1.0, 1.0}     // Gamma rate parameters for off-diagonal precision
+      };"
+  
+  # Static VARMA arrays (no glue needed)
+  varma_arrays <- if(is_varma) {
+    "
       // Additional hyperparameters for D_trend (MA coefficient matrices) when ma_lags > 0
-      array[2] vector[2] es_ma_trend = {{
-        {{0.0, 0.0}},    // Means for MA diagonal elements
-        {{0.0, 0.0}}     // Means for MA off-diagonal elements
-      }};
-      array[2] vector[2] fs_ma_trend = {{
-        {{1.0, 1.0}},    // Standard deviations for MA diagonal elements
-        {{1.0, 1.0}}     // Standard deviations for MA off-diagonal elements
-      }};
-      array[2] vector[2] gs_ma_trend = {{
-        {{2.0, 2.0}},    // Gamma shape for MA diagonal precision
-        {{2.0, 2.0}}     // Gamma shape for MA off-diagonal precision
-      }};
-      array[2] vector[2] hs_ma_trend = {{
-        {{1.0, 1.0}},    // Gamma rate for MA diagonal precision
-        {{1.0, 1.0}}     // Gamma rate for MA off-diagonal precision
-      }};
-      ') else ''}
-    "),
+      array[2] vector[2] es_ma_trend = {
+        {0.0, 0.0},    // Means for MA diagonal elements
+        {0.0, 0.0}     // Means for MA off-diagonal elements
+      };
+      array[2] vector[2] fs_ma_trend = {
+        {1.0, 1.0},    // Standard deviations for MA diagonal elements
+        {1.0, 1.0}     // Standard deviations for MA off-diagonal elements
+      };
+      array[2] vector[2] gs_ma_trend = {
+        {2.0, 2.0},    // Gamma shape for MA diagonal precision
+        {2.0, 2.0}     // Gamma shape for MA off-diagonal precision
+      };
+      array[2] vector[2] hs_ma_trend = {
+        {1.0, 1.0},    // Gamma rate for MA diagonal precision
+        {1.0, 1.0}     // Gamma rate for MA off-diagonal precision
+      };"
+  } else {
+    ""
+  }
+  
+  var_tdata_stanvar <- brms::stanvar(
+    name = "var_tdata",
+    scode = paste0(dynamic_part, static_arrays, varma_arrays),
     block = "tdata"
   )
 
@@ -5343,49 +5237,43 @@ extract_computed_variable_name <- function(line, pattern) {
 #' @noRd
 should_include_in_transformed_parameters <- function(declaration) {
   checkmate::assert_string(declaration, min.chars = 1)
-
-  # Patterns for computed variables that SHOULD be in transformed parameters
-  computed_patterns <- c(
-    # GP predictions: vector[...] gp_pred_X = gp_exp_quad(...)
-    "vector\\[.*\\]\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s*=\\s*gp_exp_quad",
-    # Spline computations: vector[...] s_X_Y = sds_X[...] * zs_X_Y
-    "vector\\[.*\\]\\s+s_[a-zA-Z0-9_]+\\s*=\\s*sds_.*\\*",
-    # Random effects computations: vector[...] r_X_Y = (sd_X[...] * ...)
-    "vector\\[.*\\]\\s+r_[a-zA-Z0-9_]+\\s*=\\s*\\(",
-    # Monotonic effects: vector[...] mo_... =
-    "vector\\[.*\\]\\s+mo_[a-zA-Z0-9_]*\\s*=",
-    # Category-specific effects: vector[...] cs_... =
-    "vector\\[.*\\]\\s+cs_[a-zA-Z0-9_]*\\s*="
-  )
-
-  # Check if declaration matches any computed variable pattern
-  for (pattern in computed_patterns) {
-    if (grepl(pattern, declaration, perl = TRUE)) {
-      return(TRUE)
-    }
+  
+  # Skip empty declarations
+  if (nchar(trimws(declaration)) == 0) return(FALSE)
+  
+  # SEMANTIC RULE 1: No assignment = data/parameter declaration
+  # Pure declarations like "int N;" or "vector[N] X;" belong in data/parameters blocks
+  has_assignment <- grepl("=", declaration)
+  if (!has_assignment) {
+    return(FALSE)
   }
-
-  # Patterns for variables that should NOT be in transformed parameters
-  data_param_patterns <- c(
-    # Data block variables: int<lower=1> N_trend;
-    "^\\s*int\\s*<[^>]*>\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s*;",
-    # Parameter declarations: real Intercept_trend;
-    "^\\s*real\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s*;",
-    # Vector data: vector[N_trend] Y;
-    "^\\s*vector\\[.*\\]\\s+[A-Z][a-zA-Z0-9_]*\\s*;",
-    # Simple vector initialization: vector[N] mu = rep_vector(...)
-    "^\\s*vector\\[.*\\]\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s*=\\s*rep_vector"
+  
+  # SEMANTIC RULE 2: Exclude simple initializations that don't need dependency ordering
+  # These are basic Stan initializations that can be computed anywhere
+  simple_initialization_patterns <- c(
+    # Zero initializations
+    "=\\s*rep_vector\\s*\\(\\s*0\\.",
+    "=\\s*rep_matrix\\s*\\(\\s*0\\.",
+    
+    # Simple constant vectors/matrices (any numeric value)
+    "=\\s*rep_vector\\s*\\(\\s*[0-9]",  
+    "=\\s*rep_matrix\\s*\\(\\s*[0-9]",
+    
+    # Simple scalar constants (integer or float)  
+    "=\\s*[0-9]+\\.?[0-9]*\\s*;\\s*$"
   )
-
-  # Check if declaration matches any data/parameter pattern (should be excluded)
-  for (pattern in data_param_patterns) {
+  
+  # Check if it's a simple initialization
+  for (pattern in simple_initialization_patterns) {
     if (grepl(pattern, declaration, perl = TRUE)) {
       return(FALSE)
     }
   }
-
-  # Default: exclude unknown declarations to be safe
-  return(FALSE)
+  
+  # SEMANTIC RULE 3: Complex assignments should be included
+  # If it has assignment and isn't simple initialization, it's a computation that needs ordering
+  # This includes GP computations, matrix operations, function calls, etc.
+  return(TRUE)
 }
 
 
@@ -5393,9 +5281,70 @@ should_include_in_transformed_parameters <- function(declaration) {
 #'
 #' Scans all Stan blocks to find declarations for referenced variables
 #'
+#' Extract variable dependencies from a Stan declaration
+#' 
+#' Parses a Stan variable declaration to find what variables it depends on.
+#' This is used for recursive dependency resolution in GP computations.
+#' 
+#' @param declaration Character string containing a Stan variable declaration
+#' @return Character vector of variable names this declaration depends on
+#' @examples
+#' \dontrun{
+#' # Example declaration: "vector[Nsubgp_1] gp_pred_1 = Xgp_1 * rgp_1;"
+#' # Returns: c("Nsubgp_1", "Xgp_1", "rgp_1")
+#' extract_dependencies_from_declaration(declaration)
+#' }
+#' @noRd
+extract_dependencies_from_declaration <- function(declaration) {
+  checkmate::assert_string(declaration)
+  
+  if (nchar(trimws(declaration)) == 0) {
+    return(character(0))
+  }
+  
+  # Extract right-hand side of assignment if present
+  if (grepl("=", declaration)) {
+    rhs_match <- regmatches(declaration, regexpr("=\\s*([^;]+)", declaration, perl = TRUE))
+    if (length(rhs_match) > 0) {
+      rhs <- gsub("^=\\s*", "", rhs_match)
+      
+      # Extract identifiers from RHS using existing Stan identifier extraction
+      identifiers <- extract_stan_identifiers(rhs)
+      
+      # Filter out known Stan functions, operators, and literals
+      stan_functions <- c("sqrt", "exp", "log", "inv", "dot_self", "dot_product", 
+                         "rep_vector", "rep_matrix", "to_vector", "to_matrix",
+                         "spd_gp_exp_quad", "gp_exp_quad", "gp_exp_quad_cov",
+                         "normal_lpdf", "std_normal_lpdf", "student_t_lpdf", 
+                         "exponential", "inv_gamma_lpdf", "gamma_lpdf",
+                         "diag_matrix", "diag_pre_multiply", "quad_form_diag")
+      
+      # Keep only variables (not functions or numeric literals)
+      variables <- identifiers[!identifiers %in% stan_functions &
+                              !grepl("^[0-9.]+$", identifiers)]
+      
+      return(variables)
+    }
+  }
+  
+  return(character(0))
+}
+
+#' Find Variable Declarations with Recursive Dependency Resolution
+#'
+#' Searches Stan code for variable declarations, following dependency chains
+#' recursively. This is crucial for GP models where gp_pred_1 depends on rgp_1,
+#' which in turn depends on other variables.
+#'
 #' @param stancode Character string containing complete Stan model code
 #' @param referenced_vars Character vector of variable names to find declarations for
-#' @return Character vector of variable declaration lines
+#' @return Character vector of variable declaration lines in dependency order
+#' @examples
+#' \dontrun{
+#' # When searching for gp_pred_1, will also find rgp_1 declaration
+#' declarations <- find_variable_declarations(stan_code, c("gp_pred_1"))
+#' # Returns both: rgp_1 declaration and gp_pred_1 declaration
+#' }
 #' @noRd
 find_variable_declarations <- function(stancode, referenced_vars) {
   if (length(referenced_vars) == 0) {
@@ -5408,37 +5357,67 @@ find_variable_declarations <- function(stancode, referenced_vars) {
   # Stan blocks to search for variable declarations  
   blocks_to_search <- c("data", "transformed data", "parameters", "transformed parameters", "model")
 
-  all_declarations <- character(0)
+  # RECURSIVE DEPENDENCY RESOLUTION ALGORITHM
+  # Initialize search queue with originally requested variables
+  to_search <- referenced_vars
+  already_searched <- character(0)  # Prevent infinite loops
+  all_declarations <- character(0)  # Accumulate found declarations
 
-  # Search each block for variable declarations
-  for (block_name in blocks_to_search) {
-    block_content <- extract_stan_block_content(stancode, block_name)
+  # Continue until no more variables to search (complete dependency tree explored)
+  while (length(to_search) > 0) {
+    current_var <- to_search[1]
+    to_search <- to_search[-1]  # Remove current variable from queue
+    
+    # Skip if already processed (prevents infinite recursion)
+    if (current_var %in% already_searched) next
+    
+    # Search for current variable's declaration across all Stan blocks
+    found_declaration <- NULL
+    for (block_name in blocks_to_search) {
+      block_content <- extract_stan_block_content(stancode, block_name)
 
-    if (is.null(block_content) || nchar(trimws(block_content)) == 0) {
-      next
-    }
+      if (is.null(block_content) || nchar(trimws(block_content)) == 0) {
+        next
+      }
 
-    # Split into lines and clean
-    lines <- strsplit(block_content, "\n")[[1]]
-    lines <- trimws(lines)
-    lines <- lines[nchar(lines) > 0]
+      # Split into lines and clean
+      lines <- strsplit(block_content, "\n")[[1]]
+      lines <- trimws(lines)
+      lines <- lines[nchar(lines) > 0]
 
-    # Find declarations for each referenced variable
-    for (var_name in referenced_vars) {
-      # Pattern to match variable declarations:
-      # - type[dims] variable_name = expression; (variable with assignment)
-      # - type[dims] variable_name; (variable declaration only)
-      # Handle both simple and array types
-
+      # Create regex pattern for this variable
+      # Matches: type[dims] variable_name = expression; or type[dims] variable_name;
       var_pattern <- paste0("^\\s*(real|int|vector|matrix|array).*?\\b",
-                           gsub("([.^$*+?{}\\[\\]()\\\\|])", "\\\\\\1", var_name),
+                           gsub("([.^$*+?{}\\[\\]()\\\\|])", "\\\\\\1", current_var),
                            "\\b.*?[;=]")
 
       matches <- grep(var_pattern, lines, value = TRUE, perl = TRUE)
-      all_declarations <- c(all_declarations, matches)
+      if (length(matches) > 0) {
+        found_declaration <- matches[1]  # Take first match
+        break  # Found in this block, no need to search other blocks
+      }
     }
+    
+    # If declaration found, add it and discover new dependencies
+    if (!is.null(found_declaration)) {
+      all_declarations <- c(all_declarations, found_declaration)
+      
+      # RECURSIVE STEP: Extract dependencies from this declaration's RHS
+      new_dependencies <- extract_dependencies_from_declaration(found_declaration)
+      
+      # Add unseen dependencies to search queue (avoid duplicates and cycles)
+      unseen_deps <- setdiff(new_dependencies, c(already_searched, to_search))
+      
+      if (length(unseen_deps) > 0) {
+        to_search <- c(to_search, unseen_deps)
+      }
+    }
+    
+    # Mark current variable as processed
+    already_searched <- c(already_searched, current_var)
   }
 
+  # Return unique declarations (dependency order naturally preserved by algorithm)
   return(unique(all_declarations))
 }
 

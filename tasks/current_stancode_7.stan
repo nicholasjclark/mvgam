@@ -57,6 +57,7 @@ transformed parameters {
   vector[N_1] r_1_1;  // actual group-level effects
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+int<lower=1> N_trend;  // total number of observations
 mu_trend += Intercept_trend;
 
 for (n in 1:N_trend) {
