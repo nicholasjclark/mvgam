@@ -5142,21 +5142,27 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
 
     time_param <- paste0("N", suffix)
 
-    mu_construction_result <- extract_mu_construction_from_model_block(stancode)
+    mu_construction_result <- extract_mu_construction_with_classification(stancode)
 
     if (length(mu_construction_result$mu_construction) > 0) {
       required_vars <- mu_construction_result$referenced_variables
       missing_vars <- setdiff(required_vars, names(mapping$original_to_renamed))
 
-      # ENHANCED FIX: Add missing computed variables to mapping before error check
+      # COMPREHENSIVE FIX: Search all Stan blocks for missing variables
       if (length(missing_vars) > 0) {
-        # Extract computed variables from entire stancode to find missing ones
+        # Extract computed variables from entire stancode  
         all_computed_vars <- extract_computed_variables(stancode)
+        
+        # Find declared variables in all Stan blocks (data, parameters, etc.)
+        all_declared_vars <- find_variable_declarations(stancode, missing_vars)
 
-        # Add any missing computed variables that exist in stancode
+        # Combine both computed and declared variables
+        all_available_vars <- unique(c(all_computed_vars, all_declared_vars))
+
+        # Add any missing variables that exist in stancode
         added_vars <- character(0)
         for (missing_var in missing_vars) {
-          if (missing_var %in% all_computed_vars) {
+          if (missing_var %in% all_available_vars) {
             renamed_var <- paste0(missing_var, suffix)
             mapping$original_to_renamed[[missing_var]] <- renamed_var
             mapping$renamed_to_original[[renamed_var]] <- missing_var
@@ -5164,13 +5170,13 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
           }
         }
 
-        # Recalculate missing vars after adding computed variables
+        # Recalculate missing vars after comprehensive search
         missing_vars <- setdiff(required_vars, names(mapping$original_to_renamed))
 
-        # Only error if there are still truly missing variables after computed var addition
+        # Only error if there are still truly missing variables after comprehensive search
         if (length(missing_vars) > 0) {
           insight::format_error(
-            "Variable mapping missing required variables: {.field {missing_vars}}. These variables were referenced in mu construction but not found in parameter mapping or computed variables."
+            "Variable mapping missing required variables: {.field {missing_vars}}. These variables were referenced in mu construction but not found in any Stan block (data, parameters, transformed data, transformed parameters, or computed variables)."
           )
         }
       }
@@ -5646,36 +5652,113 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
     }
   }
 
-  # Transform mu expressions to mu_trend expressions
+  # Transform mu expressions to mu_trend expressions with loop structure preservation
   mu_trend_expressions <- character(0)
+  loop_expressions <- character(0)
+  
   for (expr in mu_construction) {
     if (nchar(trimws(expr)) == 0) {  # Skip empty expressions
       next
     }
 
-    # Replace 'mu' with 'mu_trend'
-    trend_expr <- gsub("\\bmu\\b", "mu_trend", expr)
+    # Check if this expression requires a loop (has mu[n] pattern)
+    requires_loop <- grepl("\\bmu\\[n\\]", expr)
+    
+    if (requires_loop) {
+      # Transform mu[n] to mu_trend[n] and apply variable renaming
+      trend_expr <- gsub("\\bmu\\[n\\]", "mu_trend[n]", expr)
+      
+      # Apply variable renaming in sorted order
+      for (original_var in sorted_var_names) {
+        renamed_var <- variable_mapping[[original_var]]
+        trend_expr <- gsub(paste0("\\b", original_var, "\\b"), renamed_var, trend_expr)
+      }
+      
+      # Store as loop expression (will be wrapped in for loop later)
+      loop_expressions <- c(loop_expressions, paste0("  ", trend_expr))
+      
+    } else {
+      # Simple assignment - replace 'mu' with 'mu_trend'
+      trend_expr <- gsub("\\bmu\\b", "mu_trend", expr)
 
-    # Apply variable renaming in sorted order
-    for (original_var in sorted_var_names) {
-      renamed_var <- variable_mapping[[original_var]]
-      trend_expr <- gsub(paste0("\\b", original_var, "\\b"), renamed_var, trend_expr)
+      # Apply variable renaming in sorted order
+      for (original_var in sorted_var_names) {
+        renamed_var <- variable_mapping[[original_var]]
+        trend_expr <- gsub(paste0("\\b", original_var, "\\b"), renamed_var, trend_expr)
+      }
+
+      mu_trend_expressions <- c(mu_trend_expressions, trend_expr)
     }
-
-    mu_trend_expressions <- c(mu_trend_expressions, trend_expr)
   }
 
   # Create complete mu_trend construction code
-  # Check if initialization already exists in ORIGINAL mu_construction to avoid duplication
-  has_mu_initialization <- any(grepl("vector\\[.*\\]\\s+mu\\s*=\\s*rep_vector", mu_construction))
+  # Check if initialization already exists in ORIGINAL mu_construction 
+  # to avoid duplication
+  has_mu_initialization <- any(grepl("vector\\[.*\\]\\s+mu\\s*=\\s*rep_vector", 
+                                   mu_construction))
 
+  # Define patterns for computed variable declarations that must come first
+  # These patterns identify Stan computed variables that need declaration 
+  # before usage
+  gp_pattern <- "^\\s*vector\\[.*\\]\\s+gp_pred_[0-9]+_trend\\s*="
+  spline_pattern <- "^\\s*vector\\[.*\\]\\s+s_[0-9]+_[0-9]+_trend\\s*="
+  mono_pattern <- "^\\s*vector\\[.*\\]\\s+mo_[a-zA-Z0-9_]+_trend\\s*="
+  # General vector/matrix declaration pattern (excluding mu_trend init)
+  general_decl_pattern <- paste0(
+    "^\\s*(vector|matrix|array)\\[.*\\]\\s+[a-zA-Z_][a-zA-Z0-9_]*_trend\\s*=",
+    "(?!.*mu_trend\\s*=\\s*rep_vector)"
+  )
+
+  # Separate computed variable declarations from mu_trend expressions
+  # Computed vars must come BEFORE mu_trend usage for Stan compilation
+  computed_var_declarations <- character(0)
+  mu_only_expressions <- character(0)
+  
+  for (expr in mu_trend_expressions) {
+    # Check if this expression is a computed variable declaration
+    is_computed_declaration <- (
+      grepl(gp_pattern, expr, perl = TRUE) ||
+      grepl(spline_pattern, expr, perl = TRUE) ||
+      grepl(mono_pattern, expr, perl = TRUE) ||
+      grepl(general_decl_pattern, expr, perl = TRUE)
+    )
+    
+    if (is_computed_declaration) {
+      computed_var_declarations <- c(computed_var_declarations, expr)
+    } else {
+      mu_only_expressions <- c(mu_only_expressions, expr)
+    }
+  }
+
+  # Assemble final code with proper dependency ordering and loop structure
+  base_code <- character(0)
+  
   if (!has_mu_initialization) {
     # No initialization in input, add one
-    init_code <- paste0("vector[", time_param, "] mu_trend = rep_vector(0.0, ", time_param, ");")
-    complete_code <- c(init_code, renamed_supporting_decls, mu_trend_expressions)
+    init_code <- paste0("vector[", time_param, 
+                       "] mu_trend = rep_vector(0.0, ", time_param, ");")
+    # Order: initialization, computed vars, other supporting decls, mu expressions
+    base_code <- c(init_code, computed_var_declarations, 
+                  renamed_supporting_decls, mu_only_expressions)
   } else {
-    # Initialization already exists in transformed expressions, don't duplicate
-    complete_code <- c(renamed_supporting_decls, mu_trend_expressions)
+    # Initialization already exists in transformed expressions
+    # Order: computed vars, other supporting decls, mu expressions  
+    base_code <- c(computed_var_declarations, renamed_supporting_decls, 
+                  mu_only_expressions)
+  }
+  
+  # Add loop structure if there are loop expressions
+  if (length(loop_expressions) > 0) {
+    # Create for loop with proper indentation
+    loop_code <- c(
+      "",  # Empty line for readability
+      paste0("for (n in 1:", time_param, ") {"),
+      loop_expressions,
+      "}"
+    )
+    complete_code <- c(base_code, loop_code)
+  } else {
+    complete_code <- base_code
   }
 
   return(complete_code)
@@ -5897,9 +5980,7 @@ extract_stan_block_content <- function(stancode, block_name) {
 
   # Handle case where block wasn't found
   if (length(content_lines) == 0 && !in_block) {
-    stop(insight::format_error(
-      "Stan block {.field {block_name}} not found in code"
-    ), call. = FALSE)
+    stop(paste("Stan block", block_name, "not found in code"), call. = FALSE)
   }
 
   return(paste(content_lines, collapse = "\n"))

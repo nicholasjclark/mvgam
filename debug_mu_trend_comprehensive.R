@@ -265,6 +265,13 @@ test_scenarios <- list(
     formula = bf(mvbind(count, biomass) ~ s(x)) + set_rescor(FALSE),
     trend_formula = ~ RW(cor = TRUE),
     data_type = "multivariate"
+  ),
+  
+  "Monotonic_CAR" = list(
+    description = "Monotonic CAR (Target 7 - failing)",
+    formula = bf(y ~ (1 | series), family = poisson()),
+    trend_formula = ~ mo(income) + CAR(),
+    data_type = "univariate"
   )
 )
 
@@ -286,6 +293,12 @@ setup_stan_test_data <- function() {
     x = rnorm(n_time),
     temperature = rnorm(n_time, mean = 15, sd = 3)
   )
+  
+  # Add ordered factor for monotonic effects (Target 7)
+  income_options <- c("below_20", "20_to_40", "40_to_100", "greater_100")
+  income <- factor(sample(income_options, n_time, TRUE),
+                   levels = income_options, ordered = TRUE)
+  univariate$income <- income
 
   # Multivariate dataset with balanced design  
   multivariate <- data.frame(
@@ -297,6 +310,10 @@ setup_stan_test_data <- function() {
     x = rnorm(n_time * n_series),
     temperature = rnorm(n_time * n_series, mean = 15, sd = 3)
   )
+  
+  # Add ordered factor for monotonic effects  
+  multivariate$income <- factor(sample(income_options, n_time * n_series, TRUE),
+                               levels = income_options, ordered = TRUE)
 
   return(list(univariate = univariate, multivariate = multivariate))
 }

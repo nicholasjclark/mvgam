@@ -146,6 +146,24 @@ tryCatch({
 })
 
 # ============================================================================
+# TARGET 7: CAR trends (monotonic + irregular time)
+# ============================================================================
+cat("Generating current_stancode_7.stan (CAR trends)...\n")
+tryCatch({
+
+  income_options <- c("below_20", "20_to_40", "40_to_100", "greater_100")
+  income <- factor(sample(income_options, NROW(test_data$univariate), TRUE),
+                   levels = income_options, ordered = TRUE)
+  test_data$univariate$income <- income
+  mf6 <- mvgam_formula(y ~ (1 | series), trend_formula = ~ mo(income) + CAR())
+  code6 <- stancode(mf6, data = test_data$univariate, family = poisson(), validate = FALSE)
+  writeLines(code6, 'tasks/current_stancode_7.stan')
+  cat("✓ current_stancode_7.stan created\n")
+}, error = function(e) {
+  cat("✗ Error generating target 7:", conditionMessage(e), "\n")
+})
+
+# ============================================================================
 # Summary and Comparison Instructions
 # ============================================================================
 cat("\n", strrep("=", 70), "\n")
@@ -153,7 +171,7 @@ cat("TARGET GENERATION COMPLETE\n")
 cat(strrep("=", 70), "\n")
 
 cat("\nGenerated files for comparison:\n")
-generated_files <- paste0("tasks/current_stancode_", 1:6, ".stan")
+generated_files <- paste0("tasks/current_stancode_", 1:7, ".stan")
 for (file in generated_files) {
   if (file.exists(file)) {
     cat("✓", file, "\n")
@@ -161,30 +179,3 @@ for (file in generated_files) {
     cat("✗", file, "(failed to generate)\n")
   }
 }
-
-cat("\nCOMPARISON INSTRUCTIONS:\n")
-cat("1. Compare each current_stancode_*.stan with tasks/target_stancode_*.stan\n")
-cat("2. Use diff tools like:\n")
-cat("   - diff current_stancode_3.stan tasks/target_stancode_3.stan\n")
-cat("   - Or use VS Code/other editors with side-by-side comparison\n")
-cat("3. Focus on structural differences:\n")
-cat("   - Missing data block variables (obs_trend_time_*, obs_trend_series_*)\n")
-cat("   - Template placeholders not replaced ({lags}, {response})\n")
-cat("   - Duplicate parameter declarations\n")
-cat("   - Incorrect mu_trend computation\n")
-cat("   - Missing MA components for VARMA models\n")
-cat("   - Factor model code in non-factor models\n")
-
-cat("\nEXAMPLE COMPARISON:\n")
-cat("# Quick check for major issues in target 3 (VARMA):\n")
-cat("grep -n 'obs_trend_time_count' current_stancode_3.stan\n")
-cat("grep -n '{lags}' current_stancode_3.stan\n")
-cat("grep -n 'mu_trend +=' current_stancode_3.stan\n")
-cat("grep -n 'D_raw_trend' current_stancode_3.stan\n")
-
-cat("\nRUN VALIDATION:\n")
-cat("# Check Stan syntax (optional):\n")
-cat("library(rstan)\n")
-cat("stanc('current_stancode_3.stan')  # Should compile without errors\n")
-
-cat("\n", strrep("=", 70), "\n")

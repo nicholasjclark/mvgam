@@ -44,8 +44,8 @@ transformed parameters {
   vector[N_1] r_1_1;  // actual group-level effects
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
-mu_trend += Intercept_trend + gp_pred_1_trend[Jgp_1_trend];
 vector[Nsubgp_1_trend] gp_pred_1_trend = gp_exp_quad(Xgp_1_trend, sdgp_1_trend[1], lscale_1_trend[1], zgp_1_trend);
+mu_trend += Intercept_trend + gp_pred_1_trend[Jgp_1_trend];
   matrix[N_trend, N_lv_trend] lv_trend;
   matrix[N_trend, N_lv_trend] scaled_innovations_trend;
   scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);
