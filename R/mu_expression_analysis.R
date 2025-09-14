@@ -37,7 +37,12 @@ extract_mu_construction_with_classification <- function(stancode) {
   referenced_vars <- extract_comprehensive_variable_references(classified_expressions, stancode)
   
   # Find supporting declarations using existing utility
-  supporting_declarations <- find_variable_declarations(stancode, referenced_vars)
+  # Only search model and transformed parameters blocks to avoid data/parameter contamination
+  supporting_declarations <- find_variable_declarations(
+    stancode = stancode, 
+    referenced_vars = referenced_vars,
+    search_blocks = c("transformed parameters", "model")
+  )
   
   # Store classification metadata for downstream use
   attr(mu_lines, "classification") <- classified_expressions

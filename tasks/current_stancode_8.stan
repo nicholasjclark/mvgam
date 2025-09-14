@@ -76,8 +76,8 @@ vector<lower=-1,upper=1>[N_lv_trend] ar12_trend;
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
-vector[Nsubgp_1_trend] gp_pred_1_trend = Xgp_1_trend * rgp_1;
 vector[NBgp_1_trend] rgp_1 = sqrt(spd_gp_exp_quad(slambda_1_trend, sdgp_1_trend[1], lscale_1_trend[1])) .* zgp_1_trend;
+vector[Nsubgp_1_trend] gp_pred_1_trend = Xgp_1_trend * rgp_1;
 mu_trend += gp_pred_1_trend[Jgp_1_trend];
   
     // Scaled innovations (uncorrelated case)
@@ -97,6 +97,30 @@ lprior += inv_gamma_lpdf(lscale_1_trend[1][1] | 1.494197, 0.056607);
   // Initialize first 12 time points
   for (i in 1:12) {
     lv_trend[i, :] = scaled_innovations_trend[i, :];
+  }
+
+  // Apply AR dynamics
+  for (i in 13:N_trend) {
+    for (j in 1:N_lv_trend) {
+      lv_trend[i, j] = ar1_trend[j] * lv_trend[i-1, j] + ar12_trend[j] * lv_trend[i-12, j] + scaled_innovations_trend[i, j];
+    }
+  }
+    // Derived latent trends using universal computation pattern
+  matrix[N_trend, N_series_trend] trend;
+
+  // Universal trend computation: state-space dynamics + linear predictors
+  // dot_product captures dynamic component, mu_trend captures trend_formula
+  for (i in 1:N_trend) {
+    for (s in 1:N_series_trend) {
+      trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
+    }
+  }
+  lprior += student_t_lpdf(Intercept | 3, 6, 3);
+  lprior += student_t_lpdf(sdgp_1 | 3, 0, 3)
+    - 1 * student_t_lccdf(0 | 3, 0, 3);
+  lprior += inv_gamma_lpdf(lscale_1[1][1] | 1.494197, 0.056607);
+  lprior += student_t_lpdf(sigma | 3, 0, 3)
+    - 1 * student_t_lccdf(0 | 3, 0, 3);
 }
 model {
   // Shared Gaussian innovation priors

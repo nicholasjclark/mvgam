@@ -31,33 +31,14 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 
 ## IMMEDIATE PRIORITIES (Updated: 2025-09-14)
 
-1. **CRITICAL: File 8 GP Dependency Ordering** - Current lines 79-81 have incorrect order. `gp_pred_1_trend` uses `rgp_1` before `rgp_1` is defined. Must reorder declarations.
+1. **HIGH: File 8 Missing GP Trend Prior** - Add missing `target += std_normal_lpdf(zgp_1_trend);` prior in model block.
 
-2. **CRITICAL: File 8 Block Contamination** - Current lines 79-81 have declarations that should be in proper blocks rather than transformed parameters.
+2. **HIGH: File 4 Mathematical Ordering Issue** - Move `mu_biomass = inv(mu_biomass);` to occur AFTER trend effects are added, not before. Currently mathematically incorrect.
 
-3. **HIGH: File 8 Missing GP Trend Prior** - Add missing `target += std_normal_lpdf(zgp_1_trend);` prior in model block.
+3. **MEDIUM: File 7 Missing Prior** - Add missing `to_vector(innovations_trend) ~ std_normal();` prior statement.
 
-4. **HIGH: File 4 Mathematical Ordering Issue** - Move `mu_biomass = inv(mu_biomass);` to occur AFTER trend effects are added, not before. Currently mathematically incorrect.
+4. **LOW: File 3 Complex Function Issues** - Complex function implementations may cause compilation issues.
 
-5. **MEDIUM: File 7 Missing Prior** - Add missing `to_vector(innovations_trend) ~ std_normal();` prior statement.
+5. **LOW: File 1 Variable Ordering** - lprior statements scattered instead of grouped early.
 
-6. **LOW: File 3 Complex Function Issues** - Complex function implementations may cause compilation issues.
-
-7. **LOW: File 1 Variable Ordering** - lprior statements scattered instead of grouped early.
-
-8. **LOW: File 2 Unused Variable** - `matrix[N_lv_trend, N_lv_trend] Sigma_trend` declared but never used.
-
-## COMPILATION STATUS (Updated: 2025-09-14)
-
-- **Will Compile**: Files 1, 2, 5, 6 (4/8 files) - Duplicate variable issues resolved
-- **Will NOT Compile**: Files 3, 4, 7, 8 (4/8 files) - Various structural issues remain
-- **Progress**: Variable deduplication system now functional, eliminating duplicate declaration errors
-
-## COMPLETED WORK (2025-09-14)
-
-### Variable Deduplication System
-- Removed complex variable registry system (200+ lines of fragile regex code)
-- Fixed `extract_variable_from_line()` bug where Stan constraint syntax was incorrectly treated as assignments
-- Implemented token-based variable extraction that correctly handles `<lower=1>` and similar constraints
-- System now successfully removes duplicate variable declarations across all Stan blocks
-- Precedence rules: data > transformed data > parameters > transformed parameters
+6. **LOW: File 2 Unused Variable** - `matrix[N_lv_trend, N_lv_trend] Sigma_trend` declared but never used.

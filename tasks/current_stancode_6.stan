@@ -87,6 +87,29 @@ lprior += inv_gamma_lpdf(lscale_1_trend[1][1] | 1.494197, 0.056607);
   // Initialize first time point with innovations
   for (j in 1:N_lv_trend) {
     lv_trend[1, j] = scaled_innovations_trend[1, j];
+  }
+
+  // Apply continuous-time AR evolution for subsequent time points
+  for (j in 1:N_lv_trend) {
+    for (i in 2:N_trend) {
+      lv_trend[i, j] = pow(ar1_trend[j], time_dis[i, j]) * lv_trend[i - 1, j]
+                     + scaled_innovations_trend[i, j];
+    }
+  }
+    // Derived latent trends using universal computation pattern
+  matrix[N_trend, N_series_trend] trend;
+
+  // Universal trend computation: state-space dynamics + linear predictors
+  // dot_product captures dynamic component, mu_trend captures trend_formula
+  for (i in 1:N_trend) {
+    for (s in 1:N_series_trend) {
+      trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
+    }
+  }
+  r_1_1 = (sd_1[1] * (z_1[1]));
+  lprior += student_t_lpdf(Intercept | 3, 1.8, 2.5);
+  lprior += student_t_lpdf(sd_1 | 3, 0, 2.5)
+    - 1 * student_t_lccdf(0 | 3, 0, 2.5);
 }
 model {
   ar1_trend ~ normal(0, 0.5);

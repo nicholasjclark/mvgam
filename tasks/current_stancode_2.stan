@@ -64,6 +64,44 @@ mu_trend += Intercept_trend;
     {
       matrix[N_lv_trend, N_lv_trend] L_Sigma = diag_pre_multiply(sigma_trend, L_Omega_trend);
       scaled_innovations_trend = innovations_trend * L_Sigma';
+    }
+  matrix[N_trend, N_lv_trend] lv_trend;
+  lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);
+  matrix[N_lv_trend, N_lv_trend] Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
+    // Latent states with RW dynamics
+  
+
+  
+
+  // Apply RW dynamics
+  lv_trend[1, :] = scaled_innovations_trend[1, :];
+  for (i in 2:N_trend) {
+    lv_trend[i, :] = lv_trend[i-1, :] + scaled_innovations_trend[i, :];
+  }
+    // Derived latent trends using universal computation pattern
+  matrix[N_trend, N_series_trend] trend;
+
+  // Universal trend computation: state-space dynamics + linear predictors
+  // dot_product captures dynamic component, mu_trend captures trend_formula
+  for (i in 1:N_trend) {
+    for (s in 1:N_series_trend) {
+      trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
+    }
+  }
+  vector[N_biomass] mu_biomass = Xc_biomass * b_biomass;
+  for (n in 1:N_biomass) {
+    mu_biomass[n] += Intercept_biomass + trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
+  }
+  vector[N_count] mu_count = Xc_count * b_count;
+  for (n in 1:N_count) {
+    mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
+  }
+  lprior += student_t_lpdf(Intercept_count | 3, 4, 2.5);
+  lprior += student_t_lpdf(sigma_count | 3, 0, 2.5)
+    - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+  lprior += student_t_lpdf(Intercept_biomass | 3, 2.4, 2.5);
+  lprior += student_t_lpdf(sigma_biomass | 3, 0, 2.5)
+    - 1 * student_t_lccdf(0 | 3, 0, 2.5);
 }
 model {
   // Shared Gaussian innovation priors
