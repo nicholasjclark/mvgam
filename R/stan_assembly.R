@@ -332,6 +332,9 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
 
   # Deduplicate functions (GP models may have identical functions in both models)
   combined_stancode <- deduplicate_stan_functions(combined_stancode)
+  
+  # Deduplicate variables (prevent "Identifier already in use" compilation errors)
+  combined_stancode <- deduplicate_stan_variables(combined_stancode)
 
   # Generate complete standata using brms with trend stanvars included
   combined_standata <- generate_base_brms_standata(
@@ -5076,11 +5079,15 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
         }
       }
 
+      # Create variable registry for deduplication to prevent "Identifier already in use" errors
+      variable_registry <- create_variable_registry(stancode)
+      
       mu_trend_code_lines <- reconstruct_mu_trend_with_renamed_vars(
         mu_construction = mu_construction_result$mu_construction,
         supporting_declarations = mu_construction_result$supporting_declarations,
         variable_mapping = mapping$original_to_renamed,
-        time_param = time_param
+        time_param = time_param,
+        variable_registry = variable_registry
       )
 
       # Create stanvar from Enhanced mu_trend Construction System output
@@ -5235,11 +5242,22 @@ extract_computed_variable_name <- function(line, pattern) {
 #' @param declaration Character string of Stan variable declaration
 #' @return Logical indicating if declaration should be included in transformed parameters
 #' @noRd
-should_include_in_transformed_parameters <- function(declaration) {
+should_include_in_transformed_parameters <- function(declaration, variable_registry = NULL) {
   checkmate::assert_string(declaration, min.chars = 1)
   
   # Skip empty declarations
   if (nchar(trimws(declaration)) == 0) return(FALSE)
+  
+  # REGISTRY-AWARE RULE: If variable is already declared in data/parameters blocks, exclude it
+  if (!is.null(variable_registry)) {
+    var_name <- extract_variable_name_from_declaration(declaration)
+    if (!is.na(var_name) && nchar(var_name) > 0) {
+      # Check if variable is already declared in data or parameters blocks
+      if (var_name %in% c(variable_registry$data, variable_registry$parameters)) {
+        return(FALSE)
+      }
+    }
+  }
   
   # SEMANTIC RULE 1: No assignment = data/parameter declaration
   # Pure declarations like "int N;" or "vector[N] X;" belong in data/parameters blocks
@@ -5276,6 +5294,145 @@ should_include_in_transformed_parameters <- function(declaration) {
   return(TRUE)
 }
 
+
+#' Create Variable Registry for Deduplication
+#'
+#' Creates a comprehensive registry of all variable declarations across all Stan blocks.
+#' This registry is used to prevent duplicate declarations between data/parameters blocks
+#' and transformed parameters blocks, avoiding "Identifier already in use" compilation errors.
+#'
+#' @param stancode Character string containing complete Stan code
+#' @return Named list with variables declared in each block type
+#' @examples
+#' \dontrun{
+#' registry <- create_variable_registry(stancode)
+#' # Returns: list(
+#' #   data = c("N_trend", "Jgp_1_trend", "times_trend"),
+#' #   parameters = c("ar1_trend", "sigma_trend", "zgp_1_trend"),
+#' #   transformed_parameters = c("mu_trend", "gp_pred_1_trend")
+#' # )
+#' }
+#' @noRd
+create_variable_registry <- function(stancode) {
+  checkmate::assert_string(stancode, min.chars = 1)
+  
+  registry <- list(
+    data = character(0),
+    parameters = character(0),
+    transformed_parameters = character(0)
+  )
+  
+  # Extract declarations from each block type
+  block_types <- c("data", "parameters", "transformed parameters")
+  registry_names <- c("data", "parameters", "transformed_parameters")
+  
+  for (i in seq_along(block_types)) {
+    block_content <- extract_stan_block_content(stancode, block_types[i])
+    if (!is.null(block_content) && nchar(trimws(block_content)) > 0) {
+      variables <- extract_variables_from_block_content(block_content)
+      registry[[registry_names[i]]] <- variables
+    }
+  }
+  
+  registry
+}
+
+#' Extract Variable Names from Stan Block Content
+#'
+#' Parses Stan block content to extract all declared variable names.
+#' Uses robust parsing to handle various Stan declaration patterns.
+#'
+#' @param block_content Character string containing Stan block content
+#' @return Character vector of variable names declared in the block
+#' @noRd
+extract_variables_from_block_content <- function(block_content) {
+  checkmate::assert_string(block_content)
+  
+  if (nchar(trimws(block_content)) == 0) {
+    return(character(0))
+  }
+  
+  # Split into lines and process each declaration
+  lines <- strsplit(block_content, "\n")[[1]]
+  variables <- character(0)
+  
+  for (line in lines) {
+    line <- trimws(line)
+    
+    # Skip empty lines and comments
+    if (nchar(line) == 0 || grepl("^//", line)) {
+      next
+    }
+    
+    # Extract variable name from Stan declaration
+    var_name <- extract_variable_name_from_declaration(line)
+    if (!is.na(var_name) && nchar(var_name) > 0) {
+      variables <- c(variables, var_name)
+    }
+  }
+  
+  unique(variables)
+}
+
+#' Extract Variable Name from Stan Declaration
+#'
+#' Extracts the variable name from a Stan variable declaration line.
+#' Handles various Stan types: int, real, vector, matrix, array, etc.
+#'
+#' @param declaration Character string containing a Stan declaration
+#' @return Character string with variable name, or NA if not found
+#' @examples
+#' \dontrun{
+#' extract_variable_name_from_declaration("int<lower=1> N_trend;")
+#' # Returns: "N_trend"
+#' extract_variable_name_from_declaration("vector[N] mu_trend = rep_vector(0.0, N);")
+#' # Returns: "mu_trend"
+#' }
+#' @noRd
+extract_variable_name_from_declaration <- function(declaration) {
+  checkmate::assert_string(declaration)
+  
+  if (nchar(trimws(declaration)) == 0) {
+    return(NA_character_)
+  }
+  
+  # Remove leading/trailing whitespace
+  declaration <- trimws(declaration)
+  
+  # Handle different Stan declaration patterns
+  # Pattern 1: Simple types - int, real, etc.
+  # Example: "int<lower=1> N_trend;" or "real ar1_trend;"
+  simple_pattern <- "^(int|real)(?:<[^>]*>)?\\s+([a-zA-Z_][a-zA-Z0-9_]*)"
+  simple_match <- regmatches(declaration, regexpr(simple_pattern, declaration, perl = TRUE))
+  if (length(simple_match) > 0) {
+    var_match <- regmatches(simple_match, regexpr("[a-zA-Z_][a-zA-Z0-9_]*$", simple_match, perl = TRUE))
+    if (length(var_match) > 0) {
+      return(var_match)
+    }
+  }
+  
+  # Pattern 2: Vector/matrix types
+  # Example: "vector[N] mu_trend;" or "matrix[N, K] Z_trend;"
+  vector_pattern <- "^(vector|matrix|array)(?:<[^>]*>)?(?:\\[[^\\]]*\\])?\\s+([a-zA-Z_][a-zA-Z0-9_]*)"
+  vector_match <- regmatches(declaration, regexpr(vector_pattern, declaration, perl = TRUE))
+  if (length(vector_match) > 0) {
+    var_match <- regmatches(vector_match, regexpr("[a-zA-Z_][a-zA-Z0-9_]*$", vector_match, perl = TRUE))
+    if (length(var_match) > 0) {
+      return(var_match)
+    }
+  }
+  
+  # Pattern 3: Assignment declarations
+  # Example: "vector[N] mu_trend = rep_vector(0.0, N);"
+  if (grepl("=", declaration)) {
+    # Extract everything before the "=" sign
+    lhs <- trimws(sub("=.*$", "", declaration))
+    # Apply the same patterns to the LHS
+    return(extract_variable_name_from_declaration(paste0(lhs, ";")))
+  }
+  
+  return(NA_character_)
+}
 
 #' Find Variable Declarations Across All Stan Blocks
 #'
@@ -5432,6 +5589,7 @@ find_variable_declarations <- function(stancode, referenced_vars) {
 #' @param supporting_declarations Character vector of variable declarations that support mu expressions
 #' @param variable_mapping Named list mapping original variable names to renamed versions (original -> renamed_trend)
 #' @param time_param Character string specifying time dimension parameter name (default: "N_trend")
+#' @param variable_registry Named list of variables declared in each Stan block (default: NULL)
 #' @return Character vector of Stan code lines for mu_trend construction
 #' @examples
 #' \dontrun{
@@ -5441,12 +5599,15 @@ find_variable_declarations <- function(stancode, referenced_vars) {
 #' reconstruct_mu_trend_with_renamed_vars(mu_exprs, support_decls, var_map)
 #' }
 #' @noRd
-reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_declarations, variable_mapping, time_param = "N_trend") {
+reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_declarations, variable_mapping, time_param = "N_trend", variable_registry = NULL) {
   # Enhanced validation following project standards
   checkmate::assert_character(mu_construction)
   checkmate::assert_character(supporting_declarations)
   checkmate::assert_list(variable_mapping, types = "character", names = "named", min.len = 1)
   checkmate::assert_string(time_param, pattern = "^[A-Za-z][A-Za-z0-9_]*$")
+  if (!is.null(variable_registry)) {
+    checkmate::assert_list(variable_registry, names = "named")
+  }
 
   if (length(mu_construction) == 0) {
     return(character(0))
@@ -5470,7 +5631,8 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
     }
 
     # Only include computed variables (GP, splines, random effects, etc.) - NOT data/parameter declarations
-    if (should_include_in_transformed_parameters(decl)) {
+    # Use registry-aware checking to prevent duplicates
+    if (should_include_in_transformed_parameters(decl, variable_registry)) {
       renamed_decl <- decl
       for (original_var in sorted_var_names) {
         renamed_var <- variable_mapping[[original_var]]
@@ -6671,6 +6833,243 @@ deduplicate_stan_functions <- function(stan_code) {
   final_code <- replace_stan_functions_block(stan_code, new_functions_block)
   
   return(final_code)
+}
+
+#' Deduplicate Stan Variable Declarations
+#'
+#' Removes duplicate variable declarations across Stan blocks using precedence rules.
+#' Follows the same pattern as deduplicate_stan_functions().
+#' Precedence: data > transformed data > parameters > transformed parameters
+#'
+#' @param stan_code Character string containing complete Stan model code
+#' @return Character string with deduplicated variable declarations
+#' @noRd
+deduplicate_stan_variables <- function(stan_code) {
+  checkmate::assert_character(stan_code, len = 1, any.missing = FALSE)
+  
+  if (nchar(trimws(stan_code)) == 0) {
+    return(stan_code)
+  }
+  
+  # Extract variables from each block
+  data_vars <- extract_variables_from_block(stan_code, "data")
+  tdata_vars <- extract_variables_from_block(stan_code, "transformed data") 
+  params_vars <- extract_variables_from_block(stan_code, "parameters")
+  tparams_vars <- extract_variables_from_block(
+    stan_code, "transformed parameters"
+  )
+  
+  # Apply precedence rules
+  remove_from_tdata <- intersect(tdata_vars, data_vars)
+  remove_from_params <- intersect(params_vars, c(data_vars, tdata_vars))
+  remove_from_tparams <- intersect(
+    tparams_vars, c(data_vars, tdata_vars, params_vars)
+  )
+  
+  # Remove duplicates from lower-priority blocks
+  if (length(remove_from_tdata) > 0) {
+    stan_code <- remove_variables_from_block(
+      stan_code, "transformed data", remove_from_tdata
+    )
+  }
+  if (length(remove_from_params) > 0) {
+    stan_code <- remove_variables_from_block(
+      stan_code, "parameters", remove_from_params
+    )
+  }
+  if (length(remove_from_tparams) > 0) {
+    stan_code <- remove_variables_from_block(
+      stan_code, "transformed parameters", remove_from_tparams
+    )
+  }
+  
+  return(stan_code)
+}
+
+#' Extract Variable Names from Stan Block
+#' @param stan_code Character string containing complete Stan code
+#' @param block_name Character string specifying block name
+#' @return Character vector of variable names found in the block
+#' @noRd
+extract_variables_from_block <- function(stan_code, block_name) {
+  checkmate::assert_character(stan_code, len = 1, any.missing = FALSE)
+  
+  # Split long validation call for line length compliance
+  valid_blocks <- c("data", "transformed data", "parameters", 
+                   "transformed parameters", "model", "generated quantities")
+  checkmate::assert_choice(block_name, valid_blocks)
+  
+  block_content <- extract_stan_block_content(stan_code, block_name)
+  if (is.null(block_content) || nchar(trimws(block_content)) == 0) {
+    return(character(0))
+  }
+  
+  lines <- strsplit(block_content, "\n", fixed = TRUE)[[1]]
+  variables <- character(0)
+  
+  for (line in lines) {
+    var_name <- extract_variable_from_line(line)
+    if (!is.na(var_name)) {
+      variables <- c(variables, var_name)
+    }
+  }
+  
+  unique(variables)
+}
+
+#' Extract Variable Name from Stan Declaration Line
+#' @param line Character string containing Stan declaration line  
+#' @return Character string with variable name or NA if not found
+#' @noRd  
+extract_variable_from_line <- function(line) {
+  checkmate::assert_string(line)
+  
+  # Remove comments and clean up
+  clean_line <- trimws(gsub("//.*", "", line))
+  if (nchar(clean_line) == 0 || !grepl(";", clean_line)) {
+    return(NA_character_)
+  }
+  
+  # Handle assignment declarations
+  if (grepl("=", clean_line)) {
+    lhs <- trimws(sub("=.*$", "", clean_line))
+    clean_line <- lhs
+  }
+  
+  # Simple token extraction
+  tokens <- strsplit(gsub(";", "", clean_line), "\\s+")[[1]]
+  tokens <- tokens[tokens != ""]
+  
+  if (length(tokens) == 0) {
+    return(NA_character_)
+  }
+  
+  # Find last valid Stan identifier
+  stan_identifier_pattern <- "^[a-zA-Z_][a-zA-Z0-9_]*$"
+  for (i in length(tokens):1) {
+    if (grepl(stan_identifier_pattern, tokens[i])) {
+      return(tokens[i])
+    }
+  }
+  
+  return(NA_character_)
+}
+
+#' Remove Variables from Stan Block
+#' @param stan_code Character string containing complete Stan code
+#' @param block_name Character string specifying block to modify
+#' @param variables_to_remove Character vector of variable names to remove
+#' @return Character string with modified Stan code
+#' @noRd
+remove_variables_from_block <- function(stan_code, block_name, 
+                                       variables_to_remove) {
+  checkmate::assert_character(stan_code, len = 1, any.missing = FALSE)
+  
+  valid_blocks <- c("data", "transformed data", "parameters", 
+                   "transformed parameters", "model", "generated quantities")
+  checkmate::assert_choice(block_name, valid_blocks)
+  checkmate::assert_character(variables_to_remove, min.len = 1)
+  
+  if (length(variables_to_remove) == 0) {
+    return(stan_code)
+  }
+  
+  block_content <- extract_stan_block_content(stan_code, block_name)
+  if (is.null(block_content) || nchar(trimws(block_content)) == 0) {
+    return(stan_code)
+  }
+  
+  # Filter out duplicate variable declarations
+  lines <- strsplit(block_content, "\n", fixed = TRUE)[[1]]
+  filtered_lines <- character(0)
+  
+  for (line in lines) {
+    var_name <- extract_variable_from_line(line)
+    if (is.na(var_name) || !var_name %in% variables_to_remove) {
+      filtered_lines <- c(filtered_lines, line)
+    }
+  }
+  
+  new_block_content <- paste(filtered_lines, collapse = "\n")
+  new_stan_code <- replace_stan_block_content(
+    stan_code, block_name, new_block_content
+  )
+  
+  return(new_stan_code)
+}
+
+#' Replace Stan Block Content
+#' @param stan_code Character string containing complete Stan code  
+#' @param block_name Character string specifying block to replace
+#' @param new_content Character string with new block content
+#' @return Character string with updated Stan code
+#' @noRd  
+replace_stan_block_content <- function(stan_code, block_name, new_content) {
+  checkmate::assert_character(stan_code, len = 1, any.missing = FALSE)
+  
+  valid_blocks <- c("data", "transformed data", "parameters", 
+                   "transformed parameters", "model", "generated quantities")
+  checkmate::assert_choice(block_name, valid_blocks)
+  checkmate::assert_string(new_content)
+  
+  lines <- strsplit(stan_code, "\n", fixed = TRUE)[[1]]
+  
+  # Find block boundaries
+  block_pattern <- paste0("^\\s*", gsub(" ", "\\\\s+", block_name), "\\s*\\{")
+  block_start <- which(grepl(block_pattern, lines, ignore.case = TRUE))
+  
+  if (length(block_start) == 0) {
+    return(stan_code)
+  }
+  
+  # Count braces to find block end
+  brace_count <- 0
+  block_end <- block_start[1]
+  
+  for (i in block_start[1]:length(lines)) {
+    open_braces <- length(gregexpr("\\{", lines[i])[[1]])
+    if (open_braces > 0 && gregexpr("\\{", lines[i])[[1]][1] == -1) {
+      open_braces <- 0
+    }
+    
+    close_braces <- length(gregexpr("\\}", lines[i])[[1]])
+    if (close_braces > 0 && gregexpr("\\}", lines[i])[[1]][1] == -1) {
+      close_braces <- 0
+    }
+    
+    brace_count <- brace_count + open_braces - close_braces
+    
+    if (brace_count == 0) {
+      block_end <- i
+      break
+    }
+  }
+  
+  # Reconstruct with new content
+  before_block <- if (block_start[1] > 1) {
+    lines[1:(block_start[1] - 1)]
+  } else {
+    character(0)
+  }
+  
+  after_block <- if (block_end < length(lines)) {
+    lines[(block_end + 1):length(lines)]
+  } else {
+    character(0)
+  }
+  
+  new_block_lines <- c(
+    paste0(block_name, " {"),
+    if (nchar(trimws(new_content)) > 0) {
+      strsplit(new_content, "\n", fixed = TRUE)[[1]]
+    } else {
+      character(0)
+    },
+    "}"
+  )
+  
+  new_lines <- c(before_block, new_block_lines, after_block)
+  return(paste(new_lines, collapse = "\n"))
 }
 
 #' Extract Functions Block from Stan Code

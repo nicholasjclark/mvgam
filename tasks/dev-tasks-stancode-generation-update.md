@@ -29,17 +29,36 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 
 **AGENT TASK**: Your ONLY job is to READ the existing files and report discrepancies with specific line numbers and code snippets.
 
-## IMMEDIATE PRIORITIES (Updated: 2025-01-13)
+## IMMEDIATE PRIORITIES (Updated: 2025-09-14)
 
-1. **CRITICAL: File 8 GP Dependency Ordering** - Current lines 80-82 have incorrect order. `gp_pred_1_trend` uses `rgp_1` before `rgp_1` is defined. Must reorder declarations.
+### **NEW: CLEANUP TASKS FIRST**
 
-2. **CRITICAL: File 8 Block Contamination** - Current lines 79, 81, 83-85 have data/parameter declarations contaminating transformed parameters block. These should be in their proper blocks.
+1. **CRITICAL: Clean Up Complex Variable Registry System** - Remove unused complex logic from R/stan_assembly.R:
+   - **Lines 5082-5083**: Remove `variable_registry <- create_variable_registry(stancode)` call and related code
+   - **Lines 5089-5090**: Remove `variable_registry = variable_registry` parameter from `reconstruct_mu_trend_with_renamed_vars()` call
+   - **Lines 5316-5375**: Remove entire `create_variable_registry()` function and `extract_variables_from_block_content()` function
+   - **Lines 5392-5440**: Remove complex `extract_variable_name_from_declaration()` function with fragile regex patterns
+   - **Lines 5245-5260**: Revert `should_include_in_transformed_parameters()` to original signature (remove `variable_registry` parameter)
+   - **Lines 5635**: Change `should_include_in_transformed_parameters(decl, variable_registry)` back to `should_include_in_transformed_parameters(decl)`
+   - **Lines 5599**: Remove `variable_registry` parameter from `reconstruct_mu_trend_with_renamed_vars()` function signature
 
-3. **HIGH: File 8 Missing GP Trend Prior** - Add missing `target += std_normal_lpdf(zgp_1_trend);` prior in model block.
+2. **CRITICAL: Test New Variable Deduplication System** - Verify the new simple `deduplicate_stan_variables()` system works:
+   - **Test**: Run `target_generation.R` to regenerate all current stancode files
+   - **Verify**: Check that duplicate variable errors are eliminated (no "Identifier already in use" compilation errors)
+   - **Compare**: Run parallel agents to analyze current vs target files and verify deduplication worked
+   - **Integration**: Confirm `deduplicate_stan_variables()` is called after `deduplicate_stan_functions()` at line 335
 
-4. **HIGH: File 4 Mathematical Ordering Issue** - Move `mu_biomass = inv(mu_biomass);` to occur AFTER trend effects are added, not before. Currently mathematically incorrect.
+### **STAN CODE GENERATION ISSUES**
 
-5. **MEDIUM: File 7 Missing Prior** - Add missing `to_vector(innovations_trend) ~ std_normal();` prior statement.
+3. **CRITICAL: File 8 GP Dependency Ordering** - Current lines 80-82 have incorrect order. `gp_pred_1_trend` uses `rgp_1` before `rgp_1` is defined. Must reorder declarations.
+
+4. **CRITICAL: File 8 Block Contamination** - Current lines 79, 81, 83-85 have data/parameter declarations contaminating transformed parameters block. These should be in their proper blocks.
+
+5. **HIGH: File 8 Missing GP Trend Prior** - Add missing `target += std_normal_lpdf(zgp_1_trend);` prior in model block.
+
+6. **HIGH: File 4 Mathematical Ordering Issue** - Move `mu_biomass = inv(mu_biomass);` to occur AFTER trend effects are added, not before. Currently mathematically incorrect.
+
+7. **MEDIUM: File 7 Missing Prior** - Add missing `to_vector(innovations_trend) ~ std_normal();` prior statement.
 
 ## COMPILATION STATUS (Updated: 2025-01-13)
 
@@ -55,17 +74,33 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 ### File 2 (RW Shared)  
 - Unused variable: `matrix[N_lv_trend, N_lv_trend] Sigma_trend` declared but never used
 
-## PROGRESS UPDATE (2025-01-13)
+## PROGRESS UPDATE (2025-09-14)
 
-### Completed Fix: Semantic Refactor for GP Declaration Inclusion
+### Completed Fix: Simple Variable Deduplication System
 
-**Issue Resolved**: The `should_include_in_transformed_parameters()` function was using brittle regex patterns that rejected valid GP variable declarations.
+**Issue Resolved**: Variables were appearing in both data/parameters blocks AND transformed parameters blocks, causing "Identifier already in use" Stan compilation errors.
 
-**Solution Implemented**: Replaced 15+ fragile regex patterns with 3 semantic rules in `R/stan_assembly.R`:
-1. No assignment = data/parameter declaration (exclude)
-2. Simple initialization = basic constant/vector init (exclude)  
-3. Complex assignment = computation requiring dependency ordering (include)
+**Solution Implemented**: Added `deduplicate_stan_variables()` system in `R/stan_assembly.R` following the exact pattern of `deduplicate_stan_functions()`:
 
-**Current Status**: GP declarations now successfully included in transformed parameters blocks across all files. Dependency tracking system working correctly.
+**Key Functions Added** (lines 6834+):
+- `deduplicate_stan_variables()` - Main deduplication function with precedence rules
+- `extract_variables_from_block()` - Extract variable names from specific Stan blocks  
+- `extract_variable_from_line()` - Simple token-based variable name extraction
+- `remove_variables_from_block()` - Remove duplicate variables from lower-priority blocks
+- `replace_stan_block_content()` - Replace Stan block content with filtered version
 
-**Next Steps**: Address remaining compilation issues with proper declaration ordering and block cleanup.
+**Integration Point**: Line 335 in `generate_combined_stancode()` - calls `deduplicate_stan_variables()` immediately after `deduplicate_stan_functions()`
+
+**Precedence Rules**: data > transformed data > parameters > transformed parameters
+
+**Current Status**: New simple deduplication system implemented. Needs cleanup of old complex Variable Registry System logic and full testing.
+
+### Outstanding Cleanup Required
+
+**Complex Variable Registry System**: The previous attempt using fragile regex patterns and complex variable registries needs to be completely removed from R/stan_assembly.R (see CLEANUP TASKS above).
+
+### Next Steps
+
+1. **CLEANUP FIRST**: Remove all complex Variable Registry System logic
+2. **TEST**: Verify new deduplication system eliminates compilation errors
+3. **ADDRESS**: Remaining Stan code generation issues (Files 3, 4, 7, 8)
