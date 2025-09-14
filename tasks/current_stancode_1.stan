@@ -35,7 +35,6 @@ parameters {
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
-int<lower=1> N_trend;  // total number of observations
 mu_trend += Intercept_trend;
   
     // Scaled innovations (uncorrelated case)
@@ -54,25 +53,6 @@ mu_trend += Intercept_trend;
   lv_trend[1, :] = scaled_innovations_trend[1, :];
   for (i in 2:N_trend) {
     lv_trend[i, :] = lv_trend[i-1, :] + scaled_innovations_trend[i, :];
-  }
-    // Derived latent trends using universal computation pattern
-  matrix[N_trend, N_series_trend] trend;
-
-  // Universal trend computation: state-space dynamics + linear predictors
-  // dot_product captures dynamic component, mu_trend captures trend_formula
-  for (i in 1:N_trend) {
-    for (s in 1:N_series_trend) {
-      trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
-    }
-  }
-  lprior += student_t_lpdf(Intercept | 3, 1.8, 2.5);
-
-  // Efficient matrix multiplication for linear predictor
-  vector[N] mu = Xc * b;
-  // Add intercept and trend components
-  for (n in 1:N) {
-    mu[n] += Intercept + trend[obs_trend_time[n], obs_trend_series[n]];
-  }
 }
 model {
   // Shared Gaussian innovation priors
@@ -89,4 +69,3 @@ generated quantities {
   // actual population-level intercept
   real b_Intercept = Intercept - dot_product(means_X, b);
 }
-

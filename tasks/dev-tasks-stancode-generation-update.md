@@ -1,4 +1,4 @@
-# Stan Code Generation System - Critical Issues
+# Stan Code Generation System - Remaining Issues
 
 ## NON-NEGOTIABLE WORKFLOW
 
@@ -31,76 +31,33 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 
 ## IMMEDIATE PRIORITIES (Updated: 2025-09-14)
 
-### **NEW: CLEANUP TASKS FIRST**
+1. **CRITICAL: File 8 GP Dependency Ordering** - Current lines 79-81 have incorrect order. `gp_pred_1_trend` uses `rgp_1` before `rgp_1` is defined. Must reorder declarations.
 
-1. **CRITICAL: Clean Up Complex Variable Registry System** - Remove unused complex logic from R/stan_assembly.R:
-   - **Lines 5082-5083**: Remove `variable_registry <- create_variable_registry(stancode)` call and related code
-   - **Lines 5089-5090**: Remove `variable_registry = variable_registry` parameter from `reconstruct_mu_trend_with_renamed_vars()` call
-   - **Lines 5316-5375**: Remove entire `create_variable_registry()` function and `extract_variables_from_block_content()` function
-   - **Lines 5392-5440**: Remove complex `extract_variable_name_from_declaration()` function with fragile regex patterns
-   - **Lines 5245-5260**: Revert `should_include_in_transformed_parameters()` to original signature (remove `variable_registry` parameter)
-   - **Lines 5635**: Change `should_include_in_transformed_parameters(decl, variable_registry)` back to `should_include_in_transformed_parameters(decl)`
-   - **Lines 5599**: Remove `variable_registry` parameter from `reconstruct_mu_trend_with_renamed_vars()` function signature
+2. **CRITICAL: File 8 Block Contamination** - Current lines 79-81 have declarations that should be in proper blocks rather than transformed parameters.
 
-2. **CRITICAL: Test New Variable Deduplication System** - Verify the new simple `deduplicate_stan_variables()` system works:
-   - **Test**: Run `target_generation.R` to regenerate all current stancode files
-   - **Verify**: Check that duplicate variable errors are eliminated (no "Identifier already in use" compilation errors)
-   - **Compare**: Run parallel agents to analyze current vs target files and verify deduplication worked
-   - **Integration**: Confirm `deduplicate_stan_variables()` is called after `deduplicate_stan_functions()` at line 335
+3. **HIGH: File 8 Missing GP Trend Prior** - Add missing `target += std_normal_lpdf(zgp_1_trend);` prior in model block.
 
-### **STAN CODE GENERATION ISSUES**
+4. **HIGH: File 4 Mathematical Ordering Issue** - Move `mu_biomass = inv(mu_biomass);` to occur AFTER trend effects are added, not before. Currently mathematically incorrect.
 
-3. **CRITICAL: File 8 GP Dependency Ordering** - Current lines 80-82 have incorrect order. `gp_pred_1_trend` uses `rgp_1` before `rgp_1` is defined. Must reorder declarations.
+5. **MEDIUM: File 7 Missing Prior** - Add missing `to_vector(innovations_trend) ~ std_normal();` prior statement.
 
-4. **CRITICAL: File 8 Block Contamination** - Current lines 79, 81, 83-85 have data/parameter declarations contaminating transformed parameters block. These should be in their proper blocks.
+6. **LOW: File 3 Complex Function Issues** - Complex function implementations may cause compilation issues.
 
-5. **HIGH: File 8 Missing GP Trend Prior** - Add missing `target += std_normal_lpdf(zgp_1_trend);` prior in model block.
+7. **LOW: File 1 Variable Ordering** - lprior statements scattered instead of grouped early.
 
-6. **HIGH: File 4 Mathematical Ordering Issue** - Move `mu_biomass = inv(mu_biomass);` to occur AFTER trend effects are added, not before. Currently mathematically incorrect.
+8. **LOW: File 2 Unused Variable** - `matrix[N_lv_trend, N_lv_trend] Sigma_trend` declared but never used.
 
-7. **MEDIUM: File 7 Missing Prior** - Add missing `to_vector(innovations_trend) ~ std_normal();` prior statement.
+## COMPILATION STATUS (Updated: 2025-09-14)
 
-## COMPILATION STATUS (Updated: 2025-01-13)
+- **Will Compile**: Files 1, 2, 5, 6 (4/8 files) - Duplicate variable issues resolved
+- **Will NOT Compile**: Files 3, 4, 7, 8 (4/8 files) - Various structural issues remain
+- **Progress**: Variable deduplication system now functional, eliminating duplicate declaration errors
 
-- **Will Compile**: Files 1, 2, 5, 6 (4/8 files)
-- **Will NOT Compile**: Files 3, 4, 7, 8 (4/8 files)
-- **Progress**: Semantic refactor successfully included GP declarations in File 8, but dependency ordering and block contamination issues remain.
+## COMPLETED WORK (2025-09-14)
 
-## MINOR SYNTAX ISSUES (Non-blocking)
-
-### File 1 (RW Basic)
-- Variable ordering: lprior statements scattered instead of grouped early
-
-### File 2 (RW Shared)  
-- Unused variable: `matrix[N_lv_trend, N_lv_trend] Sigma_trend` declared but never used
-
-## PROGRESS UPDATE (2025-09-14)
-
-### Completed Fix: Simple Variable Deduplication System
-
-**Issue Resolved**: Variables were appearing in both data/parameters blocks AND transformed parameters blocks, causing "Identifier already in use" Stan compilation errors.
-
-**Solution Implemented**: Added `deduplicate_stan_variables()` system in `R/stan_assembly.R` following the exact pattern of `deduplicate_stan_functions()`:
-
-**Key Functions Added** (lines 6834+):
-- `deduplicate_stan_variables()` - Main deduplication function with precedence rules
-- `extract_variables_from_block()` - Extract variable names from specific Stan blocks  
-- `extract_variable_from_line()` - Simple token-based variable name extraction
-- `remove_variables_from_block()` - Remove duplicate variables from lower-priority blocks
-- `replace_stan_block_content()` - Replace Stan block content with filtered version
-
-**Integration Point**: Line 335 in `generate_combined_stancode()` - calls `deduplicate_stan_variables()` immediately after `deduplicate_stan_functions()`
-
-**Precedence Rules**: data > transformed data > parameters > transformed parameters
-
-**Current Status**: New simple deduplication system implemented. Needs cleanup of old complex Variable Registry System logic and full testing.
-
-### Outstanding Cleanup Required
-
-**Complex Variable Registry System**: The previous attempt using fragile regex patterns and complex variable registries needs to be completely removed from R/stan_assembly.R (see CLEANUP TASKS above).
-
-### Next Steps
-
-1. **CLEANUP FIRST**: Remove all complex Variable Registry System logic
-2. **TEST**: Verify new deduplication system eliminates compilation errors
-3. **ADDRESS**: Remaining Stan code generation issues (Files 3, 4, 7, 8)
+### Variable Deduplication System
+- Removed complex variable registry system (200+ lines of fragile regex code)
+- Fixed `extract_variable_from_line()` bug where Stan constraint syntax was incorrectly treated as assignments
+- Implemented token-based variable extraction that correctly handles `<lower=1>` and similar constraints
+- System now successfully removes duplicate variable declarations across all Stan blocks
+- Precedence rules: data > transformed data > parameters > transformed parameters

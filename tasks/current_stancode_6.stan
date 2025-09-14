@@ -73,12 +73,7 @@ transformed parameters {
   vector[N_1] r_1_1;  // actual group-level effects
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
-int<lower=1> N_trend;  // total number of observations
 vector[Nsubgp_1_trend] gp_pred_1_trend = gp_exp_quad(Xgp_1_trend, sdgp_1_trend[1], lscale_1_trend[1], zgp_1_trend);
-array[N_trend] int<lower=1> Jgp_1_trend;
-vector<lower=0>[Kgp_1_trend] sdgp_1_trend;  // GP standard deviation parameters
-array[Kgp_1_trend] vector<lower=0>[1] lscale_1_trend;  // GP length-scale parameters
-int<lower=1> Kgp_1_trend;  // number of sub-GPs (equal to 1 unless 'by' was used)
 mu_trend += Intercept_trend + gp_pred_1_trend[Jgp_1_trend];
   matrix[N_trend, N_lv_trend] lv_trend;
   matrix[N_trend, N_lv_trend] scaled_innovations_trend;
@@ -92,29 +87,6 @@ lprior += inv_gamma_lpdf(lscale_1_trend[1][1] | 1.494197, 0.056607);
   // Initialize first time point with innovations
   for (j in 1:N_lv_trend) {
     lv_trend[1, j] = scaled_innovations_trend[1, j];
-  }
-
-  // Apply continuous-time AR evolution for subsequent time points
-  for (j in 1:N_lv_trend) {
-    for (i in 2:N_trend) {
-      lv_trend[i, j] = pow(ar1_trend[j], time_dis[i, j]) * lv_trend[i - 1, j]
-                     + scaled_innovations_trend[i, j];
-    }
-  }
-    // Derived latent trends using universal computation pattern
-  matrix[N_trend, N_series_trend] trend;
-
-  // Universal trend computation: state-space dynamics + linear predictors
-  // dot_product captures dynamic component, mu_trend captures trend_formula
-  for (i in 1:N_trend) {
-    for (s in 1:N_series_trend) {
-      trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
-    }
-  }
-  r_1_1 = (sd_1[1] * (z_1[1]));
-  lprior += student_t_lpdf(Intercept | 3, 1.8, 2.5);
-  lprior += student_t_lpdf(sd_1 | 3, 0, 2.5)
-    - 1 * student_t_lccdf(0 | 3, 0, 2.5);
 }
 model {
   ar1_trend ~ normal(0, 0.5);

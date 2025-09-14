@@ -87,20 +87,25 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
   - Innovation matrices and state vectors
   - Common dimension variables for trend matrix structure
 
-### Stage 6: Stan Code Assembly with Dependency Ordering
+### Stage 6: Stan Code Assembly with Dependency Ordering and Deduplication
 - **Entry point**: `generate_combined_stancode()` in `R/stan_assembly.R`
 - **Input**: obs_setup, trend_setup, and generated stanvars
 - **Processing**:
-  - **🏆 CRITICAL**: Calls `sort_stanvars()` to reorder stanvars by dependency priority before injection
+  - **CRITICAL**: Calls `sort_stanvars()` to reorder stanvars by dependency priority before injection
   - **Dependency Resolution**: Ensures Stan variables declared before use:
     - **Priority 1**: Dimension variables (`n_trend`, `n_series_trend`, `n_lv_trend`)
     - **Priority 2**: Arrays referencing dimensions (`times_trend`, `obs_trend_time`, etc.)
     - **Priority 3**: All other stanvars
   - Combines brms observation code with trend stanvars using `generate_base_stancode_with_stanvars()`
   - Merges Stan data from both models
+  - **Deduplication System**: Applied after initial combination to prevent compilation errors:
+    - **Function deduplication**: `deduplicate_stan_functions()` removes duplicate function definitions
+    - **Variable deduplication**: `deduplicate_stan_variables()` removes duplicate variable declarations
+    - **Precedence rules**: data > transformed data > parameters > transformed parameters
+    - **Implementation**: Token-based variable extraction handles Stan constraint syntax correctly
   - Validates combined code structure
-- **Output**: Base Stan code with properly ordered trend variables ready for injection
-- **Available data structures**: Combined Stan code with both observation and trend components in correct declaration order
+- **Output**: Base Stan code with properly ordered and deduplicated trend variables ready for injection
+- **Available data structures**: Combined Stan code with both observation and trend components in correct declaration order and no duplicates
 
 ### Stage 7: GLM-Compatible Trend Injection with Enhanced Mu Analysis
 - **Entry point**: `inject_trend_into_linear_predictor()` in `R/stan_assembly.R`

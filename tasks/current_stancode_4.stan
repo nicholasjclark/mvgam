@@ -71,7 +71,6 @@ vector[N_series_trend * N_lv_trend] Z_raw;  // raw factor loadings
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
-int<lower=1> N_trend;  // total number of observations
   
     // Scaled innovations after applying correlations
     matrix[N_trend, N_lv_trend] scaled_innovations_trend;
@@ -80,59 +79,6 @@ int<lower=1> N_trend;  // total number of observations
     {
       matrix[N_lv_trend, N_lv_trend] L_Sigma = diag_pre_multiply(sigma_trend, L_Omega_trend);
       scaled_innovations_trend = innovations_trend * L_Sigma';
-    }
-  matrix[N_trend, N_lv_trend] lv_trend;
-  // Factor loading matrix with identifiability constraints
-  matrix[N_series_trend, N_lv_trend] Z = rep_matrix(0, N_series_trend, N_lv_trend);
-  // constraints allow identifiability of loadings
-  {
-    int index = 1;
-    for (j in 1 : N_lv_trend) {
-      for (i in j : N_series_trend) {
-        Z[i, j] = Z_raw[index];
-        index += 1;
-      }
-    }
-  }
-  matrix[N_lv_trend, N_lv_trend] Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
-    // Latent states with AR dynamics
-  
-
-  
-
-  // Initialize first 1 time points
-  for (i in 1:1) {
-    lv_trend[i, :] = scaled_innovations_trend[i, :];
-  }
-
-  // Apply AR dynamics
-  for (i in 2:N_trend) {
-    for (j in 1:N_lv_trend) {
-      lv_trend[i, j] = ar1_trend[j] * lv_trend[i-1, j] + scaled_innovations_trend[i, j];
-    }
-  }
-    // Derived latent trends using universal computation pattern
-  matrix[N_trend, N_series_trend] trend;
-
-  // Universal trend computation: state-space dynamics + linear predictors
-  // dot_product captures dynamic component, mu_trend captures trend_formula
-  for (i in 1:N_trend) {
-    for (s in 1:N_series_trend) {
-      trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
-    }
-  }
-  vector[N_presence] mu_presence = Xc_presence * b_presence;
-  for (n in 1:N_presence) {
-    mu_presence[n] += Intercept_presence + trend[obs_trend_time_presence[n], obs_trend_series_presence[n]];
-  }
-  vector[N_count] mu_count = Xc_count * b_count;
-  for (n in 1:N_count) {
-    mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
-  }
-  lprior += student_t_lpdf(Intercept_count | 3, 1.4, 2.5);
-  lprior += student_t_lpdf(Intercept_presence | 3, 0, 2.5);
-  lprior += student_t_lpdf(Intercept_biomass | 3, 0.4, 2.5);
-  lprior += gamma_lpdf(shape_biomass | 0.01, 0.01);
 }
 model {
   // Shared Gaussian innovation priors
