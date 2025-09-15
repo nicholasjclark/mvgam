@@ -740,10 +740,17 @@ function New-PackageDependencyMap {
         
         # Check if function was in scope for analysis
         $wasInScope = $false
-        if ($file -in $changedFiles) {
-            $keyFunctions = $dependencyMap.definitions[$file] | Where-Object { 
-                $_ -in $exportedFunctions -or 
-                $_ -match 'brms|stan|formula|prior|trend|code|data|assemble|validate|check|generate|build|mvgam|is\.|create|make|inject|merge|register|set_|get_|default_'
+        # Check changed files OR priority files for zero-dependency analysis
+        if ($file -in $changedFiles -or $file -match $priorityFilesPattern) {
+            if ($file -match $priorityFilesPattern) {
+                # For priority files, consider ALL functions in scope
+                $keyFunctions = $dependencyMap.definitions[$file]
+            } else {
+                # For other changed files, use pattern matching
+                $keyFunctions = $dependencyMap.definitions[$file] | Where-Object { 
+                    $_ -in $exportedFunctions -or 
+                    $_ -match 'brms|stan|formula|prior|trend|code|data|assemble|validate|check|generate|build|mvgam|is\.|create|make|inject|merge|register|set_|get_|default_'
+                }
             }
             $wasInScope = ($funcName -in $keyFunctions)
         }
