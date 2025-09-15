@@ -504,8 +504,8 @@ deparse0 <- function(expr, ...) {
   paste(deparse(expr, ...), collapse = "")
 }
 
-#' Handle NSE Parameter Conversion  
-#' 
+#' Handle NSE Parameter Conversion
+#'
 #' @description
 #' Convert expressions to character strings using brms's NSE pattern.
 #' This ensures consistent behavior with brms for prior specifications
@@ -912,7 +912,7 @@ validate_single_trend_formula <- function(formula, context = NULL, allow_respons
 
   # Forbid brms addition-terms in trend formulas (conflicts with State-Space)
   validate_no_addition_terms_in_trends(formula_str)
-  
+
   # Forbid multiple trend constructors in single formula
   validate_no_multiple_trend_constructors(formula_str)
 
@@ -990,21 +990,21 @@ validate_no_brms_autocor_in_trends <- function(formula_str) {
 #' @noRd
 validate_no_addition_terms_in_trends <- function(formula_str) {
   # Complete list of brms addition-terms from brms source code analysis
-  addition_terms <- c("weights", "cens", "trunc", "mi", "trials", 
+  addition_terms <- c("weights", "cens", "trunc", "mi", "trials",
                      "rate", "vreal", "vint", "subset", "index",
                      "cov_ranef")
-  
+
   # Use same pattern as brms: term_name followed by opening parenthesis
   addition_term_pattern <- paste0("\\b(", paste(addition_terms, collapse = "|"), ")\\s*\\(")
-  
+
   # Extract any found addition-terms
   matches <- regmatches(formula_str, gregexpr(addition_term_pattern, formula_str, perl = TRUE))[[1]]
-  
+
   if (length(matches) > 0) {
     # Extract just the function names (remove parentheses and arguments)
     detected_terms <- gsub("\\s*\\(.*", "", matches)
     detected_terms <- paste0(unique(detected_terms), "()")
-    
+
     stop(insight::format_error(
       "brms addition-terms not allowed in {.field trend_formula}:",
       paste("Found:", paste(detected_terms, collapse = ", ")),
@@ -1020,20 +1020,20 @@ validate_no_addition_terms_in_trends <- function(formula_str) {
 #'
 #' Trend formulas should contain exactly one trend constructor (AR, RW, VAR, etc.)
 #' Multiple trend constructors like ~AR() + RW() are not allowed.
-#' 
+#'
 #' @param formula_str String representation of trend formula
 #' @noRd
 validate_no_multiple_trend_constructors <- function(formula_str) {
   # Use existing infrastructure to detect trend constructors
   trend_patterns <- get_trend_validation_patterns()
-  
+
   detected_trends <- character(0)
   for (pattern in names(trend_patterns)) {
     if (grepl(pattern, formula_str, perl = TRUE)) {
       detected_trends <- c(detected_trends, trend_patterns[[pattern]])
     }
   }
-  
+
   if (length(detected_trends) > 1) {
     stop(insight::format_error(
       "Multiple trend constructors found in single {.field trend_formula}:",
@@ -1043,7 +1043,7 @@ validate_no_multiple_trend_constructors <- function(formula_str) {
       "{.code trend_formula = list(y1 = ~ AR(), y2 = ~ RW())}"
     ))
   }
-  
+
   return(invisible(NULL))
 }
 
@@ -1402,15 +1402,15 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     series_val = data[[series_var]],
     stringsAsFactors = FALSE
   )
-  
+
   # Sort for Stan: first by time, then by series (matches times_trend matrix structure)
   sorted_ordering <- ordering_df[order(ordering_df$time_val, ordering_df$series_val), ]
-  
+
   # Create bidirectional mappings
   stan_to_original <- sorted_ordering$original_row  # Maps Stan row index -> Original row index
   original_to_stan <- integer(nrow(data))
   original_to_stan[stan_to_original] <- seq_len(nrow(data))  # Maps Original row index -> Stan row index
-  
+
   # Create time/series index mappings (for times_trend matrix interpretation)
   sorted_unique_times <- sort(unique_times)
   sorted_unique_series <- sort(unique_series)
@@ -1428,7 +1428,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
         time_span = max(.data[[time_var]], na.rm = TRUE) - min(.data[[time_var]], na.rm = TRUE),
         .groups = "drop"
       )
-    
+
     # Create named vectors for quick access (ordered by sorted unique_series)
     last_times <- setNames(
       series_time_info$last_time[match(sorted_unique_series, series_time_info[[1]])],
@@ -1461,12 +1461,12 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     unique_times = sorted_unique_times,    # Sorted unique time points
     unique_series = sorted_unique_series   # Sorted unique series
   )
-  
+
   # Generate observation-to-trend mappings if response variables provided
   # This centralizes mapping generation with dimension calculation for consistency
   if (!is.null(response_vars)) {
     dimensions$mappings <- list()
-    
+
     for (resp_var in response_vars) {
       # Validate response variable exists in data
       if (!resp_var %in% colnames(data)) {
@@ -1475,7 +1475,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
           "Available variables: {paste(colnames(data), collapse = ', ')}"
         ), call. = FALSE)
       }
-      
+
       # Generate mapping for this response variable using existing function
       mapping <- generate_obs_trend_mapping(
         data = data,
@@ -1484,7 +1484,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
         series_var = series_var,
         dimensions = dimensions  # Pass already-calculated dimensions
       )
-      
+
       # Store mapping with response variable name as key
       dimensions$mappings[[resp_var]] <- mapping
     }
@@ -1495,69 +1495,69 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     dimensions$metadata <- list(
       # Variable identification
       variables = list(
-        time_var = time_var,                    
-        series_var = series_var,                
-        gr_var = trend_specs$gr %||% 'NA',      
-        subgr_var = trend_specs$subgr %||% 'NA', 
+        time_var = time_var,
+        series_var = series_var,
+        gr_var = trend_specs$gr %||% 'NA',
+        subgr_var = trend_specs$subgr %||% 'NA',
         has_grouping = !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
       ),
-      
-      # Data dimensions  
+
+      # Data dimensions
       dimensions = list(
-        n_obs = nrow(data),                     
-        n_time = length(unique_times),          
-        n_series = length(unique_series),       
-        n_groups = trend_specs$n_groups %||% 1,  
-        n_subgroups = trend_specs$n_subgroups %||% 1, 
-        n_lv = trend_specs$n_lv %||% NULL,      
-        time_range = c(min_time, max_time)      
+        n_obs = nrow(data),
+        n_time = length(unique_times),
+        n_series = length(unique_series),
+        n_groups = trend_specs$n_groups %||% 1,
+        n_subgroups = trend_specs$n_subgroups %||% 1,
+        n_lv = trend_specs$n_lv %||% NULL,
+        time_range = c(min_time, max_time)
       ),
-      
+
       # Unique values (sorted for Stan)
       levels = list(
-        unique_times = sorted_unique_times,      
-        unique_series = sorted_unique_series,    
-        unique_groups = if (!is.null(trend_specs$gr) && trend_specs$gr != 'NA') 
+        unique_times = sorted_unique_times,
+        unique_series = sorted_unique_series,
+        unique_groups = if (!is.null(trend_specs$gr) && trend_specs$gr != 'NA')
                           sort(unique(data[[trend_specs$gr]])) else NULL,
         unique_subgroups = if (!is.null(trend_specs$subgr) && trend_specs$subgr != 'NA')
                              sort(unique(data[[trend_specs$subgr]])) else NULL
       ),
-      
+
       # Per-series time information (key for forecasting)
       time_info = list(
         # Quick access vectors (ordered by sorted unique_series)
         last_times = last_times,
         first_times = first_times,
         series_lengths = series_lengths,
-        
+
         # Global time information
         global_last_time = max_time,
         global_first_time = min_time,
         max_forecast_horizon = if (!is.null(last_times)) max_time - min(last_times, na.rm = TRUE) else 0,
-        
+
         # Panel structure information
         is_balanced = if (!is.null(series_lengths)) length(unique(series_lengths)) == 1 else FALSE,
         series_time_info = series_time_info  # Full details by series
       ),
-      
+
       # Data ordering mappings
       ordering = list(
         # Core mappings between original data and Stan-required order
-        stan_to_original = stan_to_original,    
-        original_to_stan = original_to_stan,    
-        
-        # Index mappings for times_trend matrix interpretation  
-        time_indices = time_indices,            
-        series_indices = series_indices,        
+        stan_to_original = stan_to_original,
+        original_to_stan = original_to_stan,
+
+        # Index mappings for times_trend matrix interpretation
+        time_indices = time_indices,
+        series_indices = series_indices,
         group_indices = if (!is.null(trend_specs$gr) && trend_specs$gr != 'NA')
                           match(data[[trend_specs$gr]], sort(unique(data[[trend_specs$gr]]))) else NULL,
         subgroup_indices = if (!is.null(trend_specs$subgr) && trend_specs$subgr != 'NA')
                              match(data[[trend_specs$subgr]], sort(unique(data[[trend_specs$subgr]]))) else NULL,
-        
+
         # Efficiency flags
         requires_reordering = !identical(seq_len(nrow(data)), stan_to_original)
       ),
-      
+
       # Trend model metadata
       trend = if (!is.null(trend_specs)) list(
         trend_type = trend_specs$trend %||% trend_specs$trend_model %||% NULL,
@@ -1565,12 +1565,12 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
         is_factor_model = !is.null(trend_specs$n_lv) && trend_specs$n_lv < length(unique_series),
         correlation_structure = list(
           cor = trend_specs$cor %||% FALSE,
-          ma = trend_specs$ma %||% FALSE, 
+          ma = trend_specs$ma %||% FALSE,
           lags = trend_specs$lags %||% 1
         ),
-        trend_specs = trend_specs  
+        trend_specs = trend_specs
       ) else list(has_trend = FALSE),
-      
+
       # Validation flags
       validation = list(
         data_complete = !any(is.na(data[c(time_var, series_var)])),
@@ -1601,13 +1601,13 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
 #' @param dimensions List from extract_time_series_dimensions with time series structure
 #' @return List containing obs_trend_time and obs_trend_series arrays for Stan
 #' @noRd
-generate_obs_trend_mapping <- function(data, response_var, time_var = "time", 
+generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
                                       series_var = "series", dimensions = NULL) {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_string(response_var)
   checkmate::assert_string(time_var)
   checkmate::assert_string(series_var)
-  
+
   # Validate dimensions parameter when provided
   if (!is.null(dimensions)) {
     checkmate::assert_list(dimensions)
@@ -1619,7 +1619,7 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
       ), call. = FALSE)
     }
   }
-  
+
   # Validate required columns exist
   if (!response_var %in% colnames(data)) {
     stop(insight::format_error(
@@ -1627,29 +1627,29 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
       "Available variables: {paste(colnames(data), collapse = ', ')}"
     ), call. = FALSE)
   }
-  
+
   if (!time_var %in% colnames(data)) {
     stop(insight::format_error(
       "Time variable {.field {time_var}} not found in data.",
       "Available variables: {paste(colnames(data), collapse = ', ')}"
     ), call. = FALSE)
   }
-  
+
   if (!series_var %in% colnames(data)) {
     stop(insight::format_error(
       "Series variable {.field {series_var}} not found in data.",
       "Available variables: {paste(colnames(data), collapse = ', ')}"
     ), call. = FALSE)
   }
-  
+
   # Extract dimensions if not provided
   if (is.null(dimensions)) {
     dimensions <- extract_time_series_dimensions(data, time_var, series_var)
   }
-  
+
   # Identify non-missing observations (brms will only use these)
   non_missing_idx <- which(!is.na(data[[response_var]]))
-  
+
   # Handle edge case where all observations are missing
   if (length(non_missing_idx) == 0) {
     stop(insight::format_error(
@@ -1657,19 +1657,19 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
       "Cannot create observation mappings without any valid data."
     ), call. = FALSE)
   }
-  
+
   # Extract time and series indices for non-missing observations
   obs_data <- data[non_missing_idx, , drop = FALSE]
-  
+
   # Get sorted unique values from dimensions
   sorted_unique_times <- dimensions$unique_times
   sorted_unique_series <- dimensions$unique_series
-  
+
   # Create time and series index mappings
   # These map each observation to its position in the trend matrix
   obs_trend_time <- match(obs_data[[time_var]], sorted_unique_times)
   obs_trend_series <- match(obs_data[[series_var]], sorted_unique_series)
-  
+
   # Validate the mappings
   if (any(is.na(obs_trend_time))) {
     stop(insight::format_error(
@@ -1677,14 +1677,14 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
       "This indicates a data structure problem."
     ), call. = FALSE)
   }
-  
+
   if (any(is.na(obs_trend_series))) {
     stop(insight::format_error(
       "Failed to map some observations to series indices.",
       "This indicates a data structure problem."
     ), call. = FALSE)
   }
-  
+
   # Validate bounds
   if (any(obs_trend_time < 1 | obs_trend_time > dimensions$n_time)) {
     stop(insight::format_error(
@@ -1692,14 +1692,14 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
       "Found indices: [{min(obs_trend_time)}, {max(obs_trend_time)}]"
     ), call. = FALSE)
   }
-  
+
   if (any(obs_trend_series < 1 | obs_trend_series > dimensions$n_series)) {
     stop(insight::format_error(
       "Series indices out of bounds: must be in [1, {dimensions$n_series}].",
       "Found indices: [{min(obs_trend_series)}, {max(obs_trend_series)}]"
     ), call. = FALSE)
   }
-  
+
   return(list(
     obs_trend_time = as.integer(obs_trend_time),
     obs_trend_series = as.integer(obs_trend_series),
@@ -2107,9 +2107,8 @@ validate_data_code_compatibility <- function(stan_code, stan_data) {
   checkmate::assert_string(stan_code, min.chars = 1)
   checkmate::assert_list(stan_data, names = "named")
 
-  # Extract data block from Stan code (split into lines first)
-  code_lines <- strsplit(stan_code, "\n")[[1]]
-  data_block <- extract_code_block(code_lines, "data")
+  # Extract data block from Stan code
+  data_block <- extract_stan_block_content(stan_code, "data")
 
   # Parse variable declarations from data block
   required_vars <- parse_data_declarations(data_block)
@@ -2128,6 +2127,68 @@ validate_data_code_compatibility <- function(stan_code, stan_data) {
   invisible(TRUE)
 }
 
+#' Parse Data Declarations from Stan Data Block
+#'
+#' @description
+#' Extracts variable names from Stan data block declarations.
+#' This is a simplified parser for basic variable declarations.
+#'
+#' @param data_block Character string containing Stan data block content
+#' @return Character vector of declared variable names
+#' @noRd
+parse_data_declarations <- function(data_block) {
+  checkmate::assert_string(data_block)
+
+  if (nchar(data_block) == 0) {
+    return(character(0))
+  }
+
+  # Split into lines and clean up
+  lines <- strsplit(data_block, "\n")[[1]]
+  lines <- trimws(lines)
+  lines <- lines[nchar(lines) > 0]  # Remove empty lines
+  lines <- lines[!grepl("^//", lines)]  # Remove comment lines
+
+  var_names <- character(0)
+
+  for (line in lines) {
+    # Look for variable declarations (simplified pattern)
+    # Pattern: type<constraints> variable_name;
+    # Examples: "int N;", "vector[N] y;", "real<lower=0> sigma;"
+
+    # Remove inline comments
+    line <- sub("//.*$", "", line)
+    line <- trimws(line)
+
+    if (nchar(line) == 0) next
+
+    # Basic pattern for variable declarations
+    # This is a simplified approach - a full parser would be more robust
+    if (grepl(";\\s*$", line)) {  # Line ends with semicolon
+      # Extract variable name (last word before semicolon)
+      clean_line <- gsub(";\\s*$", "", line)  # Remove semicolon
+      tokens <- strsplit(clean_line, "\\s+")[[1]]
+
+      if (length(tokens) >= 2) {
+        # Variable name is typically the last token
+        var_name <- tokens[length(tokens)]
+
+        # Remove array subscripts if present: variable[N] -> variable
+        var_name <- gsub("\\[.*\\]", "", var_name)
+
+        # Remove any remaining special characters
+        var_name <- gsub("[^a-zA-Z0-9_]", "", var_name)
+
+        if (nchar(var_name) > 0) {
+          var_names <- c(var_names, var_name)
+        }
+      }
+    }
+  }
+
+  return(unique(var_names))
+}
+
 #' Check Basic Semicolon Syntax in Stan Code
 #'
 #' @description
@@ -2140,10 +2201,9 @@ validate_data_code_compatibility <- function(stan_code, stan_data) {
 check_semicolon_syntax <- function(stan_code) {
   checkmate::assert_string(stan_code)
 
-  # Extract code blocks that should have semicolon-terminated statements (split into lines first)
-  code_lines <- strsplit(stan_code, "\n")[[1]]
-  data_block <- extract_code_block(code_lines, "data")
-  param_block <- extract_code_block(code_lines, "parameters")
+  # Extract code blocks that should have semicolon-terminated statements
+  data_block <- extract_stan_block_content(stan_code, "data")
+  param_block <- extract_stan_block_content(stan_code, "parameters")
 
   # Check each block for syntax issues
   blocks_to_check <- list(
@@ -2396,10 +2456,10 @@ validate_multivariate_series_time <- function(data, name, time_var, check_times)
   if (check_times) {
     min_time <- as.numeric(min(data[[time_var]]))
     max_time <- as.numeric(max(data[[time_var]]))
-    
+
     unique_times_in_data <- sort(unique(data[[time_var]]))
     expected_times <- seq.int(from = min_time, to = max_time)
-    
+
     if (!identical(as.numeric(unique_times_in_data), as.numeric(expected_times))) {
       stop(insight::format_error(
         "Time series in {.field {name}} is missing observations for one or more timepoints.",
@@ -2464,17 +2524,17 @@ validate_univariate_series_time <- function(data, name, time_var, series_var, ch
         as.numeric(seq.int(from = min_time, to = max_time))
       )
     }
-    
+
     min_time <- as.numeric(min(data[[time_var]]))
     max_time <- as.numeric(max(data[[time_var]]))
-    
+
     data.frame(series = data[[series_var]], time = data[[time_var]]) %>%
       dplyr::group_by(series) %>%
       dplyr::summarise(
         all_there = all_times_avail(time, min_time, max_time),
         .groups = 'drop'
       ) -> checked_times
-      
+
     if (any(checked_times$all_there == FALSE)) {
       stop(insight::format_error(
         "One or more series in {.field {name}} is missing observations for one or more timepoints."
@@ -2621,17 +2681,17 @@ validate_and_process_trend_parameters <- function(trend_spec, data) {
 process_lag_parameters <- function(p, trend_type) {
   # Input validation with checkmate
   checkmate::assert_string(trend_type, min.chars = 1)
-  
+
   if (is.null(p)) {
     return(1L)  # Default lag
   }
 
   # Validate parameter type and range
   checkmate::assert_integerish(p, lower = 1, min.len = 1, any.missing = FALSE)
-  
+
   # Convert to integer
   p <- as.integer(p)
-  
+
   # Additional validation for edge cases
   if (any(p <= 0) || any(!is.finite(p))) {
     stop(insight::format_error(
@@ -2658,7 +2718,7 @@ process_lag_parameters <- function(p, trend_type) {
 process_capacity_parameter <- function(cap, data) {
   # Input validation with checkmate
   checkmate::assert_data_frame(data, min.rows = 1)
-  
+
   if (is.null(cap)) {
     return(NULL)
   }
@@ -2701,21 +2761,21 @@ process_capacity_parameter <- function(cap, data) {
 #'
 #' @param trend_specs Trend specification list containing n_lv, gr, subgr parameters
 #' @param n_series Number of series from data_info
-#' @param trend_name Name of the trend type for error messages (e.g., "RW", "AR", "VAR") 
+#' @param trend_name Name of the trend type for error messages (e.g., "RW", "AR", "VAR")
 #' @return Invisible TRUE if valid, stops with error if invalid
 #' @noRd
 validate_no_factor_hierarchical <- function(trend_specs, n_series, trend_name) {
   checkmate::assert_list(trend_specs, names = "named")
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_string(trend_name)
-  
+
   # Check if this is a factor model
   n_lv <- trend_specs$n_lv
   is_factor_model <- !is.null(n_lv) && n_lv < n_series
-  
+
   # Check if hierarchical grouping is requested
   use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
-  
+
   # Factor models are incompatible with hierarchical grouping
   if (use_grouping && is_factor_model) {
     stop(insight::format_error(
@@ -2723,7 +2783,7 @@ validate_no_factor_hierarchical <- function(trend_specs, n_series, trend_name) {
       "Use {.field n_lv = n_series} or remove {.field gr}/{.field subgr} parameters"
     ))
   }
-  
+
   return(invisible(TRUE))
 }
 
@@ -2733,12 +2793,12 @@ validate_no_factor_hierarchical <- function(trend_specs, n_series, trend_name) {
 # to avoid reformulate() issues with complex formula structures like (1|series)
 
 #' Parse base formula by removing trend constructor terms (structure-preserving)
-#' 
+#'
 #' @description
-#' Safely removes trend constructor terms from a formula while preserving 
+#' Safely removes trend constructor terms from a formula while preserving
 #' complex structures like (1|group) random effects. Uses rlang AST manipulation
 #' to avoid reformulate() issues.
-#' 
+#'
 #' @param trend_formula A formula object containing potential trend terms
 #' @param trend_terms Character vector of trend constructor patterns to remove
 #' @return A formula object with trend terms removed, preserving structure
@@ -2747,30 +2807,30 @@ parse_base_formula_safe <- function(trend_formula, trend_terms) {
   # Input validation - non-negotiable per CLAUDE.md
   checkmate::assert_class(trend_formula, "formula")
   checkmate::assert_character(trend_terms, min.len = 0)
-  
+
   if (length(trend_terms) == 0) {
     return(trend_formula)
   }
-  
+
   # Extract and clean right-hand side expression using rlang
   rhs_expr <- rlang::f_rhs(trend_formula)
   cleaned_expr <- remove_trend_expressions(rhs_expr, trend_terms, depth = 0)
-  
+
   # Handle case where all terms were removed
   if (is.null(cleaned_expr)) {
     cleaned_expr <- quote(1)  # Default to intercept-only
   }
-  
+
   # Reconstruct formula preserving environment (no lhs for trend formulas)
   rlang::new_formula(lhs = NULL, rhs = cleaned_expr, env = rlang::f_env(trend_formula))
 }
 
 #' Recursively remove trend expressions from AST
-#' 
+#'
 #' @description
 #' Walks the expression tree to remove trend constructor calls while preserving
 #' the overall formula structure. Handles nested expressions safely.
-#' 
+#'
 #' @param expr Expression to process
 #' @param trend_patterns Character vector of trend patterns to match
 #' @param depth Current recursion depth for protection
@@ -2780,7 +2840,7 @@ remove_trend_expressions <- function(expr, trend_patterns, depth = 0) {
   # Input validation
   checkmate::assert_character(trend_patterns)
   checkmate::assert_int(depth, lower = 0)
-  
+
   # Recursion depth protection
   if (depth > 50) {
     stop(insight::format_error(
@@ -2788,12 +2848,12 @@ remove_trend_expressions <- function(expr, trend_patterns, depth = 0) {
       "Simplify the trend formula structure."
     ))
   }
-  
+
   if (rlang::is_call(expr, "+")) {
     args <- rlang::call_args(expr)
     lhs <- remove_trend_expressions(args[[1]], trend_patterns, depth + 1)
     rhs <- remove_trend_expressions(args[[2]], trend_patterns, depth + 1)
-    
+
     # Handle removal logic preserving valid expressions
     if (is.null(lhs) && is.null(rhs)) {
       return(NULL)
@@ -2815,19 +2875,19 @@ remove_trend_expressions <- function(expr, trend_patterns, depth = 0) {
 }
 
 #' Check if expression matches trend term patterns
-#' 
+#'
 #' @description
 #' Determines if an expression represents a trend constructor term that
 #' should be removed from the base formula.
-#' 
+#'
 #' @param expr Expression to check
 #' @param trend_patterns Character vector of trend patterns to match against
 #' @return Logical indicating if expression is a trend term
-#' @noRd  
+#' @noRd
 is_trend_term <- function(expr, trend_patterns) {
   # Input validation
   checkmate::assert_character(trend_patterns)
-  
+
   expr_text <- rlang::expr_text(expr)
   any(vapply(trend_patterns, function(pattern) {
     grepl(pattern, expr_text, fixed = TRUE)
@@ -2842,7 +2902,7 @@ is_trend_term <- function(expr, trend_patterns) {
 # brmsprior objects. Separated from prior creation logic for clean architecture.
 
 #' Validate Trend Parameter Class Names
-#' 
+#'
 #' @description
 #' Validates that a trend parameter class name is valid for mvgam trend parameters.
 #' Uses existing trend infrastructure and common_trend_priors for validation
@@ -2853,7 +2913,7 @@ is_trend_term <- function(expr, trend_patterns) {
 #' @noRd
 validate_trend_parameter_class <- function(class) {
   checkmate::assert_string(class)
-  
+
   # Must have _trend suffix for trend parameters
   if (!grepl("_trend$", class)) {
     stop(insight::format_error(
@@ -2861,15 +2921,15 @@ validate_trend_parameter_class <- function(class) {
       "Trend parameter classes must end with '_trend' suffix."
     ))
   }
-  
+
   # Get valid trend parameter classes from common_trend_priors (future-proof)
   valid_common <- names(common_trend_priors)
-  
+
   # Check if parameter exists in common definitions
   if (class %in% valid_common) {
     return(invisible(TRUE))
   }
-  
+
   # Additional pattern validation for extensibility
   # These patterns allow for custom trend parameters not in common_trend_priors
   valid_patterns <- c(
@@ -2882,9 +2942,9 @@ validate_trend_parameter_class <- function(class) {
     "^L_Omega_trend$",      # Cholesky correlation matrix
     "^rw_trend$"            # Random walk specific
   )
-  
+
   is_valid_pattern <- any(sapply(valid_patterns, function(p) grepl(p, class)))
-  
+
   if (!is_valid_pattern) {
     stop(insight::format_error(
       "Invalid trend parameter class: {.field {class}}.",
@@ -2892,12 +2952,12 @@ validate_trend_parameter_class <- function(class) {
       "Common classes: {.val {paste(valid_common, collapse = ', ')}}"
     ))
   }
-  
+
   return(invisible(TRUE))
 }
 
 #' Validate Trend Parameter Bounds
-#' 
+#'
 #' @description
 #' Validates parameter bounds for trend parameters, ensuring consistency with
 #' statistical constraints and common_trend_priors specifications.
@@ -2905,40 +2965,40 @@ validate_trend_parameter_class <- function(class) {
 #'
 #' @param class Parameter class name
 #' @param lb Lower bound (numeric or NA)
-#' @param ub Upper bound (numeric or NA) 
+#' @param ub Upper bound (numeric or NA)
 #' @return Invisible TRUE if valid, stops with error if invalid
 #' @noRd
 validate_trend_parameter_bounds <- function(class, lb, ub) {
   checkmate::assert_string(class)
   checkmate::assert_number(lb, na.ok = TRUE)
   checkmate::assert_number(ub, na.ok = TRUE)
-  
+
   # Check bounds consistency
   if (!is.na(lb) && !is.na(ub) && lb >= ub) {
     stop(insight::format_error(
       "Invalid bounds for {.field {class}}: lb ({lb}) must be less than ub ({ub})"
     ))
   }
-  
+
   # Use common_trend_priors for constraint validation (future-proof)
   if (class %in% names(common_trend_priors)) {
     expected_bounds <- common_trend_priors[[class]]$bounds
-    
+
     # Check against expected lower bound
     if (!is.na(expected_bounds[1]) && !is.na(lb) && lb < expected_bounds[1]) {
       stop(insight::format_error(
         "Lower bound {lb} for {.field {class}} is below recommended minimum {expected_bounds[1]}"
       ))
     }
-    
-    # Check against expected upper bound  
+
+    # Check against expected upper bound
     if (!is.na(expected_bounds[2]) && !is.na(ub) && ub > expected_bounds[2]) {
       stop(insight::format_error(
         "Upper bound {ub} for {.field {class}} is above recommended maximum {expected_bounds[2]}"
       ))
     }
   }
-  
+
   # Apply additional statistical constraints
   if (grepl("^ar[0-9]+_trend$", class)) {
     # AR coefficients should be bounded for stationarity (general guidance)
@@ -2967,7 +3027,7 @@ validate_trend_parameter_bounds <- function(class, lb, ub) {
       }
     }
   }
-  
+
   if (class == "sigma_trend" || grepl("sigma.*_trend$", class)) {
     # Variance parameters must be positive
     if (!is.na(lb) && lb < 0) {
@@ -2976,6 +3036,6 @@ validate_trend_parameter_bounds <- function(class, lb, ub) {
       ))
     }
   }
-  
+
   return(invisible(TRUE))
 }

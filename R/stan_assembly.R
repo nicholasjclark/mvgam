@@ -540,99 +540,6 @@ prepare_stan_data <- function(data, variable_info) {
 # Stan Code Processing Utilities
 # ==============================
 
-#' Extract Code Block from Stan Code
-#'
-#' @description
-#' Extracts a specific block (e.g., "data", "parameters", "model") from Stan code.
-#'
-#' @param code_lines Character vector of Stan code lines
-#' @param block_name Character string name of block to extract
-#' @return Character string of block contents or NULL if not found
-#' @noRd
-extract_code_block <- function(code_lines, block_name) {
-  checkmate::assert_character(code_lines)
-  checkmate::assert_string(block_name)
-
-  # Find block start line
-  block_pattern <- paste0("^\\s*", block_name, "\\s*\\{\\s*$")
-  start_line <- which(grepl(block_pattern, code_lines))
-
-  if (length(start_line) == 0) {
-    return(NULL)
-  }
-
-  start_line <- start_line[1]  # Take first match
-
-  # Find matching closing brace
-  end_line <- find_matching_brace(code_lines, start_line)
-
-  if (length(end_line) == 0) {
-    return(NULL)
-  }
-
-  # Extract block content (excluding the block declaration and closing brace)
-  if (end_line > start_line + 1) {
-    block_content <- code_lines[(start_line + 1):(end_line - 1)]
-    return(paste(block_content, collapse = "\n"))
-  } else {
-    return("")  # Empty block
-  }
-}
-
-#' Find Matching Brace
-#'
-#' @description
-#' Finds the line number of the closing brace that matches an opening brace.
-#'
-#' @param code_lines Character vector of Stan code lines
-#' @param start_line Integer line number containing opening brace
-#' @return Integer line number of matching closing brace or integer(0) if not found
-#' @noRd
-find_matching_brace <- function(code_lines, start_line) {
-  checkmate::assert_character(code_lines)
-  checkmate::assert_integerish(start_line)
-
-  # Handle empty input
-  if (length(code_lines) == 0 || length(start_line) == 0) {
-    return(integer(0))
-  }
-
-  if (start_line < 1 || start_line > length(code_lines)) {
-    return(integer(0))
-  }
-
-  # Count braces starting from start_line
-  depth <- 0
-  found_opening <- FALSE
-
-  for (i in start_line:length(code_lines)) {
-    line <- code_lines[i]
-
-    # Count opening and closing braces in this line
-    opening_braces <- lengths(regmatches(line, gregexpr("\\{", line)))
-    closing_braces <- lengths(regmatches(line, gregexpr("\\}", line)))
-
-    depth <- depth + opening_braces - closing_braces
-
-    # Mark that we've seen at least one opening brace
-    if (opening_braces > 0) {
-      found_opening <- TRUE
-    }
-
-    # If depth returns to 0 after seeing an opening brace, we found the match
-    if (found_opening && depth == 0) {
-      return(i)
-    }
-
-    # If depth goes negative, braces are unbalanced
-    if (depth < 0) {
-      return(integer(0))
-    }
-  }
-
-  # No matching brace found
-  return(integer(0))
-}
 
 # Integration Support Utilities
 # =============================
@@ -678,9 +585,6 @@ prepare_stanvars_for_brms <- function(stanvars) {
 
   return(valid_stanvars)
 }
-
-# Missing Integration Functions
-# ============================
 
 #' Generate Trend Injection Stanvars
 #'
@@ -1004,7 +908,7 @@ parse_glm_parameters <- function(stan_code, glm_type) {
   checkmate::assert_character(stan_code, min.len = 1)
   checkmate::assert_string(glm_type)
 
-  # CRITICAL FIX: Split into lines first, then search for GLM call
+  # Split into lines first, then search for GLM call
   code_lines <- strsplit(stan_code, "\n", fixed = TRUE)[[1]]
 
   # Find the line containing the GLM function call - use same pattern as detect_glm_usage
@@ -1346,84 +1250,6 @@ find_stan_block <- function(code_lines, block_name) {
   return(list(start_idx = start_idx, end_idx = end_idx))
 }
 
-#' Insert Code into Stan Block
-#'
-#' @description
-#' Inserts code into existing Stan block. Since brms always generates all
-#' Stan blocks (even if empty), this function never creates new blocks.
-#' Common utility for Stan code modification.
-#'
-#' @param code_lines Character vector of Stan code lines
-#' @param block_name Character string of block name
-#' @param insertion_code Character vector of code to insert
-#' @return Modified character vector of Stan code lines
-#' @noRd
-insert_into_stan_block <- function(code_lines, block_name, insertion_code) {
-  checkmate::assert_character(code_lines, min.len = 1)
-  checkmate::assert_string(block_name)
-  checkmate::assert_character(insertion_code, min.len = 1)
-
-  block_info <- find_stan_block(code_lines, block_name)
-
-  if (is.null(block_info)) {
-    # Debug: show what blocks we can find
-    block_pattern <- paste0("^\\s*", gsub(" ", "\\\\s+", block_name), "\\s*\\{")
-    matching_lines <- which(grepl(block_pattern, code_lines))
-    debug_info <- if (length(matching_lines) > 0) {
-      paste("Found potential matches at lines:", paste(matching_lines, collapse = ", "),
-            "Patterns:", paste(code_lines[matching_lines], collapse = " | "))
-    } else {
-      "No matches found"
-    }
-
-    stop(insight::format_error(
-      paste0("Cannot find '", block_name, "' block in Stan code."),
-      paste0("Debug info: ", debug_info),
-      paste0("Pattern used: ", block_pattern),
-      "This is unexpected as brms should generate all blocks.",
-      "Please check that the Stan code is properly formed."
-    ), call. = FALSE)
-  }
-
-  # Check if block is empty (only has opening and closing braces on same or consecutive lines)
-  is_empty_block <- (block_info$end_idx - block_info$start_idx) <= 1
-
-
-  if (is_empty_block) {
-    # For empty blocks, insert between the braces
-    # Handle both "block { }" and "block {\n}" formats
-    if (block_info$end_idx == block_info$start_idx) {
-      # Same line: "block { }"
-      # Replace the line with expanded block
-      modified_lines <- c(
-        if (block_info$start_idx > 1) code_lines[1:(block_info$start_idx - 1)] else character(0),
-        paste0(block_name, " {"),
-        insertion_code,
-        "}",
-        if (block_info$end_idx < length(code_lines)) code_lines[(block_info$end_idx + 1):length(code_lines)] else character(0)
-      )
-    } else {
-      # Consecutive lines: "block {\n}"
-      modified_lines <- c(
-        code_lines[1:block_info$start_idx],
-        insertion_code,
-        code_lines[block_info$end_idx:length(code_lines)]
-      )
-    }
-  } else {
-    # Non-empty block: insert before closing brace (at the END of the block)
-    # This ensures trend injection happens after all necessary variables are declared
-    modified_lines <- c(
-      code_lines[1:(block_info$end_idx - 1)],
-      "",  # Add blank line before injection
-      insertion_code,
-      code_lines[block_info$end_idx:length(code_lines)]
-    )
-  }
-
-  return(modified_lines)
-}
-
 #' Inject Trend into Linear Predictor
 #'
 #' @description
@@ -1578,7 +1404,7 @@ generate_trend_injection_code <- function(mapping_arrays) {
     time_array <- mapping_arrays$time_arrays[i]
     series_array <- mapping_arrays$series_arrays[i]
 
-    # Extract response suffix using base R
+    # Extract response suffix
     response_suffix <- ""
     match_result <- regexpr("_y\\d+$", time_array)
     if (match_result != -1) {
@@ -1770,9 +1596,6 @@ inject_multivariate_trends_into_linear_predictors <- function(
   if (length(non_glm_responses) > 0) {
     code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
 
-    # mu_trend initialization is now handled uniformly by extract_and_rename_stan_blocks()
-    # This eliminates code duplication and ensures consistent behavior across all trend types
-
     for (resp_name in non_glm_responses) {
       # Find where mu_<resp> is computed in transformed parameters block
       mu_pattern <- paste0("mu_", resp_name, "\\s*=")
@@ -1818,11 +1641,6 @@ inject_multivariate_trends_into_linear_predictors <- function(
   return(base_stancode)
 }
 
-# Main Assembly Functions
-# =======================
-
-
-
 
 #' Generate Base brms Stan Data
 #'
@@ -1857,11 +1675,6 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
   return(standata)
 }
 
-# Stan Component Combination Utilities
-# ====================================
-
-# Note: Legacy combine_stan_components() function removed.
-# Modern system uses generate_combined_stancode() with two-stage assembly.
 
 # =============================================================================
 # SECTION 2: TREND-SPECIFIC STAN CODE GENERATORS
@@ -1932,7 +1745,7 @@ combine_stanvars <- function(...) {
     }
   }
 
-  # Return NULL if no valid components (brms expectation)
+  # Return NULL if no valid components
   if (length(valid_components) == 0) {
     return(NULL)
   }
@@ -2189,7 +2002,7 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
   )
 }
 
-#' Generate All Trend Dimension Stanvars - SINGLE SOURCE OF TRUTH
+#' Generate All Trend Dimension Stanvars
 #'
 #' Creates ALL standardized dimension data block stanvars needed by ALL trend types.
 #' This function consolidates dimension creation that was previously duplicated
@@ -2354,7 +2167,7 @@ sort_stanvars <- function(stanvars) {
   categorized <- c(dimensions, dimension_arrays, level1_mu_trend, level2_foundation, level3_trend_comp, level4_mu_inject)
   others <- setdiff(seq_along(stanvars), categorized)
 
-  # Critical: Dependency-respecting order
+  # Dependency-respecting order
   sort_order <- c(dimensions, level1_mu_trend, level2_foundation, dimension_arrays, others, level3_trend_comp, level4_mu_inject)
 
   # Validate sort_order indices are within bounds
@@ -2367,9 +2180,6 @@ sort_stanvars <- function(stanvars) {
 
   return(sorted_stanvars)
 }
-
-# Function removed - dimension stanvars now handled by generate_common_trend_data()
-# This eliminates "Duplicated names in 'stanvars'" bug
 
 #' Generate Parameter Block Injections for Matrix Z
 #'
@@ -2417,7 +2227,7 @@ generate_matrix_z_tdata <- function(is_factor_model, n_lv, n_series) {
   }
 }
 
-#' Generate Matrix Z Multiblock Stanvars (Consolidated Utility)
+#' Generate Matrix Z Multiblock Stanvars
 #'
 #' Combines all matrix Z injection functions for factor/non-factor models.
 #' This provides a single interface for matrix Z generation across all Stan blocks.
@@ -2505,7 +2315,7 @@ generate_factor_model <- function(is_factor_model, n_lv) {
 
 #' Generate Transformed Parameters Block Injections for Trend Computation
 #'
-#' WHY: All trends must use the same computation pattern:
+#' All trends must use the same computation pattern:
 #' trend[i,s] = dot_product(Z[s,:], LV[i,:]) + mu_trend[ytimes[i,s]]
 #'
 #'
@@ -2537,7 +2347,7 @@ generate_trend_computation_tparameters <- function(n_lv, n_series) {
 
 #' Generate Functions Block Injections for Hierarchical Correlations
 #'
-#' WHY: All trends (AR, VAR, CAR, ZMVN) need the same hierarchical correlation
+#' All trends (AR, VAR, CAR, ZMVN) need the same hierarchical correlation
 #' machinery when groups are specified.
 #'
 #'
@@ -3219,7 +3029,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     insight::format_error("VAR factor model requires {.field n_lv} <= {.field n_series}")
   }
 
-  # Check for hierarchical grouping requirements - CRITICAL for grouped VAR models
+  # Check for hierarchical grouping requirements
   is_hierarchical <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
   hierarchical_info <- NULL
 
@@ -3958,7 +3768,7 @@ calculate_car_time_distances <- function(data_info) {
       time_lag = dplyr::lag(time),
       dis_time = time - time_lag,
       dis_time = ifelse(is.na(dis_time), 1, dis_time),
-      dis_time = pmax(1e-3, dis_time)  # Critical: cannot let distance go to zero
+      dis_time = pmax(1e-3, dis_time)
     ) %>%
     dplyr::ungroup() %>%
     dplyr::arrange(time, series)
@@ -4696,68 +4506,6 @@ parse_model_cmdstanr <- function(model, silent = 1, ...) {
   return(paste(out$code(), collapse = "\n"))
 }
 
-#' Parse Data Declarations from Stan Data Block
-#'
-#' @description
-#' Extracts variable names from Stan data block declarations.
-#' This is a simplified parser for basic variable declarations.
-#'
-#' @param data_block Character string containing Stan data block content
-#' @return Character vector of declared variable names
-#' @noRd
-parse_data_declarations <- function(data_block) {
-  checkmate::assert_string(data_block)
-
-  if (nchar(data_block) == 0) {
-    return(character(0))
-  }
-
-  # Split into lines and clean up
-  lines <- strsplit(data_block, "\n")[[1]]
-  lines <- trimws(lines)
-  lines <- lines[nchar(lines) > 0]  # Remove empty lines
-  lines <- lines[!grepl("^//", lines)]  # Remove comment lines
-
-  var_names <- character(0)
-
-  for (line in lines) {
-    # Look for variable declarations (simplified pattern)
-    # Pattern: type<constraints> variable_name;
-    # Examples: "int N;", "vector[N] y;", "real<lower=0> sigma;"
-
-    # Remove inline comments
-    line <- sub("//.*$", "", line)
-    line <- trimws(line)
-
-    if (nchar(line) == 0) next
-
-    # Basic pattern for variable declarations
-    # This is a simplified approach - a full parser would be more robust
-    if (grepl(";\\s*$", line)) {  # Line ends with semicolon
-      # Extract variable name (last word before semicolon)
-      clean_line <- gsub(";\\s*$", "", line)  # Remove semicolon
-      tokens <- strsplit(clean_line, "\\s+")[[1]]
-
-      if (length(tokens) >= 2) {
-        # Variable name is typically the last token
-        var_name <- tokens[length(tokens)]
-
-        # Remove array subscripts if present: variable[N] -> variable
-        var_name <- gsub("\\[.*\\]", "", var_name)
-
-        # Remove any remaining special characters
-        var_name <- gsub("[^a-zA-Z0-9_]", "", var_name)
-
-        if (nchar(var_name) > 0) {
-          var_names <- c(var_names, var_name)
-        }
-      }
-    }
-  }
-
-  return(unique(var_names))
-}
-
 #' Extract and Rename brms Trend Parameters
 #'
 #' Extracts parameters and data from brms trend_setup, renames them with _trend suffix,
@@ -5141,61 +4889,6 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
     stanvars = combined_stanvars,
     mapping = mapping
   ))
-}
-
-
-
-#' Extract Model Block Computed Variables
-#'
-#' Extracts computed variable declarations from model block lines that are referenced
-#' in mu construction. Only captures variables computed locally in model block.
-#'
-#' @param lines Character vector of model block code lines
-#' @param referenced_vars Character vector of variable names to look for
-#' @return Character vector of computed variable declaration lines
-#' @noRd
-extract_model_block_computed_variables <- function(lines, referenced_vars) {
-  checkmate::assert_character(lines, any.missing = FALSE)
-  checkmate::assert_character(referenced_vars, any.missing = FALSE)
-
-  if (length(referenced_vars) == 0) {
-    return(character(0))
-  }
-
-  computed_vars <- character(0)
-
-  # Define comprehensive brms computed variable patterns
-  patterns <- list(
-    # GP predictions: vector[Nsubgp_1] gp_pred_1 = gp_exp_quad(...)
-    gp = "vector\\[\\s*[^\\]]*\\s*\\]\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*gp_exp_quad\\s*\\(",
-    # Splines: vector[knots_1[1]] s_1_1 = sds_1[1] * zs_1_1
-    spline = "vector\\[\\s*[^\\]]*\\s*\\]\\s+(s_[a-zA-Z0-9_]+)\\s*=\\s*sds_[^\\*]*\\*\\s*zs_",
-    # Random effects: vector[N_1] r_1_1 = (sd_1[1] * (z_1[1]))
-    random_effects = "vector\\[\\s*[^\\]]*\\s*\\]\\s+(r_[a-zA-Z0-9_]+)\\s*=\\s*\\(",
-    # Monotonic effects: vector[...] mo_... =
-    monotonic = "vector\\[\\s*[^\\]]*\\s*\\]\\s+(mo_[a-zA-Z0-9_]*)\\s*=",
-    # Category-specific effects: vector[...] cs_... =
-    categorical = "vector\\[\\s*[^\\]]*\\s*\\]\\s+(cs_[a-zA-Z0-9_]*)\\s*="
-  )
-
-  for (line in lines) {
-    # Skip comments
-    if (grepl("^\\s*//", line) || grepl("/\\*.*\\*/", line)) {
-      next
-    }
-
-    for (pattern in patterns) {
-      if (grepl(pattern, line, perl = TRUE)) {
-        var_name <- extract_computed_variable_name(line, pattern)
-        if (!is.na(var_name) && var_name %in% referenced_vars) {
-          computed_vars <- c(computed_vars, line)
-          break  # Don't match multiple patterns for same line
-        }
-      }
-    }
-  }
-
-  return(computed_vars)
 }
 
 #' Extract Variable Name from Computed Declaration
@@ -5642,13 +5335,7 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
   return(complete_code)
 }
 
-#' Extract Non-Likelihood Parts from Model Block
-#'
-#' Extracts priors and transformations from model block while excluding likelihood statements
-#'
-#' @param model_block Character string of model block code
-#' @return Character string with non-likelihood code or NULL
-#' @noRd
+
 #' Filter Block Content
 #'
 #' Generic function to filter out unwanted patterns from any Stan block content.
@@ -5702,7 +5389,7 @@ filter_block_content <- function(block_content, block_type = "model") {
       # Standalone closing braces (likely end of prior_only blocks)
       grepl("^\\s*}\\s*$", line),
 
-      # CRITICAL: lprior declarations and sigma priors (avoid duplication with observation model)
+      # lprior declarations and sigma priors (avoid duplication with observation model)
       grepl("^\\s*real\\s+lprior\\s*=\\s*0\\s*;", line),
       grepl("lprior\\s*\\+=\\s*student_t_lpdf\\s*\\(\\s*sigma\\s*\\|", line),
 
@@ -5713,7 +5400,7 @@ filter_block_content <- function(block_content, block_type = "model") {
     # Additional filtering for parameters and transformed parameters blocks
     if (block_type %in% c("parameters", "transformed_parameters")) {
       skip_line <- skip_line || any(c(
-        # Skip duplicate sigma parameter declarations to prevent "Identifier 'sigma' is already in use" errors
+        # Skip duplicate sigma parameter declarations
         grepl("^\\s*real\\s*<[^>]*lower\\s*=\\s*0[^>]*>\\s+sigma\\s*;", line),
         grepl("^\\s*real<lower=0>\\s+sigma\\s*;", line),
         grepl("^\\s*real\\s+sigma\\s*;", line)
@@ -5759,56 +5446,6 @@ extract_non_likelihood_from_model_block <- function(model_block) {
 
   # Use general filtering function for model blocks
   return(filter_block_content(block_content, "model"))
-}
-
-#' Extract Stan Code Block
-#'
-#' Extracts a specific block from Stan code (data, parameters, etc.)
-#'
-#' @param stancode Character string of Stan code
-#' @param block_name Name of block to extract
-#' @return Character string of extracted block or "Block not found"
-#' @noRd
-extract_stan_block <- function(stancode, block_name) {
-  checkmate::assert_string(stancode)
-  checkmate::assert_string(block_name)
-
-  # Pattern to find the block (case insensitive)
-  pattern <- paste0("(?i)", stringr::str_replace_all(block_name, " ", "\\\\s+"), "\\s*\\{")
-  start_match <- regexpr(pattern, stancode, perl = TRUE)
-
-  if (start_match == -1) {
-    return("Block not found")
-  }
-
-  start_pos <- start_match[1]
-
-  # Find the opening brace position
-  code_from_start <- substr(stancode, start_pos, nchar(stancode))
-  brace_pos <- regexpr("\\{", code_from_start)
-
-  if (brace_pos == -1) {
-    return("Block not found")
-  }
-
-  # Count braces to find matching closing brace
-  brace_count <- 0
-  end_pos <- start_pos + brace_pos[1] - 1
-
-  for (i in (start_pos + brace_pos[1]):nchar(stancode)) {
-    char <- substr(stancode, i, i)
-    if (char == "{") {
-      brace_count <- brace_count + 1
-    } else if (char == "}") {
-      brace_count <- brace_count - 1
-      if (brace_count == 0) {
-        end_pos <- i
-        break
-      }
-    }
-  }
-
-  return(substr(stancode, start_pos, end_pos))
 }
 
 #' Extract Stan Block Inner Content
@@ -6260,9 +5897,6 @@ filter_renameable_identifiers <- function(identifiers) {
   exclude_patterns <- c(
     # Response variables (trend models are always univariate with Y only)
     "Y",
-
-    # Dimension variables handled by generate_common_trend_data (avoid duplication)
-    # "N",  # REMOVED: N must be renamed to N_trend in data block declarations for proper design matrix dimensions
 
     # Global flags that should not be renamed
     "prior_only",
