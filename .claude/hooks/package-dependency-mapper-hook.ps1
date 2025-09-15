@@ -610,16 +610,13 @@ function Get-FunctionDefinitions {
         
         # Prioritize functions based on file importance
         if ($filePath -match $priorityFilesPattern) {
-            # For priority files (Stan/brms integration, core, validations), analyze many more functions
-            $keyFunctions = $definitions[$filePath] | Where-Object { 
-                $_ -in $exportedFunctions -or 
-                $_ -match 'brms|stan|formula|prior|trend|code|data|assemble|validate|check|generate|build|mvgam|is\.|create|make|inject|merge|register|set_|get_|default_'
-            } | Select-Object -First 15
+            # For priority files (Stan/brms integration, core, validations), analyze ALL functions
+            $keyFunctions = $definitions[$filePath] | Select-Object -First 25
         } else {
             # For other core files, expanded selection
             $keyFunctions = $definitions[$filePath] | Where-Object { 
                 $_ -in $exportedFunctions -or $_ -match 'mvgam|plot|validate|check|create|build'
-            } | Select-Object -First 5
+            } | Select-Object -First 10
         }
         
         foreach ($funcName in $keyFunctions) {
@@ -729,9 +726,42 @@ function New-PackageDependencyMap {
     $dependencyMap.s3_methods = $funcResults.s3_methods
     $dependencyMap.s3_classes = $funcResults.s3_classes
     $dependencyMap.file_purposes = $funcResults.file_purposes
+    # Identify functions with zero internal dependencies
+    $functionsWithZeroDeps = @{}
+    $functionsNotAnalyzed = @{}
+    
+    foreach ($funcName in $dependencyMap.functions.Keys) {
+        $file = $dependencyMap.functions[$funcName]
+        
+        if ($dependencyMap.function_dependencies.ContainsKey($funcName)) {
+            # Function was analyzed and has dependencies - skip
+            continue
+        }
+        
+        # Check if function was in scope for analysis
+        $wasInScope = $false
+        if ($file -in $changedFiles) {
+            $keyFunctions = $dependencyMap.definitions[$file] | Where-Object { 
+                $_ -in $exportedFunctions -or 
+                $_ -match 'brms|stan|formula|prior|trend|code|data|assemble|validate|check|generate|build|mvgam|is\.|create|make|inject|merge|register|set_|get_|default_'
+            }
+            $wasInScope = ($funcName -in $keyFunctions)
+        }
+        
+        if ($wasInScope) {
+            $functionsWithZeroDeps[$funcName] = $file
+        } else {
+            $functionsNotAnalyzed[$funcName] = $file
+        }
+    }
+    
+    $dependencyMap.functions_with_zero_deps = $functionsWithZeroDeps
+    $dependencyMap.functions_not_analyzed = $functionsNotAnalyzed
     $dependencyMap.metadata.total_functions = $funcResults.functions.Count
     $dependencyMap.metadata.s3_methods_count = $funcResults.s3_methods.Count
     $dependencyMap.metadata.s3_classes_count = $funcResults.s3_classes.Count
+    $dependencyMap.metadata.zero_dependency_functions = $functionsWithZeroDeps.Count
+    $dependencyMap.metadata.unanalyzed_functions = $functionsNotAnalyzed.Count
     
     # Save results
     Write-Debug "Saving dependency map..."
@@ -1091,6 +1121,32 @@ function New-PackageDependencyMap {
                 }
                 $markdown += "`n"
             }
+        }
+    }
+    
+    # Zero dependency analysis section
+    if ($functionsWithZeroDeps.Count -gt 0) {
+        $markdown += "`n## Functions with Zero Internal Dependencies`n"
+        $markdown += "*These functions may be dead code candidates or simple utilities*`n`n"
+        
+        # Group by file for better organization
+        $zeroDepsByFile = @{}
+        foreach ($func in $functionsWithZeroDeps.Keys) {
+            $file = $functionsWithZeroDeps[$func]
+            if (!$zeroDepsByFile.ContainsKey($file)) {
+                $zeroDepsByFile[$file] = @()
+            }
+            $zeroDepsByFile[$file] += $func
+        }
+        
+        foreach ($file in ($zeroDepsByFile.Keys | Sort-Object)) {
+            $funcs = $zeroDepsByFile[$file] | Sort-Object
+            $markdown += "### ``$file``:" + "`n"
+            foreach ($func in $funcs) {
+                $isExported = if ($func -in $exportedFunctions) { " (exported)" } else { " (internal)" }
+                $markdown += "- **$func()**$isExported" + "`n"
+            }
+            $markdown += "`n"
         }
     }
     
