@@ -297,6 +297,88 @@ function Get-FunctionCalls {
     return $foundCalls.Keys | Sort-Object
 }
 
+function Get-DynamicFunctionReferences {
+    param([string[]]$Files, [string[]]$AllFunctionNames)
+    
+    $dynamicReferences = @{}
+    
+    Write-Debug "Searching for dynamic function references..."
+    
+    foreach ($filePath in $Files) {
+        if (!(Test-Path $filePath)) {
+            continue
+        }
+        
+        $content = Get-Content $filePath -Raw -ErrorAction SilentlyContinue
+        if (!$content) {
+            continue
+        }
+        
+        # Search for function names in quotes that might be dynamic calls
+        # Pattern: get("funcname"), do.call("funcname", do.call('funcname',
+        # match.fun("funcname"), getFunction("funcname"), etc.
+        
+        foreach ($funcName in $AllFunctionNames) {
+            # Skip if already found
+            if ($dynamicReferences.ContainsKey($funcName)) {
+                continue
+            }
+            
+            # Escape function name for regex
+            $escapedName = [regex]::Escape($funcName)
+            
+            # Check for dynamic call patterns with this function name
+            $patterns = @(
+                "get\s*\(\s*[`"']$escapedName[`"']\s*[,)]",          # get("funcname") or get('funcname')
+                "do\.call\s*\(\s*[`"']$escapedName[`"']\s*,",        # do.call("funcname", ...)
+                "match\.fun\s*\(\s*[`"']$escapedName[`"']\s*\)",     # match.fun("funcname")
+                "getFunction\s*\(\s*[`"']$escapedName[`"']\s*\)",    # getFunction("funcname")
+                "eval\s*\([^)]*[`"']$escapedName[`"']",              # eval with function name in string
+                "apply[^(]*\([^,)]*,\s*[`"']?$escapedName[`"']?\s*[,)]", # apply family with function name
+                "[`"']$escapedName[`"']\s*%>%",                      # piped as string
+                "=\s*[`"']$escapedName[`"'](?:\s*,|\s*\))",          # passed as string argument
+                "list\s*\([^)]*[`"']$escapedName[`"']"               # in list of function names
+            )
+            
+            $found = $false
+            foreach ($pattern in $patterns) {
+                if ($content -match $pattern) {
+                    $dynamicReferences[$funcName] = $filePath
+                    $found = $true
+                    Write-Debug "Found dynamic reference to $funcName in $filePath"
+                    break
+                }
+            }
+            
+            # Also check if function name appears as a bare string that might be used dynamically
+            if (!$found) {
+                # Check for function name in quotes anywhere (less specific but catches more cases)
+                if ($content -match "[`"']$escapedName[`"']") {
+                    # Verify it's not just in a comment or message
+                    $lines = $content -split '\r?\n'
+                    foreach ($line in $lines) {
+                        # Skip comment lines
+                        if ($line -match '^\s*#') { continue }
+                        
+                        # Check if the quoted function name is in a context that suggests dynamic use
+                        if ($line -match "[`"']$escapedName[`"']" -and 
+                            ($line -match '\(' -or $line -match 'function' -or $line -match 'apply' -or 
+                             $line -match 'call' -or $line -match 'eval' -or $line -match '=' -or
+                             $line -match '<-')) {
+                            $dynamicReferences[$funcName] = $filePath
+                            Write-Debug "Found potential dynamic reference to $funcName in $filePath"
+                            break
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    Write-Debug "Found $($dynamicReferences.Count) functions with dynamic references"
+    return $dynamicReferences
+}
+
 function Get-S3Methods {
     param([string]$Content)
     
@@ -589,7 +671,26 @@ function Get-FunctionDefinitions {
         }
     }
     
-    # Second pass: analyze function dependencies (prioritize key integration files)
+    # Quick global scan for called functions (lightweight, covers ALL files)
+    Write-Debug "Quick scanning all files for function calls..."
+    $globalCalledFunctions = @{}
+    foreach ($filePath in $rFiles) {
+        if (!(Test-Path $filePath)) { continue }
+        $content = Get-Content $filePath -Raw -ErrorAction SilentlyContinue
+        if (!$content) { continue }
+        
+        # Find all function calls in this file (fast regex, no function body extraction)
+        $callMatches = [regex]::Matches($content, '\b([a-zA-Z_][a-zA-Z0-9_.]*)\s*\(', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        foreach ($match in $callMatches) {
+            $funcName = $match.Groups[1].Value
+            if ($functions.ContainsKey($funcName)) {
+                $globalCalledFunctions[$funcName] = $true
+            }
+        }
+    }
+    Write-Debug "Found $($globalCalledFunctions.Count) functions that are called somewhere"
+    
+    # Second pass: detailed analysis for priority files (for dependency mapping)
     $priorityFilesPattern = 'brms_integration|priors|stan_assembly|trend_system|mvgam_core|validations'
     $coreFilesPattern = 'mvgam\.R|sim_mvgam|plot\.mvgam|lfo_cv|series_to_mvgam'
     
@@ -717,6 +818,9 @@ function New-PackageDependencyMap {
     # Find function definitions, signatures, dependencies, and S3 methods with optimizations
     $funcResults = Get-FunctionDefinitions -Files $rFiles -ExportedFunctions $exportedFunctions -ChangedFiles $changedFiles
     
+    # Check for dynamic function references (functions called via strings)
+    $dynamicReferences = Get-DynamicFunctionReferences -Files $rFiles -AllFunctionNames $funcResults.functions.Keys
+    
     # Merge with existing analysis for unchanged files
     if ($existingAnalysis.Count -gt 0) {
         # Copy over function dependencies for unchanged files
@@ -735,6 +839,7 @@ function New-PackageDependencyMap {
     $dependencyMap.function_signatures = $funcResults.function_signatures
     $dependencyMap.function_dependencies = $funcResults.function_dependencies
     $dependencyMap.reverse_dependencies = $funcResults.reverse_dependencies
+    $dependencyMap.dynamic_references = $dynamicReferences
     $dependencyMap.detailed_analysis = $funcResults.detailed_analysis
     $dependencyMap.s3_methods = $funcResults.s3_methods
     $dependencyMap.s3_classes = $funcResults.s3_classes
@@ -780,8 +885,18 @@ function New-PackageDependencyMap {
     foreach ($funcName in $dependencyMap.functions.Keys) {
         $file = $dependencyMap.functions[$funcName]
         
-        # Skip if function has reverse dependencies (is called by other functions)
+        # Skip if function is called anywhere (from global scan)
+        if ($globalCalledFunctions.ContainsKey($funcName)) {
+            continue
+        }
+        
+        # Skip if function has reverse dependencies (is called by other functions in detailed analysis)
         if ($dependencyMap.reverse_dependencies.ContainsKey($funcName)) {
+            continue
+        }
+        
+        # Skip if function has dynamic references (called via strings like get(), do.call(), etc.)
+        if ($dependencyMap.dynamic_references.ContainsKey($funcName)) {
             continue
         }
         
@@ -817,6 +932,7 @@ function New-PackageDependencyMap {
     $dependencyMap.metadata.zero_dependency_functions = $functionsWithZeroDeps.Count
     $dependencyMap.metadata.unanalyzed_functions = $functionsNotAnalyzed.Count
     $dependencyMap.metadata.potentially_unused_functions = $potentiallyUnusedFunctions.Count
+    $dependencyMap.metadata.dynamic_references = $dynamicReferences.Count
     
     # Save results
     Write-Debug "Saving dependency map..."
@@ -1182,7 +1298,8 @@ function New-PackageDependencyMap {
     # Potentially unused functions analysis section (DEAD CODE CANDIDATES)
     if ($potentiallyUnusedFunctions.Count -gt 0) {
         $markdown += "`n## Potentially Unused Functions (Dead Code Candidates)`n"
-        $markdown += "*These internal functions are never called by other functions and may be safe to remove*`n`n"
+        $markdown += "*These internal functions are never called directly or dynamically and may be safe to remove*`n"
+        $markdown += "*Note: Functions called via get(), do.call(), match.fun() etc. are excluded from this list*`n`n"
         
         # Group by file for better organization
         $unusedByFile = @{}

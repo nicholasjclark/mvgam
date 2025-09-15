@@ -21,7 +21,7 @@
                                   "rstantools",
                                   "tibble"
                               ],
-    "generated":  "2025-09-15 12:38:56",
+    "generated":  "2025-09-15 13:04:57",
     "commit_hash":  "pending",
     "cached_files":  57,
     "version":  "2.0.0",
@@ -32,6 +32,7 @@
     "s3_methods_count":  44,
     "s3_classes_count":  25,
     "package_name":  "mvgam",
+    "potentially_unused_functions":  180,
     "changed_files":  0,
     "total_files":  57,
     "zero_dependency_functions":  385
