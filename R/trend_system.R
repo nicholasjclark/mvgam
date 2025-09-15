@@ -2518,17 +2518,12 @@ GP = function(time = NA, series = NA, ...) {
 
   # Process time argument
   time <- deparse0(substitute(time))
-  time_was_default <- (time == "NA")
   if (time == "NA") time <- "time"  # Default to 'time' when NA
 
   # Process series argument
   series <- deparse0(substitute(series))
-  series_was_default <- (series == "NA")
   if (series == "NA") series <- "series"  # Default to 'series' when NA
 
-  # Issue warnings for default usage using modular functions
-  if (time_was_default) warn_default_time_variable()
-  if (series_was_default) warn_default_series_variable()
 
   out <- structure(
     list(
@@ -3112,10 +3107,7 @@ create_mvgam_trend <- function(trend_type, ...,
   cap_var <- process_arg(.cap)
 
   # Handle default variable names
-  time_was_default <- (time_var == "NA")
   if (time_var == "NA") time_var <- "time"
-
-  series_was_default <- (series_var == "NA")
   if (series_var == "NA") series_var <- "series"
 
   # Handle grouping defaults
@@ -3125,9 +3117,6 @@ create_mvgam_trend <- function(trend_type, ...,
   # Handle cap default
   if (cap_var == "NA") cap_var <- "cap"
 
-  # Issue warnings for defaults (following existing pattern)
-  if (time_was_default) warn_default_time_variable()
-  if (series_was_default) warn_default_series_variable()
 
   # Create base trend object
   trend_obj <- list(

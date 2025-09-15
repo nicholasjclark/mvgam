@@ -649,9 +649,6 @@ validate_obs_formula_brms <- function(formula) {
   # Issue informational warning about brms autocorrelation if present
   check_brms_autocor_usage(formula_str)
 
-  # Check offset usage (informational - offsets are allowed in observation formulas)
-  validate_offsets_in_obs(formula)
-
   # Return original formula unchanged - brms handles all other validation
   return(formula)
 }
@@ -827,17 +824,10 @@ validate_single_trend_formula <- function(formula, context = NULL, allow_respons
   # Extract string for validation
   formula_str <- formula2str_mvgam(formula)
 
-  # Check for offset terms (not allowed in trend formulas)
-  validate_no_offsets_in_trends(formula)
-
-  # Forbid brms autocorrelation in trend formulas (conflicts with State-Space)
-  validate_no_brms_autocor_in_trends(formula_str)
-
-  # Forbid brms addition-terms in trend formulas (conflicts with State-Space)
-  validate_no_addition_terms_in_trends(formula_str)
-
-  # Forbid multiple trend constructors in single formula
-  validate_no_multiple_trend_constructors(formula_str)
+  # Validate trend formula restrictions
+  validate_trend_formula_restrictions(formula_str, 
+                                     c("offsets", "brms_autocor", "addition_terms", "multiple_constructors"),
+                                     formula)
 
   return(formula)
 }
@@ -869,167 +859,126 @@ check_brms_autocor_usage <- function(formula_str) {
   return(invisible(NULL))
 }
 
-#' Validate no brms autocorrelation in trend formulas
+#' Validate trend formula restrictions
+#'
+#' Validates that trend formulas do not contain prohibited patterns that would
+#' conflict with State-Space dynamics or observation model behavior.
 #'
 #' @param formula_str String representation of trend formula
+#' @param restrictions Character vector of restriction types to check
+#' @param formula Original formula object (for offset checking)
 #' @noRd
-validate_no_brms_autocor_in_trends <- function(formula_str) {
-  autocor_patterns <- c(
-    "\\bar\\s*\\(" = "ar()",
-    "\\bma\\s*\\(" = "ma()",
-    "\\barma\\s*\\(" = "arma()",
-    "\\bcosy\\s*\\(" = "cosy()",
-    "\\bunstr\\s*\\(" = "unstr()",
-    "\\bautocor\\s*\\(" = "autocor()"
+validate_trend_formula_restrictions <- function(formula_str,
+                                               restrictions = c("brms_autocor", "addition_terms", "multiple_constructors", "offsets"),
+                                               formula = NULL) {
+  checkmate::assert_string(formula_str)
+  restrictions <- match.arg(restrictions, several.ok = TRUE)
+
+  # Define restriction patterns and their error messages
+  restriction_configs <- list(
+    "brms_autocor" = list(
+      patterns = c(
+        "\\bar\\s*\\(" = "ar()",
+        "\\bma\\s*\\(" = "ma()",
+        "\\barma\\s*\\(" = "arma()",
+        "\\bcosy\\s*\\(" = "cosy()",
+        "\\bunstr\\s*\\(" = "unstr()",
+        "\\bautocor\\s*\\(" = "autocor()"
+      ),
+      error_header = "brms autocorrelation terms not allowed in {.field trend_formula}:",
+      error_reason = "These conflict with mvgam State-Space dynamics.",
+      error_suggestion = "Use mvgam trend types instead: {.code ar(p = 1)} → {.code AR(p = 1)}"
+    ),
+
+    "addition_terms" = list(
+      patterns = function(formula_str) {
+        addition_terms <- c("weights", "cens", "trunc", "mi", "trials",
+                           "rate", "vreal", "vint", "subset", "index", "cov_ranef")
+        pattern <- paste0("\\b(", paste(addition_terms, collapse = "|"), ")\\s*\\(")
+        matches <- regmatches(formula_str, gregexpr(pattern, formula_str, perl = TRUE))[[1]]
+        if (length(matches) > 0) {
+          detected_terms <- gsub("\\s*\\(.*", "", matches)
+          structure(paste0(unique(detected_terms), "()"), names = rep("detected", length(detected_terms)))
+        } else character(0)
+      },
+      error_header = "brms addition-terms not allowed in {.field trend_formula}:",
+      error_reason = "These terms modify observation model behavior, not State-Space dynamics.",
+      error_suggestion = "Include these terms in the observation {.field formula} instead."
+    ),
+
+    "multiple_constructors" = list(
+      patterns = function(formula_str) {
+        trend_patterns <- get_trend_validation_patterns()
+        detected_trends <- character(0)
+        for (pattern in names(trend_patterns)) {
+          if (grepl(pattern, formula_str, perl = TRUE)) {
+            detected_trends <- c(detected_trends, trend_patterns[[pattern]])
+          }
+        }
+        if (length(detected_trends) > 1) {
+          structure(detected_trends, names = rep("detected", length(detected_trends)))
+        } else character(0)
+      },
+      error_header = "Multiple trend constructors found in single {.field trend_formula}:",
+      error_reason = "Each trend formula must contain exactly one trend constructor.",
+      error_suggestion = c("For multiple trends, use response-specific formulas:",
+                          "{.code trend_formula = list(y1 = ~ AR(), y2 = ~ RW())}")
+    ),
+
+    "offsets" = list(
+      patterns = function(formula_str, formula = NULL) {
+        has_offset_function <- grepl("\\boffset\\s*\\(", formula_str, perl = TRUE)
+        has_offset_attr <- FALSE
+        if (!is.null(formula) && inherits(formula, "formula")) {
+          terms_obj <- terms(formula)
+          has_offset_attr <- !is.null(attr(terms_obj, 'offset'))
+        }
+        if (has_offset_function || has_offset_attr) {
+          structure("offset()", names = "detected")
+        } else character(0)
+      },
+      error_header = "Offset terms not allowed in {.field trend_formula}.",
+      error_reason = "Offsets interfere with State-Space dynamics.",
+      error_suggestion = c("Include offsets in the main observation {.field formula} instead:",
+                          "Use {.code formula = y ~ x + offset(log_exposure)} not {.code trend_formula = ~ RW() + offset(z)}")
+    )
   )
 
-  detected_autocor <- character(0)
-  for (pattern in names(autocor_patterns)) {
-    if (grepl(pattern, formula_str, perl = TRUE)) {
-      detected_autocor <- c(detected_autocor, autocor_patterns[[pattern]])
+  # Check each restriction
+  for (restriction in restrictions) {
+    config <- restriction_configs[[restriction]]
+
+    # Detect violations
+    if (is.function(config$patterns)) {
+      if (restriction == "offsets") {
+        detected <- config$patterns(formula_str, formula)
+      } else {
+        detected <- config$patterns(formula_str)
+      }
+    } else {
+      detected <- character(0)
+      for (pattern in names(config$patterns)) {
+        if (grepl(pattern, formula_str, perl = TRUE)) {
+          detected <- c(detected, config$patterns[[pattern]])
+        }
+      }
     }
-  }
 
-  if (length(detected_autocor) > 0) {
-    stop(insight::format_error(
-      "brms autocorrelation terms not allowed in {.field trend_formula}:",
-      paste("Found:", paste(unique(detected_autocor), collapse = ", ")),
-      "These conflict with mvgam State-Space dynamics.",
-      "Use mvgam trend types instead: {.code ar(p = 1)} → {.code AR(p = 1)}"
-    ))
-  }
+    # Generate error if violations found
+    if (length(detected) > 0) {
+      if (restriction == "multiple_constructors") {
+        found_text <- paste("Found:", paste(unique(detected), collapse = " + "))
+      } else {
+        found_text <- paste("Found:", paste(unique(detected), collapse = ", "))
+      }
 
-  return(invisible(NULL))
-}
-
-#' Validate no brms addition-terms in trend formulas
-#'
-#' Validates that trend formulas do not contain brms addition-terms like
-#' weights(), cens(), trunc(), mi(), trials(), rate(), vreal(), vint(),
-#' subset(), index(). These terms are allowed in observation formulas but
-#' not in trend formulas since they modify observation model behavior.
-#'
-#' @param formula_str String representation of trend formula
-#' @noRd
-validate_no_addition_terms_in_trends <- function(formula_str) {
-  # Complete list of brms addition-terms from brms source code analysis
-  addition_terms <- c("weights", "cens", "trunc", "mi", "trials",
-                     "rate", "vreal", "vint", "subset", "index",
-                     "cov_ranef")
-
-  # Use same pattern as brms: term_name followed by opening parenthesis
-  addition_term_pattern <- paste0("\\b(", paste(addition_terms, collapse = "|"), ")\\s*\\(")
-
-  # Extract any found addition-terms
-  matches <- regmatches(formula_str, gregexpr(addition_term_pattern, formula_str, perl = TRUE))[[1]]
-
-  if (length(matches) > 0) {
-    # Extract just the function names (remove parentheses and arguments)
-    detected_terms <- gsub("\\s*\\(.*", "", matches)
-    detected_terms <- paste0(unique(detected_terms), "()")
-
-    stop(insight::format_error(
-      "brms addition-terms not allowed in {.field trend_formula}:",
-      paste("Found:", paste(detected_terms, collapse = ", ")),
-      "These terms modify observation model behavior, not State-Space dynamics.",
-      "Include these terms in the observation {.field formula} instead."
-    ))
-  }
-
-  return(invisible(NULL))
-}
-
-#' Validate no multiple trend constructors in trend formulas
-#'
-#' Trend formulas should contain exactly one trend constructor (AR, RW, VAR, etc.)
-#' Multiple trend constructors like ~AR() + RW() are not allowed.
-#'
-#' @param formula_str String representation of trend formula
-#' @noRd
-validate_no_multiple_trend_constructors <- function(formula_str) {
-  # Use existing infrastructure to detect trend constructors
-  trend_patterns <- get_trend_validation_patterns()
-
-  detected_trends <- character(0)
-  for (pattern in names(trend_patterns)) {
-    if (grepl(pattern, formula_str, perl = TRUE)) {
-      detected_trends <- c(detected_trends, trend_patterns[[pattern]])
+      stop(insight::format_error(
+        config$error_header,
+        found_text,
+        config$error_reason,
+        config$error_suggestion
+      ))
     }
-  }
-
-  if (length(detected_trends) > 1) {
-    stop(insight::format_error(
-      "Multiple trend constructors found in single {.field trend_formula}:",
-      paste("Found:", paste(unique(detected_trends), collapse = " + ")),
-      "Each trend formula must contain exactly one trend constructor.",
-      "For multiple trends, use response-specific formulas:",
-      "{.code trend_formula = list(y1 = ~ AR(), y2 = ~ RW())}"
-    ))
-  }
-
-  return(invisible(NULL))
-}
-
-#' Validate no offset terms in trend formulas
-#'
-#' Offsets in trend formulas would interfere with State-Space dynamics,
-#' so they should be included in observation formulas instead.
-#'
-#' @param formula Trend formula to check
-#' @noRd
-validate_no_offsets_in_trends <- function(formula) {
-  if (is.null(formula)) return(invisible(NULL))
-
-  # Check for offset() function calls in formula string
-  formula_str <- formula2str_mvgam(formula)
-  has_offset_function <- grepl("\\boffset\\s*\\(", formula_str, perl = TRUE)
-
-  # Check for offset attribute in terms
-  has_offset_attr <- FALSE
-  if (inherits(formula, "formula")) {
-    terms_obj <- terms(formula)
-    has_offset_attr <- !is.null(attr(terms_obj, 'offset'))
-  }
-
-  if (has_offset_function || has_offset_attr) {
-    stop(insight::format_error(
-      "Offset terms not allowed in {.field trend_formula}.",
-      "Offsets interfere with State-Space dynamics.",
-      "Include offsets in the main observation {.field formula} instead:",
-      "Use {.code formula = y ~ x + offset(log_exposure)} not {.code trend_formula = ~ RW() + offset(z)}"
-    ))
-  }
-
-  return(invisible(NULL))
-}
-
-#' Validate observation formula handles offsets appropriately
-#'
-#' Checks that observation formulas properly handle offsets (which should be
-#' allowed and processed by brms) and provides informational guidance.
-#'
-#' @param formula Observation formula to check
-#' @noRd
-validate_offsets_in_obs <- function(formula) {
-  if (is.null(formula)) return(invisible(NULL))
-
-  # Extract formula string for pattern matching
-  formula_str <- formula2str_mvgam(formula)
-
-  # Check for offset usage patterns
-  has_offset <- grepl("\\boffset\\s*\\(", formula_str, perl = TRUE)
-
-  if (has_offset) {
-    # Provide informational message about offset handling
-    rlang::warn(
-      insight::format_warning(
-        "Offset terms detected in observation formula.",
-        "These will be handled by brms and are complementary to State-Space trends.",
-        "Offsets model known exposure/effort, while trends capture latent dynamics."
-      ),
-      .frequency = "once",
-      .frequency_id = "offset_obs_usage"
-    )
   }
 
   return(invisible(NULL))
@@ -1630,31 +1579,6 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
   ))
 }
 
-warn_default_time_variable <- function() {
-  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-    rlang::warn(
-      insight::format_warning(
-        "Using default time variable 'time'.",
-        "Specify {.field time = your_time_var} if your time variable has a different name."
-      ),
-      .frequency = "once",
-      .frequency_id = "mvgam_default_time_var"
-    )
-  }
-}
-
-warn_default_series_variable <- function() {
-  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-    rlang::warn(
-      insight::format_warning(
-        "Using default series variable 'series'.",
-        "Specify {.field series = your_series_var} if your series variable has a different name."
-      ),
-      .frequency = "once",
-      .frequency_id = "mvgam_default_series_var"
-    )
-  }
-}
 
 #' Validate mvgam_trend object structure
 #' @param trend_obj mvgam_trend object to validate
