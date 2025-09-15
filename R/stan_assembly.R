@@ -431,48 +431,6 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
   return(base_code)
 }
 
-#' Prepare Stanvars for brms Integration
-#'
-#' @description
-#' Prepares stanvars for integration with brms by filtering invalid ones
-#' and ensuring proper format.
-#'
-#' @param stanvars List of stanvar objects
-#' @return List of valid stanvars ready for brms
-#' @noRd
-prepare_stanvars_for_brms <- function(stanvars) {
-  checkmate::assert_list(stanvars)
-
-  if (length(stanvars) == 0) {
-    return(list())
-  }
-
-  # Filter to valid stanvars only
-  valid_stanvars <- list()
-
-  for (name in names(stanvars)) {
-    .stanvar <- stanvars[[name]]
-
-    # brms stanvars are containers - validate the actual stanvar element
-    stanvar_element <- if (inherits(.stanvar, "stanvars") && length(.stanvar) == 1) {
-      .stanvar[[1]]
-    } else {
-      .stanvar
-    }
-
-    if (is_valid_stanvar(stanvar_element)) {
-      valid_stanvars[[name]] <- .stanvar
-    } else {
-      insight::format_warning(
-        "Skipping invalid stanvar: {.field {name}}",
-        "Stanvar must have valid 'scode' and 'block' components."
-      )
-    }
-  }
-
-  return(valid_stanvars)
-}
-
 #' Generate Trend Injection Stanvars
 #'
 #' @description
@@ -4645,34 +4603,6 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
   ))
 }
 
-#' Extract Variable Name from Computed Declaration
-#'
-#' Extracts variable name from a Stan computed variable declaration line
-#'
-#' @param line Character string of Stan declaration line
-#' @param pattern Character string regex pattern with capture group for variable name
-#' @return Character string of variable name or NA if extraction fails
-#' @noRd
-extract_computed_variable_name <- function(line, pattern) {
-  checkmate::assert_string(line, min.chars = 1)
-  checkmate::assert_string(pattern, min.chars = 1)
-
-  var_match <- regexpr(pattern, line, perl = TRUE)
-
-  if (var_match == -1) {
-    return(NA_character_)
-  }
-
-  capture_start <- attr(var_match, "capture.start")[1]
-  capture_length <- attr(var_match, "capture.length")[1]
-
-  if (is.na(capture_start) || capture_length <= 0) {
-    return(NA_character_)
-  }
-
-  return(substr(line, capture_start, capture_start + capture_length - 1))
-}
-
 #' Should Include Declaration in Transformed Parameters
 #'
 #' Determines if a variable declaration should be included in transformed parameters block.
@@ -5904,25 +5834,6 @@ create_times_trend_matrix <- function(n_time, n_series, unique_times, unique_ser
   )
 }
 
-#' Format Matrix for Stan Array
-#'
-#' Converts R matrix to Stan array format
-#'
-#' @param matrix Matrix to format
-#' @return Character string in Stan array format
-#' @noRd
-format_matrix_for_stan_array <- function(matrix) {
-  checkmate::assert_matrix(matrix)
-
-  # Convert each row to Stan format
-  row_strings <- apply(matrix, 1, function(row) {
-    paste0("{", paste(row, collapse = ", "), "}")
-  })
-
-  # Combine rows
-  paste0("{", paste(row_strings, collapse = ", "), "}")
-}
-
 # =============================================================================
 # SECTION 7: STAN FUNCTIONS DEDUPLICATION SYSTEM
 # =============================================================================
@@ -5967,125 +5878,6 @@ deduplicate_stan_functions <- function(stan_code) {
   final_code <- replace_stan_functions_block(stan_code, new_functions_block)
 
   return(final_code)
-}
-
-#' Extract Variable Name from Stan Declaration Line
-#' @param line Character string containing Stan declaration line
-#' @return Character string with variable name or NA if not found
-#' @noRd
-extract_variable_from_line <- function(line) {
-  checkmate::assert_string(line)
-
-  # Remove comments and clean up
-  clean_line <- trimws(gsub("//.*", "", line))
-  if (nchar(clean_line) == 0 || !grepl(";", clean_line)) {
-    return(NA_character_)
-  }
-
-  # Remove Stan constraint syntax before checking for assignments
-  # This removes patterns like <lower=1>, <upper=10>, etc.
-  no_constraints <- gsub("<[^>]*>", "", clean_line)
-
-  # Handle assignment declarations (check on constraint-free version)
-  if (grepl("=", no_constraints)) {
-    lhs <- trimws(sub("=.*$", "", no_constraints))
-    clean_line <- lhs
-  } else {
-    # If no assignment, use the constraint-free version for token extraction
-    clean_line <- no_constraints
-  }
-
-  # Simple token extraction
-  tokens <- strsplit(gsub(";", "", clean_line), "\\s+")[[1]]
-  tokens <- tokens[tokens != ""]
-
-  if (length(tokens) == 0) {
-    return(NA_character_)
-  }
-
-  # Find last valid Stan identifier
-  stan_identifier_pattern <- "^[a-zA-Z_][a-zA-Z0-9_]*$"
-  for (i in length(tokens):1) {
-    if (grepl(stan_identifier_pattern, tokens[i])) {
-      return(tokens[i])
-    }
-  }
-
-  return(NA_character_)
-}
-
-#' Replace Stan Block Content
-#' @param stan_code Character string containing complete Stan code
-#' @param block_name Character string specifying block to replace
-#' @param new_content Character string with new block content
-#' @return Character string with updated Stan code
-#' @noRd
-replace_stan_block_content <- function(stan_code, block_name, new_content) {
-  checkmate::assert_character(stan_code, len = 1, any.missing = FALSE)
-
-  valid_blocks <- c("data", "transformed data", "parameters",
-                   "transformed parameters", "model", "generated quantities")
-  checkmate::assert_choice(block_name, valid_blocks)
-  checkmate::assert_string(new_content)
-
-  lines <- strsplit(stan_code, "\n", fixed = TRUE)[[1]]
-
-  # Find block boundaries
-  block_pattern <- paste0("^\\s*", gsub(" ", "\\\\s+", block_name), "\\s*\\{")
-  block_start <- which(grepl(block_pattern, lines, ignore.case = TRUE))
-
-  if (length(block_start) == 0) {
-    return(stan_code)
-  }
-
-  # Count braces to find block end
-  brace_count <- 0
-  block_end <- block_start[1]
-
-  for (i in block_start[1]:length(lines)) {
-    open_braces <- length(gregexpr("\\{", lines[i])[[1]])
-    if (open_braces > 0 && gregexpr("\\{", lines[i])[[1]][1] == -1) {
-      open_braces <- 0
-    }
-
-    close_braces <- length(gregexpr("\\}", lines[i])[[1]])
-    if (close_braces > 0 && gregexpr("\\}", lines[i])[[1]][1] == -1) {
-      close_braces <- 0
-    }
-
-    brace_count <- brace_count + open_braces - close_braces
-
-    if (brace_count == 0) {
-      block_end <- i
-      break
-    }
-  }
-
-  # Reconstruct with new content
-  before_block <- if (block_start[1] > 1) {
-    lines[1:(block_start[1] - 1)]
-  } else {
-    character(0)
-  }
-
-  after_block <- if (block_end < length(lines)) {
-    lines[(block_end + 1):length(lines)]
-  } else {
-    character(0)
-  }
-
-  new_block_lines <- c(
-    paste0(block_name, " {"),
-    if (nchar(trimws(new_content)) > 0) {
-      strsplit(new_content, "\n", fixed = TRUE)[[1]]
-    } else {
-      character(0)
-    },
-    "}"
-  )
-
-  new_lines <- c(before_block, new_block_lines, after_block)
-  return(paste(new_lines, collapse = "\n"))
 }
 
 #' Extract Functions Block from Stan Code

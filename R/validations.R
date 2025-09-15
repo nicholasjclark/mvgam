@@ -504,25 +504,6 @@ deparse0 <- function(expr, ...) {
   paste(deparse(expr, ...), collapse = "")
 }
 
-#' Handle NSE Parameter Conversion
-#'
-#' @description
-#' Convert expressions to character strings using brms's NSE pattern.
-#' This ensures consistent behavior with brms for prior specifications
-#' while avoiding code duplication across NSE-handling functions.
-#'
-#' @param expr Expression captured via substitute()
-#' @return Character string representation
-#' @noRd
-handle_nse_param <- function(expr) {
-  if (is.character(expr)) {
-    return(expr)
-  } else {
-    # Use standard R deparse with consistent formatting
-    return(paste(deparse(expr, width.cutoff = 500L), collapse = " "))
-  }
-}
-
 #' Check if Formula is Nonlinear
 #'
 #' @description
@@ -1112,7 +1093,6 @@ validate_offsets_in_obs <- function(formula) {
   return(invisible(NULL))
 }
 
-                            #' Validate Multivariate Trend Constraints
 #'
 #' Ensures that multivariate models with separate trends per response only use
 #' basic temporal dynamics without advanced features (factors, correlations, groupings).
@@ -1775,16 +1755,6 @@ validate_pos_integer <- function(x, name = deparse(substitute(x))) {
   invisible(TRUE)
 }
 
-#' Validate positive real numbers
-#' @param x Numeric value to validate
-#' @param name Parameter name for error messages
-#' @return Logical TRUE if valid, stops with error if not
-#' @noRd
-validate_pos_real <- function(x, name = deparse(substitute(x))) {
-  checkmate::assert_number(x, lower = 0, finite = TRUE, .var.name = name)
-  invisible(TRUE)
-}
-
 #' Evaluate an expression without printing output or messages
 #' @param expr expression to be evaluated
 #' @param type type of output to be suppressed (see ?sink)
@@ -2189,41 +2159,6 @@ parse_data_declarations <- function(data_block) {
   return(unique(var_names))
 }
 
-#' Check Basic Semicolon Syntax in Stan Code
-#'
-#' @description
-#' Performs basic checks for missing semicolons in Stan variable declarations.
-#' This is a simplified check focusing on obvious syntax errors.
-#'
-#' @param stan_code Character string containing Stan model code
-#' @return Logical indicating whether semicolon syntax appears correct
-#' @noRd
-check_semicolon_syntax <- function(stan_code) {
-  checkmate::assert_string(stan_code)
-
-  # Extract code blocks that should have semicolon-terminated statements
-  data_block <- extract_stan_block_content(stan_code, "data")
-  param_block <- extract_stan_block_content(stan_code, "parameters")
-
-  # Check each block for syntax issues
-  blocks_to_check <- list(
-    data = data_block,
-    parameters = param_block
-  )
-
-  for (block_name in names(blocks_to_check)) {
-    block_content <- blocks_to_check[[block_name]]
-
-    if (nchar(block_content) > 0) {
-      if (!check_block_semicolons(block_content)) {
-        return(FALSE)
-      }
-    }
-  }
-
-  return(TRUE)
-}
-
 #' Check Semicolons in a Stan Code Block
 #'
 #' @description
@@ -2346,99 +2281,6 @@ parse_model_cmdstanr <- function(model, silent = 1, ...) {
   # Check syntax and return code - let errors bubble up
   out$check_syntax(quiet = TRUE)
   return(paste(out$code(), collapse = "\n"))
-}
-
-#' Validate Stan Data Structure
-#'
-#' @description
-#' Validates that Stan data has proper structure and types.
-#'
-#' @param stan_data List containing Stan data
-#' @return Invisible TRUE if valid, stops/warns for issues
-#' @noRd
-validate_stan_data_structure <- function(stan_data) {
-  checkmate::assert_list(stan_data)
-
-  # Check for empty data
-  if (length(stan_data) == 0) {
-    stop(insight::format_error(
-      "Empty Stan data provided.",
-      "Stan models require at least some data elements."
-    ))
-  }
-
-  # Check data types (Stan expects numeric, integer, or array types)
-  valid_types <- c("numeric", "integer", "logical", "matrix", "array")
-
-  for (name in names(stan_data)) {
-    data_type <- class(stan_data[[name]])[1]
-
-    if (!data_type %in% valid_types && !is.numeric(stan_data[[name]])) {
-      insight::format_warning(
-        "Unexpected data type for Stan element '{name}': {data_type}",
-        "Stan typically expects numeric, integer, or matrix types."
-      )
-    }
-  }
-
-  invisible(TRUE)
-}
-
-#' Check if Object is Valid Stanvar
-#'
-#' @description
-#' Validates that an object has the structure expected for a brms stanvar.
-#'
-#' @param stanvar Object to validate
-#' @return Logical indicating whether object is a valid stanvar
-#' @noRd
-is_valid_stanvar <- function(stanvar) {
-  # Handle NULL input
-  if (is.null(stanvar)) {
-    return(FALSE)
-  }
-
-  # Must be a list
-  if (!is.list(stanvar)) {
-    return(FALSE)
-  }
-
-  # Check if it's a brms stanvar object (has required brms components)
-  required_components <- c("scode", "block")
-  if (!all(required_components %in% names(stanvar))) {
-    return(FALSE)
-  }
-
-  # scode must be character string (can be empty for data block stanvars)
-  if (!is.character(stanvar$scode) || length(stanvar$scode) != 1) {
-    return(FALSE)
-  }
-
-  # block must be valid Stan block name (brms uses abbreviated forms)
-  valid_blocks <- c("data", "tdata", "parameters", "tparameters",
-                    "model", "genquant",
-                    "transformed_data", "transformed_parameters", "generated_quantities")
-  if (!is.character(stanvar$block) || length(stanvar$block) != 1 ||
-      !stanvar$block %in% valid_blocks) {
-    return(FALSE)
-  }
-
-  return(TRUE)
-}
-
-#' Validate Trend Specification
-#'
-#' Checks if a trend specification is valid for code generation.
-#'
-#' @param trend_specs Trend specification object
-#' @return Logical indicating validity
-#' @noRd
-validate_trend_specs <- function(trend_specs) {
-  if (!is.list(trend_specs)) return(FALSE)
-  if (is.null(trend_specs$trend_type)) return(FALSE)
-  if (!trend_specs$trend_type %in% list_trend_types()$trend_type) return(FALSE)
-
-  TRUE
 }
 
 #'Argument validation functions
@@ -2960,150 +2802,4 @@ is_trend_term <- function(expr, trend_patterns) {
   any(vapply(trend_patterns, function(pattern) {
     grepl(pattern, expr_text, fixed = TRUE)
   }, logical(1)))
-}
-
-# =============================================================================
-# PRIOR PARAMETER VALIDATION FUNCTIONS
-# =============================================================================
-# WHY: Validation functions for prior parameter specifications. These functions
-# ensure that trend parameter class names and bounds are valid before creating
-# brmsprior objects. Separated from prior creation logic for clean architecture.
-
-#' Validate Trend Parameter Class Names
-#'
-#' @description
-#' Validates that a trend parameter class name is valid for mvgam trend parameters.
-#' Uses existing trend infrastructure and common_trend_priors for validation
-#' rather than hardcoded patterns for future-proof extensibility.
-#'
-#' @param class Parameter class name to validate (should have "_trend" suffix)
-#' @return Invisible TRUE if valid, stops with error if invalid
-#' @noRd
-validate_trend_parameter_class <- function(class) {
-  checkmate::assert_string(class)
-
-  # Must have _trend suffix for trend parameters
-  if (!grepl("_trend$", class)) {
-    stop(insight::format_error(
-      "Invalid trend parameter class: {.field {class}}.",
-      "Trend parameter classes must end with '_trend' suffix."
-    ))
-  }
-
-  # Get valid trend parameter classes from common_trend_priors (future-proof)
-  valid_common <- names(common_trend_priors)
-
-  # Check if parameter exists in common definitions
-  if (class %in% valid_common) {
-    return(invisible(TRUE))
-  }
-
-  # Additional pattern validation for extensibility
-  # These patterns allow for custom trend parameters not in common_trend_priors
-  valid_patterns <- c(
-    "^ar[0-9]+_trend$",     # AR coefficients: ar1_trend, ar2_trend, etc.
-    "^theta[0-9]+_trend$",  # MA coefficients: theta1_trend, theta2_trend, etc.
-    "^A[0-9]+_trend$",      # VAR coefficients: A1_trend, A2_trend, etc.
-    "^sigma_trend$",        # Innovation variance
-    "^LV.*_trend$",         # Latent variables
-    "^Z.*_trend$",          # Factor loadings
-    "^L_Omega_trend$",      # Cholesky correlation matrix
-    "^rw_trend$"            # Random walk specific
-  )
-
-  is_valid_pattern <- any(sapply(valid_patterns, function(p) grepl(p, class)))
-
-  if (!is_valid_pattern) {
-    stop(insight::format_error(
-      "Invalid trend parameter class: {.field {class}}.",
-      "Valid trend classes must match registered patterns.",
-      "Common classes: {.val {paste(valid_common, collapse = ', ')}}"
-    ))
-  }
-
-  return(invisible(TRUE))
-}
-
-#' Validate Trend Parameter Bounds
-#'
-#' @description
-#' Validates parameter bounds for trend parameters, ensuring consistency with
-#' statistical constraints and common_trend_priors specifications.
-#' Uses existing infrastructure for future-proof validation.
-#'
-#' @param class Parameter class name
-#' @param lb Lower bound (numeric or NA)
-#' @param ub Upper bound (numeric or NA)
-#' @return Invisible TRUE if valid, stops with error if invalid
-#' @noRd
-validate_trend_parameter_bounds <- function(class, lb, ub) {
-  checkmate::assert_string(class)
-  checkmate::assert_number(lb, na.ok = TRUE)
-  checkmate::assert_number(ub, na.ok = TRUE)
-
-  # Check bounds consistency
-  if (!is.na(lb) && !is.na(ub) && lb >= ub) {
-    stop(insight::format_error(
-      "Invalid bounds for {.field {class}}: lb ({lb}) must be less than ub ({ub})"
-    ))
-  }
-
-  # Use common_trend_priors for constraint validation (future-proof)
-  if (class %in% names(common_trend_priors)) {
-    expected_bounds <- common_trend_priors[[class]]$bounds
-
-    # Check against expected lower bound
-    if (!is.na(expected_bounds[1]) && !is.na(lb) && lb < expected_bounds[1]) {
-      stop(insight::format_error(
-        "Lower bound {lb} for {.field {class}} is below recommended minimum {expected_bounds[1]}"
-      ))
-    }
-
-    # Check against expected upper bound
-    if (!is.na(expected_bounds[2]) && !is.na(ub) && ub > expected_bounds[2]) {
-      stop(insight::format_error(
-        "Upper bound {ub} for {.field {class}} is above recommended maximum {expected_bounds[2]}"
-      ))
-    }
-  }
-
-  # Apply additional statistical constraints
-  if (grepl("^ar[0-9]+_trend$", class)) {
-    # AR coefficients should be bounded for stationarity (general guidance)
-    if (!is.na(lb) && lb < -1) {
-      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-        rlang::warn(
-          insight::format_warning(
-            "Lower bound {lb} for {.field {class}} may lead to non-stationary behavior.",
-            "Consider lb >= -1 for stationarity."
-          ),
-          .frequency = "once",
-          .frequency_id = paste0("ar_bounds_", class)
-        )
-      }
-    }
-    if (!is.na(ub) && ub > 1) {
-      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-        rlang::warn(
-          insight::format_warning(
-            "Upper bound {ub} for {.field {class}} may lead to non-stationary behavior.",
-            "Consider ub <= 1 for stationarity."
-          ),
-          .frequency = "once",
-          .frequency_id = paste0("ar_bounds_", class)
-        )
-      }
-    }
-  }
-
-  if (class == "sigma_trend" || grepl("sigma.*_trend$", class)) {
-    # Variance parameters must be positive
-    if (!is.na(lb) && lb < 0) {
-      stop(insight::format_error(
-        "Lower bound for {.field {class}} must be >= 0 (variance parameter)"
-      ))
-    }
-  }
-
-  return(invisible(TRUE))
 }

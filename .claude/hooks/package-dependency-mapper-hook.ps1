@@ -671,27 +671,8 @@ function Get-FunctionDefinitions {
         }
     }
     
-    # Quick global scan for called functions (lightweight, covers ALL files)
-    Write-Debug "Quick scanning all files for function calls..."
-    $globalCalledFunctions = @{}
-    foreach ($filePath in $rFiles) {
-        if (!(Test-Path $filePath)) { continue }
-        $content = Get-Content $filePath -Raw -ErrorAction SilentlyContinue
-        if (!$content) { continue }
-        
-        # Find all function calls in this file (fast regex, no function body extraction)
-        $callMatches = [regex]::Matches($content, '\b([a-zA-Z_][a-zA-Z0-9_.]*)\s*\(', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
-        foreach ($match in $callMatches) {
-            $funcName = $match.Groups[1].Value
-            if ($functions.ContainsKey($funcName)) {
-                $globalCalledFunctions[$funcName] = $true
-            }
-        }
-    }
-    Write-Debug "Found $($globalCalledFunctions.Count) functions that are called somewhere"
-    
     # Second pass: detailed analysis for priority files (for dependency mapping)
-    $priorityFilesPattern = 'brms_integration|priors|stan_assembly|trend_system|mvgam_core|validations'
+    $priorityFilesPattern = 'brms_integration|priors|stan_assembly|trend_system|mvgam_core|validations|mu_expression_analysis'
     $coreFilesPattern = 'mvgam\.R|sim_mvgam|plot\.mvgam|lfo_cv|series_to_mvgam'
     
     # Prioritize Stan/brms integration files + core/validation files first, then other core files
@@ -817,6 +798,25 @@ function New-PackageDependencyMap {
     
     # Find function definitions, signatures, dependencies, and S3 methods with optimizations
     $funcResults = Get-FunctionDefinitions -Files $rFiles -ExportedFunctions $exportedFunctions -ChangedFiles $changedFiles
+    
+    # Quick global scan for called functions (lightweight, covers ALL files)
+    Write-Debug "Quick scanning all files for function calls..."
+    $globalCalledFunctions = @{}
+    foreach ($filePath in $rFiles) {
+        if (!(Test-Path $filePath)) { continue }
+        $content = Get-Content $filePath -Raw -ErrorAction SilentlyContinue
+        if (!$content) { continue }
+        
+        # Find all function calls in this file (fast regex, no function body extraction)
+        $callMatches = [regex]::Matches($content, '\b([a-zA-Z_][a-zA-Z0-9_.]*)\s*\(', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        foreach ($match in $callMatches) {
+            $funcName = $match.Groups[1].Value
+            if ($funcResults.functions.ContainsKey($funcName)) {
+                $globalCalledFunctions[$funcName] = $true
+            }
+        }
+    }
+    Write-Debug "Found $($globalCalledFunctions.Count) functions that are called somewhere"
     
     # Check for dynamic function references (functions called via strings)
     $dynamicReferences = Get-DynamicFunctionReferences -Files $rFiles -AllFunctionNames $funcResults.functions.Keys

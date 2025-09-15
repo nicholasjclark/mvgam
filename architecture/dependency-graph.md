@@ -1,6 +1,6 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-09-15 13:04:57  
+**Generated:** 2025-09-15 13:19:22  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
@@ -318,125 +318,38 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **patchwork**: Package functionality
 
 ## Potentially Unused Functions (Dead Code Candidates)
-*These internal functions are never called by other functions and may be safe to remove*
+*These internal functions are never called directly or dynamically and may be safe to remove*
+*Note: Functions called via get(), do.call(), match.fun() etc. are excluded from this list*
 
 ### `R/brms_integration.R` (2 potentially unused):
 - **integrate_nonlinear_with_assembly()** (internal, never called)
 - **modify_stancode_for_nonlinear()** (internal, never called)
 
-### `R/conditional_effects.R` (3 potentially unused):
-- **decimalplaces()** (internal, never called)
+### `R/conditional_effects.R` (1 potentially unused):
 - **roundlabs()** (internal, never called)
-- **split_termlabs()** (internal, never called)
-
-### `R/ensemble.R` (2 potentially unused):
-- **allsame()** (internal, never called)
-- **split_fc_dots()** (internal, never called)
-
-### `R/fevd.mvgam.R` (1 potentially unused):
-- **var_fecov()** (internal, never called)
 
 ### `R/interpret_mvgam.R` (1 potentially unused):
 - **interpret_mvgam()** (internal, never called)
 
-### `R/irf.mvgam.R` (3 potentially unused):
-- **gen_irf()** (internal, never called)
-- **var_phi()** (internal, never called)
-- **var_psi()** (internal, never called)
-
-### `R/lfo_cv.mvgam.R` (4 potentially unused):
-- **cv_split()** (internal, never called)
-- **log_mean_exp()** (internal, never called)
-- **log_sum_exp()** (internal, never called)
-- **sum_rows()** (internal, never called)
-
-### `R/loo.mvgam.R` (4 potentially unused):
-- **clean_ll()** (internal, never called)
-- **named_list()** (internal, never called)
+### `R/loo.mvgam.R` (1 potentially unused):
 - **samp_noinf()** (internal, never called)
-- **split_mod_dots()** (internal, never called)
-
-### `R/make_stan.R` (1 potentially unused):
-- **generate_stan_components_mvgam_formula()** (internal, never called)
-
-### `R/marginaleffects.mvgam.R` (1 potentially unused):
-- **error()** (internal, never called)
 
 ### `R/monotonic.R` (1 potentially unused):
 - **add_mono_model_file()** (internal, never called)
 
-### `R/mu_expression_analysis.R` (24 potentially unused):
-- **analyze_assignment_type()** (internal, never called)
-- **analyze_expression_structure()** (internal, never called)
-- **analyze_function_usage()** (internal, never called)
-- **analyze_indexing_patterns_comprehensive()** (internal, never called)
-- **analyze_mathematical_operations_comprehensive()** (internal, never called)
-- **analyze_variable_relationships_comprehensive()** (internal, never called)
-- **build_execution_dependency_plan()** (internal, never called)
-- **calculate_bracket_nesting_depth()** (internal, never called)
-- **calculate_variable_complexity()** (internal, never called)
-- **check_loop_requirement()** (internal, never called)
-- **classify_mu_expressions_structurally()** (internal, never called)
-- **classify_single_mu_expression_structurally()** (internal, never called)
-- **count_mathematical_operators()** (internal, never called)
-- **create_analysis_context()** (internal, never called)
-- **create_empty_mu_result()** (internal, never called)
-- **determine_execution_order_from_type()** (internal, never called)
-- **determine_expression_type()** (internal, never called)
-- **extract_all_identifiers()** (internal, never called)
-- **extract_assignment_target()** (internal, never called)
-- **extract_comprehensive_variable_references()** (internal, never called)
-- **extract_declared_functions()** (internal, never called)
-- **extract_expression_variables_comprehensive()** (internal, never called)
-- **extract_mu_assignment_lines()** (internal, never called)
-- **normalize_mu_expression()** (internal, never called)
-
-### `R/mvgam_core.R` (1 potentially unused):
-- **extract_fit_estimates()** (internal, never called)
-
-### `R/mvgam_fevd-class.R` (1 potentially unused):
-- **fevd_df()** (internal, never called)
-
-### `R/mvgam_residcor-class.R` (3 potentially unused):
-- **cluster_cormat()** (internal, never called)
-- **gather_matrix()** (internal, never called)
-- **reorder_clusters()** (internal, never called)
-
 ### `R/plot.mvgam.R` (1 potentially unused):
 - **plottable()** (internal, never called)
 
-### `R/plot_mvgam_series.R` (5 potentially unused):
-- **plot_acf()** (internal, never called)
-- **plot_ecdf()** (internal, never called)
-- **plot_histogram()** (internal, never called)
-- **plot_time_series()** (internal, never called)
-- **validate_plot_data()** (internal, never called)
-
-### `R/plot_mvgam_uncertainty.R` (1 potentially unused):
-- **intersect_hist()** (internal, never called)
-
-### `R/ppc.mvgam.R` (2 potentially unused):
-- **ecdf_plotdat()** (internal, never called)
-- **is_like_factor()** (internal, never called)
-
-### `R/print.mvgam.R` (1 potentially unused):
-- **print_model_specification_simple()** (internal, never called)
-
-### `R/priors.R` (15 potentially unused):
+### `R/priors.R` (10 potentially unused):
 - **add_trend_component_attr()** (internal, never called)
-- **build_ar_prior_spec()** (internal, never called)
-- **combine_obs_trend_priors()** (internal, never called)
 - **extract_observation_priors()** (internal, never called)
 - **extract_observation_priors_from_enhanced()** (internal, never called)
 - **extract_observation_priors_only()** (internal, never called)
-- **extract_trend_priors()** (internal, never called)
 - **extract_trend_priors_from_enhanced()** (internal, never called)
 - **extract_trend_priors_only()** (internal, never called)
 - **get_ar_parameter_prior()** (internal, never called)
 - **get_car_parameter_prior()** (internal, never called)
-- **has_embedded_families()** (internal, never called)
 - **has_trend_priors()** (internal, never called)
-- **map_trend_priors()** (internal, never called)
 - **standardize_brmsprior_columns()** (internal, never called)
 
 ### `R/RcppExports.R` (3 potentially unused):
@@ -444,10 +357,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **var1_recursC()** (internal, never called)
 - **varma_recursC()** (internal, never called)
 
-### `R/sim_mvgam.R` (4 potentially unused):
-- **lkj_corr()** (internal, never called)
-- **periodic_gp()** (internal, never called)
-- **random_Sigma()** (internal, never called)
+### `R/sim_mvgam.R` (1 potentially unused):
 - **sim_seasonal()** (internal, never called)
 
 ### `R/stan_assembly.R` (5 potentially unused):
@@ -457,89 +367,32 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **prepare_stanvars_for_brms()** (internal, never called)
 - **replace_stan_block_content()** (internal, never called)
 
-### `R/tidier_methods.R` (1 potentially unused):
-- **split_hier_Sigma()** (internal, never called)
-
-### `R/trend_system.R` (39 potentially unused):
+### `R/trend_system.R` (13 potentially unused):
 - **add_complete_metadata()** (internal, never called)
-- **add_consistent_dispatch_metadata()** (internal, never called)
-- **add_forecast_metadata()** (internal, never called)
-- **add_monitor_params()** (internal, never called)
-- **add_summary_labels()** (internal, never called)
-- **apply_mvgam_trend_defaults()** (internal, never called)
 - **ar_trend_properties()** (internal, never called)
 - **build_trend_label()** (internal, never called)
 - **car_trend_properties()** (internal, never called)
-- **ensure_registry_initialized()** (internal, never called)
-- **eval_trend_constructor()** (internal, never called)
-- **evaluate_param_conditions()** (internal, never called)
 - **extract_regular_terms()** (internal, never called)
-- **filter_ar_forecast_params()** (internal, never called)
-- **filter_car_forecast_params()** (internal, never called)
-- **filter_pw_forecast_params()** (internal, never called)
-- **filter_rw_forecast_params()** (internal, never called)
-- **filter_var_forecast_params()** (internal, never called)
-- **filter_zmvn_forecast_params()** (internal, never called)
 - **find_trend_terms()** (internal, never called)
-- **generate_forecast_metadata()** (internal, never called)
-- **generate_forecast_required_params()** (internal, never called)
-- **generate_monitor_params()** (internal, never called)
-- **generate_parameter_label()** (internal, never called)
-- **generate_summary_labels()** (internal, never called)
-- **get_default_validation_rules()** (internal, never called)
 - **get_factor_compatible_trends()** (internal, never called)
-- **get_mvgam_trend_defaults()** (internal, never called)
-- **get_trend_dispatch_function()** (internal, never called)
 - **get_trend_info()** (internal, never called)
-- **mvgam_trend_pattern()** (internal, never called)
-- **mvgam_trend_registry()** (internal, never called)
-- **process_arg()** (internal, never called)
-- **process_trend_params()** (internal, never called)
 - **pw_trend_properties()** (internal, never called)
 - **rw_trend_properties()** (internal, never called)
 - **validate_trend_dispatch_consistency()** (internal, never called)
 - **var_trend_properties()** (internal, never called)
 - **zmvn_trend_properties()** (internal, never called)
 
-### `R/validations.R` (49 potentially unused):
-- **all_times_avail()** (internal, never called)
+### `R/validations.R` (18 potentially unused):
 - **apply_validation_rules()** (internal, never called)
-- **are_braces_balanced()** (internal, never called)
-- **as_one_logical()** (internal, never called)
-- **check_block_semicolons()** (internal, never called)
 - **check_semicolon_syntax()** (internal, never called)
-- **deparse0()** (internal, never called)
-- **eval_silent()** (internal, never called)
 - **handle_nse_param()** (internal, never called)
-- **is_trend_term()** (internal, never called)
-- **is_try_error()** (internal, never called)
-- **parse_base_formula_safe()** (internal, never called)
-- **parse_data_declarations()** (internal, never called)
-- **parse_model_cmdstanr()** (internal, never called)
-- **process_capacity_parameter()** (internal, never called)
-- **process_lag_parameters()** (internal, never called)
-- **remove_trend_expressions()** (internal, never called)
 - **validate_and_process_trend_parameters()** (internal, never called)
 - **validate_combined_stancode()** (internal, never called)
-- **validate_data_code_compatibility()** (internal, never called)
-- **validate_factor_compatibility()** (internal, never called)
-- **validate_factor_levels()** (internal, never called)
-- **validate_grouping_structure()** (internal, never called)
-- **validate_multivariate_series_time()** (internal, never called)
-- **validate_mvgam_trend()** (internal, never called)
-- **validate_no_addition_terms_in_trends()** (internal, never called)
-- **validate_no_brms_autocor_in_trends()** (internal, never called)
-- **validate_no_multiple_trend_constructors()** (internal, never called)
-- **validate_no_offsets_in_trends()** (internal, never called)
 - **validate_pos_real()** (internal, never called)
-- **validate_proportional()** (internal, never called)
-- **validate_series_time()** (internal, never called)
 - **validate_series_variable()** (internal, never called)
 - **validate_stan_code_fragment()** (internal, never called)
-- **validate_stan_code_structure()** (internal, never called)
 - **validate_stan_data_structure()** (internal, never called)
 - **validate_time_variable()** (internal, never called)
-- **validate_trend_components()** (internal, never called)
 - **validate_trend_correlation()** (internal, never called)
 - **validate_trend_factor_compatibility()** (internal, never called)
 - **validate_trend_grouping()** (internal, never called)
@@ -548,12 +401,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **validate_trend_parameter_class()** (internal, never called)
 - **validate_trend_specs()** (internal, never called)
 - **validate_trend_time_intervals()** (internal, never called)
-- **validate_univariate_series_time()** (internal, never called)
-- **warn_default_series_variable()** (internal, never called)
-- **warn_default_time_variable()** (internal, never called)
 
-### `R/zzz.R` (2 potentially unused):
-- **core_unloaded()** (internal, never called)
+### `R/zzz.R` (1 potentially unused):
 - **mvgam_attach()** (internal, never called)
 
 

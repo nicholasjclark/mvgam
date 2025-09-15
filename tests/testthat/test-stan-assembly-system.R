@@ -1334,47 +1334,6 @@ create_invalid_stanvars <- function() {
 # Unit Tests: Stanvar Preparation and Validation
 # ==============================================
 
-test_that("prepare_stanvars_for_brms filters valid stanvars", {
-  valid_stanvars <- create_realistic_trend_stanvars()
-  invalid_stanvars <- create_invalid_stanvars()
-  mixed_stanvars <- c(valid_stanvars, invalid_stanvars)
-
-  # Test with valid stanvars only
-  result_valid <- prepare_stanvars_for_brms(valid_stanvars)
-  expect_equal(length(result_valid), length(valid_stanvars))
-  expect_true(all(names(result_valid) %in% names(valid_stanvars)))
-
-  # Test with mixed stanvars - should filter out invalid ones
-  expect_warning(
-    result_mixed <- prepare_stanvars_for_brms(mixed_stanvars),
-    "Skipping invalid stanvar"
-  )
-  expect_equal(length(result_mixed), length(valid_stanvars))
-  expect_true(all(names(result_mixed) %in% names(valid_stanvars)))
-})
-
-test_that("is_valid_stanvar correctly identifies valid and invalid stanvars", {
-  valid_stanvars <- create_realistic_trend_stanvars()
-  invalid_stanvars <- create_invalid_stanvars()
-
-  # Test valid stanvars (each element is a stanvars collection)
-  for (stanvar_collection in valid_stanvars) {
-    # Each brms::stanvar() returns a stanvars collection, test individual elements
-    for (i in seq_along(stanvar_collection)) {
-      expect_true(is_valid_stanvar(stanvar_collection[[i]]))
-    }
-  }
-
-  # Test invalid stanvars (these are raw list objects, not stanvar collections)
-  for (invalid_stanvar in invalid_stanvars) {
-    expect_false(is_valid_stanvar(invalid_stanvar))
-  }
-
-  # Test edge cases
-  expect_false(is_valid_stanvar(NULL))
-  expect_false(is_valid_stanvar(list()))
-  expect_false(is_valid_stanvar("not a list"))
-})
 
 # Unit Tests: Helper Functions
 # ============================
