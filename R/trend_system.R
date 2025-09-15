@@ -44,7 +44,7 @@ register_trend_type <- function(name, supports_factors = FALSE, generator_func,
   checkmate::assert_logical(supports_factors, len = 1)
   checkmate::assert_function(generator_func, args = c("trend_specs", "data_info"))
   checkmate::assert_list(prior_spec, null.ok = TRUE, names = "named")
-  
+
   # Validate prior_spec structure if provided
   if (!is.null(prior_spec)) {
     for (param_name in names(prior_spec)) {
@@ -186,12 +186,12 @@ get_default_incompatibility_reason <- function(name) {
 #' @noRd
 auto_register_trend_types <- function() {
   # No input parameters to validate
-  
+
   # Get all generate_*_trend_stanvars functions
   all_functions <- ls(getNamespace("mvgam"))
   generator_pattern <- "^generate_(.+)_trend_stanvars$"
   generator_functions <- grep(generator_pattern, all_functions, value = TRUE)
-  
+
   if (length(generator_functions) == 0) {
     stop(insight::format_error(
       "No trend generator functions found.",
@@ -199,22 +199,22 @@ auto_register_trend_types <- function() {
       "Check that Stan assembly functions follow naming convention."
     ))
   }
-  
+
   # Extract trend type names from function names
   trend_types <- gsub(generator_pattern, "\\1", generator_functions)
   trend_types <- toupper(trend_types)  # Convert to uppercase (AR, RW, VAR, etc.)
-  
+
   # Register each discovered trend type
   for (i in seq_along(trend_types)) {
     trend_type <- trend_types[i]
     generator_func_name <- generator_functions[i]
-    
+
     # Get the actual generator function
     generator_func <- get(generator_func_name, envir = getNamespace("mvgam"))
-    
+
     # Get trend properties - REQUIRED, no defaults
     properties_func_name <- paste0(tolower(trend_type), "_trend_properties")
-    
+
     if (!exists(properties_func_name, envir = getNamespace("mvgam"))) {
       stop(insight::format_error(
         "Missing required properties function for trend type {.field {trend_type}}.",
@@ -222,14 +222,14 @@ auto_register_trend_types <- function() {
         "This ensures explicit declaration of trend capabilities."
       ))
     }
-    
+
     # Get properties function and call it
     properties_func <- get(properties_func_name, envir = getNamespace("mvgam"))
     trend_info <- properties_func()
-    
+
     # Validate properties function output
     validate_trend_properties(trend_info, trend_type, properties_func_name)
-    
+
     # Register with validated properties
     register_trend_type(
       name = trend_type,
@@ -238,7 +238,7 @@ auto_register_trend_types <- function() {
       incompatibility_reason = trend_info$incompatibility_reason
     )
   }
-  
+
   invisible(TRUE)
 }
 
@@ -269,7 +269,7 @@ validate_trend_properties <- function(trend_info, trend_type, func_name) {
   # Input validation with checkmate
   checkmate::assert_string(trend_type, min.chars = 1)
   checkmate::assert_string(func_name, min.chars = 1)
-  
+
   if (!is.list(trend_info)) {
     stop(insight::format_error(
       "Function {.field {func_name}()} must return a list.",
@@ -277,10 +277,10 @@ validate_trend_properties <- function(trend_info, trend_type, func_name) {
       "Fix: return list(supports_factors = TRUE/FALSE, incompatibility_reason = '...')"
     ))
   }
-  
+
   required_fields <- c("supports_factors")
   missing_fields <- setdiff(required_fields, names(trend_info))
-  
+
   if (length(missing_fields) > 0) {
     stop(insight::format_error(
       "Function {.field {func_name}()} missing required fields: {.field {paste(missing_fields, collapse = ', ')}}.",
@@ -288,7 +288,7 @@ validate_trend_properties <- function(trend_info, trend_type, func_name) {
       "The supports_factors field is mandatory for trend type {.field {trend_type}}."
     ))
   }
-  
+
   if (!is.logical(trend_info$supports_factors) || length(trend_info$supports_factors) != 1) {
     stop(insight::format_error(
       "Field {.field supports_factors} must be a single logical value (TRUE or FALSE).",
@@ -296,8 +296,8 @@ validate_trend_properties <- function(trend_info, trend_type, func_name) {
       "Fix {.field {func_name}()} to return supports_factors = TRUE or FALSE."
     ))
   }
-  
-  if (!trend_info$supports_factors && 
+
+  if (!trend_info$supports_factors &&
       (is.null(trend_info$incompatibility_reason) || !is.character(trend_info$incompatibility_reason))) {
     stop(insight::format_error(
       "Trends with {.field supports_factors = FALSE} must provide {.field incompatibility_reason}.",
@@ -305,7 +305,7 @@ validate_trend_properties <- function(trend_info, trend_type, func_name) {
       "This helps users understand why factor models don't work with {.field {trend_type}} trends."
     ))
   }
-  
+
   invisible(TRUE)
 }
 
@@ -321,7 +321,7 @@ ar_trend_properties <- function() {
   )
 }
 
-#' RW Trend Properties  
+#' RW Trend Properties
 #' @noRd
 rw_trend_properties <- function() {
   list(
@@ -374,11 +374,11 @@ pw_trend_properties <- function() {
 #'
 #' @details
 #' **Recommended Convention-Based Approach**:
-#' 
+#'
 #' Instead of calling this function, define these functions and let auto-discovery handle registration:
 #' 1. `generate_mytrend_trend_stanvars(trend_specs, data_info)` - Stan code generator
 #' 2. `mytrend_trend_properties()` - Returns list(supports_factors = TRUE/FALSE, incompatibility_reason = "...")
-#' 
+#'
 #' This approach requires zero manual registration calls and is automatically future-proof.
 #'
 #' @param name Character string name for the custom trend type
@@ -398,7 +398,7 @@ pw_trend_properties <- function() {
 #'   # GARCH trend implementation
 #'   list(brms::stanvar(...))
 #' }
-#' 
+#'
 #' garch_trend_properties <- function() {
 #'   list(
 #'     supports_factors = TRUE,
@@ -406,7 +406,7 @@ pw_trend_properties <- function() {
 #'   )
 #' }
 #' # No registration call needed! Auto-discovered on package load.
-#' 
+#'
 #' # ALTERNATIVE: Manual registration (discouraged)
 #' register_custom_trend("GARCH",
 #'                      supports_factors = TRUE,
@@ -717,23 +717,23 @@ generate_ar_monitor_params <- function(trend_spec) {
 #' @noRd
 generate_var_monitor_params <- function(trend_spec) {
   # VAR uses hierarchical hyperparameters following Heaps 2022 methodology
-  
+
   # Base VAR hyperparameters - always present
   var_params <- c("Amu_trend", "Aomega_trend")
-  
+
   # Add MA hyperparameters if VARMA model
   if (trend_spec$ma %||% FALSE) {
     var_params <- c(var_params, "Dmu_trend", "Domega_trend")
   }
-  
+
   # Add group-specific parameters if hierarchical
   if (!is.null(trend_spec$gr) && trend_spec$gr != "NA") {
     var_params <- c(var_params, "sigma_group_trend")
   }
-  
+
   # VAR uses variance-correlation decomposition (sigma_trend + L_Omega_trend)
   # These are handled by base_params and correlation_params in the main function
-  
+
   return(var_params)
 }
 
@@ -1040,22 +1040,6 @@ add_summary_labels <- function(trend_obj) {
   # Add to trend object
   trend_obj$summary_labels <- summary_labels
 
-  return(trend_obj)
-}
-
-#' Add Complete Metadata to Trend Object
-#'
-#' Convenience function that adds all metadata components:
-#' monitor_params, forecast_metadata, and summary_labels.
-#'
-#' @param trend_obj An mvgam_trend object
-#' @return Fully enhanced trend object with all metadata
-#' @noRd
-add_complete_metadata <- function(trend_obj) {
-  # Add all metadata components sequentially
-  trend_obj <- add_monitor_params(trend_obj)
-  trend_obj <- add_forecast_metadata(trend_obj)
-  trend_obj <- add_summary_labels(trend_obj)
   return(trend_obj)
 }
 
@@ -1582,58 +1566,6 @@ mvgam_trend_pattern <- function() {
   paste0("\\b(", paste(trend_types, collapse = "|"), ")\\s*\\([^)]*(?:\\([^)]*\\)[^)]*)*\\)")
 }
 
-#' Build trend label for display
-#'
-#' Creates human-readable labels for trend objects based on their parameters.
-#'   Used for printing and formula display.
-#'
-#' @param type Base trend type name
-#' @param cor Logical indicating correlation structure
-#' @param ma Logical indicating moving average terms
-#' @param gr Grouping variable
-#' @param n_lv Number of latent variables (for dynamic factors)
-#' @param p Order parameter (for AR/VAR models)
-#'
-#' @return Character string label
-#' @noRd
-build_trend_label <- function(type, cor = FALSE, ma = FALSE, gr = 'NA',
-                              n_lv = NULL, p = NULL) {
-
-  # Start with base type
-  label <- type
-
-  # Add order if provided
-  if (!is.null(p) && p > 1) {
-    label <- paste0(label, p)
-  }
-
-  # Add modifiers
-  modifiers <- character(0)
-
-  if (!is.null(n_lv) && n_lv > 0) {
-    modifiers <- c(modifiers, paste0("lv=", n_lv))
-  }
-
-  if (ma) {
-    modifiers <- c(modifiers, "ma")
-  }
-
-  if (cor) {
-    modifiers <- c(modifiers, "cor")
-  }
-
-  if (gr != 'NA') {
-    modifiers <- c(modifiers, "hier")
-  }
-
-  # Combine with parentheses if modifiers exist
-  if (length(modifiers) > 0) {
-    label <- paste0(label, "(", paste(modifiers, collapse = ","), ")")
-  }
-
-  return(label)
-}
-
 #' Create custom trend types
 #'
 #' Allows users to define custom trend specifications. This is the main
@@ -1856,7 +1788,7 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
 
   # Extract term labels (mvgam pattern)
   tf <- attr(tf_safe, 'term.labels')
-  
+
   # Check for intercept-only formula (~ 1) or no-intercept formula (~ -1)
   # Both should default to ZMVN
   is_intercept_only <- length(tf) == 0 && attr(tf_safe, 'intercept') == 1
@@ -1941,7 +1873,7 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
 
   # Since we enforce single trend type, trend_model is always the first component
   trend_model <- trend_components[[1]]
-  
+
   # Calculate dimensions from data for proper parameter filtering
   if (!is.null(data)) {
     # Use existing infrastructure to calculate dimensions
@@ -1951,7 +1883,7 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
       series_var = trend_model$series,
       trend_type = trend_model$trend
     )
-    
+
     # Add dimensions to trend_model for filtering
     trend_model$dimensions <- dimensions
   }
@@ -1977,14 +1909,14 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
 #' @noRd
 eval_trend_constructor <- function(trend_call) {
   checkmate::assert_string(trend_call)
-  
+
   # Parse the expression
   expr <- str2expression(trend_call)[[1]]
-  
+
   # Use package namespace where trend constructors are defined
   pkg_env <- asNamespace("mvgam")
   trend_obj <- eval(expr, envir = pkg_env)
-  
+
   # Validate result
   if (!is.mvgam_trend(trend_obj)) {
     insight::format_error(
@@ -1993,7 +1925,7 @@ eval_trend_constructor <- function(trend_call) {
       "Check that you're using a supported trend constructor."
     )
   }
-  
+
   return(trend_obj)
 }
 
@@ -2472,11 +2404,11 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
   } else {
     checkmate::assert_integerish(p, lower = 1, unique = TRUE, sorted = TRUE)
   }
-  
+
   # Basic input validation
   checkmate::assert_logical(ma, len = 1)
   checkmate::assert_logical(cor, len = 1)
-  
+
   # Use helper function for clean object creation
   # Complex logic moved to validation and Stan assembly layers
   trend_obj <- create_mvgam_trend(
@@ -2491,7 +2423,7 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
     cor = cor,
     n_lv = n_lv
   )
-  
+
   return(trend_obj)
 }
 
@@ -2518,10 +2450,10 @@ CAR = function(time = NA, series = NA) {
 VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
   # Validate VAR order parameter
   checkmate::assert_int(p, lower = 1)
-  
+
   # Basic input validation
   checkmate::assert_logical(ma, len = 1)
-  
+
   # Use helper function for clean object creation
   # Complex logic moved to validation and Stan assembly layers
   trend_obj <- create_mvgam_trend(
@@ -2536,7 +2468,7 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA, subgr = NA, n
     cor = TRUE,  # VAR models always use correlation for optimal performance
     n_lv = n_lv
   )
-  
+
   return(trend_obj)
 }
 
@@ -2801,15 +2733,15 @@ GP = function(time = NA, series = NA, ...) {
 #' }
 #'
 #' @export
-PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10, 
-              changepoint_range = 0.8, changepoint_scale = 0.05, 
+PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
+              changepoint_range = 0.8, changepoint_scale = 0.05,
               growth = 'linear', n_lv = NULL) {
   # Validate arguments
   growth <- match.arg(growth, choices = c('linear', 'logistic'))
   checkmate::assert_number(changepoint_range, lower = 0, upper = 1)
   checkmate::assert_int(n_changepoints, lower = 1)
   checkmate::assert_number(changepoint_scale, lower = 0)
-  
+
   # PW doesn't support factor models - validate n_lv
   if (!is.null(n_lv)) {
     stop(insight::format_error(
@@ -2818,7 +2750,7 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
       "Remove {.field n_lv} parameter or use factor-compatible trends: AR, RW, VAR, ZMVN"
     ), call. = FALSE)
   }
-  
+
   # Check for required cap variable in logistic models
   cap_expr <- substitute(cap)
   if (growth == 'logistic' && identical(cap_expr, quote(NA))) {
@@ -2828,7 +2760,7 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
       "Example: PW(cap = carrying_capacity, growth = 'logistic')"
     ), call. = FALSE)
   }
-  
+
   trend_obj <- create_mvgam_trend(
     "PW",  # Base trend type used for ALL dispatch
     .time = substitute(time),
@@ -2975,7 +2907,7 @@ ZMVN = function(time = NA, series = NA, gr = NA, subgr = NA, n_lv = NULL) {
   if (!is.null(n_lv)) {
     checkmate::assert_int(n_lv, lower = 1, null.ok = TRUE)
   }
-  
+
   # Use helper function for clean object creation
   # All validation logic moved to validation layer
   create_mvgam_trend(
@@ -3171,7 +3103,7 @@ create_mvgam_trend <- function(trend_type, ...,
     }
     deparsed
   }
-  
+
   # Process all variables consistently
   time_var <- process_arg(.time)
   series_var <- process_arg(.series)
@@ -3185,11 +3117,11 @@ create_mvgam_trend <- function(trend_type, ...,
 
   series_was_default <- (series_var == "NA")
   if (series_var == "NA") series_var <- "series"
-  
+
   # Handle grouping defaults
   if (gr_var == "NA") gr_var <- "NA"
   if (subgr_var == "NA") subgr_var <- "NA"
-  
+
   # Handle cap default
   if (cap_var == "NA") cap_var <- "cap"
 

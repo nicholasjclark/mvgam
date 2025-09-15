@@ -18,9 +18,7 @@
                       "extract_nonlinear_components",
                       "parse_nonlinear_manually",
                       "determine_trend_injection_point",
-                      "extract_response_from_formula",
-                      "modify_stancode_for_nonlinear",
-                      "integrate_nonlinear_with_assembly"
+                      "extract_response_from_formula"
                   ],
     "purpose":  "brms integration",
     "function_dependencies":  {
@@ -28,7 +26,6 @@
                               },
     "function_signatures":  {
                                 "extract_nonlinear_components":  "extract_nonlinear_components \u003c- function(formula) {",
-                                "modify_stancode_for_nonlinear":  "modify_stancode_for_nonlinear \u003c- function(stancode, nl_info, trend_specs) {",
                                 "create_trend_base_formula":  "create_trend_base_formula \u003c- function(trend_specs) {",
                                 "setup_brms_lightweight":  "setup_brms_lightweight \u003c- function(formula, data, family = gaussian(), trend_formula = NULL, stanvars = NULL, ...) {",
                                 "parse_nonlinear_manually":  "parse_nonlinear_manually \u003c- function(formula) {",
@@ -37,7 +34,6 @@
                                 "extract_variable_name":  "extract_variable_name \u003c- function(expr) {",
                                 "extract_response_trends":  "extract_response_trends \u003c- function(trend_formula, response_names, validate_separate = FALSE) {",
                                 "has_mvbind_response":  "has_mvbind_response \u003c- function(formula) {",
-                                "integrate_nonlinear_with_assembly":  "integrate_nonlinear_with_assembly \u003c- function(obs_setup, trend_specs) {",
                                 "handle_nonlinear_model":  "handle_nonlinear_model \u003c- function(formula, trend_specs = NULL) {",
                                 "parse_multivariate_trends":  "parse_multivariate_trends \u003c- function(formula, trend_formula = NULL) {",
                                 "determine_trend_injection_point":  "determine_trend_injection_point \u003c- function(nl_components, trend_specs) {",

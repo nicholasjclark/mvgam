@@ -2,6 +2,7 @@
     "s3_methods":  {
                        "print":  [
                                      "mvgam",
+                                     "mvgam_formula",
                                      "mvgam_prefit",
                                      "mvgamstancode"
                                  ],
@@ -11,6 +12,7 @@
                                     ]
                    },
     "functions":  [
+                      "print.mvgam_formula",
                       "print_model_specification_simple",
                       "stancode.mvgam",
                       "stancode.mvgam_prefit",
@@ -26,6 +28,7 @@
                                 "print.mvgam":  "print.mvgam = function(x, ...) {",
                                 "print_model_specification_simple":  "print_model_specification_simple \u003c- function(model_spec) {",
                                 "stancode.mvgam_prefit":  "stancode.mvgam_prefit \u003c- function(object, ...) {",
+                                "print.mvgam_formula":  "print.mvgam_formula \u003c- function(x, ...) {",
                                 "print.mvgam_prefit":  "print.mvgam_prefit = function(x, ...) {",
                                 "stancode.mvgam":  "stancode.mvgam \u003c- function(object, ...) {",
                                 "print.mvgamstancode":  "print.mvgamstancode \u003c- function(x, ...) {"

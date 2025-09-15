@@ -14,14 +14,14 @@ test_that("CAR constructor works for continuous-time AR", {
   expect_false(car_trend$cor)
   expect_false(car_trend$ma)
   expect_equal(car_trend$p, 1)  # CAR always has p = 1
-  
+
   # CAR doesn't accept p parameter anymore (simplified constructor)
   # CAR doesn't accept gr, subgr, or n_lv parameters
   expect_error(CAR(p = 2), "unused argument")
   expect_error(CAR(n_lv = 2), "unused argument")
   expect_error(CAR(gr = "group"), "unused argument")
   expect_error(CAR(subgr = "subgroup"), "unused argument")
-  
+
   # CAR accepts time and series parameters
   car_custom <- CAR(time = "month", series = "species")
   expect_equal(car_custom$time, "month")
@@ -38,25 +38,25 @@ test_that("ZMVN constructor works for zero-mean multivariate normal", {
   expect_equal(zmvn_trend$trend, "ZMVN")
   expect_true(zmvn_trend$cor)  # ZMVN always has correlation
   expect_false(zmvn_trend$ma)  # ZMVN doesn't support MA
-  
+
   # ZMVN with factor model
   suppressWarnings({
     zmvn_factor <- ZMVN(n_lv = 3)
   })
   expect_equal(zmvn_factor$n_lv, 3)
-  
-  # ZMVN with hierarchical structure  
+
+  # ZMVN with hierarchical structure
   suppressWarnings({
     zmvn_hier <- ZMVN(gr = "group", subgr = "subgroup")
   })
   expect_equal(zmvn_hier$gr, "group")
   expect_equal(zmvn_hier$subgr, "subgroup")
-  
+
   # ZMVN with custom time and series
   zmvn_custom <- ZMVN(time = "week", series = "location")
   expect_equal(zmvn_custom$time, "week")
   expect_equal(zmvn_custom$series, "location")
-  
+
   # Parameter validation
   expect_error(ZMVN(n_lv = 0), "Assertion on 'n_lv' failed")
   expect_error(ZMVN(n_lv = -1), "Assertion on 'n_lv' failed")
@@ -104,7 +104,7 @@ test_that("RW constructor accepts factor models", {
     expect_s3_class(rw_trend, "mvgam_trend")
     expect_equal(rw_trend$n_lv, 3)
     expect_equal(rw_trend$trend, "RW")
-    
+
     # Test validation rules are automatically assigned
     expect_true("supports_factors" %in% rw_trend$validation_rules)
   })
@@ -115,7 +115,7 @@ test_that("RW constructor accepts factor models", {
     expect_s3_class(rw_trend_no_lv, "mvgam_trend")
     expect_null(rw_trend_no_lv$n_lv)
     expect_equal(rw_trend_no_lv$trend, "RW")
-    
+
     # Test validation rules are automatically assigned
     expect_true("requires_regular_intervals" %in% rw_trend_no_lv$validation_rules)
     expect_true("supports_factors" %in% rw_trend_no_lv$validation_rules)
@@ -302,18 +302,18 @@ test_that("formula parsing is order-independent", {
 
 # Test formula parsing - multiple trends should fail
 test_that("multiple trend components are properly rejected", {
-  
+
   # Test formula with multiple trends should throw error
   f1 <- ~ s(season) + RW() + AR(p = 2) + cov1
-  
+
   expect_error(
     mvgam:::parse_trend_formula(f1),
     "Multiple trend constructors detected"
   )
-  
-  # Test in different order should also fail  
+
+  # Test in different order should also fail
   f2 <- ~ AR(p = 2) + cov1 + RW() + s(season)
-  
+
   expect_error(
     mvgam:::parse_trend_formula(f2),
     "Multiple trend constructors detected"
@@ -345,7 +345,7 @@ test_that("formula parsing handles edge cases correctly", {
     expect_true("I(x^2)" %in% parsed3$regular_terms)
     expect_true("log(y + 1)" %in% parsed3$regular_terms)
     expect_equal(length(parsed3$regular_terms), 2)
-    
+
     # Test that offset terms are properly rejected in trend formulas
     expect_error(
       mvgam:::parse_trend_formula(~ I(x^2) + RW() + offset(z)),
@@ -669,57 +669,6 @@ test_that("time parameter works correctly in trend constructors", {
   expect_equal(var_grouped$subgr, "species")
 })
 
-# Test time variable validation functionality
-test_that("time variable validation works correctly", {
-
-  # Test basic validation function
-  expect_equal(mvgam:::validate_time_variable("time"), "time")
-  expect_equal(mvgam:::validate_time_variable("week"), "week")
-  expect_equal(mvgam:::validate_time_variable("NA"), "time")  # Default fallback
-
-  # Test with valid data
-  test_data <- data.frame(
-    y = 1:10,
-    time = 1:10,
-    week = 1:10,
-    series = rep("A", 10)
-  )
-
-  expect_equal(mvgam:::validate_time_variable("time", test_data), "time")
-  expect_warning(
-    result <- mvgam:::validate_time_variable("week", test_data),
-    "Using.*as time variable instead of 'time'"
-  )
-  expect_equal(result, "week")
-
-  # Test error when time variable doesn't exist
-  expect_error(
-    mvgam:::validate_time_variable("missing_var", test_data),
-    "Time variable.*not found in data"
-  )
-
-  # Test error when time variable is wrong type
-  bad_data <- data.frame(
-    y = 1:10,
-    time = letters[1:10],  # Character instead of numeric
-    series = rep("A", 10)
-  )
-
-  expect_error(
-    mvgam:::validate_time_variable("time", bad_data),
-    "Time variable.*must be numeric or integer"
-  )
-
-  # Test with integer time variable (should work)
-  int_data <- data.frame(
-    y = 1:10,
-    time = as.integer(1:10),
-    series = rep("A", 10)
-  )
-
-  expect_equal(mvgam:::validate_time_variable("time", int_data), "time")
-})
-
 # Test integration with formula parsing
 test_that("time parameter integrates correctly with formula parsing", {
   suppressWarnings({
@@ -744,7 +693,7 @@ test_that("time parameter integrates correctly with formula parsing", {
     parsed4 <- mvgam:::parse_trend_formula(f4)
     expect_equal(parsed4$trend_components[[1]]$time, "period")
     expect_true("s(temp)" %in% parsed4$regular_terms)
-    
+
     # Test that offset rejection works with various formulas
     expect_error(
       mvgam:::parse_trend_formula(~ s(temp) + CAR() + offset(effort)),
@@ -825,60 +774,6 @@ test_that("series parameter works correctly in trend constructors", {
   expect_equal(ar_no_warn$p, c(1, 12))
   expect_true(ar_no_warn$ma)
   expect_true(ar_no_warn$cor)
-})
-
-# Test series variable validation functionality
-test_that("series variable validation works correctly", {
-
-  # Test basic validation function
-  expect_equal(mvgam:::validate_series_variable("series"), "series")
-  expect_equal(mvgam:::validate_series_variable("species"), "species")
-  expect_equal(mvgam:::validate_series_variable("NA"), "series")  # Default fallback
-
-  # Test with valid data
-  test_data <- data.frame(
-    y = 1:10,
-    time = 1:10,
-    series = rep(c("A", "B"), 5),
-    species = as.factor(rep(c("sp1", "sp2"), 5))
-  )
-
-  result1 <- mvgam:::validate_series_variable("series", test_data)
-  expect_equal(result1, "series")
-
-  expect_warning(
-    result2 <- mvgam:::validate_series_variable("species", test_data),
-    "Using.*as series variable instead of 'series'"
-  )
-  expect_equal(result2, "species")
-
-  # Test error when series variable doesn't exist
-  expect_error(
-    mvgam:::validate_series_variable("missing_var", test_data),
-    "Series variable.*not found in data"
-  )
-
-  # Test error when series variable is wrong type
-  bad_data <- data.frame(
-    y = 1:10,
-    time = 1:10,
-    series = 1:10  # Numeric instead of character/factor
-  )
-
-  expect_error(
-    mvgam:::validate_series_variable("series", bad_data),
-    "Series variable.*must be character or factor"
-  )
-
-  # Test with factor series variable (should work)
-  factor_data <- data.frame(
-    y = 1:10,
-    time = 1:10,
-    series = as.factor(rep(c("A", "B"), 5))
-  )
-
-  result3 <- mvgam:::validate_series_variable("series", factor_data)
-  expect_equal(result3, "series")
 })
 
 # Test integration of time and series parameters with formula parsing
@@ -1324,9 +1219,9 @@ test_that("validate_and_process_trend_parameters works correctly", {
   # Test AR trend parameter processing
   ar_spec <- list(trend = "AR", p = c(3, 1, 2), time = "time", series = "series")
   test_data <- data.frame(time = 1:10, series = factor(rep(1:2, each = 5)))
-  
+
   result <- validate_and_process_trend_parameters(ar_spec, test_data)
-  
+
   # Lag parameters should be sorted
   expect_equal(result$p, c(1, 2, 3))
   expect_equal(result$trend, "AR")
@@ -1336,13 +1231,13 @@ test_that("process_lag_parameters handles complex lag structures", {
   # Test basic lag processing
   expect_equal(process_lag_parameters(c(2, 1, 3), "AR"), c(1, 2, 3))
   expect_equal(process_lag_parameters(NULL, "AR"), 1L)
-  
+
   # Test error for invalid lags
   expect_error(
     process_lag_parameters(c(-1, 2), "AR"),
     "Lag parameters must be positive integers"
   )
-  
+
   expect_error(
     process_lag_parameters(c(1, Inf), "VAR"),
     "Lag parameters must be positive integers"
@@ -1351,22 +1246,22 @@ test_that("process_lag_parameters handles complex lag structures", {
 
 test_that("process_capacity_parameter handles PW capacity validation", {
   test_data <- data.frame(time = 1:10, series = 1, capacity_col = 100:109)
-  
+
   # Test numeric capacity
   expect_equal(process_capacity_parameter(50, test_data), 50)
-  
+
   # Test column name capacity
   expect_equal(process_capacity_parameter("capacity_col", test_data), "capacity_col")
-  
+
   # Test NULL capacity
   expect_null(process_capacity_parameter(NULL, test_data))
-  
+
   # Test invalid column name
   expect_error(
     process_capacity_parameter("missing_col", test_data),
     "Capacity variable.*not found in data"
   )
-  
+
   # Test invalid numeric capacity
   expect_error(
     process_capacity_parameter(-10, test_data),
@@ -1383,12 +1278,12 @@ test_that("rule-based validation dispatch works correctly", {
     time = "time",
     series = "series"
   )
-  
+
   test_data <- data.frame(time = 1:10, series = factor(rep(1:2, each = 5)))
-  
+
   # Test applying validation rules
   result <- apply_validation_rules(trend_spec, test_data)
-  
+
   # Should have processed parameters
   expect_equal(result$p, c(1, 2))  # Sorted
   expect_equal(result$trend, "AR")
@@ -1396,18 +1291,18 @@ test_that("rule-based validation dispatch works correctly", {
 
 test_that("validation rule dispatch table contains all expected rules", {
   dispatch_table <- get_validation_rule_dispatch_table()
-  
+
   expected_rules <- c(
     "requires_grouping_validation",
-    "supports_correlation", 
+    "supports_correlation",
     "requires_regular_intervals",
     "supports_factors",
     "supports_hierarchical",
     "requires_parameter_processing"
   )
-  
+
   expect_true(all(expected_rules %in% names(dispatch_table)))
-  
+
   # All entries should be functions
   for (rule in names(dispatch_table)) {
     expect_type(dispatch_table[[rule]], "closure")
@@ -1418,17 +1313,17 @@ test_that("validation functions handle edge cases correctly", {
   # Test trend grouping validation
   trend_spec <- list(trend = "AR", gr = "group_var", subgr = "subgroup_var")
   test_data <- data.frame(
-    time = 1:10, 
+    time = 1:10,
     series = 1,
     group_var = factor(rep(c("A", "B"), each = 5)),
     subgroup_var = factor(rep(c("X", "Y"), times = 5))
   )
-  
+
   # Should pass validation
   result <- validate_trend_grouping(trend_spec, test_data)
   expect_equal(result$gr, "group_var")
   expect_equal(result$subgr, "subgroup_var")
-  
+
   # Test missing grouping variable
   trend_spec_bad <- list(trend = "AR", gr = "missing_var")
   expect_error(
