@@ -279,7 +279,7 @@ variable_info = list(
 **Entry Point**: `validate_time_series_for_trends()` calls `validate_series_time()` using variable names from trend constructors  
 **Core Validation**: `validate_series_time()` ensures time/series exist as factors, then calls `validate_grouping_structure()` for gr/subgr  
 **Factor Management**: `validate_factor_levels()` checks for unused levels; `validate_complete_grouping()` ensures hierarchical consistency  
-**Stan Preparation**: `prepare_stan_data()` auto-drops unused levels and orders data (series-first, time-within-series) for efficient computation
+**Stan Preparation**: Data auto-dropping of unused levels and ordering (series-first, time-within-series) for efficient computation
 
 ### 7. Stanvars Combination Architecture
 

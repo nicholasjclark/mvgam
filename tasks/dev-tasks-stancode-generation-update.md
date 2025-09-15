@@ -31,8 +31,8 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 
 ## IMMEDIATE PRIORITIES (Updated: 2025-09-15)
 
-1. **CRITICAL: Zero-Dependency Function Investigation** - Investigate 10 functions in `stan_assembly.R` with zero internal dependencies to determine retention necessity:
-   - Functions: `parse_model_cmdstanr`, `parse_model_rstan`, `prepare_mvgam_stancode`, `prepare_stan_data`, `prepare_stanvars_for_brms`, `remove_variables_from_block`, `rename_multivariate_parameters`, `rename_univariate_parameters`, `generate_stan_array_declaration`, `extract_variables_from_block`
+1. **CRITICAL: Zero-Dependency Function Investigation** - Investigate 9 functions in `stan_assembly.R` with zero internal dependencies to determine retention necessity:
+   - Functions: `parse_model_cmdstanr`, `parse_model_rstan`, `prepare_mvgam_stancode`, `prepare_stan_data`, `prepare_stanvars_for_brms`, `remove_variables_from_block`, `rename_multivariate_parameters`, `rename_univariate_parameters`, `generate_stan_array_declaration`
    - **AGENT TASK**: For each function, investigate:
      a) Direct calls from exported functions or main workflow chains
      b) Dynamic dispatch usage (search for function name strings in `get()` calls)

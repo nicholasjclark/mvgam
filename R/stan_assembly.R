@@ -431,119 +431,6 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
   return(base_code)
 }
 
-
-#' Integration with Enhanced mvgam Function
-#'
-#' @description
-#' Integration point for enhanced mvgam function to use two-stage assembly.
-#' Includes time series validation to ensure data compatibility.
-#'
-#' @param obs_setup Observation model setup from setup_brms_lightweight
-#' @param trend_setup Trend model setup from setup_brms_lightweight
-#' @param trend_specs Parsed trend specification
-#' @param data Original data for validation
-#' @param backend Stan backend to use
-#' @param validate Whether to validate Stan code
-#' @param silent Verbosity level
-#' @return List ready for mvgam model fitting
-#' @noRd
-prepare_mvgam_stancode <- function(obs_setup, trend_setup, trend_specs,
-                                  data = NULL, backend = "rstan",
-                                  validate = TRUE, silent = 1) {
-
-  # Validate time series structure if data provided and trends specified
-  if (!is.null(data) && !is.null(trend_specs)) {
-    # Extract response variable names for mapping generation (matching make_stan.R approach)
-    response_vars <- extract_response_names_from_brmsfit(obs_setup$brmsfit)
-
-    validate_time_series_for_trends(data, trend_specs, silent = silent, response_vars = response_vars)
-  }
-
-  # Generate combined Stan code and data
-  stan_components <- generate_combined_stancode(
-    obs_setup = obs_setup,
-    trend_setup = trend_setup,
-    trend_specs = trend_specs,
-    backend = backend,
-    validate = validate,
-    silent = silent
-  )
-
-  # Return in format expected by mvgam fitting functions
-  return(list(
-    model_code = stan_components$stancode,
-    model_data = stan_components$standata,
-    has_trends = stan_components$has_trends,
-    trend_specification = trend_specs,
-    backend = backend,
-    validation_passed = validate
-  ))
-}
-
-#' Prepare Data for Stan
-#'
-#' @description
-#' Orders data appropriately for Stan computation and stores metadata for restoration.
-#' Stan expects data ordered by series first, then time within series for efficient
-#' block matrix operations.
-#'
-#' @param data Validated data.frame
-#' @param variable_info List containing variable names from trend constructor
-#' @return List with ordered data and ordering metadata
-#' @noRd
-prepare_stan_data <- function(data, variable_info) {
-  checkmate::assert_data_frame(data)
-  checkmate::assert_list(variable_info)
-
-  # Extract variable names
-  time_var <- variable_info$trend$time
-  series_var <- variable_info$trend$series
-  gr_var <- variable_info$trend$gr
-  subgr_var <- variable_info$trend$subgr
-
-  # Auto-drop unused factor levels for Stan compatibility
-  data <- validate_factor_levels(data, series_var, "prepared_data", auto_drop = TRUE)
-  if (!is.null(gr_var)) {
-    data <- validate_factor_levels(data, gr_var, "prepared_data", auto_drop = TRUE)
-  }
-  if (!is.null(subgr_var)) {
-    data <- validate_factor_levels(data, subgr_var, "prepared_data", auto_drop = TRUE)
-  }
-
-  # Store ordering metadata for post-processing
-  ordering_info <- list(
-    original_rows = seq_len(nrow(data)),
-    time_var = time_var,
-    series_var = series_var
-  )
-
-  # Order data for Stan: series first for block processing, then time
-  ordered_data <- data %>%
-    dplyr::arrange(
-      !!rlang::sym(series_var),  # Series blocks for efficient computation
-      !!rlang::sym(time_var)      # Time within each series
-    )
-
-  return(list(
-    data = ordered_data,
-    ordering = ordering_info
-  ))
-}
-
-# Data Extraction and Processing Utilities
-# ========================================
-
-
-# Note: Legacy merge_stan_data() and combine_stan_data() functions removed.
-# Modern system uses brms automatic stanvar data merging via generate_base_brms_standata().
-
-# Stan Code Processing Utilities
-# ==============================
-
-
-# Integration Support Utilities
-# =============================
-
 #' Prepare Stanvars for brms Integration
 #'
 #' @description
@@ -4396,116 +4283,6 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   return(do.call(combine_stanvars, components))
 }
 
-# Note: PWlinear and PWlogistic wrapper functions have been removed.
-# Use generate_pw_trend_stanvars(trend_specs, data_info, growth = "linear")
-# or generate_pw_trend_stanvars(trend_specs, data_info, growth = "logistic") instead.
-
-
-
-
-# =============================================================================
-# SECTION 3: STAN CODE VALIDATION SYSTEM
-# =============================================================================
-# WHY: Stan code validation prevents runtime compilation failures and ensures
-# generated code follows Stan syntax rules. This layer catches errors early
-# and provides actionable error messages, critical for user experience and
-# debugging the two-stage assembly system.
-
-#' Parse Stan Model Code with rstan
-#'
-#' @description
-#' Validates Stan model code using rstan::stanc.
-#' Based on existing mvgam patterns and brms approach.
-#'
-#' @param model Stan model code
-#' @param silent Numeric indicating verbosity level
-#' @param ... Additional arguments passed to rstan::stanc
-#' @return Validated Stan model code
-#' @noRd
-parse_model_rstan <- function(model, silent = 1, ...) {
-  checkmate::assert_string(model, min.chars = 1)
-
-  # Check if rstan is available
-  if (!requireNamespace("rstan", quietly = TRUE)) {
-    stop(insight::format_error(
-      "Package {.pkg rstan} is required for Stan code validation.",
-      "Install rstan or use cmdstanr backend."
-    ))
-  }
-
-  # Parse Stan model code with rstan using existing eval_silent
-  out <- eval_silent(
-    rstan::stanc(model_code = model, ...),
-    type = "message",
-    try = TRUE,
-    silent = silent >= 1L
-  )
-
-  if (inherits(out, "try-error")) {
-    stop(insight::format_error(
-      "Stan code validation failed with rstan backend.",
-      "Check Stan syntax and model structure.",
-      "Error details: {attr(out, 'condition')$message}"
-    ))
-  }
-
-  # Return validated model code
-  if (!is.null(out$model_code)) {
-    return(out$model_code)
-  } else {
-    stop(insight::format_error(
-      "Stan code validation did not return model code.",
-      "rstan::stanc failed to produce validated output."
-    ))
-  }
-}
-
-#' Parse Stan Model Code with cmdstanr
-#'
-#' @description
-#' Validates Stan model code using cmdstanr::cmdstan_model without compilation.
-#' Based on existing mvgam patterns in backends.R.
-#'
-#' @param model Stan model code
-#' @param silent Numeric indicating verbosity level
-#' @param ... Additional arguments passed to cmdstanr functions
-#' @return Validated Stan model code
-#' @noRd
-parse_model_cmdstanr <- function(model, silent = 1, ...) {
-  checkmate::assert_string(model, min.chars = 1)
-
-  # Check if cmdstanr is available
-  if (!requireNamespace("cmdstanr", quietly = TRUE)) {
-    stop(insight::format_error(
-      "Package {.pkg cmdstanr} is required for Stan code validation.",
-      "Install cmdstanr or use rstan backend."
-    ))
-  }
-
-  # Write Stan model to temporary file - let errors bubble up
-  temp_file <- cmdstanr::write_stan_file(model)
-
-  # Validate using cmdstan_model without compilation, using existing eval_silent
-  out <- eval_silent(
-    cmdstanr::cmdstan_model(temp_file, compile = FALSE, ...),
-    type = "message",
-    try = TRUE,
-    silent = silent > 0L
-  )
-
-  if (inherits(out, "try-error")) {
-    stop(insight::format_error(
-      "Stan code validation failed with cmdstanr backend.",
-      "Check Stan syntax and model structure.",
-      "Error details: {attr(out, 'condition')$message}"
-    ))
-  }
-
-  # Check syntax and return code - let errors bubble up
-  out$check_syntax(quiet = TRUE)
-  return(paste(out$code(), collapse = "\n"))
-}
-
 #' Extract and Rename brms Trend Parameters
 #'
 #' Extracts parameters and data from brms trend_setup, renames them with _trend suffix,
@@ -4591,29 +4368,6 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
   }
 
   return(combined_stanvars)
-}
-
-#' Check if brmsfit is Multivariate
-#' @param brmsfit brms model fit object
-#' @return Logical indicating if model is multivariate
-#' @noRd
-is_multivariate_brmsfit <- function(brmsfit) {
-  checkmate::assert_class(brmsfit, "brmsfit")
-
-  # Check if formula has multivariate structure
-  if (!is.null(brmsfit$formula) && inherits(brmsfit$formula, "mvbrmsformula")) {
-    return(TRUE)
-  }
-
-  # Check brmsterms for multivariate structure
-  if (!is.null(brmsfit$formula)) {
-    terms_obj <- try(brms::brmsterms(brmsfit$formula), silent = TRUE)
-    if (!inherits(terms_obj, "try-error") && inherits(terms_obj, "mvbrmsterms")) {
-      return(TRUE)
-    }
-  }
-
-  return(FALSE)
 }
 
 #' Extract Response Names from brmsfit
@@ -5448,17 +5202,6 @@ extract_non_likelihood_from_model_block <- function(model_block) {
   return(filter_block_content(block_content, "model"))
 }
 
-#' Extract Stan Block Inner Content
-#'
-#' @description
-#' Extracts only the inner content of a Stan block (without block headers).
-#' This is specifically designed for creating brms stanvars where the scode
-#' should contain only raw declarations, not block headers.
-#'
-#' @param stancode Character string containing full Stan code
-#' @param block_name Name of block to extract ("parameters", "data", etc.)
-#' @return Character string with inner block content (trimmed)
-#' @noRd
 #' Extract Stan Block Content with Improved Functions Block Handling
 #'
 #' @description
@@ -5938,106 +5681,6 @@ apply_safe_parameter_replacement <- function(code, old_name, new_name) {
   gsub(pattern, new_name, code, perl = TRUE)
 }
 
-#' Rename Univariate Parameters using comprehensive identifier extraction
-#'
-#' Replaces hardcoded parameter patterns with comprehensive Stan reserved words
-#' filtering to ensure robust parameter renaming for all brms patterns.
-#' Based on extensive testing documented in dev-tasks file.
-#'
-#' @param code Character string of Stan code
-#' @param suffix Character suffix to append
-#' @param mapping List to store parameter mappings
-#' @return Character string with renamed parameters
-#' @noRd
-rename_univariate_parameters <- function(code, suffix, mapping) {
-  checkmate::assert_character(code, len = 1)
-  checkmate::assert_character(suffix, len = 1)
-  checkmate::assert_list(mapping)
-
-  # Extract all identifiers from Stan code
-  all_identifiers <- extract_stan_identifiers(code)
-
-  if (length(all_identifiers) == 0) {
-    return(code)
-  }
-
-  # Filter to get identifiers that should be renamed
-  renameable_identifiers <- filter_renameable_identifiers(all_identifiers)
-
-  # Apply renaming with word boundary protection
-  renamed_code <- code
-
-  # Sort by length (descending) to avoid partial replacements
-  sorted_identifiers <- renameable_identifiers[order(-nchar(renameable_identifiers))]
-
-  for (identifier in sorted_identifiers) {
-    renamed_param <- paste0(identifier, suffix)
-
-    # Store mapping for later use
-    mapping$original_to_renamed[[identifier]] <- renamed_param
-    mapping$renamed_to_original[[renamed_param]] <- identifier
-
-    # Apply replacement with word boundary protection
-    renamed_code <- apply_safe_parameter_replacement(
-      renamed_code,
-      identifier,
-      renamed_param
-    )
-  }
-
-  return(renamed_code)
-}
-
-#' Rename Multivariate Parameters
-#' @param code Character string of Stan code
-#' @param suffix Character suffix to append
-#' @param mapping List to store parameter mappings
-#' @param response_names Character vector of response names
-#' @return Character string with renamed parameters
-#' @noRd
-rename_multivariate_parameters <- function(code, suffix, mapping, response_names) {
-  renamed_code <- code
-
-  # Multivariate parameter patterns for each response
-  for (resp_name in response_names) {
-    # Response-specific patterns
-    mv_patterns <- c(
-      paste0("\\bb_", resp_name, "\\b"),           # Fixed effects for response
-      paste0("\\bmu_", resp_name, "\\b"),          # Linear predictor for response
-      paste0("\\bsigma_", resp_name, "\\b"),       # Scale parameter for response
-      paste0("\\bshape_", resp_name, "\\b"),       # Shape parameter for response
-      paste0("\\bY_", resp_name, "\\b"),           # Response variable
-      paste0("\\bX_", resp_name, "\\b"),           # Design matrix for response
-      paste0("\\bN_", resp_name, "\\b"),           # Number of observations for response
-      paste0("\\bK_", resp_name, "\\b")            # Number of predictors for response
-    )
-
-    # Apply renaming for this response
-    for (param_pattern in mv_patterns) {
-      # Find all matches
-      matches <- gregexpr(param_pattern, renamed_code, perl = TRUE)
-      match_strings <- regmatches(renamed_code, matches)[[1]]
-
-      # Rename each unique match
-      unique_matches <- unique(match_strings)
-      for (param in unique_matches) {
-        if (nchar(param) > 0) {
-          renamed_param <- paste0(param, suffix)
-
-          # Store mapping
-          mapping$original_to_renamed[[param]] <- renamed_param
-          mapping$renamed_to_original[[renamed_param]] <- param
-
-          # Replace in code (use word boundaries)
-          renamed_code <- gsub(paste0("\\b", param, "\\b"), renamed_param, renamed_code, perl = TRUE)
-        }
-      }
-    }
-  }
-
-  return(renamed_code)
-}
-
 #' Extract and Rename Stan Data Objects
 #'
 #' Extracts data objects from brms standata and renames them with suffix.
@@ -6261,37 +5904,6 @@ create_times_trend_matrix <- function(n_time, n_series, unique_times, unique_ser
   )
 }
 
-#' Generate Stan Array Declaration
-#'
-#' Creates properly formatted Stan array declaration with data
-#'
-#' @param var_name Variable name
-#' @param var_type Stan variable type (int, real, etc.)
-#' @param dimensions Vector of array dimensions
-#' @param data_matrix Matrix or array of data values
-#' @return Character string with Stan declaration
-#' @noRd
-generate_stan_array_declaration <- function(var_name, var_type, dimensions, data_matrix) {
-  checkmate::assert_string(var_name)
-  checkmate::assert_string(var_type)
-  checkmate::assert_integerish(dimensions, lower = 1)
-  checkmate::assert_matrix(data_matrix)
-
-  # Create dimension string
-  dim_str <- paste(dimensions, collapse = ", ")
-
-  # Format data matrix for Stan
-  if (length(dimensions) == 2) {
-    # 2D array
-    formatted_data <- format_matrix_for_stan_array(data_matrix)
-  } else {
-    stop("Only 2D arrays currently supported")
-  }
-
-  # Create Stan declaration
-  paste0(var_type, " ", var_name, "[", dim_str, "] = ", formatted_data, ";")
-}
-
 #' Format Matrix for Stan Array
 #'
 #' Converts R matrix to Stan array format
@@ -6357,37 +5969,6 @@ deduplicate_stan_functions <- function(stan_code) {
   return(final_code)
 }
 
-#' Extract Variable Names from Stan Block
-#' @param stan_code Character string containing complete Stan code
-#' @param block_name Character string specifying block name
-#' @return Character vector of variable names found in the block
-#' @noRd
-extract_variables_from_block <- function(stan_code, block_name) {
-  checkmate::assert_character(stan_code, len = 1, any.missing = FALSE)
-
-  # Split long validation call for line length compliance
-  valid_blocks <- c("data", "transformed data", "parameters",
-                   "transformed parameters", "model", "generated quantities")
-  checkmate::assert_choice(block_name, valid_blocks)
-
-  block_content <- extract_stan_block_content(stan_code, block_name)
-  if (is.null(block_content) || nchar(trimws(block_content)) == 0) {
-    return(character(0))
-  }
-
-  lines <- strsplit(block_content, "\n", fixed = TRUE)[[1]]
-  variables <- character(0)
-
-  for (line in lines) {
-    var_name <- extract_variable_from_line(line)
-    if (!is.na(var_name)) {
-      variables <- c(variables, var_name)
-    }
-  }
-
-  unique(variables)
-}
-
 #' Extract Variable Name from Stan Declaration Line
 #' @param line Character string containing Stan declaration line
 #' @return Character string with variable name or NA if not found
@@ -6431,49 +6012,6 @@ extract_variable_from_line <- function(line) {
   }
 
   return(NA_character_)
-}
-
-#' Remove Variables from Stan Block
-#' @param stan_code Character string containing complete Stan code
-#' @param block_name Character string specifying block to modify
-#' @param variables_to_remove Character vector of variable names to remove
-#' @return Character string with modified Stan code
-#' @noRd
-remove_variables_from_block <- function(stan_code, block_name,
-                                       variables_to_remove) {
-  checkmate::assert_character(stan_code, len = 1, any.missing = FALSE)
-
-  valid_blocks <- c("data", "transformed data", "parameters",
-                   "transformed parameters", "model", "generated quantities")
-  checkmate::assert_choice(block_name, valid_blocks)
-  checkmate::assert_character(variables_to_remove, min.len = 1)
-
-  if (length(variables_to_remove) == 0) {
-    return(stan_code)
-  }
-
-  block_content <- extract_stan_block_content(stan_code, block_name)
-  if (is.null(block_content) || nchar(trimws(block_content)) == 0) {
-    return(stan_code)
-  }
-
-  # Filter out duplicate variable declarations
-  lines <- strsplit(block_content, "\n", fixed = TRUE)[[1]]
-  filtered_lines <- character(0)
-
-  for (line in lines) {
-    var_name <- extract_variable_from_line(line)
-    if (is.na(var_name) || !var_name %in% variables_to_remove) {
-      filtered_lines <- c(filtered_lines, line)
-    }
-  }
-
-  new_block_content <- paste(filtered_lines, collapse = "\n")
-  new_stan_code <- replace_stan_block_content(
-    stan_code, block_name, new_block_content
-  )
-
-  return(new_stan_code)
 }
 
 #' Replace Stan Block Content

@@ -293,7 +293,7 @@ are_braces_balanced(stan_code)             # Check brace matching
 - `validate_stan_code()` provides comprehensive validation using `rstan::stanc()` directly
 
 **Data Integration**:
-- `prepare_stan_data()` prepares and orders time/series data for Stan
+- Data preparation and ordering for time/series data for Stan
 - `combine_stan_data()` combines observation and trend data with conflict resolution
 - `validate_combined_standata()` ensures proper Stan data structure and types
 

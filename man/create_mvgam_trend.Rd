@@ -7,11 +7,11 @@
 create_mvgam_trend(
   trend_type,
   ...,
-  .time = substitute(time),
-  .series = substitute(series),
-  .gr = substitute(gr),
-  .subgr = substitute(subgr),
-  .cap = substitute(cap),
+  .time = NULL,
+  .series = NULL,
+  .gr = NULL,
+  .subgr = NULL,
+  .cap = NULL,
   .validation_rules = NULL
 )
 }

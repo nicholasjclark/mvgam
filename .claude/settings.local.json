@@ -25,7 +25,8 @@
       "Bash(for i in {1..6})",
       "Bash(cd:*)",
       "Read(/C:\\c\\Users\\uqnclar2\\OneDrive - The University of Queensland\\Desktop\\mvgam/**)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(rg:*)"
     ],
     "deny": [],
     "ask": [],

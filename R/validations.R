@@ -2302,6 +2302,51 @@ validate_stan_code <- function(stan_code, backend = "rstan", silent = TRUE, ...)
   }
 }
 
+#' Parse Stan Model Code with cmdstanr
+#'
+#' @description
+#' Validates Stan model code using cmdstanr::cmdstan_model without compilation.
+#' Based on existing mvgam patterns in backends.R.
+#'
+#' @param model Stan model code
+#' @param silent Numeric indicating verbosity level
+#' @param ... Additional arguments passed to cmdstanr functions
+#' @return Validated Stan model code
+#' @noRd
+parse_model_cmdstanr <- function(model, silent = 1, ...) {
+  checkmate::assert_string(model, min.chars = 1)
+
+  # Check if cmdstanr is available
+  if (!requireNamespace("cmdstanr", quietly = TRUE)) {
+    stop(insight::format_error(
+      "Package {.pkg cmdstanr} is required for Stan code validation.",
+      "Install cmdstanr or use rstan backend."
+    ))
+  }
+
+  # Write Stan model to temporary file - let errors bubble up
+  temp_file <- cmdstanr::write_stan_file(model)
+
+  # Validate using cmdstan_model without compilation, using existing eval_silent
+  out <- eval_silent(
+    cmdstanr::cmdstan_model(temp_file, compile = FALSE, ...),
+    type = "message",
+    try = TRUE,
+    silent = silent > 0L
+  )
+
+  if (inherits(out, "try-error")) {
+    stop(insight::format_error(
+      "Stan code validation failed with cmdstanr backend.",
+      "Check Stan syntax and model structure.",
+      "Error details: {attr(out, 'condition')$message}"
+    ))
+  }
+
+  # Check syntax and return code - let errors bubble up
+  out$check_syntax(quiet = TRUE)
+  return(paste(out$code(), collapse = "\n"))
+}
 
 #' Validate Stan Data Structure
 #'
@@ -2872,6 +2917,29 @@ remove_trend_expressions <- function(expr, trend_patterns, depth = 0) {
       return(expr)
     }
   }
+}
+
+#' Check if brmsfit is Multivariate
+#' @param brmsfit brms model fit object
+#' @return Logical indicating if model is multivariate
+#' @noRd
+is_multivariate_brmsfit <- function(brmsfit) {
+  checkmate::assert_class(brmsfit, "brmsfit")
+
+  # Check if formula has multivariate structure
+  if (!is.null(brmsfit$formula) && inherits(brmsfit$formula, "mvbrmsformula")) {
+    return(TRUE)
+  }
+
+  # Check brmsterms for multivariate structure
+  if (!is.null(brmsfit$formula)) {
+    terms_obj <- try(brms::brmsterms(brmsfit$formula), silent = TRUE)
+    if (!inherits(terms_obj, "try-error") && inherits(terms_obj, "mvbrmsterms")) {
+      return(TRUE)
+    }
+  }
+
+  return(FALSE)
 }
 
 #' Check if expression matches trend term patterns
