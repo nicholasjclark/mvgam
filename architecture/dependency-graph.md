@@ -1,6 +1,6 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-09-15 12:33:39  
+**Generated:** 2025-09-15 12:36:32  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
@@ -283,6 +283,575 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### Visualization
 - **ggplot2**: Grammar of graphics plotting system
 - **patchwork**: Package functionality
+
+## Functions with Zero Internal Dependencies
+*These functions may be dead code candidates or simple utilities*
+
+### `R/add_residuals.R`:
+- **add_residuals()** (exported)
+- **add_residuals.mvgam()** (internal)
+
+### `R/as.data.frame.mvgam.R`:
+- **as.array.mvgam()** (internal)
+- **as.data.frame.mvgam()** (internal)
+- **as.matrix.mvgam()** (internal)
+- **as_draws.mvgam()** (internal)
+- **as_draws_array.mvgam()** (internal)
+- **as_draws_df.mvgam()** (internal)
+- **as_draws_list.mvgam()** (internal)
+- **as_draws_matrix.mvgam()** (internal)
+- **as_draws_rvars.mvgam()** (internal)
+- **validate_variables()** (internal)
+
+### `R/brms_integration.R`:
+- **create_trend_base_formula()** (internal)
+- **determine_trend_injection_point()** (internal)
+- **extract_brmsterms_from_setup()** (internal)
+- **extract_mvbind_responses()** (internal)
+- **extract_nonlinear_components()** (internal)
+- **extract_prior_from_setup()** (internal)
+- **extract_response_from_formula()** (internal)
+- **extract_response_names()** (internal)
+- **extract_response_trends()** (internal)
+- **extract_variable_name()** (internal)
+- **handle_nonlinear_model()** (internal)
+- **has_mvbind_response()** (internal)
+- **integrate_nonlinear_with_assembly()** (internal)
+- **is_multivariate_formula()** (internal)
+- **modify_stancode_for_nonlinear()** (internal)
+- **parse_multivariate_trends()** (internal)
+- **parse_nonlinear_manually()** (internal)
+- **setup_brms_lightweight()** (internal)
+
+### `R/conditional_effects.R`:
+- **conditional_effects.mvgam()** (internal)
+- **decimalplaces()** (internal)
+- **plot.mvgam_conditional_effects()** (internal)
+- **print.mvgam_conditional_effects()** (internal)
+- **roundlabs()** (internal)
+- **split_termlabs()** (internal)
+
+### `R/dynamic.R`:
+- **dynamic()** (exported)
+
+### `R/ensemble.R`:
+- **allsame()** (internal)
+- **ensemble()** (exported)
+- **ensemble.mvgam_forecast()** (internal)
+- **split_fc_dots()** (internal)
+
+### `R/fevd.mvgam.R`:
+- **fevd()** (exported)
+- **fevd.mvgam()** (internal)
+- **gen_fevd()** (internal)
+- **var_fecov()** (internal)
+
+### `R/how_to_cite.R`:
+- **how_to_cite()** (exported)
+- **how_to_cite.mvgam()** (internal)
+- **print.how_to_cite()** (internal)
+
+### `R/index-mvgam.R`:
+- **variables.mvgam()** (internal)
+
+### `R/interpret_mvgam.R`:
+- **dyn_to_gphilbert()** (internal)
+- **dyn_to_gpspline()** (internal)
+- **interpret_mvgam()** (internal)
+
+### `R/irf.mvgam.R`:
+- **gen_irf()** (internal)
+- **irf()** (exported)
+- **irf.mvgam()** (internal)
+- **var_phi()** (internal)
+- **var_psi()** (internal)
+
+### `R/lfo_cv.mvgam.R`:
+- **cv_split()** (internal)
+- **lfo_cv()** (exported)
+- **lfo_cv.mvgam()** (internal)
+- **log_mean_exp()** (internal)
+- **log_sum_exp()** (internal)
+- **plot.mvgam_lfo()** (internal)
+- **sum_rows()** (internal)
+
+### `R/loo.mvgam.R`:
+- **clean_ll()** (internal)
+- **loo.mvgam()** (internal)
+- **loo_compare.mvgam()** (internal)
+- **named_list()** (internal)
+- **samp_noinf()** (internal)
+- **split_mod_dots()** (internal)
+
+### `R/lv_correlations.R`:
+- **lv_correlations()** (exported)
+
+### `R/make_stan.R`:
+- **generate_stan_components_mvgam_formula()** (internal)
+- **stancode.mvgam_formula()** (internal)
+- **standata.mvgam_formula()** (internal)
+
+### `R/marginaleffects.mvgam.R`:
+- **error()** (internal)
+- **find_predictors.mvgam()** (internal)
+- **find_predictors.mvgam_prefit()** (internal)
+- **get_coef.mvgam()** (internal)
+- **get_data.mvgam()** (internal)
+- **get_data.mvgam_prefit()** (internal)
+- **get_predict.mvgam()** (internal)
+- **get_vcov.mvgam()** (internal)
+- **set_coef.mvgam()** (internal)
+
+### `R/mcmc_plot.mvgam.R`:
+- **mcmc_plot.mvgam()** (internal)
+
+### `R/monotonic.R`:
+- **add_mono_model_file()** (internal)
+- **Predict.matrix.mod.smooth()** (internal)
+- **Predict.matrix.moi.smooth()** (internal)
+- **smooth.construct.mod.smooth.spec()** (internal)
+- **smooth.construct.moi.smooth.spec()** (internal)
+
+### `R/mu_expression_analysis.R`:
+- **analyze_assignment_type()** (internal)
+- **analyze_expression_structure()** (internal)
+- **analyze_function_usage()** (internal)
+- **analyze_indexing_patterns_comprehensive()** (internal)
+- **analyze_mathematical_operations_comprehensive()** (internal)
+- **analyze_variable_relationships_comprehensive()** (internal)
+- **build_execution_dependency_plan()** (internal)
+- **calculate_bracket_nesting_depth()** (internal)
+- **calculate_variable_complexity()** (internal)
+- **check_loop_requirement()** (internal)
+- **classify_mu_expressions_structurally()** (internal)
+- **classify_single_mu_expression_structurally()** (internal)
+- **count_mathematical_operators()** (internal)
+- **create_analysis_context()** (internal)
+- **create_empty_mu_result()** (internal)
+- **determine_execution_order_from_type()** (internal)
+- **determine_expression_type()** (internal)
+- **extract_all_identifiers()** (internal)
+- **extract_assignment_target()** (internal)
+- **extract_comprehensive_variable_references()** (internal)
+- **extract_declared_functions()** (internal)
+- **extract_expression_variables_comprehensive()** (internal)
+- **extract_mu_assignment_lines()** (internal)
+- **extract_mu_construction_with_classification()** (internal)
+- **normalize_mu_expression()** (internal)
+
+### `R/mvgam_core.R`:
+- **apply_rubins_rules()** (internal)
+- **create_mvgam_from_combined_fit()** (internal)
+- **create_observation_brmsfit()** (internal)
+- **create_pooled_mvgam()** (internal)
+- **create_trend_brmsfit()** (internal)
+- **extract_fit_estimates()** (internal)
+- **extract_mvgam_components()** (internal)
+- **extract_observation_parameters()** (internal)
+- **extract_pooling_diagnostics()** (internal)
+- **extract_series_information()** (internal)
+- **extract_time_information()** (internal)
+- **extract_trend_component_info()** (internal)
+- **extract_trend_parameters()** (internal)
+- **fit_multiple_imputation_models()** (internal)
+- **fit_mvgam_model()** (internal)
+- **generate_combined_stancode_and_data()** (internal)
+- **mvgam()** (exported)
+- **mvgam_multiple()** (internal)
+- **mvgam_single_dataset()** (internal)
+- **mvgam_single_imputation()** (internal)
+- **pool_mvgam_fits()** (internal)
+- **pool_parameter_estimates()** (internal)
+- **subset_stanfit_parameters()** (internal)
+- **validate_missing_patterns()** (internal)
+- **validate_multiple_imputation_datasets()** (internal)
+
+### `R/mvgam_fevd-class.R`:
+- **fevd_df()** (internal)
+- **plot.mvgam_fevd()** (internal)
+- **summary.mvgam_fevd()** (internal)
+
+### `R/mvgam_forecast-class.R`:
+- **summary.mvgam_forecast()** (internal)
+
+### `R/mvgam_irf-class.R`:
+- **plot.mvgam_irf()** (internal)
+- **summary.mvgam_irf()** (internal)
+
+### `R/mvgam_residcor-class.R`:
+- **cluster_cormat()** (internal)
+- **gather_matrix()** (internal)
+- **plot.mvgam_residcor()** (internal)
+- **reorder_clusters()** (internal)
+
+### `R/ordinate.jsdgam.R`:
+- **ordinate()** (exported)
+- **ordinate.jsdgam()** (internal)
+
+### `R/pairs.mvgam.R`:
+- **pairs.mvgam()** (internal)
+
+### `R/plot.mvgam.R`:
+- **plot.mvgam()** (internal)
+- **plottable()** (internal)
+
+### `R/plot_mvgam_factors.R`:
+- **plot_mvgam_factors()** (exported)
+
+### `R/plot_mvgam_fc.R`:
+- **plot.mvgam_forecast()** (internal)
+- **plot_mvgam_fc()** (exported)
+
+### `R/plot_mvgam_pterms.R`:
+- **plot_mvgam_pterms()** (exported)
+
+### `R/plot_mvgam_randomeffects.R`:
+- **plot_mvgam_randomeffects()** (exported)
+
+### `R/plot_mvgam_resids.R`:
+- **plot_mvgam_resids()** (exported)
+
+### `R/plot_mvgam_series.R`:
+- **plot_acf()** (internal)
+- **plot_ecdf()** (internal)
+- **plot_histogram()** (internal)
+- **plot_mvgam_series()** (exported)
+- **plot_time_series()** (internal)
+- **validate_plot_data()** (internal)
+
+### `R/plot_mvgam_smooth.R`:
+- **plot_mvgam_smooth()** (exported)
+
+### `R/plot_mvgam_trend.R`:
+- **plot_mvgam_trend()** (exported)
+
+### `R/plot_mvgam_uncertainty.R`:
+- **intersect_hist()** (internal)
+- **plot_mvgam_uncertainty()** (exported)
+
+### `R/ppc.mvgam.R`:
+- **ecdf_plotdat()** (internal)
+- **is_like_factor()** (internal)
+- **pp_check.mvgam()** (internal)
+- **ppc()** (exported)
+- **ppc.mvgam()** (internal)
+
+### `R/print.mvgam.R`:
+- **print.mvgam()** (internal)
+- **print.mvgam_prefit()** (internal)
+- **print.mvgamstancode()** (internal)
+- **print_model_specification_simple()** (internal)
+- **stancode.mvgam()** (internal)
+- **stancode.mvgam_prefit()** (internal)
+
+### `R/priors.R`:
+- **add_trend_component_attr()** (internal)
+- **build_ar_prior_spec()** (internal)
+- **combine_obs_trend_priors()** (internal)
+- **create_empty_brmsprior()** (internal)
+- **create_trend_parameter_prior()** (internal)
+- **extract_observation_priors()** (internal)
+- **extract_observation_priors_from_enhanced()** (internal)
+- **extract_observation_priors_only()** (internal)
+- **extract_prior_string()** (internal)
+- **extract_trend_priors()** (internal)
+- **extract_trend_priors_from_enhanced()** (internal)
+- **extract_trend_priors_only()** (internal)
+- **generate_trend_priors()** (internal)
+- **generate_trend_priors_from_monitor_params()** (internal)
+- **get_ar_parameter_prior()** (internal)
+- **get_best_prior_match()** (internal)
+- **get_car_parameter_prior()** (internal)
+- **get_default_trend_parameter_prior()** (internal)
+- **get_parameter_type_default_prior()** (internal)
+- **get_prior()** (exported)
+- **get_prior.brmsformula()** (internal)
+- **get_prior.default()** (internal)
+- **get_prior.formula()** (internal)
+- **get_prior.mvgam_formula()** (internal)
+- **get_trend_parameter_prior()** (internal)
+- **get_trend_prior_spec()** (internal)
+- **has_embedded_families()** (internal)
+- **has_trend_priors()** (internal)
+- **map_prior_to_stan_string()** (internal)
+- **map_trend_priors()** (internal)
+- **mvgam_formula()** (exported)
+- **print.mvgam_formula()** (internal)
+- **standardize_brmsprior_columns()** (internal)
+
+### `R/RcppExports.R`:
+- **ar3_recursC()** (internal)
+- **var1_recursC()** (internal)
+- **varma_recursC()** (internal)
+
+### `R/residual_cor.R`:
+- **residual_cor()** (exported)
+- **residual_cor.jsdgam()** (internal)
+- **residual_cor.mvgam()** (internal)
+
+### `R/residuals.mvgam.R`:
+- **residuals.mvgam()** (internal)
+
+### `R/series_to_mvgam.R`:
+- **series_to_mvgam()** (exported)
+- **xts.to.ts()** (internal)
+
+### `R/sim_mvgam.R`:
+- **lkj_corr()** (internal)
+- **periodic_gp()** (internal)
+- **random_Sigma()** (internal)
+- **sim_mvgam()** (exported)
+- **sim_seasonal()** (internal)
+
+### `R/stability.R`:
+- **stability()** (exported)
+- **stability.mvgam()** (internal)
+
+### `R/stan_assembly.R`:
+- **append_if_not_null()** (internal)
+- **apply_response_suffix_to_stanvars()** (internal)
+- **apply_safe_parameter_replacement()** (internal)
+- **apply_suffix_to_name()** (internal)
+- **apply_suffix_to_stan_code()** (internal)
+- **calculate_car_time_distances()** (internal)
+- **combine_stanvars()** (internal)
+- **create_times_trend_matrix()** (internal)
+- **deduplicate_stan_functions()** (internal)
+- **detect_glm_usage()** (internal)
+- **detect_shared_trends()** (internal)
+- **extract_and_rename_stan_blocks()** (internal)
+- **extract_and_rename_standata_objects()** (internal)
+- **extract_and_rename_trend_parameters()** (internal)
+- **extract_computed_variable_name()** (internal)
+- **extract_computed_variables()** (internal)
+- **extract_dependencies_from_declaration()** (internal)
+- **extract_hierarchical_info()** (internal)
+- **extract_mapping_arrays()** (internal)
+- **extract_multivariate_standata()** (internal)
+- **extract_non_likelihood_from_model_block()** (internal)
+- **extract_response_names_from_brmsfit()** (internal)
+- **extract_stan_block_content()** (internal)
+- **extract_stan_functions_block()** (internal)
+- **extract_stan_identifiers()** (internal)
+- **extract_trend_stanvars_from_setup()** (internal)
+- **extract_univariate_standata()** (internal)
+- **extract_variable_from_line()** (internal)
+- **filter_block_content()** (internal)
+- **filter_renameable_identifiers()** (internal)
+- **find_stan_block()** (internal)
+- **find_trend_computation_end()** (internal)
+- **find_variable_declarations()** (internal)
+- **format_matrix_for_stan_array()** (internal)
+- **generate_ar_trend_stanvars()** (internal)
+- **generate_base_brms_standata()** (internal)
+- **generate_base_stancode_with_stanvars()** (internal)
+- **generate_car_trend_stanvars()** (internal)
+- **generate_combined_stancode()** (internal)
+- **generate_common_trend_data()** (internal)
+- **generate_factor_model()** (internal)
+- **generate_hierarchical_correlation_model()** (internal)
+- **generate_hierarchical_correlation_parameters()** (internal)
+- **generate_hierarchical_functions()** (internal)
+- **generate_innovation_model()** (internal)
+- **generate_matrix_z_multiblock_stanvars()** (internal)
+- **generate_matrix_z_parameters()** (internal)
+- **generate_matrix_z_tdata()** (internal)
+- **generate_pw_trend_stanvars()** (internal)
+- **generate_rw_trend_stanvars()** (internal)
+- **generate_shared_innovation_stanvars()** (internal)
+- **generate_times_trend_matrices()** (internal)
+- **generate_trend_computation_tparameters()** (internal)
+- **generate_trend_injection_code()** (internal)
+- **generate_trend_priors_stanvar()** (internal)
+- **generate_trend_specific_stanvars()** (internal)
+- **generate_var_trend_stanvars()** (internal)
+- **generate_zmvn_trend_stanvars()** (internal)
+- **get_stan_reserved_words()** (internal)
+- **inject_multivariate_trends_into_linear_predictors()** (internal)
+- **inject_trend_into_glm_predictor()** (internal)
+- **inject_trend_into_linear_predictor()** (internal)
+- **insert_after_mu_lines_in_model_block()** (internal)
+- **normalize_function_body()** (internal)
+- **normalize_function_signature()** (internal)
+- **parse_glm_parameters()** (internal)
+- **parse_stan_functions()** (internal)
+- **prepare_stanvars_for_brms()** (internal)
+- **process_variable()** (internal)
+- **reconstruct_functions_block()** (internal)
+- **reconstruct_mu_trend_with_renamed_vars()** (internal)
+- **remove_duplicate_functions()** (internal)
+- **rename_parameters_in_block()** (internal)
+- **replace_stan_block_content()** (internal)
+- **replace_stan_functions_block()** (internal)
+- **should_include_in_transformed_parameters()** (internal)
+- **sort_stanvars()** (internal)
+- **transform_glm_call()** (internal)
+- **validate_mapping_arrays()** (internal)
+
+### `R/tidier_methods.R`:
+- **augment.mvgam()** (internal)
+- **split_hier_Sigma()** (internal)
+- **tidy.mvgam()** (internal)
+
+### `R/trend_system.R`:
+- **add_complete_metadata()** (internal)
+- **add_consistent_dispatch_metadata()** (internal)
+- **add_forecast_metadata()** (internal)
+- **add_monitor_params()** (internal)
+- **add_summary_labels()** (internal)
+- **apply_mvgam_trend_defaults()** (internal)
+- **AR()** (exported)
+- **ar_trend_properties()** (internal)
+- **auto_register_trend_types()** (internal)
+- **build_trend_label()** (internal)
+- **c.trend_param()** (internal)
+- **CAR()** (exported)
+- **car_trend_properties()** (internal)
+- **create_mvgam_trend()** (exported)
+- **custom_trend()** (exported)
+- **ensure_registry_initialized()** (internal)
+- **eval_trend_constructor()** (internal)
+- **evaluate_param_conditions()** (internal)
+- **extract_regular_terms()** (internal)
+- **filter_ar_forecast_params()** (internal)
+- **filter_car_forecast_params()** (internal)
+- **filter_pw_forecast_params()** (internal)
+- **filter_rw_forecast_params()** (internal)
+- **filter_var_forecast_params()** (internal)
+- **filter_zmvn_forecast_params()** (internal)
+- **find_trend_terms()** (internal)
+- **generate_ar_monitor_params()** (internal)
+- **generate_car_monitor_params()** (internal)
+- **generate_forecast_metadata()** (internal)
+- **generate_forecast_required_params()** (internal)
+- **generate_monitor_params()** (internal)
+- **generate_parameter_label()** (internal)
+- **generate_pw_monitor_params()** (internal)
+- **generate_rw_monitor_params()** (internal)
+- **generate_summary_labels()** (internal)
+- **generate_var_monitor_params()** (internal)
+- **generate_zmvn_monitor_params()** (internal)
+- **get_default_incompatibility_reason()** (internal)
+- **get_default_validation_rules()** (internal)
+- **get_factor_compatible_trends()** (internal)
+- **get_mvgam_trend_defaults()** (internal)
+- **get_trend_dispatch_function()** (internal)
+- **get_trend_info()** (internal)
+- **GP()** (exported)
+- **is.trend_param()** (exported)
+- **is_registry_initialized()** (internal)
+- **list_trend_types()** (exported)
+- **mvgam_trend_choices()** (exported)
+- **mvgam_trend_pattern()** (internal)
+- **mvgam_trend_registry()** (internal)
+- **normalize_trend_type()** (internal)
+- **parse_trend_formula()** (internal)
+- **print.mvgam_trend()** (internal)
+- **print.trend_param()** (internal)
+- **process_arg()** (internal)
+- **process_trend_params()** (internal)
+- **PW()** (exported)
+- **pw_trend_properties()** (internal)
+- **register_core_trends()** (internal)
+- **register_custom_trend()** (exported)
+- **register_trend_type()** (exported)
+- **RW()** (exported)
+- **rw_trend_properties()** (internal)
+- **trend_param()** (exported)
+- **validate_trend_dispatch_consistency()** (internal)
+- **validate_trend_properties()** (internal)
+- **VAR()** (exported)
+- **var_trend_properties()** (internal)
+- **ZMVN()** (exported)
+- **zmvn_trend_properties()** (internal)
+
+### `R/validations.R`:
+- **all_times_avail()** (internal)
+- **apply_validation_rules()** (internal)
+- **are_braces_balanced()** (internal)
+- **as_one_logical()** (internal)
+- **check_block_semicolons()** (internal)
+- **check_brms_autocor_usage()** (internal)
+- **check_semicolon_syntax()** (internal)
+- **deparse0()** (internal)
+- **dispatch_validation_rule()** (internal)
+- **eval_silent()** (internal)
+- **extract_all_bf_formulas()** (internal)
+- **extract_time_series_dimensions()** (internal)
+- **formula2str_mvgam()** (internal)
+- **generate_obs_trend_mapping()** (internal)
+- **get_trend_validation_patterns()** (internal)
+- **get_validation_rule_dispatch_table()** (internal)
+- **handle_nse_param()** (internal)
+- **is.mvgam_trend()** (exported)
+- **is_multivariate_brmsfit()** (internal)
+- **is_multivariate_trend_specs()** (internal)
+- **is_nonlinear_formula()** (internal)
+- **is_trend_term()** (internal)
+- **is_try_error()** (internal)
+- **is_valid_stanvar()** (internal)
+- **parse_base_formula_safe()** (internal)
+- **parse_data_declarations()** (internal)
+- **parse_model_cmdstanr()** (internal)
+- **process_capacity_parameter()** (internal)
+- **process_lag_parameters()** (internal)
+- **process_trend_validation_rules()** (internal)
+- **remove_trend_expressions()** (internal)
+- **validate_and_process_trend_parameters()** (internal)
+- **validate_autocor_separation()** (internal)
+- **validate_bf_trend_formula()** (internal)
+- **validate_brms_formula()** (internal)
+- **validate_combined_stancode()** (internal)
+- **validate_correlation_requirements()** (internal)
+- **validate_data_code_compatibility()** (internal)
+- **validate_factor_compatibility()** (internal)
+- **validate_factor_levels()** (internal)
+- **validate_grouping_arguments()** (internal)
+- **validate_grouping_structure()** (internal)
+- **validate_list_trend_formula()** (internal)
+- **validate_multivariate_series_time()** (internal)
+- **validate_multivariate_trend_constraints()** (internal)
+- **validate_mvgam_trend()** (internal)
+- **validate_no_addition_terms_in_trends()** (internal)
+- **validate_no_brms_autocor_in_trends()** (internal)
+- **validate_no_factor_hierarchical()** (internal)
+- **validate_no_multiple_trend_constructors()** (internal)
+- **validate_no_offsets_in_trends()** (internal)
+- **validate_nonlinear_trend_compatibility()** (internal)
+- **validate_obs_formula_brms()** (internal)
+- **validate_offsets_in_obs()** (internal)
+- **validate_pos_integer()** (internal)
+- **validate_pos_real()** (internal)
+- **validate_proportional()** (internal)
+- **validate_regular_time_intervals()** (internal)
+- **validate_series_time()** (internal)
+- **validate_series_variable()** (internal)
+- **validate_setup_components()** (internal)
+- **validate_single_trend_formula()** (internal)
+- **validate_stan_code()** (internal)
+- **validate_stan_code_fragment()** (internal)
+- **validate_stan_code_structure()** (internal)
+- **validate_stan_data_structure()** (internal)
+- **validate_time_series_for_trends()** (internal)
+- **validate_time_variable()** (internal)
+- **validate_trend_components()** (internal)
+- **validate_trend_correlation()** (internal)
+- **validate_trend_factor_compatibility()** (internal)
+- **validate_trend_formula_brms()** (internal)
+- **validate_trend_grouping()** (internal)
+- **validate_trend_hierarchical_structure()** (internal)
+- **validate_trend_parameter_bounds()** (internal)
+- **validate_trend_parameter_class()** (internal)
+- **validate_trend_specs()** (internal)
+- **validate_trend_time_intervals()** (internal)
+- **validate_univariate_series_time()** (internal)
+- **warn_default_series_variable()** (internal)
+- **warn_default_time_variable()** (internal)
+
+### `R/zzz.R`:
+- **core_unloaded()** (internal)
+- **mvgam_attach()** (internal)
+
 
 ## System-Specific Function Breakdowns
 

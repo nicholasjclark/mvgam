@@ -593,8 +593,8 @@ function Get-FunctionDefinitions {
     $coreFilesPattern = 'mvgam\.R|sim_mvgam|plot\.mvgam|lfo_cv|series_to_mvgam'
     
     # Prioritize Stan/brms integration files + core/validation files first, then other core files
-    $priorityFiles = $ChangedFiles | Where-Object { $_ -match $priorityFilesPattern }
-    $coreFiles = $ChangedFiles | Where-Object { $_ -match $coreFilesPattern }
+    $priorityFiles = $rFiles | Where-Object { $_ -match $priorityFilesPattern }
+    $coreFiles = $rFiles | Where-Object { $_ -match $coreFilesPattern }
     $keyFiles = ($priorityFiles + $coreFiles) | Select-Object -First 10
     
     foreach ($filePath in $keyFiles) {
