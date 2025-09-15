@@ -8,7 +8,6 @@
                                      ]
                    },
     "functions":  [
-                      "extract_observation_priors",
                       "extract_trend_priors",
                       "generate_trend_priors",
                       "generate_trend_priors_from_monitor_params",
@@ -62,8 +61,7 @@
                                 "get_prior":  "get_prior \u003c- function(object, ...) {",
                                 "mvgam_formula":  "mvgam_formula \u003c- function(formula, trend_formula = NULL) {",
                                 "extract_trend_priors":  "extract_trend_priors \u003c- function(trend_formula, data, response_names = NULL) {",
-                                "get_prior.brmsformula":  "get_prior.brmsformula \u003c- function(object, ...) {",
-                                "extract_observation_priors":  "extract_observation_priors \u003c- function(formula, data, family = gaussian(), ...) {"
+                                "get_prior.brmsformula":  "get_prior.brmsformula \u003c- function(object, ...) {"
                             },
     "file":  "R/priors.R"
 }

@@ -38,6 +38,7 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
      c) Test file references (`tests/testthat/`)
      d) Cross-file usage patterns
      e) Whether function serves as utility/infrastructure support
+     f) Whether there are nearby or similar functions that have limited use and can be consolidated
    - **GOAL**: Create definitive retain/remove recommendations with evidence
    - **METHOD**: Use pathfinder agent to trace call chains, grep for dynamic references, examine test patterns. Remember that references in tests DO NOT necessarily mean a function is needed
 

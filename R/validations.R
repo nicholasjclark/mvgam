@@ -28,6 +28,35 @@ validate_nonlinear_trend_compatibility <- function(nl_components, trend_specs) {
   invisible(TRUE)
 }
 
+#' Validate required variables exist in data
+#'
+#' @description
+#' Shared utility function to validate that required variables exist in a data frame.
+#' Provides consistent error messaging and reduces code duplication across validation functions.
+#'
+#' @param data Data frame to check
+#' @param required_vars Character vector of required variable names
+#' @param context Context description for error messages
+#' @noRd
+validate_required_variables <- function(data, required_vars, context = "data") {
+  checkmate::assert_data_frame(data)
+  checkmate::assert_character(required_vars, min.len = 1)
+  checkmate::assert_character(context, len = 1)
+  
+  missing_vars <- setdiff(required_vars, names(data))
+  if (length(missing_vars) > 0) {
+    stop(insight::format_error(
+      c(
+        "Required variables not found in {context}:",
+        "x" = "Missing: {.field {missing_vars}}",
+        "i" = "Available: {.field {names(data)}}"
+      )
+    ), call. = FALSE)
+  }
+  
+  invisible(TRUE)
+}
+
 #' Apply Rule-Based Validation Dispatch
 #'
 #' @description
@@ -143,20 +172,11 @@ validate_trend_grouping <- function(trend_spec, data) {
     trend_spec$subgr <- groupings$subgr
 
     # Validate grouping variables exist in data
-    if (!trend_spec$gr %in% colnames(data)) {
-      stop(insight::format_error(
-        "Grouping variable '{.field {trend_spec$gr}}' not found in data.",
-        "Available variables: {.field {paste(colnames(data), collapse = ', ')}}"
-      ))
+    required_vars <- trend_spec$gr
+    if (!is.null(trend_spec$subgr) && trend_spec$subgr != 'NA') {
+      required_vars <- c(required_vars, trend_spec$subgr)
     }
-
-    if (!is.null(trend_spec$subgr) && trend_spec$subgr != 'NA' &&
-        !trend_spec$subgr %in% colnames(data)) {
-      stop(insight::format_error(
-        "Subgrouping variable '{.field {trend_spec$subgr}}' not found in data.",
-        "Available variables: {.field {paste(colnames(data), collapse = ', ')}}"
-      ))
-    }
+    validate_required_variables(data, required_vars, "grouping data")
   }
 
   return(trend_spec)
@@ -1124,19 +1144,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   }
 
   # Validate required variables exist
-  if (!time_var %in% colnames(data)) {
-    stop(insight::format_error(
-      "Time variable '{time_var}' not found in data.",
-      "Available variables: {paste(colnames(data), collapse = ', ')}"
-    ), call. = FALSE)
-  }
-
-  if (!series_var %in% colnames(data)) {
-    stop(insight::format_error(
-      "Series variable '{series_var}' not found in data.",
-      "Available variables: {paste(colnames(data), collapse = ', ')}"
-    ), call. = FALSE)
-  }
+  validate_required_variables(data, c(time_var, series_var), "time series data")
 
   # Calculate core dimensions from data
   unique_times <- unique(data[[time_var]])
@@ -1218,12 +1226,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
 
     for (resp_var in response_vars) {
       # Validate response variable exists in data
-      if (!resp_var %in% colnames(data)) {
-        stop(insight::format_error(
-          "Response variable {.field {resp_var}} not found in data.",
-          "Available variables: {paste(colnames(data), collapse = ', ')}"
-        ), call. = FALSE)
-      }
+      validate_required_variables(data, resp_var, "response mapping data")
 
       # Generate mapping for this response variable using existing function
       mapping <- generate_obs_trend_mapping(
@@ -1370,26 +1373,7 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
   }
 
   # Validate required columns exist
-  if (!response_var %in% colnames(data)) {
-    stop(insight::format_error(
-      "Response variable {.field {response_var}} not found in data.",
-      "Available variables: {paste(colnames(data), collapse = ', ')}"
-    ), call. = FALSE)
-  }
-
-  if (!time_var %in% colnames(data)) {
-    stop(insight::format_error(
-      "Time variable {.field {time_var}} not found in data.",
-      "Available variables: {paste(colnames(data), collapse = ', ')}"
-    ), call. = FALSE)
-  }
-
-  if (!series_var %in% colnames(data)) {
-    stop(insight::format_error(
-      "Series variable {.field {series_var}} not found in data.",
-      "Available variables: {paste(colnames(data), collapse = ', ')}"
-    ), call. = FALSE)
-  }
+  validate_required_variables(data, c(response_var, time_var, series_var), "mapping data")
 
   # Extract dimensions if not provided
   if (is.null(dimensions)) {
@@ -1619,9 +1603,6 @@ validate_factor_levels <- function(data, var_name, data_name = "data", auto_drop
 
   return(data)
 }
-
-# Stan Code Structure and Syntax Validation Utilities
-# ===================================================
 
 #' Validate Stan Code Structure
 #'
@@ -2163,12 +2144,7 @@ process_capacity_parameter <- function(cap, data) {
   # If character, validate it's a column in data
   if (is.character(cap)) {
     checkmate::assert_string(cap, min.chars = 1)
-    if (!cap %in% colnames(data)) {
-      stop(insight::format_error(
-        "Capacity variable '{.field {cap}}' not found in data.",
-        "Available variables: {.field {paste(colnames(data), collapse = ', ')}}"
-      ))
-    }
+    validate_required_variables(data, cap, "capacity data")
     return(cap)
   }
 

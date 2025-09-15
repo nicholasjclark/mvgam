@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-09-15 15:22:22  
+**Generated:** 2025-09-15 15:58:23  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 57
-- **Total Functions:** 431
+- **Total Functions:** 422
 - **Exported Functions:** 68
-- **Internal Functions:** 389
+- **Internal Functions:** 380
 - **S3 Methods:** 44
 - **S3 Classes:** 25
 
@@ -78,12 +78,12 @@
   - Internal calls: extract_mvbind_responses
 - **extract_prior_from_setup()** (`R/brms_integration.R`)
   - Internal calls: get_prior
+- **validate_multivariate_trend_constraints()** (`R/validations.R`)
+  - Internal calls: parse_trend_formula
 - **extract_mvgam_components()** (`R/mvgam_core.R`)
   - Internal calls: extract_series_information, extract_time_information, extract_trend_component_info
 - **apply_validation_rules()** (`R/validations.R`)
   - Internal calls: is_multivariate_trend_specs, process_trend_validation_rules
-- **mvgam_formula()** (`R/priors.R`)
-  - Internal calls: validate_single_trend_formula
 
 ### Core Workflow Functions (Prior/Trend/Stan Assembly Systems)
 - **mvgam_formula()** (`R/priors.R`)
@@ -112,8 +112,8 @@
   - Calls: generate_ar_monitor_params, generate_car_monitor_params, generate_pw_monitor_params, generate_rw_monitor_params, generate_var_monitor_params, generate_zmvn_monitor_params, normalize_trend_type
 - **extract_mu_construction_with_classification()** (`R/mu_expression_analysis.R`) - 7 dependencies
   - Calls: build_execution_dependency_plan, classify_mu_expressions_structurally, create_empty_mu_result, extract_comprehensive_variable_references, extract_mu_assignment_lines, extract_stan_block_content, find_variable_declarations
-- **inject_trend_into_linear_predictor()** (`R/stan_assembly.R`) - 6 dependencies
-  - Calls: detect_glm_usage, extract_mapping_arrays, generate_trend_injection_code, inject_trend_into_glm_predictor, insert_after_mu_lines_in_model_block, validate_mapping_arrays
+- **analyze_expression_structure()** (`R/mu_expression_analysis.R`) - 6 dependencies
+  - Calls: analyze_assignment_type, analyze_function_usage, analyze_indexing_patterns_comprehensive, analyze_mathematical_operations_comprehensive, analyze_variable_relationships_comprehensive, extract_assignment_target
 
 ## Key Function Signatures
 
@@ -140,8 +140,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/portal_data.R`** (0 functions) - Data documentation and loading
 
 ### Validation Files
-- **`R/validations.R`** (65 functions) - Input validation and checks
-  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_correlation, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_list_trend_formula, validate_single_trend_formula, validate_nonlinear_trend_compatibility (+ 50 more)
+- **`R/validations.R`** (60 functions) - Input validation and checks
+  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_list_trend_formula, validate_single_trend_formula, validate_trend_formula_restrictions, validate_multivariate_trend_constraints (+ 45 more)
 
 ### Core Files
 - **`R/mvgam_core.R`** (25 functions) - Core package functionality
@@ -180,12 +180,12 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: variables.mvgam
 
 ### Other Files
-- **`R/trend_system.R`** (68 functions) - Trend modeling
-  - Key functions: register_trend_type, list_trend_types, register_custom_trend, trend_param, is.trend_param, mvgam_trend_choices, custom_trend, create_mvgam_trend, RW, AR, CAR, VAR, GP, PW, ZMVN (+ 53 more)
+- **`R/trend_system.R`** (65 functions) - Trend modeling
+  - Key functions: register_trend_type, list_trend_types, register_custom_trend, trend_param, is.trend_param, mvgam_trend_choices, custom_trend, create_mvgam_trend, RW, AR, CAR, VAR, GP, PW, ZMVN (+ 50 more)
 - **`R/mu_expression_analysis.R`** (25 functions)
   - Key functions: extract_mu_construction_with_classification, classify_mu_expressions_structurally, create_analysis_context, classify_single_mu_expression_structurally, analyze_expression_structure, analyze_indexing_patterns_comprehensive, analyze_mathematical_operations_comprehensive, analyze_variable_relationships_comprehensive, determine_expression_type, extract_expression_variables_comprehensive, extract_comprehensive_variable_references, create_empty_mu_result, check_loop_requirement, build_execution_dependency_plan (+ 11 more)
-- **`R/priors.R`** (25 functions) - Prior specification
-  - Key functions: mvgam_formula, get_prior, extract_observation_priors, extract_trend_priors, generate_trend_priors, generate_trend_priors_from_monitor_params, create_trend_parameter_prior, get_default_trend_parameter_prior, build_ar_prior_spec, extract_prior_string, map_trend_priors, get_trend_parameter_prior, get_prior.default, get_prior.formula, get_prior.brmsformula (+ 10 more)
+- **`R/priors.R`** (24 functions) - Prior specification
+  - Key functions: mvgam_formula, get_prior, extract_trend_priors, generate_trend_priors, generate_trend_priors_from_monitor_params, create_trend_parameter_prior, get_default_trend_parameter_prior, build_ar_prior_spec, extract_prior_string, map_trend_priors, get_trend_parameter_prior, get_prior.default, get_prior.formula, get_prior.brmsformula, get_prior.mvgam_formula (+ 9 more)
 - **`R/conditional_effects.R`** (6 functions) - Conditional effects
   - Key functions: decimalplaces, print.mvgam_conditional_effects, conditional_effects.mvgam, plot.mvgam_conditional_effects, roundlabs, split_termlabs
 - **`R/monotonic.R`** (5 functions)
@@ -336,8 +336,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### `R/plot.mvgam.R` (1 potentially unused):
 - **plottable()** (internal, never called)
 
-### `R/priors.R` (3 potentially unused):
-- **extract_observation_priors()** (internal, never called)
+### `R/priors.R` (2 potentially unused):
 - **get_ar_parameter_prior()** (internal, never called)
 - **get_car_parameter_prior()** (internal, never called)
 
@@ -349,10 +348,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### `R/sim_mvgam.R` (1 potentially unused):
 - **sim_seasonal()** (internal, never called)
 
-### `R/trend_system.R` (14 potentially unused):
-- **add_forecast_metadata()** (internal, never called)
-- **add_monitor_params()** (internal, never called)
-- **add_summary_labels()** (internal, never called)
+### `R/trend_system.R` (11 potentially unused):
 - **ar_trend_properties()** (internal, never called)
 - **car_trend_properties()** (internal, never called)
 - **extract_regular_terms()** (internal, never called)
@@ -368,7 +364,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### `R/validations.R` (4 potentially unused):
 - **apply_validation_rules()** (internal, never called)
 - **are_braces_balanced()** (internal, never called)
-- **validate_data_code_compatibility()** (internal, never called)
+- **parse_data_declarations()** (internal, never called)
 - **validate_stan_code_structure()** (internal, never called)
 
 ### `R/zzz.R` (1 potentially unused):
@@ -699,9 +695,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 
 ### `R/trend_system.R`:
 - **add_consistent_dispatch_metadata()** (internal)
-- **add_forecast_metadata()** (internal)
-- **add_monitor_params()** (internal)
-- **add_summary_labels()** (internal)
 - **apply_mvgam_trend_defaults()** (internal)
 - **AR()** (exported)
 - **ar_trend_properties()** (internal)
@@ -763,7 +756,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **all_times_avail()** (internal)
 - **are_braces_balanced()** (internal)
 - **as_one_logical()** (internal)
-- **check_brms_autocor_usage()** (internal)
 - **deparse0()** (internal)
 - **eval_silent()** (internal)
 - **extract_all_bf_formulas()** (internal)
@@ -786,15 +778,11 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **process_lag_parameters()** (internal)
 - **remove_trend_expressions()** (internal)
 - **validate_and_process_trend_parameters()** (internal)
-- **validate_autocor_separation()** (internal)
-- **validate_correlation_requirements()** (internal)
-- **validate_data_code_compatibility()** (internal)
 - **validate_factor_compatibility()** (internal)
 - **validate_factor_levels()** (internal)
 - **validate_grouping_arguments()** (internal)
 - **validate_grouping_structure()** (internal)
 - **validate_multivariate_series_time()** (internal)
-- **validate_multivariate_trend_constraints()** (internal)
 - **validate_mvgam_trend()** (internal)
 - **validate_no_factor_hierarchical()** (internal)
 - **validate_nonlinear_trend_compatibility()** (internal)
@@ -807,8 +795,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **validate_time_series_for_trends()** (internal)
 - **validate_trend_components()** (internal)
 - **validate_trend_factor_compatibility()** (internal)
-- **validate_trend_formula_restrictions()** (internal)
-- **validate_trend_hierarchical_structure()** (internal)
 - **validate_univariate_series_time()** (internal)
 
 ### `R/zzz.R`:
@@ -823,10 +809,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **combine_obs_trend_priors()** (`R/priors.R`)
 - **create_empty_brmsprior()** (`R/priors.R`)
 - **create_trend_parameter_prior()** (`R/priors.R`) - calls: get_default_trend_parameter_prior
-- **extract_observation_priors()** (`R/priors.R`) - calls: get_prior
 - **extract_prior_string()** (`R/priors.R`) - calls: get_best_prior_match
 - **extract_trend_priors()** (`R/priors.R`) - calls: generate_trend_priors, parse_trend_formula
 - **generate_trend_priors()** (`R/priors.R`) - calls: create_empty_brmsprior, generate_trend_priors_from_monitor_params, setup_brms_lightweight
+- **generate_trend_priors_from_monitor_params()** (`R/priors.R`) - calls: create_empty_brmsprior, create_trend_parameter_prior
 
 ### Trend System Functions
 - **apply_mvgam_trend_defaults()** (`R/trend_system.R`)
