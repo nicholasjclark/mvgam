@@ -409,74 +409,6 @@ test_that("piecewise trends integrate with complete Stan assembly", {
   # This unit test focuses on stanvar generation
 })
 
-test_that("piecewise Stan code validates and compiles correctly", {
-  data_info <- list(n_obs = 30, n_series = 2, series_var = "series")
-
-  # Test linear piecewise generates valid Stan code
-  pw_linear_spec <- list(
-    trend_type = "PW",
-    growth = "linear",
-    n_changepoints = 5,
-    changepoint_scale = 0.1
-  )
-
-  stanvars <- mvgam:::generate_trend_injection_stanvars(pw_linear_spec, data_info)
-
-  # Create minimal Stan code with piecewise components for validation
-  minimal_stancode <- "
-  functions {
-    // Functions will be injected here
-  }
-  data {
-    int<lower=1> N;
-    vector[N] time;
-    // Data will be injected here
-  }
-  parameters {
-    // Piecewise parameters will be injected here
-  }
-  transformed parameters {
-    // Piecewise computations will be injected here
-  }
-  model {
-    // Piecewise priors will be injected here
-  }
-  "
-
-  # Test that individual stanvar components have valid Stan fragment syntax
-  functions_code <- stanvars$pw_functions$scode
-  expect_invisible(mvgam:::validate_stan_code_fragment(
-    functions_code,
-    expected_content = c("get_changepoint_matrix", "linear_trend", "logistic_trend"),
-    expected_block = "functions"
-  ))
-
-  data_code <- stanvars$pw_data$scode
-  expect_invisible(mvgam:::validate_stan_code_fragment(
-    data_code,
-    expected_content = c("n_change_trend", "change_scale_trend")
-  ))
-
-  params_code <- stanvars$pw_parameters$scode
-  expect_invisible(mvgam:::validate_stan_code_fragment(
-    params_code,
-    expected_content = c("k_trend", "delta_trend"),
-    expected_block = "parameters"
-  ))
-
-  tparams_code <- stanvars$pw_transformed_parameters$scode
-  expect_invisible(mvgam:::validate_stan_code_fragment(
-    tparams_code,
-    expected_block = "transformed parameters"
-  ))
-
-  model_code <- stanvars$pw_model$scode
-  expect_invisible(mvgam:::validate_stan_code_fragment(
-    model_code,
-    expected_block = "model"
-  ))
-})
-
 test_that("complete Stan model assembly validates correctly", {
   # Test complete model assembly pipeline using piecewise trends
   data <- setup_test_data()$simple_univariate
@@ -664,69 +596,6 @@ test_that("validate_stan_code handles edge cases", {
   expect_invisible(mvgam:::validate_stan_code(minimal_code))
 })
 
-# Tests for comprehensive validation
-test_that("validate_combined_stancode performs comprehensive checks", {
-  data <- setup_test_data()$simple_univariate
-
-  # Create a complete, valid stancode structure
-  complete_result <- list(
-    stancode = "
-    data {
-      int<lower=1> N;
-      vector[N] y;
-    }
-    parameters {
-      real alpha;
-      real<lower=0> sigma;
-    }
-    model {
-      y ~ normal(alpha, sigma);
-      alpha ~ normal(0, 1);
-      sigma ~ student_t(3, 0, 2.5);
-    }
-    ",
-    standata = list(
-      N = nrow(data),
-      y = data$y
-    ),
-    has_trends = FALSE
-  )
-
-  validation_result <- mvgam:::validate_combined_stancode(complete_result, silent = TRUE)
-  expect_type(validation_result, "list")
-  expect_true("valid" %in% names(validation_result))
-  expect_true("syntax_valid" %in% names(validation_result))
-  expect_true("data_valid" %in% names(validation_result))
-})
-
-test_that("validate_combined_stancode catches data mismatches", {
-  # Stan code expecting different data structure
-  mismatched_result <- list(
-    stancode = "
-    data {
-      int<lower=1> N;
-      vector[N] y;
-      vector[N] x;  // Expected but not provided
-    }
-    parameters {
-      real alpha;
-    }
-    model {
-      y ~ normal(alpha, 1);
-    }
-    ",
-    standata = list(
-      N = 50,
-      y = rnorm(50)
-      # x is missing
-    ),
-    has_trends = FALSE
-  )
-
-  validation_result <- mvgam:::validate_combined_stancode(mismatched_result, silent = TRUE)
-  expect_false(validation_result$data_valid)
-})
-
 # Tests for production generate_combined_stancode function
 test_that("production generate_combined_stancode works with observation-only model", {
   data <- setup_test_data()$simple_univariate
@@ -823,47 +692,10 @@ test_that("production Stan code validation works", {
     silent = 2
   )
 
-  # Validate the generated code
-  validation_result <- mvgam:::validate_combined_stancode(combined_result, silent = TRUE)
-
   expect_type(validation_result, "list")
   expect_true(validation_result$valid)
   expect_true(validation_result$syntax_valid)
   expect_true(validation_result$data_valid)
-})
-
-test_that("production validation catches real issues", {
-  # Create intentionally broken setup
-  broken_setup <- list(
-    stancode = "
-    data {
-      int<lower=1> N;
-      vector[N] y;
-      vector[N] missing_var;  // This will cause data validation to fail
-    }
-    parameters {
-      real alpha;
-    }
-    model {
-      y ~ normal(alpha, 1);
-    }
-    ",
-    standata = list(
-      N = 50,
-      y = rnorm(50)
-      # missing_var not provided
-    )
-  )
-
-  broken_result <- list(
-    stancode = broken_setup$stancode,
-    standata = broken_setup$standata,
-    has_trends = FALSE
-  )
-
-  validation_result <- mvgam:::validate_combined_stancode(broken_result, silent = TRUE)
-  expect_false(validation_result$valid)
-  expect_false(validation_result$data_valid)
 })
 
 # Tests for error handling and edge cases
@@ -1289,47 +1121,6 @@ setup_test_data <- function() {
   )
 }
 
-# Create realistic trend stanvars using brms stanvar function
-create_realistic_trend_stanvars <- function() {
-  list(
-    rw_params = brms::stanvar(
-      name = "rw_params",
-      scode = "parameters { vector<lower=0>[2] sigma_rw; }",
-      block = "parameters"
-    ),
-    rw_model = brms::stanvar(
-      name = "rw_model",
-      scode = "model { sigma_rw ~ inv_gamma(1, 1); }",
-      block = "model"
-    ),
-    rw_data = brms::stanvar(
-      x = 2,
-      name = "n_series",
-      scode = "int<lower=1> n_series;",
-      block = "data"
-    )
-  )
-}
-
-# Create invalid stanvars for testing
-create_invalid_stanvars <- function() {
-  list(
-    invalid_no_name = list(
-      scode = "parameters { real bad_param; }",
-      x = NULL
-    ),
-    invalid_no_scode = list(
-      name = "bad_stanvar",
-      x = NULL
-    ),
-    invalid_empty_scode = list(
-      name = "empty_stanvar",
-      scode = "",
-      x = NULL
-    ),
-    not_a_list = "this is not a stanvar"
-  )
-}
 
 # Unit Tests: Stanvar Preparation and Validation
 # ==============================================

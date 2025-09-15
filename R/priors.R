@@ -99,122 +99,6 @@ common_trend_priors <- list(
 )
 
 # =============================================================================
-# SECTION 2: PRIOR HELPER FUNCTIONS
-# =============================================================================
-# WHY: Helper functions for working with brmsprior objects enable consistent
-# handling of both observation and trend priors while maintaining full brms
-# compatibility. The _trend suffix convention provides clear separation without
-# requiring a custom class.
-
-#' Check if Prior Object Contains Trend Priors
-#'
-#' @param prior A brmsprior object
-#' @return Logical indicating if any trend priors are present
-#' @noRd
-has_trend_priors <- function(prior) {
-  if (!inherits(prior, "brmsprior")) {
-    return(FALSE)
-  }
-
-  # Check for _trend suffix in class column
-  any(grepl("_trend$", prior$class))
-}
-
-#' Extract Trend Priors from Combined Prior Object
-#'
-#' @param prior A brmsprior object containing both observation and trend priors
-#' @return A brmsprior object containing only trend priors
-#' @noRd
-extract_trend_priors_only <- function(prior) {
-  checkmate::assert_class(prior, "brmsprior")
-
-  trend_rows <- grepl("_trend$", prior$class)
-  trend_priors <- prior[trend_rows, , drop = FALSE]
-
-  # Maintain brmsprior class
-  class(trend_priors) <- class(prior)
-  attr(trend_priors, "class2") <- attr(prior, "class2")
-
-  return(trend_priors)
-}
-
-#' Extract Trend Priors from Enhanced brmsprior Object
-#'
-#' @param prior An enhanced brmsprior object with mvgam attributes
-#' @return A brmsprior object containing only trend priors
-#' @noRd
-extract_trend_priors_from_enhanced <- function(prior) {
-  checkmate::assert_class(prior, "brmsprior")
-
-  # Use naming convention to detect trend priors (class ending with "_trend")
-  trend_rows <- grepl("_trend$", prior$class)
-  trend_priors <- prior[trend_rows, , drop = FALSE]
-
-  # Return standard brms prior object without custom attributes
-  class(trend_priors) <- class(prior)
-  attr(trend_priors, "class2") <- attr(prior, "class2")
-
-  return(trend_priors)
-}
-
-#' Extract Observation Priors from Enhanced brmsprior Object
-#'
-#' @param prior An enhanced brmsprior object with mvgam attributes
-#' @return A brmsprior object containing only observation priors
-#' @noRd
-extract_observation_priors_from_enhanced <- function(prior) {
-  checkmate::assert_class(prior, "brmsprior")
-
-  # Use naming convention to detect observation priors (class NOT ending with "_trend")
-  obs_rows <- !grepl("_trend$", prior$class)
-  obs_priors <- prior[obs_rows, , drop = FALSE]
-
-  # Return standard brms prior object without custom attributes
-  class(obs_priors) <- class(prior)
-  attr(obs_priors, "class2") <- attr(prior, "class2")
-
-  return(obs_priors)
-}
-
-#' Extract Observation Priors from Combined Prior Object
-#'
-#' @param prior A brmsprior object containing both observation and trend priors
-#' @return A brmsprior object containing only observation priors
-#' @noRd
-extract_observation_priors_only <- function(prior) {
-  checkmate::assert_class(prior, "brmsprior")
-
-  obs_rows <- !grepl("_trend$", prior$class)
-  obs_priors <- prior[obs_rows, , drop = FALSE]
-
-  # Maintain brmsprior class
-  class(obs_priors) <- class(prior)
-  attr(obs_priors, "class2") <- attr(prior, "class2")
-
-  return(obs_priors)
-}
-
-#' Add Trend Component Attribute to Prior Object
-#'
-#' @param prior A brmsprior object
-#' @param component Character vector indicating component for each row
-#' @return The prior object with trend_component attribute added
-#' @noRd
-add_trend_component_attr <- function(prior, component = NULL) {
-  checkmate::assert_class(prior, "brmsprior")
-
-  if (is.null(component)) {
-    # Auto-detect based on _trend suffix
-    component <- ifelse(grepl("_trend$", prior$class), "trend", "observation")
-  }
-
-  checkmate::assert_character(component, len = nrow(prior))
-  attr(prior, "trend_component") <- component
-
-  return(prior)
-}
-
-# =============================================================================
 # SECTION 2: PRIOR EXTRACTION FUNCTIONS
 # =============================================================================
 # WHY: Separate extraction for observation and trend priors enables modular
@@ -1250,7 +1134,7 @@ get_trend_parameter_prior <- function(prior = NULL, param_name) {
   if (pattern_default$prior != "") {
     return(pattern_default$prior)
   }
-  
+
   # Strategy 4: Empty string fallback (Stan will use its defaults)
   return("")
 }
@@ -1410,25 +1294,6 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
   attr(out, "formula_class") <- formula_class
 
   return(out)
-}
-
-#' Print method for mvgam_formula objects
-#'
-#' @param x An mvgam_formula object
-#' @param ... Ignored
-#' @return The object invisibly
-#' @export
-print.mvgam_formula <- function(x, ...) {
-  cat("mvgam_formula object\n")
-  cat("Observation formula: ")
-  print(x$formula)
-  if (!is.null(x$trend_formula)) {
-    cat("Trend formula: ")
-    print(x$trend_formula)
-  } else {
-    cat("Trend formula: NULL (no trend component)\n")
-  }
-  invisible(x)
 }
 
 #' Get Prior Specifications for Model Objects
@@ -1639,47 +1504,3 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
 
   return(combined_priors)
 }
-
-# =============================================================================
-# SECTION: ENHANCED PRIOR SPECIFICATION FUNCTIONS
-# =============================================================================
-
-#' Convert brms lb/ub columns to mvgam bound format for consistency
-#'
-#' @param prior_obj A brmsprior object potentially containing lb/ub columns
-#' @return The same object with bound column instead of lb/ub columns
-#' @noRd
-standardize_brmsprior_columns <- function(prior_obj) {
-  if ("lb" %in% names(prior_obj) && "ub" %in% names(prior_obj)) {
-    # Validate columns exist and have compatible types
-    checkmate::assert_numeric(prior_obj$lb, null.ok = TRUE, any.missing = TRUE)
-    checkmate::assert_numeric(prior_obj$ub, null.ok = TRUE, any.missing = TRUE)
-
-    # Convert lb/ub to bound column for consistency with safe string handling
-    bound_strings <- vapply(seq_len(nrow(prior_obj)), function(i) {
-      lb_val <- prior_obj$lb[i]
-      ub_val <- prior_obj$ub[i]
-
-      # Handle infinite values safely
-      lb_finite <- !is.na(lb_val) && is.finite(lb_val)
-      ub_finite <- !is.na(ub_val) && is.finite(ub_val)
-
-      if (lb_finite && ub_finite) {
-        sprintf("<lower=%.10g,upper=%.10g>", lb_val, ub_val)
-      } else if (lb_finite) {
-        sprintf("<lower=%.10g>", lb_val)
-      } else if (ub_finite) {
-        sprintf("<upper=%.10g>", ub_val)
-      } else {
-        ""
-      }
-    }, character(1))
-
-    prior_obj$bound <- bound_strings
-    prior_obj$lb <- NULL
-    prior_obj$ub <- NULL
-  }
-
-  return(prior_obj)
-}
-

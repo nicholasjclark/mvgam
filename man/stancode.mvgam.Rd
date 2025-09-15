@@ -32,9 +32,9 @@ generated Stan code.
 \dontrun{
 # Fit a simple mvgam model
 data(portal_data)
-mod <- mvgam(count ~ s(time), 
-             trend_formula = ~ RW(), 
-             data = portal_data, 
+mod <- mvgam(count ~ s(time),
+             trend_formula = ~ RW(),
+             data = portal_data,
              family = poisson())
 
 # Extract and inspect Stan code

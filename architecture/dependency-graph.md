@@ -1,6 +1,6 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-09-15 13:57:49  
+**Generated:** 2025-09-15 14:04:35  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
@@ -316,6 +316,74 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### Visualization
 - **ggplot2**: Grammar of graphics plotting system
 - **patchwork**: Package functionality
+
+## Potentially Unused Functions (Dead Code Candidates)
+*These internal functions are never called directly or dynamically and may be safe to remove*
+*Note: Functions called via get(), do.call(), match.fun() etc. are excluded from this list*
+
+### `R/brms_integration.R` (2 potentially unused):
+- **integrate_nonlinear_with_assembly()** (internal, never called)
+- **modify_stancode_for_nonlinear()** (internal, never called)
+
+### `R/interpret_mvgam.R` (1 potentially unused):
+- **interpret_mvgam()** (internal, never called)
+
+### `R/loo.mvgam.R` (1 potentially unused):
+- **samp_noinf()** (internal, never called)
+
+### `R/monotonic.R` (1 potentially unused):
+- **add_mono_model_file()** (internal, never called)
+
+### `R/plot.mvgam.R` (1 potentially unused):
+- **plottable()** (internal, never called)
+
+### `R/priors.R` (10 potentially unused):
+- **add_trend_component_attr()** (internal, never called)
+- **extract_observation_priors()** (internal, never called)
+- **extract_observation_priors_from_enhanced()** (internal, never called)
+- **extract_observation_priors_only()** (internal, never called)
+- **extract_trend_priors_from_enhanced()** (internal, never called)
+- **extract_trend_priors_only()** (internal, never called)
+- **get_ar_parameter_prior()** (internal, never called)
+- **get_car_parameter_prior()** (internal, never called)
+- **has_trend_priors()** (internal, never called)
+- **standardize_brmsprior_columns()** (internal, never called)
+
+### `R/RcppExports.R` (3 potentially unused):
+- **ar3_recursC()** (internal, never called)
+- **var1_recursC()** (internal, never called)
+- **varma_recursC()** (internal, never called)
+
+### `R/sim_mvgam.R` (1 potentially unused):
+- **sim_seasonal()** (internal, never called)
+
+### `R/trend_system.R` (13 potentially unused):
+- **add_complete_metadata()** (internal, never called)
+- **ar_trend_properties()** (internal, never called)
+- **build_trend_label()** (internal, never called)
+- **car_trend_properties()** (internal, never called)
+- **extract_regular_terms()** (internal, never called)
+- **find_trend_terms()** (internal, never called)
+- **get_factor_compatible_trends()** (internal, never called)
+- **get_trend_info()** (internal, never called)
+- **pw_trend_properties()** (internal, never called)
+- **rw_trend_properties()** (internal, never called)
+- **validate_trend_dispatch_consistency()** (internal, never called)
+- **var_trend_properties()** (internal, never called)
+- **zmvn_trend_properties()** (internal, never called)
+
+### `R/validations.R` (7 potentially unused):
+- **apply_validation_rules()** (internal, never called)
+- **check_block_semicolons()** (internal, never called)
+- **my_dead_function()** (internal, never called)
+- **validate_combined_stancode()** (internal, never called)
+- **validate_series_variable()** (internal, never called)
+- **validate_stan_code_fragment()** (internal, never called)
+- **validate_time_variable()** (internal, never called)
+
+### `R/zzz.R` (1 potentially unused):
+- **mvgam_attach()** (internal, never called)
+
 
 ## Functions with Zero Internal Dependencies
 *These functions don't call other internal functions (utilities and simple functions)*

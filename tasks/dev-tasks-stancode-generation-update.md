@@ -31,7 +31,7 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 
 ## IMMEDIATE PRIORITIES (Updated: 2025-09-15)
 
-1. **CRITICAL: Zero-Dependency Function Investigation** - Use up to 4 parallel sub-agents to investigate all functions in `trend_system.R`, `validations.R`, or `stan_assembly.R` listed as having zero reverse dependencies (in `architecture/dependency-graph.md`, section *Potentially Unused Functions*) to determine retention necessity
+1. **CRITICAL: Zero-Dependency Function Investigation** - Use up to 4 parallel sub-agents to investigate all functions in `trend_system.R`, `validations.R`, `priors.R`, or `stan_assembly.R` listed as having zero reverse dependencies (in `architecture/dependency-graph.md`, section *Potentially Unused Functions*) to determine retention necessity
    - **AGENT TASK**: For each function, investigate:
      a) Direct calls from exported functions or main workflow chains
      b) Dynamic dispatch usage (search for function name strings in `get()` calls)
@@ -39,7 +39,7 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
      d) Cross-file usage patterns
      e) Whether function serves as utility/infrastructure support
    - **GOAL**: Create definitive retain/remove recommendations with evidence
-   - **METHOD**: Use pathfinder agent to trace call chains, grep for dynamic references, examine test patterns
+   - **METHOD**: Use pathfinder agent to trace call chains, grep for dynamic references, examine test patterns. Remember that references in tests DO NOT necessarily mean a function is needed
 
 2. **HIGH: File 8 Missing GP Trend Prior** - Add missing `target += std_normal_lpdf(zgp_1_trend);` prior in model block.
 

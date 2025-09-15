@@ -2803,8 +2803,3 @@ is_trend_term <- function(expr, trend_patterns) {
     grepl(pattern, expr_text, fixed = TRUE)
   }, logical(1)))
 }
-
-#' @noRd
-my_dead_function <- function() {
-  return(NULL)
-}

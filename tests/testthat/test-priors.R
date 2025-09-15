@@ -59,33 +59,6 @@ mock_obs_prior <- function() {
   prior_df
 }
 
-# Core prior extraction and detection tests
-# ------------------------------------------
-test_that("prior extraction and detection functions work", {
-  trend_prior <- mock_trend_prior()
-  obs_prior <- mock_obs_prior()
-  mixed_prior <- rbind(obs_prior, trend_prior)
-  class(mixed_prior) <- c("brmsprior", "data.frame")
-
-  # Detection
-  expect_true(mvgam:::has_trend_priors(trend_prior))
-  expect_false(mvgam:::has_trend_priors(obs_prior))
-  expect_true(mvgam:::has_trend_priors(mixed_prior))
-  expect_false(mvgam:::has_trend_priors("not a prior"))
-  expect_false(mvgam:::has_trend_priors(NULL))
-
-  # Trend extraction
-  extracted_trend <- mvgam:::extract_trend_priors_only(mixed_prior)
-  expect_s3_class(extracted_trend, "brmsprior")
-  expect_equal(nrow(extracted_trend), 2)
-  expect_true(all(grepl("_trend$", extracted_trend$class)))
-
-  # Observation extraction
-  extracted_obs <- mvgam:::extract_observation_priors_only(mixed_prior)
-  expect_s3_class(extracted_obs, "brmsprior")
-  expect_equal(nrow(extracted_obs), 1)
-  expect_false(any(grepl("_trend$", extracted_obs$class)))
-})
 
 # Formula parsing tests
 # ---------------------
