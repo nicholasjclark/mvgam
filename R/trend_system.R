@@ -773,26 +773,6 @@ normalize_trend_type <- function(trend_type) {
   gsub("\\d+|\\(.*\\)", "", trend_type)
 }
 
-#' Add Monitor Parameters to Trend Object
-#'
-#' Enhances an existing trend object with auto-discovered monitor parameters.
-#' This implements the metadata storage design from Step 1.3.
-#'
-#' @param trend_obj An mvgam_trend object
-#' @return Enhanced trend object with monitor_params field
-#' @noRd
-add_monitor_params <- function(trend_obj) {
-  checkmate::assert_list(trend_obj)
-
-  # Generate monitor parameters
-  monitor_params <- generate_monitor_params(trend_obj)
-
-  # Add to trend object
-  trend_obj$monitor_params <- monitor_params
-
-  return(trend_obj)
-}
-
 # -----------------------------------------------------------------------------
 # Ultra-Efficient Forecast Metadata Generation
 # -----------------------------------------------------------------------------
@@ -924,25 +904,6 @@ filter_pw_forecast_params <- function(monitor_params, trend_spec) {
   c("k_trend", "m_trend", "delta_trend")
 }
 
-#' Add Forecast Metadata to Trend Object
-#'
-#' Enhances trend object with ultra-efficient forecast dispatch metadata.
-#' Optimized for maximum runtime speed with minimal storage overhead.
-#'
-#' @param trend_obj An mvgam_trend object
-#' @return Enhanced trend object with forecast_metadata field
-#' @noRd
-add_forecast_metadata <- function(trend_obj) {
-  checkmate::assert_list(trend_obj)
-
-  # Generate minimal forecast metadata for fast dispatch
-  forecast_metadata <- generate_forecast_metadata(trend_obj)
-
-  # Add to trend object
-  trend_obj$forecast_metadata <- forecast_metadata
-
-  return(trend_obj)
-}
 
 # -----------------------------------------------------------------------------
 # Summary Labels Generation for User-Friendly Parameter Display
@@ -1021,26 +982,6 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
     # Capitalize first letter
     return(paste0(toupper(substring(clean_name, 1, 1)), substring(clean_name, 2)))
   }
-}
-
-#' Add Summary Labels to Trend Object
-#'
-#' Enhances trend object with user-friendly parameter display labels.
-#' Enables clean parameter presentation in summaries and print methods.
-#'
-#' @param trend_obj An mvgam_trend object
-#' @return Enhanced trend object with summary_labels field
-#' @noRd
-add_summary_labels <- function(trend_obj) {
-  checkmate::assert_list(trend_obj)
-
-  # Generate summary labels
-  summary_labels <- generate_summary_labels(trend_obj)
-
-  # Add to trend object
-  trend_obj$summary_labels <- summary_labels
-
-  return(trend_obj)
 }
 
 # =============================================================================

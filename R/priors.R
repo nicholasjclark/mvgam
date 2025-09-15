@@ -98,40 +98,6 @@ common_trend_priors <- list(
   )
 )
 
-# =============================================================================
-# SECTION 2: PRIOR EXTRACTION FUNCTIONS
-# =============================================================================
-# WHY: Separate extraction for observation and trend priors enables modular
-# prior specification while maintaining consistency with brms patterns.
-
-#' Extract Observation Model Priors
-#'
-#' @param formula Observation model formula
-#' @param data Data frame
-#' @param family Response distribution family
-#' @param ... Additional arguments passed to brms::get_prior
-#' @return A brmsprior object with observation model priors
-#' @noRd
-extract_observation_priors <- function(formula, data,
-                                        family = gaussian(), ...) {
-  # Accept both formula and brmsformula objects for distributional models
-  if (!inherits(formula, c("formula", "brmsformula", "bform"))) {
-    stop(insight::format_error("Formula must be a formula or brmsformula object"))
-  }
-  checkmate::assert_data_frame(data, min.rows = 1)
-  checkmate::assert_class(family, "family")
-
-  # Use brms::get_prior directly for observation model
-  obs_priors <- brms::get_prior(
-    formula = formula,
-    data = data,
-    family = family,
-    ...
-  )
-
-  return(obs_priors)
-}
-
 #' Extract Trend Model Priors
 #'
 #' @param trend_formula Trend formula specification

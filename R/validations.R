@@ -25,15 +25,6 @@ validate_nonlinear_trend_compatibility <- function(nl_components, trend_specs) {
     ))
   }
 
-  # Warn about potential complexity
-  if (length(nl_components$nonlinear_params) > 2) {
-    insight::format_warning(
-      "Complex nonlinear model with {length(nl_components$nonlinear_params)} parameters detected.",
-      "Trend effects will be applied to main parameter only.",
-      "Consider model simplification if convergence issues occur."
-    )
-  }
-
   invisible(TRUE)
 }
 
@@ -128,10 +119,8 @@ dispatch_validation_rule <- function(rule, trend_spec, data) {
 get_validation_rule_dispatch_table <- function() {
   list(
     "requires_grouping_validation" = validate_trend_grouping,
-    "supports_correlation" = validate_trend_correlation,
     "requires_regular_intervals" = validate_trend_time_intervals,
     "supports_factors" = validate_trend_factor_compatibility,
-    "supports_hierarchical" = validate_trend_hierarchical_structure,
     "requires_parameter_processing" = validate_and_process_trend_parameters
   )
 }
@@ -168,25 +157,6 @@ validate_trend_grouping <- function(trend_spec, data) {
         "Available variables: {.field {paste(colnames(data), collapse = ', ')}}"
       ))
     }
-  }
-
-  return(trend_spec)
-}
-
-#' Validate Trend Correlation
-#'
-#' @description
-#' Validates and processes correlation requirements for trends that support them.
-#'
-#' @param trend_spec Trend specification
-#' @param data Data frame with time series data
-#' @return Enhanced trend specification
-#' @noRd
-validate_trend_correlation <- function(trend_spec, data) {
-
-  # Process correlation requirements based on grouping
-  if (!is.null(trend_spec$cor)) {
-    trend_spec$cor <- validate_correlation_requirements(trend_spec$gr, trend_spec$cor)
   }
 
   return(trend_spec)
@@ -241,23 +211,6 @@ validate_trend_factor_compatibility <- function(trend_spec, data) {
       }
     }
   }
-
-  return(trend_spec)
-}
-
-#' Validate Trend Hierarchical Structure
-#'
-#' @description
-#' Validates hierarchical grouping structure for trends that support it.
-#'
-#' @param trend_spec Trend specification
-#' @param data Data frame with time series data
-#' @return Enhanced trend specification
-#' @noRd
-validate_trend_hierarchical_structure <- function(trend_spec, data) {
-
-  # Additional hierarchical structure validation can be added here
-  # For now, this is handled by validate_trend_grouping
 
   return(trend_spec)
 }
@@ -353,38 +306,6 @@ validate_grouping_arguments <- function(gr, subgr) {
   return(list(gr = gr, subgr = subgr))
 }
 
-#' Validate Correlation Requirements
-#'
-#' @description
-#' Validates correlation settings based on grouping structure.
-#'
-#' @param gr Grouping variable name
-#' @param cor Correlation setting
-#' @return Processed correlation setting
-#' @noRd
-validate_correlation_requirements <- function(gr, cor) {
-  if (is.null(cor)) {
-    return(FALSE)  # Default to no correlation
-  }
-
-  # If grouping is specified, correlation should generally be FALSE
-  # unless explicitly requested for cross-group correlation
-  if (!is.null(gr) && cor) {
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      rlang::warn(
-        insight::format_warning(
-          "Correlation enabled with grouping variable '{gr}'.",
-          "This models cross-group correlations which may be computationally intensive.",
-          "Consider {.field cor = FALSE} for within-group correlations only."
-        ),
-        .frequency = "once",
-        .frequency_id = "correlation_with_grouping"
-      )
-    }
-  }
-
-  return(cor)
-}
 
 #' Validate Regular Time Intervals
 #'
@@ -415,20 +336,6 @@ validate_regular_time_intervals <- function(time_values, time_var = "time") {
     ))
   }
 
-  # Check for series-specific irregular intervals
-  # This would need series information to implement fully
-  # Only warn in interactive sessions, not during testing
-  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-    rlang::warn(
-      insight::format_warning(
-        "Time interval validation performed on combined data.",
-        "Ensure each series has regular intervals individually.",
-        "Some trends may not support series-specific irregular time intervals."
-      ),
-      .frequency = "once",
-      .frequency_id = "series_interval_warning"
-    )
-  }
 
   invisible(TRUE)
 }
@@ -646,8 +553,6 @@ validate_obs_formula_brms <- function(formula) {
     ))
   }
 
-  # Issue informational warning about brms autocorrelation if present
-  check_brms_autocor_usage(formula_str)
 
   # Return original formula unchanged - brms handles all other validation
   return(formula)
@@ -825,39 +730,13 @@ validate_single_trend_formula <- function(formula, context = NULL, allow_respons
   formula_str <- formula2str_mvgam(formula)
 
   # Validate trend formula restrictions
-  validate_trend_formula_restrictions(formula_str, 
+  validate_trend_formula_restrictions(formula_str,
                                      c("offsets", "brms_autocor", "addition_terms", "multiple_constructors"),
                                      formula)
 
   return(formula)
 }
 
-#' Check for brms autocorrelation in observation formulas (informational)
-#'
-#' @param formula_str String representation of formula
-#' @noRd
-check_brms_autocor_usage <- function(formula_str) {
-  autocor_patterns <- c(
-    "\\bar\\s*\\(", "\\bma\\s*\\(", "\\barma\\s*\\(",
-    "\\bcosy\\s*\\(", "\\bunstr\\s*\\("
-  )
-
-  has_autocor <- any(sapply(autocor_patterns, function(p) grepl(p, formula_str, perl = TRUE)))
-
-  if (has_autocor) {
-    rlang::warn(
-      insight::format_warning(
-        "Using brms autocorrelation in observation formula.",
-        "This models residual correlation and complements State-Space trends.",
-        "For temporal dynamics, use {.field trend_formula} with mvgam constructors."
-      ),
-      .frequency = "once",
-      .frequency_id = "brms_autocor_obs"
-    )
-  }
-
-  return(invisible(NULL))
-}
 
 #' Validate trend formula restrictions
 #'
@@ -1209,11 +1088,10 @@ validate_trend_components <- function(trend_components) {
   # Check for conflicting correlation structures
   cor_settings <- sapply(trend_components, function(x) x$cor %||% FALSE)
   if (any(cor_settings) && !all(cor_settings)) {
-    insight::format_warning(
+    stop(insight::format_error(
       "Mixed correlation settings detected.",
-      "Some trend components have correlation enabled while others don't.",
-      "This may lead to unexpected interactions."
-    )
+      "Some trend components have correlation enabled while others don't."
+    ))
   }
 
   invisible(NULL)
@@ -1813,40 +1691,6 @@ are_braces_balanced <- function(stan_code) {
 
   # Return TRUE only if depth is exactly 0 (all braces matched)
   return(depth == 0)
-}
-
-#' Validate Data-Code Compatibility
-#'
-#' @description
-#' Checks that all data variables declared in Stan code are present in standata
-#' and that data types are compatible.
-#'
-#' @param stan_code Character string containing Stan model code
-#' @param stan_data List containing Stan data
-#' @return Invisible TRUE if valid, stops with error if invalid
-#' @noRd
-validate_data_code_compatibility <- function(stan_code, stan_data) {
-  checkmate::assert_string(stan_code, min.chars = 1)
-  checkmate::assert_list(stan_data, names = "named")
-
-  # Extract data block from Stan code
-  data_block <- extract_stan_block_content(stan_code, "data")
-
-  # Parse variable declarations from data block
-  required_vars <- parse_data_declarations(data_block)
-
-  # Check that all required variables are present in stan_data
-  missing_vars <- setdiff(required_vars, names(stan_data))
-
-  if (length(missing_vars) > 0) {
-    stop(insight::format_error(
-      "Missing required data variables: {.field {missing_vars}}",
-      "Stan data block declares variables not provided in standata.",
-      "Add missing variables to standata or remove from Stan data block."
-    ))
-  }
-
-  invisible(TRUE)
 }
 
 #' Parse Data Declarations from Stan Data Block

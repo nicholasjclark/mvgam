@@ -466,10 +466,6 @@ test_that("regex pattern handles edge cases correctly", {
 # Test validation system edge cases
 test_that("validation system handles edge cases", {
 
-  # Test correlation requirements with edge cases
-  expect_true(suppressWarnings(mvgam:::validate_correlation_requirements("region", FALSE)))
-  expect_false(mvgam:::validate_correlation_requirements("NA", FALSE))
-  expect_true(mvgam:::validate_correlation_requirements("group", TRUE))
 
   # Test invalid parameter combinations through constructors
   suppressWarnings(expect_error(
