@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-09-15 13:46:58  
+**Generated:** 2025-09-15 13:57:49  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 57
-- **Total Functions:** 452
+- **Total Functions:** 453
 - **Exported Functions:** 68
-- **Internal Functions:** 410
+- **Internal Functions:** 411
 - **S3 Methods:** 44
 - **S3 Classes:** 25
 
@@ -140,8 +140,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/portal_data.R`** (0 functions) - Data documentation and loading
 
 ### Validation Files
-- **`R/validations.R`** (73 functions) - Input validation and checks
-  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_correlation, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_nonlinear_trend_compatibility, validate_trend_factor_compatibility, validate_trend_hierarchical_structure (+ 58 more)
+- **`R/validations.R`** (74 functions) - Input validation and checks
+  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_correlation, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_nonlinear_trend_compatibility, validate_trend_factor_compatibility, validate_trend_hierarchical_structure (+ 59 more)
 
 ### Core Files
 - **`R/mvgam_core.R`** (25 functions) - Core package functionality
@@ -316,82 +316,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### Visualization
 - **ggplot2**: Grammar of graphics plotting system
 - **patchwork**: Package functionality
-
-## Potentially Unused Functions (Dead Code Candidates)
-*These internal functions are never called directly or dynamically and may be safe to remove*
-*Note: Functions called via get(), do.call(), match.fun() etc. are excluded from this list*
-
-### `R/brms_integration.R` (2 potentially unused):
-- **integrate_nonlinear_with_assembly()** (internal, never called)
-- **modify_stancode_for_nonlinear()** (internal, never called)
-
-### `R/conditional_effects.R` (1 potentially unused):
-- **roundlabs()** (internal, never called)
-
-### `R/interpret_mvgam.R` (1 potentially unused):
-- **interpret_mvgam()** (internal, never called)
-
-### `R/loo.mvgam.R` (1 potentially unused):
-- **samp_noinf()** (internal, never called)
-
-### `R/monotonic.R` (1 potentially unused):
-- **add_mono_model_file()** (internal, never called)
-
-### `R/plot.mvgam.R` (1 potentially unused):
-- **plottable()** (internal, never called)
-
-### `R/priors.R` (10 potentially unused):
-- **add_trend_component_attr()** (internal, never called)
-- **extract_observation_priors()** (internal, never called)
-- **extract_observation_priors_from_enhanced()** (internal, never called)
-- **extract_observation_priors_only()** (internal, never called)
-- **extract_trend_priors_from_enhanced()** (internal, never called)
-- **extract_trend_priors_only()** (internal, never called)
-- **get_ar_parameter_prior()** (internal, never called)
-- **get_car_parameter_prior()** (internal, never called)
-- **has_trend_priors()** (internal, never called)
-- **standardize_brmsprior_columns()** (internal, never called)
-
-### `R/RcppExports.R` (3 potentially unused):
-- **ar3_recursC()** (internal, never called)
-- **var1_recursC()** (internal, never called)
-- **varma_recursC()** (internal, never called)
-
-### `R/sim_mvgam.R` (1 potentially unused):
-- **sim_seasonal()** (internal, never called)
-
-### `R/trend_system.R` (13 potentially unused):
-- **add_complete_metadata()** (internal, never called)
-- **ar_trend_properties()** (internal, never called)
-- **build_trend_label()** (internal, never called)
-- **car_trend_properties()** (internal, never called)
-- **extract_regular_terms()** (internal, never called)
-- **find_trend_terms()** (internal, never called)
-- **get_factor_compatible_trends()** (internal, never called)
-- **get_trend_info()** (internal, never called)
-- **pw_trend_properties()** (internal, never called)
-- **rw_trend_properties()** (internal, never called)
-- **validate_trend_dispatch_consistency()** (internal, never called)
-- **var_trend_properties()** (internal, never called)
-- **zmvn_trend_properties()** (internal, never called)
-
-### `R/validations.R` (12 potentially unused):
-- **apply_validation_rules()** (internal, never called)
-- **check_block_semicolons()** (internal, never called)
-- **validate_and_process_trend_parameters()** (internal, never called)
-- **validate_combined_stancode()** (internal, never called)
-- **validate_series_variable()** (internal, never called)
-- **validate_stan_code_fragment()** (internal, never called)
-- **validate_time_variable()** (internal, never called)
-- **validate_trend_correlation()** (internal, never called)
-- **validate_trend_factor_compatibility()** (internal, never called)
-- **validate_trend_grouping()** (internal, never called)
-- **validate_trend_hierarchical_structure()** (internal, never called)
-- **validate_trend_time_intervals()** (internal, never called)
-
-### `R/zzz.R` (1 potentially unused):
-- **mvgam_attach()** (internal, never called)
-
 
 ## Functions with Zero Internal Dependencies
 *These functions don't call other internal functions (utilities and simple functions)*
@@ -812,6 +736,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **is_nonlinear_formula()** (internal)
 - **is_trend_term()** (internal)
 - **is_try_error()** (internal)
+- **my_dead_function()** (internal)
 - **parse_base_formula_safe()** (internal)
 - **parse_data_declarations()** (internal)
 - **parse_model_cmdstanr()** (internal)

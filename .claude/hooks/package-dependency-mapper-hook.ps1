@@ -330,22 +330,16 @@ function Get-DynamicFunctionReferences {
             # Check for dynamic call patterns with this function name
             $patterns = @(
                 "get\s*\(\s*[`"']$escapedName[`"']\s*[,)]",          # get("funcname") or get('funcname')
-                "get\s*\(\s*[a-zA-Z_][a-zA-Z0-9_]*\s*[,)]",         # get(variable_name) - variable-based calls
                 "do\.call\s*\(\s*[`"']$escapedName[`"']\s*,",        # do.call("funcname", ...)
-                "do\.call\s*\(\s*[a-zA-Z_][a-zA-Z0-9_]*\s*,",       # do.call(variable_name, ...)
                 "match\.fun\s*\(\s*[`"']$escapedName[`"']\s*\)",     # match.fun("funcname")
-                "match\.fun\s*\(\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\)",    # match.fun(variable_name)
                 "getFunction\s*\(\s*[`"']$escapedName[`"']\s*\)",    # getFunction("funcname")
-                "getFunction\s*\(\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\)",   # getFunction(variable_name)
                 "eval\s*\([^)]*[`"']$escapedName[`"']",              # eval with function name in string
                 "apply[^(]*\([^,)]*,\s*[`"']?$escapedName[`"']?\s*[,)]", # apply family with function name
                 "[`"']$escapedName[`"']\s*%>%",                      # piped as string
                 "=\s*[`"']$escapedName[`"'](?:\s*,|\s*\))",          # passed as string argument
                 "list\s*\([^)]*[`"']$escapedName[`"']",              # in list of function names
                 "=\s*$escapedName\s*[,)]",                          # direct function reference in lists/assignments
-                "rule_functions\[\[\s*[`"']?$escapedName[`"']?\s*\]\]", # dispatch table lookups
-                "validation_function\s*<-.*$escapedName",           # validation dispatch assignment
-                "[a-zA-Z_][a-zA-Z0-9_]*\s*<-.*\[\[\s*[`"']?rule[`"']?\s*\]\]", # dispatch table variable assignment
+                "paste0.*tolower.*trend_type.*_trend_properties.*get\s*\(",  # mvgam trend properties dynamic construction
                 "\$\s*$escapedName\s*\("                            # object$funcname() calls
             )
             
@@ -366,14 +360,17 @@ function Get-DynamicFunctionReferences {
                     # Verify it's not just in a comment or message
                     $lines = $content -split '\r?\n'
                     foreach ($line in $lines) {
-                        # Skip comment lines
-                        if ($line -match '^\s*#') { continue }
+                        # Remove all comments (inline and full line) before checking
+                        $codeOnly = $line -replace '#.*$', ''
                         
-                        # Check if the quoted function name is in a context that suggests dynamic use
-                        if ($line -match "[`"']$escapedName[`"']" -and 
-                            ($line -match '\(' -or $line -match 'function' -or $line -match 'apply' -or 
-                             $line -match 'call' -or $line -match 'eval' -or $line -match '=' -or
-                             $line -match '<-')) {
+                        # Skip if line is now empty or whitespace
+                        if ($codeOnly -match '^\s*$') { continue }
+                        
+                        # Check if the quoted function name is in actual code context
+                        if ($codeOnly -match "[`"']$escapedName[`"']" -and 
+                            ($codeOnly -match '\(' -or $codeOnly -match 'function' -or $codeOnly -match 'apply' -or 
+                             $codeOnly -match 'call' -or $codeOnly -match 'eval' -or $codeOnly -match '=' -or
+                             $codeOnly -match '<-')) {
                             $dynamicReferences[$funcName] = $filePath
                             Write-Debug "Found potential dynamic reference to $funcName in $filePath"
                             break
