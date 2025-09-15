@@ -455,6 +455,7 @@ function Get-FunctionDefinitions {
     $definitions = @{}
     $function_signatures = @{}
     $function_dependencies = @{}
+    $reverse_dependencies = @{}
     $s3_methods = @{}
     $s3_classes = @()
     $file_purposes = @{}
@@ -624,6 +625,16 @@ function Get-FunctionDefinitions {
             $calls = Get-FunctionCalls -Content $content -FunctionName $funcName -AllFunctionNames $functions.Keys
             if ($calls.Count -gt 0) {
                 $function_dependencies[$funcName] = $calls
+                
+                # Build reverse dependency map (track which functions are called BY this function)
+                foreach ($calledFunc in $calls) {
+                    if (!$reverse_dependencies.ContainsKey($calledFunc)) {
+                        $reverse_dependencies[$calledFunc] = @()
+                    }
+                    if ($funcName -notin $reverse_dependencies[$calledFunc]) {
+                        $reverse_dependencies[$calledFunc] += $funcName
+                    }
+                }
             }
         }
     }
@@ -642,6 +653,7 @@ function Get-FunctionDefinitions {
         definitions = $definitions  
         function_signatures = $function_signatures
         function_dependencies = $function_dependencies
+        reverse_dependencies = $reverse_dependencies
         detailed_analysis = $detailed_analysis
         s3_methods = $s3_methods
         s3_classes = $s3_classes | Sort-Object -Unique
@@ -722,11 +734,12 @@ function New-PackageDependencyMap {
     $dependencyMap.definitions = $funcResults.definitions
     $dependencyMap.function_signatures = $funcResults.function_signatures
     $dependencyMap.function_dependencies = $funcResults.function_dependencies
+    $dependencyMap.reverse_dependencies = $funcResults.reverse_dependencies
     $dependencyMap.detailed_analysis = $funcResults.detailed_analysis
     $dependencyMap.s3_methods = $funcResults.s3_methods
     $dependencyMap.s3_classes = $funcResults.s3_classes
     $dependencyMap.file_purposes = $funcResults.file_purposes
-    # Identify functions with zero internal dependencies
+    # Identify functions with zero internal dependencies (don't call other functions)
     $functionsWithZeroDeps = @{}
     $functionsNotAnalyzed = @{}
     
@@ -762,13 +775,48 @@ function New-PackageDependencyMap {
         }
     }
     
+    # Identify potentially unused functions (zero reverse dependencies)
+    $potentiallyUnusedFunctions = @{}
+    foreach ($funcName in $dependencyMap.functions.Keys) {
+        $file = $dependencyMap.functions[$funcName]
+        
+        # Skip if function has reverse dependencies (is called by other functions)
+        if ($dependencyMap.reverse_dependencies.ContainsKey($funcName)) {
+            continue
+        }
+        
+        # Skip exported functions (called by users)
+        if ($funcName -in $exportedFunctions) {
+            continue
+        }
+        
+        # Skip S3 methods (called via dispatch)
+        $isS3Method = $false
+        foreach ($method in $dependencyMap.s3_methods.Keys) {
+            if ($funcName -in $dependencyMap.s3_methods[$method]) {
+                $isS3Method = $true
+                break
+            }
+        }
+        if ($isS3Method -or $funcName.Contains('.')) {
+            continue
+        }
+        
+        # Only include functions from analyzed files for accuracy
+        if ($file -match $priorityFilesPattern -or $file -in $changedFiles) {
+            $potentiallyUnusedFunctions[$funcName] = $file
+        }
+    }
+    
     $dependencyMap.functions_with_zero_deps = $functionsWithZeroDeps
     $dependencyMap.functions_not_analyzed = $functionsNotAnalyzed
+    $dependencyMap.potentially_unused_functions = $potentiallyUnusedFunctions
     $dependencyMap.metadata.total_functions = $funcResults.functions.Count
     $dependencyMap.metadata.s3_methods_count = $funcResults.s3_methods.Count
     $dependencyMap.metadata.s3_classes_count = $funcResults.s3_classes.Count
     $dependencyMap.metadata.zero_dependency_functions = $functionsWithZeroDeps.Count
     $dependencyMap.metadata.unanalyzed_functions = $functionsNotAnalyzed.Count
+    $dependencyMap.metadata.potentially_unused_functions = $potentiallyUnusedFunctions.Count
     
     # Save results
     Write-Debug "Saving dependency map..."
@@ -1131,10 +1179,35 @@ function New-PackageDependencyMap {
         }
     }
     
-    # Zero dependency analysis section
+    # Potentially unused functions analysis section (DEAD CODE CANDIDATES)
+    if ($potentiallyUnusedFunctions.Count -gt 0) {
+        $markdown += "`n## Potentially Unused Functions (Dead Code Candidates)`n"
+        $markdown += "*These internal functions are never called by other functions and may be safe to remove*`n`n"
+        
+        # Group by file for better organization
+        $unusedByFile = @{}
+        foreach ($func in $potentiallyUnusedFunctions.Keys) {
+            $file = $potentiallyUnusedFunctions[$func]
+            if (!$unusedByFile.ContainsKey($file)) {
+                $unusedByFile[$file] = @()
+            }
+            $unusedByFile[$file] += $func
+        }
+        
+        foreach ($file in ($unusedByFile.Keys | Sort-Object)) {
+            $funcs = $unusedByFile[$file] | Sort-Object
+            $markdown += "### ``$file`` ($($funcs.Count) potentially unused):`n"
+            foreach ($func in $funcs) {
+                $markdown += "- **$func()** (internal, never called)" + "`n"
+            }
+            $markdown += "`n"
+        }
+    }
+    
+    # Zero dependency analysis section (functions that don't call others)
     if ($functionsWithZeroDeps.Count -gt 0) {
         $markdown += "`n## Functions with Zero Internal Dependencies`n"
-        $markdown += "*These functions may be dead code candidates or simple utilities*`n`n"
+        $markdown += "*These functions don't call other internal functions (utilities and simple functions)*`n`n"
         
         # Group by file for better organization
         $zeroDepsByFile = @{}
