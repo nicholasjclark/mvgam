@@ -330,14 +330,23 @@ function Get-DynamicFunctionReferences {
             # Check for dynamic call patterns with this function name
             $patterns = @(
                 "get\s*\(\s*[`"']$escapedName[`"']\s*[,)]",          # get("funcname") or get('funcname')
+                "get\s*\(\s*[a-zA-Z_][a-zA-Z0-9_]*\s*[,)]",         # get(variable_name) - variable-based calls
                 "do\.call\s*\(\s*[`"']$escapedName[`"']\s*,",        # do.call("funcname", ...)
+                "do\.call\s*\(\s*[a-zA-Z_][a-zA-Z0-9_]*\s*,",       # do.call(variable_name, ...)
                 "match\.fun\s*\(\s*[`"']$escapedName[`"']\s*\)",     # match.fun("funcname")
+                "match\.fun\s*\(\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\)",    # match.fun(variable_name)
                 "getFunction\s*\(\s*[`"']$escapedName[`"']\s*\)",    # getFunction("funcname")
+                "getFunction\s*\(\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\)",   # getFunction(variable_name)
                 "eval\s*\([^)]*[`"']$escapedName[`"']",              # eval with function name in string
                 "apply[^(]*\([^,)]*,\s*[`"']?$escapedName[`"']?\s*[,)]", # apply family with function name
                 "[`"']$escapedName[`"']\s*%>%",                      # piped as string
                 "=\s*[`"']$escapedName[`"'](?:\s*,|\s*\))",          # passed as string argument
-                "list\s*\([^)]*[`"']$escapedName[`"']"               # in list of function names
+                "list\s*\([^)]*[`"']$escapedName[`"']",              # in list of function names
+                "=\s*$escapedName\s*[,)]",                          # direct function reference in lists/assignments
+                "rule_functions\[\[\s*[`"']?$escapedName[`"']?\s*\]\]", # dispatch table lookups
+                "validation_function\s*<-.*$escapedName",           # validation dispatch assignment
+                "[a-zA-Z_][a-zA-Z0-9_]*\s*<-.*\[\[\s*[`"']?rule[`"']?\s*\]\]", # dispatch table variable assignment
+                "\$\s*$escapedName\s*\("                            # object$funcname() calls
             )
             
             $found = $false

@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-09-15 13:19:22  
+**Generated:** 2025-09-15 13:46:58  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 57
-- **Total Functions:** 465
+- **Total Functions:** 452
 - **Exported Functions:** 68
-- **Internal Functions:** 423
+- **Internal Functions:** 410
 - **S3 Methods:** 44
 - **S3 Classes:** 25
 
@@ -40,7 +40,7 @@
 ### Main Entry Points
 - **Core Functions**: mvgam, series_to_mvgam, sim_mvgam
 - **Trend Types**: RW, GP, PW, VAR, CAR, ZMVN, AR
-- **Analysis Tools**: stability, fevd, ppc, irf, lfo_cv
+- **Analysis Tools**: ppc, stability, fevd, irf, lfo_cv
 - **Plotting Functions**: plot_mvgam_series, plot_mvgam_smooth, plot_mvgam_pterms, plot_mvgam_factors, plot_mvgam_fc, plot_mvgam_trend, plot_mvgam_randomeffects, plot_mvgam_resids, plot_mvgam_uncertainty
 
 ## S3 Object System
@@ -98,22 +98,22 @@
 - **sim_mvgam()** (`R/sim_mvgam.R`) - No internal dependencies tracked
 
 ### Most Connected Internal Functions
-- **inject_trend_into_glm_predictor()** (`R/stan_assembly.R`) - 75 dependencies
-  - Calls: append_if_not_null, apply_response_suffix_to_stanvars, apply_safe_parameter_replacement, AR, calculate_car_time_distances, CAR, combine_stanvars, create_times_trend_matrix, detect_glm_usage, extract_and_rename_stan_blocks, extract_and_rename_standata_objects, extract_computed_variables, extract_dependencies_from_declaration, extract_hierarchical_info, extract_mapping_arrays, extract_mu_construction_with_classification, extract_multivariate_standata, extract_non_likelihood_from_model_block, extract_response_names_from_brmsfit, extract_stan_block_content, extract_stan_functions_block, extract_stan_identifiers, extract_time_series_dimensions, extract_univariate_standata, filter_block_content, filter_renameable_identifiers, find_stan_block, find_trend_computation_end, find_variable_declarations, generate_ar_trend_stanvars, generate_car_trend_stanvars, generate_common_trend_data, generate_factor_model, generate_hierarchical_correlation_model, generate_hierarchical_correlation_parameters, generate_hierarchical_functions, generate_innovation_model, generate_matrix_z_multiblock_stanvars, generate_matrix_z_parameters, generate_matrix_z_tdata, generate_obs_trend_mapping, generate_pw_trend_stanvars, generate_rw_trend_stanvars, generate_shared_innovation_stanvars, generate_times_trend_matrices, generate_trend_computation_tparameters, generate_trend_injection_code, generate_trend_priors_stanvar, generate_var_trend_stanvars, generate_zmvn_trend_stanvars, get_prior, get_stan_reserved_words, get_trend_parameter_prior, inject_trend_into_linear_predictor, insert_after_mu_lines_in_model_block, is_multivariate_brmsfit, normalize_function_body, normalize_function_signature, parse_glm_parameters, parse_stan_functions, process_variable, PW, reconstruct_functions_block, reconstruct_mu_trend_with_renamed_vars, register_core_trends, remove_duplicate_functions, rename_parameters_in_block, replace_stan_functions_block, RW, should_include_in_transformed_parameters, transform_glm_call, validate_mapping_arrays, validate_no_factor_hierarchical, VAR, ZMVN
 - **detect_glm_usage()** (`R/stan_assembly.R`) - 75 dependencies
   - Calls: append_if_not_null, apply_response_suffix_to_stanvars, apply_safe_parameter_replacement, AR, calculate_car_time_distances, CAR, combine_stanvars, create_times_trend_matrix, extract_and_rename_stan_blocks, extract_and_rename_standata_objects, extract_computed_variables, extract_dependencies_from_declaration, extract_hierarchical_info, extract_mapping_arrays, extract_mu_construction_with_classification, extract_multivariate_standata, extract_non_likelihood_from_model_block, extract_response_names_from_brmsfit, extract_stan_block_content, extract_stan_functions_block, extract_stan_identifiers, extract_time_series_dimensions, extract_univariate_standata, filter_block_content, filter_renameable_identifiers, find_stan_block, find_trend_computation_end, find_variable_declarations, generate_ar_trend_stanvars, generate_car_trend_stanvars, generate_common_trend_data, generate_factor_model, generate_hierarchical_correlation_model, generate_hierarchical_correlation_parameters, generate_hierarchical_functions, generate_innovation_model, generate_matrix_z_multiblock_stanvars, generate_matrix_z_parameters, generate_matrix_z_tdata, generate_obs_trend_mapping, generate_pw_trend_stanvars, generate_rw_trend_stanvars, generate_shared_innovation_stanvars, generate_times_trend_matrices, generate_trend_computation_tparameters, generate_trend_injection_code, generate_trend_priors_stanvar, generate_var_trend_stanvars, generate_zmvn_trend_stanvars, get_prior, get_stan_reserved_words, get_trend_parameter_prior, inject_trend_into_glm_predictor, inject_trend_into_linear_predictor, insert_after_mu_lines_in_model_block, is_multivariate_brmsfit, normalize_function_body, normalize_function_signature, parse_glm_parameters, parse_stan_functions, process_variable, PW, reconstruct_functions_block, reconstruct_mu_trend_with_renamed_vars, register_core_trends, remove_duplicate_functions, rename_parameters_in_block, replace_stan_functions_block, RW, should_include_in_transformed_parameters, transform_glm_call, validate_mapping_arrays, validate_no_factor_hierarchical, VAR, ZMVN
+- **inject_trend_into_glm_predictor()** (`R/stan_assembly.R`) - 75 dependencies
+  - Calls: append_if_not_null, apply_response_suffix_to_stanvars, apply_safe_parameter_replacement, AR, calculate_car_time_distances, CAR, combine_stanvars, create_times_trend_matrix, detect_glm_usage, extract_and_rename_stan_blocks, extract_and_rename_standata_objects, extract_computed_variables, extract_dependencies_from_declaration, extract_hierarchical_info, extract_mapping_arrays, extract_mu_construction_with_classification, extract_multivariate_standata, extract_non_likelihood_from_model_block, extract_response_names_from_brmsfit, extract_stan_block_content, extract_stan_functions_block, extract_stan_identifiers, extract_time_series_dimensions, extract_univariate_standata, filter_block_content, filter_renameable_identifiers, find_stan_block, find_trend_computation_end, find_variable_declarations, generate_ar_trend_stanvars, generate_car_trend_stanvars, generate_common_trend_data, generate_factor_model, generate_hierarchical_correlation_model, generate_hierarchical_correlation_parameters, generate_hierarchical_functions, generate_innovation_model, generate_matrix_z_multiblock_stanvars, generate_matrix_z_parameters, generate_matrix_z_tdata, generate_obs_trend_mapping, generate_pw_trend_stanvars, generate_rw_trend_stanvars, generate_shared_innovation_stanvars, generate_times_trend_matrices, generate_trend_computation_tparameters, generate_trend_injection_code, generate_trend_priors_stanvar, generate_var_trend_stanvars, generate_zmvn_trend_stanvars, get_prior, get_stan_reserved_words, get_trend_parameter_prior, inject_trend_into_linear_predictor, insert_after_mu_lines_in_model_block, is_multivariate_brmsfit, normalize_function_body, normalize_function_signature, parse_glm_parameters, parse_stan_functions, process_variable, PW, reconstruct_functions_block, reconstruct_mu_trend_with_renamed_vars, register_core_trends, remove_duplicate_functions, rename_parameters_in_block, replace_stan_functions_block, RW, should_include_in_transformed_parameters, transform_glm_call, validate_mapping_arrays, validate_no_factor_hierarchical, VAR, ZMVN
 - **generate_combined_stancode()** (`R/stan_assembly.R`) - 13 dependencies
   - Calls: AR, deduplicate_stan_functions, detect_shared_trends, extract_response_names, extract_trend_stanvars_from_setup, generate_base_brms_standata, generate_base_stancode_with_stanvars, inject_multivariate_trends_into_linear_predictors, inject_trend_into_linear_predictor, is_multivariate_trend_specs, RW, sort_stanvars, validate_stan_code
 - **mvgam_single_dataset()** (`R/mvgam_core.R`) - 10 dependencies
   - Calls: create_mvgam_from_combined_fit, extract_response_names, fit_mvgam_model, generate_combined_stancode, generate_combined_stancode_and_data, is_multivariate_trend_specs, parse_multivariate_trends, setup_brms_lightweight, validate_autocor_separation, validate_time_series_for_trends
 - **find_stan_block()** (`R/stan_assembly.R`) - 9 dependencies
   - Calls: detect_glm_usage, extract_mapping_arrays, find_trend_computation_end, generate_obs_trend_mapping, generate_trend_injection_code, inject_trend_into_glm_predictor, inject_trend_into_linear_predictor, insert_after_mu_lines_in_model_block, validate_mapping_arrays
+- **extract_mu_construction_with_classification()** (`R/mu_expression_analysis.R`) - 7 dependencies
+  - Calls: build_execution_dependency_plan, classify_mu_expressions_structurally, create_empty_mu_result, extract_comprehensive_variable_references, extract_mu_assignment_lines, extract_stan_block_content, find_variable_declarations
 - **generate_monitor_params()** (`R/trend_system.R`) - 7 dependencies
   - Calls: generate_ar_monitor_params, generate_car_monitor_params, generate_pw_monitor_params, generate_rw_monitor_params, generate_var_monitor_params, generate_zmvn_monitor_params, normalize_trend_type
-- **parse_multivariate_trends()** (`R/brms_integration.R`) - 6 dependencies
-  - Calls: create_trend_base_formula, extract_response_names, extract_response_trends, is_multivariate_formula, parse_trend_formula, validate_trend_formula_brms
-- **validate_obs_formula_brms()** (`R/validations.R`) - 6 dependencies
-  - Calls: check_brms_autocor_usage, formula2str_mvgam, get_trend_validation_patterns, mvgam, RW, validate_offsets_in_obs
+- **classify_single_mu_expression_structurally()** (`R/mu_expression_analysis.R`) - 6 dependencies
+  - Calls: analyze_expression_structure, check_loop_requirement, determine_execution_order_from_type, determine_expression_type, extract_expression_variables_comprehensive, normalize_mu_expression
 
 ## Key Function Signatures
 
@@ -140,8 +140,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/portal_data.R`** (0 functions) - Data documentation and loading
 
 ### Validation Files
-- **`R/validations.R`** (81 functions) - Input validation and checks
-  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_correlation, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_nonlinear_trend_compatibility, validate_trend_factor_compatibility, validate_trend_hierarchical_structure (+ 66 more)
+- **`R/validations.R`** (73 functions) - Input validation and checks
+  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_correlation, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_nonlinear_trend_compatibility, validate_trend_factor_compatibility, validate_trend_hierarchical_structure (+ 58 more)
 
 ### Core Files
 - **`R/mvgam_core.R`** (25 functions) - Core package functionality
@@ -165,7 +165,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/fevd.mvgam.R`** (4 functions)
   - Key functions: fevd, fevd.mvgam, gen_fevd, var_fecov
 - **`R/interpret_mvgam.R`** (3 functions)
-  - Key functions: interpret_mvgamdyn_to_gpspline dyn_to_gphilbert (+ 2 more)
+  - Key functions: interpret_mvgam, dyn_to_gpspline, dyn_to_gphilbert
 - **`R/plot.mvgam.R`** (2 functions) - Plotting and visualization
   - Key functions: plot.mvgam, plottable
 - **`R/series_to_mvgam.R`** (2 functions)
@@ -185,7 +185,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/priors.R`** (33 functions) - Prior specification
   - Key functions: mvgam_formula, get_prior, extract_observation_priors, extract_trend_priors, generate_trend_priors, generate_trend_priors_from_monitor_params, create_trend_parameter_prior, get_default_trend_parameter_prior, build_ar_prior_spec, extract_prior_string, map_trend_priors, get_trend_parameter_prior, has_trend_priors, extract_trend_priors_only, extract_trend_priors_from_enhanced (+ 18 more)
 - **`R/mu_expression_analysis.R`** (25 functions)
-  - Key functions: create_empty_mu_result, create_analysis_context, check_loop_requirement, build_execution_dependency_plan, extract_mu_construction_with_classification, extract_mu_assignment_lines, classify_mu_expressions_structurally, extract_declared_functions, classify_single_mu_expression_structurally, normalize_mu_expression (+ 15 more)
+  - Key functions: extract_mu_construction_with_classification, classify_mu_expressions_structurally, create_analysis_context, classify_single_mu_expression_structurally, analyze_expression_structure, analyze_indexing_patterns_comprehensive, analyze_mathematical_operations_comprehensive, analyze_variable_relationships_comprehensive, extract_expression_variables_comprehensive, extract_comprehensive_variable_references, create_empty_mu_result, check_loop_requirement, build_execution_dependency_plan (+ 12 more)
 - **`R/conditional_effects.R`** (6 functions) - Conditional effects
   - Key functions: decimalplaces, print.mvgam_conditional_effects, conditional_effects.mvgam, plot.mvgam_conditional_effects, roundlabs, split_termlabs
 - **`R/monotonic.R`** (5 functions)
@@ -227,8 +227,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: add_residualsadd_residuals.mvgam (+ 1 more)
 
 ### Stan/Modeling Files
-- **`R/stan_assembly.R`** (79 functions) - Stan model integration
-  - Key functions: apply_response_suffix_to_stanvars, generate_combined_stancode, generate_base_stancode_with_stanvars, prepare_stanvars_for_brms, extract_trend_stanvars_from_setup, detect_glm_usage, inject_trend_into_glm_predictor, validate_mapping_arrays, find_stan_block, inject_trend_into_linear_predictor, insert_after_mu_lines_in_model_block, inject_multivariate_trends_into_linear_predictors, generate_shared_innovation_stanvars, generate_innovation_model, apply_suffix_to_stan_code (+ 64 more)
+- **`R/stan_assembly.R`** (74 functions) - Stan model integration
+  - Key functions: apply_response_suffix_to_stanvars, generate_combined_stancode, generate_base_stancode_with_stanvars, extract_trend_stanvars_from_setup, detect_glm_usage, inject_trend_into_glm_predictor, validate_mapping_arrays, find_stan_block, inject_trend_into_linear_predictor, insert_after_mu_lines_in_model_block, inject_multivariate_trends_into_linear_predictors, generate_shared_innovation_stanvars, generate_innovation_model, apply_suffix_to_stan_code, detect_shared_trends (+ 59 more)
 - **`R/brms_integration.R`** (18 functions) - brms integration
   - Key functions: setup_brms_lightweight, extract_prior_from_setup, parse_multivariate_trends, is_multivariate_formula, extract_response_names, extract_mvbind_responses, extract_response_trends, handle_nonlinear_model, extract_nonlinear_components, parse_nonlinear_manually, integrate_nonlinear_with_assembly, extract_brmsterms_from_setup, create_trend_base_formula, determine_trend_injection_point, modify_stancode_for_nonlinear (+ 3 more)
 - **`R/make_stan.R`** (3 functions) - Stan model integration
@@ -360,13 +360,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### `R/sim_mvgam.R` (1 potentially unused):
 - **sim_seasonal()** (internal, never called)
 
-### `R/stan_assembly.R` (5 potentially unused):
-- **extract_computed_variable_name()** (internal, never called)
-- **extract_variable_from_line()** (internal, never called)
-- **format_matrix_for_stan_array()** (internal, never called)
-- **prepare_stanvars_for_brms()** (internal, never called)
-- **replace_stan_block_content()** (internal, never called)
-
 ### `R/trend_system.R` (13 potentially unused):
 - **add_complete_metadata()** (internal, never called)
 - **ar_trend_properties()** (internal, never called)
@@ -382,24 +375,18 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **var_trend_properties()** (internal, never called)
 - **zmvn_trend_properties()** (internal, never called)
 
-### `R/validations.R` (18 potentially unused):
+### `R/validations.R` (12 potentially unused):
 - **apply_validation_rules()** (internal, never called)
-- **check_semicolon_syntax()** (internal, never called)
-- **handle_nse_param()** (internal, never called)
+- **check_block_semicolons()** (internal, never called)
 - **validate_and_process_trend_parameters()** (internal, never called)
 - **validate_combined_stancode()** (internal, never called)
-- **validate_pos_real()** (internal, never called)
 - **validate_series_variable()** (internal, never called)
 - **validate_stan_code_fragment()** (internal, never called)
-- **validate_stan_data_structure()** (internal, never called)
 - **validate_time_variable()** (internal, never called)
 - **validate_trend_correlation()** (internal, never called)
 - **validate_trend_factor_compatibility()** (internal, never called)
 - **validate_trend_grouping()** (internal, never called)
 - **validate_trend_hierarchical_structure()** (internal, never called)
-- **validate_trend_parameter_bounds()** (internal, never called)
-- **validate_trend_parameter_class()** (internal, never called)
-- **validate_trend_specs()** (internal, never called)
 - **validate_trend_time_intervals()** (internal, never called)
 
 ### `R/zzz.R` (1 potentially unused):
@@ -458,6 +445,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### `R/interpret_mvgam.R`:
 - **dyn_to_gphilbert()** (internal)
 - **dyn_to_gpspline()** (internal)
+- **interpret_mvgam()** (internal)
 
 ### `R/irf.mvgam.R`:
 - **gen_irf()** (internal)
@@ -514,29 +502,19 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 
 ### `R/mu_expression_analysis.R`:
 - **analyze_assignment_type()** (internal)
-- **analyze_expression_structure()** (internal)
 - **analyze_function_usage()** (internal)
-- **analyze_indexing_patterns_comprehensive()** (internal)
-- **analyze_mathematical_operations_comprehensive()** (internal)
-- **analyze_variable_relationships_comprehensive()** (internal)
 - **build_execution_dependency_plan()** (internal)
 - **calculate_bracket_nesting_depth()** (internal)
 - **calculate_variable_complexity()** (internal)
 - **check_loop_requirement()** (internal)
-- **classify_mu_expressions_structurally()** (internal)
-- **classify_single_mu_expression_structurally()** (internal)
 - **count_mathematical_operators()** (internal)
-- **create_analysis_context()** (internal)
 - **create_empty_mu_result()** (internal)
 - **determine_execution_order_from_type()** (internal)
 - **determine_expression_type()** (internal)
 - **extract_all_identifiers()** (internal)
 - **extract_assignment_target()** (internal)
-- **extract_comprehensive_variable_references()** (internal)
 - **extract_declared_functions()** (internal)
-- **extract_expression_variables_comprehensive()** (internal)
 - **extract_mu_assignment_lines()** (internal)
-- **extract_mu_construction_with_classification()** (internal)
 - **normalize_mu_expression()** (internal)
 
 ### `R/mvgam_core.R`:
@@ -695,7 +673,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **extract_and_rename_stan_blocks()** (internal)
 - **extract_and_rename_standata_objects()** (internal)
 - **extract_and_rename_trend_parameters()** (internal)
-- **extract_computed_variable_name()** (internal)
 - **extract_computed_variables()** (internal)
 - **extract_dependencies_from_declaration()** (internal)
 - **extract_hierarchical_info()** (internal)
@@ -707,12 +684,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **extract_stan_functions_block()** (internal)
 - **extract_stan_identifiers()** (internal)
 - **extract_univariate_standata()** (internal)
-- **extract_variable_from_line()** (internal)
 - **filter_block_content()** (internal)
 - **filter_renameable_identifiers()** (internal)
 - **find_trend_computation_end()** (internal)
 - **find_variable_declarations()** (internal)
-- **format_matrix_for_stan_array()** (internal)
 - **generate_ar_trend_stanvars()** (internal)
 - **generate_base_brms_standata()** (internal)
 - **generate_car_trend_stanvars()** (internal)
@@ -743,7 +718,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **reconstruct_mu_trend_with_renamed_vars()** (internal)
 - **remove_duplicate_functions()** (internal)
 - **rename_parameters_in_block()** (internal)
-- **replace_stan_block_content()** (internal)
 - **replace_stan_functions_block()** (internal)
 - **should_include_in_transformed_parameters()** (internal)
 - **sort_stanvars()** (internal)
@@ -824,7 +798,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **as_one_logical()** (internal)
 - **check_block_semicolons()** (internal)
 - **check_brms_autocor_usage()** (internal)
-- **check_semicolon_syntax()** (internal)
 - **deparse0()** (internal)
 - **eval_silent()** (internal)
 - **extract_all_bf_formulas()** (internal)
@@ -833,14 +806,12 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **generate_obs_trend_mapping()** (internal)
 - **get_trend_validation_patterns()** (internal)
 - **get_validation_rule_dispatch_table()** (internal)
-- **handle_nse_param()** (internal)
 - **is.mvgam_trend()** (exported)
 - **is_multivariate_brmsfit()** (internal)
 - **is_multivariate_trend_specs()** (internal)
 - **is_nonlinear_formula()** (internal)
 - **is_trend_term()** (internal)
 - **is_try_error()** (internal)
-- **is_valid_stanvar()** (internal)
 - **parse_base_formula_safe()** (internal)
 - **parse_data_declarations()** (internal)
 - **parse_model_cmdstanr()** (internal)
@@ -868,7 +839,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **validate_nonlinear_trend_compatibility()** (internal)
 - **validate_offsets_in_obs()** (internal)
 - **validate_pos_integer()** (internal)
-- **validate_pos_real()** (internal)
 - **validate_proportional()** (internal)
 - **validate_series_time()** (internal)
 - **validate_series_variable()** (internal)
@@ -877,15 +847,11 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **validate_stan_code()** (internal)
 - **validate_stan_code_fragment()** (internal)
 - **validate_stan_code_structure()** (internal)
-- **validate_stan_data_structure()** (internal)
 - **validate_time_series_for_trends()** (internal)
 - **validate_time_variable()** (internal)
 - **validate_trend_components()** (internal)
 - **validate_trend_factor_compatibility()** (internal)
 - **validate_trend_hierarchical_structure()** (internal)
-- **validate_trend_parameter_bounds()** (internal)
-- **validate_trend_parameter_class()** (internal)
-- **validate_trend_specs()** (internal)
 - **validate_univariate_series_time()** (internal)
 - **warn_default_series_variable()** (internal)
 - **warn_default_time_variable()** (internal)
