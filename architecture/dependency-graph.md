@@ -1,17 +1,17 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-09-16 11:02:00  
+**Generated:** 2025-09-16 11:04:41  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
-- **Total Files:** 57
-- **Total Functions:** 425
+- **Total Files:** 56
+- **Total Functions:** 419
 - **Exported Functions:** 68
-- **Internal Functions:** 383
-- **S3 Methods:** 44
-- **S3 Classes:** 25
+- **Internal Functions:** 377
+- **S3 Methods:** 43
+- **S3 Classes:** 24
 
 ## External Dependencies
 - bayesplot
@@ -46,7 +46,7 @@
 ## S3 Object System
 
 ### S3 Classes
-- array.mvgam, brmsformula, construct.mod.smooth.spec, construct.moi.smooth.spec, data.frame.mvgam, default, formula, how_to_cite, jsdgam, matrix.mod.smooth, matrix.moi.smooth, matrix.mvgam, mvgam, mvgam_conditional_effects, mvgam_fevd, mvgam_forecast, mvgam_formula, mvgam_irf, mvgam_lfo, mvgam_prefit, mvgam_residcor, mvgam_trend, mvgamstancode, to.ts, trend_param
+- array.mvgam, brmsformula, construct.mod.smooth.spec, construct.moi.smooth.spec, data.frame.mvgam, default, formula, how_to_cite, jsdgam, matrix.mod.smooth, matrix.moi.smooth, matrix.mvgam, mvgam, mvgam_fevd, mvgam_forecast, mvgam_formula, mvgam_irf, mvgam_lfo, mvgam_prefit, mvgam_residcor, mvgam_trend, mvgamstancode, to.ts, trend_param
 
 ### Key S3 Methods
 - **as()**: array.mvgam, data.frame.mvgam, matrix.mvgam
@@ -54,9 +54,9 @@
 - **get_data()**: mvgam, mvgam_prefit
 - **get_prior()**: brmsformula, default, formula, mvgam_formula
 - **is()**: mvgam_trend, trend_param
-- **plot()**: mvgam, mvgam_conditional_effects, mvgam_fevd, mvgam_forecast, mvgam_irf, mvgam_lfo, mvgam_residcor
+- **plot()**: mvgam, mvgam_fevd, mvgam_forecast, mvgam_irf, mvgam_lfo, mvgam_residcor
 - **Predict()**: matrix.mod.smooth, matrix.moi.smooth
-- **print()**: how_to_cite, mvgam, mvgam_conditional_effects, mvgam_formula, mvgam_prefit, mvgam_trend, mvgamstancode, trend_param
+- **print()**: how_to_cite, mvgam, mvgam_formula, mvgam_prefit, mvgam_trend, mvgamstancode, trend_param
 - **residual_cor()**: jsdgam, mvgam
 - **residuals()**: mvgam
 - **smooth()**: construct.mod.smooth.spec, construct.moi.smooth.spec
@@ -186,8 +186,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: extract_mu_construction_with_classification, classify_mu_expressions_structurally, create_analysis_context, classify_single_mu_expression_structurally, analyze_expression_structure, analyze_indexing_patterns_comprehensive, analyze_mathematical_operations_comprehensive, analyze_variable_relationships_comprehensive, determine_expression_type, extract_expression_variables_comprehensive, extract_comprehensive_variable_references, create_empty_mu_result, check_loop_requirement, build_execution_dependency_plan (+ 11 more)
 - **`R/priors.R`** (24 functions) - Prior specification
   - Key functions: mvgam_formula, get_prior, extract_trend_priors, generate_trend_priors, generate_trend_priors_from_monitor_params, create_trend_parameter_prior, get_default_trend_parameter_prior, build_ar_prior_spec, extract_prior_string, map_trend_priors, get_trend_parameter_prior, get_prior.default, get_prior.formula, get_prior.brmsformula, get_prior.mvgam_formula (+ 9 more)
-- **`R/conditional_effects.R`** (6 functions) - Conditional effects
-  - Key functions: decimalplaces, print.mvgam_conditional_effects, conditional_effects.mvgam, plot.mvgam_conditional_effects, roundlabs, split_termlabs
 - **`R/monotonic.R`** (5 functions)
   - Key functions: smooth.construct.moi.smooth.spec, smooth.construct.mod.smooth.spec, Predict.matrix.moi.smooth, Predict.matrix.mod.smooth, add_mono_model_file
 - **`R/mvgam_residcor-class.R`** (4 functions) - Class definitions and methods
@@ -196,22 +194,22 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: ensembleensemble.mvgam_forecast allsame split_fc_dots (+ 3 more)
 - **`R/residual_cor.R`** (3 functions) - Residual analysis
   - Key functions: residual_corresidual_cor.mvgam residual_cor.jsdgam (+ 2 more)
-- **`R/how_to_cite.R`** (3 functions)
-  - Key functions: how_to_citeprint.how_to_cite how_to_cite.mvgam (+ 2 more)
 - **`R/tidier_methods.R`** (3 functions) - Method implementations
   - Key functions: tidy.mvgam, split_hier_Sigma, augment.mvgam
-- **`R/mvgam_fevd-class.R`** (3 functions) - Class definitions and methods
-  - Key functions: summary.mvgam_fevd, plot.mvgam_fevd, fevd_df
+- **`R/how_to_cite.R`** (3 functions)
+  - Key functions: how_to_citeprint.how_to_cite how_to_cite.mvgam (+ 2 more)
 - **`R/RcppExports.R`** (3 functions) - Exported functions
   - Key functions: ar3_recursC, var1_recursC, varma_recursC
+- **`R/mvgam_fevd-class.R`** (3 functions) - Class definitions and methods
+  - Key functions: summary.mvgam_fevd, plot.mvgam_fevd, fevd_df
 - **`R/zzz.R`** (2 functions) - Package startup and attachment
   - Key functions: core_unloaded, mvgam_attach
-- **`R/stability.R`** (2 functions)
-  - Key functions: stabilitystability.mvgam (+ 1 more)
 - **`R/mvgam_irf-class.R`** (2 functions) - Class definitions and methods
   - Key functions: summary.mvgam_irf, plot.mvgam_irf
 - **`R/ordinate.jsdgam.R`** (2 functions)
   - Key functions: ordinateordinate.jsdgam (+ 1 more)
+- **`R/stability.R`** (2 functions)
+  - Key functions: stabilitystability.mvgam (+ 1 more)
 - **`R/dynamic.R`** (1 functions)
   - Key functions: dynamic
 - **`R/mvgam_forecast-class.R`** (1 functions) - Class definitions and methods
@@ -241,18 +239,18 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: plot_mvgam_uncertaintyintersect_hist (+ 1 more)
 - **`R/plot_mvgam_fc.R`** (2 functions) - Plotting and visualization
   - Key functions: plot_mvgam_fcplot.mvgam_forecast (+ 1 more)
-- **`R/plot_mvgam_smooth.R`** (1 functions) - Plotting and visualization
-  - Key functions: plot_mvgam_smooth
-- **`R/plot_mvgam_resids.R`** (1 functions) - Plotting and visualization
-  - Key functions: plot_mvgam_resids
-- **`R/plot_mvgam_pterms.R`** (1 functions) - Plotting and visualization
-  - Key functions: plot_mvgam_pterms
-- **`R/plot_mvgam_randomeffects.R`** (1 functions) - Plotting and visualization
-  - Key functions: plot_mvgam_randomeffects
-- **`R/plot_mvgam_trend.R`** (1 functions) - Trend modeling
-  - Key functions: plot_mvgam_trend
 - **`R/plot_mvgam_factors.R`** (1 functions) - Plotting and visualization
   - Key functions: plot_mvgam_factors
+- **`R/plot_mvgam_pterms.R`** (1 functions) - Plotting and visualization
+  - Key functions: plot_mvgam_pterms
+- **`R/plot_mvgam_smooth.R`** (1 functions) - Plotting and visualization
+  - Key functions: plot_mvgam_smooth
+- **`R/plot_mvgam_trend.R`** (1 functions) - Trend modeling
+  - Key functions: plot_mvgam_trend
+- **`R/plot_mvgam_randomeffects.R`** (1 functions) - Plotting and visualization
+  - Key functions: plot_mvgam_randomeffects
+- **`R/plot_mvgam_resids.R`** (1 functions) - Plotting and visualization
+  - Key functions: plot_mvgam_resids
 
 ## Function Location Quick Reference
 
@@ -388,14 +386,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **extract_response_from_formula()** (internal)
 - **extract_variable_name()** (internal)
 - **has_mvbind_response()** (internal)
-
-### `R/conditional_effects.R`:
-- **conditional_effects.mvgam()** (internal)
-- **decimalplaces()** (internal)
-- **plot.mvgam_conditional_effects()** (internal)
-- **print.mvgam_conditional_effects()** (internal)
-- **roundlabs()** (internal)
-- **split_termlabs()** (internal)
 
 ### `R/dynamic.R`:
 - **dynamic()** (exported)
