@@ -31,7 +31,7 @@
                                 "parse_nonlinear_manually":  "parse_nonlinear_manually \u003c- function(formula) {",
                                 "is_multivariate_formula":  "is_multivariate_formula \u003c- function(formula) {",
                                 "extract_mvbind_responses":  "extract_mvbind_responses \u003c- function(formula) {",
-                                "extract_variable_name":  "extract_variable_name \u003c- function(expr) {",
+                                "extract_variable_name":  "extract_variable_name \u003c- function(expr, max_depth = 10) {",
                                 "extract_response_trends":  "extract_response_trends \u003c- function(trend_formula, response_names, validate_separate = FALSE) {",
                                 "has_mvbind_response":  "has_mvbind_response \u003c- function(formula) {",
                                 "handle_nonlinear_model":  "handle_nonlinear_model \u003c- function(formula, trend_specs = NULL) {",
