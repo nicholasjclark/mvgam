@@ -1,16 +1,16 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-09-16 11:04:41  
+**Generated:** 2025-09-16 11:06:24  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
-- **Total Files:** 56
-- **Total Functions:** 419
+- **Total Files:** 54
+- **Total Functions:** 407
 - **Exported Functions:** 68
-- **Internal Functions:** 377
-- **S3 Methods:** 43
+- **Internal Functions:** 365
+- **S3 Methods:** 37
 - **S3 Classes:** 24
 
 ## External Dependencies
@@ -50,8 +50,6 @@
 
 ### Key S3 Methods
 - **as()**: array.mvgam, data.frame.mvgam, matrix.mvgam
-- **find_predictors()**: mvgam, mvgam_prefit
-- **get_data()**: mvgam, mvgam_prefit
 - **get_prior()**: brmsformula, default, formula, mvgam_formula
 - **is()**: mvgam_trend, trend_param
 - **plot()**: mvgam, mvgam_fevd, mvgam_forecast, mvgam_irf, mvgam_lfo, mvgam_residcor
@@ -146,36 +144,32 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### Core Files
 - **`R/mvgam_core.R`** (25 functions) - Core package functionality
   - Key functions: mvgam, mvgam_single_dataset, generate_combined_stancode_and_data, create_mvgam_from_combined_fit, create_observation_brmsfit, create_trend_brmsfit, extract_mvgam_components, mvgam_multiple, validate_multiple_imputation_datasets, fit_multiple_imputation_models, mvgam_single_imputation, pool_mvgam_fits, apply_rubins_rules, create_pooled_mvgam, extract_trend_parameters (+ 10 more)
-- **`R/marginaleffects.mvgam.R`** (10 functions) - Marginal effects
-  - Key functions: get_coef.mvgam, set_coef.mvgam, get_vcov.mvgam, get_predict.mvgam, get_data.mvgam, error, get_data.mvgam_prefit, error, find_predictors.mvgam, find_predictors.mvgam_prefit
 - **`R/as.data.frame.mvgam.R`** (10 functions) - Data documentation and loading
   - Key functions: as_draws.mvgam, as_draws_matrix.mvgam, as_draws_df.mvgam, as_draws_array.mvgam, as_draws_list.mvgam, as_draws_rvars.mvgam, as.data.frame.mvgam, as.matrix.mvgam, as.array.mvgam, validate_variables
-- **`R/print.mvgam.R`** (7 functions) - Print methods for objects
-  - Key functions: stancode.mvgam, stancode.mvgam_prefit, print.mvgamstancode, print.mvgam_formula, print_model_specification_simple, print.mvgam, print.mvgam_prefit
 - **`R/lfo_cv.mvgam.R`** (7 functions)
   - Key functions: lfo_cvlog_sum_exp log_mean_exp lfo_cv.mvgam plot.mvgam_lfo cv_split sum_rows (+ 6 more)
+- **`R/print.mvgam.R`** (7 functions) - Print methods for objects
+  - Key functions: stancode.mvgam, stancode.mvgam_prefit, print.mvgamstancode, print.mvgam_formula, print_model_specification_simple, print.mvgam, print.mvgam_prefit
 - **`R/loo.mvgam.R`** (6 functions)
   - Key functions: loo.mvgam, loo_compare.mvgam, split_mod_dots, named_list, clean_ll, samp_noinf
+- **`R/ppc.mvgam.R`** (5 functions)
+  - Key functions: ppc, pp_check.mvgam, ppc.mvgam, ecdf_plotdat, is_like_factor
 - **`R/sim_mvgam.R`** (5 functions)
   - Key functions: sim_mvgamperiodic_gp lkj_corr sim_seasonal random_Sigma (+ 4 more)
 - **`R/irf.mvgam.R`** (5 functions)
   - Key functions: irfirf.mvgam gen_irf var_phi var_psi (+ 4 more)
-- **`R/ppc.mvgam.R`** (5 functions)
-  - Key functions: ppc, pp_check.mvgam, ppc.mvgam, ecdf_plotdat, is_like_factor
 - **`R/fevd.mvgam.R`** (4 functions)
   - Key functions: fevd, fevd.mvgam, gen_fevd, var_fecov
-- **`R/interpret_mvgam.R`** (3 functions)
-  - Key functions: interpret_mvgam, dyn_to_gpspline, dyn_to_gphilbert
-- **`R/plot.mvgam.R`** (2 functions) - Plotting and visualization
-  - Key functions: plot.mvgam, plottable
 - **`R/series_to_mvgam.R`** (2 functions)
   - Key functions: series_to_mvgamxts.to.ts (+ 1 more)
+- **`R/plot.mvgam.R`** (2 functions) - Plotting and visualization
+  - Key functions: plot.mvgam, plottable
+- **`R/residuals.mvgam.R`** (1 functions) - Residual analysis
+  - Key functions: residuals.mvgam
 - **`R/pairs.mvgam.R`** (1 functions)
   - Key functions: pairs.mvgam
 - **`R/mcmc_plot.mvgam.R`** (1 functions) - Plotting and visualization
   - Key functions: mcmc_plot.mvgam
-- **`R/residuals.mvgam.R`** (1 functions) - Residual analysis
-  - Key functions: residuals.mvgam
 - **`R/index-mvgam.R`** (1 functions)
   - Key functions: variables.mvgam
 
@@ -198,18 +192,18 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: tidy.mvgam, split_hier_Sigma, augment.mvgam
 - **`R/how_to_cite.R`** (3 functions)
   - Key functions: how_to_citeprint.how_to_cite how_to_cite.mvgam (+ 2 more)
-- **`R/RcppExports.R`** (3 functions) - Exported functions
-  - Key functions: ar3_recursC, var1_recursC, varma_recursC
 - **`R/mvgam_fevd-class.R`** (3 functions) - Class definitions and methods
   - Key functions: summary.mvgam_fevd, plot.mvgam_fevd, fevd_df
-- **`R/zzz.R`** (2 functions) - Package startup and attachment
-  - Key functions: core_unloaded, mvgam_attach
+- **`R/RcppExports.R`** (3 functions) - Exported functions
+  - Key functions: ar3_recursC, var1_recursC, varma_recursC
 - **`R/mvgam_irf-class.R`** (2 functions) - Class definitions and methods
   - Key functions: summary.mvgam_irf, plot.mvgam_irf
-- **`R/ordinate.jsdgam.R`** (2 functions)
-  - Key functions: ordinateordinate.jsdgam (+ 1 more)
+- **`R/zzz.R`** (2 functions) - Package startup and attachment
+  - Key functions: core_unloaded, mvgam_attach
 - **`R/stability.R`** (2 functions)
   - Key functions: stabilitystability.mvgam (+ 1 more)
+- **`R/ordinate.jsdgam.R`** (2 functions)
+  - Key functions: ordinateordinate.jsdgam (+ 1 more)
 - **`R/dynamic.R`** (1 functions)
   - Key functions: dynamic
 - **`R/mvgam_forecast-class.R`** (1 functions) - Class definitions and methods
@@ -239,18 +233,18 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: plot_mvgam_uncertaintyintersect_hist (+ 1 more)
 - **`R/plot_mvgam_fc.R`** (2 functions) - Plotting and visualization
   - Key functions: plot_mvgam_fcplot.mvgam_forecast (+ 1 more)
-- **`R/plot_mvgam_factors.R`** (1 functions) - Plotting and visualization
-  - Key functions: plot_mvgam_factors
+- **`R/plot_mvgam_randomeffects.R`** (1 functions) - Plotting and visualization
+  - Key functions: plot_mvgam_randomeffects
 - **`R/plot_mvgam_pterms.R`** (1 functions) - Plotting and visualization
   - Key functions: plot_mvgam_pterms
 - **`R/plot_mvgam_smooth.R`** (1 functions) - Plotting and visualization
   - Key functions: plot_mvgam_smooth
 - **`R/plot_mvgam_trend.R`** (1 functions) - Trend modeling
   - Key functions: plot_mvgam_trend
-- **`R/plot_mvgam_randomeffects.R`** (1 functions) - Plotting and visualization
-  - Key functions: plot_mvgam_randomeffects
 - **`R/plot_mvgam_resids.R`** (1 functions) - Plotting and visualization
   - Key functions: plot_mvgam_resids
+- **`R/plot_mvgam_factors.R`** (1 functions) - Plotting and visualization
+  - Key functions: plot_mvgam_factors
 
 ## Function Location Quick Reference
 
@@ -321,9 +315,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 
 ### `R/brms_integration.R` (1 potentially unused):
 - **handle_nonlinear_model()** (internal, never called)
-
-### `R/interpret_mvgam.R` (1 potentially unused):
-- **interpret_mvgam()** (internal, never called)
 
 ### `R/loo.mvgam.R` (1 potentially unused):
 - **samp_noinf()** (internal, never called)
@@ -409,11 +400,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### `R/index-mvgam.R`:
 - **variables.mvgam()** (internal)
 
-### `R/interpret_mvgam.R`:
-- **dyn_to_gphilbert()** (internal)
-- **dyn_to_gpspline()** (internal)
-- **interpret_mvgam()** (internal)
-
 ### `R/irf.mvgam.R`:
 - **gen_irf()** (internal)
 - **irf()** (exported)
@@ -445,17 +431,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **generate_stan_components_mvgam_formula()** (internal)
 - **stancode.mvgam_formula()** (internal)
 - **standata.mvgam_formula()** (internal)
-
-### `R/marginaleffects.mvgam.R`:
-- **error()** (internal)
-- **find_predictors.mvgam()** (internal)
-- **find_predictors.mvgam_prefit()** (internal)
-- **get_coef.mvgam()** (internal)
-- **get_data.mvgam()** (internal)
-- **get_data.mvgam_prefit()** (internal)
-- **get_predict.mvgam()** (internal)
-- **get_vcov.mvgam()** (internal)
-- **set_coef.mvgam()** (internal)
 
 ### `R/mcmc_plot.mvgam.R`:
 - **mcmc_plot.mvgam()** (internal)

@@ -1,4 +1,9 @@
-// generated with brms 2.22.9
+// Expected Stan code for:
+//   mf <- mvgam_formula(
+//    formula = y ~ gp(x, k = 5),
+//    trend_formula = ~ -1 + gp(temperature, k = 6) + AR(p = c(1, 12))
+//  )
+//  stancode(mf, data = test_data$univariate, validate = FALSE)
 
 functions {
   /* Spectral density function of a Gaussian process

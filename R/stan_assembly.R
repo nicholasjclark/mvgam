@@ -1500,10 +1500,12 @@ inject_multivariate_trends_into_linear_predictors <- function(
 #' @noRd
 generate_base_brms_standata <- function(formula, data, family = gaussian(),
                                        stanvars = NULL) {
-  # Accept both regular formulas and brms multivariate formulas
+  # Accept both regular formulas and brms formula objects
   checkmate::assert(
     checkmate::check_class(formula, "formula"),
+    checkmate::check_class(formula, "brmsformula"),
     checkmate::check_class(formula, c("mvbrmsformula", "bform")),
+    combine = "or",
     .var.name = "formula"
   )
   checkmate::assert_data_frame(data)

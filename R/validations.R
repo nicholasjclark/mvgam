@@ -1,3 +1,150 @@
+#' Cache Formula Latent Parameters
+#'
+#' @description
+#' Extract and cache latent parameters from brmsformula objects to avoid
+#' repetitive parsing during validation. Caches parameters from pforms
+#' (distributional parameters) and nlpars (nonlinear parameters).
+#'
+#' @param formula A formula object, potentially with brmsformula structure
+#' @return Same formula object with cached latent parameters as attributes
+#' @noRd
+#'
+#' @examples
+#' # Internal usage only
+#' formula <- brms::bf(y ~ x, sigma ~ z, nl = TRUE)  
+#' cached_formula <- cache_formula_latent_params(formula)
+cache_formula_latent_params <- function(formula) {
+  # Input validation
+  if (is.null(formula)) {
+    return(formula)
+  }
+  
+  checkmate::assert(
+    checkmate::check_formula(formula),
+    checkmate::check_class(formula, "brmsformula"),
+    checkmate::check_class(formula, "mvbrmsformula"),
+    combine = "or"
+  )
+  
+  # Skip if already cached (avoid redundant processing)
+  existing_cache <- attr(formula, "mvgam_latent_params")
+  if (!is.null(existing_cache) && !is.null(attr(formula, "mvgam_cache_version"))) {
+    return(formula)
+  }
+  
+  # Initialize latent parameter collection
+  latent_params <- character()
+  
+  # Extract latent parameters based on formula type
+  if (inherits(formula, "brmsformula")) {
+    # Extract distributional parameters (pforms: sigma, nu, etc.)
+    if (!is.null(formula$pforms) && length(formula$pforms) > 0) {
+      pform_params <- names(formula$pforms)
+      if (!is.null(pform_params)) {
+        latent_params <- c(latent_params, pform_params)
+      }
+    }
+    
+    # Extract nonlinear parameters (nlpars) if present
+    if (!is.null(formula$nlpars) && length(formula$nlpars) > 0) {
+      nlpar_params <- names(formula$nlpars)
+      if (!is.null(nlpar_params)) {
+        latent_params <- c(latent_params, nlpar_params)
+      }
+    }
+  }
+  
+  # Clean and deduplicate parameters
+  latent_params <- unique(latent_params[nzchar(latent_params)])
+  
+  # Cache results as attributes
+  attr(formula, "mvgam_latent_params") <- latent_params
+  attr(formula, "mvgam_cache_version") <- "1.0"
+  attr(formula, "mvgam_cache_timestamp") <- Sys.time()
+  
+  return(formula)
+}
+
+#' Filter Required Variables Using Formula Metadata
+#'
+#' @description
+#' Remove latent parameters from variable requirements using cached formula
+#' metadata. Prevents validation errors for model-defined parameters that
+#' don't exist in user data.
+#'
+#' @param required_vars Character vector of required variable names
+#' @param formula Formula object with potential cached metadata
+#' @return Character vector with latent parameters filtered out
+#' @noRd
+#'
+#' @examples
+#' # Internal usage only
+#' required_vars <- c("x", "y", "sigma", "nu")
+#' formula <- brms::bf(y ~ x, sigma ~ z)
+#' cached_formula <- cache_formula_latent_params(formula)
+#' filtered_vars <- filter_required_variables(required_vars, cached_formula)
+#' # Returns: c("x", "y") - sigma filtered out as latent parameter
+filter_required_variables <- function(required_vars, formula = NULL) {
+  # Input validation
+  checkmate::assert_character(required_vars, any.missing = FALSE)
+  
+  # Early return for edge cases
+  if (length(required_vars) == 0) {
+    return(character())
+  }
+  
+  if (is.null(formula)) {
+    return(required_vars)
+  }
+  
+  checkmate::assert(
+    checkmate::check_formula(formula),
+    checkmate::check_class(formula, "brmsformula"),  
+    checkmate::check_class(formula, "mvbrmsformula"),
+    combine = "or"
+  )
+  
+  # Extract latent parameters for filtering
+  latent_params <- character()
+  
+  # Primary: Use cached metadata if available
+  cached_latent <- attr(formula, "mvgam_latent_params")
+  cache_version <- attr(formula, "mvgam_cache_version")
+  
+  if (!is.null(cached_latent) && !is.null(cache_version)) {
+    latent_params <- cached_latent
+  } else {
+    # Fallback: Direct extraction for uncached formulas
+    if (inherits(formula, "brmsformula")) {
+      fallback_params <- character()
+      
+      if (!is.null(formula$pforms) && length(formula$pforms) > 0) {
+        pform_names <- names(formula$pforms)
+        if (!is.null(pform_names)) {
+          fallback_params <- c(fallback_params, pform_names)
+        }
+      }
+      
+      if (!is.null(formula$nlpars) && length(formula$nlpars) > 0) {
+        nlpar_names <- names(formula$nlpars)
+        if (!is.null(nlpar_names)) {
+          fallback_params <- c(fallback_params, nlpar_names)
+        }
+      }
+      
+      latent_params <- unique(fallback_params[nzchar(fallback_params)])
+    }
+  }
+  
+  # Filter out latent parameters from requirements
+  if (length(latent_params) > 0) {
+    filtered_vars <- setdiff(required_vars, latent_params)
+    return(filtered_vars)
+  }
+  
+  return(required_vars)
+}
+
 #' Validate Nonlinear Trend Compatibility
 #'
 #' @description
@@ -77,138 +224,6 @@ validate_required_variables <- function(data, required_vars, context = "data", f
   }
 
   invisible(TRUE)
-}
-
-# Variable Requirements System for mvgam
-# Internal performance optimization to consolidate formula parsing
-
-#' Create Variable Requirements List
-#' 
-#' Creates a lightweight structure containing all variable requirements
-#' for mvgam formula processing. Designed for internal use to consolidate
-#' the 20+ scattered terms() calls and 10+ all.vars() calls throughout
-#' the codebase.
-#' 
-#' @param response_vars Character vector of response variable names
-#' @param time_vars Character vector of time variable names
-#' @param series_vars Character vector of series variable names
-#' @param grouping_vars Character vector of grouping variable names
-#' @param capacity_vars Character vector of capacity variable names  
-#' @param context Character description of where requirements were extracted
-#' @param metadata List with formula metadata (has_nonlinear, multivariate)
-#' 
-#' @return Named list with variable requirements
-#' @noRd
-create_variable_requirements <- function(response_vars = character(0),
-                                       time_vars = character(0),
-                                       series_vars = character(0), 
-                                       grouping_vars = character(0),
-                                       capacity_vars = character(0),
-                                       context = "unknown",
-                                       metadata = list()) {
-  
-  # Input validation using checkmate
-  checkmate::assert_character(response_vars, null.ok = TRUE)
-  checkmate::assert_character(time_vars, null.ok = TRUE)
-  checkmate::assert_character(series_vars, null.ok = TRUE)
-  checkmate::assert_character(grouping_vars, null.ok = TRUE)
-  checkmate::assert_character(capacity_vars, null.ok = TRUE)
-  checkmate::assert_string(context)
-  checkmate::assert_list(metadata)
-  
-  # Combine all unique variables
-  all_vars <- unique(c(response_vars, time_vars, series_vars, 
-                      grouping_vars, capacity_vars))
-  
-  # Default metadata with defensive copying
-  metadata_copy <- metadata
-  if (is.null(metadata_copy$has_nonlinear)) {
-    metadata_copy$has_nonlinear <- FALSE
-  }
-  if (is.null(metadata_copy$multivariate)) {
-    metadata_copy$multivariate <- FALSE
-  }
-  
-  # Return lightweight named list
-  list(
-    response_vars = response_vars,
-    time_vars = time_vars,
-    series_vars = series_vars,
-    grouping_vars = grouping_vars,
-    capacity_vars = capacity_vars,
-    all_vars = all_vars,
-    context = context,
-    metadata = metadata_copy
-  )
-}
-
-#' Extract Variables from Formula Objects
-#' 
-#' Consolidates formula parsing to replace scattered all.vars() and terms() 
-#' calls throughout the mvgam codebase. Single point for extracting all
-#' variable requirements from formula and trend_formula.
-#' 
-#' @param formula Formula object (standard R formula)
-#' @param trend_formula Trend formula (optional)
-#' @param data Data frame (optional, for validation)
-#' 
-#' @return Named list from create_variable_requirements()
-#' @noRd  
-extract_formula_variables <- function(formula, trend_formula = NULL, data = NULL) {
-  
-  # Input validation
-  checkmate::assert_class(formula, "formula", null.ok = FALSE)
-  checkmate::assert_class(trend_formula, "formula", null.ok = TRUE)
-  checkmate::assert_data_frame(data, null.ok = TRUE)
-  
-  # Extract response variables using base R
-  if (length(formula) < 2 || is.null(formula[[2]])) {
-    stop(insight::format_error("Invalid formula: missing response variable"))
-  }
-  response_vars <- all.vars(formula[[2]])
-  
-  # Extract predictor variables from observation formula  
-  obs_vars <- character(0)
-  if (length(formula) >= 3 && !is.null(formula[[3]])) {
-    obs_vars <- all.vars(formula[[3]])
-  }
-  
-  # Extract trend-specific variables with proper validation
-  trend_vars <- character(0)
-  time_vars <- character(0)
-  series_vars <- character(0)
-  
-  if (!is.null(trend_formula)) {
-    if (length(trend_formula) >= 3 && !is.null(trend_formula[[3]])) {
-      trend_vars <- all.vars(trend_formula[[3]])
-    }
-    
-    # Use standard defaults for time/series variables
-    # Will be enhanced in T2.2 and T2.3 with proper extraction logic
-    time_vars <- "time" 
-    series_vars <- "series"
-  }
-  
-  # Combine variable categories (basic implementation for T1.1)
-  grouping_vars <- character(0)
-  capacity_vars <- character(0)
-  
-  # Create basic metadata 
-  metadata <- list(
-    has_nonlinear = inherits(formula, "brmsformula") && !is.null(attr(formula, "nl")),
-    multivariate = length(response_vars) > 1
-  )
-  
-  # Create and return requirements object
-  create_variable_requirements(
-    response_vars = response_vars,
-    time_vars = time_vars,
-    series_vars = series_vars,
-    grouping_vars = grouping_vars,
-    capacity_vars = capacity_vars,
-    context = "extract_formula_variables",
-    metadata = metadata
-  )
 }
 
 #' Apply Rule-Based Validation Dispatch
@@ -317,7 +332,7 @@ get_validation_rule_dispatch_table <- function() {
 #' @param data Data frame with time series data
 #' @return Enhanced trend specification
 #' @noRd
-validate_trend_grouping <- function(trend_spec, data) {
+validate_trend_grouping <- function(trend_spec, data, cached_formulas = NULL) {
 
   # Process grouping arguments if present
   if (!is.null(trend_spec$gr) && trend_spec$gr != 'NA') {
@@ -330,7 +345,11 @@ validate_trend_grouping <- function(trend_spec, data) {
     if (!is.null(trend_spec$subgr) && trend_spec$subgr != 'NA') {
       required_vars <- c(required_vars, trend_spec$subgr)
     }
-    validate_required_variables(data, required_vars, "grouping data")
+    
+    # Filter variables using cached formula metadata
+    formula_to_use <- if (!is.null(cached_formulas)) cached_formulas$formula else NULL
+    filtered_vars <- filter_required_variables(required_vars, formula_to_use)
+    validate_required_variables(data, filtered_vars, "grouping data")
   }
 
   return(trend_spec)
@@ -1165,12 +1184,16 @@ validate_setup_components <- function(components) {
 #' @param silent Verbosity level
 #' @return Invisible TRUE if valid, stops with error if invalid
 #' @noRd
-validate_time_series_for_trends <- function(data, trend_specs, silent = 1, response_vars = NULL) {
+validate_time_series_for_trends <- function(data, trend_specs, silent = 1, response_vars = NULL, cached_formulas = NULL) {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_list(trend_specs)
   # Validate response_vars parameter if provided
   if (!is.null(response_vars)) {
     checkmate::assert_character(response_vars, min.len = 1, any.missing = FALSE, null.ok = TRUE)
+  }
+  # Validate cached_formulas parameter if provided
+  if (!is.null(cached_formulas)) {
+    checkmate::assert_list(cached_formulas)
   }
 
   # Extract variable names from trend specification
@@ -1194,7 +1217,8 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1, respo
     time_var = time_var,
     series_var = series_var,
     trend_type = trend_type,
-    response_vars = response_vars  # Pass response variables for mapping generation
+    response_vars = response_vars,  # Pass response variables for mapping generation
+    cached_formulas = cached_formulas
   )
 
   # Additional validation using existing mvgam infrastructure
@@ -1285,7 +1309,7 @@ validate_trend_components <- function(trend_components) {
 #' @param trend_specs Optional trend specification list for enhanced metadata
 #' @return List with time series dimensions and optional enhanced metadata
 #' @noRd
-extract_time_series_dimensions <- function(data, time_var = "time", series_var = "series", trend_type = NULL, trend_specs = NULL, response_vars = NULL) {
+extract_time_series_dimensions <- function(data, time_var = "time", series_var = "series", trend_type = NULL, trend_specs = NULL, response_vars = NULL, cached_formulas = NULL) {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_string(time_var)
   checkmate::assert_string(series_var)
@@ -1298,7 +1322,9 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   }
 
   # Validate required variables exist
-  validate_required_variables(data, c(time_var, series_var), "time series data")
+  formula_to_use <- if (!is.null(cached_formulas)) cached_formulas$formula else NULL
+  filtered_vars <- filter_required_variables(c(time_var, series_var), formula_to_use)
+  validate_required_variables(data, filtered_vars, "time series data")
 
   # Calculate core dimensions from data
   unique_times <- unique(data[[time_var]])
@@ -1380,7 +1406,9 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
 
     for (resp_var in response_vars) {
       # Validate response variable exists in data
-      validate_required_variables(data, resp_var, "response mapping data")
+      formula_to_use <- if (!is.null(cached_formulas)) cached_formulas$formula else NULL
+      filtered_vars <- filter_required_variables(resp_var, formula_to_use)
+      validate_required_variables(data, filtered_vars, "response mapping data")
 
       # Generate mapping for this response variable using existing function
       mapping <- generate_obs_trend_mapping(
@@ -1388,7 +1416,8 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
         response_var = resp_var,
         time_var = time_var,
         series_var = series_var,
-        dimensions = dimensions  # Pass already-calculated dimensions
+        dimensions = dimensions,  # Pass already-calculated dimensions
+        cached_formulas = cached_formulas
       )
 
       # Store mapping with response variable name as key
@@ -1508,7 +1537,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
 #' @return List containing obs_trend_time and obs_trend_series arrays for Stan
 #' @noRd
 generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
-                                      series_var = "series", dimensions = NULL) {
+                                      series_var = "series", dimensions = NULL, cached_formulas = NULL) {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_string(response_var)
   checkmate::assert_string(time_var)
@@ -1527,11 +1556,13 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
   }
 
   # Validate required columns exist
-  validate_required_variables(data, c(response_var, time_var, series_var), "mapping data")
+  formula_to_use <- if (!is.null(cached_formulas)) cached_formulas$formula else NULL
+  filtered_vars <- filter_required_variables(c(response_var, time_var, series_var), formula_to_use)
+  validate_required_variables(data, filtered_vars, "mapping data")
 
   # Extract dimensions if not provided
   if (is.null(dimensions)) {
-    dimensions <- extract_time_series_dimensions(data, time_var, series_var)
+    dimensions <- extract_time_series_dimensions(data, time_var, series_var, cached_formulas = cached_formulas)
   }
 
   # Identify non-missing observations (brms will only use these)
