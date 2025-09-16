@@ -3069,6 +3069,17 @@
                                                                            "y"
                                                                        ]
                                                      },
+                              "validate_required_variables":  {
+                                                                  "s3_class":  "",
+                                                                  "s3_method":  "",
+                                                                  "signature":  "validate_required_variables \u003c- function(data, required_vars, context = \"data\") {",
+                                                                  "is_s3_method":  false,
+                                                                  "arguments":  [
+                                                                                    "data",
+                                                                                    "required_vars",
+                                                                                    "context"
+                                                                                ]
+                                                              },
                               "extract_assignment_target":  {
                                                                 "s3_class":  "",
                                                                 "s3_method":  "",
@@ -4120,6 +4131,7 @@
                                                    ],
                         "R/validations.R":  [
                                                 "validate_nonlinear_trend_compatibility",
+                                                "validate_required_variables",
                                                 "apply_validation_rules",
                                                 "process_trend_validation_rules",
                                                 "dispatch_validation_rule",
@@ -5138,6 +5150,7 @@
                       "as_one_logical":  "R/validations.R",
                       "process_capacity_parameter":  "R/validations.R",
                       "plot.mvgam_conditional_effects":  "R/conditional_effects.R",
+                      "validate_required_variables":  "R/validations.R",
                       "extract_assignment_target":  "R/mu_expression_analysis.R",
                       "plot_mvgam_randomeffects":  "R/plot_mvgam_randomeffects.R",
                       "c.trend_param":  "R/trend_system.R",
@@ -5267,7 +5280,7 @@
                                      "filter_pw_forecast_params":  "R/trend_system.R",
                                      "validate_nonlinear_trend_compatibility":  "R/validations.R",
                                      "sort_stanvars":  "R/stan_assembly.R",
-                                     "validate_mvgam_trend":  "R/validations.R",
+                                     "validate_autocor_separation":  "R/validations.R",
                                      "how_to_cite.mvgam":  "R/how_to_cite.R",
                                      "decimalplaces":  "R/conditional_effects.R",
                                      "smooth.construct.moi.smooth.spec":  "R/monotonic.R",
@@ -5480,6 +5493,7 @@
                                      "as_one_logical":  "R/validations.R",
                                      "process_capacity_parameter":  "R/validations.R",
                                      "plot.mvgam_conditional_effects":  "R/conditional_effects.R",
+                                     "validate_required_variables":  "R/validations.R",
                                      "extract_assignment_target":  "R/mu_expression_analysis.R",
                                      "plot_mvgam_randomeffects":  "R/plot_mvgam_randomeffects.R",
                                      "validate_univariate_series_time":  "R/validations.R",
@@ -5555,6 +5569,7 @@
                                      "residual_cor.jsdgam":  "R/residual_cor.R",
                                      "sum_rows":  "R/lfo_cv.mvgam.R",
                                      "rw_trend_properties":  "R/trend_system.R",
+                                     "validate_mvgam_trend":  "R/validations.R",
                                      "cv_split":  "R/lfo_cv.mvgam.R",
                                      "get_trend_info":  "R/trend_system.R",
                                      "get_factor_compatible_trends":  "R/trend_system.R",
@@ -5926,6 +5941,7 @@
                                 "as_one_logical":  "as_one_logical = function(x, allow_na = FALSE) {",
                                 "process_capacity_parameter":  "process_capacity_parameter \u003c- function(cap, data) {",
                                 "plot.mvgam_conditional_effects":  "plot.mvgam_conditional_effects = function(x, plot = TRUE, ask = FALSE, ...) {",
+                                "validate_required_variables":  "validate_required_variables \u003c- function(data, required_vars, context = \"data\") {",
                                 "extract_assignment_target":  "extract_assignment_target \u003c- function(expr) {",
                                 "plot_mvgam_randomeffects":  "plot_mvgam_randomeffects = function(object, trend_effects = FALSE) {",
                                 "c.trend_param":  "c.trend_param \u003c- function(x, ..., replace = FALSE) {",
@@ -6209,8 +6225,7 @@
                                                                         "mvgam_single_imputation"
                                                                     ],
                                  "validate_obs_formula_brms":  [
-                                                                   "validate_brms_formula",
-                                                                   "validate_autocor_separation"
+                                                                   "validate_brms_formula"
                                                                ],
                                  "get_parameter_type_default_prior":  [
                                                                           "get_default_trend_parameter_prior",
@@ -6638,6 +6653,9 @@
                                  "validate_trend_properties":  [
                                                                    "auto_register_trend_types"
                                                                ],
+                                 "validate_required_variables":  [
+                                                                     "validate_trend_grouping"
+                                                                 ],
                                  "parse_trend_formula":  [
                                                              "parse_multivariate_trends",
                                                              "extract_trend_priors",
@@ -6788,8 +6806,7 @@
                                                                                  "extract_response_trends"
                                                                              ],
                                  "validate_trend_formula_brms":  [
-                                                                     "parse_multivariate_trends",
-                                                                     "validate_autocor_separation"
+                                                                     "parse_multivariate_trends"
                                                                  ],
                                  "process_variable":  [
                                                           "detect_glm_usage",
@@ -6897,22 +6914,22 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-09-15 15:58:23",
+                     "generated":  "2025-09-16 09:03:47",
                      "commit_hash":  "pending",
-                     "cached_files":  54,
+                     "cached_files":  56,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
-                     "total_functions":  422,
+                     "total_functions":  423,
                      "exported_functions":  68,
                      "s3_methods_count":  44,
                      "s3_classes_count":  25,
                      "dynamic_references":  33,
                      "package_name":  "mvgam",
                      "potentially_unused_functions":  27,
-                     "changed_files":  3,
+                     "changed_files":  1,
                      "total_files":  57,
-                     "zero_dependency_functions":  327
+                     "zero_dependency_functions":  329
                  },
     "dependencies":  {
 
@@ -7278,10 +7295,6 @@
                                                                       "is_registry_initialized",
                                                                       "register_core_trends"
                                                                   ],
-                                  "validate_autocor_separation":  [
-                                                                      "validate_obs_formula_brms",
-                                                                      "validate_trend_formula_brms"
-                                                                  ],
                                   "validate_mapping_arrays":  "generate_obs_trend_mapping",
                                   "register_trend_type":  "get_default_incompatibility_reason",
                                   "extract_comprehensive_variable_references":  "create_analysis_context",
@@ -7325,7 +7338,10 @@
                                                                   "normalize_trend_type"
                                                               ],
                                   "as_draws_df.mvgam":  "validate_variables",
-                                  "validate_trend_grouping":  "validate_grouping_arguments",
+                                  "validate_trend_grouping":  [
+                                                                  "validate_grouping_arguments",
+                                                                  "validate_required_variables"
+                                                              ],
                                   "is_multivariate_formula":  "has_mvbind_response",
                                   "create_mvgam_from_combined_fit":  [
                                                                          "create_observation_brmsfit",

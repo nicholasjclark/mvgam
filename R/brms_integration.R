@@ -417,12 +417,23 @@ has_mvbind_response <- function(formula) {
 #'
 #' @seealso \code{\link{is_multivariate_formula}}, \code{\link{parse_multivariate_trends}}
 #' @noRd
+#' Extract Response Variable Names from Formula
+#'
+#' @description
+#' Extracts response variable names from various formula types including
+#' standard formulas, brmsformula objects, multivariate formulas, and
+#' nonlinear formulas. Handles mvbind() multivariate binding and properly
+#' distinguishes between response variables and model parameters.
+#'
+#' @param formula A formula, brmsformula, mvbrmsformula, or bform object
+#' @return Character vector of response variable names
+#' @examples
+#' extract_response_names(y ~ x)  # "y"
+#' extract_response_names(mvbind(a, b) ~ x)  # c("a", "b") 
+#' extract_response_names(bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE))  # "y"
+#' @noRd
 extract_response_names <- function(formula) {
-  # Parameter validation - support all brms formula types
-  checkmate::assert(
-    inherits(formula, c("formula", "brmsformula", "mvbrmsformula", "bform")),
-    .var.name = "formula"
-  )
+  checkmate::assert_multi_class(formula, c("formula", "brmsformula", "mvbrmsformula", "bform"))
 
   # Case 1: mvbrmsformula - use $responses field directly (brms standard)
   # This covers: bf() + bf() combinations and mvbf() objects
@@ -432,14 +443,28 @@ extract_response_names <- function(formula) {
     }
   }
 
-  # Case 2: brmsformula with pforms - combine main + additional responses
-  # This covers: bf(y1 ~ x, y2 ~ z) pattern
+  # Case 2: brmsformula - handle both regular and nonlinear formulas
   if (inherits(formula, "brmsformula")) {
+    # Check for nonlinear formula using existing detection
     if (!is.null(formula$pforms) && length(formula$pforms) > 0) {
-      main_resp <- formula$resp
-      additional_resp <- names(formula$pforms)
-      return(c(main_resp, additional_resp))
+      # For nonlinear formulas, pforms contain parameter definitions, not responses
+      # Return only the main response variable
+      if (is.null(formula$resp)) {
+        stop(insight::format_error(
+          "Nonlinear formula missing response variable.",
+          "Ensure the formula has a valid response on the left-hand side."
+        ), call. = FALSE)
+      }
+      return(formula$resp)
     }
+    # Regular brmsformula - return response
+    if (is.null(formula$resp)) {
+      stop(insight::format_error(
+        "brmsformula missing response variable.",
+        "Ensure the formula has a valid response specification."
+      ), call. = FALSE)
+    }
+    return(formula$resp)
   }
 
   # Case 3: Standard formula with mvbind binding ONLY (corrected)
@@ -506,6 +531,11 @@ extract_response_names <- function(formula) {
 #' - Complex expressions: mvbind(y1 + offset, scale(y2))
 #'
 #' @noRd
+#' Extract Response Names from mvbind() Formula
+#'
+#' @param formula A formula object that may contain mvbind() on left side
+#' @return Character vector of response names or NULL if not mvbind formula
+#' @noRd
 extract_mvbind_responses <- function(formula) {
   checkmate::assert_formula(formula)
 
@@ -517,8 +547,21 @@ extract_mvbind_responses <- function(formula) {
   # Get response expression (left side of ~)
   response_expr <- formula[[2]]
 
-  # Check if response expression is a call to mvbind
-  if (!is.call(response_expr) || as.character(response_expr[[1]])[1] != "mvbind") {
+  # Check if response expression is a call to mvbind (handle namespaced calls)
+  if (!is.call(response_expr)) {
+    return(NULL)
+  }
+  
+  # Extract function name, handling namespaced calls like mvgam::mvbind
+  call_name <- if (is.name(response_expr[[1]])) {
+    as.character(response_expr[[1]])
+  } else if (is.call(response_expr[[1]]) && identical(response_expr[[1]][[1]], quote(`::`))) {
+    as.character(response_expr[[1]][[3]])
+  } else {
+    ""
+  }
+  
+  if (call_name != "mvbind") {
     return(NULL)
   }
 
@@ -527,7 +570,10 @@ extract_mvbind_responses <- function(formula) {
 
   # Validate we have arguments
   if (length(response_args) == 0) {
-    return(NULL)
+    stop(insight::format_error(
+      "mvbind() call contains no arguments.",
+      "Provide at least one response variable: {.code mvbind(response1, response2, ...)}"
+    ), call. = FALSE)
   }
 
   # Extract variable names from each argument
@@ -540,9 +586,10 @@ extract_mvbind_responses <- function(formula) {
     var_name <- extract_variable_name(arg)
 
     if (is.null(var_name) || nchar(var_name) == 0) {
+      arg_text <- deparse(arg)
       stop(insight::format_error(
-        "Could not extract response variable name from mvbind() argument {i}.",
-        "Argument: {deparse(arg)}",
+        paste0("Could not extract response variable name from mvbind() argument ", i, "."),
+        paste0("Argument: ", arg_text),
         "Ensure all mvbind() arguments reference valid variable names."
       ), call. = FALSE)
     }
@@ -550,10 +597,18 @@ extract_mvbind_responses <- function(formula) {
     response_names[i] <- var_name
   }
 
-  # Filter out any empty names and return
-  response_names <- response_names[nchar(response_names) > 0]
+  # Validate extracted names are valid R identifiers
+  invalid_names <- !grepl("^[a-zA-Z][a-zA-Z0-9_.]*$", response_names)
+  if (any(invalid_names)) {
+    invalid_list <- response_names[invalid_names]
+    stop(insight::format_error(
+      "Invalid variable names extracted from mvbind():",
+      paste0("Invalid names: ", paste(invalid_list, collapse = ", ")),
+      "Use valid R variable names in mvbind() arguments."
+    ), call. = FALSE)
+  }
 
-  return(if (length(response_names) > 0) response_names else NULL)
+  return(response_names)
 }
 
 #' Extract Primary Variable Name from Expression
@@ -565,7 +620,18 @@ extract_mvbind_responses <- function(formula) {
 #' @param expr R expression object
 #' @return Character string with variable name, or NULL if cannot extract
 #' @noRd
-extract_variable_name <- function(expr) {
+#' Extract Primary Variable Name from Expression
+#'
+#' @param expr An R expression (name, call, or constant)
+#' @param max_depth Maximum recursion depth to prevent infinite loops
+#' @return Character string of first variable name found, or NULL
+#' @noRd
+extract_variable_name <- function(expr, max_depth = 10) {
+  # Protect against infinite recursion
+  if (max_depth <= 0) {
+    return(NULL)
+  }
+  
   # Simple variable name
   if (is.name(expr)) {
     return(as.character(expr))
@@ -578,8 +644,8 @@ extract_variable_name <- function(expr) {
       if (is.name(arg)) {
         return(as.character(arg))
       }
-      # Recursively check nested calls
-      nested_var <- extract_variable_name(arg)
+      # Recursively check nested calls with decremented depth
+      nested_var <- extract_variable_name(arg, max_depth - 1)
       if (!is.null(nested_var)) {
         return(nested_var)
       }
@@ -669,7 +735,8 @@ create_trend_base_formula <- function(trend_specs) {
 # WHY: Nonlinear models require specialized handling to determine where trend
 # effects should be injected into the parameter structure. This system enables
 # mvgam trends to work with brms nonlinear modeling capabilities while
-# maintaining proper identifiability and parameter interpretation.#' @noRd
+# maintaining proper identifiability and parameter interpretation.
+#' @noRd
 handle_nonlinear_model <- function(formula, trend_specs = NULL) {
   checkmate::assert_formula(formula)
   checkmate::assert_list(trend_specs, null.ok = TRUE)

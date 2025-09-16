@@ -31,7 +31,7 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 
 ## IMMEDIATE PRIORITIES (Updated: 2025-09-15)
 
-1. **CRITICAL: Zero-Dependency Function Investigation** - Use up to 4 parallel sub-agents to investigate all functions in `trend_system.R`, `validations.R`, `priors.R` listed as having zero reverse dependencies (in `architecture/dependency-graph.md`, section *Potentially Unused Functions*) to determine retention necessity
+1. **CRITICAL: Zero-Dependency Function Investigation** - Use up to 4 parallel sub-agents to investigate all functions in `brms_integration.R`, `trend_system.R`, `validations.R`, `priors.R` listed as having zero reverse dependencies (in `architecture/dependency-graph.md`, section *Potentially Unused Functions*) to determine retention necessity
    - **AGENT TASK**: For each function, investigate:
      a) Direct calls from exported functions or main workflow chains
      b) Dynamic dispatch usage (search for function name strings in `get()` calls)

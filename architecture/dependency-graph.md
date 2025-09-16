@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-09-15 15:58:23  
+**Generated:** 2025-09-16 09:03:47  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 57
-- **Total Functions:** 422
+- **Total Functions:** 423
 - **Exported Functions:** 68
-- **Internal Functions:** 380
+- **Internal Functions:** 381
 - **S3 Methods:** 44
 - **S3 Classes:** 25
 
@@ -140,8 +140,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/portal_data.R`** (0 functions) - Data documentation and loading
 
 ### Validation Files
-- **`R/validations.R`** (60 functions) - Input validation and checks
-  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_list_trend_formula, validate_single_trend_formula, validate_trend_formula_restrictions, validate_multivariate_trend_constraints (+ 45 more)
+- **`R/validations.R`** (61 functions) - Input validation and checks
+  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_list_trend_formula, validate_single_trend_formula, validate_trend_formula_restrictions, validate_multivariate_trend_constraints (+ 46 more)
 
 ### Core Files
 - **`R/mvgam_core.R`** (25 functions) - Core package functionality
@@ -778,6 +778,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **process_lag_parameters()** (internal)
 - **remove_trend_expressions()** (internal)
 - **validate_and_process_trend_parameters()** (internal)
+- **validate_autocor_separation()** (internal)
 - **validate_factor_compatibility()** (internal)
 - **validate_factor_levels()** (internal)
 - **validate_grouping_arguments()** (internal)
@@ -788,6 +789,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **validate_nonlinear_trend_compatibility()** (internal)
 - **validate_pos_integer()** (internal)
 - **validate_proportional()** (internal)
+- **validate_required_variables()** (internal)
 - **validate_series_time()** (internal)
 - **validate_setup_components()** (internal)
 - **validate_stan_code()** (internal)

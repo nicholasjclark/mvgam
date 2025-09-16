@@ -31,30 +31,184 @@ validate_nonlinear_trend_compatibility <- function(nl_components, trend_specs) {
 #' Validate required variables exist in data
 #'
 #' @description
-#' Shared utility function to validate that required variables exist in a data frame.
-#' Provides consistent error messaging and reduces code duplication across validation functions.
+#' Checks that all required variables are present in the provided data.
+#' Automatically filters out latent parameters from nonlinear formulas
+#' to avoid validation errors for model-defined parameters.
 #'
 #' @param data Data frame to check
 #' @param required_vars Character vector of required variable names
 #' @param context Context description for error messages
+#' @param formula Optional formula object for nonlinear parameter filtering
+#' @return Invisible TRUE if validation passes, throws error otherwise
 #' @noRd
-validate_required_variables <- function(data, required_vars, context = "data") {
+validate_required_variables <- function(data, required_vars, context = "data", formula = NULL) {
   checkmate::assert_data_frame(data)
   checkmate::assert_character(required_vars, min.len = 1)
   checkmate::assert_character(context, len = 1)
-  
+  checkmate::assert(
+    is.null(formula) || inherits(formula, "brmsformula"),
+    .var.name = "formula"
+  )
+
+  # Remove latent parameters from nonlinear formulas as they are model-defined, not data variables
+  if (!is.null(formula) && inherits(formula, "brmsformula") && !is.null(formula$pforms)) {
+    latent_params <- names(formula$pforms)
+    required_vars <- setdiff(required_vars, latent_params)
+
+    # If no variables remain after filtering, validation passes
+    if (length(required_vars) == 0) {
+      return(invisible(TRUE))
+    }
+  }
+
   missing_vars <- setdiff(required_vars, names(data))
   if (length(missing_vars) > 0) {
+    # Pre-compute strings for proper interpolation
+    missing_str <- paste(missing_vars, collapse = ", ")
+    available_str <- paste(names(data), collapse = ", ")
+
     stop(insight::format_error(
       c(
-        "Required variables not found in {context}:",
-        "x" = "Missing: {.field {missing_vars}}",
-        "i" = "Available: {.field {names(data)}}"
+        paste0("Required variables not found in ", context, ":"),
+        "x" = paste0("Missing: ", missing_str),
+        "i" = paste0("Available: ", available_str)
       )
     ), call. = FALSE)
   }
-  
+
   invisible(TRUE)
+}
+
+# Variable Requirements System for mvgam
+# Internal performance optimization to consolidate formula parsing
+
+#' Create Variable Requirements List
+#' 
+#' Creates a lightweight structure containing all variable requirements
+#' for mvgam formula processing. Designed for internal use to consolidate
+#' the 20+ scattered terms() calls and 10+ all.vars() calls throughout
+#' the codebase.
+#' 
+#' @param response_vars Character vector of response variable names
+#' @param time_vars Character vector of time variable names
+#' @param series_vars Character vector of series variable names
+#' @param grouping_vars Character vector of grouping variable names
+#' @param capacity_vars Character vector of capacity variable names  
+#' @param context Character description of where requirements were extracted
+#' @param metadata List with formula metadata (has_nonlinear, multivariate)
+#' 
+#' @return Named list with variable requirements
+#' @noRd
+create_variable_requirements <- function(response_vars = character(0),
+                                       time_vars = character(0),
+                                       series_vars = character(0), 
+                                       grouping_vars = character(0),
+                                       capacity_vars = character(0),
+                                       context = "unknown",
+                                       metadata = list()) {
+  
+  # Input validation using checkmate
+  checkmate::assert_character(response_vars, null.ok = TRUE)
+  checkmate::assert_character(time_vars, null.ok = TRUE)
+  checkmate::assert_character(series_vars, null.ok = TRUE)
+  checkmate::assert_character(grouping_vars, null.ok = TRUE)
+  checkmate::assert_character(capacity_vars, null.ok = TRUE)
+  checkmate::assert_string(context)
+  checkmate::assert_list(metadata)
+  
+  # Combine all unique variables
+  all_vars <- unique(c(response_vars, time_vars, series_vars, 
+                      grouping_vars, capacity_vars))
+  
+  # Default metadata with defensive copying
+  metadata_copy <- metadata
+  if (is.null(metadata_copy$has_nonlinear)) {
+    metadata_copy$has_nonlinear <- FALSE
+  }
+  if (is.null(metadata_copy$multivariate)) {
+    metadata_copy$multivariate <- FALSE
+  }
+  
+  # Return lightweight named list
+  list(
+    response_vars = response_vars,
+    time_vars = time_vars,
+    series_vars = series_vars,
+    grouping_vars = grouping_vars,
+    capacity_vars = capacity_vars,
+    all_vars = all_vars,
+    context = context,
+    metadata = metadata_copy
+  )
+}
+
+#' Extract Variables from Formula Objects
+#' 
+#' Consolidates formula parsing to replace scattered all.vars() and terms() 
+#' calls throughout the mvgam codebase. Single point for extracting all
+#' variable requirements from formula and trend_formula.
+#' 
+#' @param formula Formula object (standard R formula)
+#' @param trend_formula Trend formula (optional)
+#' @param data Data frame (optional, for validation)
+#' 
+#' @return Named list from create_variable_requirements()
+#' @noRd  
+extract_formula_variables <- function(formula, trend_formula = NULL, data = NULL) {
+  
+  # Input validation
+  checkmate::assert_class(formula, "formula", null.ok = FALSE)
+  checkmate::assert_class(trend_formula, "formula", null.ok = TRUE)
+  checkmate::assert_data_frame(data, null.ok = TRUE)
+  
+  # Extract response variables using base R
+  if (length(formula) < 2 || is.null(formula[[2]])) {
+    stop(insight::format_error("Invalid formula: missing response variable"))
+  }
+  response_vars <- all.vars(formula[[2]])
+  
+  # Extract predictor variables from observation formula  
+  obs_vars <- character(0)
+  if (length(formula) >= 3 && !is.null(formula[[3]])) {
+    obs_vars <- all.vars(formula[[3]])
+  }
+  
+  # Extract trend-specific variables with proper validation
+  trend_vars <- character(0)
+  time_vars <- character(0)
+  series_vars <- character(0)
+  
+  if (!is.null(trend_formula)) {
+    if (length(trend_formula) >= 3 && !is.null(trend_formula[[3]])) {
+      trend_vars <- all.vars(trend_formula[[3]])
+    }
+    
+    # Use standard defaults for time/series variables
+    # Will be enhanced in T2.2 and T2.3 with proper extraction logic
+    time_vars <- "time" 
+    series_vars <- "series"
+  }
+  
+  # Combine variable categories (basic implementation for T1.1)
+  grouping_vars <- character(0)
+  capacity_vars <- character(0)
+  
+  # Create basic metadata 
+  metadata <- list(
+    has_nonlinear = inherits(formula, "brmsformula") && !is.null(attr(formula, "nl")),
+    multivariate = length(response_vars) > 1
+  )
+  
+  # Create and return requirements object
+  create_variable_requirements(
+    response_vars = response_vars,
+    time_vars = time_vars,
+    series_vars = series_vars,
+    grouping_vars = grouping_vars,
+    capacity_vars = capacity_vars,
+    context = "extract_formula_variables",
+    metadata = metadata
+  )
 }
 
 #' Apply Rule-Based Validation Dispatch
