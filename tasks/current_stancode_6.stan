@@ -114,6 +114,7 @@ lprior += inv_gamma_lpdf(lscale_1_trend[1][1] | 1.494197, 0.056607);
 model {
   ar1_trend ~ normal(0, 0.5);
 sigma_trend ~ exponential(2);
+  to_vector(innovations_trend) ~ std_normal();
   // likelihood including constants
   if (!prior_only) {
     // initialize linear predictor term

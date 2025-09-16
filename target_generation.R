@@ -181,6 +181,23 @@ tryCatch({
 })
 
 # ============================================================================
+# TARGET 9: Nonlinear with AR trends
+# ============================================================================
+cat("Generating current_stancode_9.stan (Nonlinear AR trends)...\n")
+tryCatch({
+
+  mf9 <- mvgam_formula(
+    bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE),
+    trend_formula = ~ AR()
+  )
+  code9 <- stancode(mf9, data = test_data$univariate, validate = FALSE)
+  writeLines(code9, 'tasks/current_stancode_9.stan')
+  cat("✓ current_stancode_9.stan created\n")
+}, error = function(e) {
+  cat("✗ Error generating target 9:", conditionMessage(e), "\n")
+})
+
+# ============================================================================
 # Summary and Comparison Instructions
 # ============================================================================
 cat("\n", strrep("=", 70), "\n")
@@ -188,7 +205,7 @@ cat("TARGET GENERATION COMPLETE\n")
 cat(strrep("=", 70), "\n")
 
 cat("\nGenerated files for comparison:\n")
-generated_files <- paste0("tasks/current_stancode_", 1:8, ".stan")
+generated_files <- paste0("tasks/current_stancode_", 1:9, ".stan")
 for (file in generated_files) {
   if (file.exists(file)) {
     cat("✓", file, "\n")

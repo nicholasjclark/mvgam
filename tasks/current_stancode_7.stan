@@ -99,6 +99,7 @@ lprior += dirichlet_lpdf(simo_1_trend | con_simo_1_trend);
 model {
   ar1_trend ~ normal(0, 0.5);
 sigma_trend ~ exponential(2);
+  to_vector(innovations_trend) ~ std_normal();
   // likelihood including constants
   if (!prior_only) {
     // initialize linear predictor term

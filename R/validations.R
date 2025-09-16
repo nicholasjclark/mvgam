@@ -555,7 +555,7 @@ deparse0 <- function(expr, ...) {
 #' @return Logical indicating if formula is nonlinear
 #' @noRd
 is_nonlinear_formula <- function(formula) {
-  checkmate::assert_formula(formula)
+  checkmate::assert(inherits(formula, c("formula", "brmsformula", "brmsterms")))
 
   # Check for brms bf() structure with nl = TRUE
   if (inherits(formula, "brmsterms")) {
@@ -563,7 +563,7 @@ is_nonlinear_formula <- function(formula) {
   }
 
   if (inherits(formula, "brmsformula")) {
-    return(attr(formula, "nl") %||% FALSE)
+    return(attr(formula$formula, "nl") %||% FALSE)
   }
 
   # Check formula structure for nonlinear indicators

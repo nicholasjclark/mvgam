@@ -3804,6 +3804,14 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     components <- append_if_not_null(components, car_model_stanvar)
   }
 
+  # 3.5. Add sampling statement for CAR innovations_trend parameter
+  car_innovations_sampling_stanvar <- brms::stanvar(
+    name = "car_innovations_sampling", 
+    scode = "to_vector(innovations_trend) ~ std_normal();",
+    block = "model"
+  )
+  components <- append(components, list(car_innovations_sampling_stanvar))
+
   # 4. Add trend computation (maps lv_trend through Z if needed)
   trend_computation <- generate_trend_computation_tparameters(n_lv, n_series)
   components <- append_if_not_null(components, trend_computation)

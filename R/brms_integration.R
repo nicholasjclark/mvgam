@@ -18,7 +18,8 @@
 # WHY: Lightweight brms setup enables rapid model prototyping and validation
 # without full compilation overhead. This is essential for mvgam's two-stage
 # assembly system where brms provides the foundation and mvgam adds trends
-# through stanvars injection without modifying brms internals.#' @noRd
+# through stanvars injection without modifying brms internals.
+#' @noRd
 setup_brms_lightweight <- function(formula, data, family = gaussian(),
                                    trend_formula = NULL, stanvars = NULL,
                                    ...) {
@@ -64,7 +65,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   }
 
   # Validate brms formula compatibility
-  formula_validation <- mvgam:::validate_brms_formula(formula)
+  formula_validation <- validate_brms_formula(formula)
   if (!formula_validation$valid) {
     stop(insight::format_error(
       "Invalid brms formula structure:",
@@ -79,7 +80,6 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   }
 
   # Use mock backend for rapid setup (creates brmsfit object needed for prediction)
-  # Let brms errors bubble up naturally - no masking
   mock_setup <- brms::brm(
     formula = formula,
     data = data,
@@ -151,11 +151,10 @@ extract_brmsterms_from_setup <- function(setup_object) {
 # WHY: Multivariate models require sophisticated formula parsing to handle
 # response-specific trends and cross-series dependencies. This system enables
 # flexible trend specifications while maintaining brms compatibility for
-# multivariate response families and distributional modeling.#' @noRd
+# multivariate response families and distributional modeling.
+#' @noRd
 parse_multivariate_trends <- function(formula, trend_formula = NULL) {
   # Validate inputs - accept either regular formula or brms formula objects
-  # Note: We don't extract underlying formulas as the helper functions
-  # (is_multivariate_formula, extract_response_names) already handle all types
   checkmate::assert(
     checkmate::check_formula(formula),
     checkmate::check_class(formula, "mvbrmsformula"),
@@ -164,6 +163,12 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
     combine = "or"
   )
 
+  # Cache formula metadata for efficient validation filtering (DRY principle)
+  formula <- cache_formula_latent_params(formula)
+  if (!is.null(trend_formula)) {
+    trend_formula <- cache_formula_latent_params(trend_formula)
+  }
+
   # Handle missing trend formula
   if (is.null(trend_formula)) {
     return(list(
@@ -171,7 +176,11 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
       is_multivariate = FALSE,
       response_names = NULL,
       trend_specs = NULL,
-      base_formula = NULL
+      base_formula = NULL,
+      cached_formulas = list(
+        formula = formula,
+        trend_formula = NULL
+      )
     ))
   }
 
@@ -253,7 +262,11 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
     response_names = response_names,
     trend_specs = trend_specs,
     base_formula = base_formula,
-    validation = trend_validation
+    validation = trend_validation,
+    cached_formulas = list(
+      formula = formula,
+      trend_formula = trend_formula
+    )
   ))
 }
 
@@ -313,6 +326,11 @@ is_multivariate_formula <- function(formula) {
   # Case 2: brmsformula with additional responses (brms bf() pattern)
   # This covers: bf(y1 ~ x, y2 ~ z) with pforms field
   if (inherits(formula, "brmsformula")) {
+    # For nonlinear formulas, pforms contain parameter definitions, not responses
+    if (is_nonlinear_formula(formula)) {
+      return(FALSE)
+    }
+    
     return(!is.null(formula$pforms) && length(formula$pforms) > 0)
   }
 
@@ -429,7 +447,7 @@ has_mvbind_response <- function(formula) {
 #' @return Character vector of response variable names
 #' @examples
 #' extract_response_names(y ~ x)  # "y"
-#' extract_response_names(mvbind(a, b) ~ x)  # c("a", "b") 
+#' extract_response_names(mvbind(a, b) ~ x)  # c("a", "b")
 #' extract_response_names(bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE))  # "y"
 #' @noRd
 extract_response_names <- function(formula) {
@@ -551,7 +569,7 @@ extract_mvbind_responses <- function(formula) {
   if (!is.call(response_expr)) {
     return(NULL)
   }
-  
+
   # Extract function name, handling namespaced calls like mvgam::mvbind
   call_name <- if (is.name(response_expr[[1]])) {
     as.character(response_expr[[1]])
@@ -560,7 +578,7 @@ extract_mvbind_responses <- function(formula) {
   } else {
     ""
   }
-  
+
   if (call_name != "mvbind") {
     return(NULL)
   }
@@ -631,7 +649,7 @@ extract_variable_name <- function(expr, max_depth = 10) {
   if (max_depth <= 0) {
     return(NULL)
   }
-  
+
   # Simple variable name
   if (is.name(expr)) {
     return(as.character(expr))

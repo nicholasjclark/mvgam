@@ -121,7 +121,8 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
     validation_result <- validate_time_series_for_trends(
       data, 
       mv_spec$trend_specs,
-      response_vars = response_vars
+      response_vars = response_vars,
+      cached_formulas = mv_spec$cached_formulas
     )
     if (is.null(validation_result) || is.null(validation_result$dimensions)) {
       insight::format_error(
