@@ -2931,7 +2931,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Extract key parameters with validation
   n_series <- data_info$n_series %||% 1
   n_lv <- trend_specs$n_lv %||% n_series
-  lags <- trend_specs$lags %||% 1
+  lags <- trend_specs$p %||% 1
   ma_lags <- trend_specs$ma_lags %||% 0
   n <- data_info$n_obs
 
@@ -5176,7 +5176,7 @@ filter_block_content <- function(block_content, block_type = "model") {
       skip_line <- skip_line || any(c(
         # Actual likelihood statements
         grepl("~\\s+normal\\s*\\(", line),
-        grepl("target\\s*\\+=.*normal.*lpdf\\s*\\(", line),
+        grepl("target\\s*\\+=.*normal.*lpdf\\s*\\(\\s*Y\\s*\\|", line),
         grepl("target\\s*\\+=.*normal.*glm.*lpdf\\s*\\(", line),
         grepl("target\\s*\\+=.*multi_normal.*lpdf\\s*\\(", line),
         grepl("target\\s*\\+=.*normal.*lpdf\\s*\\([^)]*\\|", line),
@@ -5446,7 +5446,7 @@ get_stan_reserved_words <- function() {
     "append_row",
 
     # Stan probability distributions (lpdf/lpmf)
-    "normal_lpdf", "normal_id_glm_lpdf", "student_t_lpdf", "cauchy_lpdf",
+    "normal_lpdf", "std_normal_lpdf", "normal_id_glm_lpdf", "student_t_lpdf", "cauchy_lpdf",
     "double_exponential_lpdf", "logistic_lpdf", "gumbel_lpdf",
     "lognormal_lpdf", "chi_square_lpdf", "inv_chi_square_lpdf",
     "scaled_inv_chi_square_lpdf", "exponential_lpdf", "gamma_lpdf",
@@ -5465,6 +5465,7 @@ get_stan_reserved_words <- function() {
 
     # Stan distribution CDFs
     "normal_cdf", "normal_ccdf", "normal_lcdf", "normal_lccdf",
+    "std_normal_cdf", "std_normal_ccdf", "std_normal_lcdf", "std_normal_lccdf",
     "student_t_cdf", "student_t_ccdf", "student_t_lcdf", "student_t_lccdf",
     "cauchy_cdf", "cauchy_ccdf", "cauchy_lcdf", "cauchy_lccdf",
     "double_exponential_cdf", "double_exponential_ccdf",
@@ -5504,7 +5505,7 @@ get_stan_reserved_words <- function() {
     "neg_binomial_2_log_lcdf", "neg_binomial_2_log_lccdf",
 
     # Stan random number generators
-    "normal_rng", "student_t_rng", "cauchy_rng", "double_exponential_rng",
+    "normal_rng", "std_normal_rng", "student_t_rng", "cauchy_rng", "double_exponential_rng",
     "logistic_rng", "gumbel_rng", "lognormal_rng", "chi_square_rng",
     "inv_chi_square_rng", "scaled_inv_chi_square_rng", "exponential_rng",
     "gamma_rng", "inv_gamma_rng", "weibull_rng", "frechet_rng",

@@ -818,6 +818,17 @@
                                                               "is_s3_method":  false,
                                                               "arguments":  "body_lines"
                                                           },
+                              "handle_nonlinear_trend_injection":  {
+                                                                       "s3_class":  "",
+                                                                       "s3_method":  "",
+                                                                       "signature":  "handle_nonlinear_trend_injection \u003c- function(code_lines, block_info, trend_injection_code) {",
+                                                                       "is_s3_method":  false,
+                                                                       "arguments":  [
+                                                                                         "code_lines",
+                                                                                         "block_info",
+                                                                                         "trend_injection_code"
+                                                                                     ]
+                                                                   },
                               "generate_shared_innovation_stanvars":  {
                                                                           "s3_class":  "",
                                                                           "s3_method":  "",
@@ -4080,6 +4091,7 @@
                                                   "find_stan_block",
                                                   "inject_trend_into_linear_predictor",
                                                   "insert_after_mu_lines_in_model_block",
+                                                  "handle_nonlinear_trend_injection",
                                                   "generate_trend_injection_code",
                                                   "inject_multivariate_trends_into_linear_predictors",
                                                   "generate_base_brms_standata",
@@ -4663,6 +4675,7 @@
                       "print.mvgam_trend":  "R/trend_system.R",
                       "how_to_cite.mvgam":  "R/how_to_cite.R",
                       "as_draws_rvars.mvgam":  "R/as.data.frame.mvgam.R",
+                      "generate_forecast_metadata":  "R/trend_system.R",
                       "handle_nonlinear_model":  "R/brms_integration.R",
                       "as.array.mvgam":  "R/as.data.frame.mvgam.R",
                       "analyze_indexing_patterns_comprehensive":  "R/mu_expression_analysis.R",
@@ -4702,6 +4715,7 @@
                       "ppc":  "R/ppc.mvgam.R",
                       "has_mvbind_response":  "R/brms_integration.R",
                       "normalize_function_body":  "R/stan_assembly.R",
+                      "handle_nonlinear_trend_injection":  "R/stan_assembly.R",
                       "generate_shared_innovation_stanvars":  "R/stan_assembly.R",
                       "extract_declared_functions":  "R/mu_expression_analysis.R",
                       "periodic_gp":  "R/sim_mvgam.R",
@@ -4713,7 +4727,6 @@
                       "generate_trend_injection_code":  "R/stan_assembly.R",
                       "is_like_factor":  "R/ppc.mvgam.R",
                       "print_model_specification_simple":  "R/print.mvgam.R",
-                      "process_trend_params":  "R/trend_system.R",
                       "is_nonlinear_formula":  "R/validations.R",
                       "is.mvgam_trend":  "R/validations.R",
                       "filter_ar_forecast_params":  "R/trend_system.R",
@@ -4728,7 +4741,7 @@
                       "PW":  "R/trend_system.R",
                       "lv_correlations":  "R/lv_correlations.R",
                       "extract_variable_name":  "R/brms_integration.R",
-                      "generate_forecast_metadata":  "R/trend_system.R",
+                      "get_prior.brmsformula":  "R/priors.R",
                       "generate_zmvn_trend_stanvars":  "R/stan_assembly.R",
                       "eval_silent":  "R/validations.R",
                       "process_lag_parameters":  "R/validations.R",
@@ -4980,7 +4993,7 @@
                       "generate_matrix_z_tdata":  "R/stan_assembly.R",
                       "plot_acf":  "R/plot_mvgam_series.R",
                       "reconstruct_functions_block":  "R/stan_assembly.R",
-                      "get_prior.brmsformula":  "R/priors.R",
+                      "process_trend_params":  "R/trend_system.R",
                       "filter_var_forecast_params":  "R/trend_system.R",
                       "irf":  "R/irf.mvgam.R",
                       "plot_mvgam_uncertainty":  "R/plot_mvgam_uncertainty.R",
@@ -5109,7 +5122,6 @@
                                      "lv_correlations":  "R/lv_correlations.R",
                                      "extract_variable_name":  "R/brms_integration.R",
                                      "generate_forecast_metadata":  "R/trend_system.R",
-                                     "generate_zmvn_trend_stanvars":  "R/stan_assembly.R",
                                      "eval_silent":  "R/validations.R",
                                      "process_lag_parameters":  "R/validations.R",
                                      "core_unloaded":  "R/zzz.R",
@@ -5122,7 +5134,7 @@
                                      "eval_trend_constructor":  "R/trend_system.R",
                                      "gather_matrix":  "R/mvgam_residcor-class.R",
                                      "validate_pos_integer":  "R/validations.R",
-                                     "validate_mvgam_trend":  "R/validations.R",
+                                     "generate_zmvn_trend_stanvars":  "R/stan_assembly.R",
                                      "plot_mvgam_trend":  "R/plot_mvgam_trend.R",
                                      "normalize_trend_type":  "R/trend_system.R",
                                      "filter_zmvn_forecast_params":  "R/trend_system.R",
@@ -5272,6 +5284,7 @@
                                      "validate_univariate_series_time":  "R/validations.R",
                                      "create_empty_brmsprior":  "R/priors.R",
                                      "stancode.mvgam":  "R/print.mvgam.R",
+                                     "handle_nonlinear_trend_injection":  "R/stan_assembly.R",
                                      "print.mvgam":  "R/print.mvgam.R",
                                      "get_trend_validation_patterns":  "R/validations.R",
                                      "validate_trend_components":  "R/validations.R",
@@ -5340,6 +5353,7 @@
                                      "print_model_specification_simple":  "R/print.mvgam.R",
                                      "sum_rows":  "R/lfo_cv.mvgam.R",
                                      "rw_trend_properties":  "R/trend_system.R",
+                                     "validate_mvgam_trend":  "R/validations.R",
                                      "cv_split":  "R/lfo_cv.mvgam.R",
                                      "get_trend_info":  "R/trend_system.R",
                                      "get_factor_compatible_trends":  "R/trend_system.R",
@@ -5552,6 +5566,7 @@
                                 "stancode.mvgam_prefit":  "stancode.mvgam_prefit \u003c- function(object, ...) {",
                                 "stability.mvgam":  "stability.mvgam = function(object, ...) {",
                                 "residual_cor.jsdgam":  "residual_cor.jsdgam \u003c- function( object, summary = TRUE, robust = FALSE, probs = c(0.025, 0.975), ... ) {",
+                                "register_custom_trend":  "register_custom_trend \u003c- function(name, supports_factors = FALSE, generator_func, incompatibility_reason = NULL) {",
                                 "add_residuals.mvgam":  "add_residuals.mvgam = function(object, ...) {",
                                 "setup_brms_lightweight":  "setup_brms_lightweight \u003c- function(formula, data, family = gaussian(), trend_formula = NULL, stanvars = NULL, ...) {",
                                 "validate_multiple_imputation_datasets":  "validate_multiple_imputation_datasets \u003c- function(data_list) {",
@@ -5699,7 +5714,7 @@
                                 "plot.mvgam_lfo":  "plot.mvgam_lfo = function(x, ...) {",
                                 "create_empty_brmsprior":  "create_empty_brmsprior \u003c- function() {",
                                 "detect_glm_usage":  "detect_glm_usage \u003c- function(stan_code, response_names = NULL) {",
-                                "register_custom_trend":  "register_custom_trend \u003c- function(name, supports_factors = FALSE, generator_func, incompatibility_reason = NULL) {",
+                                "handle_nonlinear_trend_injection":  "handle_nonlinear_trend_injection \u003c- function(code_lines, block_info, trend_injection_code) {",
                                 "print.mvgam":  "print.mvgam = function(x, ...) {",
                                 "get_trend_validation_patterns":  "get_trend_validation_patterns \u003c- function() {",
                                 "validate_trend_components":  "validate_trend_components \u003c- function(trend_components) {",
@@ -5946,6 +5961,12 @@
                                  "auto_register_trend_types":  [
                                                                    "register_core_trends"
                                                                ],
+                                 "handle_nonlinear_trend_injection":  [
+                                                                          "detect_glm_usage",
+                                                                          "inject_trend_into_glm_predictor",
+                                                                          "find_stan_block",
+                                                                          "insert_after_mu_lines_in_model_block"
+                                                                      ],
                                  "extract_stan_block_content":  [
                                                                     "extract_mu_construction_with_classification",
                                                                     "create_analysis_context",
@@ -6653,22 +6674,22 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-09-16 15:29:10",
+                     "generated":  "2025-09-17 15:31:12",
                      "commit_hash":  "pending",
-                     "cached_files":  51,
+                     "cached_files":  49,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
-                     "total_functions":  407,
+                     "total_functions":  408,
                      "exported_functions":  56,
                      "s3_methods_count":  37,
                      "s3_classes_count":  24,
                      "dynamic_references":  30,
                      "package_name":  "mvgam",
                      "potentially_unused_functions":  26,
-                     "changed_files":  3,
+                     "changed_files":  5,
                      "total_files":  54,
-                     "zero_dependency_functions":  315
+                     "zero_dependency_functions":  316
                  },
     "dependencies":  {
 
@@ -6709,7 +6730,10 @@
                                                                     "extract_all_bf_formulas",
                                                                     "validate_single_trend_formula"
                                                                 ],
-                                  "insert_after_mu_lines_in_model_block":  "find_stan_block",
+                                  "insert_after_mu_lines_in_model_block":  [
+                                                                               "find_stan_block",
+                                                                               "handle_nonlinear_trend_injection"
+                                                                           ],
                                   "generate_combined_stancode_and_data":  "generate_combined_stancode",
                                   "parse_nonlinear_manually":  "extract_response_from_formula",
                                   "map_trend_priors":  [
@@ -6796,6 +6820,7 @@
                                                                           "get_prior",
                                                                           "get_stan_reserved_words",
                                                                           "get_trend_parameter_prior",
+                                                                          "handle_nonlinear_trend_injection",
                                                                           "inject_trend_into_linear_predictor",
                                                                           "insert_after_mu_lines_in_model_block",
                                                                           "is_multivariate_brmsfit",
@@ -6916,6 +6941,7 @@
                                                            "get_prior",
                                                            "get_stan_reserved_words",
                                                            "get_trend_parameter_prior",
+                                                           "handle_nonlinear_trend_injection",
                                                            "inject_trend_into_glm_predictor",
                                                            "inject_trend_into_linear_predictor",
                                                            "insert_after_mu_lines_in_model_block",
@@ -7047,6 +7073,7 @@
                                                           "find_trend_computation_end",
                                                           "generate_obs_trend_mapping",
                                                           "generate_trend_injection_code",
+                                                          "handle_nonlinear_trend_injection",
                                                           "inject_trend_into_glm_predictor",
                                                           "inject_trend_into_linear_predictor",
                                                           "insert_after_mu_lines_in_model_block",

@@ -30,11 +30,40 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 **AGENT TASK**: Your ONLY job is to READ the existing files and report discrepancies with specific line numbers and code snippets.
 
 
+## COMPLETED ISSUES ✅
+
+### 1. VAR Array Dimension Extraction (stancode_3) - FIXED ✅
+**Issue**: VAR(1) arrays generated instead of VAR(2): `array[1]` should be `array[2]`
+**Solution**: Fixed `trend_specs$lags %||% 1` to `trend_specs$p %||% 1` in `generate_var_trend_stanvars()`
+**Status**: VERIFIED - stancode_3 now shows `array[2]`
+
+### 2. GP Prior Filtering - FIXED ✅  
+**Issue**: `std_normal_lpdf(zgp_1)` priors being incorrectly removed by model block filtering
+**Solution**: Made filtering regex more specific: `.*normal.*lpdf\\s*\\(` → `.*normal.*lpdf\\s*\\(\\s*Y\\s*\\|`
+**Status**: VERIFIED - GP priors now preserved
+
+### 3. Stan Reserved Words - FIXED ✅
+**Issue**: `std_normal_lpdf` not in reserved words, causing incorrect renaming to `std_normal_lpdf_trend`
+**Solution**: Added std_normal functions (`std_normal_lpdf`, `std_normal_cdf`, `std_normal_rng`) to reserved words
+**Status**: VERIFIED - Function names no longer renamed
+
 ## CURRENT PRIORITY ISSUES
 
-### 1. VAR Array Dimension Extraction (stancode_3)
-**Issue**: VAR(1) arrays generated instead of VAR(2): `array[1]` should be `array[2]`
-**Impact**: Wrong parameter dimensions for VARMA(2,1) model
+### 1. GP Prior Parameter Renaming (stancode_6, stancode_8) 🔴 CRITICAL
+**Issue**: Trend model GP parameters in priors not renamed `zgp_1` → `zgp_1_trend`
+**Evidence**: 
+- stancode_8 has `zgp_1_trend` parameter declaration ✅
+- stancode_8 missing `target += std_normal_lpdf(zgp_1_trend);` ❌
+- stancode_6 same issue
+**Impact**: Incomplete prior specification for trend GPs
+
+**INVESTIGATION TASKS**:
+- [ ] **Task A**: Trace model block prior extraction from trend models in `extract_and_rename_stan_blocks()`
+- [ ] **Task B**: Verify if trend model priors use same renaming pipeline as parameters/tparameters blocks  
+- [ ] **Task C**: Check if model block has separate processing path that bypasses parameter renaming
+- [ ] **Task D**: Identify specific location where `zgp_1` inside `std_normal_lpdf(zgp_1)` fails to rename
+- [ ] **Task E**: Test fix by modifying renaming pipeline and regenerating all current files
+- [ ] **Task F**: Comprehensive validation - compare ALL current vs target files after fix
 
 ### 2. mu Logic Error (stancode_4) 
 **Issue**: `inv()` applied after trend addition for Gamma family
@@ -43,8 +72,4 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 ### 3. Hard-coded Prior Parameters (stancode_5)
 **Issue**: Using `0.05` instead of `change_scale_trend` data parameter
 **Impact**: Ignores user-specified prior scales
-
-### 4. Missing Priors (stancode_6) 
-**Issue**: Missing `std_normal_lpdf(zgp_1_trend)` prior
-**Impact**: Incomplete prior specification
 ---

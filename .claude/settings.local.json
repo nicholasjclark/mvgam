@@ -30,7 +30,8 @@
       "Bash(git log:*)",
       "Bash(for func in repair_stanfit repair_variable_names is_equal ulapply prepare_mvgam_stancode prepare_stan_data parse_model_rstan parse_model_cmdstanr is_multivariate_brmsfit rename_univariate_parameters rename_multivariate_parameters generate_stan_array_declaration extract_variables_from_block remove_variables_from_block)",
       "Bash(for func in prepare_stanvars_for_brms extract_computed_variable_name format_matrix_for_stan_array extract_variable_from_line replace_stan_block_content handle_nse_param validate_pos_real check_semicolon_syntax validate_stan_data_structure is_valid_stanvar validate_trend_specs validate_trend_parameter_class validate_trend_parameter_bounds)",
-      "Bash(for func in validate_stan_code_fragment validate_combined_stancode apply_validation_rules validate_time_variable validate_series_variable)"
+      "Bash(for func in validate_stan_code_fragment validate_combined_stancode apply_validation_rules validate_time_variable validate_series_variable)",
+      "WebFetch(domain:mc-stan.org)"
     ],
     "deny": [],
     "ask": [],

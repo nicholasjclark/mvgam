@@ -268,7 +268,7 @@ parameters {
   vector[Kc_trend] b_trend;  // regression coefficients
 real Intercept_trend;  // temporary intercept for centered predictors
           // Standard VAR: single raw matrix
-      array[1] matrix[N_lv_trend, N_lv_trend] A_raw_trend;
+      array[2] matrix[N_lv_trend, N_lv_trend] A_raw_trend;
 
       // Standard variance and correlation parameters
       vector<lower=0>[N_lv_trend] sigma_trend;
@@ -276,11 +276,11 @@ real Intercept_trend;  // temporary intercept for centered predictors
 
   // Shared hierarchical hyperparameters for A_raw coefficients (across all groups)
   // [1] = diagonal elements, [2] = off-diagonal elements
-  array[2] vector[1] Amu_trend;     // Shared means
-  array[2] vector<lower=0>[1] Aomega_trend;  // Shared precisions
+  array[2] vector[2] Amu_trend;     // Shared means
+  array[2] vector<lower=0>[2] Aomega_trend;  // Shared precisions
 
   // Joint initialization vector for stationary distribution
-  vector[(1 + 1) * N_lv_trend] init_trend;
+  vector[(2 + 1) * N_lv_trend] init_trend;
 
   // VAR dynamics
   // Raw MA partial autocorrelation matrices (unconstrained for stationarity)
@@ -308,26 +308,26 @@ transformed parameters {
       cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
 
       // Transform raw parameters to stationary coefficients
-      array[1] matrix[N_lv_trend, N_lv_trend] A_trend;
+      array[2] matrix[N_lv_trend, N_lv_trend] A_trend;
 
       // Working arrays for stationarity transformation
-      array[1] matrix[N_lv_trend, N_lv_trend] P_var;
-      array[2, 1] matrix[N_lv_trend, N_lv_trend] result_var;
+      array[2] matrix[N_lv_trend, N_lv_trend] P_var;
+      array[2, 2] matrix[N_lv_trend, N_lv_trend] result_var;
 
-      for (i in 1:1) {
+      for (i in 1:2) {
         P_var[i] = AtoP(A_raw_trend[i]);
       }
 
       result_var = rev_mapping(P_var, Sigma_trend);
 
-      for (i in 1:1) {
+      for (i in 1:2) {
         A_trend[i] = result_var[1, i];
       }
 
   array[1] matrix[N_lv_trend, N_lv_trend] D_trend;
 
   // Joint covariance matrix for stationary initialization
-  cov_matrix[(1 + 1) * N_lv_trend] Omega_trend;
+  cov_matrix[(2 + 1) * N_lv_trend] Omega_trend;
 
   vector[N_lv_trend] ma_init_trend[1];  // Initial MA errors
 
@@ -353,8 +353,8 @@ for (i in 1:1) {
 
   // Initialize MA error terms from init_trend (VARMA specific)
 for (i in 1:1) {
-  int start_idx = 1 * N_lv_trend + (i - 1) * N_lv_trend + 1;
-  int end_idx = 1 * N_lv_trend + i * N_lv_trend;
+  int start_idx = 2 * N_lv_trend + (i - 1) * N_lv_trend + 1;
+  int end_idx = 2 * N_lv_trend + i * N_lv_trend;
   ma_init_trend[i] = init_trend[start_idx:end_idx];
 }
     // Derived latent trends using universal computation pattern
@@ -386,7 +386,7 @@ model {
     // VARMA likelihood implementation following Heaps 2022 methodology
 
   // Initial joint distribution for stationary VARMA initialization
-  vector[(1 + 1) * N_lv_trend] mu_init_trend = rep_vector(0.0, (1 + 1) * N_lv_trend);
+  vector[(2 + 1) * N_lv_trend] mu_init_trend = rep_vector(0.0, (2 + 1) * N_lv_trend);
   init_trend ~ multi_normal(mu_init_trend, Omega_trend);
 
   // Conditional means for VARMA dynamics
@@ -398,11 +398,11 @@ model {
     mu_t_trend[t] = rep_vector(0.0, N_lv_trend);
 
     // VAR component: Add autoregressive terms
-    for (i in 1:1) {
+    for (i in 1:2) {
       if (t - i <= 0) {
         // Use values from earlier than series start (from init_trend)
-        int init_idx = 1 - (t - i) + 1;
-        if (init_idx > 0 && init_idx <= 1) {
+        int init_idx = 2 - (t - i) + 1;
+        if (init_idx > 0 && init_idx <= 2) {
           vector[N_lv_trend] lagged_lv;
           int start_idx = (init_idx - 1) * N_lv_trend + 1;
           int end_idx = init_idx * N_lv_trend;
@@ -437,7 +437,7 @@ for (i in 1:1) {
   }
 
         // Standard VAR: single matrix priors
-      for (lag in 1:1) {
+      for (lag in 1:2) {
         // Diagonal elements prior
         diagonal(A_raw_trend[lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));
 
