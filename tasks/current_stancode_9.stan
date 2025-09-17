@@ -11,12 +11,12 @@ data {
   // covariates for non-linear functions
   vector[N] C_1;
   int prior_only;  // should the likelihood be ignored?
+    int<lower=1> N_trend;  // total number of observations
   int<lower=1> N_series_trend;
   int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
-    int<lower=1> N_trend_y;  // total number of observations
-  array[N_y] int obs_trend_time_y;
-  array[N_y] int obs_trend_series_y;
+  array[N] int obs_trend_time;
+  array[N] int obs_trend_series;
 }
 transformed data {
   matrix[N_series_trend, N_lv_trend] Z = diag_matrix(rep_vector(1.0, N_lv_trend));
@@ -25,7 +25,7 @@ parameters {
   vector[K_b1] b_b1;  // regression coefficients
   vector[K_b2] b_b2;  // regression coefficients
   real<lower=0> sigma;  // dispersion parameter
-  real Intercept_trend_y;  // temporary intercept for centered predictors
+  real Intercept_trend;  // temporary intercept for centered predictors
   vector<lower=0>[N_lv_trend] sigma_trend;
   matrix[N_trend, N_lv_trend] innovations_trend;
   // AR coefficient parameters
@@ -33,6 +33,8 @@ vector<lower=-1,upper=1>[N_lv_trend] ar1_trend;
 }
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
+  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+mu_trend += Intercept_trend;
   
     // Scaled innovations (uncorrelated case)
     matrix[N_trend, N_lv_trend] scaled_innovations_trend;
@@ -40,9 +42,7 @@ transformed parameters {
     // Apply scaling using vectorized operations
     scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);
   matrix[N_trend, N_lv_trend] lv_trend;
-  lprior += student_t_lpdf(Intercept_trend_y | 3, 0.1, 2.5);
-  vector[N_trend_y] mu_trend = rep_vector(0.0, N_trend_y);
-mu_trend += Intercept_trend_y;
+  lprior += student_t_lpdf(Intercept_trend | 3, 0.1, 2.5);
     // Latent states with AR dynamics
   
 
@@ -89,7 +89,7 @@ model {
     nlp_b2 += X_b2 * b_b2;
     for (n in 1:N) {
       // compute non-linear predictor values
-      mu[n] = (nlp_b1[n] * exp(nlp_b2[n] * C_1[n]));
+      mu[n] = ((nlp_b1[n] * exp(nlp_b2[n] * C_1[n]))) + trend[obs_trend_time[n], obs_trend_series[n]];
     }
     target += normal_lpdf(Y | mu, sigma);
   }

@@ -1167,7 +1167,8 @@ insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_cod
   mu_line_indices <- which(grepl("\\s*mu\\s*\\+=", model_lines))
 
   if (length(mu_line_indices) == 0) {
-    insight::format_error("No mu += lines found in model block")
+    # Handle nonlinear models: look for mu[n] = ... patterns inside for loops
+    return(handle_nonlinear_trend_injection(code_lines, block_info, trend_injection_code))
   }
 
   # Calculate absolute position of last mu += line
@@ -1183,6 +1184,75 @@ insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_cod
   )
 
   return(result_lines)
+}
+
+#' Handle Nonlinear Trend Injection for Models Using mu[n] = ... Patterns
+#'
+#' @description
+#' Injects trend effects into nonlinear brms models that compute mu using
+#' assignment patterns like mu[n] = (expression) within for loops. Modifies
+#' the Stan code to add trend effects to the nonlinear predictor.
+#'
+#' @param code_lines Character vector of all model code lines
+#' @param block_info List with start_idx and end_idx for model block
+#' @param trend_injection_code Character vector of trend code to inject (unused in nonlinear case)
+#' @return Modified code_lines with trend injection added to mu assignment
+#' @noRd
+handle_nonlinear_trend_injection <- function(code_lines, block_info, 
+                                           trend_injection_code) {
+  # Validate inputs
+  checkmate::assert_character(code_lines, min.len = 1)
+  checkmate::assert_list(block_info)
+  checkmate::assert_names(names(block_info), 
+                         must.include = c("start_idx", "end_idx"))
+  checkmate::assert_integerish(block_info$start_idx, len = 1)
+  checkmate::assert_integerish(block_info$end_idx, len = 1)
+  checkmate::assert_character(trend_injection_code, min.len = 1)
+  
+  # Validate block indices
+  if (block_info$start_idx > block_info$end_idx || 
+      block_info$end_idx > length(code_lines)) {
+    insight::format_error("Invalid block indices in {.field block_info}")
+  }
+  
+  model_lines <- code_lines[block_info$start_idx:block_info$end_idx]
+  
+  # Find mu[n] = ... pattern within model block
+  mu_assignment_indices <- which(grepl("\\s*mu\\[n\\]\\s*=", model_lines))
+  
+  if (length(mu_assignment_indices) == 0) {
+    insight::format_error(
+      "No mu[n] assignment patterns found in nonlinear model block. ",
+      "Expected pattern: mu[n] = <expression>;"
+    )
+  }
+  
+  # Use the last mu assignment for trend injection
+  last_mu_idx <- max(mu_assignment_indices)
+  abs_idx <- block_info$start_idx + last_mu_idx - 1
+  
+  # Extract and modify the mu assignment line
+  current_line <- code_lines[abs_idx]
+  
+  # Validate we can extract the right-hand side
+  if (!grepl("mu\\[n\\]\\s*=\\s*(.+);", current_line)) {
+    insight::format_error(
+      "Could not parse mu assignment in line: {.field current_line}"
+    )
+  }
+  
+  # Extract the right-hand side expression
+  rhs <- sub(".*mu\\[n\\]\\s*=\\s*(.+);.*", "\\1", current_line)
+  
+  # Create new line with trend addition
+  indent <- sub("^(\\s*).*", "\\1", current_line)
+  new_line <- paste0(indent, "mu[n] = (", rhs, 
+                    ") + trend[obs_trend_time[n], obs_trend_series[n]];")
+  
+  # Replace the line
+  code_lines[abs_idx] <- new_line
+  
+  return(code_lines)
 }
 
 #' Generate Trend Injection Code for Stan Transformed Parameters Block

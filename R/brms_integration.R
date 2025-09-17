@@ -330,7 +330,7 @@ is_multivariate_formula <- function(formula) {
     if (is_nonlinear_formula(formula)) {
       return(FALSE)
     }
-    
+
     return(!is.null(formula$pforms) && length(formula$pforms) > 0)
   }
 
@@ -425,7 +425,7 @@ has_mvbind_response <- function(formula) {
 #' extract_response_names(bf(count ~ temp, biomass ~ precip))  # c("count", "biomass")
 #' extract_response_names(bf(y1 ~ x) + bf(y2 ~ z))  # c("y1", "y2")
 #'
-#' # Univariate patterns (NEW - no longer returns NULL)
+#' # Univariate patterns
 #' extract_response_names(y ~ x)  # "y"
 #' extract_response_names(count ~ temp + precip)  # "count"
 #'
@@ -434,21 +434,6 @@ has_mvbind_response <- function(formula) {
 #' }
 #'
 #' @seealso \code{\link{is_multivariate_formula}}, \code{\link{parse_multivariate_trends}}
-#' @noRd
-#' Extract Response Variable Names from Formula
-#'
-#' @description
-#' Extracts response variable names from various formula types including
-#' standard formulas, brmsformula objects, multivariate formulas, and
-#' nonlinear formulas. Handles mvbind() multivariate binding and properly
-#' distinguishes between response variables and model parameters.
-#'
-#' @param formula A formula, brmsformula, mvbrmsformula, or bform object
-#' @return Character vector of response variable names
-#' @examples
-#' extract_response_names(y ~ x)  # "y"
-#' extract_response_names(mvbind(a, b) ~ x)  # c("a", "b")
-#' extract_response_names(bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE))  # "y"
 #' @noRd
 extract_response_names <- function(formula) {
   checkmate::assert_multi_class(formula, c("formula", "brmsformula", "mvbrmsformula", "bform"))
@@ -549,11 +534,6 @@ extract_response_names <- function(formula) {
 #' - Complex expressions: mvbind(y1 + offset, scale(y2))
 #'
 #' @noRd
-#' Extract Response Names from mvbind() Formula
-#'
-#' @param formula A formula object that may contain mvbind() on left side
-#' @return Character vector of response names or NULL if not mvbind formula
-#' @noRd
 extract_mvbind_responses <- function(formula) {
   checkmate::assert_formula(formula)
 
@@ -637,12 +617,6 @@ extract_mvbind_responses <- function(formula) {
 #'
 #' @param expr R expression object
 #' @return Character string with variable name, or NULL if cannot extract
-#' @noRd
-#' Extract Primary Variable Name from Expression
-#'
-#' @param expr An R expression (name, call, or constant)
-#' @param max_depth Maximum recursion depth to prevent infinite loops
-#' @return Character string of first variable name found, or NULL
 #' @noRd
 extract_variable_name <- function(expr, max_depth = 10) {
   # Protect against infinite recursion
