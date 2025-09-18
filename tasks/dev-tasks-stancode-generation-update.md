@@ -31,20 +31,19 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 
 ## PRIORITY ISSUES
 
-### 1. Model 7 Parsing Failure
-**Error**: `Cannot find end of model block. Stan code structure is invalid or malformed.`
-**Location**: `find_stan_block()` at stan_assembly.R#1089
-**Impact**: Prevents model generation for formula with for-loop mu construction
-**Next Step**: Investigate block parsing logic for complex nested structures
-
-### 2. File 4 - Biomass mu Logic Error  
+### 1. File 4 - Biomass mu Logic Error  
 **Issue**: `inv()` transformation applied before trend addition
 **Current**: `mu_biomass = inv(mu_biomass)` then `mu_biomass[n] += trend[...]`
 **Target**: Add trend first, then apply `inv()` transformation
 **Location**: Lines 146-156 in current_stancode_4.stan
 
-### 3. File 5 - Hard-coded Prior Parameter
+### 2. File 5 - Hard-coded Prior Parameter
 **Issue**: Using literal `0.05` instead of `change_scale_trend` parameter
 **Current**: `to_vector(delta_trend) ~ double_exponential(0, 0.05);`
 **Target**: `to_vector(delta_trend) ~ double_exponential(0, change_scale_trend);`
 **Location**: Line 137 in current_stancode_5.stan
+
+### 2. Files 6 & 8 - Order of lprior statements on model block
+**Issue**: lprior statements scattered throughout model block
+**Target**: all lprior statements together at the end of the block
+**Location**: Line 126 in current_stancode_8.stan

@@ -1791,9 +1791,12 @@
                               "extract_non_likelihood_from_model_block":  {
                                                                               "s3_class":  "",
                                                                               "s3_method":  "",
-                                                                              "signature":  "extract_non_likelihood_from_model_block \u003c- function(model_block) {",
+                                                                              "signature":  "extract_non_likelihood_from_model_block \u003c- function(model_block, exclude_mu_lines = character(0)) {",
                                                                               "is_s3_method":  false,
-                                                                              "arguments":  "model_block"
+                                                                              "arguments":  [
+                                                                                                "model_block",
+                                                                                                "exclude_mu_lines"
+                                                                                            ]
                                                                           },
                               "create_times_trend_matrix":  {
                                                                 "s3_class":  "",
@@ -5582,7 +5585,7 @@
                                 "ecdf_plotdat":  "ecdf_plotdat \u003c- function(vals, x) {",
                                 "create_trend_brmsfit":  "create_trend_brmsfit \u003c- function(combined_fit, trend_setup, mv_spec) {",
                                 "validate_single_trend_formula":  "validate_single_trend_formula \u003c- function(formula, context = NULL, allow_response = FALSE) {",
-                                "extract_non_likelihood_from_model_block":  "extract_non_likelihood_from_model_block \u003c- function(model_block) {",
+                                "extract_non_likelihood_from_model_block":  "extract_non_likelihood_from_model_block \u003c- function(model_block, exclude_mu_lines = character(0)) {",
                                 "create_times_trend_matrix":  "create_times_trend_matrix \u003c- function(n_time, n_series, unique_times, unique_series, matrix_name) {",
                                 "ordinate.jsdgam":  "ordinate.jsdgam \u003c- function( object, which_lvs = c(1, 2), biplot = TRUE, alpha = 0.5, label_sites = TRUE, ... ) {",
                                 "fit_multiple_imputation_models":  "fit_multiple_imputation_models \u003c- function(formula, trend_formula, data_list, backend, ...) {",
@@ -6674,7 +6677,7 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-09-17 19:51:34",
+                     "generated":  "2025-09-18 19:50:24",
                      "commit_hash":  "pending",
                      "cached_files":  53,
                      "version":  "2.0.0",

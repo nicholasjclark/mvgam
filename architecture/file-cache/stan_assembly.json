@@ -126,7 +126,7 @@
                                 "generate_matrix_z_multiblock_stanvars":  "generate_matrix_z_multiblock_stanvars \u003c- function(is_factor_model, n_lv, n_series) {",
                                 "generate_car_trend_stanvars":  "generate_car_trend_stanvars \u003c- function(trend_specs, data_info, prior = NULL) {",
                                 "get_stan_reserved_words":  "get_stan_reserved_words \u003c- function() {",
-                                "extract_non_likelihood_from_model_block":  "extract_non_likelihood_from_model_block \u003c- function(model_block) {",
+                                "extract_non_likelihood_from_model_block":  "extract_non_likelihood_from_model_block \u003c- function(model_block, exclude_mu_lines = character(0)) {",
                                 "find_variable_declarations":  "find_variable_declarations \u003c- function(stancode, referenced_vars, search_blocks = c(\"data\", \"transformed data\", \"parameters\", \"transformed parameters\", \"model\"), sort_dependencies = FALSE) {",
                                 "extract_response_names_from_brmsfit":  "extract_response_names_from_brmsfit \u003c- function(brmsfit) {",
                                 "append_if_not_null":  "append_if_not_null \u003c- function(components, new_component) {",

@@ -4566,7 +4566,7 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
         mu_construction_result$mu_construction,
         mu_construction_result$supporting_declarations
       )
-      
+
       required_vars <- mu_construction_result$referenced_variables
       missing_vars <- setdiff(required_vars, names(mapping$original_to_renamed))
 
@@ -5189,10 +5189,11 @@ filter_block_content <- function(block_content, block_type = "model") {
         grepl("target\\s*\\+=.*normal.*lpdf\\s*\\(\\s*Y\\s*\\|", line),
         grepl("target\\s*\\+=.*normal.*glm.*lpdf\\s*\\(", line),
         grepl("target\\s*\\+=.*multi_normal.*lpdf\\s*\\(", line),
-        # Removed overly broad pattern that was catching std_normal_lpdf priors
         grepl("target\\s*\\+=.*Y\\s*\\|", line),
         # Filter out lprior accumulation since observation model handles it
-        grepl("^\\s*target\\s*\\+=\\s*lprior\\s*;", line)
+        grepl("^\\s*target\\s*\\+=\\s*lprior\\s*;", line),
+        # Filter orphaned for loops from monotonic effects
+        grepl("^\\s*for\\s*\\(\\s*n_trend\\s+in\\s+\\d+:\\s*[Nn]_?[Tt]rend\\s*\\)\\s*\\{?\\s*$", line)
       ))
     }
 
@@ -5217,29 +5218,51 @@ extract_non_likelihood_from_model_block <- function(model_block, exclude_mu_line
 
   # extract_stan_block_content() already provides the complete inner content
   # No need for brace extraction since the content is already unwrapped
-  
-  # Use general filtering function for model blocks  
+
+  # Use general filtering function for model blocks
   filtered_content <- filter_block_content(model_block, "model")
-  
+
   # Additionally filter out mu construction lines if provided
   if (length(exclude_mu_lines) > 0 && !is.null(filtered_content)) {
     lines <- strsplit(filtered_content, "\n", fixed = TRUE)[[1]]
     lines <- trimws(lines)
+
+    # Remove lines that match exclude_mu_lines and their preceding for loops if needed
+    lines_to_remove <- character(0)
     
-    # Remove lines that match any of the exclude_mu_lines
     for (mu_line in exclude_mu_lines) {
       mu_line_trimmed <- trimws(mu_line)
       if (nchar(mu_line_trimmed) > 0) {
-        lines <- lines[lines != mu_line_trimmed]
+        lines_to_remove <- c(lines_to_remove, mu_line_trimmed)
+        
+        # If this mu line contains mu[n] pattern, find and mark preceding for loop for removal
+        if (grepl("mu\\[n\\]", mu_line_trimmed)) {
+          # Find the index of this mu line
+          mu_line_idx <- which(lines == mu_line_trimmed)
+          if (length(mu_line_idx) > 0) {
+            # Check the line immediately before it
+            for (idx in mu_line_idx) {
+              if (idx > 1) {
+                preceding_line <- lines[idx - 1]
+                if (grepl("^\\s*for\\s*\\(\\s*n\\s+in\\s+1:\\s*N\\s*\\)\\s*\\{?\\s*$", preceding_line)) {
+                  lines_to_remove <- c(lines_to_remove, preceding_line)
+                }
+              }
+            }
+          }
+        }
       }
     }
     
+    # Remove all identified lines
+    lines <- lines[!lines %in% lines_to_remove]
+
     filtered_content <- paste(lines, collapse = "\n")
     if (nchar(trimws(filtered_content)) == 0) {
       filtered_content <- NULL
     }
   }
-  
+
   return(filtered_content)
 }
 
