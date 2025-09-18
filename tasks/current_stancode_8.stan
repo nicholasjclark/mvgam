@@ -123,6 +123,7 @@ lprior += inv_gamma_lpdf(lscale_1_trend[1][1] | 1.494197, 0.056607);
     - 1 * student_t_lccdf(0 | 3, 0, 3);
 }
 model {
+  target += std_normal_lpdf(zgp_1_trend);
   // Shared Gaussian innovation priors
   sigma_trend ~ exponential(2);
   to_vector(innovations_trend) ~ std_normal();

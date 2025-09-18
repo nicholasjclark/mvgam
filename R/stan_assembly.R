@@ -1198,60 +1198,60 @@ insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_cod
 #' @param trend_injection_code Character vector of trend code to inject (unused in nonlinear case)
 #' @return Modified code_lines with trend injection added to mu assignment
 #' @noRd
-handle_nonlinear_trend_injection <- function(code_lines, block_info, 
+handle_nonlinear_trend_injection <- function(code_lines, block_info,
                                            trend_injection_code) {
   # Validate inputs
   checkmate::assert_character(code_lines, min.len = 1)
   checkmate::assert_list(block_info)
-  checkmate::assert_names(names(block_info), 
+  checkmate::assert_names(names(block_info),
                          must.include = c("start_idx", "end_idx"))
   checkmate::assert_integerish(block_info$start_idx, len = 1)
   checkmate::assert_integerish(block_info$end_idx, len = 1)
   checkmate::assert_character(trend_injection_code, min.len = 1)
-  
+
   # Validate block indices
-  if (block_info$start_idx > block_info$end_idx || 
+  if (block_info$start_idx > block_info$end_idx ||
       block_info$end_idx > length(code_lines)) {
     insight::format_error("Invalid block indices in {.field block_info}")
   }
-  
+
   model_lines <- code_lines[block_info$start_idx:block_info$end_idx]
-  
+
   # Find mu[n] = ... pattern within model block
   mu_assignment_indices <- which(grepl("\\s*mu\\[n\\]\\s*=", model_lines))
-  
+
   if (length(mu_assignment_indices) == 0) {
     insight::format_error(
       "No mu[n] assignment patterns found in nonlinear model block. ",
       "Expected pattern: mu[n] = <expression>;"
     )
   }
-  
+
   # Use the last mu assignment for trend injection
   last_mu_idx <- max(mu_assignment_indices)
   abs_idx <- block_info$start_idx + last_mu_idx - 1
-  
+
   # Extract and modify the mu assignment line
   current_line <- code_lines[abs_idx]
-  
+
   # Validate we can extract the right-hand side
   if (!grepl("mu\\[n\\]\\s*=\\s*(.+);", current_line)) {
     insight::format_error(
       "Could not parse mu assignment in line: {.field current_line}"
     )
   }
-  
+
   # Extract the right-hand side expression
   rhs <- sub(".*mu\\[n\\]\\s*=\\s*(.+);.*", "\\1", current_line)
-  
+
   # Create new line with trend addition
   indent <- sub("^(\\s*).*", "\\1", current_line)
-  new_line <- paste0(indent, "mu[n] = (", rhs, 
+  new_line <- paste0(indent, "mu[n] = (", rhs,
                     ") + trend[obs_trend_time[n], obs_trend_series[n]];")
-  
+
   # Replace the line
   code_lines[abs_idx] <- new_line
-  
+
   return(code_lines)
 }
 
@@ -3876,7 +3876,7 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # 3.5. Add sampling statement for CAR innovations_trend parameter
   car_innovations_sampling_stanvar <- brms::stanvar(
-    name = "car_innovations_sampling", 
+    name = "car_innovations_sampling",
     scode = "to_vector(innovations_trend) ~ std_normal();",
     block = "model"
   )
@@ -4541,34 +4541,15 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
     }
   }
 
-  # 3. Extract model block content (without headers) but exclude likelihood statements
-  model_block <- extract_stan_block_content(stancode, "model")
-  model_stanvar_created <- FALSE
-
-  if (!is.null(model_block) && nchar(model_block) > 0) {
-    # Extract non-likelihood parts (priors, transformations)
-    non_likelihood_model <- extract_non_likelihood_from_model_block(model_block)
-
-    if (!is.null(non_likelihood_model) && nchar(trimws(non_likelihood_model)) > 0) {
-      model_result <- rename_parameters_in_block(
-        non_likelihood_model, suffix, mapping, "model", is_multivariate, response_names
-      )
-      mapping <- model_result$mapping  # Update mapping
-
-      stanvar_list[["trend_model_priors"]] <- brms::stanvar(
-        scode = model_result$code,
-        block = "model"
-      )
-      model_stanvar_created <- TRUE
-    }
-  }
-
-  # 4. ENHANCED: Create mu_trend using variable-tracing system for complex patterns
+  # 3. Create mu_trend using variable-tracing system for complex patterns FIRST
+  # This prevents duplicate mu construction by extracting mu lines before model block processing
   # Check if mu_trend declaration already exists in stancode
   mu_trend_pattern <- paste0("vector\\[.*?\\]\\s+mu", gsub("_", "\\_", suffix))
   mu_trend_exists <- any(grepl(mu_trend_pattern,
                               strsplit(stancode, "\n")[[1]],
                               perl = TRUE))
+
+  extracted_mu_lines <- character(0)  # Track extracted mu lines for model block filtering
 
   if (!mu_trend_exists) {
     checkmate::assert_character(stancode, len = 1, min.chars = 1)
@@ -4580,6 +4561,12 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
     mu_construction_result <- extract_mu_construction_with_classification(stancode)
 
     if (length(mu_construction_result$mu_construction) > 0) {
+      # Store extracted mu lines AND supporting declarations to filter them from model block (DRY solution)
+      extracted_mu_lines <- c(
+        mu_construction_result$mu_construction,
+        mu_construction_result$supporting_declarations
+      )
+      
       required_vars <- mu_construction_result$referenced_variables
       missing_vars <- setdiff(required_vars, names(mapping$original_to_renamed))
 
@@ -4623,7 +4610,7 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
         time_param = time_param
       )
 
-      # Create stanvar from Enhanced mu_trend Construction System output
+      # Create stanvar from mu_trend Construction System output
       stanvar_list[["trend_model_mu_creation"]] <- brms::stanvar(
         scode = paste(mu_trend_code_lines, collapse = "\n"),
         block = "tparameters"
@@ -4672,6 +4659,29 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
 
     mapping$original_to_renamed[["mu"]] <- paste0("mu", suffix)
     mapping$renamed_to_original[[paste0("mu", suffix)]] <- "mu"
+  }
+
+  # 4. Extract model block content (without headers) but exclude likelihood statements
+  # Process AFTER mu_trend extraction to avoid duplicate mu construction (DRY solution)
+  model_block <- extract_stan_block_content(stancode, "model")
+  model_stanvar_created <- FALSE
+
+  if (!is.null(model_block) && nchar(model_block) > 0) {
+    # Extract non-likelihood parts (priors, transformations) and exclude extracted mu lines
+    non_likelihood_model <- extract_non_likelihood_from_model_block(model_block, extracted_mu_lines)
+
+    if (!is.null(non_likelihood_model) && nchar(trimws(non_likelihood_model)) > 0) {
+      model_result <- rename_parameters_in_block(
+        non_likelihood_model, suffix, mapping, "model", is_multivariate, response_names
+      )
+      mapping <- model_result$mapping  # Update mapping
+
+      stanvar_list[["trend_model_priors"]] <- brms::stanvar(
+        scode = model_result$code,
+        block = "model"
+      )
+      model_stanvar_created <- TRUE
+    }
   }
 
   # Combine individual stanvar objects into proper stanvars collection
@@ -5174,13 +5184,15 @@ filter_block_content <- function(block_content, block_type = "model") {
     # Additional filtering for model block only
     if (block_type == "model") {
       skip_line <- skip_line || any(c(
-        # Actual likelihood statements
+        # Actual likelihood statements (not priors)
         grepl("~\\s+normal\\s*\\(", line),
         grepl("target\\s*\\+=.*normal.*lpdf\\s*\\(\\s*Y\\s*\\|", line),
         grepl("target\\s*\\+=.*normal.*glm.*lpdf\\s*\\(", line),
         grepl("target\\s*\\+=.*multi_normal.*lpdf\\s*\\(", line),
-        grepl("target\\s*\\+=.*normal.*lpdf\\s*\\([^)]*\\|", line),
-        grepl("target\\s*\\+=.*Y\\s*\\|", line)
+        # Removed overly broad pattern that was catching std_normal_lpdf priors
+        grepl("target\\s*\\+=.*Y\\s*\\|", line),
+        # Filter out lprior accumulation since observation model handles it
+        grepl("^\\s*target\\s*\\+=\\s*lprior\\s*;", line)
       ))
     }
 
@@ -5199,17 +5211,36 @@ filter_block_content <- function(block_content, block_type = "model") {
   return(paste(filtered_lines, collapse = "\n"))
 }
 
-extract_non_likelihood_from_model_block <- function(model_block) {
+extract_non_likelihood_from_model_block <- function(model_block, exclude_mu_lines = character(0)) {
   checkmate::assert_string(model_block)
+  checkmate::assert_character(exclude_mu_lines)
 
-  # Remove the "model {" and "}" wrapper using base R
-  block_match <- regmatches(model_block, regexpr("\\{.*\\}", model_block))
-  if (length(block_match) == 0) return(NULL)
-
-  block_content <- gsub("^\\{|\\}$", "", block_match)
-
-  # Use general filtering function for model blocks
-  return(filter_block_content(block_content, "model"))
+  # extract_stan_block_content() already provides the complete inner content
+  # No need for brace extraction since the content is already unwrapped
+  
+  # Use general filtering function for model blocks  
+  filtered_content <- filter_block_content(model_block, "model")
+  
+  # Additionally filter out mu construction lines if provided
+  if (length(exclude_mu_lines) > 0 && !is.null(filtered_content)) {
+    lines <- strsplit(filtered_content, "\n", fixed = TRUE)[[1]]
+    lines <- trimws(lines)
+    
+    # Remove lines that match any of the exclude_mu_lines
+    for (mu_line in exclude_mu_lines) {
+      mu_line_trimmed <- trimws(mu_line)
+      if (nchar(mu_line_trimmed) > 0) {
+        lines <- lines[lines != mu_line_trimmed]
+      }
+    }
+    
+    filtered_content <- paste(lines, collapse = "\n")
+    if (nchar(trimws(filtered_content)) == 0) {
+      filtered_content <- NULL
+    }
+  }
+  
+  return(filtered_content)
 }
 
 #' Extract Stan Block Content with Improved Functions Block Handling
@@ -5306,9 +5337,27 @@ extract_stan_block_content <- function(stancode, block_name) {
         next  # Skip the opening brace line
       }
 
-      # Check for block end (closing brace on its own line)
-      if (in_block && grepl("^\\s*\\}\\s*$", line)) {
-        break  # Stop at closing brace
+      # Check for block end using Stan's mandatory block order
+      if (in_block) {
+        # Determine next block pattern based on current block
+        next_block_pattern <- switch(tolower(gsub("\\s+", " ", trimws(block_name))),
+          "data" = "^\\s*transformed\\s+data\\s*\\{",
+          "transformed data" = "^\\s*parameters\\s*\\{",
+          "parameters" = "^\\s*transformed\\s+parameters\\s*\\{",
+          "transformed parameters" = "^\\s*model\\s*\\{",
+          "model" = "^\\s*generated\\s+quantities\\s*\\{",
+          "generated quantities" = "^\\s*\\}\\s*$"  # Last block ends at final brace
+        )
+
+        if (!is.null(next_block_pattern) && grepl(next_block_pattern, line, ignore.case = TRUE)) {
+          # Remove trailing brace if present (except for generated quantities)
+          if (tolower(gsub("\\s+", " ", trimws(block_name))) != "generated quantities" &&
+              length(content_lines) > 0 &&
+              grepl("^\\s*\\}\\s*$", content_lines[length(content_lines)])) {
+            content_lines <- content_lines[-length(content_lines)]
+          }
+          break
+        }
       }
 
       # Collect content lines

@@ -210,6 +210,7 @@ transformed data {
   for (i_trend in 2:K_trend) {
     means_X_trend[i_trend - 1] = mean(X_trend[, i_trend]);
     Xc_trend[, i_trend - 1] = X_trend[, i_trend] - means_X_trend[i_trend - 1];
+  }
       // Zero mean vector for VARMA process (following Heaps 2022)
     vector[3] trend_zeros = rep_vector(0.0, 3);
 

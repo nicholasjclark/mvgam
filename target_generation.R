@@ -155,9 +155,9 @@ tryCatch({
   income <- factor(sample(income_options, NROW(test_data$univariate), TRUE),
                    levels = income_options, ordered = TRUE)
   test_data$univariate$income <- income
-  mf6 <- mvgam_formula(y ~ (1 | series), trend_formula = ~ mo(income) + CAR())
-  code6 <- stancode(mf6, data = test_data$univariate, family = poisson(), validate = FALSE)
-  writeLines(code6, 'tasks/current_stancode_7.stan')
+  mf7 <- mvgam_formula(y ~ (1 | series), trend_formula = ~ mo(income) + CAR())
+  code7 <- stancode(mf7, data = test_data$univariate, family = poisson(), validate = FALSE)
+  writeLines(code7, 'tasks/current_stancode_7.stan')
   cat("✓ current_stancode_7.stan created\n")
 }, error = function(e) {
   cat("✗ Error generating target 7:", conditionMessage(e), "\n")
