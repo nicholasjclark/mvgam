@@ -99,4 +99,6 @@ model {
   target += lprior;
 }
 generated quantities {
+    // actual population-level intercept
+  real b_Intercept_trend = Intercept_trend;
 }

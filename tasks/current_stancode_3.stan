@@ -212,7 +212,7 @@ transformed data {
     Xc_trend[, i_trend - 1] = X_trend[, i_trend] - means_X_trend[i_trend - 1];
   }
       // Zero mean vector for VARMA process (following Heaps 2022)
-    vector[3] trend_zeros = rep_vector(0.0, 3);
+    vector[N_lv_trend] trend_zeros = rep_vector(0.0, N_lv_trend);
 
     
 }
@@ -231,6 +231,7 @@ parameters {
   vector[knots_biomass_1[1]] zs_biomass_1_1;
   vector<lower=0>[nb_biomass_1] sds_biomass_1;  // SDs of penalized spline coefficients
   real<lower=0> sigma_biomass;  // dispersion parameter
+  matrix[N_trend, N_lv_trend] lv_trend;
   vector[Kc_trend] b_trend;  // regression coefficients
 real Intercept_trend;  // temporary intercept for centered predictors
           // Standard VAR: single raw matrix
@@ -267,8 +268,7 @@ transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   mu_trend += Intercept_trend + Xc_trend * b_trend;
-  matrix[N_trend, N_lv_trend] lv_trend;
-  lprior += student_t_lpdf(Intercept_trend | 3, 0.2, 2.5);
+  lprior += student_t_lpdf(Intercept_trend | 3, -0.2, 2.5);
           // Standard VAR: single covariance matrix and transformation
       matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
       cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
@@ -477,4 +477,6 @@ generated quantities {
   real b_count_Intercept = Intercept_count;
   // actual population-level intercept
   real b_biomass_Intercept = Intercept_biomass;
+    // actual population-level intercept
+  real b_Intercept_trend = Intercept_trend - dot_product(means_X_trend, b_trend);
 }

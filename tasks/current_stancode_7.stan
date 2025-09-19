@@ -123,4 +123,6 @@ sigma_trend ~ exponential(2);
 generated quantities {
   // actual population-level intercept
   real b_Intercept = Intercept;
+    // actual population-level intercept
+  real b_Intercept_trend = Intercept_trend;
 }

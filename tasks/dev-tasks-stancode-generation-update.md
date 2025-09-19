@@ -32,10 +32,7 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 
 ### PRIORITY 0 (URGENT): Align current_stancode_3.stan with target architecture
 - **CRITICAL**: Fix fundamental parameter structure discrepancies in file 3
-- Move `lv_trend` from computed variable to parameter declaration (target has this correct)
 - Verify VARMA dynamics implementation against original Heaps 2022 specification
-- Fix hard-coded dimensions: `trend_zeros` should use `N_lv_trend` not hardcoded `3`
-- Ensure generated quantities includes `b_trend_Intercept` computation
 - **STATUS**: current_stancode_3.stan compiles but has wrong architecture vs target
 
 ### Priority 1: Check compilation status of all current_stancode files in tasks/

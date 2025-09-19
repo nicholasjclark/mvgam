@@ -2561,11 +2561,15 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
     trend_stanvars <- apply_response_suffix_to_stanvars(trend_stanvars, response_suffix)
   }
 
+  # Determine correct block for lv_trend based on trend type
+  # For VAR models, lv_trend must be in parameters block for proper MCMC sampling
+  lv_trend_block <- if (trend_type == "VAR") "parameters" else "tparameters"
+
   # Add shared lv_trend matrix declaration (used by all trend types)
   lv_trend_stanvar <- brms::stanvar(
     name = "shared_lv_trend",
     scode = "matrix[N_trend, N_lv_trend] lv_trend;",
-    block = "tparameters"
+    block = lv_trend_block
   )
 
   # Combine all components: common dimensions + shared innovations + lv_trend + trend-specific
@@ -3295,7 +3299,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Dynamic parts that need variable interpolation
   dynamic_part <- glue::glue("
       // Zero mean vector for VARMA process (following Heaps 2022)
-      vector[{n_lv}] trend_zeros = rep_vector(0.0, {n_lv});
+      vector[N_lv_trend] trend_zeros = rep_vector(0.0, N_lv_trend);
 
       {if(is_hierarchical) glue::glue('
       // Hierarchical grouping data structures
@@ -4727,6 +4731,21 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
       )
       model_stanvar_created <- TRUE
     }
+  }
+
+  # 5. Extract generated quantities block content (without headers)
+  genquant_block <- extract_stan_block_content(stancode, "generated quantities")
+  
+  if (!is.null(genquant_block) && nchar(trimws(genquant_block)) > 0) {
+    genquant_result <- rename_parameters_in_block(
+      genquant_block, suffix, mapping, "generated quantities", is_multivariate, response_names
+    )
+    mapping <- genquant_result$mapping  # Update mapping
+
+    stanvar_list[["trend_generated_quantities"]] <- brms::stanvar(
+      scode = genquant_result$code,
+      block = "genquant"
+    )
   }
 
   # Combine individual stanvar objects into proper stanvars collection

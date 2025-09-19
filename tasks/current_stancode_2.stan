@@ -121,4 +121,6 @@ generated quantities {
   real b_count_Intercept = Intercept_count - dot_product(means_X_count, b_count);
   // actual population-level intercept
   real b_biomass_Intercept = Intercept_biomass - dot_product(means_X_biomass, b_biomass);
+    // actual population-level intercept
+  real b_Intercept_trend = Intercept_trend;
 }
