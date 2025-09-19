@@ -51,44 +51,66 @@ functions {
   array[,] matrix rev_mapping(array[] matrix P, matrix Sigma) {
     int p = size(P);
     int m = rows(Sigma);
-
-    if (p == 0) {
-      array[2, 0] matrix[m, m] empty_result;
-      return empty_result;
-    }
-
     array[p, p] matrix[m, m] phi_for;
     array[p, p] matrix[m, m] phi_rev;
     array[p + 1] matrix[m, m] Sigma_for;
     array[p + 1] matrix[m, m] Sigma_rev;
+    matrix[m, m] S_for;
+    matrix[m, m] S_rev;
+    array[p + 1] matrix[m, m] S_for_list;
+    array[p + 1] matrix[m, m] Gamma_trans;
     array[2, p] matrix[m, m] phiGamma;
 
-    Sigma_for[1] = Sigma;
-    Sigma_rev[p + 1] = Sigma;
-
-    for (k in 1:p) {
-      phi_for[k, k] = P[k];
-      Sigma_for[k + 1] = Sigma_for[k] - quad_form_sym(Sigma_for[k], P[k]');
-
-      for (j in 1:(k-1)) {
-        phi_for[j, k] = phi_for[j, k-1] - phi_for[k, k] * phi_for[k-j, k-1];
+    // Step 1: Forward pass - compute Sigma_for and S_for_list
+    Sigma_for[p + 1] = Sigma;
+    S_for_list[p + 1] = sqrtm(Sigma);
+    for (s in 1:p) {
+      // Compute working matrices (S_rev is B^{-1}, S_for is working matrix)
+      S_for = -tcrossprod(P[p - s + 1]);
+      for (i in 1:m) {
+        S_for[i, i] += 1.0;
       }
+      S_rev = sqrtm(S_for);
+      S_for_list[p - s + 1] = mdivide_right_spd(
+        mdivide_left_spd(S_rev, sqrtm(quad_form_sym(Sigma_for[p - s + 2], S_rev))),
+        S_rev
+      );
+      Sigma_for[p - s + 1] = tcrossprod(S_for_list[p - s + 1]);
     }
 
-    for (k in p:1) {
-      phi_rev[k, k] = P[k];
-      Sigma_rev[k] = Sigma_rev[k + 1] - quad_form_sym(Sigma_rev[k + 1], P[k]');
+    // Step 2: Reverse pass - compute phi coefficients and Gamma matrices
+    Sigma_rev[1] = Sigma_for[1];
+    Gamma_trans[1] = Sigma_for[1];
+    for (s in 0:(p - 1)) {
+      S_for = S_for_list[s + 1];
+      S_rev = sqrtm(Sigma_rev[s + 1]);
+      phi_for[s + 1, s + 1] = mdivide_right_spd(S_for * P[s + 1], S_rev);
+      phi_rev[s + 1, s + 1] = mdivide_right_spd(S_rev * P[s + 1]', S_for);
+      Gamma_trans[s + 2] = phi_for[s + 1, s + 1] * Sigma_rev[s + 1];
 
-      for (j in 1:(k-1)) {
-        phi_rev[j, k] = phi_rev[j, k+1] - phi_rev[k, k] * phi_rev[k-j, k+1];
+      if (s >= 1) {
+        // Update phi coefficients using recursive relations
+        for (k in 1:s) {
+          phi_for[s + 1, k] = phi_for[s, k] -
+                              phi_for[s + 1, s + 1] * phi_rev[s, s - k + 1];
+          phi_rev[s + 1, k] = phi_rev[s, k] -
+                              phi_rev[s + 1, s + 1] * phi_for[s, s - k + 1];
+        }
+        // Update Gamma_trans using phi coefficients
+        for (k in 1:s) {
+          Gamma_trans[s + 2] = Gamma_trans[s + 2] +
+                               phi_for[s, k] * Gamma_trans[s + 2 - k];
+        }
       }
+      Sigma_rev[s + 2] = Sigma_rev[s + 1] -
+                         quad_form_sym(Sigma_for[s + 1], phi_rev[s + 1, s + 1]');
     }
 
+    // Pack results: phi coefficients in row 1, Gamma matrices in row 2
     for (i in 1:p) {
-      phiGamma[1, i] = phi_for[i, p];
-      phiGamma[2, i] = Sigma_for[i + 1];
+      phiGamma[1, i] = phi_for[p, i];
+      phiGamma[2, i] = Gamma_trans[i]';
     }
-
     return phiGamma;
   }
 
@@ -350,10 +372,8 @@ model {
   }
 
   for (lag in 1:2) {
-    Amu_trend[1, lag] ~ normal(0.0, 1.0);
-    Aomega_trend[1, lag] ~ gamma(2.0, 1.0);
-    Amu_trend[2, lag] ~ normal(0.0, 1.0);
-    Aomega_trend[2, lag] ~ gamma(2.0, 1.0);
+    Amu_trend[lag] ~ normal(0, sqrt(0.455));
+    Aomega_trend[lag] ~ gamma(1.365, 0.071175);
   }
 
   Dmu_trend[1, 1] ~ normal(0.0, 1.0);

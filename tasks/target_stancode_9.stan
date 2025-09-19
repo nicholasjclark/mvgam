@@ -80,8 +80,7 @@ model {
     nlp_b2 += X_b2 * b_b2;
 
     for (n in 1:N) {
-      mu[n] = (nlp_b1[n] * exp(nlp_b2[n] * C_1[n]));
-      mu[n] += trend[obs_trend_time[n], obs_trend_series[n]];
+      mu[n] = ((nlp_b1[n] * exp(nlp_b2[n] * C_1[n]))) + trend[obs_trend_time[n], obs_trend_series[n]];
     }
 
     target += normal_lpdf(Y | mu, sigma);

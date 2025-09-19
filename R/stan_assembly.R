@@ -3154,7 +3154,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
        * @param Sigma Innovation covariance matrix
        * @return Array containing phi coefficients and Gamma matrices [2, p]
        */
-      array[,] matrix[,] rev_mapping(array[] matrix[,] P, matrix Sigma) {
+      array[,] matrix rev_mapping(array[] matrix P, matrix Sigma) {
         int p = size(P);
         int m = rows(Sigma);
         array[p, p] matrix[m, m] phi_for;
@@ -3228,7 +3228,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
        * @param theta Array of stationary MA coefficient matrices
        * @return Joint covariance matrix Omega for (y_0,...,y_{1-p},eps_0,...,eps_{1-q})
        */
-      matrix initial_joint_var(matrix Sigma, array[] matrix[,] phi, array[] matrix[,] theta) {
+      matrix initial_joint_var(matrix Sigma, array[] matrix phi, array[] matrix theta) {
         int p = size(phi);
         int q = size(theta);
         int m = rows(Sigma);
@@ -3311,54 +3311,9 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       ') else ''}
   ")
 
-  # Static array initializations (no glue needed)
-  static_arrays <- "
-      // Hyperparameter constants for hierarchical priors (as constants, not user inputs)
-      // For A_trend coefficient matrices: diagonal and off-diagonal elements
-      array[2] vector[2] es_trend = {
-        {0.0, 0.0},    // Means for diagonal elements [lag 1, lag 2, ...]
-        {0.0, 0.0}     // Means for off-diagonal elements [lag 1, lag 2, ...]
-      };
-      array[2] vector[2] fs_trend = {
-        {1.0, 1.0},    // Standard deviations for diagonal elements
-        {1.0, 1.0}     // Standard deviations for off-diagonal elements
-      };
-      array[2] vector[2] gs_trend = {
-        {2.0, 2.0},    // Gamma shape parameters for diagonal precision
-        {2.0, 2.0}     // Gamma shape parameters for off-diagonal precision
-      };
-      array[2] vector[2] hs_trend = {
-        {1.0, 1.0},    // Gamma rate parameters for diagonal precision
-        {1.0, 1.0}     // Gamma rate parameters for off-diagonal precision
-      };"
-
-  # Static VARMA arrays (no glue needed)
-  varma_arrays <- if(is_varma) {
-    "
-      // Additional hyperparameters for D_trend (MA coefficient matrices) when ma_lags > 0
-      array[2] vector[2] es_ma_trend = {
-        {0.0, 0.0},    // Means for MA diagonal elements
-        {0.0, 0.0}     // Means for MA off-diagonal elements
-      };
-      array[2] vector[2] fs_ma_trend = {
-        {1.0, 1.0},    // Standard deviations for MA diagonal elements
-        {1.0, 1.0}     // Standard deviations for MA off-diagonal elements
-      };
-      array[2] vector[2] gs_ma_trend = {
-        {2.0, 2.0},    // Gamma shape for MA diagonal precision
-        {2.0, 2.0}     // Gamma shape for MA off-diagonal precision
-      };
-      array[2] vector[2] hs_ma_trend = {
-        {1.0, 1.0},    // Gamma rate for MA diagonal precision
-        {1.0, 1.0}     // Gamma rate for MA off-diagonal precision
-      };"
-  } else {
-    ""
-  }
-
   var_tdata_stanvar <- brms::stanvar(
     name = "var_tdata",
-    scode = paste0(dynamic_part, static_arrays, varma_arrays),
+    scode = dynamic_part,
     block = "tdata"
   )
 
@@ -3595,13 +3550,17 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       "        }\n",
       "      }\n\n",
       "      // Hyperpriors for hierarchical MA coefficient means and precisions\n",
-      "      for (component in 1:2) {  // [1] diagonal, [2] off-diagonal\n",
-      "        Dmu_trend[component] ~ normal(es_ma_trend[component], fs_ma_trend[component]);\n",
-      "        Domega_trend[component] ~ gamma(gs_ma_trend[component], hs_ma_trend[component]);\n",
-      "      }"
+      "      Dmu_trend[1, 1] ~ normal(0.0, 1.0);\n",
+      "      Domega_trend[1, 1] ~ gamma(2.0, 1.0);\n",
+      "      Dmu_trend[2, 1] ~ normal(0.0, 1.0);\n",
+      "      Domega_trend[2, 1] ~ gamma(2.0, 1.0);"
     )
   } else ""
 
+  # Create transpose strings to avoid quote escaping issues in glue
+  lv_transpose <- "lv_trend[t, :]'"
+  lv_transpose_lag <- "lv_trend[t - i, :]'"
+  
   var_model_stanvar <- brms::stanvar(
     name = "var_model",
     scode = glue::glue("
@@ -3633,7 +3592,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
             }}
           }} else {{
             // Use regular lv_trend values
-            mu_t_trend[t] += A_trend[i] * lv_trend[t - i, :];
+            mu_t_trend[t] += A_trend[i] * {lv_transpose_lag};
           }}
         }}
 
@@ -3653,10 +3612,10 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         ') else ''}
       }}
 
-      // Observation likelihood for time series
+      // Latent variable dynamics
       for (t in 1:N_trend) {{
-        lv_trend[t, :] ~ multi_normal(mu_t_trend[t], Sigma_trend);
-        {if(is_varma) '// Compute MA error for next iteration\n        ma_error_trend[t] = lv_trend[t, :] - mu_t_trend[t];' else ''}
+        {lv_transpose} ~ multi_normal(mu_t_trend[t], Sigma_trend);
+        {if(is_varma) paste0('// Compute MA error for next iteration\n        ma_error_trend[t] = ', lv_transpose, ' - mu_t_trend[t];') else ''}
       }}
 
       {var_priors_block}
@@ -3667,10 +3626,9 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       L_Omega_trend ~ lkj_corr_cholesky(2);
 
       // Hyperpriors for hierarchical VAR coefficient means and precisions
-      // Following Heaps 2022 exchangeable hyperprior structure
-      for (component in 1:2) {{  // [1] diagonal, [2] off-diagonal
-        Amu_trend[component] ~ normal(es_trend[component], fs_trend[component]);
-        Aomega_trend[component] ~ gamma(gs_trend[component], hs_trend[component]);
+      for (lag in 1:2) {{
+        Amu_trend[lag] ~ normal(0, sqrt(0.455));
+        Aomega_trend[lag] ~ gamma(1.365, 0.071175);
       }}
     "),
     block = "model"

@@ -43,7 +43,7 @@ functions {
         return C;
       }
 
-      array[,] matrix[,] rev_mapping(array[] matrix[,] P, matrix Sigma) {
+      array[,] matrix rev_mapping(array[] matrix P, matrix Sigma) {
         int p = size(P);
         int m = rows(Sigma);
         array[p, p] matrix[m, m] phi_for;
@@ -109,7 +109,7 @@ functions {
         return phiGamma;
       }
 
-      matrix initial_joint_var(matrix Sigma, array[] matrix[,] phi, array[] matrix[,] theta) {
+      matrix initial_joint_var(matrix Sigma, array[] matrix phi, array[] matrix theta) {
         int p = size(phi);
         int q = size(theta);
         int m = rows(Sigma);
@@ -215,41 +215,6 @@ transformed data {
     vector[3] trend_zeros = rep_vector(0.0, 3);
 
     
-      // Hyperparameter constants for hierarchical priors (as constants, not user inputs)
-      // For A_trend coefficient matrices: diagonal and off-diagonal elements
-      array[2] vector[2] es_trend = {
-        {0.0, 0.0},    // Means for diagonal elements [lag 1, lag 2, ...]
-        {0.0, 0.0}     // Means for off-diagonal elements [lag 1, lag 2, ...]
-      };
-      array[2] vector[2] fs_trend = {
-        {1.0, 1.0},    // Standard deviations for diagonal elements
-        {1.0, 1.0}     // Standard deviations for off-diagonal elements
-      };
-      array[2] vector[2] gs_trend = {
-        {2.0, 2.0},    // Gamma shape parameters for diagonal precision
-        {2.0, 2.0}     // Gamma shape parameters for off-diagonal precision
-      };
-      array[2] vector[2] hs_trend = {
-        {1.0, 1.0},    // Gamma rate parameters for diagonal precision
-        {1.0, 1.0}     // Gamma rate parameters for off-diagonal precision
-      };
-      // Additional hyperparameters for D_trend (MA coefficient matrices) when ma_lags > 0
-      array[2] vector[2] es_ma_trend = {
-        {0.0, 0.0},    // Means for MA diagonal elements
-        {0.0, 0.0}     // Means for MA off-diagonal elements
-      };
-      array[2] vector[2] fs_ma_trend = {
-        {1.0, 1.0},    // Standard deviations for MA diagonal elements
-        {1.0, 1.0}     // Standard deviations for MA off-diagonal elements
-      };
-      array[2] vector[2] gs_ma_trend = {
-        {2.0, 2.0},    // Gamma shape for MA diagonal precision
-        {2.0, 2.0}     // Gamma shape for MA off-diagonal precision
-      };
-      array[2] vector[2] hs_ma_trend = {
-        {1.0, 1.0},    // Gamma rate for MA diagonal precision
-        {1.0, 1.0}     // Gamma rate for MA off-diagonal precision
-      };
 }
 parameters {
   real Intercept_count;  // temporary intercept for centered predictors
@@ -303,7 +268,7 @@ transformed parameters {
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   mu_trend += Intercept_trend + Xc_trend * b_trend;
   matrix[N_trend, N_lv_trend] lv_trend;
-  lprior += student_t_lpdf(Intercept_trend | 3, -0.2, 2.5);
+  lprior += student_t_lpdf(Intercept_trend | 3, 0.2, 2.5);
           // Standard VAR: single covariance matrix and transformation
       matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
       cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
@@ -412,7 +377,7 @@ model {
         }
       } else {
         // Use regular lv_trend values
-        mu_t_trend[t] += A_trend[i] * lv_trend[t - i, :];
+        mu_t_trend[t] += A_trend[i] * lv_trend[t - i, :]';
       }
     }
 
@@ -430,11 +395,11 @@ for (i in 1:1) {
 }
   }
 
-  // Observation likelihood for time series
+  // Latent variable dynamics
   for (t in 1:N_trend) {
-    lv_trend[t, :] ~ multi_normal(mu_t_trend[t], Sigma_trend);
+    lv_trend[t, :]' ~ multi_normal(mu_t_trend[t], Sigma_trend);
     // Compute MA error for next iteration
-    ma_error_trend[t] = lv_trend[t, :] - mu_t_trend[t];
+    ma_error_trend[t] = lv_trend[t, :]' - mu_t_trend[t];
   }
 
         // Standard VAR: single matrix priors
@@ -469,19 +434,18 @@ for (i in 1:1) {
       }
 
       // Hyperpriors for hierarchical MA coefficient means and precisions
-      for (component in 1:2) {  // [1] diagonal, [2] off-diagonal
-        Dmu_trend[component] ~ normal(es_ma_trend[component], fs_ma_trend[component]);
-        Domega_trend[component] ~ gamma(gs_ma_trend[component], hs_ma_trend[component]);
-      }
+      Dmu_trend[1, 1] ~ normal(0.0, 1.0);
+      Domega_trend[1, 1] ~ gamma(2.0, 1.0);
+      Dmu_trend[2, 1] ~ normal(0.0, 1.0);
+      Domega_trend[2, 1] ~ gamma(2.0, 1.0);
 
   // LKJ correlation prior on Cholesky factor
   L_Omega_trend ~ lkj_corr_cholesky(2);
 
   // Hyperpriors for hierarchical VAR coefficient means and precisions
-  // Following Heaps 2022 exchangeable hyperprior structure
-  for (component in 1:2) {  // [1] diagonal, [2] off-diagonal
-    Amu_trend[component] ~ normal(es_trend[component], fs_trend[component]);
-    Aomega_trend[component] ~ gamma(gs_trend[component], hs_trend[component]);
+  for (lag in 1:2) {
+    Amu_trend[lag] ~ normal(0, sqrt(0.455));
+    Aomega_trend[lag] ~ gamma(1.365, 0.071175);
   }
   sigma_trend ~ exponential(2);
   // likelihood including constants

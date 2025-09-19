@@ -29,12 +29,15 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 
 **AGENT TASK**: Your ONLY job is to read the existing files and report discrepancies with specific line numbers and code snippets.
 
-### 1. **PRIORITY**: Computational Logic Differences
-**Location**: Files 8 & 9 (nonlinear and GP computation approaches)
-**Issue**: Different computation strategies between current vs target files
-**Evidence**: File 9 uses single-line vs two-operation nonlinear computation; File 8 may have GP placement differences
-**Investigation Needed**: Line-by-line logic comparison to identify functional vs cosmetic differences
 
-### 2. **PRIORITY**: Cosmetics
-**Location**: All files
-**Issue**: Comments should be stripped following target file patterns, and indentation should be clear and structured. Inspect clean_target_comments.R for guidance
+### PRIORITY 0 (URGENT): Align current_stancode_3.stan with target architecture
+- **CRITICAL**: Fix fundamental parameter structure discrepancies in file 3
+- Move `lv_trend` from computed variable to parameter declaration (target has this correct)
+- Verify VARMA dynamics implementation against original Heaps 2022 specification
+- Fix hard-coded dimensions: `trend_zeros` should use `N_lv_trend` not hardcoded `3`
+- Ensure generated quantities includes `b_trend_Intercept` computation
+- **STATUS**: current_stancode_3.stan compiles but has wrong architecture vs target
+
+### Priority 1: Check compilation status of all current_stancode files in tasks/
+- Run `rstan::stanc('tasks/current_stancode_*.stan') for each example file
+- Summarize findings and use any failures to generate next priorities for development
