@@ -1,13 +1,13 @@
 // Expected final model for the following:
-// stancode(
-//  mvgam_formula(
-//    formula = bf(count ~ x, family = poisson()) +
-//      bf(presence ~ x, family = bernoulli()) +
-//      bf(biomass ~ x, family = Gamma()),
-//    trend_formula = ~ -1 + AR(p = 1, n_lv = 2, cor = TRUE),
-//  ),
-//  data = data
-// )
+  // stancode(
+    //  mvgam_formula(
+      //    formula = bf(count ~ x, family = poisson()) +
+        //      bf(presence ~ x, family = bernoulli()) +
+        //      bf(biomass ~ x, family = Gamma()),
+      //    trend_formula = ~ -1 + AR(p = 1, n_lv = 2, cor = TRUE),
+      //  ),
+    //  data = data
+    // )
 
 functions {
 }
@@ -117,27 +117,27 @@ transformed parameters {
     }
   }
 
-  vector[N_count] mu_count = Xc_count * b_count;
-  vector[N_presence] mu_presence = Xc_presence * b_presence;
-  vector[N_biomass] mu_biomass = rep_vector(0.0, N_biomass);
-  mu_biomass += Intercept_biomass + Xc_biomass * b_biomass;
-
-  for (n in 1:N_count) {
-    mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
-  }
-
-  for (n in 1:N_presence) {
-    mu_presence[n] += Intercept_presence + trend[obs_trend_time_presence[n], obs_trend_series_presence[n]];
-  }
-
-  for (n in 1:N_biomass) {
-    mu_biomass[n] += trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
-  }
-
-  mu_biomass = inv(mu_biomass);
 }
 model {
   if (!prior_only) {
+    vector[N_count] mu_count = Xc_count * b_count;
+    vector[N_presence] mu_presence = Xc_presence * b_presence;
+    vector[N_biomass] mu_biomass = rep_vector(0.0, N_biomass);
+    mu_biomass += Intercept_biomass + Xc_biomass * b_biomass;
+
+    for (n in 1:N_count) {
+      mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
+    }
+
+    for (n in 1:N_presence) {
+      mu_presence[n] += Intercept_presence + trend[obs_trend_time_presence[n], obs_trend_series_presence[n]];
+    }
+
+    for (n in 1:N_biomass) {
+      mu_biomass[n] += trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
+    }
+
+    mu_biomass = inv(mu_biomass);
     target += poisson_log_glm_lpmf(Y_count | to_matrix(mu_count), 0.0, mu_ones_count);
     target += bernoulli_logit_glm_lpmf(Y_presence | to_matrix(mu_presence), 0.0, mu_ones_presence);
     target += gamma_lpdf(Y_biomass | shape_biomass, shape_biomass ./ mu_biomass);

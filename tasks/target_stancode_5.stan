@@ -91,12 +91,6 @@ transformed parameters {
       trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
     }
   }
-
-  vector[N] mu = Xc * b;
-
-  for (n in 1:N) {
-    mu[n] += Intercept + trend[obs_trend_time[n], obs_trend_series[n]];
-  }
 }
 model {
   m_trend ~ student_t(3, 0, 2.5);
@@ -104,6 +98,12 @@ model {
   to_vector(delta_trend) ~ double_exponential(0, change_scale_trend);
 
   if (!prior_only) {
+    vector[N] mu = Xc * b;
+
+    for (n in 1:N) {
+      mu[n] += Intercept + trend[obs_trend_time[n], obs_trend_series[n]];
+    }
+
     target += poisson_log_glm_lpmf(Y | to_matrix(mu), 0.0, mu_ones);
   }
 

@@ -696,7 +696,7 @@ detect_glm_usage <- function(stan_code, response_names = NULL) {
 
   if (is.null(response_names)) {
     detected <- sapply(glm_patterns, function(pattern) {
-      any(grepl(paste0(pattern, "_l(pdf|pmf)\\s*\\("), stan_code))
+      any(grepl(paste0("target\\s*\\+=.*", pattern, "_l(pdf|pmf)"), stan_code))
     })
     return(names(detected)[detected])
   }
@@ -850,6 +850,7 @@ transform_glm_call <- function(stan_code, glm_type, params) {
 #' @return Modified Stan code with GLM-compatible trend injection
 #' @noRd
 inject_trend_into_glm_predictor <- function(base_stancode, trend_stanvars, glm_type) {
+  cat("DEBUG: inject_trend_into_glm_predictor called with glm_type =", glm_type, "\n")
   checkmate::assert_string(base_stancode, min.chars = 1)
   checkmate::assert_list(trend_stanvars)
   checkmate::assert_string(glm_type)
@@ -898,27 +899,19 @@ inject_trend_into_glm_predictor <- function(base_stancode, trend_stanvars, glm_t
     "  }"
   )
 
-  # Create stanvar for combined mu construction in transformed parameters
+  # Create stanvar for combined mu construction in model block
   mu_stanvar_code <- paste0(combined_mu_code, collapse = "\n")
 
-  # Insert combined mu into transformed parameters block
-  tparams_pattern <- "(transformed parameters\\s*\\{)(.*?)(\\}\\s*model)"
-  if (grepl(tparams_pattern, base_stancode)) {
-    # Add to existing transformed parameters
-    modified_code <- gsub(
-      tparams_pattern,
-      paste0("\\1\\2\n", mu_stanvar_code, "\n\\3"),
-      base_stancode
-    )
-  } else {
-    # Insert new transformed parameters block
-    model_pattern <- "(\\s*)(model\\s*\\{)"
-    modified_code <- gsub(
-      model_pattern,
-      paste0("\\1transformed parameters {\n", mu_stanvar_code, "\n}\n\\1\\2"),
-      base_stancode
-    )
-  }
+  # Extract common logic for finding prior_only insertion point
+  # This eliminates duplication between GLM and multivariate paths while
+  # using the proven robust line-by-line approach from multivariate implementation
+  code_lines <- strsplit(base_stancode, "\n")[[1]]
+  model_info <- find_stan_block(code_lines, "model")
+  insertion_point <- find_prior_only_insertion_point(code_lines, model_info)
+
+  # Insert mu code at correct location
+  code_lines <- append(code_lines, mu_stanvar_code, after = insertion_point)
+  modified_code <- paste(code_lines, collapse = "\n")
 
   # Transform GLM function calls to use combined mu
   final_code <- transform_glm_call(modified_code, glm_type, params)
@@ -1095,6 +1088,49 @@ find_stan_block <- function(code_lines, block_name) {
   return(list(start_idx = start_idx, end_idx = end_idx))
 }
 
+#' Find Insertion Point After if (!prior_only) in Model Block
+#'
+#' @description
+#' Locates the optimal insertion point for code within a model block,
+#' preferring after if (!prior_only) conditional when present.
+#' Eliminates duplication between GLM and multivariate injection paths.
+#'
+#' @param code_lines Character vector of Stan code lines  
+#' @param model_block_info List with start_idx, end_idx from find_stan_block()
+#' @return Integer insertion point (line number where code should be inserted)
+#' @noRd
+find_prior_only_insertion_point <- function(code_lines, model_block_info) {
+  checkmate::assert_character(code_lines, min.len = 1)
+  checkmate::assert_list(model_block_info, names = "named")
+  checkmate::assert_names(names(model_block_info), must.include = c("start_idx", "end_idx"))
+  checkmate::assert_integerish(model_block_info$start_idx, lower = 1)
+  checkmate::assert_integerish(model_block_info$end_idx, lower = model_block_info$start_idx)
+  
+  # Search for if (!prior_only) pattern within model block bounds
+  search_start <- model_block_info$start_idx + 1
+  search_end <- min(model_block_info$end_idx, length(code_lines))
+  
+  for (i in search_start:search_end) {
+    if (grepl("if\\s*\\(\\s*!prior_only\\s*\\)", code_lines[i], perl = TRUE)) {
+      cat("DEBUG: Found if (!prior_only) at line", i, ":", code_lines[i], "\n")
+      # Check if opening brace is on same line or next line
+      if (grepl("\\{", code_lines[i], perl = TRUE)) {
+        cat("DEBUG: Brace on same line, returning", i, "\n")
+        return(i)  # Brace on same line, insert after this line
+      } else if (i + 1 <= length(code_lines) && grepl("^\\s*\\{", code_lines[i + 1], perl = TRUE)) {
+        cat("DEBUG: Brace on next line, returning", i + 1, "\n")
+        return(i + 1)  # Brace on next line, insert after the brace line
+      } else {
+        cat("DEBUG: No brace found, fallback returning", i, "\n")
+        return(i)  # Fallback to after the if line
+      }
+    }
+  }
+  
+  # Fallback: insert after model block declaration
+  return(model_block_info$start_idx)
+}
+
 #' Inject Trend into Linear Predictor
 #'
 #' @description
@@ -1106,6 +1142,7 @@ find_stan_block <- function(code_lines, block_name) {
 #' @return Modified Stan code with trend injection
 #' @noRd
 inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
+  cat("DEBUG: inject_trend_into_linear_predictor called\n")
   # Input validation
   checkmate::assert_string(base_stancode, min.chars = 1)
   checkmate::assert_list(trend_stanvars, null.ok = TRUE)
@@ -1173,14 +1210,36 @@ insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_cod
 
   # Calculate absolute position of last mu += line
   last_mu_pos <- block_info$start_idx + mu_line_indices[length(mu_line_indices)] - 1
+  
+  # Look ahead for family transformation lines (mu.*= not mu.*+=)
+  # Use specific pattern to match function transformations: inv(), exp(), log(), etc.
+  transformation_pattern <- "^\\s*mu(_\\w+)?\\s*=\\s*\\w+\\s*\\("
+  transformation_indices <- which(grepl(transformation_pattern, model_lines))
+  
+  # Find insertion point: after last += but before any transformation
+  insert_pos <- last_mu_pos
+  if (length(transformation_indices) > 0) {
+    # Find first transformation that comes after the last += line
+    relative_transformations <- transformation_indices[transformation_indices > mu_line_indices[length(mu_line_indices)]]
+    if (length(relative_transformations) > 0) {
+      first_transformation_pos <- block_info$start_idx + relative_transformations[1] - 1
+      # Validate bounds before setting insert position
+      if (first_transformation_pos > last_mu_pos && first_transformation_pos <= length(code_lines)) {
+        insert_pos <- first_transformation_pos - 1
+      }
+    }
+  }
+  
+  # Validate final insert position
+  checkmate::assert_int(insert_pos, lower = 1, upper = length(code_lines))
 
-  # Insert trend injection after last mu += line with proper indentation
+  # Insert trend injection with proper indentation
   indented_injection <- paste0("    ", trend_injection_code)
 
   result_lines <- c(
-    code_lines[1:last_mu_pos],
+    code_lines[1:insert_pos],
     indented_injection,
-    code_lines[(last_mu_pos + 1):length(code_lines)]
+    code_lines[(insert_pos + 1):length(code_lines)]
   )
 
   return(result_lines)
@@ -1373,6 +1432,9 @@ inject_multivariate_trends_into_linear_predictors <- function(
   # Separate responses by GLM usage
   glm_responses <- names(detected_glm_types[detected_glm_types])
   non_glm_responses <- setdiff(responses_with_trends, glm_responses)
+  cat("DEBUG: detected_glm_types =", paste(names(detected_glm_types), ":", detected_glm_types, collapse=", "), "\n")
+  cat("DEBUG: glm_responses =", paste(glm_responses, collapse=", "), "\n")
+  cat("DEBUG: non_glm_responses =", paste(non_glm_responses, collapse=", "), "\n")
 
   # Handle GLM responses with response-specific transformations
   if (length(glm_responses) > 0) {
@@ -1412,51 +1474,53 @@ inject_multivariate_trends_into_linear_predictors <- function(
         }
       }
 
-      # Add mu_<resp> computation in transformed parameters
-      tparams_start <- which(grepl("^\\s*transformed parameters\\s*\\{", code_lines))
-      if (length(tparams_start) > 0) {
-        # Find insertion point AFTER trend computation to respect dependencies
-        # Validate tparams_start exists before proceeding
-        checkmate::assert_integerish(tparams_start, len = 1, lower = 1,
-                                    upper = length(code_lines))
+      # Add mu_<resp> computation in model block using shared utility
+      model_info <- find_stan_block(code_lines, "model")
+      if (!is.null(model_info)) {
+        # Use shared utility for consistent prior_only insertion logic
+        insert_point <- find_prior_only_insertion_point(code_lines, model_info)
+        cat("DEBUG: resp_name =", resp_name, "| glm_responses =", paste(glm_responses, collapse=","), "\n")
+        cat("DEBUG: Initial insert_point =", insert_point, "| Line content:", code_lines[insert_point], "\n")
 
-        insert_point <- tparams_start[1]
+        # For GLM responses: preserve prior_only insertion point for optimization
+        # For non-GLM responses: use trend computation strategies for complex positioning
+        if (!resp_name %in% glm_responses) {
+          cat("DEBUG: Taking NON-GLM path for", resp_name, "\n")
+          # Strategy 1: Look for nested trend computation loops with semantic understanding
+          trend_computation_end <- find_trend_computation_end(code_lines)
 
-        # Strategy 1: Look for nested trend computation loops with semantic understanding
-        trend_computation_end <- find_trend_computation_end(code_lines)
+          if (!is.null(trend_computation_end)) {
+            # Use the detected end point
+            insert_point <- trend_computation_end
+          } else {
+            # Fallback: Look for any trend computation pattern
+            trend_pattern <- "trend\\[\\s*i\\s*,\\s*s\\s*\\]\\s*=.*dot_product"
+            trend_lines <- which(grepl(trend_pattern, code_lines))
 
-        if (!is.null(trend_computation_end)) {
-          # Use the detected end point
-          insert_point <- trend_computation_end
-        } else {
-          # Fallback: Look for any trend computation pattern
-          trend_pattern <- "trend\\[\\s*i\\s*,\\s*s\\s*\\]\\s*=.*dot_product"
-          trend_lines <- which(grepl(trend_pattern, code_lines))
+            if (length(trend_lines) > 0) {
+              # Strategy 2: Find the outermost closing brace after trend computation
+              trend_start <- trend_lines[1]
 
-          if (length(trend_lines) > 0) {
-            # Strategy 2: Find the outermost closing brace after trend computation
-            trend_start <- trend_lines[1]
+              # Look for the trend computation nested loop start
+              loop_start <- grep("for\\s*\\(\\s*i\\s+in\\s+1:N_trend\\s*\\)", code_lines)
+              if (length(loop_start) > 0 && loop_start[1] <= trend_start) {
+                # Found the outer trend loop - look for its closing brace
+                outer_loop_line <- loop_start[1]
 
-            # Look for the trend computation nested loop start
-            loop_start <- grep("for\\s*\\(\\s*i\\s+in\\s+1:N_trend\\s*\\)", code_lines)
-            if (length(loop_start) > 0 && loop_start[1] <= trend_start) {
-              # Found the outer trend loop - look for its closing brace
-              outer_loop_line <- loop_start[1]
+                # Simple approach: find line with only closing brace after the trend computation
+                search_start <- max(trend_lines) + 1
+                search_end <- min(length(code_lines), search_start + 20)
 
-              # Simple approach: find line with only closing brace after the trend computation
-              search_start <- max(trend_lines) + 1
-              search_end <- min(length(code_lines), search_start + 20)
-
-              for (j in search_start:search_end) {
-                if (grepl("^\\s*}\\s*$", code_lines[j])) {
-                  insert_point <- j + 1  # Insert after the closing brace
-                  break
+                for (j in search_start:search_end) {
+                  if (grepl("^\\s*}\\s*$", code_lines[j])) {
+                    insert_point <- j + 1  # Insert after the closing brace
+                    break
+                  }
                 }
+              } else {
+                # Strategy 3: Simple fallback - insert after last trend line
+                insert_point <- max(trend_lines) + 1
               }
-            } else {
-              # Strategy 3: Simple fallback - insert after last trend line
-              insert_point <- max(trend_lines) + 1
-            }
           } else {
             # Strategy 2: Fallback for edge cases (CAR without standard loop)
             matrix_pattern <- "matrix\\[\\s*N_trend\\s*,\\s*N_series_trend\\s*\\]\\s+trend"
@@ -1479,23 +1543,61 @@ inject_multivariate_trends_into_linear_predictors <- function(
             }
           }
         }
+        }
 
         # Final validation of insert point
         checkmate::assert_int(insert_point, lower = 1, upper = length(code_lines))
 
+        # Input validation for transformation handling
+        checkmate::assert_character(code_lines, min.len = 1)
+        checkmate::assert_int(insert_point, lower = 1, upper = length(code_lines))
+        
+        # Detect and extract any existing transformation lines for this response  
+        # Use fixed string matching to avoid regex complications with resp_name
+        mu_transformation_pattern <- paste0("^\\s*mu_", resp_name, "(\\[\\w+\\])?\\s*=\\s*\\S+\\s*\\(")
+        
+        transformation_indices <- which(grepl(mu_transformation_pattern, code_lines))
+        transformation_lines <- character(0)
+        
+        if (length(transformation_indices) > 0) {
+          # Extract transformation lines and remove them from original position
+          transformation_lines <- code_lines[transformation_indices]
+          code_lines <- code_lines[-transformation_indices]
+          
+          # Safe index adjustment with bounds checking
+          removed_before_insert <- sum(transformation_indices < insert_point)
+          new_insert_point <- insert_point - removed_before_insert
+          
+          if (new_insert_point < 1) {
+            insight::format_error(
+              "Insertion point became invalid after removing transformations for {.field resp_name}. ",
+              "Check Stan code structure."
+            )
+          }
+          insert_point <- new_insert_point
+        }
+
         # Create mu computation code
         mu_computation <- c(
-          paste0("  vector[N_", resp_name, "] mu_", resp_name, " = Xc_", resp_name, " * b_", resp_name, ";"),
-          paste0("  for (n in 1:N_", resp_name, ") {"),
-          paste0("    mu_", resp_name, "[n] += Intercept_", resp_name, " + trend[obs_trend_time_", resp_name, "[n], obs_trend_series_", resp_name, "[n]];"),
-          paste0("  }")
+          paste0("    vector[N_", resp_name, "] mu_", resp_name, " = Xc_", resp_name, " * b_", resp_name, ";"),
+          paste0("    for (n in 1:N_", resp_name, ") {"),
+          paste0("      mu_", resp_name, "[n] += Intercept_", resp_name, " + trend[obs_trend_time_", resp_name, "[n], obs_trend_series_", resp_name, "[n]];"),
+          paste0("    }")
         )
+        
+        # Add transformation lines AFTER trend injection if they exist
+        if (length(transformation_lines) > 0) {
+          mu_computation <- c(mu_computation, transformation_lines)
+        }
 
         # Insert mu computation before the closing brace
+        cat("DEBUG: Final insert_point =", insert_point, "| Inserting mu code for", resp_name, "\n")
+        cat("DEBUG: Line at insert_point:", code_lines[insert_point], "\n")
+        cat("DEBUG: mu_computation:", paste(mu_computation, collapse=" | "), "\n")
         code_lines <- c(
-          code_lines[1:(insert_point - 1)],
-          mu_computation,
-          code_lines[insert_point:length(code_lines)]
+          code_lines[1:insert_point],  # Include the if (!prior_only) { line
+          mu_computation,               # Insert mu code AFTER the if line
+          code_lines[(insert_point + 1):length(code_lines)]  # Rest of the code
         )
       }
     }

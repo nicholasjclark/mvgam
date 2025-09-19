@@ -29,21 +29,22 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 
 **AGENT TASK**: Your ONLY job is to read the existing files and report discrepancies with specific line numbers and code snippets.
 
-## PRIORITY ISSUES
+## PRIORITY ISSUES - NEXT AGENT START HERE ⭐
 
-### 1. File 4 - Biomass mu Logic Error  
-**Issue**: `inv()` transformation applied before trend addition
-**Current**: `mu_biomass = inv(mu_biomass)` then `mu_biomass[n] += trend[...]`
-**Target**: Add trend first, then apply `inv()` transformation
-**Location**: Lines 146-156 in current_stancode_4.stan
+### 1. **PRIORITY**: Parameter Naming Consistency Issues
+**Location**: File 8 (current_stancode_8.stan vs target_stancode_8.stan)
+**Issue**: Variable naming inconsistency in GP computation
+**Evidence**: Current uses `rgp_1`, target uses `rgp_1_trend`
+**Investigation Needed**: Systematic review of all trend parameter naming to ensure `_trend` suffix consistency
 
-### 2. File 5 - Hard-coded Prior Parameter
-**Issue**: Using literal `0.05` instead of `change_scale_trend` parameter
-**Current**: `to_vector(delta_trend) ~ double_exponential(0, 0.05);`
-**Target**: `to_vector(delta_trend) ~ double_exponential(0, change_scale_trend);`
-**Location**: Line 137 in current_stancode_5.stan
+### 2. **PRIORITY**: Missing Prior Declarations  
+**Location**: File 9 (current_stancode_9.stan vs target_stancode_9.stan)
+**Issue**: Missing trend parameter priors in transformed parameters block
+**Evidence**: Target includes `lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);` which may be missing in current
+**Investigation Needed**: Comprehensive diff of prior computations between current vs target
 
-### 2. Files 6 & 8 - Order of lprior statements on model block
-**Issue**: lprior statements scattered throughout model block
-**Target**: all lprior statements together at the end of the block
-**Location**: Line 126 in current_stancode_8.stan
+### 3. **PRIORITY**: Computational Logic Differences
+**Location**: Files 8 & 9 (nonlinear and GP computation approaches)
+**Issue**: Different computation strategies between current vs target files
+**Evidence**: File 9 uses single-line vs two-operation nonlinear computation; File 8 may have GP placement differences
+**Investigation Needed**: Line-by-line logic comparison to identify functional vs cosmetic differences

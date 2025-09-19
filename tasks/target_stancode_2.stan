@@ -90,20 +90,19 @@ transformed parameters {
       trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
     }
   }
-
-  vector[N_count] mu_count = Xc_count * b_count;
-  vector[N_biomass] mu_biomass = Xc_biomass * b_biomass;
-
-  for (n in 1:N_count) {
-    mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
-  }
-
-  for (n in 1:N_biomass) {
-    mu_biomass[n] += Intercept_biomass + trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
-  }
 }
 model {
   if (!prior_only) {
+    vector[N_count] mu_count = Xc_count * b_count;
+    vector[N_biomass] mu_biomass = Xc_biomass * b_biomass;
+
+    for (n in 1:N_count) {
+      mu_count[n] += Intercept_count + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
+    }
+
+    for (n in 1:N_biomass) {
+      mu_biomass[n] += Intercept_biomass + trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
+    }
     target += normal_id_glm_lpdf(Y_count | to_matrix(mu_count), 0.0, mu_ones_count, sigma_count);
     target += normal_id_glm_lpdf(Y_biomass | to_matrix(mu_biomass), 0.0, mu_ones_biomass, sigma_biomass);
   }

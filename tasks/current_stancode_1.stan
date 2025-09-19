@@ -65,13 +65,6 @@ mu_trend += Intercept_trend;
     }
   }
   lprior += student_t_lpdf(Intercept | 3, 1.8, 2.5);
-
-  // Efficient matrix multiplication for linear predictor
-  vector[N] mu = Xc * b;
-  // Add intercept and trend components
-  for (n in 1:N) {
-    mu[n] += Intercept + trend[obs_trend_time[n], obs_trend_series[n]];
-  }
 }
 model {
   // Shared Gaussian innovation priors
@@ -79,6 +72,12 @@ model {
   to_vector(innovations_trend) ~ std_normal();
   // likelihood including constants
   if (!prior_only) {
+  // Efficient matrix multiplication for linear predictor
+  vector[N] mu = Xc * b;
+  // Add intercept and trend components
+  for (n in 1:N) {
+    mu[n] += Intercept + trend[obs_trend_time[n], obs_trend_series[n]];
+  }
     target += poisson_log_glm_lpmf(Y | to_matrix(mu), 0.0, mu_ones);
   }
   // priors including constants
@@ -88,4 +87,3 @@ generated quantities {
   // actual population-level intercept
   real b_Intercept = Intercept - dot_product(means_X, b);
 }
-
