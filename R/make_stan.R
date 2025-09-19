@@ -57,11 +57,14 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
   }
 
   # Setup observation model using lightweight brms
+  # Filter priors: only pass observation-related priors to observation setup
+  obs_priors <- filter_obs_priors(prior)
+  
   if (is.null(obs_setup <- setup_brms_lightweight(
     formula = obs_formula,
     data = data,
     family = family,
-    prior = prior,
+    prior = obs_priors,
     data2 = data2,
     sample_prior = sample_prior,
     sparse = sparse,
@@ -84,11 +87,14 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
 
   # Setup trend model if trends are specified
   trend_setup <- if (mv_spec$has_trends) {
+    # Filter priors: only pass trend-related priors to trend setup
+    trend_priors <- filter_trend_priors(prior)
+    
     if (is.null(trend_result <- setup_brms_lightweight(
       formula = mv_spec$base_formula,
       data = data,
       family = gaussian(), # Trends are gaussian processes per architecture
-      prior = prior,
+      prior = trend_priors,
       data2 = data2,
       sample_prior = sample_prior,
       sparse = sparse,

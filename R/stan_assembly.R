@@ -850,7 +850,6 @@ transform_glm_call <- function(stan_code, glm_type, params) {
 #' @return Modified Stan code with GLM-compatible trend injection
 #' @noRd
 inject_trend_into_glm_predictor <- function(base_stancode, trend_stanvars, glm_type) {
-  cat("DEBUG: inject_trend_into_glm_predictor called with glm_type =", glm_type, "\n")
   checkmate::assert_string(base_stancode, min.chars = 1)
   checkmate::assert_list(trend_stanvars)
   checkmate::assert_string(glm_type)
@@ -1112,16 +1111,12 @@ find_prior_only_insertion_point <- function(code_lines, model_block_info) {
   
   for (i in search_start:search_end) {
     if (grepl("if\\s*\\(\\s*!prior_only\\s*\\)", code_lines[i], perl = TRUE)) {
-      cat("DEBUG: Found if (!prior_only) at line", i, ":", code_lines[i], "\n")
       # Check if opening brace is on same line or next line
       if (grepl("\\{", code_lines[i], perl = TRUE)) {
-        cat("DEBUG: Brace on same line, returning", i, "\n")
         return(i)  # Brace on same line, insert after this line
       } else if (i + 1 <= length(code_lines) && grepl("^\\s*\\{", code_lines[i + 1], perl = TRUE)) {
-        cat("DEBUG: Brace on next line, returning", i + 1, "\n")
         return(i + 1)  # Brace on next line, insert after the brace line
       } else {
-        cat("DEBUG: No brace found, fallback returning", i, "\n")
         return(i)  # Fallback to after the if line
       }
     }
@@ -1142,7 +1137,6 @@ find_prior_only_insertion_point <- function(code_lines, model_block_info) {
 #' @return Modified Stan code with trend injection
 #' @noRd
 inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
-  cat("DEBUG: inject_trend_into_linear_predictor called\n")
   # Input validation
   checkmate::assert_string(base_stancode, min.chars = 1)
   checkmate::assert_list(trend_stanvars, null.ok = TRUE)
@@ -1432,9 +1426,6 @@ inject_multivariate_trends_into_linear_predictors <- function(
   # Separate responses by GLM usage
   glm_responses <- names(detected_glm_types[detected_glm_types])
   non_glm_responses <- setdiff(responses_with_trends, glm_responses)
-  cat("DEBUG: detected_glm_types =", paste(names(detected_glm_types), ":", detected_glm_types, collapse=", "), "\n")
-  cat("DEBUG: glm_responses =", paste(glm_responses, collapse=", "), "\n")
-  cat("DEBUG: non_glm_responses =", paste(non_glm_responses, collapse=", "), "\n")
 
   # Handle GLM responses with response-specific transformations
   if (length(glm_responses) > 0) {
@@ -1479,13 +1470,10 @@ inject_multivariate_trends_into_linear_predictors <- function(
       if (!is.null(model_info)) {
         # Use shared utility for consistent prior_only insertion logic
         insert_point <- find_prior_only_insertion_point(code_lines, model_info)
-        cat("DEBUG: resp_name =", resp_name, "| glm_responses =", paste(glm_responses, collapse=","), "\n")
-        cat("DEBUG: Initial insert_point =", insert_point, "| Line content:", code_lines[insert_point], "\n")
 
         # For GLM responses: preserve prior_only insertion point for optimization
         # For non-GLM responses: use trend computation strategies for complex positioning
         if (!resp_name %in% glm_responses) {
-          cat("DEBUG: Taking NON-GLM path for", resp_name, "\n")
           # Strategy 1: Look for nested trend computation loops with semantic understanding
           trend_computation_end <- find_trend_computation_end(code_lines)
 
@@ -1591,9 +1579,6 @@ inject_multivariate_trends_into_linear_predictors <- function(
         }
 
         # Insert mu computation before the closing brace
-        cat("DEBUG: Final insert_point =", insert_point, "| Inserting mu code for", resp_name, "\n")
-        cat("DEBUG: Line at insert_point:", code_lines[insert_point], "\n")
-        cat("DEBUG: mu_computation:", paste(mu_computation, collapse=" | "), "\n")
         code_lines <- c(
           code_lines[1:insert_point],  # Include the if (!prior_only) { line
           mu_computation,               # Insert mu code AFTER the if line
@@ -5034,6 +5019,10 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
 
   # Filter and rename supporting declarations - only include computed variables from model block
   renamed_supporting_decls <- character(0)
+  
+  # Create local copy of mapping to avoid side effects
+  local_mapping <- variable_mapping
+  
   for (decl in supporting_declarations) {
     if (nchar(trimws(decl)) == 0) {  # Skip empty declarations
       next
@@ -5042,9 +5031,27 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
     # Only include computed variables (GP, splines, random effects, etc.) - NOT data/parameter declarations
     # Use registry-aware checking to prevent duplicates
     if (should_include_in_transformed_parameters(decl)) {
+      # Extract the variable being declared (if this is a declaration with assignment)
+      # Pattern: type[dims] var_name = expression
+      decl_pattern <- "\\b(?:vector|matrix|real|int|array)\\s*(?:\\[[^\\]]*\\])*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*="
+      decl_match <- regmatches(decl, regexec(decl_pattern, decl, perl = TRUE))[[1]]
+      
+      if (length(decl_match) > 1) {
+        declared_var <- decl_match[2]
+        # Validate variable name format
+        if (grepl("^[a-zA-Z_][a-zA-Z0-9_]*$", declared_var)) {
+          # Add to local mapping if not already there and doesn't already have _trend suffix
+          if (!declared_var %in% names(local_mapping) && !grepl("_trend$", declared_var)) {
+            local_mapping[[declared_var]] <- paste0(declared_var, "_trend")
+          }
+        }
+      }
+      
+      # Apply renaming using the updated local mapping
       renamed_decl <- decl
-      for (original_var in sorted_var_names) {
-        renamed_var <- variable_mapping[[original_var]]
+      sorted_local_vars <- names(local_mapping)[order(-nchar(names(local_mapping)))]
+      for (original_var in sorted_local_vars) {
+        renamed_var <- local_mapping[[original_var]]
         renamed_decl <- gsub(paste0("\\b", original_var, "\\b"), renamed_var, renamed_decl)
       }
       renamed_supporting_decls <- c(renamed_supporting_decls, renamed_decl)

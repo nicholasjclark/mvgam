@@ -509,6 +509,66 @@ combine_obs_trend_priors <- function(obs_priors, trend_priors) {
   structure(combined, class = c("brmsprior", "data.frame"))
 }
 
+#' Filter Observation Priors from Combined Prior Object
+#'
+#' @description
+#' Extracts only observation model priors from a combined brmsprior object by
+#' filtering out trend parameters (those with _trend suffix). This is the
+#' complement of filter_trend_priors() and uses the established _trend suffix
+#' convention for parameter separation.
+#'
+#' @param combined_priors A brmsprior object containing both observation and trend priors
+#' @return A brmsprior object with only observation model priors
+#' @noRd
+filter_obs_priors <- function(combined_priors) {
+  checkmate::assert_class(combined_priors, "brmsprior", null.ok = TRUE)
+  
+  if (is.null(combined_priors)) {
+    return(NULL)
+  }
+  
+  # Filter out trend parameters (those with _trend suffix)
+  obs_mask <- !grepl("_trend$", combined_priors$class)
+  obs_priors <- combined_priors[obs_mask, , drop = FALSE]
+  
+  if (nrow(obs_priors) == 0) {
+    return(NULL)
+  }
+  
+  # Return standard brms prior object
+  structure(obs_priors, class = c("brmsprior", "data.frame"))
+}
+
+#' Filter Trend Priors from Combined Prior Object
+#'
+#' @description
+#' Extracts only trend model priors from a combined brmsprior object by
+#' filtering for trend parameters (those with _trend suffix). This is the
+#' complement of filter_obs_priors() and uses the established _trend suffix
+#' convention for parameter separation.
+#'
+#' @param combined_priors A brmsprior object containing both observation and trend priors
+#' @return A brmsprior object with only trend model priors
+#' @noRd
+filter_trend_priors <- function(combined_priors) {
+  checkmate::assert_class(combined_priors, "brmsprior", null.ok = TRUE)
+  
+  if (is.null(combined_priors)) {
+    return(NULL)
+  }
+  
+  # Filter for trend parameters (those with _trend suffix)
+  trend_mask <- grepl("_trend$", combined_priors$class)
+  trend_priors <- combined_priors[trend_mask, , drop = FALSE]
+  
+  if (nrow(trend_priors) == 0) {
+    return(NULL)
+  }
+  
+  # Return standard brms prior object
+  structure(trend_priors, class = c("brmsprior", "data.frame"))
+}
+
 #' Get Complete Prior Specification for a Trend Type
 #'
 #' @description

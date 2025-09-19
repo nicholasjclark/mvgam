@@ -76,8 +76,8 @@ vector<lower=-1,upper=1>[N_lv_trend] ar12_trend;
 transformed parameters {
   real lprior = 0;  // prior contributions to the log posterior
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
-vector[NBgp_1_trend] rgp_1 = sqrt(spd_gp_exp_quad(slambda_1_trend, sdgp_1_trend[1], lscale_1_trend[1])) .* zgp_1_trend;
-vector[Nsubgp_1_trend] gp_pred_1_trend = Xgp_1_trend * rgp_1;
+vector[NBgp_1_trend] rgp_1_trend = sqrt(spd_gp_exp_quad(slambda_1_trend, sdgp_1_trend[1], lscale_1_trend[1])) .* zgp_1_trend;
+vector[Nsubgp_1_trend] gp_pred_1_trend = Xgp_1_trend * rgp_1_trend;
 mu_trend += gp_pred_1_trend[Jgp_1_trend];
   
     // Scaled innovations (uncorrelated case)

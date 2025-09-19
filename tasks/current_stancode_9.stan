@@ -69,6 +69,8 @@ mu_trend += Intercept_trend;
       trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
     }
   }
+  lprior += normal_lpdf(b_b1 | 1, 2);
+  lprior += normal_lpdf(b_b2 | 0, 2);
   lprior += student_t_lpdf(sigma | 3, 0, 3)
     - 1 * student_t_lccdf(0 | 3, 0, 3);
 }

@@ -546,13 +546,6 @@
                                                                                 "imputation_id"
                                                                             ]
                                                           },
-                              "extract_all_bf_formulas":  {
-                                                              "s3_class":  "",
-                                                              "s3_method":  "",
-                                                              "signature":  "extract_all_bf_formulas \u003c- function(bf_obj) {",
-                                                              "is_s3_method":  false,
-                                                              "arguments":  "bf_obj"
-                                                          },
                               "validate_grouping_arguments":  {
                                                                   "s3_class":  "",
                                                                   "s3_method":  "",
@@ -1031,6 +1024,16 @@
                                                                                                "time_param"
                                                                                            ]
                                                                          },
+                              "find_prior_only_insertion_point":  {
+                                                                      "s3_class":  "",
+                                                                      "s3_method":  "",
+                                                                      "signature":  "find_prior_only_insertion_point \u003c- function(code_lines, model_block_info) {",
+                                                                      "is_s3_method":  false,
+                                                                      "arguments":  [
+                                                                                        "code_lines",
+                                                                                        "model_block_info"
+                                                                                    ]
+                                                                  },
                               "filter_var_forecast_params":  {
                                                                  "s3_class":  "",
                                                                  "s3_method":  "",
@@ -1314,13 +1317,13 @@
                                                            "is_s3_method":  false,
                                                            "arguments":  "functions_content"
                                                        },
-                              "plottable":  {
-                                                "s3_class":  "",
-                                                "s3_method":  "",
-                                                "signature":  "plottable = function(x) {",
-                                                "is_s3_method":  false,
-                                                "arguments":  "x"
-                                            },
+                              "ar_trend_properties":  {
+                                                          "s3_class":  "",
+                                                          "s3_method":  "",
+                                                          "signature":  "ar_trend_properties \u003c- function() {",
+                                                          "is_s3_method":  false,
+                                                          "arguments":  null
+                                                      },
                               "analyze_mathematical_operations_comprehensive":  {
                                                                                     "s3_class":  "",
                                                                                     "s3_method":  "",
@@ -1992,6 +1995,13 @@
                                                                                          "new_name"
                                                                                      ]
                                                                    },
+                              "reconstruct_functions_block":  {
+                                                                  "s3_class":  "",
+                                                                  "s3_method":  "",
+                                                                  "signature":  "reconstruct_functions_block \u003c- function(unique_functions) {",
+                                                                  "is_s3_method":  false,
+                                                                  "arguments":  "unique_functions"
+                                                              },
                               "print.how_to_cite":  {
                                                         "s3_class":  "how_to_cite",
                                                         "s3_method":  "print",
@@ -2548,13 +2558,13 @@
                                                       "is_s3_method":  false,
                                                       "arguments":  "fits"
                                                   },
-                              "add_residuals":  {
-                                                    "s3_class":  "",
-                                                    "s3_method":  "",
-                                                    "signature":  "add_residuals \u003c- function(object, ...) {",
-                                                    "is_s3_method":  false,
-                                                    "arguments":  "object"
-                                                },
+                              "extract_all_bf_formulas":  {
+                                                              "s3_class":  "",
+                                                              "s3_method":  "",
+                                                              "signature":  "extract_all_bf_formulas \u003c- function(bf_obj) {",
+                                                              "is_s3_method":  false,
+                                                              "arguments":  "bf_obj"
+                                                          },
                               "validate_and_process_trend_parameters":  {
                                                                             "s3_class":  "",
                                                                             "s3_method":  "",
@@ -2837,13 +2847,6 @@
                                                                                              "trend_injection_code"
                                                                                          ]
                                                                        },
-                              "ar_trend_properties":  {
-                                                          "s3_class":  "",
-                                                          "s3_method":  "",
-                                                          "signature":  "ar_trend_properties \u003c- function() {",
-                                                          "is_s3_method":  false,
-                                                          "arguments":  null
-                                                      },
                               "calculate_car_time_distances":  {
                                                                    "s3_class":  "",
                                                                    "s3_method":  "",
@@ -3299,6 +3302,13 @@
                                                                             "is_s3_method":  false,
                                                                             "arguments":  "declaration"
                                                                         },
+                              "plottable":  {
+                                                "s3_class":  "",
+                                                "s3_method":  "",
+                                                "signature":  "plottable = function(x) {",
+                                                "is_s3_method":  false,
+                                                "arguments":  "x"
+                                            },
                               "has_embedded_families":  {
                                                             "s3_class":  "",
                                                             "s3_method":  "",
@@ -3391,13 +3401,13 @@
                                                "is_s3_method":  false,
                                                "arguments":  "x"
                                            },
-                              "reconstruct_functions_block":  {
-                                                                  "s3_class":  "",
-                                                                  "s3_method":  "",
-                                                                  "signature":  "reconstruct_functions_block \u003c- function(unique_functions) {",
-                                                                  "is_s3_method":  false,
-                                                                  "arguments":  "unique_functions"
-                                                              },
+                              "add_residuals":  {
+                                                    "s3_class":  "",
+                                                    "s3_method":  "",
+                                                    "signature":  "add_residuals \u003c- function(object, ...) {",
+                                                    "is_s3_method":  false,
+                                                    "arguments":  "object"
+                                                },
                               "validate_obs_formula_brms":  {
                                                                 "s3_class":  "",
                                                                 "s3_method":  "",
@@ -4092,6 +4102,7 @@
                                                   "find_trend_computation_end",
                                                   "validate_mapping_arrays",
                                                   "find_stan_block",
+                                                  "find_prior_only_insertion_point",
                                                   "inject_trend_into_linear_predictor",
                                                   "insert_after_mu_lines_in_model_block",
                                                   "handle_nonlinear_trend_injection",
@@ -4739,7 +4750,7 @@
                       "extract_response_names_from_brmsfit":  "R/stan_assembly.R",
                       "clean_ll":  "R/loo.mvgam.R",
                       "reconstruct_mu_trend_with_renamed_vars":  "R/stan_assembly.R",
-                      "validate_trend_time_intervals":  "R/validations.R",
+                      "find_prior_only_insertion_point":  "R/stan_assembly.R",
                       "fevd.mvgam":  "R/fevd.mvgam.R",
                       "PW":  "R/trend_system.R",
                       "lv_correlations":  "R/lv_correlations.R",
@@ -4779,6 +4790,7 @@
                       "deparse0":  "R/validations.R",
                       "generate_trend_priors":  "R/priors.R",
                       "analyze_variable_relationships_comprehensive":  "R/mu_expression_analysis.R",
+                      "validate_trend_time_intervals":  "R/validations.R",
                       "var_trend_properties":  "R/trend_system.R",
                       "as_draws_matrix.mvgam":  "R/as.data.frame.mvgam.R",
                       "list_trend_types":  "R/trend_system.R",
@@ -5063,7 +5075,7 @@
                                      "get_default_validation_rules":  "R/trend_system.R",
                                      "ar3_recursC":  "R/RcppExports.R",
                                      "subset_stanfit_parameters":  "R/mvgam_core.R",
-                                     "generate_zmvn_monitor_params":  "R/trend_system.R",
+                                     "generate_innovation_model":  "R/stan_assembly.R",
                                      "residuals.mvgam":  "R/residuals.mvgam.R",
                                      "mcmc_plot.mvgam":  "R/mcmc_plot.mvgam.R",
                                      "is_multivariate_trend_specs":  "R/validations.R",
@@ -5258,6 +5270,7 @@
                                      "plot_histogram":  "R/plot_mvgam_series.R",
                                      "deparse0":  "R/validations.R",
                                      "validate_trend_dispatch_consistency":  "R/trend_system.R",
+                                     "generate_zmvn_monitor_params":  "R/trend_system.R",
                                      "plot.mvgam_irf":  "R/mvgam_irf-class.R",
                                      "validate_stan_code_structure":  "R/validations.R",
                                      "lfo_cv.mvgam":  "R/lfo_cv.mvgam.R",
@@ -5501,7 +5514,7 @@
                                 "plot_mvgam_series":  "plot_mvgam_series \u003c- function( object, data, newdata, y = \u0027y\u0027, lines = TRUE, series = 1, n_bins = NULL, log_scale = FALSE ) {",
                                 "clean_ll":  "clean_ll = function(x, logliks) {",
                                 "reconstruct_mu_trend_with_renamed_vars":  "reconstruct_mu_trend_with_renamed_vars \u003c- function(mu_construction, supporting_declarations, variable_mapping, time_param = \"N_trend\") {",
-                                "validate_trend_time_intervals":  "validate_trend_time_intervals \u003c- function(trend_spec, data) {",
+                                "find_prior_only_insertion_point":  "find_prior_only_insertion_point \u003c- function(code_lines, model_block_info) {",
                                 "filter_var_forecast_params":  "filter_var_forecast_params \u003c- function(monitor_params, trend_spec) {",
                                 "PW":  "PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10, changepoint_range = 0.8, changepoint_scale = 0.05, growth = \u0027linear\u0027, n_lv = NULL) {",
                                 "lv_correlations":  "lv_correlations = function(object) {",
@@ -5542,6 +5555,7 @@
                                 "deparse0":  "deparse0 \u003c- function(expr, ...) {",
                                 "generate_trend_priors":  "generate_trend_priors \u003c- function(trend_spec, data, response_names = NULL) {",
                                 "analyze_variable_relationships_comprehensive":  "analyze_variable_relationships_comprehensive \u003c- function(expr) {",
+                                "validate_trend_time_intervals":  "validate_trend_time_intervals \u003c- function(trend_spec, data) {",
                                 "var_trend_properties":  "var_trend_properties \u003c- function() {",
                                 "as_draws_matrix.mvgam":  "as_draws_matrix.mvgam \u003c- function( x, variable = NULL, regex = FALSE, inc_warmup = FALSE, use_alias = TRUE, ... ) {",
                                 "list_trend_types":  "list_trend_types \u003c- function() {",
@@ -5606,7 +5620,6 @@
                                 "generate_car_monitor_params":  "generate_car_monitor_params \u003c- function(trend_spec) {",
                                 "apply_safe_parameter_replacement":  "apply_safe_parameter_replacement \u003c- function(code, old_name, new_name) {",
                                 "validate_autocor_separation":  "validate_autocor_separation \u003c- function(obs_formula, trend_formula = NULL) {",
-                                "reconstruct_functions_block":  "reconstruct_functions_block \u003c- function(unique_functions) {",
                                 "print.how_to_cite":  "print.how_to_cite \u003c- function(x, ...) {",
                                 "tidy.mvgam":  "tidy.mvgam \u003c- function(x, probs = c(0.025, 0.5, 0.975), ...) {",
                                 "residual_cor.mvgam":  "residual_cor.mvgam \u003c- function( object, summary = TRUE, robust = FALSE, probs = c(0.025, 0.975), ... ) {",
@@ -5699,6 +5712,7 @@
                                 "smooth.construct.mod.smooth.spec":  "smooth.construct.mod.smooth.spec \u003c- function(object, data, knots) {",
                                 "inject_trend_into_linear_predictor":  "inject_trend_into_linear_predictor \u003c- function(base_stancode, trend_stanvars) {",
                                 "insert_after_mu_lines_in_model_block":  "insert_after_mu_lines_in_model_block \u003c- function(code_lines, trend_injection_code) {",
+                                "ar_trend_properties":  "ar_trend_properties \u003c- function() {",
                                 "calculate_car_time_distances":  "calculate_car_time_distances \u003c- function(data_info) {",
                                 "generate_ar_trend_stanvars":  "generate_ar_trend_stanvars \u003c- function(trend_specs, data_info, prior = NULL) {",
                                 "build_execution_dependency_plan":  "build_execution_dependency_plan \u003c- function(classified_expressions) {",
@@ -5755,7 +5769,7 @@
                                 "calculate_bracket_nesting_depth":  "calculate_bracket_nesting_depth \u003c- function(expr) {",
                                 "generate_matrix_z_tdata":  "generate_matrix_z_tdata \u003c- function(is_factor_model, n_lv, n_series) {",
                                 "plot_acf":  "plot_acf \u003c- function(dat) {",
-                                "ar_trend_properties":  "ar_trend_properties \u003c- function() {",
+                                "reconstruct_functions_block":  "reconstruct_functions_block \u003c- function(unique_functions) {",
                                 "process_trend_params":  "process_trend_params \u003c- function(param_specs, envir = parent.frame()) {",
                                 "get_validation_rule_dispatch_table":  "get_validation_rule_dispatch_table \u003c- function() {",
                                 "irf":  "irf \u003c- function(object, ...) {",
@@ -5866,7 +5880,8 @@
                                  "RW":  [
                                             "generate_combined_stancode",
                                             "detect_glm_usage",
-                                            "inject_trend_into_glm_predictor",
+                                            "find_stan_block",
+                                            "find_prior_only_insertion_point",
                                             "validate_obs_formula_brms",
                                             "validate_list_trend_formula",
                                             "validate_single_trend_formula"
@@ -5882,13 +5897,14 @@
                                                      ],
                                  "insert_after_mu_lines_in_model_block":  [
                                                                               "detect_glm_usage",
-                                                                              "inject_trend_into_glm_predictor",
                                                                               "find_stan_block",
+                                                                              "find_prior_only_insertion_point",
                                                                               "inject_trend_into_linear_predictor"
                                                                           ],
                                  "parse_stan_functions":  [
                                                               "detect_glm_usage",
-                                                              "inject_trend_into_glm_predictor"
+                                                              "find_stan_block",
+                                                              "find_prior_only_insertion_point"
                                                           ],
                                  "inject_multivariate_trends_into_linear_predictors":  [
                                                                                            "generate_combined_stancode"
@@ -5898,7 +5914,8 @@
                                                                ],
                                  "filter_block_content":  [
                                                               "detect_glm_usage",
-                                                              "inject_trend_into_glm_predictor"
+                                                              "find_stan_block",
+                                                              "find_prior_only_insertion_point"
                                                           ],
                                  "get_prior":  [
                                                    "extract_prior_from_setup",
@@ -5907,7 +5924,8 @@
                                                    "get_prior.brmsformula",
                                                    "get_prior.mvgam_formula",
                                                    "detect_glm_usage",
-                                                   "inject_trend_into_glm_predictor"
+                                                   "find_stan_block",
+                                                   "find_prior_only_insertion_point"
                                                ],
                                  "get_best_prior_match":  [
                                                               "extract_prior_string"
@@ -5922,7 +5940,8 @@
                                                             ],
                                  "generate_common_trend_data":  [
                                                                     "detect_glm_usage",
-                                                                    "inject_trend_into_glm_predictor"
+                                                                    "find_stan_block",
+                                                                    "find_prior_only_insertion_point"
                                                                 ],
                                  "fit_multiple_imputation_models":  [
                                                                         "mvgam_multiple"
@@ -5935,14 +5954,16 @@
                                                                      ],
                                  "generate_times_trend_matrices":  [
                                                                        "detect_glm_usage",
-                                                                       "inject_trend_into_glm_predictor"
+                                                                       "find_stan_block",
+                                                                       "find_prior_only_insertion_point"
                                                                    ],
                                  "validate_autocor_separation":  [
                                                                      "mvgam_single_dataset"
                                                                  ],
                                  "calculate_car_time_distances":  [
                                                                       "detect_glm_usage",
-                                                                      "inject_trend_into_glm_predictor"
+                                                                      "find_stan_block",
+                                                                      "find_prior_only_insertion_point"
                                                                   ],
                                  "generate_rw_monitor_params":  [
                                                                     "generate_monitor_params"
@@ -5956,7 +5977,8 @@
                                                    ],
                                  "generate_matrix_z_multiblock_stanvars":  [
                                                                                "detect_glm_usage",
-                                                                               "inject_trend_into_glm_predictor"
+                                                                               "find_stan_block",
+                                                                               "find_prior_only_insertion_point"
                                                                            ],
                                  "calculate_variable_complexity":  [
                                                                        "analyze_variable_relationships_comprehensive"
@@ -5966,15 +5988,16 @@
                                                                ],
                                  "handle_nonlinear_trend_injection":  [
                                                                           "detect_glm_usage",
-                                                                          "inject_trend_into_glm_predictor",
                                                                           "find_stan_block",
+                                                                          "find_prior_only_insertion_point",
                                                                           "insert_after_mu_lines_in_model_block"
                                                                       ],
                                  "extract_stan_block_content":  [
                                                                     "extract_mu_construction_with_classification",
                                                                     "create_analysis_context",
                                                                     "detect_glm_usage",
-                                                                    "inject_trend_into_glm_predictor"
+                                                                    "find_stan_block",
+                                                                    "find_prior_only_insertion_point"
                                                                 ],
                                  "extract_prior_string":  [
                                                               "map_trend_priors",
@@ -5993,7 +6016,8 @@
                                                                       ],
                                  "remove_duplicate_functions":  [
                                                                     "detect_glm_usage",
-                                                                    "inject_trend_into_glm_predictor"
+                                                                    "find_stan_block",
+                                                                    "find_prior_only_insertion_point"
                                                                 ],
                                  "get_trend_validation_patterns":  [
                                                                        "validate_obs_formula_brms"
@@ -6018,7 +6042,8 @@
                                                                ],
                                  "apply_safe_parameter_replacement":  [
                                                                           "detect_glm_usage",
-                                                                          "inject_trend_into_glm_predictor"
+                                                                          "find_stan_block",
+                                                                          "find_prior_only_insertion_point"
                                                                       ],
                                  "extract_prior_from_setup":  [
                                                                   "setup_brms_lightweight"
@@ -6041,23 +6066,27 @@
                                               ],
                                  "generate_car_trend_stanvars":  [
                                                                      "detect_glm_usage",
-                                                                     "inject_trend_into_glm_predictor"
+                                                                     "find_stan_block",
+                                                                     "find_prior_only_insertion_point"
                                                                  ],
                                  "extract_declared_functions":  [
                                                                     "create_analysis_context"
                                                                 ],
                                  "generate_hierarchical_functions":  [
                                                                          "detect_glm_usage",
-                                                                         "inject_trend_into_glm_predictor",
+                                                                         "find_stan_block",
+                                                                         "find_prior_only_insertion_point",
                                                                          "generate_shared_innovation_stanvars"
                                                                      ],
                                  "extract_and_rename_standata_objects":  [
                                                                              "detect_glm_usage",
-                                                                             "inject_trend_into_glm_predictor"
+                                                                             "find_stan_block",
+                                                                             "find_prior_only_insertion_point"
                                                                          ],
                                  "extract_multivariate_standata":  [
                                                                        "detect_glm_usage",
-                                                                       "inject_trend_into_glm_predictor"
+                                                                       "find_stan_block",
+                                                                       "find_prior_only_insertion_point"
                                                                    ],
                                  "mvgam_multiple":  [
                                                         "mvgam"
@@ -6067,12 +6096,14 @@
                                                               ],
                                  "generate_hierarchical_correlation_parameters":  [
                                                                                       "detect_glm_usage",
-                                                                                      "inject_trend_into_glm_predictor",
+                                                                                      "find_stan_block",
+                                                                                      "find_prior_only_insertion_point",
                                                                                       "generate_shared_innovation_stanvars"
                                                                                   ],
                                  "rename_parameters_in_block":  [
                                                                     "detect_glm_usage",
-                                                                    "inject_trend_into_glm_predictor"
+                                                                    "find_stan_block",
+                                                                    "find_prior_only_insertion_point"
                                                                 ],
                                  "validate_nonlinear_trend_compatibility":  [
                                                                                 "handle_nonlinear_model"
@@ -6082,7 +6113,8 @@
                                                         ],
                                  "generate_matrix_z_tdata":  [
                                                                  "detect_glm_usage",
-                                                                 "inject_trend_into_glm_predictor"
+                                                                 "find_stan_block",
+                                                                 "find_prior_only_insertion_point"
                                                              ],
                                  "parse_multivariate_trends":  [
                                                                    "setup_brms_lightweight",
@@ -6122,14 +6154,16 @@
                                                            ],
                                  "extract_non_likelihood_from_model_block":  [
                                                                                  "detect_glm_usage",
-                                                                                 "inject_trend_into_glm_predictor"
+                                                                                 "find_stan_block",
+                                                                                 "find_prior_only_insertion_point"
                                                                              ],
                                  "get_validation_rule_dispatch_table":  [
                                                                             "dispatch_validation_rule"
                                                                         ],
                                  "generate_zmvn_trend_stanvars":  [
                                                                       "detect_glm_usage",
-                                                                      "inject_trend_into_glm_predictor"
+                                                                      "find_stan_block",
+                                                                      "find_prior_only_insertion_point"
                                                                   ],
                                  "extract_pooling_diagnostics":  [
                                                                      "create_pooled_mvgam"
@@ -6138,6 +6172,7 @@
                                                                        "detect_glm_usage",
                                                                        "inject_trend_into_glm_predictor",
                                                                        "find_stan_block",
+                                                                       "find_prior_only_insertion_point",
                                                                        "inject_trend_into_linear_predictor"
                                                                    ],
                                  "validate_single_trend_formula":  [
@@ -6148,7 +6183,8 @@
                                                                    ],
                                  "is_multivariate_brmsfit":  [
                                                                  "detect_glm_usage",
-                                                                 "inject_trend_into_glm_predictor"
+                                                                 "find_stan_block",
+                                                                 "find_prior_only_insertion_point"
                                                              ],
                                  "extract_response_trends":  [
                                                                  "parse_multivariate_trends"
@@ -6157,7 +6193,8 @@
                                             "build_ar_prior_spec",
                                             "generate_combined_stancode",
                                             "detect_glm_usage",
-                                            "inject_trend_into_glm_predictor",
+                                            "find_stan_block",
+                                            "find_prior_only_insertion_point",
                                             "generate_ar_monitor_params",
                                             "validate_list_trend_formula",
                                             "validate_single_trend_formula"
@@ -6167,7 +6204,8 @@
                                                             ],
                                  "extract_and_rename_stan_blocks":  [
                                                                         "detect_glm_usage",
-                                                                        "inject_trend_into_glm_predictor"
+                                                                        "find_stan_block",
+                                                                        "find_prior_only_insertion_point"
                                                                     ],
                                  "create_trend_parameter_prior":  [
                                                                       "generate_trend_priors_from_monitor_params"
@@ -6183,7 +6221,8 @@
                                                           ],
                                  "CAR":  [
                                              "detect_glm_usage",
-                                             "inject_trend_into_glm_predictor",
+                                             "find_stan_block",
+                                             "find_prior_only_insertion_point",
                                              "validate_regular_time_intervals"
                                          ],
                                  "create_trend_brmsfit":  [
@@ -6211,29 +6250,32 @@
                                                               ],
                                  "generate_innovation_model":  [
                                                                    "detect_glm_usage",
-                                                                   "inject_trend_into_glm_predictor"
+                                                                   "find_stan_block",
+                                                                   "find_prior_only_insertion_point"
                                                                ],
                                  "create_pooled_mvgam":  [
                                                              "pool_mvgam_fits"
                                                          ],
                                  "extract_mu_construction_with_classification":  [
                                                                                      "detect_glm_usage",
-                                                                                     "inject_trend_into_glm_predictor"
+                                                                                     "find_stan_block",
+                                                                                     "find_prior_only_insertion_point"
                                                                                  ],
                                  "generate_trend_priors_stanvar":  [
                                                                        "detect_glm_usage",
-                                                                       "inject_trend_into_glm_predictor"
+                                                                       "find_stan_block",
+                                                                       "find_prior_only_insertion_point"
                                                                    ],
                                  "find_trend_computation_end":  [
                                                                     "detect_glm_usage",
-                                                                    "inject_trend_into_glm_predictor",
                                                                     "find_stan_block",
+                                                                    "find_prior_only_insertion_point",
                                                                     "inject_multivariate_trends_into_linear_predictors"
                                                                 ],
                                  "validate_mapping_arrays":  [
                                                                  "detect_glm_usage",
-                                                                 "inject_trend_into_glm_predictor",
                                                                  "find_stan_block",
+                                                                 "find_prior_only_insertion_point",
                                                                  "inject_trend_into_linear_predictor"
                                                              ],
                                  "mvgam_single_dataset":  [
@@ -6244,21 +6286,24 @@
                                                                                 ],
                                  "extract_computed_variables":  [
                                                                     "detect_glm_usage",
-                                                                    "inject_trend_into_glm_predictor"
+                                                                    "find_stan_block",
+                                                                    "find_prior_only_insertion_point"
                                                                 ],
                                  "should_include_in_transformed_parameters":  [
                                                                                   "detect_glm_usage",
-                                                                                  "inject_trend_into_glm_predictor"
+                                                                                  "find_stan_block",
+                                                                                  "find_prior_only_insertion_point"
                                                                               ],
                                  "generate_pw_trend_stanvars":  [
                                                                     "detect_glm_usage",
-                                                                    "inject_trend_into_glm_predictor"
+                                                                    "find_stan_block",
+                                                                    "find_prior_only_insertion_point"
                                                                 ],
                                  "generate_obs_trend_mapping":  [
                                                                     "detect_glm_usage",
-                                                                    "inject_trend_into_glm_predictor",
                                                                     "validate_mapping_arrays",
-                                                                    "find_stan_block"
+                                                                    "find_stan_block",
+                                                                    "find_prior_only_insertion_point"
                                                                 ],
                                  "extract_mvgam_components":  [
                                                                   "create_mvgam_from_combined_fit"
@@ -6268,11 +6313,13 @@
                                                                 ],
                                  "normalize_function_signature":  [
                                                                       "detect_glm_usage",
-                                                                      "inject_trend_into_glm_predictor"
+                                                                      "find_stan_block",
+                                                                      "find_prior_only_insertion_point"
                                                                   ],
                                  "register_core_trends":  [
                                                               "detect_glm_usage",
-                                                              "inject_trend_into_glm_predictor",
+                                                              "find_stan_block",
+                                                              "find_prior_only_insertion_point",
                                                               "ensure_registry_initialized"
                                                           ],
                                  "extract_all_bf_formulas":  [
@@ -6280,13 +6327,14 @@
                                                              ],
                                  "get_trend_parameter_prior":  [
                                                                    "detect_glm_usage",
-                                                                   "inject_trend_into_glm_predictor",
-                                                                   "generate_innovation_model"
+                                                                   "find_stan_block",
+                                                                   "find_prior_only_insertion_point"
                                                                ],
                                  "find_variable_declarations":  [
                                                                     "extract_mu_construction_with_classification",
                                                                     "detect_glm_usage",
-                                                                    "inject_trend_into_glm_predictor"
+                                                                    "find_stan_block",
+                                                                    "find_prior_only_insertion_point"
                                                                 ],
                                  "parse_glm_parameters":  [
                                                               "detect_glm_usage",
@@ -6294,7 +6342,8 @@
                                                           ],
                                  "generate_hierarchical_correlation_model":  [
                                                                                  "detect_glm_usage",
-                                                                                 "inject_trend_into_glm_predictor",
+                                                                                 "find_stan_block",
+                                                                                 "find_prior_only_insertion_point",
                                                                                  "generate_shared_innovation_stanvars"
                                                                              ],
                                  "extract_observation_parameters":  [
@@ -6302,7 +6351,8 @@
                                                                     ],
                                  "create_times_trend_matrix":  [
                                                                    "detect_glm_usage",
-                                                                   "inject_trend_into_glm_predictor"
+                                                                   "find_stan_block",
+                                                                   "find_prior_only_insertion_point"
                                                                ],
                                  "process_trend_validation_rules":  [
                                                                         "apply_validation_rules"
@@ -6312,29 +6362,32 @@
                                                              ],
                                  "extract_stan_functions_block":  [
                                                                       "detect_glm_usage",
-                                                                      "inject_trend_into_glm_predictor"
+                                                                      "find_stan_block",
+                                                                      "find_prior_only_insertion_point"
                                                                   ],
                                  "extract_response_names_from_brmsfit":  [
                                                                              "detect_glm_usage",
-                                                                             "inject_trend_into_glm_predictor"
+                                                                             "find_stan_block",
+                                                                             "find_prior_only_insertion_point"
                                                                          ],
                                  "inject_trend_into_linear_predictor":  [
                                                                             "generate_combined_stancode",
                                                                             "detect_glm_usage",
-                                                                            "inject_trend_into_glm_predictor",
-                                                                            "find_stan_block"
+                                                                            "find_stan_block",
+                                                                            "find_prior_only_insertion_point"
                                                                         ],
                                  "generate_trend_specific_stanvars":  [
                                                                           "extract_trend_stanvars_from_setup"
                                                                       ],
                                  "append_if_not_null":  [
                                                             "detect_glm_usage",
-                                                            "inject_trend_into_glm_predictor"
+                                                            "find_stan_block",
+                                                            "find_prior_only_insertion_point"
                                                         ],
                                  "extract_mapping_arrays":  [
                                                                 "detect_glm_usage",
-                                                                "inject_trend_into_glm_predictor",
                                                                 "find_stan_block",
+                                                                "find_prior_only_insertion_point",
                                                                 "inject_trend_into_linear_predictor"
                                                             ],
                                  "extract_variable_name":  [
@@ -6349,20 +6402,24 @@
                                                           ],
                                  "VAR":  [
                                              "detect_glm_usage",
-                                             "inject_trend_into_glm_predictor",
+                                             "find_stan_block",
+                                             "find_prior_only_insertion_point",
                                              "fevd.mvgam"
                                          ],
                                  "ZMVN":  [
                                               "detect_glm_usage",
-                                              "inject_trend_into_glm_predictor"
+                                              "find_stan_block",
+                                              "find_prior_only_insertion_point"
                                           ],
                                  "generate_var_trend_stanvars":  [
                                                                      "detect_glm_usage",
-                                                                     "inject_trend_into_glm_predictor"
+                                                                     "find_stan_block",
+                                                                     "find_prior_only_insertion_point"
                                                                  ],
                                  "extract_dependencies_from_declaration":  [
                                                                                "detect_glm_usage",
-                                                                               "inject_trend_into_glm_predictor"
+                                                                               "find_stan_block",
+                                                                               "find_prior_only_insertion_point"
                                                                            ],
                                  "is_multivariate_trend_specs":  [
                                                                      "mvgam_single_dataset",
@@ -6375,14 +6432,16 @@
                                                          ],
                                  "reconstruct_mu_trend_with_renamed_vars":  [
                                                                                 "detect_glm_usage",
-                                                                                "inject_trend_into_glm_predictor"
+                                                                                "find_stan_block",
+                                                                                "find_prior_only_insertion_point"
                                                                             ],
                                  "combine_obs_trend_priors":  [
                                                                   "get_prior.mvgam_formula"
                                                               ],
                                  "PW":  [
                                             "detect_glm_usage",
-                                            "inject_trend_into_glm_predictor"
+                                            "find_stan_block",
+                                            "find_prior_only_insertion_point"
                                         ],
                                  "create_observation_brmsfit":  [
                                                                     "create_mvgam_from_combined_fit"
@@ -6429,7 +6488,8 @@
                                                                          ],
                                  "extract_hierarchical_info":  [
                                                                    "detect_glm_usage",
-                                                                   "inject_trend_into_glm_predictor"
+                                                                   "find_stan_block",
+                                                                   "find_prior_only_insertion_point"
                                                                ],
                                  "extract_comprehensive_variable_references":  [
                                                                                    "extract_mu_construction_with_classification"
@@ -6437,19 +6497,28 @@
                                  "inject_trend_into_glm_predictor":  [
                                                                          "detect_glm_usage",
                                                                          "find_stan_block",
+                                                                         "find_prior_only_insertion_point",
                                                                          "inject_trend_into_linear_predictor"
                                                                      ],
                                  "validate_no_factor_hierarchical":  [
                                                                          "detect_glm_usage",
-                                                                         "inject_trend_into_glm_predictor"
+                                                                         "find_stan_block",
+                                                                         "find_prior_only_insertion_point"
                                                                      ],
                                  "get_default_incompatibility_reason":  [
                                                                             "register_trend_type"
                                                                         ],
+                                 "find_prior_only_insertion_point":  [
+                                                                         "detect_glm_usage",
+                                                                         "inject_trend_into_glm_predictor",
+                                                                         "find_stan_block",
+                                                                         "inject_multivariate_trends_into_linear_predictors"
+                                                                     ],
                                  "combine_stanvars":  [
                                                           "extract_trend_stanvars_from_setup",
                                                           "detect_glm_usage",
-                                                          "inject_trend_into_glm_predictor"
+                                                          "find_stan_block",
+                                                          "find_prior_only_insertion_point"
                                                       ],
                                  "extract_response_names":  [
                                                                 "parse_multivariate_trends",
@@ -6460,14 +6529,16 @@
                                  "extract_time_series_dimensions":  [
                                                                         "extract_trend_stanvars_from_setup",
                                                                         "detect_glm_usage",
-                                                                        "inject_trend_into_glm_predictor"
+                                                                        "find_stan_block",
+                                                                        "find_prior_only_insertion_point"
                                                                     ],
                                  "filter_required_variables":  [
                                                                    "validate_trend_grouping"
                                                                ],
                                  "normalize_function_body":  [
                                                                  "detect_glm_usage",
-                                                                 "inject_trend_into_glm_predictor"
+                                                                 "find_stan_block",
+                                                                 "find_prior_only_insertion_point"
                                                              ],
                                  "subset_stanfit_parameters":  [
                                                                    "create_observation_brmsfit",
@@ -6482,7 +6553,8 @@
                                                               ],
                                  "filter_renameable_identifiers":  [
                                                                        "detect_glm_usage",
-                                                                       "inject_trend_into_glm_predictor"
+                                                                       "find_stan_block",
+                                                                       "find_prior_only_insertion_point"
                                                                    ],
                                  "determine_execution_order_from_type":  [
                                                                              "classify_single_mu_expression_structurally"
@@ -6490,14 +6562,15 @@
                                  "detect_glm_usage":  [
                                                           "create_analysis_context",
                                                           "extract_trend_stanvars_from_setup",
-                                                          "inject_trend_into_glm_predictor",
                                                           "find_stan_block",
+                                                          "find_prior_only_insertion_point",
                                                           "inject_trend_into_linear_predictor",
                                                           "inject_multivariate_trends_into_linear_predictors"
                                                       ],
                                  "generate_rw_trend_stanvars":  [
                                                                     "detect_glm_usage",
-                                                                    "inject_trend_into_glm_predictor"
+                                                                    "find_stan_block",
+                                                                    "find_prior_only_insertion_point"
                                                                 ],
                                  "cache_formula_latent_params":  [
                                                                      "parse_multivariate_trends"
@@ -6534,25 +6607,29 @@
                                                         ],
                                  "generate_trend_computation_tparameters":  [
                                                                                 "detect_glm_usage",
-                                                                                "inject_trend_into_glm_predictor"
+                                                                                "find_stan_block",
+                                                                                "find_prior_only_insertion_point"
                                                                             ],
                                  "create_empty_mu_result":  [
                                                                 "extract_mu_construction_with_classification"
                                                             ],
                                  "generate_ar_trend_stanvars":  [
                                                                     "detect_glm_usage",
-                                                                    "inject_trend_into_glm_predictor"
+                                                                    "find_stan_block",
+                                                                    "find_prior_only_insertion_point"
                                                                 ],
                                  "generate_var_monitor_params":  [
                                                                      "generate_monitor_params"
                                                                  ],
                                  "generate_shared_innovation_stanvars":  [
                                                                              "detect_glm_usage",
-                                                                             "inject_trend_into_glm_predictor"
+                                                                             "find_stan_block",
+                                                                             "find_prior_only_insertion_point"
                                                                          ],
                                  "generate_factor_model":  [
                                                                "detect_glm_usage",
-                                                               "inject_trend_into_glm_predictor"
+                                                               "find_stan_block",
+                                                               "find_prior_only_insertion_point"
                                                            ],
                                  "count_mathematical_operators":  [
                                                                       "analyze_mathematical_operations_comprehensive"
@@ -6563,7 +6640,8 @@
                                  "get_stan_reserved_words":  [
                                                                  "create_analysis_context",
                                                                  "detect_glm_usage",
-                                                                 "inject_trend_into_glm_predictor"
+                                                                 "find_stan_block",
+                                                                 "find_prior_only_insertion_point"
                                                              ],
                                  "validate_multivariate_trend_constraints":  [
                                                                                  "extract_response_trends"
@@ -6573,7 +6651,8 @@
                                                                  ],
                                  "process_variable":  [
                                                           "detect_glm_usage",
-                                                          "inject_trend_into_glm_predictor"
+                                                          "find_stan_block",
+                                                          "find_prior_only_insertion_point"
                                                       ],
                                  "normalize_trend_type":  [
                                                               "generate_monitor_params"
@@ -6587,11 +6666,14 @@
                                  "find_stan_block":  [
                                                          "detect_glm_usage",
                                                          "inject_trend_into_glm_predictor",
-                                                         "insert_after_mu_lines_in_model_block"
+                                                         "find_prior_only_insertion_point",
+                                                         "insert_after_mu_lines_in_model_block",
+                                                         "inject_multivariate_trends_into_linear_predictors"
                                                      ],
                                  "extract_univariate_standata":  [
                                                                      "detect_glm_usage",
-                                                                     "inject_trend_into_glm_predictor"
+                                                                     "find_stan_block",
+                                                                     "find_prior_only_insertion_point"
                                                                  ],
                                  "extract_all_identifiers":  [
                                                                  "analyze_variable_relationships_comprehensive",
@@ -6602,7 +6684,8 @@
                                                         ],
                                  "reconstruct_functions_block":  [
                                                                      "detect_glm_usage",
-                                                                     "inject_trend_into_glm_predictor"
+                                                                     "find_stan_block",
+                                                                     "find_prior_only_insertion_point"
                                                                  ],
                                  "generate_trend_priors_from_monitor_params":  [
                                                                                    "generate_trend_priors"
@@ -6612,7 +6695,8 @@
                                                              ],
                                  "generate_matrix_z_parameters":  [
                                                                       "detect_glm_usage",
-                                                                      "inject_trend_into_glm_predictor"
+                                                                      "find_stan_block",
+                                                                      "find_prior_only_insertion_point"
                                                                   ],
                                  "detect_shared_trends":  [
                                                               "generate_combined_stancode"
@@ -6622,7 +6706,8 @@
                                                                ],
                                  "apply_response_suffix_to_stanvars":  [
                                                                            "detect_glm_usage",
-                                                                           "inject_trend_into_glm_predictor"
+                                                                           "find_stan_block",
+                                                                           "find_prior_only_insertion_point"
                                                                        ],
                                  "extract_nonlinear_components":  [
                                                                       "handle_nonlinear_model"
@@ -6638,7 +6723,8 @@
                                                                ],
                                  "replace_stan_functions_block":  [
                                                                       "detect_glm_usage",
-                                                                      "inject_trend_into_glm_predictor"
+                                                                      "find_stan_block",
+                                                                      "find_prior_only_insertion_point"
                                                                   ],
                                  "analyze_indexing_patterns_comprehensive":  [
                                                                                  "analyze_expression_structure"
@@ -6648,7 +6734,8 @@
                                                                  ],
                                  "extract_stan_identifiers":  [
                                                                   "detect_glm_usage",
-                                                                  "inject_trend_into_glm_predictor"
+                                                                  "find_stan_block",
+                                                                  "find_prior_only_insertion_point"
                                                               ],
                                  "get_trend_prior_spec":  [
                                                               "map_trend_priors"
@@ -6677,13 +6764,13 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-09-19 08:23:40",
+                     "generated":  "2025-09-19 11:13:57",
                      "commit_hash":  "pending",
                      "cached_files":  53,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
-                     "total_functions":  408,
+                     "total_functions":  409,
                      "exported_functions":  56,
                      "s3_methods_count":  37,
                      "s3_classes_count":  24,
@@ -6692,7 +6779,7 @@
                      "potentially_unused_functions":  26,
                      "changed_files":  1,
                      "total_files":  54,
-                     "zero_dependency_functions":  316
+                     "zero_dependency_functions":  317
                  },
     "dependencies":  {
 
@@ -6770,82 +6857,11 @@
                                                      ],
                                   "get_default_trend_parameter_prior":  "get_parameter_type_default_prior",
                                   "inject_trend_into_glm_predictor":  [
-                                                                          "append_if_not_null",
-                                                                          "apply_response_suffix_to_stanvars",
-                                                                          "apply_safe_parameter_replacement",
-                                                                          "AR",
-                                                                          "calculate_car_time_distances",
-                                                                          "CAR",
-                                                                          "combine_stanvars",
-                                                                          "create_times_trend_matrix",
-                                                                          "detect_glm_usage",
-                                                                          "extract_and_rename_stan_blocks",
-                                                                          "extract_and_rename_standata_objects",
-                                                                          "extract_computed_variables",
-                                                                          "extract_dependencies_from_declaration",
-                                                                          "extract_hierarchical_info",
-                                                                          "extract_mapping_arrays",
-                                                                          "extract_mu_construction_with_classification",
-                                                                          "extract_multivariate_standata",
-                                                                          "extract_non_likelihood_from_model_block",
-                                                                          "extract_response_names_from_brmsfit",
-                                                                          "extract_stan_block_content",
-                                                                          "extract_stan_functions_block",
-                                                                          "extract_stan_identifiers",
-                                                                          "extract_time_series_dimensions",
-                                                                          "extract_univariate_standata",
-                                                                          "filter_block_content",
-                                                                          "filter_renameable_identifiers",
+                                                                          "find_prior_only_insertion_point",
                                                                           "find_stan_block",
-                                                                          "find_trend_computation_end",
-                                                                          "find_variable_declarations",
-                                                                          "generate_ar_trend_stanvars",
-                                                                          "generate_car_trend_stanvars",
-                                                                          "generate_common_trend_data",
-                                                                          "generate_factor_model",
-                                                                          "generate_hierarchical_correlation_model",
-                                                                          "generate_hierarchical_correlation_parameters",
-                                                                          "generate_hierarchical_functions",
-                                                                          "generate_innovation_model",
-                                                                          "generate_matrix_z_multiblock_stanvars",
-                                                                          "generate_matrix_z_parameters",
-                                                                          "generate_matrix_z_tdata",
-                                                                          "generate_obs_trend_mapping",
-                                                                          "generate_pw_trend_stanvars",
-                                                                          "generate_rw_trend_stanvars",
-                                                                          "generate_shared_innovation_stanvars",
-                                                                          "generate_times_trend_matrices",
-                                                                          "generate_trend_computation_tparameters",
                                                                           "generate_trend_injection_code",
-                                                                          "generate_trend_priors_stanvar",
-                                                                          "generate_var_trend_stanvars",
-                                                                          "generate_zmvn_trend_stanvars",
-                                                                          "get_prior",
-                                                                          "get_stan_reserved_words",
-                                                                          "get_trend_parameter_prior",
-                                                                          "handle_nonlinear_trend_injection",
-                                                                          "inject_trend_into_linear_predictor",
-                                                                          "insert_after_mu_lines_in_model_block",
-                                                                          "is_multivariate_brmsfit",
-                                                                          "normalize_function_body",
-                                                                          "normalize_function_signature",
                                                                           "parse_glm_parameters",
-                                                                          "parse_stan_functions",
-                                                                          "process_variable",
-                                                                          "PW",
-                                                                          "reconstruct_functions_block",
-                                                                          "reconstruct_mu_trend_with_renamed_vars",
-                                                                          "register_core_trends",
-                                                                          "remove_duplicate_functions",
-                                                                          "rename_parameters_in_block",
-                                                                          "replace_stan_functions_block",
-                                                                          "RW",
-                                                                          "should_include_in_transformed_parameters",
-                                                                          "transform_glm_call",
-                                                                          "validate_mapping_arrays",
-                                                                          "validate_no_factor_hierarchical",
-                                                                          "VAR",
-                                                                          "ZMVN"
+                                                                          "transform_glm_call"
                                                                       ],
                                   "extract_mu_construction_with_classification":  [
                                                                                       "build_execution_dependency_plan",
@@ -6917,6 +6933,7 @@
                                                            "extract_univariate_standata",
                                                            "filter_block_content",
                                                            "filter_renameable_identifiers",
+                                                           "find_prior_only_insertion_point",
                                                            "find_stan_block",
                                                            "find_trend_computation_end",
                                                            "find_variable_declarations",
@@ -7050,6 +7067,83 @@
                                                                 ],
                                   "analyze_mathematical_operations_comprehensive":  "count_mathematical_operators",
                                   "extract_mvbind_responses":  "extract_variable_name",
+                                  "find_prior_only_insertion_point":  [
+                                                                          "append_if_not_null",
+                                                                          "apply_response_suffix_to_stanvars",
+                                                                          "apply_safe_parameter_replacement",
+                                                                          "AR",
+                                                                          "calculate_car_time_distances",
+                                                                          "CAR",
+                                                                          "combine_stanvars",
+                                                                          "create_times_trend_matrix",
+                                                                          "detect_glm_usage",
+                                                                          "extract_and_rename_stan_blocks",
+                                                                          "extract_and_rename_standata_objects",
+                                                                          "extract_computed_variables",
+                                                                          "extract_dependencies_from_declaration",
+                                                                          "extract_hierarchical_info",
+                                                                          "extract_mapping_arrays",
+                                                                          "extract_mu_construction_with_classification",
+                                                                          "extract_multivariate_standata",
+                                                                          "extract_non_likelihood_from_model_block",
+                                                                          "extract_response_names_from_brmsfit",
+                                                                          "extract_stan_block_content",
+                                                                          "extract_stan_functions_block",
+                                                                          "extract_stan_identifiers",
+                                                                          "extract_time_series_dimensions",
+                                                                          "extract_univariate_standata",
+                                                                          "filter_block_content",
+                                                                          "filter_renameable_identifiers",
+                                                                          "find_stan_block",
+                                                                          "find_trend_computation_end",
+                                                                          "find_variable_declarations",
+                                                                          "generate_ar_trend_stanvars",
+                                                                          "generate_car_trend_stanvars",
+                                                                          "generate_common_trend_data",
+                                                                          "generate_factor_model",
+                                                                          "generate_hierarchical_correlation_model",
+                                                                          "generate_hierarchical_correlation_parameters",
+                                                                          "generate_hierarchical_functions",
+                                                                          "generate_innovation_model",
+                                                                          "generate_matrix_z_multiblock_stanvars",
+                                                                          "generate_matrix_z_parameters",
+                                                                          "generate_matrix_z_tdata",
+                                                                          "generate_obs_trend_mapping",
+                                                                          "generate_pw_trend_stanvars",
+                                                                          "generate_rw_trend_stanvars",
+                                                                          "generate_shared_innovation_stanvars",
+                                                                          "generate_times_trend_matrices",
+                                                                          "generate_trend_computation_tparameters",
+                                                                          "generate_trend_injection_code",
+                                                                          "generate_trend_priors_stanvar",
+                                                                          "generate_var_trend_stanvars",
+                                                                          "generate_zmvn_trend_stanvars",
+                                                                          "get_prior",
+                                                                          "get_stan_reserved_words",
+                                                                          "get_trend_parameter_prior",
+                                                                          "handle_nonlinear_trend_injection",
+                                                                          "inject_trend_into_glm_predictor",
+                                                                          "inject_trend_into_linear_predictor",
+                                                                          "insert_after_mu_lines_in_model_block",
+                                                                          "is_multivariate_brmsfit",
+                                                                          "normalize_function_body",
+                                                                          "normalize_function_signature",
+                                                                          "parse_stan_functions",
+                                                                          "process_variable",
+                                                                          "PW",
+                                                                          "reconstruct_functions_block",
+                                                                          "reconstruct_mu_trend_with_renamed_vars",
+                                                                          "register_core_trends",
+                                                                          "remove_duplicate_functions",
+                                                                          "rename_parameters_in_block",
+                                                                          "replace_stan_functions_block",
+                                                                          "RW",
+                                                                          "should_include_in_transformed_parameters",
+                                                                          "validate_mapping_arrays",
+                                                                          "validate_no_factor_hierarchical",
+                                                                          "VAR",
+                                                                          "ZMVN"
+                                                                      ],
                                   "validate_obs_formula_brms":  [
                                                                     "formula2str_mvgam",
                                                                     "get_trend_validation_patterns",
@@ -7071,16 +7165,81 @@
                                   "validate_brms_formula":  "validate_obs_formula_brms",
                                   "process_trend_validation_rules":  "dispatch_validation_rule",
                                   "find_stan_block":  [
+                                                          "append_if_not_null",
+                                                          "apply_response_suffix_to_stanvars",
+                                                          "apply_safe_parameter_replacement",
+                                                          "AR",
+                                                          "calculate_car_time_distances",
+                                                          "CAR",
+                                                          "combine_stanvars",
+                                                          "create_times_trend_matrix",
                                                           "detect_glm_usage",
+                                                          "extract_and_rename_stan_blocks",
+                                                          "extract_and_rename_standata_objects",
+                                                          "extract_computed_variables",
+                                                          "extract_dependencies_from_declaration",
+                                                          "extract_hierarchical_info",
                                                           "extract_mapping_arrays",
+                                                          "extract_mu_construction_with_classification",
+                                                          "extract_multivariate_standata",
+                                                          "extract_non_likelihood_from_model_block",
+                                                          "extract_response_names_from_brmsfit",
+                                                          "extract_stan_block_content",
+                                                          "extract_stan_functions_block",
+                                                          "extract_stan_identifiers",
+                                                          "extract_time_series_dimensions",
+                                                          "extract_univariate_standata",
+                                                          "filter_block_content",
+                                                          "filter_renameable_identifiers",
+                                                          "find_prior_only_insertion_point",
                                                           "find_trend_computation_end",
+                                                          "find_variable_declarations",
+                                                          "generate_ar_trend_stanvars",
+                                                          "generate_car_trend_stanvars",
+                                                          "generate_common_trend_data",
+                                                          "generate_factor_model",
+                                                          "generate_hierarchical_correlation_model",
+                                                          "generate_hierarchical_correlation_parameters",
+                                                          "generate_hierarchical_functions",
+                                                          "generate_innovation_model",
+                                                          "generate_matrix_z_multiblock_stanvars",
+                                                          "generate_matrix_z_parameters",
+                                                          "generate_matrix_z_tdata",
                                                           "generate_obs_trend_mapping",
+                                                          "generate_pw_trend_stanvars",
+                                                          "generate_rw_trend_stanvars",
+                                                          "generate_shared_innovation_stanvars",
+                                                          "generate_times_trend_matrices",
+                                                          "generate_trend_computation_tparameters",
                                                           "generate_trend_injection_code",
+                                                          "generate_trend_priors_stanvar",
+                                                          "generate_var_trend_stanvars",
+                                                          "generate_zmvn_trend_stanvars",
+                                                          "get_prior",
+                                                          "get_stan_reserved_words",
+                                                          "get_trend_parameter_prior",
                                                           "handle_nonlinear_trend_injection",
                                                           "inject_trend_into_glm_predictor",
                                                           "inject_trend_into_linear_predictor",
                                                           "insert_after_mu_lines_in_model_block",
-                                                          "validate_mapping_arrays"
+                                                          "is_multivariate_brmsfit",
+                                                          "normalize_function_body",
+                                                          "normalize_function_signature",
+                                                          "parse_stan_functions",
+                                                          "process_variable",
+                                                          "PW",
+                                                          "reconstruct_functions_block",
+                                                          "reconstruct_mu_trend_with_renamed_vars",
+                                                          "register_core_trends",
+                                                          "remove_duplicate_functions",
+                                                          "rename_parameters_in_block",
+                                                          "replace_stan_functions_block",
+                                                          "RW",
+                                                          "should_include_in_transformed_parameters",
+                                                          "validate_mapping_arrays",
+                                                          "validate_no_factor_hierarchical",
+                                                          "VAR",
+                                                          "ZMVN"
                                                       ],
                                   "analyze_expression_structure":  [
                                                                        "analyze_assignment_type",
@@ -7154,9 +7313,10 @@
                                                                         ],
                                   "inject_multivariate_trends_into_linear_predictors":  [
                                                                                             "detect_glm_usage",
+                                                                                            "find_prior_only_insertion_point",
+                                                                                            "find_stan_block",
                                                                                             "find_trend_computation_end"
                                                                                         ],
-                                  "generate_innovation_model":  "get_trend_parameter_prior",
                                   "validate_trend_formula_brms":  [
                                                                       "validate_bf_trend_formula",
                                                                       "validate_list_trend_formula",

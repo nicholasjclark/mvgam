@@ -29,22 +29,12 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 
 **AGENT TASK**: Your ONLY job is to read the existing files and report discrepancies with specific line numbers and code snippets.
 
-## PRIORITY ISSUES - NEXT AGENT START HERE ⭐
-
-### 1. **PRIORITY**: Parameter Naming Consistency Issues
-**Location**: File 8 (current_stancode_8.stan vs target_stancode_8.stan)
-**Issue**: Variable naming inconsistency in GP computation
-**Evidence**: Current uses `rgp_1`, target uses `rgp_1_trend`
-**Investigation Needed**: Systematic review of all trend parameter naming to ensure `_trend` suffix consistency
-
-### 2. **PRIORITY**: Missing Prior Declarations  
-**Location**: File 9 (current_stancode_9.stan vs target_stancode_9.stan)
-**Issue**: Missing trend parameter priors in transformed parameters block
-**Evidence**: Target includes `lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);` which may be missing in current
-**Investigation Needed**: Comprehensive diff of prior computations between current vs target
-
-### 3. **PRIORITY**: Computational Logic Differences
+### 1. **PRIORITY**: Computational Logic Differences
 **Location**: Files 8 & 9 (nonlinear and GP computation approaches)
 **Issue**: Different computation strategies between current vs target files
 **Evidence**: File 9 uses single-line vs two-operation nonlinear computation; File 8 may have GP placement differences
 **Investigation Needed**: Line-by-line logic comparison to identify functional vs cosmetic differences
+
+### 2. **PRIORITY**: Cosmetics
+**Location**: All files
+**Issue**: Comments should be stripped following target file patterns, and indentation should be clear and structured. Inspect clean_target_comments.R for guidance

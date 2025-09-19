@@ -21,13 +21,13 @@
                                   "rstantools",
                                   "tibble"
                               ],
-    "generated":  "2025-09-19 08:23:40",
+    "generated":  "2025-09-19 11:13:57",
     "commit_hash":  "pending",
     "cached_files":  53,
     "version":  "2.0.0",
     "commit_message":  "pre-commit analysis",
     "unanalyzed_functions":  0,
-    "total_functions":  408,
+    "total_functions":  409,
     "exported_functions":  56,
     "s3_methods_count":  37,
     "s3_classes_count":  24,
@@ -36,5 +36,5 @@
     "potentially_unused_functions":  26,
     "changed_files":  1,
     "total_files":  54,
-    "zero_dependency_functions":  316
+    "zero_dependency_functions":  317
 }

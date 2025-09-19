@@ -19,9 +19,20 @@
 # without full compilation overhead. This is essential for mvgam's two-stage
 # assembly system where brms provides the foundation and mvgam adds trends
 # through stanvars injection without modifying brms internals.
+#' Lightweight brms Setup with Prior Support
+#'
+#' @param formula Formula or brms formula object for model specification
+#' @param data Data frame containing model variables
+#' @param family Response distribution family (default: gaussian())
+#' @param trend_formula Optional trend formula specification (default: NULL)
+#' @param stanvars Optional brms stanvars object (default: NULL)
+#' @param prior A brmsprior object or NULL. Prior specifications
+#'   for model parameters. Defaults to NULL.
+#' @param ... Additional arguments passed to brms functions
 #' @noRd
 setup_brms_lightweight <- function(formula, data, family = gaussian(),
                                    trend_formula = NULL, stanvars = NULL,
+                                   prior = NULL,
                                    ...) {
   # Accept both regular formulas and brms formula objects
   checkmate::assert(
@@ -32,6 +43,11 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     combine = "or"
   )
   checkmate::assert_data_frame(data, min.rows = 1)
+  checkmate::assert(
+    checkmate::check_null(prior), 
+    checkmate::check_class(prior, "brmsprior"),
+    combine = "or"
+  )
   if (!is.null(trend_formula)) {
     checkmate::assert(
       inherits(trend_formula, "formula") ||
@@ -85,6 +101,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     data = data,
     family = family,
     stanvars = stanvars,
+    prior = prior,
     backend = "mock",
     mock_fit = 1,
     rename = FALSE

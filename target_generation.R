@@ -185,12 +185,15 @@ tryCatch({
 # ============================================================================
 cat("Generating current_stancode_9.stan (Nonlinear AR trends)...\n")
 tryCatch({
+  # Define the priors that should generate the missing lprior statements
+  prior9 <- prior(normal(1, 2), nlpar = "b1") +
+            prior(normal(0, 2), nlpar = "b2")
 
   mf9 <- mvgam_formula(
     bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE),
     trend_formula = ~ AR()
   )
-  code9 <- stancode(mf9, data = test_data$univariate, validate = FALSE)
+  code9 <- stancode(mf9, data = test_data$univariate, prior = prior9, validate = FALSE)
   writeLines(code9, 'tasks/current_stancode_9.stan')
   cat("✓ current_stancode_9.stan created\n")
 }, error = function(e) {
