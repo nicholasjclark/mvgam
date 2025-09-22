@@ -31,6 +31,7 @@ transformed data {
   vector[Kc_count] means_X_count;
   matrix[N_biomass, Kc_biomass] Xc_biomass;
   vector[Kc_biomass] means_X_biomass;
+  // Factor loadings matrix: maps latent variables to observed series
   matrix[N_series_trend, N_lv_trend] Z = diag_matrix(rep_vector(1.0,
                                                                 N_lv_trend));
   for (i in 2 : K_count) {
@@ -55,7 +56,15 @@ parameters {
   matrix[N_trend, N_lv_trend] innovations_trend;
 }
 transformed parameters {
+  // Prior log-probability accumulator
   real lprior = 0;
+  lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);
+  lprior += student_t_lpdf(Intercept_count | 3, 4, 2.5);
+  lprior += student_t_lpdf(sigma_count | 3, 0, 2.5)
+            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+  lprior += student_t_lpdf(Intercept_biomass | 3, 2.4, 2.5);
+  lprior += student_t_lpdf(sigma_biomass | 3, 0, 2.5)
+            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   mu_trend += Intercept_trend;
   matrix[N_trend, N_lv_trend] scaled_innovations_trend;
@@ -64,8 +73,8 @@ transformed parameters {
                                                                L_Omega_trend);
     scaled_innovations_trend = innovations_trend * L_Sigma';
   }
+  // Latent variable trajectories over time
   matrix[N_trend, N_lv_trend] lv_trend;
-  lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);
   matrix[N_lv_trend, N_lv_trend] Sigma_trend = diag_pre_multiply(sigma_trend,
                                                                  L_Omega_trend);
   lv_trend[1,  : ] = scaled_innovations_trend[1,  : ];
@@ -73,24 +82,21 @@ transformed parameters {
     lv_trend[i,  : ] = lv_trend[i - 1,  : ]
                        + scaled_innovations_trend[i,  : ];
   }
+  // Final trend values for each time point and series
   matrix[N_trend, N_series_trend] trend;
+  // Map latent variables to trend values via factor loadings
   for (i in 1 : N_trend) {
     for (s in 1 : N_series_trend) {
       trend[i, s] = dot_product(Z[s,  : ], lv_trend[i,  : ])
                     + mu_trend[times_trend[i, s]];
     }
   }
-  lprior += student_t_lpdf(Intercept_count | 3, 4, 2.5);
-  lprior += student_t_lpdf(sigma_count | 3, 0, 2.5)
-            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
-  lprior += student_t_lpdf(Intercept_biomass | 3, 2.4, 2.5);
-  lprior += student_t_lpdf(sigma_biomass | 3, 0, 2.5)
-            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
 }
 model {
   sigma_trend ~ exponential(2);
   L_Omega_trend ~ lkj_corr_cholesky(2);
   to_vector(innovations_trend) ~ std_normal();
+  // Likelihood calculation (skipped when sampling from prior only)
   if (!prior_only) {
     vector[N_biomass] mu_biomass = Xc_biomass * b_biomass;
     for (n in 1 : N_biomass) {

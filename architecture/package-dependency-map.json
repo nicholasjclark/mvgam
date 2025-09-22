@@ -4007,32 +4007,33 @@
                           "R/plot_mvgam_randomeffects.R":  "Plotting and visualization"
                       },
     "potentially_unused_functions":  {
-                                         "extract_regular_terms":  "R/trend_system.R",
-                                         "car_trend_properties":  "R/trend_system.R",
-                                         "get_car_parameter_prior":  "R/priors.R",
-                                         "ar3_recursC":  "R/RcppExports.R",
-                                         "parse_data_declarations":  "R/validations.R",
-                                         "get_trend_info":  "R/trend_system.R",
-                                         "validate_trend_dispatch_consistency":  "R/trend_system.R",
-                                         "plottable":  "R/plot.mvgam.R",
-                                         "get_ar_parameter_prior":  "R/priors.R",
-                                         "var_trend_properties":  "R/trend_system.R",
-                                         "add_mono_model_file":  "R/monotonic.R",
-                                         "find_trend_terms":  "R/trend_system.R",
-                                         "mvgam_attach":  "R/zzz.R",
-                                         "validate_stan_code_structure":  "R/validations.R",
-                                         "apply_validation_rules":  "R/validations.R",
-                                         "handle_nonlinear_model":  "R/brms_integration.R",
-                                         "rw_trend_properties":  "R/trend_system.R",
-                                         "varma_recursC":  "R/RcppExports.R",
-                                         "zmvn_trend_properties":  "R/trend_system.R",
-                                         "var1_recursC":  "R/RcppExports.R",
-                                         "are_braces_balanced":  "R/validations.R",
-                                         "samp_noinf":  "R/loo.mvgam.R",
                                          "get_factor_compatible_trends":  "R/trend_system.R",
-                                         "pw_trend_properties":  "R/trend_system.R",
+                                         "add_mono_model_file":  "R/monotonic.R",
+                                         "zmvn_trend_properties":  "R/trend_system.R",
+                                         "handle_nonlinear_model":  "R/brms_integration.R",
+                                         "get_car_parameter_prior":  "R/priors.R",
+                                         "rw_trend_properties":  "R/trend_system.R",
+                                         "car_trend_properties":  "R/trend_system.R",
+                                         "validate_trend_dispatch_consistency":  "R/trend_system.R",
+                                         "samp_noinf":  "R/loo.mvgam.R",
+                                         "varma_recursC":  "R/RcppExports.R",
                                          "sim_seasonal":  "R/sim_mvgam.R",
-                                         "ar_trend_properties":  "R/trend_system.R"
+                                         "extract_regular_terms":  "R/trend_system.R",
+                                         "are_braces_balanced":  "R/validations.R",
+                                         "var_trend_properties":  "R/trend_system.R",
+                                         "find_trend_terms":  "R/trend_system.R",
+                                         "var1_recursC":  "R/RcppExports.R",
+                                         "ar_trend_properties":  "R/trend_system.R",
+                                         "mvgam_attach":  "R/zzz.R",
+                                         "ar3_recursC":  "R/RcppExports.R",
+                                         "validate_autocor_separation":  "R/validations.R",
+                                         "get_trend_info":  "R/trend_system.R",
+                                         "validate_stan_code_structure":  "R/validations.R",
+                                         "get_ar_parameter_prior":  "R/priors.R",
+                                         "apply_validation_rules":  "R/validations.R",
+                                         "parse_data_declarations":  "R/validations.R",
+                                         "plottable":  "R/plot.mvgam.R",
+                                         "pw_trend_properties":  "R/trend_system.R"
                                      },
     "definitions":  {
                         "R/cpp_funs.R":  [
@@ -6005,15 +6006,10 @@
                                                               "find_stan_block",
                                                               "find_prior_only_insertion_point"
                                                           ],
-                                 "get_prior":  [
-                                                   "extract_prior_from_setup",
-                                                   "get_prior.default",
-                                                   "get_prior.formula",
-                                                   "get_prior.brmsformula",
-                                                   "detect_glm_usage",
-                                                   "find_stan_block",
-                                                   "find_prior_only_insertion_point"
-                                               ],
+                                 "is_multivariate_trend_specs":  [
+                                                                     "generate_combined_stancode",
+                                                                     "apply_validation_rules"
+                                                                 ],
                                  "get_best_prior_match":  [
                                                               "extract_prior_string"
                                                           ],
@@ -6021,7 +6017,6 @@
                                                                       "setup_brms_lightweight"
                                                                   ],
                                  "setup_brms_lightweight":  [
-                                                                "mvgam_single_dataset",
                                                                 "mvgam_single_imputation",
                                                                 "generate_trend_priors"
                                                             ],
@@ -6044,9 +6039,9 @@
                                                                        "find_stan_block",
                                                                        "find_prior_only_insertion_point"
                                                                    ],
-                                 "validate_autocor_separation":  [
-                                                                     "mvgam_single_dataset"
-                                                                 ],
+                                 "create_empty_mu_result":  [
+                                                                "extract_mu_construction_with_classification"
+                                                            ],
                                  "calculate_car_time_distances":  [
                                                                       "detect_glm_usage",
                                                                       "find_stan_block",
@@ -6205,7 +6200,6 @@
                                                              ],
                                  "parse_multivariate_trends":  [
                                                                    "setup_brms_lightweight",
-                                                                   "mvgam_single_dataset",
                                                                    "mvgam_single_imputation"
                                                                ],
                                  "apply_suffix_to_stan_code":  [
@@ -6233,9 +6227,9 @@
                                  "generate_base_stancode_with_stanvars":  [
                                                                               "generate_combined_stancode"
                                                                           ],
-                                 "validate_time_series_for_trends":  [
-                                                                         "mvgam_single_dataset"
-                                                                     ],
+                                 "create_pooled_mvgam":  [
+                                                             "pool_mvgam_fits"
+                                                         ],
                                  "validate_brms_formula":  [
                                                                "setup_brms_lightweight"
                                                            ],
@@ -6244,9 +6238,9 @@
                                                                                  "find_stan_block",
                                                                                  "find_prior_only_insertion_point"
                                                                              ],
-                                 "get_validation_rule_dispatch_table":  [
-                                                                            "dispatch_validation_rule"
-                                                                        ],
+                                 "generate_stan_components_mvgam_formula":  [
+                                                                                "mvgam_single_dataset"
+                                                                            ],
                                  "generate_zmvn_trend_stanvars":  [
                                                                       "detect_glm_usage",
                                                                       "find_stan_block",
@@ -6289,6 +6283,15 @@
                                  "analyze_function_usage":  [
                                                                 "analyze_expression_structure"
                                                             ],
+                                 "get_prior":  [
+                                                   "extract_prior_from_setup",
+                                                   "get_prior.default",
+                                                   "get_prior.formula",
+                                                   "get_prior.brmsformula",
+                                                   "detect_glm_usage",
+                                                   "find_stan_block",
+                                                   "find_prior_only_insertion_point"
+                                               ],
                                  "extract_and_rename_stan_blocks":  [
                                                                         "detect_glm_usage",
                                                                         "find_stan_block",
@@ -6319,7 +6322,6 @@
                                                                     "generate_monitor_params"
                                                                 ],
                                  "generate_combined_stancode_and_data":  [
-                                                                             "mvgam_single_dataset",
                                                                              "mvgam_single_imputation"
                                                                          ],
                                  "dispatch_validation_rule":  [
@@ -6337,9 +6339,6 @@
                                                                    "find_stan_block",
                                                                    "find_prior_only_insertion_point"
                                                                ],
-                                 "create_pooled_mvgam":  [
-                                                             "pool_mvgam_fits"
-                                                         ],
                                  "extract_mu_construction_with_classification":  [
                                                                                      "detect_glm_usage",
                                                                                      "find_stan_block",
@@ -6389,6 +6388,9 @@
                                                                     "find_stan_block",
                                                                     "find_prior_only_insertion_point"
                                                                 ],
+                                 "get_validation_rule_dispatch_table":  [
+                                                                            "dispatch_validation_rule"
+                                                                        ],
                                  "extract_mvgam_components":  [
                                                                   "create_mvgam_from_combined_fit"
                                                               ],
@@ -6502,11 +6504,6 @@
                                                                                "find_stan_block",
                                                                                "find_prior_only_insertion_point"
                                                                            ],
-                                 "is_multivariate_trend_specs":  [
-                                                                     "mvgam_single_dataset",
-                                                                     "generate_combined_stancode",
-                                                                     "apply_validation_rules"
-                                                                 ],
                                  "register_trend_type":  [
                                                              "auto_register_trend_types",
                                                              "register_custom_trend"
@@ -6542,7 +6539,6 @@
                                                                "extract_trend_priors"
                                                            ],
                                  "generate_combined_stancode":  [
-                                                                    "mvgam_single_dataset",
                                                                     "generate_combined_stancode_and_data"
                                                                 ],
                                  "validate_trend_properties":  [
@@ -6578,6 +6574,9 @@
                                                                          "find_prior_only_insertion_point",
                                                                          "inject_trend_into_linear_predictor"
                                                                      ],
+                                 "mvgam_formula":  [
+                                                       "mvgam_single_dataset"
+                                                   ],
                                  "get_default_incompatibility_reason":  [
                                                                             "register_trend_type"
                                                                         ],
@@ -6595,7 +6594,6 @@
                                                       ],
                                  "extract_response_names":  [
                                                                 "parse_multivariate_trends",
-                                                                "mvgam_single_dataset",
                                                                 "generate_combined_stancode"
                                                             ],
                                  "extract_time_series_dimensions":  [
@@ -6682,9 +6680,6 @@
                                                                                 "find_stan_block",
                                                                                 "find_prior_only_insertion_point"
                                                                             ],
-                                 "create_empty_mu_result":  [
-                                                                "extract_mu_construction_with_classification"
-                                                            ],
                                  "generate_ar_trend_stanvars":  [
                                                                     "detect_glm_usage",
                                                                     "find_stan_block",
@@ -6841,9 +6836,9 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-09-22 15:30:23",
+                     "generated":  "2025-09-22 16:03:51",
                      "commit_hash":  "pending",
-                     "cached_files":  54,
+                     "cached_files":  52,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
@@ -6853,8 +6848,8 @@
                      "s3_classes_count":  24,
                      "dynamic_references":  30,
                      "package_name":  "mvgam",
-                     "potentially_unused_functions":  26,
-                     "changed_files":  1,
+                     "potentially_unused_functions":  27,
+                     "changed_files":  3,
                      "total_files":  55,
                      "zero_dependency_functions":  325
                  },
@@ -7361,15 +7356,9 @@
                                                               ],
                                   "mvgam_single_dataset":  [
                                                                "create_mvgam_from_combined_fit",
-                                                               "extract_response_names",
                                                                "fit_mvgam_model",
-                                                               "generate_combined_stancode",
-                                                               "generate_combined_stancode_and_data",
-                                                               "is_multivariate_trend_specs",
-                                                               "parse_multivariate_trends",
-                                                               "setup_brms_lightweight",
-                                                               "validate_autocor_separation",
-                                                               "validate_time_series_for_trends"
+                                                               "generate_stan_components_mvgam_formula",
+                                                               "mvgam_formula"
                                                            ],
                                   "generate_ar_monitor_params":  "AR",
                                   "generate_shared_innovation_stanvars":  [

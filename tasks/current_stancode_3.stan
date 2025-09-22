@@ -174,6 +174,7 @@ data {
   array[N_biomass] int obs_trend_series_biomass;
 }
 transformed data {
+  // Factor loadings matrix: maps latent variables to observed series
   matrix[N_series_trend, N_lv_trend] Z = diag_matrix(rep_vector(1.0,
                                                                 N_lv_trend));
   matrix[N_trend, Kc_trend] Xc_trend;
@@ -196,6 +197,7 @@ parameters {
   vector[knots_biomass_1[1]] zs_biomass_1_1;
   vector<lower=0>[nb_biomass_1] sds_biomass_1;
   real<lower=0> sigma_biomass;
+  // Latent variable trajectories over time
   matrix[N_trend, N_lv_trend] lv_trend;
   vector[Kc_trend] b_trend;
   real Intercept_trend;
@@ -212,10 +214,21 @@ parameters {
 transformed parameters {
   vector[knots_count_1[1]] s_count_1_1;
   vector[knots_biomass_1[1]] s_biomass_1_1;
+  // Prior log-probability accumulator
   real lprior = 0;
+  lprior += student_t_lpdf(Intercept_trend | 3, -0.2, 2.5);
+  lprior += student_t_lpdf(Intercept_count | 3, 4, 2.5);
+  lprior += student_t_lpdf(sds_count_1 | 3, 0, 2.5)
+            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+  lprior += student_t_lpdf(sigma_count | 3, 0, 2.5)
+            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+  lprior += student_t_lpdf(Intercept_biomass | 3, 2.4, 2.5);
+  lprior += student_t_lpdf(sds_biomass_1 | 3, 0, 2.5)
+            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+  lprior += student_t_lpdf(sigma_biomass | 3, 0, 2.5)
+            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   mu_trend += Intercept_trend + Xc_trend * b_trend;
-  lprior += student_t_lpdf(Intercept_trend | 3, -0.2, 2.5);
   matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend,
                                                                    L_Omega_trend);
   cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
@@ -243,7 +256,9 @@ transformed parameters {
   }
   Omega_trend = initial_joint_var(Sigma_trend, A_trend, D_trend);
   ma_init_trend = init_trend[(2 * N_lv_trend + 1) : (3 * N_lv_trend)];
+  // Final trend values for each time point and series
   matrix[N_trend, N_series_trend] trend;
+  // Map latent variables to trend values via factor loadings
   for (i in 1 : N_trend) {
     for (s in 1 : N_series_trend) {
       trend[i, s] = dot_product(Z[s,  : ], lv_trend[i,  : ])
@@ -252,16 +267,6 @@ transformed parameters {
   }
   s_count_1_1 = sds_count_1[1] * zs_count_1_1;
   s_biomass_1_1 = sds_biomass_1[1] * zs_biomass_1_1;
-  lprior += student_t_lpdf(Intercept_count | 3, 4, 2.5);
-  lprior += student_t_lpdf(sds_count_1 | 3, 0, 2.5)
-            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
-  lprior += student_t_lpdf(sigma_count | 3, 0, 2.5)
-            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
-  lprior += student_t_lpdf(Intercept_biomass | 3, 2.4, 2.5);
-  lprior += student_t_lpdf(sds_biomass_1 | 3, 0, 2.5)
-            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
-  lprior += student_t_lpdf(sigma_biomass | 3, 0, 2.5)
-            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
 }
 model {
   vector[(2 + 1) * N_lv_trend] mu_init_trend = rep_vector(0.0,
@@ -331,6 +336,7 @@ model {
     Aomega_trend[lag] ~ gamma(1.365, 0.071175);
   }
   sigma_trend ~ exponential(2);
+  // Likelihood calculation (skipped when sampling from prior only)
   if (!prior_only) {
     vector[N_count] mu_count = rep_vector(0.0, N_count);
     for (n in 1 : N_count) {

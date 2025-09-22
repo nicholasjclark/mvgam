@@ -48,6 +48,8 @@ polish_generated_stan_code <- function(stan_code, silent = TRUE) {
   lines <- update_stan_header(lines)
   lines <- clean_stan_comments(lines)
   lines <- fix_blank_lines(lines)
+  lines <- reorganize_lprior_statements(lines)
+  lines <- add_targeted_comments(lines)
   preprocessed_code <- paste(lines, collapse = "\n")
 
   # Try StanHeaders formatting on preprocessed code
@@ -63,6 +65,8 @@ polish_generated_stan_code <- function(stan_code, silent = TRUE) {
   lines <- update_stan_header(lines)
   lines <- clean_stan_comments(lines)
   lines <- fix_blank_lines(lines)
+  lines <- reorganize_lprior_statements(lines)
+  lines <- add_targeted_comments(lines)
 
   # Return as single string with embedded newlines
   return(paste(lines, collapse = "\n"))
@@ -241,6 +245,201 @@ update_stan_header <- function(lines) {
   }
   
   return(lines)
+}
+
+#' Add Targeted Comments to Stan Code
+#'
+#' Adds specific, useful comments to explain key data structures and 
+#' computational steps that are not obvious from variable names alone.
+#'
+#' @param lines Character vector of Stan code lines
+#'
+#' @return Character vector with targeted comments added
+#'
+#' @noRd
+add_targeted_comments <- function(lines) {
+  if (length(lines) == 0) return(lines)
+  
+  # Comment 1: Z matrix - factor loadings matrix
+  z_pattern <- "matrix\\[N_series_trend,\\s*N_lv_trend\\]\\s*Z\\s*="
+  z_lines <- grep(z_pattern, lines)
+  if (length(z_lines) > 0) {
+    lines <- insert_comment_before_line(lines, z_lines[1], 
+                                        "  // Factor loadings matrix: maps latent variables to observed series")
+  }
+  
+  # Comment 2: lv_trend matrix - latent variable trajectories  
+  lv_pattern <- "matrix\\[N_trend,\\s*N_lv_trend\\]\\s*lv_trend\\s*;"
+  lv_lines <- grep(lv_pattern, lines)
+  if (length(lv_lines) > 0) {
+    lines <- insert_comment_before_line(lines, lv_lines[1],
+                                        "  // Latent variable trajectories over time")
+  }
+  
+  # Comment 3: trend matrix - final trend values
+  trend_pattern <- "matrix\\[N_trend,\\s*N_series_trend\\]\\s*trend\\s*;"
+  trend_lines <- grep(trend_pattern, lines)
+  if (length(trend_lines) > 0) {
+    lines <- insert_comment_before_line(lines, trend_lines[1],
+                                        "  // Final trend values for each time point and series")
+  }
+  
+  # Comment 4: Trend mapping computation
+  trend_loop_pattern <- "for\\s*\\(\\s*i\\s*in\\s*1\\s*:\\s*N_trend\\)\\s*\\{"
+  trend_loop_lines <- grep(trend_loop_pattern, lines)
+  if (length(trend_loop_lines) > 0) {
+    # Check if this is the trend mapping loop (contains dot_product and trend assignment)
+    for (line_idx in trend_loop_lines) {
+      # Look ahead a few lines to see if this contains trend mapping
+      check_range <- line_idx:(min(line_idx + 10, length(lines)))
+      if (any(grepl("trend\\[.*\\].*=.*dot_product", lines[check_range]))) {
+        lines <- insert_comment_before_line(lines, line_idx,
+                                            "  // Map latent variables to trend values via factor loadings")
+        break
+      }
+    }
+  }
+  
+  # Comment 5: Likelihood calculation
+  likelihood_pattern <- "if\\s*\\(\\s*!prior_only\\s*\\)\\s*\\{"
+  likelihood_lines <- grep(likelihood_pattern, lines)
+  if (length(likelihood_lines) > 0) {
+    lines <- insert_comment_before_line(lines, likelihood_lines[1],
+                                        "  // Likelihood calculation (skipped when sampling from prior only)")
+  }
+  
+  # Comment 6: Prior log-probability accumulator
+  lprior_init_pattern <- "real\\s+lprior\\s*=\\s*0\\s*;"
+  lprior_init_lines <- grep(lprior_init_pattern, lines)
+  if (length(lprior_init_lines) > 0) {
+    lines <- insert_comment_before_line(lines, lprior_init_lines[1],
+                                        "  // Prior log-probability accumulator")
+  }
+  
+  return(lines)
+}
+
+#' Insert Comment Before Line
+#' @param lines Character vector of Stan code lines
+#' @param line_num Line number to insert before
+#' @param comment Comment text to insert
+#' @return Character vector with comment inserted
+#' @noRd
+insert_comment_before_line <- function(lines, line_num, comment) {
+  if (line_num < 1 || line_num > length(lines)) return(lines)
+  
+  before <- if (line_num == 1) character(0) else lines[1:(line_num - 1)]
+  after <- lines[line_num:length(lines)]
+  
+  c(before, comment, after)
+}
+
+#' Reorganize lprior Statements in Transformed Parameters Block
+#'
+#' Moves all lprior += statements to just after the lprior = 0 declaration
+#' in the transformed parameters block. Handles multi-line statements correctly.
+#'
+#' @param lines Character vector of Stan code lines
+#'
+#' @return Character vector with lprior statements reorganized
+#'
+#' @noRd
+reorganize_lprior_statements <- function(lines) {
+  if (length(lines) == 0) return(lines)
+  
+  # Find parameters block (transformed parameters always follows)
+  params_pattern <- "^\\s*parameters\\s*\\{\\s*$"
+  params_line <- grep(params_pattern, lines)
+  if (length(params_line) == 0) return(lines)
+  
+  # Find transformed parameters block (always after parameters)
+  tparams_pattern <- "^\\s*transformed parameters\\s*\\{\\s*$"
+  tparams_line <- grep(tparams_pattern, lines)
+  if (length(tparams_line) == 0) return(lines)
+  
+  # Find model block (always after transformed parameters)
+  model_pattern <- "^\\s*model\\s*\\{\\s*$"
+  model_line <- grep(model_pattern, lines)
+  if (length(model_line) == 0) return(lines)
+  
+  tparams_start <- tparams_line[1]
+  model_start <- model_line[1]
+  
+  # Find the lprior = 0 line within the transformed parameters block
+  lprior_init_pattern <- "real\\s+lprior\\s*=\\s*0\\s*;"
+  lprior_init_line <- NA
+  for (i in (tparams_start + 1):(model_start - 1)) {
+    if (grepl(lprior_init_pattern, lines[i])) {
+      lprior_init_line <- i
+      break
+    }
+  }
+  
+  if (is.na(lprior_init_line)) return(lines)
+  
+  # Find all lprior += statements and their continuation lines
+  lprior_statements <- character(0)
+  lines_to_remove <- integer(0)
+  i <- tparams_start + 1
+  
+  while (i < model_start) {
+    line <- trimws(lines[i])
+    
+    if (grepl("^lprior\\s*\\+=", line)) {
+      # Always collect lprior statements - we'll move ALL of them to right after lprior = 0
+      statement_lines <- c(i)
+      
+      # Look for continuation lines (multi-line statements)
+      j <- i + 1
+      while (j < model_start && !grepl(";\\s*$", lines[i])) {
+        next_line <- lines[j]
+        next_trimmed <- trimws(next_line)
+        
+        # Continue if line is indented and doesn't start a new declaration
+        if (grepl("^\\s+", next_line) && 
+            !grepl("^\\s*(real|int|vector|matrix|array|for|if|while|lprior)", next_trimmed) &&
+            !grepl("^\\}", next_trimmed)) {
+          statement_lines <- c(statement_lines, j)
+          j <- j + 1
+        } else {
+          break
+        }
+      }
+      
+      # Collect the statement text
+      for (idx in statement_lines) {
+        lprior_statements <- c(lprior_statements, lines[idx])
+        lines_to_remove <- c(lines_to_remove, idx)
+      }
+      
+      i <- max(statement_lines) + 1
+    } else {
+      i <- i + 1
+    }
+  }
+  
+  if (length(lines_to_remove) == 0) return(lines)
+  
+  # Insert lprior statements immediately after lprior = 0 line BEFORE removing them
+  # This avoids line number adjustment issues
+  insert_point <- lprior_init_line + 1
+  
+  # Insert the collected lprior statements
+  before <- lines[1:lprior_init_line]
+  after <- lines[insert_point:length(lines)]
+  lines_with_inserted <- c(before, lprior_statements, after)
+  
+  # Now remove the original lprior statements (adjust indices for inserted lines)
+  # Need to adjust line numbers because we inserted lines
+  adjusted_remove_indices <- lines_to_remove + length(lprior_statements)
+  # But lines that were before the insertion point don't need adjustment
+  adjusted_remove_indices[lines_to_remove <= lprior_init_line] <- 
+    lines_to_remove[lines_to_remove <= lprior_init_line]
+  
+  # Remove the original lprior statements
+  lines_final <- lines_with_inserted[-adjusted_remove_indices]
+  
+  return(lines_final)
 }
 
 #' Clean Stan Comments

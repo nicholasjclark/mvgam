@@ -68,7 +68,12 @@ parameters {
   vector[N_series_trend * N_lv_trend] Z_raw;
 }
 transformed parameters {
+  // Prior log-probability accumulator
   real lprior = 0;
+  lprior += student_t_lpdf(Intercept_count | 3, 1.4, 2.5);
+  lprior += student_t_lpdf(Intercept_presence | 3, 0, 2.5);
+  lprior += student_t_lpdf(Intercept_biomass | 3, 0.4, 2.5);
+  lprior += gamma_lpdf(shape_biomass | 0.01, 0.01);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   matrix[N_trend, N_lv_trend] scaled_innovations_trend;
   {
@@ -76,7 +81,9 @@ transformed parameters {
                                                                L_Omega_trend);
     scaled_innovations_trend = innovations_trend * L_Sigma';
   }
+  // Latent variable trajectories over time
   matrix[N_trend, N_lv_trend] lv_trend;
+  // Factor loadings matrix: maps latent variables to observed series
   matrix[N_series_trend, N_lv_trend] Z = rep_matrix(0, N_series_trend,
                                                     N_lv_trend);
   {
@@ -99,17 +106,15 @@ transformed parameters {
                        + scaled_innovations_trend[i, j];
     }
   }
+  // Final trend values for each time point and series
   matrix[N_trend, N_series_trend] trend;
+  // Map latent variables to trend values via factor loadings
   for (i in 1 : N_trend) {
     for (s in 1 : N_series_trend) {
       trend[i, s] = dot_product(Z[s,  : ], lv_trend[i,  : ])
                     + mu_trend[times_trend[i, s]];
     }
   }
-  lprior += student_t_lpdf(Intercept_count | 3, 1.4, 2.5);
-  lprior += student_t_lpdf(Intercept_presence | 3, 0, 2.5);
-  lprior += student_t_lpdf(Intercept_biomass | 3, 0.4, 2.5);
-  lprior += gamma_lpdf(shape_biomass | 0.01, 0.01);
 }
 model {
   sigma_trend ~ exponential(2);
@@ -117,6 +122,7 @@ model {
   to_vector(innovations_trend) ~ std_normal();
   ar1_trend ~ normal(0, 0.5);
   Z_raw ~ student_t(3, 0, 1);
+  // Likelihood calculation (skipped when sampling from prior only)
   if (!prior_only) {
     vector[N_presence] mu_presence = Xc_presence * b_presence;
     for (n in 1 : N_presence) {

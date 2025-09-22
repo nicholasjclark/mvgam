@@ -74,6 +74,7 @@ data {
 transformed data {
   matrix[N, Kc] Xc;
   vector[Kc] means_X;
+  // Factor loadings matrix: maps latent variables to observed series
   matrix[N_series_trend, N_lv_trend] Z = diag_matrix(rep_vector(1.0,
                                                                 N_lv_trend));
   vector[N_trend] time_trend;
@@ -97,30 +98,35 @@ parameters {
   matrix[n_change_trend, N_lv_trend] delta_trend;
 }
 transformed parameters {
+  // Prior log-probability accumulator
   real lprior = 0;
+  lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);
+  lprior += student_t_lpdf(Intercept | 3, 1.8, 2.5);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   mu_trend += Intercept_trend;
+  // Latent variable trajectories over time
   matrix[N_trend, N_lv_trend] lv_trend;
-  lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);
   for (s in 1 : N_lv_trend) {
     lv_trend[1 : N_trend, s] = linear_trend(k_trend[s], m_trend[s],
                                             to_vector(delta_trend[ : , s]),
                                             time_trend, Kappa_trend,
                                             t_change_trend);
   }
+  // Final trend values for each time point and series
   matrix[N_trend, N_series_trend] trend;
+  // Map latent variables to trend values via factor loadings
   for (i in 1 : N_trend) {
     for (s in 1 : N_series_trend) {
       trend[i, s] = dot_product(Z[s,  : ], lv_trend[i,  : ])
                     + mu_trend[times_trend[i, s]];
     }
   }
-  lprior += student_t_lpdf(Intercept | 3, 1.8, 2.5);
 }
 model {
   m_trend ~ student_t(3, 0, 2.5);
   k_trend ~ std_normal();
   to_vector(delta_trend) ~ double_exponential(0, 0.05);
+  // Likelihood calculation (skipped when sampling from prior only)
   if (!prior_only) {
     vector[N] mu = Xc * b;
     for (n in 1 : N) {
