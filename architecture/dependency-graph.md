@@ -1,6 +1,6 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-09-22 16:46:19  
+**Generated:** 2025-09-23 08:31:28  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
