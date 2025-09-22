@@ -58,3 +58,9 @@ Based on pathfinder analysis, both `mvgam()` and `stancode()` flows converge at 
 - Single source of truth for Stan code generation in `stancode()`
 - Automatic polishing applied consistently to both `mvgam()` and `stancode()` paths
 - Cleaner architecture with DRY principles
+
+
+### Priority 2: Implement simple yet informative Stan commenting strategy
+- Deploy parallel subagents to read full Stan files in `tasks/current_stancode_*`
+- Each subagent must provide a summary of no more than 12 above-line comments for the non-functions blocks that could be helpful for users interested in understanding the code without adding verbosity
+- Summarize the subagent recommendations and ultrathink about a simple, robust and future-proof general commenting strategy that is agnostic to the type of trend model being used

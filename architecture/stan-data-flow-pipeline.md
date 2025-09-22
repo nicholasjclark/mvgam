@@ -6,12 +6,19 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 
 ## Pipeline Stages
 
-### Stage 1: Input Processing
-- **Entry point**: `mvgam()` in `R/mvgam_core.R`
+### Stage 1: Input Processing and Convergence
+- **Entry points**: 
+  - `mvgam()` in `R/mvgam_core.R` (for model fitting)
+  - `stancode.mvgam_formula()` in `R/make_stan.R` (for code inspection)
+  - `standata.mvgam_formula()` in `R/make_stan.R` (for data inspection)
+- **Convergence point**: All entry points converge at `generate_stan_components_mvgam_formula()` in `R/make_stan.R`
 - **Input**: User formula, trend_formula, data, family, and additional parameters
-- **Processing**: Input validation using checkmate, multiple imputation detection, multivariate trend parsing via `parse_multivariate_trends()`
-- **Output**: Validated inputs and multivariate specification (mv_spec)
-- **Available data structures**: Raw user data with original row ordering
+- **Processing**: 
+  - Creates `mvgam_formula` object for shared processing
+  - Single source of truth for Stan code generation eliminating duplicate logic
+  - Input validation using checkmate, multiple imputation detection, multivariate trend parsing via `parse_multivariate_trends()`
+- **Output**: Structured components containing all elements needed for downstream processing
+- **Available data structures**: Raw user data with original row ordering, complete component set
 
 ### Stage 2: Formula Parsing and Validation
 - **Entry point**: `parse_multivariate_trends()` in `R/brms_integration.R`
@@ -107,6 +114,16 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 - **Output**: Base Stan code with properly ordered and deduplicated trend variables ready for injection
 - **Available data structures**: Combined Stan code with both observation and trend components in correct declaration order and no duplicates
 
+### Stage 6.5: Integrated Stan Code Polishing (Post-Assembly)
+- **Entry point**: `polish_generated_stan_code()` called from `generate_stan_components_mvgam_formula()` in `R/make_stan.R`
+- **Input**: Raw combined Stan code from assembly stage
+- **Processing**:
+  - **Single polishing point**: Applied once in shared infrastructure ensures consistency
+  - **Automatic formatting**: Removes empty lines, trims whitespace, removes duplicates
+  - **Consistent output**: Both `mvgam()` and `stancode()` get identically polished code
+- **Output**: Polished Stan code ready for compilation or inspection
+- **Available data structures**: Final polished Stan code with consistent formatting
+
 ### Stage 7: GLM-Compatible Trend Injection with Enhanced Mu Analysis
 - **Entry point**: `inject_trend_into_linear_predictor()` in `R/stan_assembly.R`
 - **Input**: Base Stan code and trend stanvars (including mapping arrays and GLM compatibility stanvars)
@@ -194,37 +211,54 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 ## Function Call Hierarchy
 
 ```
-mvgam() →
-  ├─ parse_multivariate_trends() →                       [EXTRACTS response_names FROM FORMULA]
-  │   └─ returns mv_spec with response_names →
-  ├─ validate_time_series_for_trends(data, trend_specs, response_vars) →
-  │   └─ extract_time_series_dimensions(data, time_var, series_var, trend_type, response_vars) →
-  │       ├─ calculate dimensions (n_time, n_series, n_obs) →
-  │       ├─ create ordering mappings →
-  │       └─ FOR EACH response_var IN response_vars:
-  │           └─ generate_obs_trend_mapping(data, response_var, time_var, series_var, dimensions) →
-  │               ├─ which(!is.na(data[[response_var]])) →    [IDENTIFIES NON-MISSING OBS]
-  │               ├─ match(obs_times, sorted_unique_times) →   [MAPS TO TIME INDICES]
-  │               ├─ match(obs_series, sorted_unique_series) → [MAPS TO SERIES INDICES]
-  │               └─ returns {obs_trend_time, obs_trend_series} arrays →
-  ├─ setup_brms_lightweight() →                          [BRMS PROCESSES DATA INDEPENDENTLY]
-  ├─ generate_combined_stancode() →
-  │   ├─ extract_trend_stanvars_from_setup(trend_setup, trend_specs, response_suffix, response_name, obs_setup) →
-  │   │   ├─ detect_glm_usage(obs_setup$stancode) →     [GLM DETECTION AND OPTIMIZATION]
-  │   │   ├─ create mu_ones stanvar (if GLM detected) →
-  │   │   ├─ extract_and_rename_trend_parameters() →
-  │   │   ├─ filter_block_content() →                   [REMOVES DUPLICATE DECLARATIONS]
-  │   │   ├─ dimensions$mappings[[response_name]] →     [RETRIEVES PRE-GENERATED MAPPING]
-  │   │   ├─ create stanvar for obs_trend_time →
-  │   │   ├─ create stanvar for obs_trend_series →
-  │   │   └─ generate_trend_specific_stanvars() →
-  │   ├─ sort_stanvars() →                              [DEPENDENCY-BASED REORDERING]
-  │   └─ inject_trend_into_linear_predictor() →         [GLM-COMPATIBLE TREND INJECTION]
-  │       ├─ detect_glm_usage() →                       [DETERMINES INJECTION APPROACH]
-  │       ├─ inject_trend_into_glm_predictor() →        [GLM-OPTIMIZED PATH]
-  │       │   ├─ parse_glm_parameters() →               [EXTRACTS GLM FUNCTION PARAMETERS]
-  │       │   ├─ generate efficient mu construction →   [MATRIX MULTIPLICATION + LOOP]
-  │       │   └─ transform_glm_call() →                 [GLM FUNCTION TRANSFORMATION]
-  │       └─ standard trend injection →                 [TRADITIONAL PATH FOR NON-GLM]
-  └─ Stan compilation and fitting
+[MULTIPLE ENTRY POINTS - DRY CONSOLIDATION ARCHITECTURE]
+
+├─ mvgam() in R/mvgam_core.R →                          [MODEL FITTING PATH]
+│   ├─ mvgam_single_dataset() →
+│   │   └─ generate_stan_components_mvgam_formula() →   [CONVERGES HERE]
+│   └─ fit_mvgam_model() + create_mvgam_from_combined_fit()
+│
+├─ stancode.mvgam_formula() in R/make_stan.R →          [CODE INSPECTION PATH]
+│   └─ generate_stan_components_mvgam_formula() →       [CONVERGES HERE]
+│
+├─ standata.mvgam_formula() in R/make_stan.R →          [DATA INSPECTION PATH]
+│   └─ generate_stan_components_mvgam_formula() →       [CONVERGES HERE]
+│
+└─ generate_stan_components_mvgam_formula() →           [SHARED INFRASTRUCTURE - SINGLE SOURCE OF TRUTH]
+    ├─ parse_multivariate_trends() →                   [EXTRACTS response_names FROM FORMULA]
+    │   └─ returns mv_spec with response_names →
+    ├─ validate_time_series_for_trends(data, trend_specs, response_vars) →
+    │   └─ extract_time_series_dimensions(data, time_var, series_var, trend_type, response_vars) →
+    │       ├─ calculate dimensions (n_time, n_series, n_obs) →
+    │       ├─ create ordering mappings →
+    │       └─ FOR EACH response_var IN response_vars:
+    │           └─ generate_obs_trend_mapping(data, response_var, time_var, series_var, dimensions) →
+    │               ├─ which(!is.na(data[[response_var]])) →    [IDENTIFIES NON-MISSING OBS]
+    │               ├─ match(obs_times, sorted_unique_times) →   [MAPS TO TIME INDICES]
+    │               ├─ match(obs_series, sorted_unique_series) → [MAPS TO SERIES INDICES]
+    │               └─ returns {obs_trend_time, obs_trend_series} arrays →
+    ├─ setup_brms_lightweight() →                      [BRMS PROCESSES DATA INDEPENDENTLY]
+    ├─ generate_combined_stancode() →
+    │   ├─ extract_trend_stanvars_from_setup(trend_setup, trend_specs, response_suffix, response_name, obs_setup) →
+    │   │   ├─ detect_glm_usage(obs_setup$stancode) →     [GLM DETECTION AND OPTIMIZATION]
+    │   │   ├─ create mu_ones stanvar (if GLM detected) →
+    │   │   ├─ extract_and_rename_trend_parameters() →
+    │   │   ├─ filter_block_content() →                   [REMOVES DUPLICATE DECLARATIONS]
+    │   │   ├─ dimensions$mappings[[response_name]] →     [RETRIEVES PRE-GENERATED MAPPING]
+    │   │   ├─ create stanvar for obs_trend_time →
+    │   │   ├─ create stanvar for obs_trend_series →
+    │   │   └─ generate_trend_specific_stanvars() →
+    │   ├─ sort_stanvars() →                            [DEPENDENCY-BASED REORDERING]
+    │   └─ inject_trend_into_linear_predictor() →       [GLM-COMPATIBLE TREND INJECTION]
+    │       ├─ detect_glm_usage() →                     [DETERMINES INJECTION APPROACH]
+    │       ├─ inject_trend_into_glm_predictor() →      [GLM-OPTIMIZED PATH]
+    │       │   ├─ parse_glm_parameters() →             [EXTRACTS GLM FUNCTION PARAMETERS]
+    │       │   ├─ generate efficient mu construction → [MATRIX MULTIPLICATION + LOOP]
+    │       │   └─ transform_glm_call() →               [GLM FUNCTION TRANSFORMATION]
+    │       └─ standard trend injection →               [TRADITIONAL PATH FOR NON-GLM]
+    ├─ polish_generated_stan_code() →                   [SINGLE POLISHING POINT]
+    └─ returns {combined_components, obs_setup, trend_setup, mv_spec} →
+        ├─ mvgam() path: extract stancode/standata + create mvgam object
+        ├─ stancode() path: extract and return polished stancode
+        └─ standata() path: extract and return standata
 ```

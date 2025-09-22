@@ -81,82 +81,32 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
 mvgam_single_dataset <- function(formula, trend_formula, data, backend,
                                 family, ...) {
 
-  # Parse multivariate trends and validate
-  mv_spec <- parse_multivariate_trends(formula, trend_formula)
-
-  # Validate formula compatibility with brms
-  if (!is.null(trend_formula)) {
-    validate_autocor_separation(formula, trend_formula)
-  }
-
-  # Setup observation model using lightweight brms
-  obs_setup <- setup_brms_lightweight(
-    formula = formula,
-    data = data,
+  # Create mvgam_formula object for shared processing
+  mvgam_formula_obj <- mvgam_formula(formula, trend_formula)
+  
+  # Use existing shared infrastructure (same as stancode())
+  stan_components <- generate_stan_components_mvgam_formula(
+    formula = mvgam_formula_obj,
+    data = data, 
     family = family,
-    ...
-  )
-
-  # Setup trend model if trends are specified
-  trend_setup <- if (mv_spec$has_trends) {
-    setup_brms_lightweight(
-      formula = mv_spec$base_formula,
-      data = data,
-      family = gaussian(), # Trends are typically gaussian processes
-      ...
-    )
-  } else {
-    NULL
-  }
-
-  # Validate time series structure and inject dimensions if trends are specified
-  if (mv_spec$has_trends) {
-    # Extract response variable names for mapping generation using enhanced function
-    response_vars <- extract_response_names(formula)
-
-    validation_result <- validate_time_series_for_trends(
-      data,
-      mv_spec$trend_specs,
-      response_vars = response_vars,
-      cached_formulas = mv_spec$cached_formulas
-    )
-
-    # Inject dimensions back into trend specifications for stanvar generation
-    # Standardized structure: univariate=direct, multivariate=named list
-    if (is_multivariate_trend_specs(mv_spec$trend_specs)) {
-      # Multivariate: inject dimensions into each response-specific trend spec
-      for (response_name in names(mv_spec$trend_specs)) {
-        mv_spec$trend_specs[[response_name]]$dimensions <- validation_result$dimensions
-      }
-    } else {
-      # Univariate: inject dimensions directly into trend object
-      mv_spec$trend_specs$dimensions <- validation_result$dimensions
-    }
-  }
-
-  # Note: Legacy trend stanvar extraction removed - modern system handles this automatically in generate_combined_stancode()
-
-  # Generate combined Stan code and data using modern system
-  combined_components <- generate_combined_stancode_and_data(
-    obs_setup = obs_setup,
-    trend_setup = trend_setup,
-    mv_spec = mv_spec
-  )
-
-  # Fit the combined model
-  combined_fit <- fit_mvgam_model(
-    stancode = combined_components$stancode,
-    standata = combined_components$standata,
     backend = backend,
     ...
   )
 
-  # Create mvgam object from combined fit
+  # Fit the combined model
+  combined_fit <- fit_mvgam_model(
+    stancode = stan_components$combined_components$stancode,
+    standata = stan_components$combined_components$standata,
+    backend = backend,
+    ...
+  )
+
+  # Create mvgam object from combined fit - now we have all required components
   mvgam_object <- create_mvgam_from_combined_fit(
     combined_fit = combined_fit,
-    obs_setup = obs_setup,
-    trend_setup = trend_setup,
-    mv_spec = mv_spec
+    obs_setup = stan_components$obs_setup,
+    trend_setup = stan_components$trend_setup,
+    mv_spec = stan_components$mv_spec
   )
 
   return(mvgam_object)

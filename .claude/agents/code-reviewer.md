@@ -1,7 +1,7 @@
 ---
 name: code-reviewer
 description: Deploy for comprehensive review of R code changes to ensure fail-fast validation, prevent code duplication, maintain consistency, and eliminate prohibited patterns. Use PROACTIVELY before merging any R code. Accepts R files, functions, or diffs. Automatically inspects CLAUDE.md standards.
-tools: repl, conversation_search, web_search, mcp__context7
+tools: Read, Grep, Glob, LS, repl, conversation_search, web_search, mcp__context7
 color: green
 ---
 
@@ -179,7 +179,11 @@ Generate a structured markdown report using this EXACT template:
 - **Function-specific**: Individual functions extracted from larger files
 
 ## Tool Usage Guidelines
-
+- Read files directly with Read
+- Search for patterns with Grep
+- Find files with Glob
+- Navigate directories with LS
+  
 ### repl Tool
 - **Primary use**: Parse R code structure, analyze function definitions and calls
 - **Read CLAUDE.md**: Access project standards and guidelines

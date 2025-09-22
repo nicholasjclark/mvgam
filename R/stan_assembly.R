@@ -4181,7 +4181,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
       matrix get_changepoint_matrix(vector t, vector t_change_trend, int T, int S) {
         /* Function to sort changepoints */
 
-        /* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/
+        /* credit goes to the Prophet development team at Meta */
         matrix[T, S] Kappa;
         row_vector[S] a_row;
         int cp_idx;
@@ -4201,7 +4201,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
       vector logistic_gamma(real k, real m, vector delta, vector t_change_trend, int S) {
         /* Function to compute a logistic trend with changepoints */
 
-        /* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/
+        /* credit goes to the Prophet development team at Meta */
         vector[S] gamma; // adjusted offsets, for piecewise continuity
         vector[S + 1] k_s; // actual rate in each segment
         real m_pr;
@@ -4218,7 +4218,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
                             matrix Kappa_trend, vector t_change_trend, int S) {
         /* Function to adjust a logistic trend using a carrying capacity */
 
-        /* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/
+        /* credit goes to the Prophet development team at Meta */
         vector[S] gamma;
         gamma = logistic_gamma(k, m, delta, t_change_trend, S);
         return cap_trend .* inv_logit((k + Kappa_trend * delta) .* (t - (m + Kappa_trend * gamma)));
@@ -4228,7 +4228,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
                           vector t_change_trend) {
         /* Function to compute a linear trend with changepoints */
 
-        /* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/
+        /* credit goes to the Prophet development team at Meta */
         return (k + Kappa_trend * delta) .* t + (m + Kappa_trend * (-t_change_trend .* delta));
       }
     ",

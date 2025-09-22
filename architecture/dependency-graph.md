@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-09-22 14:46:13  
+**Generated:** 2025-09-22 15:30:23  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 55
-- **Total Functions:** 414
+- **Total Functions:** 416
 - **Exported Functions:** 56
-- **Internal Functions:** 372
+- **Internal Functions:** 374
 - **S3 Methods:** 37
 - **S3 Classes:** 24
 
@@ -223,10 +223,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: apply_response_suffix_to_stanvars, generate_combined_stancode, generate_base_stancode_with_stanvars, extract_trend_stanvars_from_setup, detect_glm_usage, inject_trend_into_glm_predictor, validate_mapping_arrays, find_stan_block, find_prior_only_insertion_point, inject_trend_into_linear_predictor, insert_after_mu_lines_in_model_block, inject_multivariate_trends_into_linear_predictors, generate_shared_innovation_stanvars, apply_suffix_to_stan_code, detect_shared_trends (+ 61 more)
 - **`R/brms_integration.R`** (16 functions) - brms integration
   - Key functions: setup_brms_lightweight, extract_prior_from_setup, parse_multivariate_trends, is_multivariate_formula, extract_response_names, extract_mvbind_responses, extract_response_trends, handle_nonlinear_model, extract_nonlinear_components, parse_nonlinear_manually, extract_brmsterms_from_setup, create_trend_base_formula, determine_trend_injection_point (+ 3 more)
+- **`R/stan_polish.R`** (5 functions) - Stan model integration
+  - Key functions: polish_generated_stan_code, try_stanheaders_formatting, update_stan_header, clean_stan_comments, fix_blank_lines
 - **`R/make_stan.R`** (3 functions) - Stan model integration
   - Key functions: generate_stan_components_mvgam_formula, stancode.mvgam_formula, standata.mvgam_formula
-- **`R/stan_polish.R`** (3 functions) - Stan model integration
-  - Key functions: polish_generated_stan_code, try_stanheaders_formatting, fix_blank_lines
 
 ### Plotting Files
 - **`R/plot_mvgam_series.R`** (6 functions) - Plotting and visualization
@@ -661,9 +661,11 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **transform_glm_call()** (internal)
 
 ### `R/stan_polish.R`:
+- **clean_stan_comments()** (internal)
 - **fix_blank_lines()** (internal)
 - **polish_generated_stan_code()** (internal)
 - **try_stanheaders_formatting()** (internal)
+- **update_stan_header()** (internal)
 
 ### `R/tidier_methods.R`:
 - **augment.mvgam()** (internal)

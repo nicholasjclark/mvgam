@@ -5,14 +5,18 @@
     "functions":  [
                       "polish_generated_stan_code",
                       "try_stanheaders_formatting",
-                      "fix_blank_lines"
+                      "fix_blank_lines",
+                      "update_stan_header",
+                      "clean_stan_comments"
                   ],
     "purpose":  "Stan model integration",
     "function_dependencies":  {
 
                               },
     "function_signatures":  {
+                                "update_stan_header":  "update_stan_header \u003c- function(lines) {",
                                 "fix_blank_lines":  "fix_blank_lines \u003c- function(lines) {",
+                                "clean_stan_comments":  "clean_stan_comments \u003c- function(lines) {",
                                 "polish_generated_stan_code":  "polish_generated_stan_code \u003c- function(stan_code, silent = TRUE) {",
                                 "try_stanheaders_formatting":  "try_stanheaders_formatting \u003c- function(stan_code, silent = TRUE, line_length = 80) {"
                             },
