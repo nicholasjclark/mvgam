@@ -391,14 +391,20 @@ reorganize_lprior_statements <- function(lines) {
       
       # Look for continuation lines (multi-line statements)
       j <- i + 1
-      while (j < model_start && !grepl(";\\s*$", lines[i])) {
+      while (j < model_start && !grepl(";\\s*$", lines[j-1])) {
         next_line <- lines[j]
         next_trimmed <- trimws(next_line)
         
-        # Continue if line is indented and doesn't start a new declaration
-        if (grepl("^\\s+", next_line) && 
+        # Continue if line is indented OR starts with mathematical operators (for lprior continuations)
+        is_indented_continuation <- grepl("^\\s+", next_line) && 
             !grepl("^\\s*(real|int|vector|matrix|array|for|if|while|lprior)", next_trimmed) &&
-            !grepl("^\\}", next_trimmed)) {
+            !grepl("^\\}", next_trimmed)
+        
+        # Also accept unindented lines that start with mathematical operators (common in lprior statements)
+        is_math_continuation <- grepl("^\\s*[-+*/]", next_trimmed) && 
+            !grepl("^\\s*(real|int|vector|matrix|array|for|if|while|lprior)", next_trimmed)
+        
+        if (is_indented_continuation || is_math_continuation) {
           statement_lines <- c(statement_lines, j)
           j <- j + 1
         } else {

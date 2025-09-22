@@ -40,7 +40,7 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 - Data dimension mismatches in multivariate models (TARGET 2, 3, 4)
 - Complex fitting failures requiring investigation
 
-### Priority 2: Fix Stan syntax errors in prior statements (15 min task)
+### Priority 2: Fix Stan syntax errors in prior statements [COMPLETED]
 **ISSUE**: TARGET 6 & 8 fail compilation due to missing semicolons in lprior statements
 **TASK**: 
 - Locate and inspect `lprior` rearrangement steps in `R/stan_polish.R`
@@ -49,7 +49,9 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 **VALIDATION**: Re-run `target_generation.R` for TARGET 6 & 8, verify compilation success
 **TIME LIMIT**: 15 minutes
 
-### Priority 3: Investigate data dimension calculation for multivariate models (15 min task)
+**SOLUTION**: Fixed `reorganize_lprior_statements()` in `R/stan_polish.R` to properly detect mathematical continuation lines. Added recognition for unindented lines starting with operators (`-`, `+`, `*`, `/`) as valid continuations for multi-line lprior statements, preventing orphaned fragments like `- 1 * student_t_lccdf(...)`. All targets now compile with correct lprior formatting.
+
+### Priority 3: Investigate data dimension calculation for multivariate models
 **ISSUE**: TARGET 2, 3, 4 show `times_trend; dims declared=(72,3); dims found=(24,3)` mismatch
 **TASK**:
 - Use pathfinder agent to locate dimension calculation functions in time series processing
@@ -59,7 +61,7 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 **VALIDATION**: Document exact location and logic causing dimension mismatch
 **TIME LIMIT**: 15 minutes
 
-### Priority 4: Fix times_trend dimension calculation logic (15 min task)
+### Priority 4: Fix times_trend dimension calculation logic
 **ISSUE**: Multivariate models calculate time dimensions incorrectly
 **TASK**:
 - Based on Priority 3 findings, fix the dimension calculation logic
@@ -69,7 +71,7 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 **VALIDATION**: Re-run `target_generation.R` for TARGET 2, 3, 4 and verify no dimension errors
 **TIME LIMIT**: 15 minutes
 
-### Priority 5: Debug complex model fitting failures (15 min task)
+### Priority 5: Debug complex model fitting failures
 **ISSUE**: Even with fixed dimensions, some complex models fail during MCMC sampling
 **TASK**:
 - Focus on models that compile but fail fitting (post-dimension fixes)
@@ -79,7 +81,7 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 **VALIDATION**: Identify specific Stan modeling issues preventing successful sampling
 **TIME LIMIT**: 15 minutes
 
-### Priority 6: Comprehensive validation and testing (15 min task)
+### Priority 6: Comprehensive validation and testing
 **ISSUE**: Need to verify all fixes work together
 **TASK**:
 - Re-run complete `target_fitting.R` after all fixes implemented
