@@ -1,4 +1,4 @@
-// generated with brms 2.22.9
+// Generated with mvgam 2.0.0 using brms 2.22.9
 functions {
   matrix sqrtm(matrix A) {
     int m = rows(A);
@@ -8,13 +8,11 @@ functions {
     if (min(eigenvals) <= 1e-12) {
       reject("Matrix must be positive definite for square root computation");
     }
-    
     vector[m] root_root_evals = sqrt(sqrt(eigenvals));
     matrix[m, m] evecs = eigenvectors_sym(A);
     matrix[m, m] eprod = diag_post_multiply(evecs, root_root_evals);
     return tcrossprod(eprod);
   }
-  
   matrix AtoP(matrix P_real) {
     int m = rows(P_real);
     matrix[m, m] B = tcrossprod(P_real);
@@ -23,14 +21,12 @@ functions {
     }
     return mdivide_left_spd(sqrtm(B), P_real);
   }
-  
   matrix kronecker_prod(matrix A, matrix B) {
     int m = rows(A);
     int n = cols(A);
     int p = rows(B);
     int q = cols(B);
     matrix[m * p, n * q] C;
-    
     for (i in 1 : m) {
       for (j in 1 : n) {
         int row_start = (i - 1) * p + 1;
@@ -42,7 +38,6 @@ functions {
     }
     return C;
   }
-  
   array[,] matrix rev_mapping(array[] matrix P, matrix Sigma) {
     int p = size(P);
     int m = rows(Sigma);
@@ -55,12 +50,9 @@ functions {
     array[p + 1] matrix[m, m] S_for_list;
     array[p + 1] matrix[m, m] Gamma_trans;
     array[2, p] matrix[m, m] phiGamma;
-    
-    // Step 1: Forward pass - compute Sigma_for and S_for_list
     Sigma_for[p + 1] = Sigma;
     S_for_list[p + 1] = sqrtm(Sigma);
     for (s in 1 : p) {
-      // Compute working matrices (S_rev is B^{-1}, S_for is working matrix)
       S_for = -tcrossprod(P[p - s + 1]);
       for (i in 1 : m) {
         S_for[i, i] += 1.0;
@@ -75,8 +67,6 @@ functions {
                                                 S_rev);
       Sigma_for[p - s + 1] = tcrossprod(S_for_list[p - s + 1]);
     }
-    
-    // Step 2: Reverse pass - compute phi coefficients and Gamma matrices
     Sigma_rev[1] = Sigma_for[1];
     Gamma_trans[1] = Sigma_for[1];
     for (s in 0 : (p - 1)) {
@@ -85,17 +75,13 @@ functions {
       phi_for[s + 1, s + 1] = mdivide_right_spd(S_for * P[s + 1], S_rev);
       phi_rev[s + 1, s + 1] = mdivide_right_spd(S_rev * P[s + 1]', S_for);
       Gamma_trans[s + 2] = phi_for[s + 1, s + 1] * Sigma_rev[s + 1];
-      
       if (s >= 1) {
-        // Update phi coefficients using recursive relations
         for (k in 1 : s) {
           phi_for[s + 1, k] = phi_for[s, k]
                               - phi_for[s + 1, s + 1] * phi_rev[s, s - k + 1];
           phi_rev[s + 1, k] = phi_rev[s, k]
                               - phi_rev[s + 1, s + 1] * phi_for[s, s - k + 1];
         }
-        
-        // Update Gamma_trans using phi coefficients
         for (k in 1 : s) {
           Gamma_trans[s + 2] = Gamma_trans[s + 2]
                                + phi_for[s, k] * Gamma_trans[s + 2 - k];
@@ -105,15 +91,12 @@ functions {
                          - quad_form_sym(Sigma_for[s + 1],
                                          phi_rev[s + 1, s + 1]');
     }
-    
-    // Pack results: phi coefficients in row 1, Gamma matrices in row 2
     for (i in 1 : p) {
       phiGamma[1, i] = phi_for[p, i];
       phiGamma[2, i] = Gamma_trans[i]';
     }
     return phiGamma;
   }
-  
   matrix initial_joint_var(matrix Sigma, array[] matrix phi,
                            array[] matrix theta) {
     int p = size(phi);
@@ -127,25 +110,17 @@ functions {
                                                                 (p + q) * m);
     matrix[(p + q) * m * (p + q) * m, (p + q) * m * (p + q) * m] tmp;
     matrix[(p + q) * m, (p + q) * m] Omega;
-    
-    // Construct companion matrix (phi_tilde) following Heaps 2022
-    // VAR component: phi matrices in top-left block
     for (i in 1 : p) {
       companion_mat[1 : m, ((i - 1) * m + 1) : (i * m)] = phi[i];
       if (i > 1) {
-        // Identity blocks for VAR lags
         for (j in 1 : m) {
           companion_mat[(i - 1) * m + j, (i - 2) * m + j] = 1.0;
         }
       }
     }
-    
-    // MA component: theta matrices in top-right block
     for (i in 1 : q) {
       companion_mat[1 : m, ((p + i - 1) * m + 1) : ((p + i) * m)] = theta[i];
     }
-    
-    // Identity blocks for MA lags (if q > 1)
     if (q > 1) {
       for (i in 2 : q) {
         for (j in 1 : m) {
@@ -153,68 +128,46 @@ functions {
         }
       }
     }
-    
-    // Construct innovation covariance matrix (Sigma_tilde)
-    // Innovations affect y_t and eps_t simultaneously
-    companion_var[1 : m, 1 : m] = Sigma; // For y_t innovations
-    companion_var[(p * m + 1) : ((p + 1) * m), (p * m + 1) : ((p + 1) * m)] = Sigma; // For eps_t innovations
-    companion_var[1 : m, (p * m + 1) : ((p + 1) * m)] = Sigma; // Cross-covariance
-    companion_var[(p * m + 1) : ((p + 1) * m), 1 : m] = Sigma; // Symmetric cross-covariance
-    
-    // Solve Lyapunov equation: Omega = Sigma_tilde + Phi_tilde * Omega * Phi_tilde'
-    // Vectorized form: vec(Omega) = (I - Phi_tilde ⊗ Phi_tilde)^{-1} vec(Sigma_tilde)
+    companion_var[1 : m, 1 : m] = Sigma;
+    companion_var[(p * m + 1) : ((p + 1) * m), (p * m + 1) : ((p + 1) * m)] = Sigma;
+    companion_var[1 : m, (p * m + 1) : ((p + 1) * m)] = Sigma;
+    companion_var[(p * m + 1) : ((p + 1) * m), 1 : m] = Sigma;
     tmp = diag_matrix(rep_vector(1.0, (p + q) * m * (p + q) * m))
           - kronecker_prod(companion_mat, companion_mat);
-    
     Omega = to_matrix(tmp \ to_vector(companion_var), (p + q) * m,
                       (p + q) * m);
-    
-    // Ensure numerical symmetry of result
     for (i in 1 : (rows(Omega) - 1)) {
       for (j in (i + 1) : rows(Omega)) {
         Omega[j, i] = Omega[i, j];
       }
     }
-    
     return Omega;
   }
 }
 data {
-  int<lower=1> N; // total number of observations
-  int<lower=1> N_count; // number of observations
-  vector[N_count] Y_count; // response variable
-  
-  // data for splines
-  int Ks_count; // number of linear effects
-  matrix[N_count, Ks_count] Xs_count; // design matrix for the linear effects
-  
-  // data for spline 1
-  int nb_count_1; // number of bases
-  array[nb_count_1] int knots_count_1; // number of knots
-  
-  // basis function matrices
+  int<lower=1> N;
+  int<lower=1> N_count;
+  vector[N_count] Y_count;
+  int Ks_count;
+  matrix[N_count, Ks_count] Xs_count;
+  int nb_count_1;
+  array[nb_count_1] int knots_count_1;
   matrix[N_count, knots_count_1[1]] Zs_count_1_1;
-  int<lower=1> N_biomass; // number of observations
-  vector[N_biomass] Y_biomass; // response variable
-  
-  // data for splines
-  int Ks_biomass; // number of linear effects
-  matrix[N_biomass, Ks_biomass] Xs_biomass; // design matrix for the linear effects
-  
-  // data for spline 1
-  int nb_biomass_1; // number of bases
-  array[nb_biomass_1] int knots_biomass_1; // number of knots
-  
-  // basis function matrices
+  int<lower=1> N_biomass;
+  vector[N_biomass] Y_biomass;
+  int Ks_biomass;
+  matrix[N_biomass, Ks_biomass] Xs_biomass;
+  int nb_biomass_1;
+  array[nb_biomass_1] int knots_biomass_1;
   matrix[N_biomass, knots_biomass_1[1]] Zs_biomass_1_1;
-  int prior_only; // should the likelihood be ignored?
-  int<lower=1> N_trend; // total number of observations
+  int prior_only;
+  int<lower=1> N_trend;
   int<lower=1> N_series_trend;
   int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
-  int<lower=1> K_trend; // number of population-level effects
-  int<lower=1> Kc_trend; // number of population-level effects after centering
-  matrix[N_trend, K_trend] X_trend; // population-level design matrix
+  int<lower=1> K_trend;
+  int<lower=1> Kc_trend;
+  matrix[N_trend, K_trend] X_trend;
   array[N_count] int obs_trend_time_count;
   array[N_count] int obs_trend_series_count;
   array[N_biomass] int obs_trend_time_biomass;
@@ -223,143 +176,81 @@ data {
 transformed data {
   matrix[N_series_trend, N_lv_trend] Z = diag_matrix(rep_vector(1.0,
                                                                 N_lv_trend));
-  matrix[N_trend, Kc_trend] Xc_trend; // centered version of X_trend without an intercept
-  vector[Kc_trend] means_X_trend; // column means of X_trend before centering
+  matrix[N_trend, Kc_trend] Xc_trend;
+  vector[Kc_trend] means_X_trend;
   for (i_trend in 2 : K_trend) {
     means_X_trend[i_trend - 1] = mean(X_trend[ : , i_trend]);
     Xc_trend[ : , i_trend - 1] = X_trend[ : , i_trend]
                                  - means_X_trend[i_trend - 1];
   }
-  
-  // Zero mean vector for VARMA process (following Heaps 2022)
   vector[N_lv_trend] trend_zeros = rep_vector(0.0, N_lv_trend);
 }
 parameters {
-  real Intercept_count; // temporary intercept for centered predictors
-  vector[Ks_count] bs_count; // unpenalized spline coefficients
-  
-  // parameters for spline 1
-  // standardized penalized spline coefficients
+  real Intercept_count;
+  vector[Ks_count] bs_count;
   vector[knots_count_1[1]] zs_count_1_1;
-  vector<lower=0>[nb_count_1] sds_count_1; // SDs of penalized spline coefficients
-  real<lower=0> sigma_count; // dispersion parameter
-  real Intercept_biomass; // temporary intercept for centered predictors
-  vector[Ks_biomass] bs_biomass; // unpenalized spline coefficients
-  
-  // parameters for spline 1
-  // standardized penalized spline coefficients
+  vector<lower=0>[nb_count_1] sds_count_1;
+  real<lower=0> sigma_count;
+  real Intercept_biomass;
+  vector[Ks_biomass] bs_biomass;
   vector[knots_biomass_1[1]] zs_biomass_1_1;
-  vector<lower=0>[nb_biomass_1] sds_biomass_1; // SDs of penalized spline coefficients
-  real<lower=0> sigma_biomass; // dispersion parameter
+  vector<lower=0>[nb_biomass_1] sds_biomass_1;
+  real<lower=0> sigma_biomass;
   matrix[N_trend, N_lv_trend] lv_trend;
-  vector[Kc_trend] b_trend; // regression coefficients
-  real Intercept_trend; // temporary intercept for centered predictors
-  
-  // Standard VAR: single raw matrix
+  vector[Kc_trend] b_trend;
+  real Intercept_trend;
   array[2] matrix[N_lv_trend, N_lv_trend] A_raw_trend;
-  
-  // Standard variance and correlation parameters
   vector<lower=0>[N_lv_trend] sigma_trend;
   cholesky_factor_corr[N_lv_trend] L_Omega_trend;
-  
-  // Shared hierarchical hyperparameters for A_raw coefficients (across all groups)
-  // [1] = diagonal elements, [2] = off-diagonal elements
-  array[2] vector[2] Amu_trend; // Shared means
-  array[2] vector<lower=0>[2] Aomega_trend; // Shared precisions
-  
-  // Joint initialization vector for stationary distribution
+  array[2] vector[2] Amu_trend;
+  array[2] vector<lower=0>[2] Aomega_trend;
   vector[(2 + 1) * N_lv_trend] init_trend;
-  
-  // VAR dynamics
-  // Raw MA partial autocorrelation matrices (unconstrained for stationarity)
-  // D_raw_trend gets transformed to D_trend (stationary MA coefficients)
   array[1] matrix[N_lv_trend, N_lv_trend] D_raw_trend;
-  
-  // Hierarchical hyperparameters for D_raw_trend (MA) coefficients
-  // Mirrors A_raw_trend hyperparameter structure for consistency
-  // [1] = diagonal elements, [2] = off-diagonal elements
-  array[2] vector[1] Dmu_trend; // Means for D_raw_trend elements
-  array[2] vector<lower=0>[1] Domega_trend; // Precisions for D_raw_trend elements
+  array[2] vector[1] Dmu_trend;
+  array[2] vector<lower=0>[1] Domega_trend;
 }
 transformed parameters {
-  // penalized spline coefficients
   vector[knots_count_1[1]] s_count_1_1;
-  
-  // penalized spline coefficients
   vector[knots_biomass_1[1]] s_biomass_1_1;
-  real lprior = 0; // prior contributions to the log posterior
+  real lprior = 0;
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   mu_trend += Intercept_trend + Xc_trend * b_trend;
   lprior += student_t_lpdf(Intercept_trend | 3, -0.2, 2.5);
-  
-  // Standard VAR: single covariance matrix and transformation
   matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend,
                                                                    L_Omega_trend);
   cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
-  
-  // Transform raw parameters to stationary coefficients
   array[2] matrix[N_lv_trend, N_lv_trend] A_trend;
-  
-  // Working arrays for stationarity transformation
   array[2] matrix[N_lv_trend, N_lv_trend] P_var;
   array[2, 2] matrix[N_lv_trend, N_lv_trend] result_var;
-  
   for (i in 1 : 2) {
     P_var[i] = AtoP(A_raw_trend[i]);
   }
-  
   result_var = rev_mapping(P_var, Sigma_trend);
-  
   for (i in 1 : 2) {
     A_trend[i] = result_var[1, i];
   }
-  
   array[1] matrix[N_lv_trend, N_lv_trend] D_trend;
-  
-  // Joint covariance matrix for stationary initialization
   cov_matrix[(2 + 1) * N_lv_trend] Omega_trend;
-  
   vector[N_lv_trend] ma_init_trend;
-  
-  // Transform D_raw_trend to stationary D_trend (VARMA only)
   array[1] matrix[N_lv_trend, N_lv_trend] P_ma;
   array[2, 1] matrix[N_lv_trend, N_lv_trend] result_ma;
-  
-  // Transform D_raw_trend matrices using AtoP transformation
   for (i in 1 : 1) {
     P_ma[i] = AtoP(D_raw_trend[i]);
   }
-  
-  // Apply reverse mapping to get stationary MA coefficients
   result_ma = rev_mapping(P_ma, Sigma_trend);
-  
-  // Extract stationary MA coefficients (negative sign per Heaps 2022)
   for (i in 1 : 1) {
     D_trend[i] = -result_ma[1, i];
   }
-  
-  // Compute initial joint covariance matrix using companion matrix approach
   Omega_trend = initial_joint_var(Sigma_trend, A_trend, D_trend);
-  
-  // Initialize MA error term from init_trend 
   ma_init_trend = init_trend[(2 * N_lv_trend + 1) : (3 * N_lv_trend)];
-  
-  // Derived latent trends using universal computation pattern
   matrix[N_trend, N_series_trend] trend;
-  
-  // Universal trend computation: state-space dynamics + linear predictors
-  // dot_product captures dynamic component, mu_trend captures trend_formula
   for (i in 1 : N_trend) {
     for (s in 1 : N_series_trend) {
       trend[i, s] = dot_product(Z[s,  : ], lv_trend[i,  : ])
                     + mu_trend[times_trend[i, s]];
     }
   }
-  
-  // compute penalized spline coefficients
   s_count_1_1 = sds_count_1[1] * zs_count_1_1;
-  
-  // compute penalized spline coefficients
   s_biomass_1_1 = sds_biomass_1[1] * zs_biomass_1_1;
   lprior += student_t_lpdf(Intercept_count | 3, 4, 2.5);
   lprior += student_t_lpdf(sds_count_1 | 3, 0, 2.5)
@@ -373,25 +264,16 @@ transformed parameters {
             - 1 * student_t_lccdf(0 | 3, 0, 2.5);
 }
 model {
-  // VARMA likelihood implementation following Heaps 2022 methodology
-  // Initial joint distribution for stationary VARMA initialization
   vector[(2 + 1) * N_lv_trend] mu_init_trend = rep_vector(0.0,
                                                           (2 + 1)
                                                           * N_lv_trend);
   init_trend ~ multi_normal(mu_init_trend, Omega_trend);
-  
-  // Conditional means for VARMA dynamics
   array[N_trend] vector[N_lv_trend] mu_t_trend;
-  array[N_trend] vector[N_lv_trend] ma_error_trend; // MA error terms
-  
-  // Compute conditional means for all time points
+  array[N_trend] vector[N_lv_trend] ma_error_trend;
   for (t in 1 : N_trend) {
     mu_t_trend[t] = rep_vector(0.0, N_lv_trend);
-    
-    // VAR component: Add autoregressive terms
     for (i in 1 : 2) {
       if (t - i <= 0) {
-        // Use values from earlier than series start (from init_trend)
         int init_idx = 2 - (t - i) + 1;
         if (init_idx > 0 && init_idx <= 2) {
           vector[N_lv_trend] lagged_lv;
@@ -401,36 +283,22 @@ model {
           mu_t_trend[t] += A_trend[i] * lagged_lv;
         }
       } else {
-        // Use regular lv_trend values
         mu_t_trend[t] += A_trend[i] * lv_trend[t - i,  : ]';
       }
     }
-    
-    // MA component: Add moving average term for VARMA
     if (t - 1 <= 0) {
-      // Use initial MA error for first time point
       mu_t_trend[t] += D_trend[1] * ma_init_trend;
     } else {
-      // Use computed MA error from previous time point
       mu_t_trend[t] += D_trend[1] * ma_error_trend[t - 1];
     }
   }
-  
-  // Latent variable dynamics
   for (t in 1 : N_trend) {
     lv_trend[t,  : ]' ~ multi_normal(mu_t_trend[t], Sigma_trend);
-    
-    // Compute MA error for next iteration
     ma_error_trend[t] = lv_trend[t,  : ]' - mu_t_trend[t];
   }
-  
-  // Standard VAR: single matrix priors
   for (lag in 1 : 2) {
-    // Diagonal elements prior
     diagonal(A_raw_trend[lag]) ~ normal(Amu_trend[1, lag],
                                         1 / sqrt(Aomega_trend[1, lag]));
-    
-    // Off-diagonal elements prior
     for (i in 1 : N_lv_trend) {
       for (j in 1 : N_lv_trend) {
         if (i != j) {
@@ -440,15 +308,9 @@ model {
       }
     }
   }
-  
-  // Hierarchical priors for VARMA MA coefficient matrices (D_raw_trend)
-  // Following same structure as VAR coefficients but conditional on ma_lags > 0
   for (ma_lag in 1 : 1) {
-    // Diagonal elements prior for MA coefficients
     diagonal(D_raw_trend[ma_lag]) ~ normal(Dmu_trend[1, ma_lag],
                                            1 / sqrt(Domega_trend[1, ma_lag]));
-    
-    // Off-diagonal elements prior for MA coefficients
     for (i in 1 : N_lv_trend) {
       for (j in 1 : N_lv_trend) {
         if (i != j) {
@@ -459,36 +321,22 @@ model {
       }
     }
   }
-  
-  // Hyperpriors for hierarchical MA coefficient means and precisions
   Dmu_trend[1, 1] ~ normal(0.0, 1.0);
   Domega_trend[1, 1] ~ gamma(2.0, 1.0);
   Dmu_trend[2, 1] ~ normal(0.0, 1.0);
   Domega_trend[2, 1] ~ gamma(2.0, 1.0);
-  
-  // LKJ correlation prior on Cholesky factor
   L_Omega_trend ~ lkj_corr_cholesky(2);
-  
-  // Hyperpriors for hierarchical VAR coefficient means and precisions
   for (lag in 1 : 2) {
     Amu_trend[lag] ~ normal(0, sqrt(0.455));
     Aomega_trend[lag] ~ gamma(1.365, 0.071175);
   }
   sigma_trend ~ exponential(2);
-  
-  // likelihood including constants
   if (!prior_only) {
-    // initialize linear predictor term
     vector[N_count] mu_count = rep_vector(0.0, N_count);
-    
-    // initialize linear predictor term
-    // Add trend effects for response count
     for (n in 1 : N_count) {
       mu_count[n] += trend[obs_trend_time_count[n], obs_trend_series_count[n]];
     }
     vector[N_biomass] mu_biomass = rep_vector(0.0, N_biomass);
-    
-    // Add trend effects for response biomass
     for (n in 1 : N_biomass) {
       mu_biomass[n] += trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
     }
@@ -499,20 +347,13 @@ model {
     target += normal_lpdf(Y_count | mu_count, sigma_count);
     target += normal_lpdf(Y_biomass | mu_biomass, sigma_biomass);
   }
-  
-  // priors including constants
   target += lprior;
   target += std_normal_lpdf(zs_count_1_1);
   target += std_normal_lpdf(zs_biomass_1_1);
 }
 generated quantities {
-  // actual population-level intercept
   real b_count_Intercept = Intercept_count;
-  
-  // actual population-level intercept
   real b_biomass_Intercept = Intercept_biomass;
-  
-  // actual population-level intercept
   real b_Intercept_trend = Intercept_trend
                            - dot_product(means_X_trend, b_trend);
 }

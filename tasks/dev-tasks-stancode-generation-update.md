@@ -28,29 +28,6 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 - **DO NOT**: Attempt to "fix" files directly
 
 **AGENT TASK**: Your ONLY job is to read the existing files and report discrepancies with specific line numbers and code snippets.
-
-### Priority 0: Streamline and simplify Stan code polishing in R/stan_polish.R
- 1. We shouldn't break at += operators
- 2. We should have a blank line before above-line comments
- 3. No blank line between consecutive above-line comments
- 4. Strange breaks happening within words like mu_ones_biomass being broken
-
-  In current_stancode_2.stan:
-  - Lines 30-34: target + and = normal_id_glm_lpdf(...) are broken awkwardly
-  - Line 33-34: mu_ones_bio and mass are broken in the middle of a word
-
-  In current_stancode_3.stan:
-  - Lines 469-470 and 475-476: mu_count[n] + and = trend[...] are broken at +=
-  - Lines 431-432 and 438-439: Similar breaking at function calls
-
-  In current_stancode_4.stan:
-  - Lines 157-158 and 161-162: Similar += breaking issues
-
-  These are clear problems with our line breaking logic. Need to:
-
-  1. Remove += from the break patterns or handle it specially
-  2. Add logic for comment spacing (blank line before standalone comments)
-  3. Fix the word breaking issue (this might be related to the bracket counting or break point detection)
   
 ### Priority 1: DRY Consolidation - mvgam() calls stancode() internally
 **CRITICAL ARCHITECTURAL IMPROVEMENT**

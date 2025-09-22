@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-09-19 16:01:40  
+**Generated:** 2025-09-22 14:46:13  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
-- **Total Files:** 54
-- **Total Functions:** 411
+- **Total Files:** 55
+- **Total Functions:** 414
 - **Exported Functions:** 56
-- **Internal Functions:** 369
+- **Internal Functions:** 372
 - **S3 Methods:** 37
 - **S3 Classes:** 24
 
@@ -225,6 +225,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: setup_brms_lightweight, extract_prior_from_setup, parse_multivariate_trends, is_multivariate_formula, extract_response_names, extract_mvbind_responses, extract_response_trends, handle_nonlinear_model, extract_nonlinear_components, parse_nonlinear_manually, extract_brmsterms_from_setup, create_trend_base_formula, determine_trend_injection_point (+ 3 more)
 - **`R/make_stan.R`** (3 functions) - Stan model integration
   - Key functions: generate_stan_components_mvgam_formula, stancode.mvgam_formula, standata.mvgam_formula
+- **`R/stan_polish.R`** (3 functions) - Stan model integration
+  - Key functions: polish_generated_stan_code, try_stanheaders_formatting, fix_blank_lines
 
 ### Plotting Files
 - **`R/plot_mvgam_series.R`** (6 functions) - Plotting and visualization
@@ -657,6 +659,11 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **should_include_in_transformed_parameters()** (internal)
 - **sort_stanvars()** (internal)
 - **transform_glm_call()** (internal)
+
+### `R/stan_polish.R`:
+- **fix_blank_lines()** (internal)
+- **polish_generated_stan_code()** (internal)
+- **try_stanheaders_formatting()** (internal)
 
 ### `R/tidier_methods.R`:
 - **augment.mvgam()** (internal)

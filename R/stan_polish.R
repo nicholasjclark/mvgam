@@ -43,8 +43,10 @@ polish_generated_stan_code <- function(stan_code, silent = TRUE) {
     paste(stan_code, collapse = "\n")
   }
 
-  # Apply comment spacing fixes BEFORE calling stanc
+  # Apply comment cleaning and spacing fixes BEFORE calling stanc
   lines <- strsplit(stan_string, "\n", fixed = TRUE)[[1]]
+  lines <- update_stan_header(lines)
+  lines <- clean_stan_comments(lines)
   lines <- fix_blank_lines(lines)
   preprocessed_code <- paste(lines, collapse = "\n")
 
@@ -56,8 +58,10 @@ polish_generated_stan_code <- function(stan_code, silent = TRUE) {
     return(formatted_code)
   }
 
-  # Fallback: only comment spacing fixes
+  # Fallback: apply all preprocessing steps
   lines <- strsplit(stan_string, "\n", fixed = TRUE)[[1]]
+  lines <- update_stan_header(lines)
+  lines <- clean_stan_comments(lines)
   lines <- fix_blank_lines(lines)
 
   # Return as single string with embedded newlines
@@ -214,3 +218,95 @@ fix_blank_lines <- function(lines) {
   
   return(result)
 }
+
+#' Update Stan Header with Package Versions
+#'
+#' Replaces the generic brms header with one that includes both mvgam and brms versions.
+#'
+#' @param lines Character vector of Stan code lines
+#'
+#' @return Character vector with updated header
+#'
+#' @noRd
+update_stan_header <- function(lines) {
+  if (length(lines) == 0) return(lines)
+  
+  # Check if first line is the brms generated header
+  if (grepl("^//\\s*generated with brms", lines[1])) {
+    # Create new header with both package versions
+    mvgam_version <- utils::packageVersion("mvgam")
+    brms_version <- utils::packageVersion("brms")
+    lines[1] <- paste0("// Generated with mvgam ", mvgam_version, 
+                       " using brms ", brms_version)
+  }
+  
+  return(lines)
+}
+
+#' Clean Stan Comments
+#'
+#' Removes ALL comments and empty lines from all blocks except functions block.
+#' Preserves all comments and empty lines within functions block for documentation.
+#'
+#' @param lines Character vector of Stan code lines
+#'
+#' @return Character vector with cleaned comments and empty lines
+#'
+#' @noRd
+clean_stan_comments <- function(lines) {
+  if (length(lines) == 0) return(lines)
+  
+  result <- character(0)
+  in_functions_block <- FALSE
+  
+  for (i in seq_along(lines)) {
+    line <- lines[i]
+    line_trimmed <- trimws(line)
+    
+    # Track if we're in functions block
+    if (grepl("^functions\\s*\\{", line_trimmed)) {
+      in_functions_block <- TRUE
+    } else if (grepl("^(data|transformed data|parameters|transformed parameters|model|generated quantities)\\s*\\{", line_trimmed)) {
+      in_functions_block <- FALSE
+    }
+    
+    # Check if this is the header (first line with "Generated with")
+    is_header <- (i == 1 && grepl("^//\\s*Generated with", line_trimmed))
+    
+    # Handle comments
+    if (in_functions_block || is_header) {
+      # Functions block or header: preserve everything
+      result <- c(result, line)
+      
+    } else {
+      # All other blocks: remove ALL comments and empty lines
+      if (grepl("//", line)) {
+        code_part <- strsplit(line, "//", fixed = TRUE)[[1]][1]
+        code_trimmed <- trimws(code_part, which = "right")
+        # Only keep line if there's actual code
+        if (nzchar(code_trimmed)) {
+          result <- c(result, code_trimmed)
+        }
+        # Skip comment-only lines entirely
+      } else {
+        # No comment - only keep if not empty
+        line_trimmed <- trimws(line)
+        if (nzchar(line_trimmed)) {
+          result <- c(result, line)
+        }
+        # Skip completely empty lines
+      }
+    }
+    
+    # Handle closing braces (they reset block tracking)
+    if (grepl("^\\}\\s*$", line_trimmed)) {
+      if (in_functions_block) {
+        # Functions block ends when we see another block start
+        in_functions_block <- FALSE
+      }
+    }
+  }
+  
+  return(result)
+}
+
