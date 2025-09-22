@@ -29,38 +29,7 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 
 **AGENT TASK**: Your ONLY job is to read the existing files and report discrepancies with specific line numbers and code snippets.
   
-### Priority 1: DRY Consolidation - mvgam() calls stancode() internally
-**CRITICAL ARCHITECTURAL IMPROVEMENT**
-
-Based on pathfinder analysis, both `mvgam()` and `stancode()` flows converge at `generate_combined_stancode_and_data()`. Consolidate so mvgam() internally uses stancode() for single source of truth.
-
-**Sub-tasks:**
-0.1. **Modify mvgam_single_dataset() lines 140-144** (mvgam_core.R)
-   - Replace direct `generate_combined_stancode_and_data()` call
-   - Use `stancode()` and `standata()` inspection functions instead
-   - Ensure mvgam_formula() construction works correctly
-
-0.2. **Integrate polish_generated_stan_code() into stancode() pipeline**
-   - Add polishing step to `generate_combined_stancode()` after line 334
-   - Apply `paste(polish_generated_stan_code(combined_stancode), collapse = "\n")`
-   - Ensure polishing happens before validation
-
-0.3. **Test consolidation with code-reviewer**
-   - Verify both `mvgam()` and `stancode()` produce identical results
-   - Ensure no regressions in Stan code generation
-   - Validate that polishing applies to both paths
-
-0.4. **Update function dependencies and documentation**
-   - Update roxygen docs for affected functions
-   - Ensure dependency chain is clear and maintainable
-
-**Expected Outcome**: 
-- Single source of truth for Stan code generation in `stancode()`
-- Automatic polishing applied consistently to both `mvgam()` and `stancode()` paths
-- Cleaner architecture with DRY principles
-
-
-### Priority 2: Implement simple yet informative Stan commenting strategy
-- Deploy parallel subagents to read full Stan files in `tasks/current_stancode_*`
-- Each subagent must provide a summary of no more than 12 above-line comments for the non-functions blocks that could be helpful for users interested in understanding the code without adding verbosity
-- Summarize the subagent recommendations and ultrathink about a simple, robust and future-proof general commenting strategy that is agnostic to the type of trend model being used
+### Priority 1: Run `target_generation.R`
+- [ ] Deploy parallel subagents to systematically compare the created data `.rds` objects against declared data objects in each Stan file
+- [ ] Each subagent must provide a comprehensive summary of any discrepancies in data object names, structures and dimensions
+- [ ] Summarise subagent findings and present to the user

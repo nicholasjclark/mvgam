@@ -72,7 +72,7 @@ transformed parameters {
   vector[N_1] r_1_1;
   // Prior log-probability accumulator
   real lprior = 0;
-  lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
+  lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);
 lprior += student_t_lpdf(sdgp_1_trend | 3, 0, 2.5)
 lprior += inv_gamma_lpdf(lscale_1_trend[1][1] | 1.494197, 0.056607);
   lprior += student_t_lpdf(Intercept | 3, 1.8, 2.5);

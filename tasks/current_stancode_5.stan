@@ -100,7 +100,7 @@ parameters {
 transformed parameters {
   // Prior log-probability accumulator
   real lprior = 0;
-  lprior += student_t_lpdf(Intercept_trend | 3, -0.1, 2.5);
+  lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
   lprior += student_t_lpdf(Intercept | 3, 1.8, 2.5);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   mu_trend += Intercept_trend;

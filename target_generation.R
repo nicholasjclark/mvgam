@@ -60,6 +60,11 @@ tryCatch({
   code1 <- stancode(mf1, data = test_data$univariate, family = poisson(), validate = FALSE)
   writeLines(code1, 'tasks/current_stancode_1.stan')
   cat("✓ current_stancode_1.stan created\n")
+  
+  # Generate standata
+  data1 <- standata(mf1, data = test_data$univariate, family = poisson())
+  saveRDS(data1, 'tasks/current_standata_1.rds')
+  cat("✓ current_standata_1.rds created\n")
 }, error = function(e) {
   cat("✗ Error generating target 1:", conditionMessage(e), "\n")
 })
@@ -76,6 +81,11 @@ tryCatch({
   code2 <- stancode(mf2, data = test_data$multivariate, validate = FALSE)
   writeLines(code2, 'tasks/current_stancode_2.stan')
   cat("✓ current_stancode_2.stan created\n")
+  
+  # Generate standata
+  data2 <- standata(mf2, data = test_data$multivariate)
+  saveRDS(data2, 'tasks/current_standata_2.rds')
+  cat("✓ current_standata_2.rds created\n")
 }, error = function(e) {
   cat("✗ Error generating target 2:", conditionMessage(e), "\n")
 })
@@ -92,6 +102,11 @@ tryCatch({
   code3 <- stancode(mf3, data = test_data$multivariate, validate = FALSE)
   writeLines(code3, 'tasks/current_stancode_3.stan')
   cat("✓ current_stancode_3.stan created\n")
+  
+  # Generate standata
+  data3 <- standata(mf3, data = test_data$multivariate)
+  saveRDS(data3, 'tasks/current_standata_3.rds')
+  cat("✓ current_standata_3.rds created\n")
 }, error = function(e) {
   cat("✗ Error generating target 3:", conditionMessage(e), "\n")
 })
@@ -111,6 +126,11 @@ tryCatch({
   code4 <- stancode(mf4, data = test_data$multivariate, validate = FALSE)
   writeLines(code4, 'tasks/current_stancode_4.stan')
   cat("✓ current_stancode_4.stan created\n")
+  
+  # Generate standata
+  data4 <- standata(mf4, data = test_data$multivariate)
+  saveRDS(data4, 'tasks/current_standata_4.rds')
+  cat("✓ current_standata_4.rds created\n")
 }, error = function(e) {
   cat("✗ Error generating target 4:", conditionMessage(e), "\n")
 })
@@ -127,6 +147,11 @@ tryCatch({
   code5 <- stancode(mf5, data = test_data$univariate, family = poisson(), validate = FALSE)
   writeLines(code5, 'tasks/current_stancode_5.stan')
   cat("✓ current_stancode_5.stan created\n")
+  
+  # Generate standata
+  data5 <- standata(mf5, data = test_data$univariate, family = poisson())
+  saveRDS(data5, 'tasks/current_standata_5.rds')
+  cat("✓ current_standata_5.rds created\n")
 }, error = function(e) {
   cat("✗ Error generating target 5:", conditionMessage(e), "\n")
 })
@@ -141,6 +166,11 @@ tryCatch({
   code6 <- stancode(mf6, data = test_data$univariate, family = poisson(), validate = FALSE)
   writeLines(code6, 'tasks/current_stancode_6.stan')
   cat("✓ current_stancode_6.stan created\n")
+  
+  # Generate standata
+  data6 <- standata(mf6, data = test_data$univariate, family = poisson())
+  saveRDS(data6, 'tasks/current_standata_6.rds')
+  cat("✓ current_standata_6.rds created\n")
 }, error = function(e) {
   cat("✗ Error generating target 6:", conditionMessage(e), "\n")
 })
@@ -159,6 +189,11 @@ tryCatch({
   code7 <- stancode(mf7, data = test_data$univariate, family = poisson(), validate = FALSE)
   writeLines(code7, 'tasks/current_stancode_7.stan')
   cat("✓ current_stancode_7.stan created\n")
+  
+  # Generate standata
+  data7 <- standata(mf7, data = test_data$univariate, family = poisson())
+  saveRDS(data7, 'tasks/current_standata_7.rds')
+  cat("✓ current_standata_7.rds created\n")
 }, error = function(e) {
   cat("✗ Error generating target 7:", conditionMessage(e), "\n")
 })
@@ -176,6 +211,11 @@ tryCatch({
   code8 <- stancode(mf8, data = test_data$univariate, validate = FALSE)
   writeLines(code8, 'tasks/current_stancode_8.stan')
   cat("✓ current_stancode_8.stan created\n")
+  
+  # Generate standata
+  data8 <- standata(mf8, data = test_data$univariate, family = poisson())
+  saveRDS(data8, 'tasks/current_standata_8.rds')
+  cat("✓ current_standata_8.rds created\n")
 }, error = function(e) {
   cat("✗ Error generating target 8:", conditionMessage(e), "\n")
 })
@@ -196,6 +236,11 @@ tryCatch({
   code9 <- stancode(mf9, data = test_data$univariate, prior = prior9, validate = FALSE)
   writeLines(code9, 'tasks/current_stancode_9.stan')
   cat("✓ current_stancode_9.stan created\n")
+  
+  # Generate standata
+  data9 <- standata(mf9, data = test_data$univariate, prior = prior9)
+  saveRDS(data9, 'tasks/current_standata_9.rds')
+  cat("✓ current_standata_9.rds created\n")
 }, error = function(e) {
   cat("✗ Error generating target 9:", conditionMessage(e), "\n")
 })
@@ -207,9 +252,19 @@ cat("\n", strrep("=", 70), "\n")
 cat("TARGET GENERATION COMPLETE\n")
 cat(strrep("=", 70), "\n")
 
-cat("\nGenerated files for comparison:\n")
-generated_files <- paste0("tasks/current_stancode_", 1:9, ".stan")
-for (file in generated_files) {
+cat("\nGenerated Stan code files:\n")
+generated_code_files <- paste0("tasks/current_stancode_", 1:9, ".stan")
+for (file in generated_code_files) {
+  if (file.exists(file)) {
+    cat("✓", file, "\n")
+  } else {
+    cat("✗", file, "(failed to generate)\n")
+  }
+}
+
+cat("\nGenerated Stan data files:\n")
+generated_data_files <- paste0("tasks/current_standata_", 1:9, ".rds")
+for (file in generated_data_files) {
   if (file.exists(file)) {
     cat("✓", file, "\n")
   } else {

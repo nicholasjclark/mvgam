@@ -2036,29 +2036,31 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL, is_factor_m
     n_lv <- n_series  # Non-factor model: N_lv_trend = N_series_trend
   }
 
-  # Create consolidated dimensions stanvar - N_trend comes from parameter extraction
-  # Only create N_series_trend and N_lv_trend here
-  dimensions_scode <- paste(
-    "int<lower=1> N_series_trend;",
-    "int<lower=1> N_lv_trend;",
-    sep = "\n  "
-  )
+  # Validate factor model scenario requirements
+  checkmate::assert_number(n_lv, lower = 1, null.ok = !is_factor_model)
+  
+  # Calculate effective n_lv value
+  n_lv_effective <- if (is_factor_model) n_lv else n_series
 
-  # Prepare data list - N_trend comes from parameter extraction
-  dimensions_data <- list(
-    N_series_trend = n_series,
-    N_lv_trend = if (is_factor_model) n_lv else n_series
-  )
-
-  dimensions_stanvar <- brms::stanvar(
-    x = dimensions_data,
-    name = "trend_dimensions",
-    scode = dimensions_scode,
+  # Create individual stanvars instead of nested structure  
+  n_series_stanvar <- brms::stanvar(
+    x = n_series,
+    name = "N_series_trend",
+    scode = "int<lower=1> N_series_trend;",
     block = "data",
-    position = "start"  # Ensure all dimensions declared first
+    position = "start"
   )
 
-  return(dimensions_stanvar)
+  n_lv_stanvar <- brms::stanvar(
+    x = n_lv_effective,
+    name = "N_lv_trend", 
+    scode = "int<lower=1> N_lv_trend;",
+    block = "data",
+    position = "start"
+  )
+
+  # Return combined stanvars for compatibility with calling code
+  return(c(n_series_stanvar, n_lv_stanvar))
 }
 
 #' Sort stanvars by dependency priority
@@ -4235,19 +4237,30 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     block = "functions"
   )
 
-  # Data block - piecewise-specific data components
-  pw_data_stanvar <- brms::stanvar(
-    x = list(
-      n_change_trend = n_changepoints,
-      t_change_trend = seq(0.1, 0.9, length.out = n_changepoints),  # Default changepoint times
-      change_scale_trend = changepoint_scale
-    ),
-    name = "pw_data",
-    scode = glue::glue("
-      int<lower=0> n_change_trend; // number of potential trend changepoints
-      vector[n_change_trend] t_change_trend; // times of potential changepoints
-      real<lower=0> change_scale_trend; // scale of changepoint shock prior
-    "),
+  # Validate PW-specific parameters
+  checkmate::assert_number(n_changepoints, lower = 0)
+  checkmate::assert_number(changepoint_scale, lower = 0)
+  t_change_values <- seq(0.1, 0.9, length.out = n_changepoints)
+
+  # Create individual stanvars for each PW data component
+  n_change_stanvar <- brms::stanvar(
+    x = n_changepoints,
+    name = "n_change_trend",
+    scode = "int<lower=0> n_change_trend;",
+    block = "data"
+  )
+
+  t_change_stanvar <- brms::stanvar(
+    x = t_change_values,
+    name = "t_change_trend",
+    scode = "vector[n_change_trend] t_change_trend;",
+    block = "data"
+  )
+
+  change_scale_stanvar <- brms::stanvar(
+    x = changepoint_scale,
+    name = "change_scale_trend",
+    scode = "real<lower=0> change_scale_trend;",
     block = "data"
   )
 
@@ -4354,7 +4367,9 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   # Add all required components to the list
   components <- append(components, list(
     pw_functions_stanvar,
-    pw_data_stanvar,
+    n_change_stanvar,
+    t_change_stanvar,
+    change_scale_stanvar,
     pw_transformed_data_stanvar,
     pw_parameters_stanvar,
     pw_transformed_parameters_stanvar,
