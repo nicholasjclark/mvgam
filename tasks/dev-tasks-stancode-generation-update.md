@@ -29,12 +29,55 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 
 **AGENT TASK**: Your ONLY job is to read the existing files and report discrepancies with specific line numbers and code snippets.
 
+### Priority 0: Streamline and simplify Stan code polishing in R/stan_polish.R
+ 1. We shouldn't break at += operators
+ 2. We should have a blank line before above-line comments
+ 3. No blank line between consecutive above-line comments
+ 4. Strange breaks happening within words like mu_ones_biomass being broken
 
-### PRIORITY 0 (URGENT): Align current_stancode_3.stan with target architecture
-- **CRITICAL**: Fix fundamental parameter structure discrepancies in file 3
-- Verify VARMA dynamics implementation against original Heaps 2022 specification
-- **STATUS**: current_stancode_3.stan compiles but has wrong architecture vs target
+  In current_stancode_2.stan:
+  - Lines 30-34: target + and = normal_id_glm_lpdf(...) are broken awkwardly
+  - Line 33-34: mu_ones_bio and mass are broken in the middle of a word
 
-### Priority 1: Check compilation status of all current_stancode files in tasks/
-- Run `rstan::stanc('tasks/current_stancode_*.stan') for each example file
-- Summarize findings and use any failures to generate next priorities for development
+  In current_stancode_3.stan:
+  - Lines 469-470 and 475-476: mu_count[n] + and = trend[...] are broken at +=
+  - Lines 431-432 and 438-439: Similar breaking at function calls
+
+  In current_stancode_4.stan:
+  - Lines 157-158 and 161-162: Similar += breaking issues
+
+  These are clear problems with our line breaking logic. Need to:
+
+  1. Remove += from the break patterns or handle it specially
+  2. Add logic for comment spacing (blank line before standalone comments)
+  3. Fix the word breaking issue (this might be related to the bracket counting or break point detection)
+  
+### Priority 1: DRY Consolidation - mvgam() calls stancode() internally
+**CRITICAL ARCHITECTURAL IMPROVEMENT**
+
+Based on pathfinder analysis, both `mvgam()` and `stancode()` flows converge at `generate_combined_stancode_and_data()`. Consolidate so mvgam() internally uses stancode() for single source of truth.
+
+**Sub-tasks:**
+0.1. **Modify mvgam_single_dataset() lines 140-144** (mvgam_core.R)
+   - Replace direct `generate_combined_stancode_and_data()` call
+   - Use `stancode()` and `standata()` inspection functions instead
+   - Ensure mvgam_formula() construction works correctly
+
+0.2. **Integrate polish_generated_stan_code() into stancode() pipeline**
+   - Add polishing step to `generate_combined_stancode()` after line 334
+   - Apply `paste(polish_generated_stan_code(combined_stancode), collapse = "\n")`
+   - Ensure polishing happens before validation
+
+0.3. **Test consolidation with code-reviewer**
+   - Verify both `mvgam()` and `stancode()` produce identical results
+   - Ensure no regressions in Stan code generation
+   - Validate that polishing applies to both paths
+
+0.4. **Update function dependencies and documentation**
+   - Update roxygen docs for affected functions
+   - Ensure dependency chain is clear and maintainable
+
+**Expected Outcome**: 
+- Single source of truth for Stan code generation in `stancode()`
+- Automatic polishing applied consistently to both `mvgam()` and `stancode()` paths
+- Cleaner architecture with DRY principles

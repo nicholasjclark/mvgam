@@ -265,6 +265,10 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
 
   # Add mvgam-specific stancode class with brms compatibility
   stancode <- combined_components$stancode
+  
+  # Polish Stan code for consistent formatting and spacing
+  stancode <- polish_generated_stan_code(stancode)
+  
   class(stancode) <- c("mvgamstancode", "stancode", "character")
   return(stancode)
 }

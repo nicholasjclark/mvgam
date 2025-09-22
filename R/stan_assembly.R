@@ -2950,13 +2950,17 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   return(do.call(combine_stanvars, components))
 }
 
-#' VAR Trend Generator
+#' VAR/VARMA Trend Generator
 #'
 #' @description
-#' Generates Stan code components for vector autoregressive (VAR) trends with
+#' Generates Stan code components for vector autoregressive (VAR) and VARMA trends with
 #' support for factor models, hierarchical correlations, and stationarity
 #' constraints. Uses efficient matrix formulation for multi-lag VAR models
 #' with proper parameter naming and non-centered parameterization.
+#' 
+#' NOTE: VARMA implementation follows Heaps (2022) methodology with constraint
+#' that MA order q=1 (ma_lags must be 0 or 1). Higher order MA components 
+#' are not supported.
 #'
 #' @param trend_specs Trend specification for VAR model containing parameters
 #'   like lags (VAR order), n_lv (latent variables), gr (grouping), unit (time units)
@@ -2991,6 +2995,11 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #' @examples
 #' # Standard VAR(2) model
 #' trend_specs <- list(lags = 2, n_lv = 3)
+#' data_info <- list(n_obs = 100, n_series = 3, n_time = 100)
+#' stanvars <- generate_var_trend_stanvars(trend_specs, data_info)
+#'
+#' # VARMA(2,1) model 
+#' trend_specs <- list(lags = 2, ma_lags = 1, n_lv = 3)
 #' data_info <- list(n_obs = 100, n_series = 3, n_time = 100)
 #' stanvars <- generate_var_trend_stanvars(trend_specs, data_info)
 #'
@@ -3032,6 +3041,11 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   }
   if (ma_lags < 0) {
     insight::format_error("VARMA model requires {.field ma_lags} >= 0")
+  }
+  # VARMA constraint: only q=1 is supported for mvgam
+  # Reason: Simplifies initialization and computation while covering most practical use cases
+  if (ma_lags > 1) {
+    insight::format_error("mvgam VARMA models support only {.field ma_lags} = 1. Higher order MA components are not currently implemented.")
   }
   if (n_lv > n_series && ma_lags == 0) {
     insight::format_error("VAR factor model requires {.field n_lv} <= {.field n_series}")
@@ -3439,7 +3453,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # Pre-compute VARMA-specific additions
   varma_d_trend <- if(is_varma) paste0("array[", ma_lags, "] matrix[N_lv_trend, N_lv_trend] D_trend;") else ""
-  varma_ma_init <- if(is_varma) paste0("vector[N_lv_trend] ma_init_trend[", ma_lags, "];  // Initial MA errors") else ""
+  varma_ma_init <- if(is_varma) "vector[N_lv_trend] ma_init_trend;" else ""
 
   var_tparameters_stanvar <- brms::stanvar(
     name = "var_tparameters",
@@ -3476,12 +3490,8 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       {if(is_varma) 'Omega_trend = initial_joint_var(Sigma_trend, A_trend, D_trend);' else 'array[1] matrix[N_lv_trend, N_lv_trend] empty_theta; empty_theta[1] = rep_matrix(0.0, N_lv_trend, N_lv_trend); Omega_trend = initial_joint_var(Sigma_trend, A_trend, empty_theta[1:0]);'}
 
       {if(is_varma) glue::glue('
-      // Initialize MA error terms from init_trend (VARMA specific)
-      for (i in 1:{ma_lags}) {{
-        int start_idx = {lags} * N_lv_trend + (i - 1) * N_lv_trend + 1;
-        int end_idx = {lags} * N_lv_trend + i * N_lv_trend;
-        ma_init_trend[i] = init_trend[start_idx:end_idx];
-      }}
+      // Initialize MA error term from init_trend 
+      ma_init_trend = init_trend[({lags} * N_lv_trend + 1):({lags + 1} * N_lv_trend)];
       ') else ''}
     "),
     block = "tparameters"
@@ -3601,17 +3611,13 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         }}
 
         {if(is_varma) glue::glue('
-        // MA component: Add moving average terms for VARMA
-        for (i in 1:{ma_lags}) {{
-          if (t - i <= 0) {{
-            // Use initial MA errors for early time points
-            if (i <= {ma_lags}) {{
-              mu_t_trend[t] += D_trend[i] * ma_init_trend[i];
-            }}
-          }} else {{
-            // Use computed MA errors from previous time points
-            mu_t_trend[t] += D_trend[i] * ma_error_trend[t - i];
-          }}
+        // MA component: Add moving average term for VARMA
+        if (t - 1 <= 0) {{
+          // Use initial MA error for first time point
+          mu_t_trend[t] += D_trend[1] * ma_init_trend;
+        }} else {{
+          // Use computed MA error from previous time point
+          mu_t_trend[t] += D_trend[1] * ma_error_trend[t - 1];
         }}
         ') else ''}
       }}

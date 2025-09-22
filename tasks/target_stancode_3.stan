@@ -251,7 +251,7 @@ parameters {
   array[2] vector<lower=0>[1] Domega_trend;
   vector<lower=0>[N_lv_trend] sigma_trend;
   cholesky_factor_corr[N_lv_trend] L_Omega_trend;
-  vector[3 * N_lv_trend] init_trend;
+  vector[(2 + 1) * N_lv_trend] init_trend;
   matrix[N_trend, N_lv_trend] lv_trend;
 }
 transformed parameters {
