@@ -1,0 +1,142 @@
+[2025-09-23 11:05:11] SUMMARY: MVGAM TARGET FITTING VALIDATION 
+[2025-09-23 11:05:11] SUMMARY: Starting comprehensive testing of all target scenarios... 
+[2025-09-23 11:05:11] SUMMARY: Test timestamp: 2025-09-23 11:05:11 
+[2025-09-23 11:05:11] INFO: TESTING TARGET 1 : RW trends (basic structure) 
+[2025-09-23 11:05:11] INFO: Input files found 
+[2025-09-23 11:05:11] INFO: Attempting Stan model compilation... 
+[2025-09-23 11:05:43] INFO: Compilation successful ( 32.2 s) 
+[2025-09-23 11:05:43] INFO: Loading Stan data... 
+[2025-09-23 11:05:43] INFO: Data loaded successfully 
+[2025-09-23 11:05:43] INFO: Data elements: 13 
+[2025-09-23 11:05:43] INFO: Key dimensions: N = 24 
+[2025-09-23 11:05:43] INFO: Attempting model fitting (short chains for testing)... 
+[2025-09-23 11:05:45] INFO: Fitting successful ( 1.76 s) 
+[2025-09-23 11:05:45] INFO: Divergent transitions: 0 
+[2025-09-23 11:05:45] INFO: Max treedepth hits: 0 
+[2025-09-23 11:05:45] INFO: TESTING TARGET 2 : Shared RW trends (multivariate) 
+[2025-09-23 11:05:45] INFO: Input files found 
+[2025-09-23 11:05:45] INFO: Attempting Stan model compilation... 
+[2025-09-23 11:06:22] INFO: Compilation successful ( 37 s) 
+[2025-09-23 11:06:22] INFO: Loading Stan data... 
+[2025-09-23 11:06:22] INFO: Data loaded successfully 
+[2025-09-23 11:06:22] INFO: Data elements: 22 
+[2025-09-23 11:06:22] INFO: Key dimensions: N = 24 
+[2025-09-23 11:06:22] INFO: Attempting model fitting (short chains for testing)... 
+[2025-09-23 11:06:23] INFO: Fitting successful ( 1.59 s) 
+[2025-09-23 11:06:23] INFO: Divergent transitions: 0 
+[2025-09-23 11:06:23] INFO: Max treedepth hits: 0 
+[2025-09-23 11:06:23] INFO: TESTING TARGET 3 : VARMA trends (complex functions) 
+[2025-09-23 11:06:23] INFO: Input files found 
+[2025-09-23 11:06:23] INFO: Attempting Stan model compilation... 
+[2025-09-23 11:07:40] INFO: Compilation successful ( 76.76 s) 
+[2025-09-23 11:07:40] INFO: Loading Stan data... 
+[2025-09-23 11:07:40] INFO: Data loaded successfully 
+[2025-09-23 11:07:40] INFO: Data elements: 33 
+[2025-09-23 11:07:40] INFO: Key dimensions: N = 24 
+[2025-09-23 11:07:40] INFO: Attempting model fitting (short chains for testing)... 
+[2025-09-23 11:07:40] ERROR: Fitting failed: Fitting failed. Unable to retrieve the metadata. 
+[2025-09-23 11:07:40] INFO: Warnings during fitting: 1 warnings 
+[2025-09-23 11:07:40] INFO: Warning 1 : No chains finished successfully. Unable to retrieve the fit. 
+[2025-09-23 11:07:40] INFO: TESTING TARGET 4 : Factor AR trends (Z matrix patterns) 
+[2025-09-23 11:07:40] INFO: Input files found 
+[2025-09-23 11:07:40] INFO: Attempting Stan model compilation... 
+[2025-09-23 11:08:15] INFO: Compilation successful ( 34.81 s) 
+[2025-09-23 11:08:15] INFO: Loading Stan data... 
+[2025-09-23 11:08:15] INFO: Data loaded successfully 
+[2025-09-23 11:08:15] INFO: Data elements: 29 
+[2025-09-23 11:08:15] INFO: Key dimensions: N = 24 
+[2025-09-23 11:08:15] INFO: Attempting model fitting (short chains for testing)... 
+[2025-09-23 11:08:16] ERROR: Fitting failed: Fitting failed. Unable to retrieve the metadata. 
+[2025-09-23 11:08:16] INFO: Warnings during fitting: 1 warnings 
+[2025-09-23 11:08:16] INFO: Warning 1 : No chains finished successfully. Unable to retrieve the fit. 
+[2025-09-23 11:08:16] INFO: TESTING TARGET 5 : PW trends (Prophet functions) 
+[2025-09-23 11:08:16] INFO: Input files found 
+[2025-09-23 11:08:16] INFO: Attempting Stan model compilation... 
+[2025-09-23 11:08:41] INFO: Compilation successful ( 25.84 s) 
+[2025-09-23 11:08:41] INFO: Loading Stan data... 
+[2025-09-23 11:08:41] INFO: Data loaded successfully 
+[2025-09-23 11:08:41] INFO: Data elements: 16 
+[2025-09-23 11:08:41] INFO: Key dimensions: N = 24 
+[2025-09-23 11:08:41] INFO: Attempting model fitting (short chains for testing)... 
+[2025-09-23 11:08:43] INFO: Fitting successful ( 1.69 s) 
+[2025-09-23 11:08:43] INFO: Divergent transitions: 0 
+[2025-09-23 11:08:43] INFO: Max treedepth hits: 38 
+[2025-09-23 11:08:43] INFO: TESTING TARGET 6 : CAR trends (GP + irregular time) 
+[2025-09-23 11:08:43] INFO: Input files found 
+[2025-09-23 11:08:43] INFO: Attempting Stan model compilation... 
+[2025-09-23 11:09:26] INFO: Compilation successful ( 42.4 s) 
+[2025-09-23 11:09:26] INFO: Loading Stan data... 
+[2025-09-23 11:09:26] INFO: Data loaded successfully 
+[2025-09-23 11:09:26] INFO: Data elements: 23 
+[2025-09-23 11:09:26] INFO: Key dimensions: N = 24 
+[2025-09-23 11:09:26] INFO: Attempting model fitting (short chains for testing)... 
+[2025-09-23 11:09:27] INFO: Fitting successful ( 1.7 s) 
+[2025-09-23 11:09:27] INFO: Divergent transitions: 19 
+[2025-09-23 11:09:27] INFO: Max treedepth hits: 25 
+[2025-09-23 11:09:27] INFO: TESTING TARGET 7 : CAR trends (monotonic + irregular time) 
+[2025-09-23 11:09:27] INFO: Input files found 
+[2025-09-23 11:09:27] INFO: Attempting Stan model compilation... 
+[2025-09-23 11:10:01] INFO: Compilation successful ( 34.08 s) 
+[2025-09-23 11:10:01] INFO: Loading Stan data... 
+[2025-09-23 11:10:01] INFO: Data loaded successfully 
+[2025-09-23 11:10:01] INFO: Data elements: 23 
+[2025-09-23 11:10:01] INFO: Key dimensions: N = 24 
+[2025-09-23 11:10:01] INFO: Attempting model fitting (short chains for testing)... 
+[2025-09-23 11:10:03] INFO: Fitting successful ( 1.38 s) 
+[2025-09-23 11:10:03] INFO: Divergent transitions: 2 
+[2025-09-23 11:10:03] INFO: Max treedepth hits: 1 
+[2025-09-23 11:10:03] INFO: TESTING TARGET 8 : Seasonal AR trends 
+[2025-09-23 11:10:03] INFO: Input files found 
+[2025-09-23 11:10:03] INFO: Attempting Stan model compilation... 
+[2025-09-23 11:10:43] INFO: Compilation successful ( 40.45 s) 
+[2025-09-23 11:10:43] INFO: Loading Stan data... 
+[2025-09-23 11:10:43] INFO: Data loaded successfully 
+[2025-09-23 11:10:43] INFO: Data elements: 30 
+[2025-09-23 11:10:43] INFO: Key dimensions: N = 24 
+[2025-09-23 11:10:43] INFO: Attempting model fitting (short chains for testing)... 
+[2025-09-23 11:10:45] INFO: Fitting successful ( 1.4 s) 
+[2025-09-23 11:10:45] INFO: Divergent transitions: 3 
+[2025-09-23 11:10:45] INFO: Max treedepth hits: 0 
+[2025-09-23 11:10:45] INFO: TESTING TARGET 9 : Nonlinear with AR trends 
+[2025-09-23 11:10:45] INFO: Input files found 
+[2025-09-23 11:10:45] INFO: Attempting Stan model compilation... 
+[2025-09-23 11:11:16] INFO: Compilation successful ( 31.85 s) 
+[2025-09-23 11:11:16] INFO: Loading Stan data... 
+[2025-09-23 11:11:16] INFO: Data loaded successfully 
+[2025-09-23 11:11:16] INFO: Data elements: 14 
+[2025-09-23 11:11:16] INFO: Key dimensions: N = 24 
+[2025-09-23 11:11:16] INFO: Attempting model fitting (short chains for testing)... 
+[2025-09-23 11:11:18] INFO: Fitting successful ( 1.45 s) 
+[2025-09-23 11:11:18] INFO: Divergent transitions: 0 
+[2025-09-23 11:11:18] INFO: Max treedepth hits: 0 
+[2025-09-23 11:11:18] SUMMARY: COMPREHENSIVE TESTING SUMMARY 
+[2025-09-23 11:11:18] SUMMARY: Total testing time: 367.37 seconds 
+[2025-09-23 11:11:18] SUMMARY: OVERALL RESULTS: 
+[2025-09-23 11:11:18] SUMMARY: Compilation success rate: 9 / 9 ( 100 %) 
+[2025-09-23 11:11:18] SUMMARY: Fitting success rate: 7 / 9 ( 77.8 %) 
+[2025-09-23 11:11:18] SUMMARY: DETAILED SCENARIO BREAKDOWN: 
+[2025-09-23 11:11:18] SUMMARY: Scenario 1 : RW trends (basic structure) | Compilation: SUCCESS | Fitting: SUCCESS | Notes: OK 
+[2025-09-23 11:11:18] SUMMARY: Scenario 2 : Shared RW trends (multivariate) | Compilation: SUCCESS | Fitting: SUCCESS | Notes: OK 
+[2025-09-23 11:11:18] SUMMARY: Scenario 3 : VARMA trends (complex functions) | Compilation: SUCCESS | Fitting: FAILED | Notes: Fit error: Fitting failed. Unable to retrieve the metadata.; 1 warnings 
+[2025-09-23 11:11:18] SUMMARY: Scenario 4 : Factor AR trends (Z matrix patterns) | Compilation: SUCCESS | Fitting: FAILED | Notes: Fit error: Fitting failed. Unable to retrieve the metadata.; 1 warnings 
+[2025-09-23 11:11:18] SUMMARY: Scenario 5 : PW trends (Prophet functions) | Compilation: SUCCESS | Fitting: SUCCESS | Notes: OK 
+[2025-09-23 11:11:18] SUMMARY: Scenario 6 : CAR trends (GP + irregular time) | Compilation: SUCCESS | Fitting: SUCCESS | Notes: OK 
+[2025-09-23 11:11:18] SUMMARY: Scenario 7 : CAR trends (monotonic + irregular time) | Compilation: SUCCESS | Fitting: SUCCESS | Notes: OK 
+[2025-09-23 11:11:18] SUMMARY: Scenario 8 : Seasonal AR trends | Compilation: SUCCESS | Fitting: SUCCESS | Notes: OK 
+[2025-09-23 11:11:18] SUMMARY: Scenario 9 : Nonlinear with AR trends | Compilation: SUCCESS | Fitting: SUCCESS | Notes: OK 
+[2025-09-23 11:11:18] SUMMARY: FAILED SCENARIOS DETAILED ERRORS: 
+[2025-09-23 11:11:18] ERROR: SCENARIO 3 : VARMA trends (complex functions) 
+[2025-09-23 11:11:18] ERROR:   Fitting Error: Fitting failed. Unable to retrieve the metadata. 
+[2025-09-23 11:11:18] ERROR:   Fitting Warnings: 
+[2025-09-23 11:11:18] ERROR:      1 : No chains finished successfully. Unable to retrieve the fit. 
+[2025-09-23 11:11:18] ERROR: SCENARIO 4 : Factor AR trends (Z matrix patterns) 
+[2025-09-23 11:11:18] ERROR:   Fitting Error: Fitting failed. Unable to retrieve the metadata. 
+[2025-09-23 11:11:18] ERROR:   Fitting Warnings: 
+[2025-09-23 11:11:18] ERROR:      1 : No chains finished successfully. Unable to retrieve the fit. 
+[2025-09-23 11:11:18] SUMMARY: PERFORMANCE SUMMARY: 
+[2025-09-23 11:11:18] SUMMARY: Average compilation time: 39.49 seconds 
+[2025-09-23 11:11:18] SUMMARY: Range: 25.84 - 76.76 seconds 
+[2025-09-23 11:11:18] SUMMARY: Average fitting time: 1.57 seconds 
+[2025-09-23 11:11:18] SUMMARY: Range: 1.38 - 1.76 seconds 
+[2025-09-23 11:11:18] SUMMARY: TESTING COMPLETE 
+[2025-09-23 11:11:18] SUMMARY: Detailed results saved to: tasks/target_fitting_results.rds 

@@ -72,7 +72,7 @@ transformed parameters {
   real lprior = 0;
   lprior += student_t_lpdf(Intercept_count | 3, 1.4, 2.5);
   lprior += student_t_lpdf(Intercept_presence | 3, 0, 2.5);
-  lprior += student_t_lpdf(Intercept_biomass | 3, 0.4, 2.5);
+  lprior += student_t_lpdf(Intercept_biomass | 3, 0.9, 2.5);
   lprior += gamma_lpdf(shape_biomass | 0.01, 0.01);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   matrix[N_trend, N_lv_trend] scaled_innovations_trend;
@@ -122,7 +122,8 @@ model {
   to_vector(innovations_trend) ~ std_normal();
   ar1_trend ~ normal(0, 0.5);
   Z_raw ~ student_t(3, 0, 1);
-  // Likelihood calculation (skipped when sampling from prior only)
+  
+  // Observation linear predictors and likelihoods (skipped when sampling from prior only)
   if (!prior_only) {
     vector[N_presence] mu_presence = Xc_presence * b_presence;
     for (n in 1 : N_presence) {
@@ -136,15 +137,18 @@ model {
     }
     vector[N_biomass] mu_biomass = rep_vector(0.0, N_biomass);
     mu_biomass += Intercept_biomass + Xc_biomass * b_biomass;
-    mu_biomass = inv(mu_biomass);
     for (n in 1 : N_biomass) {
       mu_biomass[n] += trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
     }
+    mu_biomass = exp(mu_biomass);
+    // Likelihood calculations
     target += poisson_log_glm_lpmf(Y_count | to_matrix(mu_count), 0.0, mu_ones_count);
     target += bernoulli_logit_glm_lpmf(Y_presence | to_matrix(mu_presence), 0.0, mu_ones_presence);
     target += gamma_lpdf(Y_biomass | shape_biomass, shape_biomass
                                                     ./ mu_biomass);
   }
+  
+  // Prior contributions
   target += lprior;
 }
 generated quantities {

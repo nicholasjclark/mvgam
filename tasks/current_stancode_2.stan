@@ -96,7 +96,8 @@ model {
   sigma_trend ~ exponential(2);
   L_Omega_trend ~ lkj_corr_cholesky(2);
   to_vector(innovations_trend) ~ std_normal();
-  // Likelihood calculation (skipped when sampling from prior only)
+  
+  // Observation linear predictors and likelihoods (skipped when sampling from prior only)
   if (!prior_only) {
     vector[N_biomass] mu_biomass = Xc_biomass * b_biomass;
     for (n in 1 : N_biomass) {
@@ -108,9 +109,12 @@ model {
       mu_count[n] += Intercept_count
                      + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
     }
+    // Likelihood calculations
     target += normal_id_glm_lpdf(Y_count | to_matrix(mu_count), 0.0, mu_ones_count, sigma_count);
     target += normal_id_glm_lpdf(Y_biomass | to_matrix(mu_biomass), 0.0, mu_ones_biomass, sigma_biomass);
   }
+  
+  // Prior contributions
   target += lprior;
 }
 generated quantities {

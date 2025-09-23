@@ -336,23 +336,27 @@ model {
     Aomega_trend[lag] ~ gamma(1.365, 0.071175);
   }
   sigma_trend ~ exponential(2);
-  // Likelihood calculation (skipped when sampling from prior only)
+  
+  // Observation linear predictors and likelihoods (skipped when sampling from prior only)
   if (!prior_only) {
     vector[N_count] mu_count = rep_vector(0.0, N_count);
+    vector[N_biomass] mu_biomass = rep_vector(0.0, N_biomass);
+    mu_count += Intercept_count + Xs_count * bs_count
+                + Zs_count_1_1 * s_count_1_1;
     for (n in 1 : N_count) {
       mu_count[n] += trend[obs_trend_time_count[n], obs_trend_series_count[n]];
     }
-    vector[N_biomass] mu_biomass = rep_vector(0.0, N_biomass);
+    mu_biomass += Intercept_biomass + Xs_biomass * bs_biomass
+                  + Zs_biomass_1_1 * s_biomass_1_1;
     for (n in 1 : N_biomass) {
       mu_biomass[n] += trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
     }
-    mu_count += Intercept_count + Xs_count * bs_count
-                + Zs_count_1_1 * s_count_1_1;
-    mu_biomass += Intercept_biomass + Xs_biomass * bs_biomass
-                  + Zs_biomass_1_1 * s_biomass_1_1;
+    // Likelihood calculations
     target += normal_lpdf(Y_count | mu_count, sigma_count);
     target += normal_lpdf(Y_biomass | mu_biomass, sigma_biomass);
   }
+  
+  // Prior contributions
   target += lprior;
   target += std_normal_lpdf(zs_count_1_1);
   target += std_normal_lpdf(zs_biomass_1_1);

@@ -110,11 +110,11 @@ transformed parameters {
   r_1_1 = (sd_1[1] * (z_1[1]));
 }
 model {
-  target += std_normal_lpdf(zgp_1_trend);
   ar1_trend ~ normal(0, 0.5);
   sigma_trend ~ exponential(2);
   to_vector(innovations_trend) ~ std_normal();
-  // Likelihood calculation (skipped when sampling from prior only)
+  
+  // Observation linear predictors and likelihoods (skipped when sampling from prior only)
   if (!prior_only) {
     vector[N] mu = rep_vector(0.0, N);
     mu += Intercept;
@@ -124,9 +124,13 @@ model {
     for (n in 1 : N) {
       mu[n] += r_1_1[J_1[n]] * Z_1_1[n];
     }
+    // Likelihood calculations
     target += poisson_log_lpmf(Y | mu);
   }
+  
+  // Prior contributions
   target += lprior;
+  target += std_normal_lpdf(zgp_1_trend);
   target += std_normal_lpdf(z_1[1]);
 }
 generated quantities {

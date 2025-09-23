@@ -69,7 +69,8 @@ model {
   sigma_trend ~ exponential(2);
   to_vector(innovations_trend) ~ std_normal();
   ar1_trend ~ normal(0, 0.5);
-  // Likelihood calculation (skipped when sampling from prior only)
+  
+  // Observation linear predictors and likelihoods (skipped when sampling from prior only)
   if (!prior_only) {
     vector[N] nlp_b1 = rep_vector(0.0, N);
     vector[N] nlp_b2 = rep_vector(0.0, N);
@@ -80,8 +81,11 @@ model {
       mu[n] = ((nlp_b1[n] * exp(nlp_b2[n] * C_1[n])))
               + trend[obs_trend_time[n], obs_trend_series[n]];
     }
+    // Likelihood calculations
     target += normal_lpdf(Y | mu, sigma);
   }
+  
+  // Prior contributions
   target += lprior;
 }
 generated quantities {

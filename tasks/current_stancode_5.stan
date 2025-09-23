@@ -126,14 +126,18 @@ model {
   m_trend ~ student_t(3, 0, 2.5);
   k_trend ~ std_normal();
   to_vector(delta_trend) ~ double_exponential(0, 0.05);
-  // Likelihood calculation (skipped when sampling from prior only)
+  
+  // Observation linear predictors and likelihoods (skipped when sampling from prior only)
   if (!prior_only) {
     vector[N] mu = Xc * b;
     for (n in 1 : N) {
       mu[n] += Intercept + trend[obs_trend_time[n], obs_trend_series[n]];
     }
+    // Likelihood calculations
     target += poisson_log_glm_lpmf(Y | to_matrix(mu), 0.0, mu_ones);
   }
+  
+  // Prior contributions
   target += lprior;
 }
 generated quantities {

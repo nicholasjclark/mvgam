@@ -111,12 +111,12 @@ transformed parameters {
   }
 }
 model {
-  target += std_normal_lpdf(zgp_1_trend);
   sigma_trend ~ exponential(2);
   to_vector(innovations_trend) ~ std_normal();
   ar1_trend ~ normal(0, 0.5);
   ar12_trend ~ normal(0, 0.5);
-  // Likelihood calculation (skipped when sampling from prior only)
+  
+  // Observation linear predictors and likelihoods (skipped when sampling from prior only)
   if (!prior_only) {
     vector[NBgp_1] rgp_1 = sqrt(spd_gp_exp_quad(slambda_1, sdgp_1[1],
                                                 lscale_1[1]))
@@ -127,9 +127,13 @@ model {
     for (n in 1 : N) {
       mu[n] += trend[obs_trend_time[n], obs_trend_series[n]];
     }
+    // Likelihood calculations
     target += normal_lpdf(Y | mu, sigma);
   }
+  
+  // Prior contributions
   target += lprior;
+  target += std_normal_lpdf(zgp_1_trend);
   target += std_normal_lpdf(zgp_1);
 }
 generated quantities {

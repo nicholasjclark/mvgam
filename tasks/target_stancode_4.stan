@@ -137,7 +137,7 @@ model {
       mu_biomass[n] += trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
     }
 
-    mu_biomass = inv(mu_biomass);
+    mu_biomass = exp(mu_biomass);
     target += poisson_log_glm_lpmf(Y_count | to_matrix(mu_count), 0.0, mu_ones_count);
     target += bernoulli_logit_glm_lpmf(Y_presence | to_matrix(mu_presence), 0.0, mu_ones_presence);
     target += gamma_lpdf(Y_biomass | shape_biomass, shape_biomass ./ mu_biomass);

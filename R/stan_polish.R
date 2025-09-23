@@ -49,6 +49,8 @@ polish_generated_stan_code <- function(stan_code, silent = TRUE) {
   lines <- clean_stan_comments(lines)
   lines <- fix_blank_lines(lines)
   lines <- reorganize_lprior_statements(lines)
+  lines <- reorganize_target_statements(lines)
+  lines <- reorganize_model_block_statements(lines)
   lines <- add_targeted_comments(lines)
   preprocessed_code <- paste(lines, collapse = "\n")
 
@@ -66,6 +68,8 @@ polish_generated_stan_code <- function(stan_code, silent = TRUE) {
   lines <- clean_stan_comments(lines)
   lines <- fix_blank_lines(lines)
   lines <- reorganize_lprior_statements(lines)
+  lines <- reorganize_target_statements(lines)
+  lines <- reorganize_model_block_statements(lines)
   lines <- add_targeted_comments(lines)
 
   # Return as single string with embedded newlines
@@ -300,20 +304,73 @@ add_targeted_comments <- function(lines) {
     }
   }
   
-  # Comment 5: Likelihood calculation
+  # Comment 5: Observation linear predictors and likelihoods
   likelihood_pattern <- "if\\s*\\(\\s*!prior_only\\s*\\)\\s*\\{"
   likelihood_lines <- grep(likelihood_pattern, lines)
   if (length(likelihood_lines) > 0) {
-    lines <- insert_comment_before_line(lines, likelihood_lines[1],
-                                        "  // Likelihood calculation (skipped when sampling from prior only)")
+    lines <- insert_comment_before_line(
+      lines, likelihood_lines[1],
+      "  // Observation linear predictors and likelihoods (skipped when sampling from prior only)"
+    )
   }
   
-  # Comment 6: Prior log-probability accumulator
+  # Comment 6: First target += statement for likelihood calculations
+  # Find the if (!prior_only) block
+  prior_only_pattern <- "if\\s*\\(\\s*!prior_only\\s*\\)\\s*\\{"
+  prior_only_lines <- grep(prior_only_pattern, lines)
+  
+  if (length(prior_only_lines) > 0) {
+    prior_only_start <- prior_only_lines[1]
+    prior_only_end <- find_matching_closing_brace(lines, prior_only_start)
+    
+    if (!is.na(prior_only_end)) {
+      # Find first target += within this block
+      target_pattern <- "target\\s*\\+="
+      for (i in (prior_only_start + 1):(prior_only_end - 1)) {
+        if (grepl(target_pattern, lines[i])) {
+          # Check if there's already a "Likelihood calculations" comment above it
+          comment_above <- if (i > 1) trimws(lines[i - 1]) else ""
+          if (!grepl("Likelihood calculations", comment_above)) {
+            lines <- insert_comment_before_line(lines, i,
+                                                "    // Likelihood calculations")
+          }
+          break  # Only comment the first target += statement
+        }
+      }
+    }
+  }
+  
+  # Comment 7: Prior log-probability accumulator
   lprior_init_pattern <- "real\\s+lprior\\s*=\\s*0\\s*;"
   lprior_init_lines <- grep(lprior_init_pattern, lines)
   if (length(lprior_init_lines) > 0) {
     lines <- insert_comment_before_line(lines, lprior_init_lines[1],
                                         "  // Prior log-probability accumulator")
+  }
+  
+  # Comment 8: Prior contributions (target += lprior should be first in final section)
+  # Find target += lprior in model block
+  model_pattern <- "^\\s*model\\s*\\{\\s*$"
+  model_lines <- grep(model_pattern, lines)
+  
+  if (length(model_lines) > 0) {
+    model_start <- model_lines[1]
+    model_end <- find_matching_closing_brace(lines, model_start)
+    
+    if (!is.na(model_end)) {
+      # Find target += lprior line in model block
+      for (i in (model_start + 1):(model_end - 1)) {
+        if (grepl("^\\s*target\\s*\\+=\\s*lprior", lines[i])) {
+          # Check if there's already a "Prior contributions" comment above it
+          comment_above <- if (i > 1) trimws(lines[i - 1]) else ""
+          if (!grepl("Prior contributions", comment_above)) {
+            lines <- insert_comment_before_line(lines, i,
+                                                "  // Prior contributions")
+          }
+          break  # Only comment the first target += lprior
+        }
+      }
+    }
   }
   
   return(lines)
@@ -397,7 +454,8 @@ reorganize_lprior_statements <- function(lines) {
         
         # Continue if line is indented OR starts with mathematical operators (for lprior continuations)
         is_indented_continuation <- grepl("^\\s+", next_line) && 
-            !grepl("^\\s*(real|int|vector|matrix|array|for|if|while|lprior)", next_trimmed) &&
+            !grepl("^\\s*(real|int|vector|matrix|array|for|if|while|lprior)", 
+                   next_trimmed) &&
             !grepl("^\\}", next_trimmed)
         
         # Also accept unindented lines that start with mathematical operators (common in lprior statements)
@@ -446,6 +504,161 @@ reorganize_lprior_statements <- function(lines) {
   lines_final <- lines_with_inserted[-adjusted_remove_indices]
   
   return(lines_final)
+}
+
+#' Reorganize target Statements in Model Block
+#'
+#' Moves all target += statements to just before the closing brace of the 
+#' if (!prior_only) block in the model block. Handles multi-line statements 
+#' correctly.
+#' This is purely cosmetic to improve Stan code readability.
+#'
+#' @param lines Character vector of Stan code lines
+#'
+#' @return Character vector with target statements reorganized
+#'
+#' @details
+#' This function reorganizes target += statements for cosmetic purposes, moving them
+#' to the end of the if (!prior_only) block. It follows the same pattern as
+#' reorganize_lprior_statements() but operates on the model block instead of
+#' transformed parameters block.
+#'
+#' @noRd
+reorganize_target_statements <- function(lines) {
+  checkmate::assert_character(lines, min.len = 0)
+  
+  if (length(lines) == 0) return(lines)
+  
+  # Find model block
+  model_pattern <- "^\\s*model\\s*\\{\\s*$"
+  model_line <- grep(model_pattern, lines)
+  if (length(model_line) == 0) return(lines)
+  
+  # Find if (!prior_only) block within model block
+  model_start <- model_line[1]
+  
+  # Find the if (!prior_only) line
+  prior_only_pattern <- "if\\s*\\(\\s*!prior_only\\s*\\)\\s*\\{"
+  prior_only_line <- NA
+  for (i in (model_start + 1):length(lines)) {
+    if (grepl(prior_only_pattern, lines[i])) {
+      prior_only_line <- i
+      break
+    }
+  }
+  
+  if (is.na(prior_only_line)) return(lines)
+  
+  # Find closing brace of if (!prior_only) block using helper function
+  prior_only_end <- find_matching_closing_brace(lines, prior_only_line)
+  
+  if (is.na(prior_only_end)) return(lines)
+  
+  # Find all target += statements within the if (!prior_only) block
+  target_statements <- character(0)
+  lines_to_remove <- integer(0)
+  i <- prior_only_line + 1
+  
+  while (i < prior_only_end) {
+    line <- trimws(lines[i])
+    
+    if (grepl("^target\\s*\\+=", line)) {
+      statement_lines <- c(i)
+      
+      # Look for continuation lines (multi-line statements)
+      j <- i + 1
+      while (j < prior_only_end && !grepl(";\\s*$", lines[j-1])) {
+        next_line <- lines[j]
+        next_trimmed <- trimws(next_line)
+        
+        # Continue if line is indented OR starts with mathematical operators
+        is_indented_continuation <- grepl("^\\s+", next_line) && 
+            !grepl("^\\s*(real|int|vector|matrix|array|for|if|while|target)", 
+                   next_trimmed) &&
+            !grepl("^\\}", next_trimmed)
+        
+        is_math_continuation <- grepl("^\\s*[-+*/]", next_trimmed) && 
+            !grepl("^\\s*(real|int|vector|matrix|array|for|if|while|target)", 
+                   next_trimmed)
+        
+        if (is_indented_continuation || is_math_continuation) {
+          statement_lines <- c(statement_lines, j)
+          j <- j + 1
+        } else {
+          break
+        }
+      }
+      
+      # Collect the statement text
+      for (idx in statement_lines) {
+        target_statements <- c(target_statements, lines[idx])
+        lines_to_remove <- c(lines_to_remove, idx)
+      }
+      
+      i <- max(statement_lines) + 1
+    } else {
+      i <- i + 1
+    }
+  }
+  
+  if (length(lines_to_remove) == 0) return(lines)
+  
+  # Insert target statements just before closing brace of if (!prior_only)
+  insert_point <- prior_only_end
+  
+  # Insert the collected target statements
+  before <- lines[1:(insert_point - 1)]
+  after <- lines[insert_point:length(lines)]
+  lines_with_inserted <- c(before, target_statements, after)
+  
+  # Remove the original target statements (adjust indices for inserted lines)
+  adjusted_remove_indices <- lines_to_remove + length(target_statements)
+  # Lines before insertion point don't need adjustment
+  adjusted_remove_indices[lines_to_remove < insert_point] <- 
+    lines_to_remove[lines_to_remove < insert_point]
+  
+  # Remove the original target statements
+  lines_final <- lines_with_inserted[-adjusted_remove_indices]
+  
+  return(lines_final)
+}
+
+#' Find Closing Brace Using Brace Counting
+#'
+#' Finds the line number of the closing brace that matches an opening brace
+#' at the specified starting line. Uses brace counting to handle nested blocks.
+#'
+#' @param lines Character vector of Stan code lines
+#' @param start_line Line number where the opening brace is located
+#'
+#' @return Integer line number of the matching closing brace, or NA if not found
+#'
+#' @noRd
+find_matching_closing_brace <- function(lines, start_line) {
+  checkmate::assert_character(lines, min.len = 1)
+  checkmate::assert_int(start_line, lower = 1, upper = length(lines))
+  
+  brace_count <- 1  # Start with 1 for the opening brace
+  
+  for (i in (start_line + 1):length(lines)) {
+    line <- lines[i]
+    # Count opening and closing braces on this line
+    open_braces <- lengths(regmatches(line, gregexpr("\\{", line)))
+    close_braces <- lengths(regmatches(line, gregexpr("\\}", line)))
+    brace_count <- brace_count + open_braces - close_braces
+    
+    if (brace_count == 0) {
+      return(i)
+    }
+    
+    # Safety check: if brace count goes negative, something is wrong
+    if (brace_count < 0) {
+      return(NA)
+    }
+  }
+  
+  # No matching closing brace found
+  return(NA)
 }
 
 #' Clean Stan Comments
@@ -513,5 +726,98 @@ clean_stan_comments <- function(lines) {
   }
   
   return(result)
+}
+
+#' Reorganize Model Block into Three Sections  
+#'
+#' Reorganizes model block statements into clean sections: priors first, 
+#' if (!prior_only) block unchanged, then other target += statements.
+#'
+#' @param lines Character vector of Stan code lines
+#' @return Character vector with reorganized model block
+#' @noRd
+reorganize_model_block_statements <- function(lines) {
+  checkmate::assert_character(lines, min.len = 0)
+  
+  if (length(lines) == 0) return(lines)
+  
+  # Find model block
+  model_pattern <- "^\\s*model\\s*\\{\\s*$"
+  model_start <- grep(model_pattern, lines)[1]
+  if (is.na(model_start)) return(lines)
+  
+  model_end <- find_matching_closing_brace(lines, model_start)
+  if (is.na(model_end)) return(lines)
+  
+  # Find if (!prior_only) block
+  prior_only_pattern <- "if\\s*\\(\\s*!prior_only\\s*\\)\\s*\\{"
+  prior_only_start <- NA
+  prior_only_end <- NA
+  
+  for (i in (model_start + 1):(model_end - 1)) {
+    if (grepl(prior_only_pattern, lines[i])) {
+      prior_only_start <- i
+      prior_only_end <- find_matching_closing_brace(lines, i)
+      break
+    }
+  }
+  
+  # Collect statements by category
+  prior_statements <- character(0)
+  prior_only_block <- character(0)
+  target_statements <- character(0)
+  
+  # Preserve if (!prior_only) block unchanged
+  if (!is.na(prior_only_start) && !is.na(prior_only_end)) {
+    prior_only_block <- lines[prior_only_start:prior_only_end]
+  }
+  
+  # Classify other statements
+  lprior_statement <- character(0)
+  other_target_statements <- character(0)
+  
+  i <- model_start + 1
+  while (i < model_end) {
+    # Skip if (!prior_only) block
+    if (!is.na(prior_only_start) && i >= prior_only_start && i <= prior_only_end) {
+      i <- prior_only_end + 1
+      next
+    }
+    
+    line <- trimws(lines[i])
+    
+    if (grepl("^target\\s*\\+=", line)) {
+      # Prioritize target += lprior; as first in target section
+      if (grepl("target\\s*\\+=\\s*lprior", line)) {
+        lprior_statement <- lines[i]
+      } else {
+        other_target_statements <- c(other_target_statements, lines[i])
+      }
+    } else if (nzchar(line) && !grepl("^\\s*//", line)) {
+      prior_statements <- c(prior_statements, lines[i])
+    }
+    
+    i <- i + 1
+  }
+  
+  # Combine target statements with lprior first
+  target_statements <- c(lprior_statement, other_target_statements)
+  
+  # Reconstruct model block
+  before_model <- lines[1:model_start]
+  after_model <- lines[model_end:length(lines)]
+  
+  new_model <- character(0)
+  if (length(prior_statements) > 0) {
+    new_model <- c(new_model, prior_statements)
+  }
+  if (length(prior_only_block) > 0) {
+    new_model <- c(new_model, "", prior_only_block)
+  }
+  if (length(target_statements) > 0) {
+    new_model <- c(new_model, "", target_statements)
+  }
+  
+  return(c(before_model, new_model, after_model))
 }
 

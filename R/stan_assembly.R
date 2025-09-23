@@ -1205,37 +1205,137 @@ insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_cod
   # Calculate absolute position of last mu += line
   last_mu_pos <- block_info$start_idx + mu_line_indices[length(mu_line_indices)] - 1
   
-  # Look ahead for family transformation lines (mu.*= not mu.*+=)
-  # Use specific pattern to match function transformations: inv(), exp(), log(), etc.
+  # Use the new utility function to apply correct transformation order
   transformation_pattern <- "^\\s*mu(_\\w+)?\\s*=\\s*\\w+\\s*\\("
-  transformation_indices <- which(grepl(transformation_pattern, model_lines))
   
-  # Find insertion point: after last += but before any transformation
-  insert_pos <- last_mu_pos
-  if (length(transformation_indices) > 0) {
-    # Find first transformation that comes after the last += line
-    relative_transformations <- transformation_indices[transformation_indices > mu_line_indices[length(mu_line_indices)]]
-    if (length(relative_transformations) > 0) {
-      first_transformation_pos <- block_info$start_idx + relative_transformations[1] - 1
-      # Validate bounds before setting insert position
-      if (first_transformation_pos > last_mu_pos && first_transformation_pos <= length(code_lines)) {
-        insert_pos <- first_transformation_pos - 1
-      }
-    }
+  return(apply_correct_transformation_order(
+    code_lines = code_lines,
+    insert_pos = last_mu_pos,
+    trend_injection_code = trend_injection_code,
+    transform_pattern = transformation_pattern,
+    block_info = block_info
+  ))
+}
+
+#' Handle Trend Injection with Transformation Extraction for Any Response Type
+#'
+#' @description Unified handler for trend injection that works with both GLM
+#' and non-GLM responses. Extracts transformation lines, injects trends, then
+#' re-adds transformations in correct order.
+#'
+#' @param code_lines Character vector of Stan code lines
+#' @param resp_name String name of the response variable
+#'
+#' @return Character vector with properly ordered code
+#' @noRd
+handle_response_trend_injection <- function(code_lines, resp_name) {
+  # Parameter validation
+  checkmate::assert_character(code_lines, min.len = 1)
+  checkmate::assert_string(resp_name)
+  checkmate::assert_true(nchar(resp_name) > 0)
+  
+  # Find mu assignment lines (positive pattern)
+  mu_assign_pattern <- paste0("mu_", resp_name, "\\s*(\\+=|=\\s*[^=])")
+  mu_assign_lines <- which(grepl(mu_assign_pattern, code_lines, perl = TRUE))
+  
+  if (length(mu_assign_lines) == 0) {
+    insight::format_warning("No mu assignment found for response {.field ", 
+                           resp_name, "}")
+    return(code_lines)
   }
   
-  # Validate final insert position
-  checkmate::assert_int(insert_pos, lower = 1, upper = length(code_lines))
+  last_mu_line <- max(mu_assign_lines)
+  
+  # Get block context
+  model_block <- find_stan_block(code_lines, "model")
+  if (is.null(model_block)) {
+    model_block <- list(start_idx = 1, end_idx = length(code_lines))
+  }
+  
+  # Robust transformation pattern for complete statements
+  transform_pattern <- paste0("^\\s*mu_", resp_name, 
+                            "\\s*=\\s*\\w+\\s*\\(.*\\);?\\s*$")
+  
+  # Trend injection code
+  trend_injection <- c(
+    paste0("for (n in 1:N_", resp_name, ") {"),
+    paste0("  mu_", resp_name, "[n] += trend[obs_trend_time_", 
+           resp_name, "[n], obs_trend_series_", resp_name, "[n]];"),
+    "}"
+  )
+  
+  # Use existing utility for transformation ordering
+  return(apply_correct_transformation_order(
+    code_lines = code_lines,
+    insert_pos = last_mu_line,
+    trend_injection_code = trend_injection,
+    transform_pattern = transform_pattern,
+    block_info = model_block
+  ))
+}
 
+#' Apply Correct Transformation Order for Stan Linear Predictors
+#'
+#' @description Implements correct order: base predictor -> trend injection -> 
+#' link function transformations. Extracts transformations, injects trends, 
+#' then re-adds transformations after trend injection.
+#'
+#' @param code_lines Character vector of Stan code lines
+#' @param insert_pos Integer position where trend injection should occur
+#' @param trend_injection_code Character vector of trend injection code lines
+#' @param transform_pattern Regex pattern to detect transformation lines
+#' @param block_info List with start_idx and end_idx for the code block
+#'
+#' @return Character vector with properly ordered code
+#' @noRd
+apply_correct_transformation_order <- function(code_lines, insert_pos, 
+                                             trend_injection_code, 
+                                             transform_pattern, block_info) {
+  # Parameter validation
+  checkmate::assert_character(code_lines, min.len = 1)
+  checkmate::assert_int(insert_pos, lower = 1, upper = length(code_lines))
+  checkmate::assert_character(trend_injection_code, min.len = 1)
+  checkmate::assert_string(transform_pattern)
+  checkmate::assert_list(block_info)
+  checkmate::assert_names(names(block_info), 
+                         must.include = c("start_idx", "end_idx"))
+  
+  # Find transformation lines within the block
+  model_lines <- code_lines[block_info$start_idx:block_info$end_idx]
+  transformation_indices <- which(grepl(transform_pattern, model_lines))
+  
+  # Convert to absolute indices
+  abs_transform_indices <- block_info$start_idx + transformation_indices - 1
+  
+  # Extract transformation lines and remove from original position
+  transformation_lines <- character(0)
+  if (length(abs_transform_indices) > 0) {
+    transformation_lines <- code_lines[abs_transform_indices]
+    code_lines <- code_lines[-abs_transform_indices]
+    
+    # Adjust insert position for removed lines
+    removed_before_insert <- sum(abs_transform_indices < insert_pos)
+    insert_pos <- insert_pos - removed_before_insert
+    
+    # Validate adjusted position
+    checkmate::assert_int(insert_pos, lower = 1, upper = length(code_lines))
+  }
+  
   # Insert trend injection with proper indentation
   indented_injection <- paste0("    ", trend_injection_code)
-
+  
+  # Build result: code before + trend injection + transformations + code after
   result_lines <- c(
     code_lines[1:insert_pos],
     indented_injection,
-    code_lines[(insert_pos + 1):length(code_lines)]
+    if (length(transformation_lines) > 0) transformation_lines else character(0),
+    if (insert_pos < length(code_lines)) {
+      code_lines[(insert_pos + 1):length(code_lines)]
+    } else {
+      character(0)
+    }
   )
-
+  
   return(result_lines)
 }
 
@@ -1426,7 +1526,7 @@ inject_multivariate_trends_into_linear_predictors <- function(
   # Separate responses by GLM usage
   glm_responses <- names(detected_glm_types[detected_glm_types])
   non_glm_responses <- setdiff(responses_with_trends, glm_responses)
-
+  
   # Handle GLM responses with response-specific transformations
   if (length(glm_responses) > 0) {
     code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
@@ -1533,56 +1633,19 @@ inject_multivariate_trends_into_linear_predictors <- function(
         }
         }
 
-        # Final validation of insert point
-        checkmate::assert_int(insert_point, lower = 1, upper = length(code_lines))
-
-        # Input validation for transformation handling
-        checkmate::assert_character(code_lines, min.len = 1)
-        checkmate::assert_int(insert_point, lower = 1, upper = length(code_lines))
-        
-        # Detect and extract any existing transformation lines for this response  
-        # Use fixed string matching to avoid regex complications with resp_name
-        mu_transformation_pattern <- paste0("^\\s*mu_", resp_name, "(\\[\\w+\\])?\\s*=\\s*\\S+\\s*\\(")
-        
-        transformation_indices <- which(grepl(mu_transformation_pattern, code_lines))
-        transformation_lines <- character(0)
-        
-        if (length(transformation_indices) > 0) {
-          # Extract transformation lines and remove them from original position
-          transformation_lines <- code_lines[transformation_indices]
-          code_lines <- code_lines[-transformation_indices]
-          
-          # Safe index adjustment with bounds checking
-          removed_before_insert <- sum(transformation_indices < insert_point)
-          new_insert_point <- insert_point - removed_before_insert
-          
-          if (new_insert_point < 1) {
-            insight::format_error(
-              "Insertion point became invalid after removing transformations for {.field resp_name}. ",
-              "Check Stan code structure."
-            )
-          }
-          insert_point <- new_insert_point
-        }
-
-        # Create mu computation code
+        # Create mu computation code for GLM responses
         mu_computation <- c(
           paste0("    vector[N_", resp_name, "] mu_", resp_name, " = Xc_", resp_name, " * b_", resp_name, ";"),
           paste0("    for (n in 1:N_", resp_name, ") {"),
           paste0("      mu_", resp_name, "[n] += Intercept_", resp_name, " + trend[obs_trend_time_", resp_name, "[n], obs_trend_series_", resp_name, "[n]];"),
           paste0("    }")
         )
-        
-        # Add transformation lines AFTER trend injection if they exist
-        if (length(transformation_lines) > 0) {
-          mu_computation <- c(mu_computation, transformation_lines)
-        }
 
-        # Insert mu computation before the closing brace
+        # Insert mu computation 
         code_lines <- c(
-          code_lines[1:insert_point],  # Include the if (!prior_only) { line
-          mu_computation,               # Insert mu code AFTER the if line
-          code_lines[(insert_point + 1):length(code_lines)]  # Rest of the code
+          code_lines[1:insert_point],
+          mu_computation,
+          code_lines[(insert_point + 1):length(code_lines)]
         )
       }
     }
@@ -1594,47 +1657,12 @@ inject_multivariate_trends_into_linear_predictors <- function(
   checkmate::assert_string(base_stancode)
   has_varma_components <- any(grepl("D_trend|ma_.*_trend", base_stancode))
 
-  # Handle non-GLM responses with enhanced logic
+  # Handle non-GLM responses using unified transformation handler
   if (length(non_glm_responses) > 0) {
     code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
 
     for (resp_name in non_glm_responses) {
-      # Find where mu_<resp> is computed in transformed parameters block
-      mu_pattern <- paste0("mu_", resp_name, "\\s*=")
-      mu_lines <- which(grepl(mu_pattern, code_lines))
-
-      if (length(mu_lines) > 0) {
-        # Find the last line where mu_<resp> is modified
-        last_mu_line <- max(mu_lines)
-
-        # Look for the end of mu computation (before next variable or block end)
-        insert_point <- last_mu_line
-        for (i in (last_mu_line + 1):length(code_lines)) {
-          if (grepl("^\\s*}", code_lines[i]) ||
-              grepl("^\\s*[a-zA-Z_].*=", code_lines[i])) {
-            insert_point <- i - 1
-            break
-          }
-          # Also check if we're still modifying mu_<resp>
-          if (grepl(paste0("mu_", resp_name), code_lines[i])) {
-            insert_point <- i
-          }
-        }
-
-        # Insert trend addition using correct mapping pattern (like GLM path)
-        trend_addition <- c(
-          paste0("  // Add trend effects for response ", resp_name),
-          paste0("  for (n in 1:N_", resp_name, ") {"),
-          paste0("    mu_", resp_name, "[n] += trend[obs_trend_time_", resp_name, "[n], obs_trend_series_", resp_name, "[n]];"),
-          "  }"
-        )
-
-        code_lines <- c(
-          code_lines[1:insert_point],
-          trend_addition,
-          code_lines[(insert_point + 1):length(code_lines)]
-        )
-      }
+      code_lines <- handle_response_trend_injection(code_lines, resp_name)
     }
 
     base_stancode <- paste(code_lines, collapse = "\n")
@@ -1675,6 +1703,12 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
       family = family,
       stanvars = stanvars
     )
+
+  # Fix N value for trend models - should be n_time not n_obs
+  if ("N" %in% names(standata) && "time" %in% names(data)) {
+    n_time <- length(unique(data$time))
+    standata$N <- n_time
+  }
 
   return(standata)
 }
@@ -4447,7 +4481,8 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
     suffix = suffix,
     mapping = parameter_mapping,
     is_multivariate = is_multivariate,
-    response_names = response_names
+    response_names = response_names,
+    n_time = n_time
   )
 
   # 3. Generate times_trend matrix (support both univariate and multivariate)
@@ -5883,12 +5918,13 @@ apply_safe_parameter_replacement <- function(code, old_name, new_name) {
 #' @param response_names Character vector of response names (NULL for univariate)
 #' @return List of stanvar objects with renamed data
 #' @noRd
-extract_and_rename_standata_objects <- function(standata, suffix, mapping, is_multivariate, response_names) {
+extract_and_rename_standata_objects <- function(standata, suffix, mapping, is_multivariate, response_names, n_time = NULL) {
   checkmate::assert_list(standata, names = "named")
   checkmate::assert_string(suffix)
   checkmate::assert_list(mapping)
   checkmate::assert_flag(is_multivariate)
   checkmate::assert_character(response_names, null.ok = TRUE)
+  checkmate::assert_number(n_time, lower = 1, null.ok = TRUE)
 
   stanvar_list <- list()
 
@@ -5897,7 +5933,7 @@ extract_and_rename_standata_objects <- function(standata, suffix, mapping, is_mu
     stanvar_list <- extract_multivariate_standata(standata, suffix, mapping, response_names)
   } else {
     # Handle univariate data objects
-    stanvar_list <- extract_univariate_standata(standata, suffix, mapping)
+    stanvar_list <- extract_univariate_standata(standata, suffix, mapping, n_time)
   }
 
   # Combine individual stanvar objects into proper stanvars collection
@@ -5914,10 +5950,11 @@ extract_and_rename_standata_objects <- function(standata, suffix, mapping, is_mu
 #' @param mapping List to store parameter mappings
 #' @return List of stanvar objects with renamed data
 #' @noRd
-extract_univariate_standata <- function(standata, suffix, mapping) {
+extract_univariate_standata <- function(standata, suffix, mapping, n_time = NULL) {
   checkmate::assert_list(standata, names = "named")
   checkmate::assert_character(suffix, len = 1)
   checkmate::assert_list(mapping, names = "named")
+  checkmate::assert_number(n_time, lower = 1, null.ok = TRUE)
 
   # Validate mapping structure if data_declarations is present
   if (!is.null(mapping$data_declarations)) {
@@ -5955,6 +5992,11 @@ extract_univariate_standata <- function(standata, suffix, mapping) {
       }
 
       data_value <- standata[[data_name]]
+
+      # Fix N_trend value for trend models - use source of truth n_time from dimensions
+      if (data_name == "N" && renamed_data_name == "N_trend" && !is.null(n_time)) {
+        data_value <- n_time
+      }
 
       # Store mapping for coordination with Stan code renaming
       if (is.null(mapping$original_to_renamed)) mapping$original_to_renamed <- list()

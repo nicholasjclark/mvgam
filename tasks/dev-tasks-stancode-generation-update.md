@@ -28,50 +28,50 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 - **DO NOT**: Attempt to "fix" files directly
 
 **AGENT TASK**: Your ONLY job is to read the existing files and report discrepancies with specific line numbers and code snippets.
-  
-### Priority 1: Modify `target_fitting.R` to fit quick models for each target [COMPLETED]
-- Inspect the contents of `tasks/` to see the current_stancode and current_standata objects
-- Read `target_generation.R` in root to understand where these model files came from
-- Modify `target_fitting.R` to attempt fitting for each of the modelling scenarios and to log useful information about warnings or errors
-- Run the modified `target_fitting.R` and summarise findings for the user
 
-**RESULTS**: 7/9 compilation success, 4/9 fitting success. Key issues identified:
-- Stan syntax errors (missing semicolons) in TARGET 6 & 8
-- Data dimension mismatches in multivariate models (TARGET 2, 3, 4)
-- Complex fitting failures requiring investigation
+### Priority 0: CRITICAL MISMATCH - Stan Code vs Stan Data Variables
+**ISSUE**: Stan code declares data variables not present in corresponding standata files
+**AFFECTED**: Scenario 3 (VARMA trends) - compilation fails due to missing data variables
+**ERROR MESSAGE**: "Missing input data for the following data variables: Ks_count, Xs_count, nb_count_1, knots_count_1, Zs_count_1_1, Ks_biomass, Xs_biomass, nb_biomass_1, knots_biomass_1, Zs_biomass_1_1, K_trend, Kc_trend, X_trend"
 
-### Priority 2: Fix Stan syntax errors in prior statements [COMPLETED]
-**ISSUE**: TARGET 6 & 8 fail compilation due to missing semicolons in lprior statements
-**TASK**: 
-- Locate and inspect `lprior` rearrangement steps in `R/stan_polish.R`
-- Think hard about why semicolons are being lost and, if necessary, write a debugging script to investigate
-- Make necessary edits AFTER receiving code-reviewer approval
-**VALIDATION**: Re-run `target_generation.R` for TARGET 6 & 8, verify compilation success
+**PROBLEM ANALYSIS**:
+- **Stan Code Declares**: Spline-related variables (`Ks_count`, `Xs_count`, `knots_count_1`, `Zs_count_1_1`, etc.)
+- **Stan Data Missing**: These variables not generated in `current_standata_3.rds`
+- **Root Cause**: Mismatch between Stan code generation and Stan data generation processes
+- **Impact**: Model cannot even initialize - immediate compilation failure
+
+**MISSING DATA VARIABLES (from current_stancode_3.stan)**:
+```stan
+// Spline data for count response
+int Ks_count;
+matrix[N_count, Ks_count] Xs_count;
+int nb_count_1;
+array[nb_count_1] int knots_count_1;
+matrix[N_count, knots_count_1[1]] Zs_count_1_1;
+
+// Spline data for biomass response  
+int Ks_biomass;
+matrix[N_biomass, Ks_biomass] Xs_biomass;
+int nb_biomass_1;
+array[nb_biomass_1] int knots_biomass_1;
+matrix[N_biomass, knots_biomass_1[1]] Zs_biomass_1_1;
+
+// Trend design matrix
+int<lower=1> K_trend;
+int<lower=1> Kc_trend;
+matrix[N_trend, K_trend] X_trend;
+```
+
+**SYSTEMATIC PROBLEM**: 
+- Stan code generation includes brms spline terms
+- Stan data generation doesn't create corresponding spline data
+- Indicates broader issue with brms→mvgam Stan integration
+
+**VALIDATION**: Ensure `current_standata_3.rds` contains ALL variables declared in `current_stancode_3.stan`
 **TIME LIMIT**: 15 minutes
 
-**SOLUTION**: Fixed `reorganize_lprior_statements()` in `R/stan_polish.R` to properly detect mathematical continuation lines. Added recognition for unindented lines starting with operators (`-`, `+`, `*`, `/`) as valid continuations for multi-line lprior statements, preventing orphaned fragments like `- 1 * student_t_lccdf(...)`. All targets now compile with correct lprior formatting.
-
-### Priority 3: Investigate data dimension calculation for multivariate models
-**ISSUE**: TARGET 2, 3, 4 show `times_trend; dims declared=(72,3); dims found=(24,3)` mismatch
-**TASK**:
-- Use pathfinder agent to locate dimension calculation functions in time series processing
-- Examine how `n_time_trend` is calculated for multivariate vs univariate models
-- Compare expected vs actual dimensions: declared (72,3) suggests 24*3 time points, found (24,3) suggests incorrect calculation
-- Identify the specific function/location where multivariate time dimensions are incorrectly computed
-**VALIDATION**: Document exact location and logic causing dimension mismatch
-**TIME LIMIT**: 15 minutes
-
-### Priority 4: Fix times_trend dimension calculation logic
-**ISSUE**: Multivariate models calculate time dimensions incorrectly
-**TASK**:
-- Based on Priority 3 findings, fix the dimension calculation logic
-- Ensure multivariate models properly account for: n_time × n_series structure
-- Verify `times_trend` array is correctly sized as (n_time * n_series, n_lv_trend) for multivariate cases
-- Focus on functions that create time indexing arrays for Stan data
-**VALIDATION**: Re-run `target_generation.R` for TARGET 2, 3, 4 and verify no dimension errors
-**TIME LIMIT**: 15 minutes
-
-### Priority 5: Debug complex model fitting failures
+### Priority 1: Debug complex model fitting failures
+- Re-run complete `target_fitting.R` and summarise findings
 **ISSUE**: Even with fixed dimensions, some complex models fail during MCMC sampling
 **TASK**:
 - Focus on models that compile but fail fitting (post-dimension fixes)
@@ -79,14 +79,4 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 - Check for: unbounded parameters, improper priors, matrix rank issues in factor models
 - Generate diagnostic output for failed models using cmdstan error messages
 **VALIDATION**: Identify specific Stan modeling issues preventing successful sampling
-**TIME LIMIT**: 15 minutes
-
-### Priority 6: Comprehensive validation and testing
-**ISSUE**: Need to verify all fixes work together
-**TASK**:
-- Re-run complete `target_fitting.R` after all fixes implemented
-- Compare results to initial baseline: aim for >90% compilation success, >70% fitting success
-- Document remaining issues (if any) with specific error messages and line numbers
-- Generate final validation report comparing before/after success rates
-**VALIDATION**: All 9 targets should compile successfully, most should fit successfully
 **TIME LIMIT**: 15 minutes
