@@ -126,12 +126,37 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
 
   # Setup trend model if trends are specified
   trend_setup <- if (mv_spec$has_trends) {
+    # Validate trend model prerequisites
+    checkmate::assert_class(mv_spec$base_formula, "formula")
+    
     # Filter priors: only pass trend-related priors to trend setup
     trend_priors <- filter_trend_priors(prior)
     
+    # Extract response variables and time series structure for trend validation
+    response_vars <- extract_response_names(obs_formula)
+    
+    # Extract time/series variables from trend specs following existing pattern
+    if (is_multivariate_trend_specs(mv_spec$trend_specs)) {
+      first_spec <- mv_spec$trend_specs[[1]]
+      time_var <- first_spec$time_var %||% first_spec$time %||% "time"
+      series_var <- first_spec$series_var %||% first_spec$series %||% "series"
+    } else {
+      time_var <- mv_spec$trend_specs$time_var %||% mv_spec$trend_specs$time %||% "time"
+      series_var <- mv_spec$trend_specs$series_var %||% mv_spec$trend_specs$series %||% "series"
+    }
+    
+    # Prepare trend data with validation and reduction using existing infrastructure
+    trend_data <- data  # Default to full data
+    if (!is.null(response_vars) && length(response_vars) > 0) {
+      # Validate trend covariates - will stop with error if validation fails
+      validate_trend_covariates(mv_spec$base_formula, response_vars, data)
+      validate_trend_invariance(data, mv_spec$base_formula, time_var, series_var) 
+      trend_data <- extract_trend_data(data, mv_spec$base_formula, time_var, series_var)
+    }
+    
     if (is.null(trend_result <- setup_brms_lightweight(
       formula = mv_spec$base_formula,
-      data = data,
+      data = trend_data,  # Use reduced trend data
       family = gaussian(), # Trends are gaussian processes per architecture
       prior = trend_priors,
       data2 = data2,

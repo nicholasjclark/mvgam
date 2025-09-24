@@ -10,20 +10,26 @@
                       "add_targeted_comments",
                       "insert_comment_before_line",
                       "reorganize_lprior_statements",
-                      "clean_stan_comments"
+                      "reorganize_target_statements",
+                      "find_matching_closing_brace",
+                      "clean_stan_comments",
+                      "reorganize_model_block_statements"
                   ],
     "purpose":  "Stan model integration",
     "function_dependencies":  {
 
                               },
     "function_signatures":  {
+                                "reorganize_model_block_statements":  "reorganize_model_block_statements \u003c- function(lines) {",
                                 "polish_generated_stan_code":  "polish_generated_stan_code \u003c- function(stan_code, silent = TRUE) {",
                                 "reorganize_lprior_statements":  "reorganize_lprior_statements \u003c- function(lines) {",
                                 "update_stan_header":  "update_stan_header \u003c- function(lines) {",
                                 "try_stanheaders_formatting":  "try_stanheaders_formatting \u003c- function(stan_code, silent = TRUE, line_length = 80) {",
+                                "reorganize_target_statements":  "reorganize_target_statements \u003c- function(lines) {",
                                 "insert_comment_before_line":  "insert_comment_before_line \u003c- function(lines, line_num, comment) {",
                                 "clean_stan_comments":  "clean_stan_comments \u003c- function(lines) {",
                                 "add_targeted_comments":  "add_targeted_comments \u003c- function(lines) {",
+                                "find_matching_closing_brace":  "find_matching_closing_brace \u003c- function(lines, start_line) {",
                                 "fix_blank_lines":  "fix_blank_lines \u003c- function(lines) {"
                             },
     "file":  "R/stan_polish.R"

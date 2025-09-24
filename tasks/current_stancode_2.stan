@@ -59,10 +59,10 @@ transformed parameters {
   // Prior log-probability accumulator
   real lprior = 0;
   lprior += student_t_lpdf(Intercept_trend | 3, -0.2, 2.5);
-  lprior += student_t_lpdf(Intercept_count | 3, 4, 2.5);
+  lprior += student_t_lpdf(Intercept_count | 3, 3.5, 2.5);
   lprior += student_t_lpdf(sigma_count | 3, 0, 2.5)
             - 1 * student_t_lccdf(0 | 3, 0, 2.5);
-  lprior += student_t_lpdf(Intercept_biomass | 3, 2.4, 2.5);
+  lprior += student_t_lpdf(Intercept_biomass | 3, 2.8, 2.5);
   lprior += student_t_lpdf(sigma_biomass | 3, 0, 2.5)
             - 1 * student_t_lccdf(0 | 3, 0, 2.5);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);

@@ -2514,3 +2514,207 @@ is_trend_term <- function(expr, trend_patterns) {
     grepl(pattern, expr_text, fixed = TRUE)
   }, logical(1)))
 }
+
+#' Validate Trend Covariates Against Response Variables
+#' 
+#' @description Ensure trend formulas don't include response variables as predictors.
+#'   Reuses existing parse_trend_formula() infrastructure.
+#' 
+#' @param trend_formula Formula object for trend specification
+#' @param response_vars Character vector of response variable names
+#' @param data Data frame (required for parse_trend_formula)
+#' @return Invisible TRUE if valid, throws error if invalid
+#' @noRd
+validate_trend_covariates <- function(trend_formula, response_vars, data) {
+  # Input validation - non-negotiable per CLAUDE.md
+  checkmate::assert_class(trend_formula, "formula")
+  checkmate::assert_character(response_vars, min.len = 1)
+  checkmate::assert_data_frame(data)
+  
+  # Reuse existing parse_trend_formula to extract regular terms
+  parsed_trend <- parse_trend_formula(trend_formula, data = data)
+  regular_terms <- parsed_trend$regular_terms
+  
+  # If no regular terms, validation passes
+  if (is.null(regular_terms) || length(regular_terms) == 0) {
+    return(invisible(TRUE))
+  }
+  
+  # Extract variable names from terms with proper error handling
+  trend_variables <- character(0)
+  failed_terms <- character(0)
+  
+  for (term in regular_terms) {
+    tryCatch({
+      # Parse term as formula to extract variables
+      term_formula <- as.formula(paste("~", term))
+      term_vars <- all.vars(term_formula)
+      trend_variables <- c(trend_variables, term_vars)
+    }, error = function(e) {
+      failed_terms <<- c(failed_terms, term)
+    })
+  }
+  
+  # Report any terms that failed to parse
+  if (length(failed_terms) > 0) {
+    stop(insight::format_error(
+      c(
+        "Failed to parse trend formula terms:",
+        "x" = paste("Unparseable terms:", paste(failed_terms, collapse = ", ")),
+        "i" = "Check for balanced parentheses and valid R syntax in {.field trend_formula}."
+      )
+    ), call. = FALSE)
+  }
+  
+  # Remove duplicates
+  trend_variables <- unique(trend_variables)
+  
+  # Check for response variables used as trend predictors
+  offending_vars <- intersect(trend_variables, response_vars)
+  
+  if (length(offending_vars) > 0) {
+    stop(insight::format_error(
+      c(
+        "Response variables cannot be used as trend predictors:",
+        "x" = paste("Offending variables: {.field", paste(offending_vars, collapse = "}, {.field"), "}"),
+        "i" = "Trend models require exogenous covariates only.",
+        "i" = "Consider using these variables in the observation formula instead.",
+        ">" = "See ?mvgam_formulas for guidance on proper covariate specification."
+      )
+    ), call. = FALSE)
+  }
+  
+  invisible(TRUE)
+}
+
+#' Validate Trend Covariate Invariance Within Groups
+#' 
+#' @description Ensure trend covariates are constant within (time, series) groups.
+#'   Reuses existing parse_trend_formula() infrastructure.
+#' 
+#' @param data Data frame containing time series data
+#' @param trend_formula Formula object for trend specification  
+#' @param time_var Character name of time variable (default "time")
+#' @param series_var Character name of series variable (default "series")
+#' @return Invisible TRUE if valid, throws error if invalid
+#' @noRd
+validate_trend_invariance <- function(data, trend_formula, time_var = "time", series_var = "series") {
+  # Input validation - non-negotiable per CLAUDE.md
+  checkmate::assert_data_frame(data, min.rows = 1)
+  checkmate::assert_string(time_var)
+  checkmate::assert_string(series_var)
+  checkmate::assert_class(trend_formula, "formula")
+  
+  # Reuse existing parse_trend_formula to extract regular terms
+  parsed_trend <- parse_trend_formula(trend_formula, data = data)
+  regular_terms <- parsed_trend$regular_terms
+  
+  # If no regular terms, validation passes
+  if (is.null(regular_terms) || length(regular_terms) == 0) {
+    return(invisible(TRUE))
+  }
+  
+  # Extract variable names from terms (assuming parse_trend_formula ensures valid terms)
+  trend_variables <- character(0)
+  
+  for (term in regular_terms) {
+    term_formula <- as.formula(paste("~", term))
+    term_vars <- all.vars(term_formula)
+    trend_variables <- c(trend_variables, term_vars)
+  }
+  
+  # Remove duplicates
+  trend_variables <- unique(trend_variables)
+  
+  # Validate all extracted variables exist in data (don't silently drop)
+  required_vars <- c(time_var, series_var, trend_variables)
+  missing_vars <- setdiff(required_vars, names(data))
+  if (length(missing_vars) > 0) {
+    stop(insight::format_error(
+      c(
+        "Required variables for trend validation not found in data:",
+        "x" = paste("Missing: {.field", paste(missing_vars, collapse = "}, {.field"), "}"),
+        "i" = paste("Available:", paste(names(data), collapse = ", "))
+      )
+    ), call. = FALSE)
+  }
+  
+  # Check invariance within (time, series) groups using explicit dplyr namespace
+  if (length(trend_variables) > 0) {
+    varying_covariates <- data %>%
+      dplyr::group_by(.data[[time_var]], .data[[series_var]]) %>%
+      dplyr::summarise(
+        dplyr::across(dplyr::all_of(trend_variables), ~ length(unique(.x)) > 1),
+        .groups = "drop"
+      ) %>%
+      dplyr::select(-dplyr::all_of(c(time_var, series_var))) %>%
+      dplyr::summarise(dplyr::across(dplyr::everything(), any)) %>%
+      dplyr::select(dplyr::where(isTRUE)) %>%
+      names()
+    
+    if (length(varying_covariates) > 0) {
+      stop(insight::format_error(
+        c(
+          "Trend covariates must be constant within (time, series) groups:",
+          "x" = paste("Varying covariates: {.field", paste(varying_covariates, collapse = "}, {.field"), "}"),
+          "i" = "Each (time, series) combination must have identical covariate values.",
+          "i" = "Consider aggregating data or using observation-level effects instead.",
+          ">" = "See ?mvgam_data_structure for data preparation guidance."
+        )
+      ), call. = FALSE)
+    }
+  }
+  
+  invisible(TRUE)
+}
+
+#' Extract Trend Data from Full Time Series Data
+#' 
+#' @description Creates reduced dataset with one row per (time, series) combination
+#'   for trend modeling. Assumes validation already performed.
+#' 
+#' @param data Data frame containing full time series observations
+#' @param trend_formula Formula object for trend specification  
+#' @param time_var Character name of time variable
+#' @param series_var Character name of series variable
+#' @return Data frame with one row per (time, series) combination
+#' @noRd
+extract_trend_data <- function(data, trend_formula, time_var = "time", series_var = "series") {
+  checkmate::assert_data_frame(data, min.rows = 1)
+  checkmate::assert_class(trend_formula, "formula")
+  checkmate::assert_string(time_var)
+  checkmate::assert_string(series_var)
+  checkmate::assert_names(names(data), must.include = c(time_var, series_var))
+  
+  # Extract trend variables using existing infrastructure
+  parsed_trend <- parse_trend_formula(trend_formula, data = data)
+  regular_terms <- parsed_trend$regular_terms
+  
+  # Extract variables from terms (validation ensures this works)
+  trend_variables <- character(0)
+  if (!is.null(regular_terms) && length(regular_terms) > 0) {
+    for (term in regular_terms) {
+      term_formula <- as.formula(paste("~", term))
+      trend_variables <- c(trend_variables, all.vars(term_formula))
+    }
+    trend_variables <- unique(trend_variables)
+  }
+  
+  # Create reduced dataset - one row per (time, series)
+  if (length(trend_variables) > 0) {
+    trend_data <- data %>%
+      dplyr::group_by(.data[[time_var]], .data[[series_var]]) %>%
+      dplyr::summarise(
+        dplyr::across(dplyr::all_of(trend_variables), dplyr::first),
+        .groups = "drop"
+      ) %>%
+      dplyr::arrange(.data[[time_var]], .data[[series_var]])
+  } else {
+    # No covariates, just time/series structure
+    trend_data <- data %>%
+      dplyr::distinct(.data[[time_var]], .data[[series_var]]) %>%
+      dplyr::arrange(.data[[time_var]], .data[[series_var]])
+  }
+  
+  return(trend_data)
+}

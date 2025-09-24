@@ -25,14 +25,19 @@ setup_stan_test_data <- function() {
   )
 
   # Multivariate dataset with balanced design
+  # Create time-series-invariant covariates for trend formulas (one value per time-series combination)
+  timeseries_x <- rnorm(n_time * n_series)  # One x value per (time, series) combination
+  timeseries_presence <- rbinom(n_time * n_series, size = 1, prob = 0.7)  # One presence per (time, series)
+  timeseries_habitat <- factor(sample(c("forest", "grassland"), n_time * n_series, replace = TRUE))
+  
   multivariate <- data.frame(
     time = rep(1:n_time, n_series),
     series = factor(rep(paste0("series", 1:n_series), each = n_time)),
     count = rpois(n_time * n_series, lambda = 4),
     biomass = rlnorm(n_time * n_series, meanlog = 1, sdlog = 0.5),
-    presence = rbinom(n_time * n_series, size = 1, prob = 0.7),
-    x = rnorm(n_time * n_series),
-    habitat = factor(sample(c("forest", "grassland"), n_time * n_series, replace = TRUE))
+    presence = timeseries_presence,  # One value per (time, series)
+    x = timeseries_x,  # One value per (time, series)
+    habitat = timeseries_habitat  # One value per (time, series)
   )
 
   # Dataset with missing values

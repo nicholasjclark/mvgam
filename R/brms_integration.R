@@ -28,11 +28,21 @@
 #' @param stanvars Optional brms stanvars object (default: NULL)
 #' @param prior A brmsprior object or NULL. Prior specifications
 #'   for model parameters. Defaults to NULL.
+#' @param is_trend_setup Logical. If TRUE, validates trend covariates and
+#'   reduces data to one row per (time, series) combination. Default: FALSE.
+#' @param response_vars Character vector of response variable names for 
+#'   trend validation. Required when is_trend_setup = TRUE.
+#' @param time_var Character name of time variable. Default: "time".
+#' @param series_var Character name of series variable. Default: "series".
 #' @param ... Additional arguments passed to brms functions
 #' @noRd
 setup_brms_lightweight <- function(formula, data, family = gaussian(),
                                    trend_formula = NULL, stanvars = NULL,
                                    prior = NULL,
+                                   is_trend_setup = FALSE,
+                                   response_vars = NULL,
+                                   time_var = "time", 
+                                   series_var = "series",
                                    ...) {
   # Accept both regular formulas and brms formula objects
   checkmate::assert(
@@ -48,6 +58,11 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     checkmate::check_class(prior, "brmsprior"),
     combine = "or"
   )
+  # Validation for new parameters
+  checkmate::assert_logical(is_trend_setup, len = 1)
+  checkmate::assert_character(response_vars, null.ok = TRUE)
+  checkmate::assert_string(time_var)
+  checkmate::assert_string(series_var)
   if (!is.null(trend_formula)) {
     checkmate::assert(
       inherits(trend_formula, "formula") ||
@@ -56,6 +71,19 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
       is.list(trend_formula),
       .var.name = "trend_formula"
     )
+  }
+
+  # Trend context handling - validate and reduce data if this is trend setup
+  if (is_trend_setup && !is.null(trend_formula)) {
+    # Validate trend covariates using new infrastructure
+    validate_trend_covariates(trend_formula, response_vars, data)
+    validate_trend_invariance(data, trend_formula, time_var, series_var)
+    
+    # Extract reduced trend data (one row per time-series combination)
+    data <- extract_trend_data(data, trend_formula, time_var, series_var)
+    
+    # Use trend formula as main formula for brms processing
+    formula <- trend_formula
   }
 
   # Handle trend formulas without response variables
