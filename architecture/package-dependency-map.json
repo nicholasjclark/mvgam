@@ -317,6 +317,13 @@
                                                                       "is_s3_method":  false,
                                                                       "arguments":  null
                                                                   },
+                              "get_series_for_grouping":  {
+                                                              "s3_class":  "",
+                                                              "s3_method":  "",
+                                                              "signature":  "get_series_for_grouping \u003c- function(data) {",
+                                                              "is_s3_method":  false,
+                                                              "arguments":  "data"
+                                                          },
                               "mvgam_trend_choices":  {
                                                           "s3_class":  "",
                                                           "s3_method":  "",
@@ -894,6 +901,13 @@
                                                               "is_s3_method":  false,
                                                               "arguments":  null
                                                           },
+                              "has_mvgam_variables":  {
+                                                          "s3_class":  "",
+                                                          "s3_method":  "",
+                                                          "signature":  "has_mvgam_variables \u003c- function(data) {",
+                                                          "is_s3_method":  false,
+                                                          "arguments":  "data"
+                                                      },
                               "trend_param":  {
                                                   "s3_class":  "",
                                                   "s3_method":  "",
@@ -958,13 +972,21 @@
                                                                                        "data"
                                                                                    ]
                                                                  },
-                              "print_model_specification_simple":  {
-                                                                       "s3_class":  "",
-                                                                       "s3_method":  "",
-                                                                       "signature":  "print_model_specification_simple \u003c- function(model_spec) {",
-                                                                       "is_s3_method":  false,
-                                                                       "arguments":  "model_spec"
-                                                                   },
+                              "extract_time_series_dimensions":  {
+                                                                     "s3_class":  "",
+                                                                     "s3_method":  "",
+                                                                     "signature":  "extract_time_series_dimensions \u003c- function(data, time_var = \"time\", series_var = \"series\", trend_type = NULL, trend_specs = NULL, response_vars = NULL, cached_formulas = NULL) {",
+                                                                     "is_s3_method":  false,
+                                                                     "arguments":  [
+                                                                                       "data",
+                                                                                       "time_var",
+                                                                                       "series_var",
+                                                                                       "trend_type",
+                                                                                       "trend_specs",
+                                                                                       "response_vars",
+                                                                                       "cached_formulas"
+                                                                                   ]
+                                                                 },
                               "process_trend_params":  {
                                                            "s3_class":  "",
                                                            "s3_method":  "",
@@ -1645,17 +1667,6 @@
                                                       "is_s3_method":  true,
                                                       "arguments":  "object"
                                                   },
-                              "validate_trend_covariates":  {
-                                                                "s3_class":  "",
-                                                                "s3_method":  "",
-                                                                "signature":  "validate_trend_covariates \u003c- function(trend_formula, response_vars, data) {",
-                                                                "is_s3_method":  false,
-                                                                "arguments":  [
-                                                                                  "trend_formula",
-                                                                                  "response_vars",
-                                                                                  "data"
-                                                                              ]
-                                                            },
                               "reorganize_model_block_statements":  {
                                                                         "s3_class":  "",
                                                                         "s3_method":  "",
@@ -1674,21 +1685,13 @@
                                                                                "family"
                                                                            ]
                                                          },
-                              "extract_time_series_dimensions":  {
-                                                                     "s3_class":  "",
-                                                                     "s3_method":  "",
-                                                                     "signature":  "extract_time_series_dimensions \u003c- function(data, time_var = \"time\", series_var = \"series\", trend_type = NULL, trend_specs = NULL, response_vars = NULL, cached_formulas = NULL) {",
-                                                                     "is_s3_method":  false,
-                                                                     "arguments":  [
-                                                                                       "data",
-                                                                                       "time_var",
-                                                                                       "series_var",
-                                                                                       "trend_type",
-                                                                                       "trend_specs",
-                                                                                       "response_vars",
-                                                                                       "cached_formulas"
-                                                                                   ]
-                                                                 },
+                              "validate_multiple_imputation_datasets":  {
+                                                                            "s3_class":  "",
+                                                                            "s3_method":  "",
+                                                                            "signature":  "validate_multiple_imputation_datasets \u003c- function(data_list) {",
+                                                                            "is_s3_method":  false,
+                                                                            "arguments":  "data_list"
+                                                                        },
                               "try_stanheaders_formatting":  {
                                                                  "s3_class":  "",
                                                                  "s3_method":  "",
@@ -1839,6 +1842,20 @@
                                                                              "mv_spec"
                                                                          ]
                                                        },
+                              "ensure_mvgam_variables":  {
+                                                             "s3_class":  "",
+                                                             "s3_method":  "",
+                                                             "signature":  "ensure_mvgam_variables \u003c- function(data, parsed_trend = NULL, time_var = \"time\", series_var = \"series\", response_vars = NULL, metadata = NULL) {",
+                                                             "is_s3_method":  false,
+                                                             "arguments":  [
+                                                                               "data",
+                                                                               "parsed_trend",
+                                                                               "time_var",
+                                                                               "series_var",
+                                                                               "response_vars",
+                                                                               "metadata"
+                                                                           ]
+                                                         },
                               "extract_non_likelihood_from_model_block":  {
                                                                               "s3_class":  "",
                                                                               "s3_method":  "",
@@ -2330,11 +2347,12 @@
                               "parse_trend_formula":  {
                                                           "s3_class":  "",
                                                           "s3_method":  "",
-                                                          "signature":  "parse_trend_formula \u003c- function(trend_formula, data = NULL) {",
+                                                          "signature":  "parse_trend_formula \u003c- function(trend_formula, data = NULL, response_vars = NULL) {",
                                                           "is_s3_method":  false,
                                                           "arguments":  [
                                                                             "trend_formula",
-                                                                            "data"
+                                                                            "data",
+                                                                            "response_vars"
                                                                         ]
                                                       },
                               "VAR":  {
@@ -2528,7 +2546,7 @@
                               "generate_obs_trend_mapping":  {
                                                                  "s3_class":  "",
                                                                  "s3_method":  "",
-                                                                 "signature":  "generate_obs_trend_mapping \u003c- function(data, response_var, time_var = \"time\", series_var = \"series\", dimensions = NULL, cached_formulas = NULL) {",
+                                                                 "signature":  "generate_obs_trend_mapping \u003c- function(data, response_var, time_var = \"time\", series_var = \"series\", dimensions = NULL, cached_formulas = NULL, response_vars = NULL) {",
                                                                  "is_s3_method":  false,
                                                                  "arguments":  [
                                                                                    "data",
@@ -2536,7 +2554,8 @@
                                                                                    "time_var",
                                                                                    "series_var",
                                                                                    "dimensions",
-                                                                                   "cached_formulas"
+                                                                                   "cached_formulas",
+                                                                                   "response_vars"
                                                                                ]
                                                              },
                               "filter_block_content":  {
@@ -3035,15 +3054,23 @@
                               "create_mvgam_from_combined_fit":  {
                                                                      "s3_class":  "",
                                                                      "s3_method":  "",
-                                                                     "signature":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL) {",
+                                                                     "signature":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL, trend_metadata = NULL) {",
                                                                      "is_s3_method":  false,
                                                                      "arguments":  [
                                                                                        "combined_fit",
                                                                                        "obs_setup",
                                                                                        "trend_setup",
-                                                                                       "mv_spec"
+                                                                                       "mv_spec",
+                                                                                       "trend_metadata"
                                                                                    ]
                                                                  },
+                              "get_time_for_grouping":  {
+                                                            "s3_class":  "",
+                                                            "s3_method":  "",
+                                                            "signature":  "get_time_for_grouping \u003c- function(data) {",
+                                                            "is_s3_method":  false,
+                                                            "arguments":  "data"
+                                                        },
                               "build_execution_dependency_plan":  {
                                                                       "s3_class":  "",
                                                                       "s3_method":  "",
@@ -3248,13 +3275,6 @@
                                                          "is_s3_method":  true,
                                                          "arguments":  "x"
                                                      },
-                              "validate_multiple_imputation_datasets":  {
-                                                                            "s3_class":  "",
-                                                                            "s3_method":  "",
-                                                                            "signature":  "validate_multiple_imputation_datasets \u003c- function(data_list) {",
-                                                                            "is_s3_method":  false,
-                                                                            "arguments":  "data_list"
-                                                                        },
                               "generate_common_trend_data":  {
                                                                  "s3_class":  "",
                                                                  "s3_method":  "",
@@ -3327,13 +3347,16 @@
                               "extract_trend_data":  {
                                                          "s3_class":  "",
                                                          "s3_method":  "",
-                                                         "signature":  "extract_trend_data \u003c- function(data, trend_formula, time_var = \"time\", series_var = \"series\") {",
+                                                         "signature":  "extract_trend_data \u003c- function(data, trend_formula = NULL, time_var = \"time\", series_var = \"series\", mvgam_object = NULL, newdata = NULL, response_vars = NULL, .return_metadata = FALSE) {",
                                                          "is_s3_method":  false,
                                                          "arguments":  [
                                                                            "data",
                                                                            "trend_formula",
                                                                            "time_var",
-                                                                           "series_var"
+                                                                           "series_var",
+                                                                           "mvgam_object",
+                                                                           "newdata",
+                                                                           "response_vars"
                                                                        ]
                                                      },
                               "get_best_prior_match":  {
@@ -3415,18 +3438,6 @@
                                                         "is_s3_method":  true,
                                                         "arguments":  "object"
                                                     },
-                              "validate_trend_invariance":  {
-                                                                "s3_class":  "",
-                                                                "s3_method":  "",
-                                                                "signature":  "validate_trend_invariance \u003c- function(data, trend_formula, time_var = \"time\", series_var = \"series\") {",
-                                                                "is_s3_method":  false,
-                                                                "arguments":  [
-                                                                                  "data",
-                                                                                  "trend_formula",
-                                                                                  "time_var",
-                                                                                  "series_var"
-                                                                              ]
-                                                            },
                               "extract_dependencies_from_declaration":  {
                                                                             "s3_class":  "",
                                                                             "s3_method":  "",
@@ -3752,6 +3763,13 @@
                                                                               "use_alias"
                                                                           ]
                                                         },
+                              "remove_mvgam_variables":  {
+                                                             "s3_class":  "",
+                                                             "s3_method":  "",
+                                                             "signature":  "remove_mvgam_variables \u003c- function(data) {",
+                                                             "is_s3_method":  false,
+                                                             "arguments":  "data"
+                                                         },
                               "create_empty_brmsprior":  {
                                                              "s3_class":  "",
                                                              "s3_method":  "",
@@ -3993,6 +4011,13 @@
                                                                             "probs"
                                                                         ]
                                                       },
+                              "print_model_specification_simple":  {
+                                                                       "s3_class":  "",
+                                                                       "s3_method":  "",
+                                                                       "signature":  "print_model_specification_simple \u003c- function(model_spec) {",
+                                                                       "is_s3_method":  false,
+                                                                       "arguments":  "model_spec"
+                                                                   },
                               "sum_rows":  {
                                                "s3_class":  "",
                                                "s3_method":  "",
@@ -4220,8 +4245,11 @@
                                                 "remove_trend_expressions",
                                                 "is_multivariate_brmsfit",
                                                 "is_trend_term",
-                                                "validate_trend_covariates",
-                                                "validate_trend_invariance",
+                                                "ensure_mvgam_variables",
+                                                "get_time_for_grouping",
+                                                "get_series_for_grouping",
+                                                "has_mvgam_variables",
+                                                "remove_mvgam_variables",
                                                 "extract_trend_data",
                                                 "patterns",
                                                 "patterns",
@@ -4863,6 +4891,7 @@
                       "validate_trend_grouping":  "R/validations.R",
                       "plot_ecdf":  "R/plot_mvgam_series.R",
                       "generate_hierarchical_functions":  "R/stan_assembly.R",
+                      "get_series_for_grouping":  "R/validations.R",
                       "mvgam_trend_choices":  "R/trend_system.R",
                       "create_empty_mu_result":  "R/mu_expression_analysis.R",
                       "RW":  "R/trend_system.R",
@@ -4928,6 +4957,7 @@
                       "extract_declared_functions":  "R/mu_expression_analysis.R",
                       "periodic_gp":  "R/sim_mvgam.R",
                       "validate_factor_levels":  "R/validations.R",
+                      "has_mvgam_variables":  "R/validations.R",
                       "trend_param":  "R/trend_system.R",
                       "is_registry_initialized":  "R/trend_system.R",
                       "polish_generated_stan_code":  "R/stan_polish.R",
@@ -5016,7 +5046,6 @@
                       "stancode.mvgam_prefit":  "R/print.mvgam.R",
                       "stability.mvgam":  "R/stability.R",
                       "residual_cor.jsdgam":  "R/residual_cor.R",
-                      "validate_trend_covariates":  "R/validations.R",
                       "register_custom_trend":  "R/trend_system.R",
                       "add_residuals.mvgam":  "R/add_residuals.R",
                       "setup_brms_lightweight":  "R/brms_integration.R",
@@ -5035,6 +5064,7 @@
                       "create_trend_brmsfit":  "R/mvgam_core.R",
                       "validate_single_trend_formula":  "R/validations.R",
                       "is_multivariate_trend_specs":  "R/validations.R",
+                      "ensure_mvgam_variables":  "R/validations.R",
                       "extract_trend_parameters":  "R/mvgam_core.R",
                       "extract_non_likelihood_from_model_block":  "R/stan_assembly.R",
                       "create_times_trend_matrix":  "R/stan_assembly.R",
@@ -5158,6 +5188,7 @@
                       "extract_prior_from_setup":  "R/brms_integration.R",
                       "generate_var_trend_stanvars":  "R/stan_assembly.R",
                       "create_mvgam_from_combined_fit":  "R/mvgam_core.R",
+                      "get_time_for_grouping":  "R/validations.R",
                       "as_one_logical":  "R/validations.R",
                       "reorganize_model_block_statements":  "R/stan_polish.R",
                       "process_capacity_parameter":  "R/validations.R",
@@ -5197,7 +5228,6 @@
                       "plot.mvgam":  "R/plot.mvgam.R",
                       "get_parameter_type_default_prior":  "R/priors.R",
                       "get_prior.default":  "R/priors.R",
-                      "validate_trend_invariance":  "R/validations.R",
                       "extract_dependencies_from_declaration":  "R/stan_assembly.R",
                       "plottable":  "R/plot.mvgam.R",
                       "has_embedded_families":  "R/priors.R",
@@ -5229,6 +5259,7 @@
                       "summary.mvgam_fevd":  "R/mvgam_fevd-class.R",
                       "create_mvgam_trend":  "R/trend_system.R",
                       "loo_compare.mvgam":  "R/loo.mvgam.R",
+                      "remove_mvgam_variables":  "R/validations.R",
                       "get_ar_parameter_prior":  "R/priors.R",
                       "var_psi":  "R/irf.mvgam.R",
                       "parse_base_formula_safe":  "R/validations.R",
@@ -5288,6 +5319,7 @@
                                      "is_multivariate_trend_specs":  "R/validations.R",
                                      "plot_ecdf":  "R/plot_mvgam_series.R",
                                      "generate_hierarchical_functions":  "R/stan_assembly.R",
+                                     "get_series_for_grouping":  "R/validations.R",
                                      "mvgam_trend_choices":  "R/trend_system.R",
                                      "create_empty_mu_result":  "R/mu_expression_analysis.R",
                                      "plot_mvgam_smooth":  "R/plot_mvgam_smooth.R",
@@ -5332,6 +5364,7 @@
                                      "periodic_gp":  "R/sim_mvgam.R",
                                      "validate_factor_levels":  "R/validations.R",
                                      "get_stan_reserved_words":  "R/stan_assembly.R",
+                                     "has_mvgam_variables":  "R/validations.R",
                                      "trend_param":  "R/trend_system.R",
                                      "is_registry_initialized":  "R/trend_system.R",
                                      "polish_generated_stan_code":  "R/stan_polish.R",
@@ -5344,7 +5377,6 @@
                                      "validate_multivariate_trend_constraints":  "R/validations.R",
                                      "clean_ll":  "R/loo.mvgam.R",
                                      "reconstruct_mu_trend_with_renamed_vars":  "R/stan_assembly.R",
-                                     "filter_var_forecast_params":  "R/trend_system.R",
                                      "lv_correlations":  "R/lv_correlations.R",
                                      "extract_variable_name":  "R/brms_integration.R",
                                      "generate_forecast_metadata":  "R/trend_system.R",
@@ -5396,7 +5428,6 @@
                                      "check_loop_requirement":  "R/mu_expression_analysis.R",
                                      "stancode.mvgam_prefit":  "R/print.mvgam.R",
                                      "stability.mvgam":  "R/stability.R",
-                                     "validate_trend_covariates":  "R/validations.R",
                                      "create_mvgam_trend":  "R/trend_system.R",
                                      "extract_time_series_dimensions":  "R/validations.R",
                                      "try_stanheaders_formatting":  "R/stan_polish.R",
@@ -5411,8 +5442,10 @@
                                      "extract_multivariate_standata":  "R/stan_assembly.R",
                                      "extract_hierarchical_info":  "R/stan_assembly.R",
                                      "ecdf_plotdat":  "R/ppc.mvgam.R",
+                                     "ensure_mvgam_variables":  "R/validations.R",
                                      "extract_trend_parameters":  "R/mvgam_core.R",
                                      "extract_non_likelihood_from_model_block":  "R/stan_assembly.R",
+                                     "generate_base_brms_standata":  "R/stan_assembly.R",
                                      "create_times_trend_matrix":  "R/stan_assembly.R",
                                      "ordinate.jsdgam":  "R/ordinate.jsdgam.R",
                                      "apply_correct_transformation_order":  "R/stan_assembly.R",
@@ -5469,7 +5502,7 @@
                                      "pw_trend_properties":  "R/trend_system.R",
                                      "xts.to.ts":  "R/series_to_mvgam.R",
                                      "split_fc_dots":  "R/ensemble.R",
-                                     "generate_base_brms_standata":  "R/stan_assembly.R",
+                                     "filter_var_forecast_params":  "R/trend_system.R",
                                      "remove_trend_expressions":  "R/validations.R",
                                      "plot_mvgam_fc":  "R/plot_mvgam_fc.R",
                                      "generate_obs_trend_mapping":  "R/validations.R",
@@ -5510,6 +5543,7 @@
                                      "validate_no_factor_hierarchical":  "R/validations.R",
                                      "extract_brmsterms_from_setup":  "R/brms_integration.R",
                                      "generate_var_trend_stanvars":  "R/stan_assembly.R",
+                                     "get_time_for_grouping":  "R/validations.R",
                                      "as_one_logical":  "R/validations.R",
                                      "process_capacity_parameter":  "R/validations.R",
                                      "validate_plot_data":  "R/plot_mvgam_series.R",
@@ -5539,7 +5573,6 @@
                                      "generate_hierarchical_correlation_parameters":  "R/stan_assembly.R",
                                      "plot.mvgam":  "R/plot.mvgam.R",
                                      "get_parameter_type_default_prior":  "R/priors.R",
-                                     "validate_trend_invariance":  "R/validations.R",
                                      "extract_dependencies_from_declaration":  "R/stan_assembly.R",
                                      "has_embedded_families":  "R/priors.R",
                                      "generate_pw_trend_stanvars":  "R/stan_assembly.R",
@@ -5571,6 +5604,7 @@
                                      "print.mvgam_trend":  "R/trend_system.R",
                                      "validate_trend_factor_compatibility":  "R/validations.R",
                                      "loo_compare.mvgam":  "R/loo.mvgam.R",
+                                     "remove_mvgam_variables":  "R/validations.R",
                                      "create_empty_brmsprior":  "R/priors.R",
                                      "var_psi":  "R/irf.mvgam.R",
                                      "parse_base_formula_safe":  "R/validations.R",
@@ -5661,6 +5695,7 @@
                                 "is_multivariate_trend_specs":  "is_multivariate_trend_specs \u003c- function(trend_specs) {",
                                 "plot_ecdf":  "plot_ecdf \u003c- function(dat, ylab = \u0027y\u0027) {",
                                 "generate_hierarchical_functions":  "generate_hierarchical_functions \u003c- function() {",
+                                "get_series_for_grouping":  "get_series_for_grouping \u003c- function(data) {",
                                 "mvgam_trend_choices":  "mvgam_trend_choices \u003c- function() {",
                                 "create_empty_mu_result":  "create_empty_mu_result \u003c- function() {",
                                 "RW":  "RW = function( time = NA, series = NA, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {",
@@ -5670,7 +5705,6 @@
                                 "find_trend_terms":  "find_trend_terms \u003c- function(x) {",
                                 "parse_data_declarations":  "parse_data_declarations \u003c- function(data_block) {",
                                 "plot_time_series":  "plot_time_series \u003c- function( dat, lines = TRUE, log_scale = FALSE, ylab = \u0027y\u0027, series = \u0027all\u0027 ) {",
-                                "are_braces_balanced":  "are_braces_balanced \u003c- function(stan_code) {",
                                 "validate_nonlinear_trend_compatibility":  "validate_nonlinear_trend_compatibility \u003c- function(nl_components, trend_specs) {",
                                 "sort_stanvars":  "sort_stanvars \u003c- function(stanvars) {",
                                 "get_trend_info":  "get_trend_info \u003c- function(name) {",
@@ -5728,6 +5762,7 @@
                                 "periodic_gp":  "periodic_gp \u003c- function(T, period = 12, rho = 1) {",
                                 "validate_factor_levels":  "validate_factor_levels \u003c- function(data, var_name, data_name = \"data\", auto_drop = FALSE) {",
                                 "validate_trend_grouping":  "validate_trend_grouping \u003c- function(trend_spec, data, cached_formulas = NULL) {",
+                                "has_mvgam_variables":  "has_mvgam_variables \u003c- function(data) {",
                                 "trend_param":  "trend_param \u003c- function(name, bounds = NULL, monitor = TRUE, label = NULL, condition = TRUE) {",
                                 "is_registry_initialized":  "is_registry_initialized \u003c- function() {",
                                 "polish_generated_stan_code":  "polish_generated_stan_code \u003c- function(stan_code, silent = TRUE) {",
@@ -5735,6 +5770,7 @@
                                 "create_trend_base_formula":  "create_trend_base_formula \u003c- function(trend_specs) {",
                                 "generate_trend_injection_code":  "generate_trend_injection_code \u003c- function(mapping_arrays) {",
                                 "is_like_factor":  "is_like_factor \u003c- function(x) {",
+                                "process_trend_validation_rules":  "process_trend_validation_rules \u003c- function(trend_spec, data) {",
                                 "print_model_specification_simple":  "print_model_specification_simple \u003c- function(model_spec) {",
                                 "is_nonlinear_formula":  "is_nonlinear_formula \u003c- function(formula) {",
                                 "is.mvgam_trend":  "is.mvgam_trend \u003c- function(x) {",
@@ -5770,7 +5806,7 @@
                                 "extract_response_names":  "extract_response_names \u003c- function(formula) {",
                                 "normalize_trend_type":  "normalize_trend_type \u003c- function(trend_type) {",
                                 "filter_zmvn_forecast_params":  "filter_zmvn_forecast_params \u003c- function(monitor_params, trend_spec) {",
-                                "formula2str_mvgam":  "formula2str_mvgam \u003c- function(formula, space = \"trim\") {",
+                                "validate_autocor_separation":  "validate_autocor_separation \u003c- function(obs_formula, trend_formula = NULL) {",
                                 "Predict.matrix.moi.smooth":  "Predict.matrix.moi.smooth \u003c- function(object, data) {",
                                 "validate_no_factor_hierarchical":  "validate_no_factor_hierarchical \u003c- function(trend_specs, n_series, trend_name) {",
                                 "fevd_df":  "fevd_df = function(x, ynames) {",
@@ -5815,7 +5851,6 @@
                                 "stancode.mvgam_prefit":  "stancode.mvgam_prefit \u003c- function(object, ...) {",
                                 "stability.mvgam":  "stability.mvgam = function(object, ...) {",
                                 "residual_cor.jsdgam":  "residual_cor.jsdgam \u003c- function( object, summary = TRUE, robust = FALSE, probs = c(0.025, 0.975), ... ) {",
-                                "validate_trend_covariates":  "validate_trend_covariates \u003c- function(trend_formula, response_vars, data) {",
                                 "register_custom_trend":  "register_custom_trend \u003c- function(name, supports_factors = FALSE, generator_func, incompatibility_reason = NULL) {",
                                 "add_residuals.mvgam":  "add_residuals.mvgam = function(object, ...) {",
                                 "setup_brms_lightweight":  "setup_brms_lightweight \u003c- function(formula, data, family = gaussian(), trend_formula = NULL, stanvars = NULL, prior = NULL, is_trend_setup = FALSE, response_vars = NULL, time_var = \"time\", series_var = \"series\", ...) {",
@@ -5833,11 +5868,12 @@
                                 "ecdf_plotdat":  "ecdf_plotdat \u003c- function(vals, x) {",
                                 "create_trend_brmsfit":  "create_trend_brmsfit \u003c- function(combined_fit, trend_setup, mv_spec) {",
                                 "validate_single_trend_formula":  "validate_single_trend_formula \u003c- function(formula, context = NULL, allow_response = FALSE) {",
+                                "ensure_mvgam_variables":  "ensure_mvgam_variables \u003c- function(data, parsed_trend = NULL, time_var = \"time\", series_var = \"series\", response_vars = NULL, metadata = NULL) {",
                                 "extract_non_likelihood_from_model_block":  "extract_non_likelihood_from_model_block \u003c- function(model_block, exclude_mu_lines = character(0)) {",
                                 "create_times_trend_matrix":  "create_times_trend_matrix \u003c- function(n_time, n_series, unique_times, unique_series, matrix_name) {",
                                 "ordinate.jsdgam":  "ordinate.jsdgam \u003c- function( object, which_lvs = c(1, 2), biplot = TRUE, alpha = 0.5, label_sites = TRUE, ... ) {",
                                 "fit_multiple_imputation_models":  "fit_multiple_imputation_models \u003c- function(formula, trend_formula, data_list, backend, ...) {",
-                                "process_trend_validation_rules":  "process_trend_validation_rules \u003c- function(trend_spec, data) {",
+                                "are_braces_balanced":  "are_braces_balanced \u003c- function(stan_code) {",
                                 "samp_noinf":  "samp_noinf = function(x) {",
                                 "var1_recursC":  "var1_recursC \u003c- function(A, linpreds, errors, drift, last_trends, h) {",
                                 "is_multivariate_brmsfit":  "is_multivariate_brmsfit \u003c- function(brmsfit) {",
@@ -5853,12 +5889,11 @@
                                 "fit_mvgam_model":  "fit_mvgam_model \u003c- function(stancode, standata, backend = \"cmdstanr\", ...) {",
                                 "generate_car_monitor_params":  "generate_car_monitor_params \u003c- function(trend_spec) {",
                                 "apply_safe_parameter_replacement":  "apply_safe_parameter_replacement \u003c- function(code, old_name, new_name) {",
-                                "validate_autocor_separation":  "validate_autocor_separation \u003c- function(obs_formula, trend_formula = NULL) {",
                                 "print.how_to_cite":  "print.how_to_cite \u003c- function(x, ...) {",
                                 "tidy.mvgam":  "tidy.mvgam \u003c- function(x, probs = c(0.025, 0.5, 0.975), ...) {",
                                 "residual_cor.mvgam":  "residual_cor.mvgam \u003c- function( object, summary = TRUE, robust = FALSE, probs = c(0.025, 0.975), ... ) {",
                                 "generate_matrix_z_parameters":  "generate_matrix_z_parameters \u003c- function(is_factor_model, n_lv, n_series) {",
-                                "parse_trend_formula":  "parse_trend_formula \u003c- function(trend_formula, data = NULL) {",
+                                "parse_trend_formula":  "parse_trend_formula \u003c- function(trend_formula, data = NULL, response_vars = NULL) {",
                                 "plot.mvgam_residcor":  "plot.mvgam_residcor = function(x, cluster = FALSE, ...) {",
                                 "ordinate":  "ordinate \u003c- function(object, ...) {",
                                 "is_trend_term":  "is_trend_term \u003c- function(expr, trend_patterns) {",
@@ -5901,7 +5936,7 @@
                                 "remove_trend_expressions":  "remove_trend_expressions \u003c- function(expr, trend_patterns, depth = 0) {",
                                 "validate_multivariate_series_time":  "validate_multivariate_series_time \u003c- function(data, name, time_var, check_times) {",
                                 "plot_mvgam_fc":  "plot_mvgam_fc = function( object, series = 1, newdata, data_test, realisations = FALSE, n_realisations = 15, hide_xlabels = FALSE, xlab, ylab, ylim, n_cores = 1, return_forecasts = FALSE, return_score = FALSE, ... ) {",
-                                "generate_obs_trend_mapping":  "generate_obs_trend_mapping \u003c- function(data, response_var, time_var = \"time\", series_var = \"series\", dimensions = NULL, cached_formulas = NULL) {",
+                                "generate_obs_trend_mapping":  "generate_obs_trend_mapping \u003c- function(data, response_var, time_var = \"time\", series_var = \"series\", dimensions = NULL, cached_formulas = NULL, response_vars = NULL) {",
                                 "filter_block_content":  "filter_block_content \u003c- function(block_content, block_type = \"model\") {",
                                 "transform_glm_call":  "transform_glm_call \u003c- function(stan_code, glm_type, params) {",
                                 "sim_mvgam":  "sim_mvgam = function( T = 100, n_series = 3, seasonality = \u0027shared\u0027, use_lv = FALSE, n_lv = 0, trend_model = RW(), drift = FALSE, prop_trend = 0.2, trend_rel, freq = 12, family = poisson(), phi, shape, sigma, nu, mu, prop_missing = 0, prop_train = 0.85 ) {",
@@ -5950,10 +5985,12 @@
                                 "calculate_car_time_distances":  "calculate_car_time_distances \u003c- function(data_info) {",
                                 "generate_ar_trend_stanvars":  "generate_ar_trend_stanvars \u003c- function(trend_specs, data_info, prior = NULL) {",
                                 "build_execution_dependency_plan":  "build_execution_dependency_plan \u003c- function(classified_expressions) {",
+                                "formula2str_mvgam":  "formula2str_mvgam \u003c- function(formula, space = \"trim\") {",
                                 "validate_trend_dispatch_consistency":  "validate_trend_dispatch_consistency \u003c- function(trend_obj) {",
                                 "extract_prior_from_setup":  "extract_prior_from_setup \u003c- function(setup_object) {",
                                 "generate_var_trend_stanvars":  "generate_var_trend_stanvars \u003c- function(trend_specs, data_info, prior = NULL) {",
-                                "create_mvgam_from_combined_fit":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL) {",
+                                "create_mvgam_from_combined_fit":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL, trend_metadata = NULL) {",
+                                "get_time_for_grouping":  "get_time_for_grouping \u003c- function(data) {",
                                 "as_one_logical":  "as_one_logical = function(x, allow_na = FALSE) {",
                                 "reorganize_model_block_statements":  "reorganize_model_block_statements \u003c- function(lines) {",
                                 "process_capacity_parameter":  "process_capacity_parameter \u003c- function(cap, data) {",
@@ -5985,7 +6022,7 @@
                                 "extract_all_identifiers":  "extract_all_identifiers \u003c- function(expr) {",
                                 "extract_prior_string":  "extract_prior_string \u003c- function(prior_frame, class_name, coef_name = NULL, handle_suffix = TRUE) {",
                                 "get_prior.mvgam_formula":  "get_prior.mvgam_formula \u003c- function(object, data, family = gaussian(), ...) {",
-                                "extract_trend_data":  "extract_trend_data \u003c- function(data, trend_formula, time_var = \"time\", series_var = \"series\") {",
+                                "extract_trend_data":  "extract_trend_data \u003c- function(data, trend_formula = NULL, time_var = \"time\", series_var = \"series\", mvgam_object = NULL, newdata = NULL, response_vars = NULL, .return_metadata = FALSE) {",
                                 "find_stan_block":  "find_stan_block \u003c- function(code_lines, block_name) {",
                                 "CAR":  "CAR = function(time = NA, series = NA) {",
                                 "plot_mvgam_resids":  "plot_mvgam_resids = function( object, series = 1, n_draws = 100L, n_points = 1000L ) {",
@@ -5995,7 +6032,6 @@
                                 "plot.mvgam":  "plot.mvgam = function( x, type = \u0027residuals\u0027, series = 1, residuals = FALSE, newdata, data_test, trend_effects = FALSE, ... ) {",
                                 "get_parameter_type_default_prior":  "get_parameter_type_default_prior \u003c- function(param_name) {",
                                 "get_prior.default":  "get_prior.default \u003c- function(object, ...) {",
-                                "validate_trend_invariance":  "validate_trend_invariance \u003c- function(data, trend_formula, time_var = \"time\", series_var = \"series\") {",
                                 "extract_dependencies_from_declaration":  "extract_dependencies_from_declaration \u003c- function(declaration) {",
                                 "has_embedded_families":  "has_embedded_families \u003c- function(formula) {",
                                 "generate_pw_trend_stanvars":  "generate_pw_trend_stanvars \u003c- function(trend_specs, data_info, growth = NULL, prior = NULL) {",
@@ -6026,6 +6062,7 @@
                                 "summary.mvgam_fevd":  "summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {",
                                 "create_mvgam_trend":  "create_mvgam_trend \u003c- function(trend_type, ..., .time = NULL, .series = NULL, .gr = NULL, .subgr = NULL, .cap = NULL, .validation_rules = NULL) {",
                                 "loo_compare.mvgam":  "loo_compare.mvgam \u003c- function( x, ..., model_names = NULL, incl_dynamics = FALSE ) {",
+                                "remove_mvgam_variables":  "remove_mvgam_variables \u003c- function(data) {",
                                 "get_ar_parameter_prior":  "get_ar_parameter_prior \u003c- function(param_name, trend_obj) {",
                                 "var_psi":  "var_psi \u003c- function(x, h = 10) {",
                                 "parse_base_formula_safe":  "parse_base_formula_safe \u003c- function(trend_formula, trend_terms) {",
@@ -6523,6 +6560,11 @@
                                  "extract_expression_variables_comprehensive":  [
                                                                                     "classify_single_mu_expression_structurally"
                                                                                 ],
+                                 "extract_computed_variables":  [
+                                                                    "detect_glm_usage",
+                                                                    "find_stan_block",
+                                                                    "find_prior_only_insertion_point"
+                                                                ],
                                  "should_include_in_transformed_parameters":  [
                                                                                   "detect_glm_usage",
                                                                                   "find_stan_block",
@@ -6712,9 +6754,9 @@
                                  "extract_response_from_formula":  [
                                                                        "parse_nonlinear_manually"
                                                                    ],
-                                 "validate_trend_covariates":  [
-                                                                   "setup_brms_lightweight"
-                                                               ],
+                                 "extract_and_rename_trend_parameters":  [
+                                                                             "extract_trend_stanvars_from_setup"
+                                                                         ],
                                  "extract_hierarchical_info":  [
                                                                    "detect_glm_usage",
                                                                    "find_stan_block",
@@ -6810,17 +6852,9 @@
                                  "get_default_trend_parameter_prior":  [
                                                                            "create_trend_parameter_prior"
                                                                        ],
-                                 "validate_trend_invariance":  [
-                                                                   "setup_brms_lightweight"
-                                                               ],
                                  "extract_time_information":  [
                                                                   "extract_mvgam_components"
                                                               ],
-                                 "process_variable":  [
-                                                          "detect_glm_usage",
-                                                          "find_stan_block",
-                                                          "find_prior_only_insertion_point"
-                                                      ],
                                  "analyze_assignment_type":  [
                                                                  "analyze_expression_structure"
                                                              ],
@@ -6889,9 +6923,11 @@
                                  "extract_trend_data":  [
                                                             "setup_brms_lightweight"
                                                         ],
-                                 "extract_and_rename_trend_parameters":  [
-                                                                             "extract_trend_stanvars_from_setup"
-                                                                         ],
+                                 "process_variable":  [
+                                                          "detect_glm_usage",
+                                                          "find_stan_block",
+                                                          "find_prior_only_insertion_point"
+                                                      ],
                                  "normalize_trend_type":  [
                                                               "generate_monitor_params"
                                                           ],
@@ -6918,11 +6954,6 @@
                                                                  "analyze_variable_relationships_comprehensive",
                                                                  "extract_expression_variables_comprehensive"
                                                              ],
-                                 "extract_computed_variables":  [
-                                                                    "detect_glm_usage",
-                                                                    "find_stan_block",
-                                                                    "find_prior_only_insertion_point"
-                                                                ],
                                  "apply_rubins_rules":  [
                                                             "pool_mvgam_fits"
                                                         ],
@@ -7008,22 +7039,22 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-09-24 16:15:21",
+                     "generated":  "2025-09-26 12:39:35",
                      "commit_hash":  "pending",
-                     "cached_files":  55,
+                     "cached_files":  49,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
-                     "total_functions":  427,
+                     "total_functions":  430,
                      "exported_functions":  56,
                      "s3_methods_count":  37,
                      "s3_classes_count":  24,
                      "dynamic_references":  30,
                      "package_name":  "mvgam",
                      "potentially_unused_functions":  27,
-                     "changed_files":  0,
+                     "changed_files":  6,
                      "total_files":  55,
-                     "zero_dependency_functions":  336
+                     "zero_dependency_functions":  339
                  },
     "dependencies":  {
 
@@ -7144,9 +7175,7 @@
                                                                  "extract_trend_data",
                                                                  "parse_multivariate_trends",
                                                                  "validate_brms_formula",
-                                                                 "validate_setup_components",
-                                                                 "validate_trend_covariates",
-                                                                 "validate_trend_invariance"
+                                                                 "validate_setup_components"
                                                              ],
                                   "apply_rubins_rules":  "pool_parameter_estimates",
                                   "validate_list_trend_formula":  [

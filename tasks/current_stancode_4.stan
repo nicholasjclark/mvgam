@@ -70,7 +70,7 @@ parameters {
 transformed parameters {
   // Prior log-probability accumulator
   real lprior = 0;
-  lprior += student_t_lpdf(Intercept_count | 3, 1.2, 2.5);
+  lprior += student_t_lpdf(Intercept_count | 3, 1.1, 2.5);
   lprior += student_t_lpdf(Intercept_presence | 3, 0, 2.5);
   lprior += student_t_lpdf(Intercept_biomass | 3, 1, 2.5);
   lprior += gamma_lpdf(shape_biomass | 0.01, 0.01);

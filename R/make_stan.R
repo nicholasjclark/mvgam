@@ -145,15 +145,16 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
       series_var <- mv_spec$trend_specs$series_var %||% mv_spec$trend_specs$series %||% "series"
     }
     
-    # Prepare trend data with validation and reduction using existing infrastructure
-    trend_data <- data  # Default to full data
-    if (!is.null(response_vars) && length(response_vars) > 0) {
-      # Use consolidated validation and data extraction with metadata capture
-      result <- extract_trend_data(data, mv_spec$base_formula, time_var, series_var,
-                                  response_vars = response_vars, .return_metadata = TRUE)
-      trend_data <- result$trend_data
-      trend_metadata <- result$metadata
-    }
+    # Extract response variable names for mapping generation
+    response_vars <- extract_response_names(obs_formula)
+    
+    # Consolidated trend processing - replaces dual path architecture
+    components <- extract_and_validate_trend_components(
+      data, mv_spec, response_vars, time_var, series_var, trend_formula
+    )
+    trend_data <- components$trend_data
+    mv_spec <- components$enhanced_mv_spec  # Already has dimensions injected
+    trend_metadata <- components$metadata
     
     if (is.null(trend_result <- setup_brms_lightweight(
       formula = mv_spec$base_formula,
@@ -182,36 +183,6 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
     trend_result
   } else {
     NULL
-  }
-
-  # Validate time series structure and inject dimensions
-  if (mv_spec$has_trends) {
-    # Extract response variable names for mapping generation using enhanced function
-    response_vars <- extract_response_names(obs_formula)
-    
-    validation_result <- validate_time_series_for_trends(
-      data, 
-      mv_spec$trend_specs,
-      response_vars = response_vars,
-      cached_formulas = mv_spec$cached_formulas
-    )
-    if (is.null(validation_result) || is.null(validation_result$dimensions)) {
-      insight::format_error(
-        "Time series validation failed for trend specification.",
-        "Ensure your data has proper {.field time} and {.field series} structure."
-      )
-    }
-
-    # Inject dimensions back into trend specifications
-    if (is_multivariate_trend_specs(mv_spec$trend_specs)) {
-      # Multivariate: inject dimensions into each response-specific trend spec
-      for (response_name in names(mv_spec$trend_specs)) {
-        mv_spec$trend_specs[[response_name]]$dimensions <- validation_result$dimensions
-      }
-    } else {
-      # Univariate: inject dimensions directly into trend object
-      mv_spec$trend_specs$dimensions <- validation_result$dimensions
-    }
   }
 
   # Generate combined Stan code and data using existing infrastructure

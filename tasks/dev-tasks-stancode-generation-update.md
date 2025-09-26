@@ -307,6 +307,247 @@ remove_mvgam_variables <- function(data) {
 
 **Evidence**: Scenarios 6-7 (CAR) work, but 1-5, 8-9 fail because they hit these remaining direct access points.
 
+## PRIORITY: Eliminate Redundant extract_time_series_dimensions() Calls via Dependency Injection
+
+**THE CORE PROBLEM**: `extract_time_series_dimensions()` is expensive (validates data, creates attributes, computes dimensions) and gets called 2-3 times with identical inputs:
+- Path 1: `extract_trend_data()` → `parse_trend_formula()` → `extract_time_series_dimensions()`
+- Path 2: `validate_time_series_for_trends()` → `extract_time_series_dimensions()`
+- Path 3: `generate_obs_trend_mapping()` → `extract_time_series_dimensions()` (conditional)
+
+**WHY THIS MATTERS**: 
+- Performance waste: Same expensive computation 2-3 times per request
+- Inconsistency risk: Multiple computations could theoretically yield different results
+- Maintenance burden: Changes must be validated across multiple call paths
+
+**THE DRY SOLUTION: Dependency Injection**
+Compute dimensions ONCE at the top level, pass them down to all functions that need them. No caching, no R6, just clean parameter passing.
+
+**Architecture**:
+```
+extract_and_validate_trend_components()
+├── extract_time_series_dimensions() ← COMPUTE ONCE HERE
+├── extract_trend_data(..., .precomputed_dimensions = dimensions)
+├── validate_time_series_for_trends(..., .precomputed_dimensions = dimensions)
+└── All functions receive dimensions as parameter, never recompute
+```
+
+### Sub-Task B1: ✅ COMPLETED - Modify extract_and_validate_trend_components to compute dimensions once
+
+**Objective**: Make our consolidated function compute dimensions ONCE and pass them to all sub-functions
+
+**File**: `R/validations.R`
+**Function**: `extract_and_validate_trend_components()` starting at line 2862
+
+**WHY**: This function is the single entry point for trend processing. Computing dimensions here and passing them down eliminates ALL redundant calls.
+
+**Actions**:
+1. Add dimensions computation at the beginning (after parameter validation):
+```r
+# Compute dimensions ONCE - this is the expensive operation we don't want to repeat
+dimensions <- extract_time_series_dimensions(
+  data, time_var, series_var, 
+  trend_type = if (is_multivariate_trend_specs(mv_spec$trend_specs)) {
+    first_spec <- mv_spec$trend_specs[[1]]
+    first_spec$trend_type %||% first_spec$trend_model %||% first_spec$trend
+  } else {
+    mv_spec$trend_specs$trend_type %||% mv_spec$trend_specs$trend_model %||% mv_spec$trend_specs$trend
+  },
+  trend_specs = mv_spec$trend_specs,
+  response_vars = response_vars,
+  cached_formulas = mv_spec$cached_formulas
+)
+```
+
+2. Modify the extract_trend_data call to use precomputed dimensions:
+```r
+result <- extract_trend_data(
+  data, mv_spec$base_formula, time_var, series_var,
+  response_vars = response_vars, 
+  .return_metadata = TRUE,
+  .precomputed_dimensions = dimensions  # Pass dimensions to avoid recomputation
+)
+```
+
+3. Modify the validate_time_series_for_trends call to use precomputed dimensions:
+```r
+validation_result <- validate_time_series_for_trends(
+  data, 
+  mv_spec$trend_specs,
+  response_vars = response_vars,
+  cached_formulas = mv_spec$cached_formulas,
+  .precomputed_dimensions = dimensions  # Pass dimensions to avoid recomputation
+)
+```
+
+**Expected result**: Dimensions computed exactly ONCE per request
+
+### Sub-Task B2: ✅ COMPLETED - Update extract_trend_data to accept precomputed dimensions
+
+**Objective**: Modify function to use precomputed dimensions instead of triggering recomputation
+
+**File**: `R/validations.R`  
+**Function**: `extract_trend_data()` starting at line 2947
+
+**WHY**: This function currently calls parse_trend_formula() which calls extract_time_series_dimensions(). We need to bypass this redundant call.
+
+**Actions**:
+1. Add new parameter `.precomputed_dimensions = NULL` to function signature
+2. Modify the logic to use precomputed dimensions when available:
+```r
+if (!is.null(.precomputed_dimensions)) {
+  # Use precomputed dimensions - skip parse_trend_formula call
+  trend_variables <- .precomputed_dimensions$metadata$covariates %||% character(0)
+  dimensions <- .precomputed_dimensions
+} else {
+  # Existing logic for backward compatibility
+  parsed_trend <- parse_trend_formula(trend_formula, data = data, response_vars = response_vars)
+  trend_variables <- parsed_trend$trend_variables %||% character(0)
+  dimensions <- parsed_trend$dimensions
+}
+```
+
+**Expected result**: Function uses precomputed dimensions, avoiding Path 1's redundant call
+
+### Sub-Task B3: ✅ COMPLETED - Update validate_time_series_for_trends to accept precomputed dimensions
+
+**Objective**: Modify function to use precomputed dimensions instead of calling extract_time_series_dimensions again
+
+**File**: `R/validations.R`
+**Function**: `validate_time_series_for_trends()` starting at line 1187
+
+**WHY**: This function currently calls extract_time_series_dimensions() at line 1227. We need to use precomputed dimensions instead.
+
+**Actions**:
+1. Add new parameter `.precomputed_dimensions = NULL` to function signature
+2. Modify the dimensions extraction logic:
+```r
+if (!is.null(.precomputed_dimensions)) {
+  # Use precomputed dimensions - skip extraction
+  dimensions <- .precomputed_dimensions
+} else {
+  # Existing logic for backward compatibility
+  dimensions <- extract_time_series_dimensions(
+    data = data,
+    time_var = time_var,
+    # ... existing parameters
+  )
+}
+```
+
+**Expected result**: Function uses precomputed dimensions, avoiding Path 2's redundant call
+
+### Sub-Task B4: ✅ COMPLETED - Update parse_trend_formula to accept precomputed dimensions
+
+**Objective**: Modify function to use precomputed dimensions instead of calling extract_time_series_dimensions
+
+**File**: `R/trend_system.R`
+**Function**: `parse_trend_formula()` around line 1697
+
+**WHY**: This function calls extract_time_series_dimensions() at line 1854. When called from extract_trend_data with precomputed dimensions, it should skip this.
+
+**Actions**:
+1. Add new parameter `.precomputed_dimensions = NULL` to function signature
+2. Modify the dimensions computation logic around line 1854:
+```r
+if (!is.null(.precomputed_dimensions)) {
+  # Use precomputed dimensions
+  trend_model$dimensions <- .precomputed_dimensions
+  trend_model$metadata <- .precomputed_dimensions$metadata
+} else if (!is.null(data)) {
+  # Only compute if not provided
+  dimensions <- extract_time_series_dimensions(...)
+  trend_model$dimensions <- dimensions
+  trend_model$metadata <- dimensions$metadata
+}
+```
+
+**Expected result**: Function uses precomputed dimensions when available
+
+### Sub-Task B5: ✅ COMPLETED - Test dependency injection implementation
+
+**Objective**: Verify that extract_time_series_dimensions() is called exactly ONCE per request
+
+**Actions**:
+1. Add debug logging to extract_time_series_dimensions() to count calls:
+```r
+if (Sys.getenv("MVGAM_DEBUG") == "TRUE") {
+  .mvgam_dimension_call_count <<- get0(".mvgam_dimension_call_count", ifnotfound = 0) + 1
+  cat("[DEBUG] extract_time_series_dimensions call #", .mvgam_dimension_call_count, "\n")
+}
+```
+2. Run `Rscript target_generation.R` with `MVGAM_DEBUG=TRUE`
+3. Verify each scenario shows exactly ONE call to extract_time_series_dimensions
+4. Confirm all scenarios generate successfully
+5. Remove debug counter code after verification
+
+**Expected result**: Performance improvement from single dimension computation per request
+
+## NEXT PRIORITY: Comprehensive Stancode and Standata Validation
+
+### Sub-Task C1: Parallel Subagent Analysis of All Generated Stan Files (45 minutes)
+
+**Objective**: Deploy parallel general-purpose subagents to comprehensively analyze all `current_stancode_*.stan` and `current_standata_*.rds` files in the `tasks/` directory to identify any discrepancies between Stan code declarations and actual data objects.
+
+**WHY THIS IS CRITICAL**: 
+- All 9 models now generate successfully (✅ confirmed)
+- Need to validate that Stan code declares correct data structures
+- Need to verify standata provides exactly what Stan code expects
+- Must catch dimension mismatches, missing variables, type errors before compilation
+
+**Architecture**:
+```
+Deploy 9 parallel subagents (one per model):
+├── Agent 1: Analyze current_stancode_1.stan + current_standata_1.rds
+├── Agent 2: Analyze current_stancode_2.stan + current_standata_2.rds  
+├── ...
+└── Agent 9: Analyze current_stancode_9.stan + current_standata_9.rds
+```
+
+**Each Subagent Must**:
+1. **READ** complete Stan code file (`.stan`)
+2. **READ** complete Stan data file (`.rds`)  
+3. **Extract** all data declarations from `data {}` block
+4. **Verify** each declared variable exists in standata with correct:
+   - Dimensions (e.g., `matrix[N_trend, K_trend] X_trend` → check `dim(standata$X_trend)`)
+   - Type (int, real, vector, matrix, array)
+   - Bounds (lower=0, upper=1, etc.)
+5. **Identify** any missing variables, dimension mismatches, or type errors
+6. **Report** findings with specific line numbers and variable names
+
+**Subagent Instructions Template**:
+```markdown
+TASK: Comprehensive Stan Code vs Stan Data Validation for Model {N}
+
+FILES TO ANALYZE:
+- Stan code: C:\Users\uqnclar2\OneDrive - The University of Queensland\Desktop\mvgam\tasks\current_stancode_{N}.stan
+- Stan data: C:\Users\uqnclar2\OneDrive - The University of Queensland\Desktop\mvgam\tasks\current_standata_{N}.rds
+
+REQUIREMENTS:
+1. READ both files completely
+2. Extract ALL variable declarations from `data {}` block in Stan code
+3. Load standata RDS file and verify each declared variable exists with correct dimensions/type
+4. Report any discrepancies with specific details:
+   - Variable name
+   - Expected (from Stan code)  
+   - Actual (from standata)
+   - Line number in Stan code where declared
+
+DO NOT modify files - READ and ANALYZE only.
+Provide comprehensive report of all findings.
+```
+
+**Expected Deliverables**:
+- 9 detailed reports identifying any Stan code/standata discrepancies
+- Specific variable names, dimensions, and line numbers for all issues found
+- Confirmation of which models have correct Stan code/standata alignment
+- Priority list of any issues that need immediate attention
+
+**Task Complete When**:
+- All 9 models analyzed by parallel subagents
+- Comprehensive validation reports received
+- Any critical discrepancies identified and prioritized
+- Stan compilation readiness assessed for all models
+
 ### Sub-Task A4: Handle Prediction Context with Attributes (15 minutes)
 
 **Objective**: Ensure prediction context applies same attribute-based logic to newdata

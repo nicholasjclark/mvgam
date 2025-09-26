@@ -237,6 +237,11 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
 
   # Parse response names from main formula using enhanced function
   response_names <- extract_response_names(formula)
+  
+  if (Sys.getenv("MVGAM_DEBUG") == "TRUE") {
+    cat("\n[DEBUG] parse_multivariate_trends:\n")
+    cat("  - extracted response_names:", if(!is.null(response_names)) paste(response_names, collapse=", ") else "NULL", "\n")
+  }
 
   # Handle response-specific trend formulas
   if (inherits(trend_formula, "brmsformula") ||

@@ -40,7 +40,7 @@
                                 "mvgam_single_dataset":  "mvgam_single_dataset \u003c- function(formula, trend_formula, data, backend, family, ...) {",
                                 "mvgam_single_imputation":  "mvgam_single_imputation \u003c- function(formula, trend_formula, data, backend, imputation_id, ...) {",
                                 "apply_rubins_rules":  "apply_rubins_rules \u003c- function(estimates_list) {",
-                                "create_mvgam_from_combined_fit":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL) {",
+                                "create_mvgam_from_combined_fit":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL, trend_metadata = NULL) {",
                                 "extract_trend_component_info":  "extract_trend_component_info \u003c- function(combined_fit, mv_spec) {",
                                 "subset_stanfit_parameters":  "subset_stanfit_parameters \u003c- function(stanfit, param_names) {",
                                 "create_observation_brmsfit":  "create_observation_brmsfit \u003c- function(combined_fit, obs_setup, mv_spec) {",

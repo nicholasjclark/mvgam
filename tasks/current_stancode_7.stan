@@ -56,7 +56,7 @@ transformed parameters {
   vector[N_1] r_1_1;
   // Prior log-probability accumulator
   real lprior = 0;
-  lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
+  lprior += student_t_lpdf(Intercept_trend | 3, -0.2, 2.5);
   lprior += dirichlet_lpdf(simo_1_trend | con_simo_1_trend);
   lprior += student_t_lpdf(Intercept | 3, 1.8, 2.5);
   lprior += student_t_lpdf(sd_1 | 3, 0, 2.5)

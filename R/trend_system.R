@@ -1694,12 +1694,15 @@ extract_regular_terms <- function(formula_terms) {
 #'
 #' @return List containing parsed formula components
 #' @noRd
-parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL) {
+parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL, .precomputed_dimensions = NULL) {
 
   # Input validation with brms-inspired error handling
   checkmate::assert_class(trend_formula, "formula")
   if (!is.null(response_vars)) {
     checkmate::assert_character(response_vars, min.len = 1, any.missing = FALSE)
+  }
+  if (!is.null(.precomputed_dimensions)) {
+    checkmate::assert_list(.precomputed_dimensions, names = "named")
   }
 
   # Safe formula parsing with try() like brms
@@ -1849,22 +1852,25 @@ parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL
     # Add regular_terms to trend_model for covariate extraction
     trend_model$regular_terms <- regular_terms
     
-    # Pass complete trend_model as trend_specs for full metadata extraction
-    # This enables extract_time_series_dimensions to access gr, subgr, n_lv, cor, ma, lags
-    dimensions <- extract_time_series_dimensions(
-      data = data,
-      time_var = trend_model$time %||% "time",
-      series_var = trend_model$series %||% "series", 
-      trend_type = trend_model$trend,
-      trend_specs = trend_model,  # Pass full object for complete metadata
-      response_vars = response_vars  # Pass response variables for multivariate series creation
-    )
+    # Use precomputed dimensions - no fallback in ultra-DRY architecture
+    if (!is.null(.precomputed_dimensions)) {
+      dimensions <- .precomputed_dimensions
+    } else if (!is.null(data)) {
+      stop(insight::format_error(
+        "Missing precomputed dimensions in ultra-DRY architecture.",
+        "When data is provided, precomputed dimensions must be supplied.",
+        "Check that calling function is passing dimensions correctly."
+      ), call. = FALSE)
+    } else {
+      # No data provided - dimensions not needed for formula parsing only
+      dimensions <- NULL
+    }
 
-    # Add dimensions to trend_model for filtering
-    trend_model$dimensions <- dimensions
-    
-    # Store metadata for prediction contexts
-    trend_model$metadata <- dimensions$metadata
+    # Add dimensions to trend_model for filtering if available
+    if (!is.null(dimensions)) {
+      trend_model$dimensions <- dimensions
+      trend_model$metadata <- dimensions$metadata
+    }
   }
 
   return(list(

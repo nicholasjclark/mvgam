@@ -25,19 +25,21 @@ setup_stan_test_data <- function() {
   )
 
   # Multivariate dataset with balanced design
-  # Create time-series-invariant covariates for trend formulas (one value per time-series combination)
-  timeseries_x <- rnorm(n_time * n_series)  # One x value per (time, series) combination
-  timeseries_presence <- rbinom(n_time * n_series, size = 1, prob = 0.7)  # One presence per (time, series)
-  timeseries_habitat <- factor(sample(c("forest", "grassland"), n_time * n_series, replace = TRUE))
+  # Create time-invariant covariates for trend formulas (constant within time-series groups)
+  # For multivariate data, series are created from response structure, so covariates
+  # must be constant within each time point across all response variables
+  time_presence <- rbinom(n_time, size = 1, prob = 0.7)  # One presence per time
+  time_x <- rnorm(n_time)  # One x value per time
+  time_habitat <- factor(sample(c("forest", "grassland"), n_time, replace = TRUE))  # One habitat per time
 
   multivariate <- data.frame(
     time = rep(1:n_time, n_series),
     #series = factor(rep(paste0("series", 1:n_series), each = n_time)),
     count = rpois(n_time * n_series, lambda = 4),
     biomass = rlnorm(n_time * n_series, meanlog = 1, sdlog = 0.5),
-    presence = timeseries_presence,  # One value per (time, series)
-    x = timeseries_x,  # One value per (time, series)
-    habitat = timeseries_habitat  # One value per (time, series)
+    presence = rep(time_presence, n_series),  # Same presence value for each time across all series
+    x = rep(time_x, n_series),  # Same x value for each time across all series  
+    habitat = rep(time_habitat, n_series)  # Same habitat for each time across all series
   )
 
   # Dataset with missing values
