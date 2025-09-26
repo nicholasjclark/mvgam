@@ -148,10 +148,11 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
     # Prepare trend data with validation and reduction using existing infrastructure
     trend_data <- data  # Default to full data
     if (!is.null(response_vars) && length(response_vars) > 0) {
-      # Validate trend covariates - will stop with error if validation fails
-      validate_trend_covariates(mv_spec$base_formula, response_vars, data)
-      validate_trend_invariance(data, mv_spec$base_formula, time_var, series_var) 
-      trend_data <- extract_trend_data(data, mv_spec$base_formula, time_var, series_var)
+      # Use consolidated validation and data extraction with metadata capture
+      result <- extract_trend_data(data, mv_spec$base_formula, time_var, series_var,
+                                  response_vars = response_vars, .return_metadata = TRUE)
+      trend_data <- result$trend_data
+      trend_metadata <- result$metadata
     }
     
     if (is.null(trend_result <- setup_brms_lightweight(
@@ -244,7 +245,8 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
     combined_components = combined_components,
     obs_setup = obs_setup,
     trend_setup = trend_setup,
-    mv_spec = mv_spec
+    mv_spec = mv_spec,
+    trend_metadata = if (exists("trend_metadata")) trend_metadata else NULL
   ))
 }
 

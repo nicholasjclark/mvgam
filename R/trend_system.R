@@ -1694,10 +1694,13 @@ extract_regular_terms <- function(formula_terms) {
 #'
 #' @return List containing parsed formula components
 #' @noRd
-parse_trend_formula <- function(trend_formula, data = NULL) {
+parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL) {
 
   # Input validation with brms-inspired error handling
   checkmate::assert_class(trend_formula, "formula")
+  if (!is.null(response_vars)) {
+    checkmate::assert_character(response_vars, min.len = 1, any.missing = FALSE)
+  }
 
   # Safe formula parsing with try() like brms
   tf_safe <- try(terms(trend_formula, keep.order = TRUE), silent = TRUE)
@@ -1815,18 +1818,53 @@ parse_trend_formula <- function(trend_formula, data = NULL) {
   # Since we enforce single trend type, trend_model is always the first component
   trend_model <- trend_components[[1]]
 
+  # Validate CAR restrictions early in parsing flow
+  # CAR models use irregular time intervals that vary by series,
+  # making shared trend covariates incompatible only in multivariate models
+  if (identical(trend_model$trend, "CAR") && length(regular_terms) > 0 && !is.null(data)) {
+    # Determine if this is a multivariate model by checking series count
+    series_var <- trend_model$series %||% "series"
+    time_var <- trend_model$time %||% "time"
+    
+    # Try to count series - if series column exists, count unique values
+    # If series column doesn't exist, assume univariate (single series)
+    n_series <- 1  # Default assumption for missing series column
+    if (series_var %in% names(data)) {
+      n_series <- length(unique(data[[series_var]]))
+    }
+    
+    # Only restrict CAR models with covariates if multivariate (n_series > 1)
+    if (n_series > 1) {
+      stop(insight::format_error(
+        "Multivariate CAR models cannot include trend covariates in {.field trend_formula}.",
+        "CAR models use irregular time intervals that vary by series in multivariate settings.",
+        "Remove covariates from the trend formula or use a different trend type.",
+        "Note: Univariate CAR models (single series) can include trend covariates."
+      ), call. = FALSE)
+    }
+  }
+
   # Calculate dimensions from data for proper parameter filtering
   if (!is.null(data)) {
-    # Use existing infrastructure to calculate dimensions
+    # Add regular_terms to trend_model for covariate extraction
+    trend_model$regular_terms <- regular_terms
+    
+    # Pass complete trend_model as trend_specs for full metadata extraction
+    # This enables extract_time_series_dimensions to access gr, subgr, n_lv, cor, ma, lags
     dimensions <- extract_time_series_dimensions(
       data = data,
-      time_var = trend_model$time,
-      series_var = trend_model$series,
-      trend_type = trend_model$trend
+      time_var = trend_model$time %||% "time",
+      series_var = trend_model$series %||% "series", 
+      trend_type = trend_model$trend,
+      trend_specs = trend_model,  # Pass full object for complete metadata
+      response_vars = response_vars  # Pass response variables for multivariate series creation
     )
 
     # Add dimensions to trend_model for filtering
     trend_model$dimensions <- dimensions
+    
+    # Store metadata for prediction contexts
+    trend_model$metadata <- dimensions$metadata
   }
 
   return(list(

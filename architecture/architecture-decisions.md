@@ -668,3 +668,71 @@ priors_obs_only <- get_prior(mvgam_formula(y ~ x), data = dat)
 **Forbidden in trend_formula**: All brms addition-terms (`offset()`, `weights()`, `cens()`, etc.) and brms autocorr (`ar()`, `ma()`, etc.)
 
 **User Documentation**: Complete list of forbidden terms and rationale documented in `?mvgam_formula` with examples of correct/incorrect usage patterns.
+
+### 19. Dual-Context Function Architecture for Validation and Prediction
+
+**Design Principle**: Functions that process trend metadata and data must work seamlessly in both fitting and prediction contexts to enable robust forecasting and model evaluation.
+
+**Architectural Pattern**:
+```r
+# Dual-context function signature
+function_name <- function(data, trend_formula = NULL, ..., 
+                         mvgam_object = NULL, newdata = NULL) {
+  if (!is.null(mvgam_object)) {
+    # PREDICTION CONTEXT: Use stored metadata from fitted object
+    metadata <- mvgam_object$trend_metadata
+    # Process newdata using stored requirements
+  } else {
+    # FITTING CONTEXT: Extract metadata from formulas and data
+    # Store metadata for future prediction use
+  }
+  # Common processing logic
+}
+```
+
+**Key Design Requirements**:
+1. **Context Detection**: Automatically detect context based on presence of `mvgam_object` parameter
+2. **Metadata Storage**: Store comprehensive trend metadata in fitted objects for prediction validation
+3. **Consistent Output**: Same output structure regardless of context
+4. **DRY Principle**: Single function with shared processing logic
+5. **Validation Consistency**: Same validation rules applied in both contexts
+
+**Metadata Storage Structure in mvgam Objects**:
+```r
+mvgam_object$trend_metadata <- list(
+  # Variable names for validation
+  variables = list(
+    time_var = "time",
+    series_var = "series", 
+    gr_var = "site",      # NULL if not used
+    subgr_var = "plot"    # NULL if not used
+  ),
+  
+  # Extracted covariates for prediction validation
+  covariates = c("temperature", "rainfall"),
+  
+  # Trend specification details
+  trend_type = "AR",
+  is_car = FALSE,
+  grouping_structure = "hierarchical",  # "series_only", "hierarchical", "nested_hierarchical"
+  
+  # Model parameters for forecasting
+  n_lv = 2,
+  cor = TRUE,
+  ma = FALSE, 
+  lags = c(1, 12)
+)
+```
+
+**Implementation Examples**:
+- `extract_trend_data()`: Dual-context data extraction (R/validations.R:2671)
+- `validate_trend_setup()`: Future master validation function
+- `extract_trend_metadata()`: Future unified metadata extraction
+
+**Benefits**:
+- **User Experience**: Consistent interface across fitting and prediction
+- **Maintainability**: Single function to maintain instead of separate fitting/prediction versions
+- **Robustness**: Prediction validation uses exactly the same metadata and rules as fitting
+- **Extensibility**: New trend types automatically support both contexts
+
+**Future Applications**: This pattern should be applied to all validation and data processing functions that will need to work during prediction, including hierarchical validation, CAR special handling, and metadata-driven processing.

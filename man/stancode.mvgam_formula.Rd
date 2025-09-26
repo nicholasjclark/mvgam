@@ -69,14 +69,24 @@ Default is \code{TRUE}.}
 \item{...}{Additional arguments passed to internal functions.}
 }
 \value{
-A character string containing complete Stan model code with data,
+A character string containing complete, polished Stan model code with data,
 parameters, model, and generated quantities blocks for both observation
-and trend components.
+and trend components. The returned code is automatically polished for
+consistent formatting and is identical to the code used internally by
+\code{mvgam()} for model fitting.
 }
 \description{
 Generate complete Stan model code for an \code{mvgam_formula} object before
 model fitting. This allows users to inspect the generated Stan code for
 debugging, understanding, or modification purposes.
+}
+\details{
+This function uses the shared Stan code generation infrastructure
+(\code{generate_stan_components_mvgam_formula()}) to ensure identical output
+to what \code{mvgam()} uses internally. The Stan code is automatically
+polished for consistent formatting, with empty lines removed and whitespace
+trimmed. This guarantees that \code{stancode()} produces exactly the same
+model code that would be compiled and fit by \code{mvgam()}.
 }
 \examples{
 \dontrun{

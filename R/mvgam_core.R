@@ -106,7 +106,8 @@ mvgam_single_dataset <- function(formula, trend_formula, data, backend,
     combined_fit = combined_fit,
     obs_setup = stan_components$obs_setup,
     trend_setup = stan_components$trend_setup,
-    mv_spec = stan_components$mv_spec
+    mv_spec = stan_components$mv_spec,
+    trend_metadata = stan_components$trend_metadata
   )
 
   return(mvgam_object)
@@ -200,11 +201,13 @@ fit_mvgam_model <- function(stancode, standata, backend = "cmdstanr", ...) {
 #' @noRd
 create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
                                           trend_setup = NULL,
-                                          mv_spec = NULL) {
+                                          mv_spec = NULL,
+                                          trend_metadata = NULL) {
   checkmate::assert_class(combined_fit, "stanfit")
   checkmate::assert_list(obs_setup, names = "named")
   checkmate::assert_list(trend_setup, names = "named", null.ok = TRUE)
   checkmate::assert_list(mv_spec, names = "named", null.ok = TRUE)
+  checkmate::assert_list(trend_metadata, names = "named", null.ok = TRUE)
 
   # Create observation brmsfit-like object
   obs_fit <- create_observation_brmsfit(combined_fit, obs_setup, mv_spec)
@@ -247,6 +250,9 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       trend_components = mvgam_components$trend_components,
       series_info = mvgam_components$series_info,
       time_info = mvgam_components$time_info,
+
+      # Trend metadata for prediction validation
+      trend_metadata = trend_metadata,
 
       # Compatibility metadata
       brms_version = utils::packageVersion("brms"),
@@ -796,7 +802,8 @@ mvgam_single_imputation <- function(formula, trend_formula, data, backend,
     combined_fit = combined_fit,
     obs_setup = obs_setup,
     trend_setup = trend_setup,
-    mv_spec = mv_spec
+    mv_spec = mv_spec,
+    trend_metadata = trend_setup$trend_metadata
   )
 
   return(mvgam_object)

@@ -29,162 +29,443 @@ When analyzing `current_stancode*` vs `target_stancode*` files:
 
 **AGENT TASK**: Your ONLY job is to read the existing files and report discrepancies with specific line numbers and code snippets.
 
-## TOP PRIORITY: Enhanced Dual-Context Trend Covariate System [INVESTIGATION COMPLETE]
+## CURRENT PRIORITY TASKS
 
-### Context from Investigation
-**Current System Analysis**:
-- ✅ `validate_trend_covariates()`, `validate_trend_invariance()`, `extract_trend_data()` exist in R/validations.R
-- ✅ `all.vars()` correctly handles complex expressions: `log(temp + 1)` → `"temp"`, `poly(temp, 2)` → `"temp"`
-- ❌ No hierarchical grouping (gr/subgr) support in validation 
-- ❌ No CAR formula restrictions enforced
-- ❌ No trend metadata storage for prediction contexts
-- ❌ Scattered validation calls need centralization
+### FUNDAMENTAL PROBLEM: Attribute-Based Time and Series Variables for Universal Grouping
 
-**Key Design Requirements**:
-- **No Backward Compatibility**: Complete redesign acceptable
-- **Dual-Context Support**: Same system handles fitting and prediction  
-- **Metadata Storage**: Store trend requirements in fitted objects for prediction validation
-- **Clean Integration**: Single entry point replaces scattered validation calls
+## WHY WE NEED ATTRIBUTE-BASED VARIABLES (Essential Understanding for Junior Developers)
 
-### Priority -5: **Extract and Store Trend Constructor Metadata**
-**TASK**: Parse complete trend metadata from constructors for dual-context use
-**SCOPE**:
-- Enhance `parse_trend_formula()` to extract gr/subgr from evaluated trend constructors  
-- Extract required covariates from regular_terms using existing `all.vars()` pattern
-- Create comprehensive metadata structure: grouping variables, covariates, trend type
-- Handle both shared trends and response-specific trend collections
-- Return structured metadata for storage in fitted objects
-**IMPLEMENTATION PATTERN**:
+**Universal Principle**: mvgam **ALWAYS** groups trend data by `(time, series)` using **attribute-based accessors** for ALL operations:
+
+1. **Covariate Invariance Validation**: Check that trend covariates are constant within each (time, series) combination
+2. **Trend Data Extraction**: Reduce data to unique (time, series) combinations for Stan `matrix[N_trend, K_trend] X_trend`
+3. **Prediction Processing**: Apply identical grouping logic to newdata
+
+**The Scenario 3 Problem Revealed**:
 ```r
-# Returns: list(
-#   trend_type = "AR", gr = "site", subgr = "plot", 
-#   covariates = c("temp", "rain"), is_car = FALSE,
-#   grouping_structure = "hierarchical" | "series_only"
-# )
+# target_generation.R line 26 shows the real issue:
+#series = factor(rep(paste0("series", 1:n_series), each = n_time)), ← COMMENTED OUT!
+
+# Scenario 3 setup:
+mf3 <- mvgam_formula(
+  bf(mvbind(count, biomass) ~ s(x)) + set_rescor(FALSE),
+  trend_formula = ~ presence + VAR(p = 2, ma = TRUE) 
+)
+
+# Test data structure:
+# - 72 observations, 24 time points
+# - NO series column (commented out in target_generation.R)
+# - Multivariate responses: count, biomass
+
+# Current failure:
+# extract_trend_data() tries to group by (time, series) → ERROR: no series column
+# Expected: CREATE series via attributes, then group using attribute accessors → correct dimensions
 ```
-**DELIVERABLE**: Complete trend metadata extraction system
-**TIME LIMIT**: 15 minutes
 
-### Priority -4: **Design Dual-Context extract_trend_data() System**
-**TASK**: Create unified data extraction for both fitting and prediction contexts
-**SCOPE**:
-- **Fitting Mode**: `extract_trend_data(data, trend_formula, time_var, series_var)`
-- **Prediction Mode**: `extract_trend_data(fitted_object, newdata)`
-- Auto-detect context based on first argument type (data.frame vs mvgam object)
-- Use stored metadata from fitted objects for prediction validation
-- Apply appropriate grouping: (time, series) vs (time, gr) vs (time, gr, subgr)
-- Handle missing combinations and irregular data appropriately
-**IMPLEMENTATION PATTERN**:
+**The Clean Solution**:
+- **Store time and series as attributes** - never contaminate original data
+- **Universal accessor functions** for all grouping operations
+- **Same attribute creation logic** for both fitting and prediction contexts
+
+## IMPLEMENTATION STRATEGY: Attribute-Based Variable System
+
+**Key Insight**: Store time and series variables as attributes, access via universal functions
+
+**Universal Interface**:
 ```r
-extract_trend_data <- function(x, ...) {
-  if (is.data.frame(x)) {
-    # Fitting context: x is data, ... contains trend_formula, etc.
-  } else if (inherits(x, "mvgam")) {
-    # Prediction context: x is fitted object, ... contains newdata
-    # Use x$trend_metadata for validation
+# All downstream code uses these - never direct data access:
+get_time_for_grouping(data)    # Returns attr(data, "mvgam_time")
+get_series_for_grouping(data)  # Returns attr(data, "mvgam_series") 
+
+# All grouping becomes:
+data %>% group_by(
+  time = get_time_for_grouping(data),
+  series = get_series_for_grouping(data)
+)
+```
+
+**Three Series Creation Strategies** (stored as attributes):
+1. **Explicit Series**: `attr(data, "mvgam_series") <- data[[series_var]]`
+2. **Hierarchical Series**: `attr(data, "mvgam_series") <- interaction(data[[gr_var]], data[[subgr_var]], sep='_')`  
+3. **Missing Series**: `attr(data, "mvgam_series") <- create_from_multivariate_structure(data, response_vars)`
+
+**Two Contexts Requiring Identical Logic**:
+1. **Fitting Context**: `data + trend_formula` → create attributes before processing
+2. **Prediction Context**: `mvgam_object + newdata` → apply same attribute creation to newdata
+
+### Sub-Task A1: ✅ COMPLETED - Create Universal Variable Attribute System
+
+**Objective**: Add core function to create time and series attributes, handling all three series creation strategies
+
+**File**: `R/validations.R`
+**Location**: Added after line 2534 (before `extract_trend_data()`)
+
+**Function Added**:
+```r
+# Universal attribute-based variable system for mvgam grouping
+ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time", series_var = "series", response_vars = NULL) {
+  checkmate::assert_data_frame(data)
+  checkmate::assert_string(time_var)
+  checkmate::assert_string(series_var)
+  
+  # Always create implicit time mapping for consistency (ALL MODELS)
+  checkmate::assert_names(names(data), must.include = time_var)
+  unique_times <- unique(data[[time_var]])
+  time_mapping <- setNames(seq_along(unique_times), unique_times)
+  attr(data, "mvgam_time") <- time_mapping[as.character(data[[time_var]])]
+  attr(data, "mvgam_time_source") <- "implicit"
+  attr(data, "mvgam_original_time") <- data[[time_var]]  # Store original for distance calculations
+  
+  # Three series creation strategies
+  series_values <- NULL
+  series_source <- NULL
+  
+  # Strategy 1: Hierarchical series (gr + subgr present)
+  if (!is.null(parsed_trend$trend_model)) {
+    gr_var <- if (!is.null(parsed_trend$trend_model$gr) && parsed_trend$trend_model$gr != "NA") parsed_trend$trend_model$gr else NULL
+    subgr_var <- if (!is.null(parsed_trend$trend_model$subgr) && parsed_trend$trend_model$subgr != "NA") parsed_trend$trend_model$subgr else NULL
+    
+    if (!is.null(gr_var) && !is.null(subgr_var)) {
+      checkmate::assert_names(names(data), must.include = c(gr_var, subgr_var))
+      series_values <- interaction(data[[gr_var]], data[[subgr_var]], drop = TRUE, sep = '_', lex.order = TRUE)
+      series_source <- "hierarchical"
+    }
+  }
+  
+  # Strategy 2: Explicit series (column exists)
+  if (is.null(series_values) && series_var %in% names(data)) {
+    series_values <- data[[series_var]]
+    series_source <- "explicit"
+  }
+  
+  # Strategy 3: Missing series (create from multivariate structure)
+  if (is.null(series_values)) {
+    if (!is.null(response_vars) && length(response_vars) > 1) {
+      # Multivariate case: create series from response structure
+      n_obs_per_response <- nrow(data) / length(response_vars)
+      if (n_obs_per_response == floor(n_obs_per_response)) {
+        series_values <- factor(rep(response_vars, each = n_obs_per_response))
+        series_source <- "multivariate"
+      } else {
+        stop(insight::format_error(
+          "Cannot create series from multivariate structure.",
+          "Data has {nrow(data)} observations but {length(response_vars)} responses.",
+          "Expected equal observations per response for automatic series creation."
+        ), call. = FALSE)
+      }
+    } else {
+      stop(insight::format_error(
+        "No series variable found in data.",
+        "Either provide {.field {series_var}} column, hierarchical grouping variables (gr and subgr), or specify response_vars for multivariate series creation."
+      ), call. = FALSE)
+    }
+  }
+  
+  # Store series as attribute
+  attr(data, "mvgam_series") <- series_values
+  attr(data, "mvgam_series_source") <- series_source
+  
+  return(data)
+}
+```
+
+**✅ COMPLETED**:
+- Function added to R/validations.R at lines 2536-2600
+- **Universal implicit time**: ALL models now use sequential time indices (1, 2, 3, ...) with original time preserved 
+- Handles all three series creation strategies via attributes
+- Uses checkmate validation per CLAUDE.md standards
+- Works for both fitting and prediction contexts
+
+### Sub-Task A2: ✅ COMPLETED - Add Universal Accessor Functions
+
+**Objective**: Add accessor functions to retrieve time and series from attributes
+
+**File**: `R/validations.R`
+**Location**: Added after `ensure_mvgam_variables()` function
+
+**Functions Added**:
+```r
+#' Get time variable for grouping operations
+#' 
+#' Retrieves implicit time indices from data attributes for consistent grouping
+#' 
+#' @param data Data frame with mvgam time attributes
+#' @return Numeric vector of sequential time indices (1, 2, 3, ...)
+#' @noRd
+get_time_for_grouping <- function(data) {
+  checkmate::assert_data_frame(data, min.rows = 1)
+  
+  time_values <- attr(data, "mvgam_time")
+  if (is.null(time_values)) {
+    stop(insight::format_error(
+      "No time variable attribute found.",
+      "Call ensure_mvgam_variables() first to create time attributes."
+    ), call. = FALSE)
+  }
+  
+  return(time_values)
+}
+
+#' Get series variable for grouping operations
+#' 
+#' Retrieves series values from data attributes for consistent grouping
+#' 
+#' @param data Data frame with mvgam series attributes
+#' @return Factor or character vector of series identifiers
+#' @noRd
+get_series_for_grouping <- function(data) {
+  checkmate::assert_data_frame(data, min.rows = 1)
+  
+  series_values <- attr(data, "mvgam_series")
+  if (is.null(series_values)) {
+    stop(insight::format_error(
+      "No series variable attribute found.",
+      "Call ensure_mvgam_variables() first to create series attributes."
+    ), call. = FALSE)
+  }
+  
+  return(series_values)
+}
+
+#' Check if mvgam variables are ready
+#' 
+#' Verifies that both time and series attributes exist on data object
+#' 
+#' @param data Data frame to check for mvgam attributes
+#' @return Logical indicating if both time and series attributes exist
+#' @noRd
+has_mvgam_variables <- function(data) {
+  checkmate::assert_data_frame(data)
+  !is.null(attr(data, "mvgam_time")) && !is.null(attr(data, "mvgam_series"))
+}
+
+#' Remove mvgam variable attributes
+#' 
+#' Cleans up all mvgam-related attributes from data object
+#' 
+#' @param data Data frame with mvgam attributes to remove
+#' @return Data frame with mvgam attributes removed
+#' @noRd
+remove_mvgam_variables <- function(data) {
+  checkmate::assert_data_frame(data)
+  attr(data, "mvgam_time") <- NULL
+  attr(data, "mvgam_time_source") <- NULL
+  attr(data, "mvgam_original_time") <- NULL
+  attr(data, "mvgam_series") <- NULL
+  attr(data, "mvgam_series_source") <- NULL
+  return(data)
+}
+```
+
+**✅ COMPLETED**:
+- All accessor functions added to R/validations.R at lines 2602-2671
+- **Roxygen documentation**: All functions have @noRd tags and proper documentation
+- **Enhanced checkmate validation**: Added `min.rows = 1` validation, `response_vars` parameter validation
+- Proper error handling using `insight::format_error()`
+- Helper functions for checking and cleanup included
+- Follows CLAUDE.md validation patterns
+
+### Sub-Task A3: ✅ COMPLETED - Update extract_trend_data() Fitting Context
+
+**Objective**: Modify extract_trend_data() to use attribute-based variables in fitting context
+
+**✅ COMPLETED**:
+- Modified `extract_trend_data()` to use attribute-based variables in fitting context
+- Implemented universal (time, series) grouping using `get_time_for_grouping()` and `get_series_for_grouping()`
+- Applied dplyr best practices: mutate-first pattern with `.data` pronouns
+- Fixed series validation to only require `time_var` (series can be created via attributes)
+- Fixed CAR validation to allow covariates for univariate models (n_series = 1)
+- Attributes cleaned up after processing using `remove_mvgam_variables()`
+
+### Sub-Task A3.1: 🔄 IN PROGRESS - Fix response_vars Parameter Threading
+
+**Objective**: Thread `response_vars` parameter through pipeline to enable multivariate series creation
+
+**✅ COMPLETED Threading**:
+- Extended `parse_trend_formula()` to accept `response_vars` parameter
+- Updated `extract_time_series_dimensions()` calls to pass `response_vars`
+- Modified `generate_obs_trend_mapping()` to accept and use `response_vars`
+- Extended `ensure_mvgam_variables()` to handle prediction context with metadata
+
+**🔄 REMAINING ISSUE - Critical**: 
+**ALL DOWNSTREAM FUNCTIONS must use attribute-based accessors after `ensure_mvgam_variables()` is called**
+
+**PROBLEM**: Multiple functions still try to access `data[[time_var]]` and `data[[series_var]]` directly after attributes are created, causing:
+- "undefined columns selected" errors
+- "No time variable attribute found" errors  
+- Data generation failures preventing X_trend dimension fixes
+
+**MANDATORY REQUIREMENT**: After `ensure_mvgam_variables(data, ...)` is called, ALL subsequent code must use:
+- ❌ **NEVER**: `data[[time_var]]` or `data[[series_var]]` 
+- ✅ **ALWAYS**: `get_time_for_grouping(data)` and `get_series_for_grouping(data)`
+
+**Remaining Locations to Fix** (found via `grep "data\[\[.*_var\]\]"`):
+- `R/validations.R:1613-1614`: `obs_trend_time <- match(obs_data[[time_var]], ...)`
+- `R/validations.R:2595,2597,2599`: Direct time access in `ensure_mvgam_variables()`  
+- `R/validations.R:396,2127,2139`: Series validation checks
+- Multiple other validation functions
+
+**Evidence**: Scenarios 6-7 (CAR) work, but 1-5, 8-9 fail because they hit these remaining direct access points.
+
+### Sub-Task A4: Handle Prediction Context with Attributes (15 minutes)
+
+**Objective**: Ensure prediction context applies same attribute-based logic to newdata
+
+**File**: `R/validations.R`
+**Location**: Lines 2584-2591 (prediction context section)
+
+**Add After Line 2591** (after grouping_vars extraction):
+```r
+# EXISTING (lines 2584-2591):
+# Get grouping variables from metadata
+grouping_vars <- character(0)
+if (!is.null(metadata$variables$gr_var) && metadata$variables$gr_var != "NA") {
+  grouping_vars <- c(grouping_vars, metadata$variables$gr_var)
+}
+if (!is.null(metadata$variables$subgr_var) && metadata$variables$subgr_var != "NA") {
+  grouping_vars <- c(grouping_vars, metadata$variables$subgr_var)
+}
+
+# ADD AFTER (new lines):
+# Apply same attribute creation to newdata using stored metadata
+if (length(grouping_vars) >= 2) {
+  # Hierarchical case: reconstruct parsed_trend structure
+  dummy_parsed_trend <- list(
+    trend_model = list(
+      gr = metadata$variables$gr_var,
+      subgr = metadata$variables$subgr_var
+    )
+  )
+  data <- ensure_mvgam_variables(data, dummy_parsed_trend, time_var, series_var)
+} else {
+  # Use stored series source to determine strategy
+  series_source <- metadata$series_source %||% "explicit"
+  if (series_source == "multivariate") {
+    # Apply same multivariate series creation
+    response_vars <- metadata$response_vars
+    data <- ensure_mvgam_variables(data, NULL, time_var, series_var, response_vars)
+  } else {
+    # Explicit series case
+    data <- ensure_mvgam_variables(data, list(trend_model = NULL), time_var, series_var)
   }
 }
 ```
-**DELIVERABLE**: Unified extraction system supporting both contexts
-**TIME LIMIT**: 15 minutes
 
-### Priority -3: **Implement Hierarchical Grouping Validation**  
-**TASK**: Enhance invariance validation for gr/subgr grouping structures
-**SCOPE**:
-- Modify `validate_trend_invariance()` to use metadata-driven grouping
-- **Series-only grouping**: Current (time, series) validation
-- **Hierarchical grouping (gr only)**: Validate invariance within (time, gr) groups
-- **Nested grouping (gr + subgr)**: Validate invariance within (time, gr, subgr) groups
-- Skip validation entirely for CAR models (no shared latent states)
-- Clear error messages explaining grouping requirements for shared latent states
-**DELIVERABLE**: Enhanced validation supporting all grouping patterns
-**TIME LIMIT**: 15 minutes
-
-### Priority -2: **Add CAR Model Formula Restrictions and Special Handling**
-**TASK**: Enforce CAR-specific limitations and skip inappropriate validation
-**SCOPE**:
-- Detect CAR constructors during trend parsing  
-- If CAR + non-empty regular_terms: error "CAR models cannot include trend covariates due to irregular time requirements"
-- Skip `validate_trend_invariance()` entirely for CAR models
-- Document that CAR uses series-specific evolution (no shared latent states)
-- Handle CAR in dual-context extraction (no grouping beyond series)
-**DELIVERABLE**: Complete CAR special handling with clear restrictions
-**TIME LIMIT**: 10 minutes
-
-### Priority -1: **Create validate_trend_setup() Master Function**
-**TASK**: Centralize all validation logic with metadata return
-**SCOPE**:
-- Single entry point replacing all scattered validation calls
-- Extract metadata from trend specifications automatically
-- Apply appropriate validation based on trend type (CAR vs others)
-- Return both validated trend data AND complete metadata structure  
-- Handle response-specific vs shared trend validation paths
-- Store metadata in format suitable for fitted object storage
-**IMPLEMENTATION PATTERN**:
+**Also Update Metadata Storage** (add to the metadata object around line 2780):
 ```r
-validate_trend_setup <- function(data, trend_formula, response_vars, time_var, series_var) {
-  metadata <- extract_trend_metadata(trend_formula)
-  if (metadata$is_car && length(metadata$covariates) > 0) stop("CAR restrictions...")
-  # Apply validation with metadata$grouping_structure
-  trend_data <- extract_trend_data(data, trend_formula, time_var, series_var)
-  list(trend_data = trend_data, metadata = metadata)
-}
+# ADD to metadata creation:
+metadata <- list(
+  # ... existing fields ...
+  time_source = attr(data, "mvgam_time_source"),  # Always "implicit" for universal time mapping
+  series_source = attr(data, "mvgam_series_source"),
+  response_vars = response_vars  # Store for prediction context
+)
 ```
-**DELIVERABLE**: Complete centralized validation with metadata output
-**TIME LIMIT**: 15 minutes
 
-### Priority 0: **Integrate Metadata Storage in mvgam Objects**
-**TASK**: Store trend metadata in fitted objects for prediction use
-**SCOPE**:
-- Modify mvgam fitting pipeline to store validation metadata
-- Add `trend_metadata` field to mvgam object structure
-- Include: grouping variables, required covariates, trend specifications
-- Enable prediction-time validation using stored metadata
-- Update object creation in `create_mvgam_from_combined_fit()` or similar
-**DELIVERABLE**: Fitted objects with complete trend metadata for prediction
-**TIME LIMIT**: 10 minutes
+**Task Complete When**:
+- Prediction context applies identical attribute creation to newdata
+- Stored metadata enables consistent series reconstruction
+- Both hierarchical and multivariate cases handled in prediction
+- newdata processed identically to original fitting data
 
-### Priority 1: **Replace Scattered Validation Calls**
-**TASK**: Clean integration of centralized system throughout codebase  
-**SCOPE**:
-- Replace validation calls in R/brms_integration.R setup_brms_lightweight()
-- Replace validation calls in R/make_stan.R generation functions
-- Use returned metadata for downstream processing
-- Remove redundant validation functions if no longer needed
-- Ensure clean flow from validation → metadata storage → prediction capability
-**DELIVERABLE**: Complete integration with no scattered validation calls
-**TIME LIMIT**: 10 minutes
+### Sub-Task A5: Update Architecture Documentation (15 minutes)
 
-### Priority 2: **Implement Prediction-Time Validation**
-**TASK**: Validate newdata against stored trend requirements
-**SCOPE**:
-- Use stored metadata to validate newdata structure in prediction contexts
-- Check required covariates present with same names/types
-- Validate grouping variable structure matches training data
-- Ensure time/series variables compatible with fitted model
-- Clear error messages for prediction-time validation failures
-- Integrate with existing prediction workflow seamlessly
-**DELIVERABLE**: Complete prediction validation using fitted object metadata
-**TIME LIMIT**: 15 minutes
+**Objective**: Update architecture documents to reflect attribute-based variable system
 
-### Priority 3: **Create Comprehensive Test Suite**
-**TASK**: Test all functionality with focus on dual-context behavior
-**SCOPE**:
-- Test fitting context: various grouping patterns, CAR restrictions, multivariate models
-- Test prediction context: metadata usage, newdata validation, error handling
-- Test edge cases: missing groups, complex formulas, response-specific trends
-- Test integration: end-to-end fitting → prediction workflow
-- Verify no regression in existing functionality
-**DELIVERABLE**: Complete test coverage for dual-context system  
-**TIME LIMIT**: 15 minutes
+**Files to Update**:
+1. `architecture/architecture-decisions.md`
+2. `architecture/stan-data-flow-pipeline.md`
 
-### Priority 4: **Documentation and Verification**
-**TASK**: Document new system and verify target compliance
-**SCOPE**:
-- Update roxygen documentation for all modified/new functions
-- Document dual-context usage patterns and metadata storage
-- Add examples showing prediction workflow with trend covariates
-- Run target_generation.R and verify all outputs match targets
-- Update architecture documentation with new validation flow
-**DELIVERABLE**: Fully documented and verified dual-context system
-**TIME LIMIT**: 10 minutes
+**Changes to architecture-decisions.md** (Section 5: Variable Name Management Architecture):
+```markdown
+### 5. Attribute-Based Variable System Architecture
+
+**Design Decision**: Use attribute-based time and series variable storage for universal (time, series) grouping without data contamination.
+
+**Key Principles**:
+- **Universal Grouping**: All trend processing uses (time, series) grouping via attribute accessors
+- **Zero Contamination**: Original data never modified - variables stored as attributes only
+- **Universal Implicit Time**: ALL models use sequential time indices (1, 2, 3, ...) with original time preserved
+- **Three Series Strategies**: Explicit, hierarchical, and multivariate series creation
+- **Dual Context**: Same logic for fitting (data + trend_formula) and prediction (mvgam_object + newdata)
+
+**Implementation Pattern**:
+```r
+# Step 1: Create attributes for time and series
+data <- ensure_mvgam_variables(data, parsed_trend, time_var, series_var, response_vars)
+
+# Step 2: Universal grouping using accessors
+data %>% group_by(
+  time = get_time_for_grouping(data),      # Sequential indices (1, 2, 3, ...)
+  series = get_series_for_grouping(data)   # Explicit/hierarchical/multivariate
+)
+
+# Step 3: Clean up attributes
+data <- remove_mvgam_variables(data)
+```
+
+**Time Creation Strategy (Universal)**:
+- **Implicit Time**: `attr(data, "mvgam_time") <- sequential indices mapped from unique times`
+- **Original Preserved**: `attr(data, "mvgam_original_time") <- data[[time_var]]` for CAR distance calculations
+
+**Series Creation Strategies**:
+- **Explicit**: `attr(data, "mvgam_series") <- data[[series_var]]`
+- **Hierarchical**: `attr(data, "mvgam_series") <- interaction(gr, subgr, sep='_')`
+- **Multivariate**: `attr(data, "mvgam_series") <- factor(rep(response_vars, each = n_obs_per_response))`
+```
+
+**Changes to stan-data-flow-pipeline.md** (add new section):
+```markdown
+### Stage 2.5: Attribute-Based Variable Standardization
+
+**Purpose**: Ensure universal (time, series) grouping using attribute-based variables with consistent time indexing
+
+**Process**:
+1. `extract_trend_data()` calls `ensure_mvgam_variables()` 
+2. Creates universal implicit time: `attr(data, "mvgam_time")` with sequential indices (1, 2, 3, ...)
+3. Preserves original time: `attr(data, "mvgam_original_time")` for CAR distance calculations
+4. Creates series: `attr(data, "mvgam_series")` using appropriate strategy (explicit/hierarchical/multivariate)
+5. All grouping uses `get_time_for_grouping()` and `get_series_for_grouping()`
+6. Attributes cleaned up after processing via `remove_mvgam_variables()`
+
+**Benefits**:
+- **Consistent Stan indexing**: All models use sequential time indices
+- **CAR model support**: Original time values available for distance matrices
+- **Scenario 3 fix**: Gets series from multivariate structure → X_trend[24, 2] correct dimensions
+```
+
+**Task Complete When**:
+- Both architecture documents updated with attribute-based system
+- All three series creation strategies documented
+- Examples show universal interface usage
+
+### Sub-Task A6: Validation and Testing (15 minutes)
+
+**Objective**: Verify scenario 3 fix and ensure no regressions in existing scenarios
+
+**Steps**:
+1. Run `target_generation.R` to test the new attribute system
+2. Check that scenario 3 creates series from multivariate structure
+3. Verify all scenarios work with attribute-based grouping
+4. Test both fitting and prediction contexts
+
+**Commands to Run**:
+```bash
+# Test the current implementation
+Rscript target_generation.R
+
+# Check scenario 3 dimensions specifically
+Rscript -e "data3 <- readRDS('tasks/current_standata_3.rds'); cat('X_trend dimensions:', dim(data3$X_trend), '\n')"
+
+# Check all generated data files exist
+ls -la tasks/current_standata_*.rds
+```
+
+**Task Complete When**:
+- Scenario 3: X_trend has dimensions [24, 2] (corrected from [72, 2])
+- All scenarios generate without errors
+- Both explicit and multivariate series creation work
+- No regressions in existing functionality
+
+**DELIVERABLE**: Attribute-based variable system that enables universal (time, series) grouping, fixing scenario 3 multivariate series creation while maintaining clean separation from original data.
+

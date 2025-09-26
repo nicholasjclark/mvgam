@@ -33,7 +33,12 @@
       "Bash(for func in validate_stan_code_fragment validate_combined_stancode apply_validation_rules validate_time_variable validate_series_variable)",
       "WebFetch(domain:mc-stan.org)",
       "Bash(where stanc)",
-      "Read(/C:\\Users\\uqnclar2\\Documents\\.cmdstan\\cmdstan-2.34.1/**)"
+      "Read(/C:\\Users\\uqnclar2\\Documents\\.cmdstan\\cmdstan-2.34.1/**)",
+      "WebFetch(domain:about.uq.edu.au)",
+      "WebFetch(domain:ecogambler.netlify.app)",
+      "WebFetch(domain:mathmarecol.github.io)",
+      "WebFetch(domain:www.physalia-courses.org)",
+      "WebFetch(domain:seonixbio.com)"
     ],
     "deny": [],
     "ask": [],

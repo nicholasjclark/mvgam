@@ -676,29 +676,34 @@ test_that("validate_trend_covariates prevents response variables in trend formul
 
   # Test valid trend formula (no response variables)
   expect_silent(
-    mvgam:::validate_trend_covariates(~ temperature, c("count", "biomass"), test_data)
+    mvgam:::extract_trend_data(test_data, ~ temperature, "time", "series", 
+                              response_vars = c("count", "biomass"))
   )
 
   # Test invalid trend formula (contains response variable)
   expect_error(
-    mvgam:::validate_trend_covariates(~ count + temperature, c("count", "biomass"), test_data),
+    mvgam:::extract_trend_data(test_data, ~ count + temperature, "time", "series",
+                              response_vars = c("count", "biomass")),
     "Response variables cannot be used as trend predictors"
   )
 
   # Test multiple response variables in trend formula
   expect_error(
-    mvgam:::validate_trend_covariates(~ count + biomass, c("count", "biomass"), test_data),
+    mvgam:::extract_trend_data(test_data, ~ count + biomass, "time", "series",
+                              response_vars = c("count", "biomass")),
     "count.*biomass"
   )
 
   # Test intercept-only formula (should pass)
   expect_silent(
-    mvgam:::validate_trend_covariates(~ 1, c("count", "biomass"), test_data)
+    mvgam:::extract_trend_data(test_data, ~ 1, "time", "series",
+                              response_vars = c("count", "biomass"))
   )
 
   # Test no-intercept formula (should pass)
   expect_silent(
-    mvgam:::validate_trend_covariates(~ -1, c("count", "biomass"), test_data)
+    mvgam:::extract_trend_data(test_data, ~ -1, "time", "series",
+                              response_vars = c("count", "biomass"))
   )
 })
 
@@ -713,11 +718,11 @@ test_that("validate_trend_invariance ensures covariates constant within groups",
 
   # Test valid invariant covariates
   expect_silent(
-    mvgam:::validate_trend_invariance(test_data_good, ~ temperature, "time", "series")
+    mvgam:::extract_trend_data(test_data_good, ~ temperature, "time", "series")
   )
 
   expect_silent(
-    mvgam:::validate_trend_invariance(test_data_good, ~ site_type, "time", "series")
+    mvgam:::extract_trend_data(test_data_good, ~ site_type, "time", "series")
   )
 
   # Create test data with varying covariates within groups
@@ -729,13 +734,13 @@ test_that("validate_trend_invariance ensures covariates constant within groups",
 
   # Test invalid varying covariates
   expect_error(
-    mvgam:::validate_trend_invariance(test_data_bad, ~ temperature, "time", "series"),
+    mvgam:::extract_trend_data(test_data_bad, ~ temperature, "time", "series"),
     "Trend covariates must be constant within \\(time, series\\) groups"
   )
 
   # Test missing variables
   expect_error(
-    mvgam:::validate_trend_invariance(test_data_good, ~ missing_var, "time", "series"),
+    mvgam:::extract_trend_data(test_data_good, ~ missing_var, "time", "series"),
     "Required variables for trend validation not found"
   )
 })
@@ -793,22 +798,26 @@ test_that("trend validation functions handle complex formula terms", {
 
   # Test smooth terms
   expect_silent(
-    mvgam:::validate_trend_covariates(~ s(x), c("count"), test_data)
+    mvgam:::extract_trend_data(test_data, ~ s(x), "time", "series",
+                              response_vars = c("count"))
   )
 
   # Test interaction terms
   expect_silent(
-    mvgam:::validate_trend_covariates(~ x * y, c("count"), test_data)
+    mvgam:::extract_trend_data(test_data, ~ x * y, "time", "series",
+                              response_vars = c("count"))
   )
 
   # Test polynomial terms
   expect_silent(
-    mvgam:::validate_trend_covariates(~ poly(x, 2), c("count"), test_data)
+    mvgam:::extract_trend_data(test_data, ~ poly(x, 2), "time", "series",
+                              response_vars = c("count"))
   )
 
   # Test factor terms
   expect_silent(
-    mvgam:::validate_trend_covariates(~ habitat, c("count"), test_data)
+    mvgam:::extract_trend_data(test_data, ~ habitat, "time", "series",
+                              response_vars = c("count"))
   )
 })
 
@@ -822,13 +831,14 @@ test_that("trend validation error messages are informative", {
 
   # Test response variable error message
   expect_error(
-    mvgam:::validate_trend_covariates(~ count, c("count"), test_data),
+    mvgam:::extract_trend_data(test_data, ~ count, "time", "series",
+                              response_vars = c("count")),
     "Response variables cannot be used as trend predictors.*count.*exogenous covariates"
   )
 
   # Test invariance error message
   expect_error(
-    mvgam:::validate_trend_invariance(test_data, ~ temperature, "time", "series"),
+    mvgam:::extract_trend_data(test_data, ~ temperature, "time", "series"),
     "constant within \\(time, series\\) groups.*temperature.*aggregating data"
   )
 })

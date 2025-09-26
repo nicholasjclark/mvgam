@@ -1645,6 +1645,17 @@
                                                       "is_s3_method":  true,
                                                       "arguments":  "object"
                                                   },
+                              "validate_trend_covariates":  {
+                                                                "s3_class":  "",
+                                                                "s3_method":  "",
+                                                                "signature":  "validate_trend_covariates \u003c- function(trend_formula, response_vars, data) {",
+                                                                "is_s3_method":  false,
+                                                                "arguments":  [
+                                                                                  "trend_formula",
+                                                                                  "response_vars",
+                                                                                  "data"
+                                                                              ]
+                                                            },
                               "reorganize_model_block_statements":  {
                                                                         "s3_class":  "",
                                                                         "s3_method":  "",
@@ -1655,7 +1666,7 @@
                               "setup_brms_lightweight":  {
                                                              "s3_class":  "",
                                                              "s3_method":  "",
-                                                             "signature":  "setup_brms_lightweight \u003c- function(formula, data, family = gaussian(), trend_formula = NULL, stanvars = NULL, prior = NULL, ...) {",
+                                                             "signature":  "setup_brms_lightweight \u003c- function(formula, data, family = gaussian(), trend_formula = NULL, stanvars = NULL, prior = NULL, is_trend_setup = FALSE, response_vars = NULL, time_var = \"time\", series_var = \"series\", ...) {",
                                                              "is_s3_method":  false,
                                                              "arguments":  [
                                                                                "formula",
@@ -3313,6 +3324,18 @@
                                                                      "bounds"
                                                                  ]
                                                },
+                              "extract_trend_data":  {
+                                                         "s3_class":  "",
+                                                         "s3_method":  "",
+                                                         "signature":  "extract_trend_data \u003c- function(data, trend_formula, time_var = \"time\", series_var = \"series\") {",
+                                                         "is_s3_method":  false,
+                                                         "arguments":  [
+                                                                           "data",
+                                                                           "trend_formula",
+                                                                           "time_var",
+                                                                           "series_var"
+                                                                       ]
+                                                     },
                               "get_best_prior_match":  {
                                                            "s3_class":  "",
                                                            "s3_method":  "",
@@ -3392,6 +3415,18 @@
                                                         "is_s3_method":  true,
                                                         "arguments":  "object"
                                                     },
+                              "validate_trend_invariance":  {
+                                                                "s3_class":  "",
+                                                                "s3_method":  "",
+                                                                "signature":  "validate_trend_invariance \u003c- function(data, trend_formula, time_var = \"time\", series_var = \"series\") {",
+                                                                "is_s3_method":  false,
+                                                                "arguments":  [
+                                                                                  "data",
+                                                                                  "trend_formula",
+                                                                                  "time_var",
+                                                                                  "series_var"
+                                                                              ]
+                                                            },
                               "extract_dependencies_from_declaration":  {
                                                                             "s3_class":  "",
                                                                             "s3_method":  "",
@@ -4185,6 +4220,9 @@
                                                 "remove_trend_expressions",
                                                 "is_multivariate_brmsfit",
                                                 "is_trend_term",
+                                                "validate_trend_covariates",
+                                                "validate_trend_invariance",
+                                                "extract_trend_data",
                                                 "patterns",
                                                 "patterns",
                                                 "patterns",
@@ -4978,6 +5016,7 @@
                       "stancode.mvgam_prefit":  "R/print.mvgam.R",
                       "stability.mvgam":  "R/stability.R",
                       "residual_cor.jsdgam":  "R/residual_cor.R",
+                      "validate_trend_covariates":  "R/validations.R",
                       "register_custom_trend":  "R/trend_system.R",
                       "add_residuals.mvgam":  "R/add_residuals.R",
                       "setup_brms_lightweight":  "R/brms_integration.R",
@@ -5148,6 +5187,7 @@
                       "extract_all_identifiers":  "R/mu_expression_analysis.R",
                       "extract_prior_string":  "R/priors.R",
                       "get_prior.mvgam_formula":  "R/priors.R",
+                      "extract_trend_data":  "R/validations.R",
                       "find_stan_block":  "R/stan_assembly.R",
                       "CAR":  "R/trend_system.R",
                       "plot_mvgam_resids":  "R/plot_mvgam_resids.R",
@@ -5157,6 +5197,7 @@
                       "plot.mvgam":  "R/plot.mvgam.R",
                       "get_parameter_type_default_prior":  "R/priors.R",
                       "get_prior.default":  "R/priors.R",
+                      "validate_trend_invariance":  "R/validations.R",
                       "extract_dependencies_from_declaration":  "R/stan_assembly.R",
                       "plottable":  "R/plot.mvgam.R",
                       "has_embedded_families":  "R/priors.R",
@@ -5355,6 +5396,7 @@
                                      "check_loop_requirement":  "R/mu_expression_analysis.R",
                                      "stancode.mvgam_prefit":  "R/print.mvgam.R",
                                      "stability.mvgam":  "R/stability.R",
+                                     "validate_trend_covariates":  "R/validations.R",
                                      "create_mvgam_trend":  "R/trend_system.R",
                                      "extract_time_series_dimensions":  "R/validations.R",
                                      "try_stanheaders_formatting":  "R/stan_polish.R",
@@ -5475,7 +5517,6 @@
                                      "extract_assignment_target":  "R/mu_expression_analysis.R",
                                      "plot_mvgam_randomeffects":  "R/plot_mvgam_randomeffects.R",
                                      "validate_univariate_series_time":  "R/validations.R",
-                                     "create_empty_brmsprior":  "R/priors.R",
                                      "stancode.mvgam":  "R/print.mvgam.R",
                                      "handle_nonlinear_trend_injection":  "R/stan_assembly.R",
                                      "print.mvgam":  "R/print.mvgam.R",
@@ -5490,6 +5531,7 @@
                                      "extract_response_names_from_brmsfit":  "R/stan_assembly.R",
                                      "extract_all_identifiers":  "R/mu_expression_analysis.R",
                                      "custom_trend":  "R/trend_system.R",
+                                     "extract_trend_data":  "R/validations.R",
                                      "get_best_prior_match":  "R/priors.R",
                                      "CAR":  "R/trend_system.R",
                                      "plot_mvgam_resids":  "R/plot_mvgam_resids.R",
@@ -5497,6 +5539,7 @@
                                      "generate_hierarchical_correlation_parameters":  "R/stan_assembly.R",
                                      "plot.mvgam":  "R/plot.mvgam.R",
                                      "get_parameter_type_default_prior":  "R/priors.R",
+                                     "validate_trend_invariance":  "R/validations.R",
                                      "extract_dependencies_from_declaration":  "R/stan_assembly.R",
                                      "has_embedded_families":  "R/priors.R",
                                      "generate_pw_trend_stanvars":  "R/stan_assembly.R",
@@ -5528,11 +5571,12 @@
                                      "print.mvgam_trend":  "R/trend_system.R",
                                      "validate_trend_factor_compatibility":  "R/validations.R",
                                      "loo_compare.mvgam":  "R/loo.mvgam.R",
-                                     "get_ar_parameter_prior":  "R/priors.R",
+                                     "create_empty_brmsprior":  "R/priors.R",
                                      "var_psi":  "R/irf.mvgam.R",
                                      "parse_base_formula_safe":  "R/validations.R",
                                      "validate_time_series_for_trends":  "R/validations.R",
                                      "extract_computed_variables":  "R/stan_assembly.R",
+                                     "get_ar_parameter_prior":  "R/priors.R",
                                      "extract_mu_assignment_lines":  "R/mu_expression_analysis.R",
                                      "summary.mvgam_fevd":  "R/mvgam_fevd-class.R",
                                      "ZMVN":  "R/trend_system.R",
@@ -5771,9 +5815,10 @@
                                 "stancode.mvgam_prefit":  "stancode.mvgam_prefit \u003c- function(object, ...) {",
                                 "stability.mvgam":  "stability.mvgam = function(object, ...) {",
                                 "residual_cor.jsdgam":  "residual_cor.jsdgam \u003c- function( object, summary = TRUE, robust = FALSE, probs = c(0.025, 0.975), ... ) {",
+                                "validate_trend_covariates":  "validate_trend_covariates \u003c- function(trend_formula, response_vars, data) {",
                                 "register_custom_trend":  "register_custom_trend \u003c- function(name, supports_factors = FALSE, generator_func, incompatibility_reason = NULL) {",
                                 "add_residuals.mvgam":  "add_residuals.mvgam = function(object, ...) {",
-                                "setup_brms_lightweight":  "setup_brms_lightweight \u003c- function(formula, data, family = gaussian(), trend_formula = NULL, stanvars = NULL, prior = NULL, ...) {",
+                                "setup_brms_lightweight":  "setup_brms_lightweight \u003c- function(formula, data, family = gaussian(), trend_formula = NULL, stanvars = NULL, prior = NULL, is_trend_setup = FALSE, response_vars = NULL, time_var = \"time\", series_var = \"series\", ...) {",
                                 "validate_multiple_imputation_datasets":  "validate_multiple_imputation_datasets \u003c- function(data_list) {",
                                 "try_stanheaders_formatting":  "try_stanheaders_formatting \u003c- function(stan_code, silent = TRUE, line_length = 80) {",
                                 "zmvn_trend_properties":  "zmvn_trend_properties \u003c- function() {",
@@ -5940,6 +5985,7 @@
                                 "extract_all_identifiers":  "extract_all_identifiers \u003c- function(expr) {",
                                 "extract_prior_string":  "extract_prior_string \u003c- function(prior_frame, class_name, coef_name = NULL, handle_suffix = TRUE) {",
                                 "get_prior.mvgam_formula":  "get_prior.mvgam_formula \u003c- function(object, data, family = gaussian(), ...) {",
+                                "extract_trend_data":  "extract_trend_data \u003c- function(data, trend_formula, time_var = \"time\", series_var = \"series\") {",
                                 "find_stan_block":  "find_stan_block \u003c- function(code_lines, block_name) {",
                                 "CAR":  "CAR = function(time = NA, series = NA) {",
                                 "plot_mvgam_resids":  "plot_mvgam_resids = function( object, series = 1, n_draws = 100L, n_points = 1000L ) {",
@@ -5949,6 +5995,7 @@
                                 "plot.mvgam":  "plot.mvgam = function( x, type = \u0027residuals\u0027, series = 1, residuals = FALSE, newdata, data_test, trend_effects = FALSE, ... ) {",
                                 "get_parameter_type_default_prior":  "get_parameter_type_default_prior \u003c- function(param_name) {",
                                 "get_prior.default":  "get_prior.default \u003c- function(object, ...) {",
+                                "validate_trend_invariance":  "validate_trend_invariance \u003c- function(data, trend_formula, time_var = \"time\", series_var = \"series\") {",
                                 "extract_dependencies_from_declaration":  "extract_dependencies_from_declaration \u003c- function(declaration) {",
                                 "has_embedded_families":  "has_embedded_families \u003c- function(formula) {",
                                 "generate_pw_trend_stanvars":  "generate_pw_trend_stanvars \u003c- function(trend_specs, data_info, growth = NULL, prior = NULL) {",
@@ -6476,11 +6523,6 @@
                                  "extract_expression_variables_comprehensive":  [
                                                                                     "classify_single_mu_expression_structurally"
                                                                                 ],
-                                 "extract_computed_variables":  [
-                                                                    "detect_glm_usage",
-                                                                    "find_stan_block",
-                                                                    "find_prior_only_insertion_point"
-                                                                ],
                                  "should_include_in_transformed_parameters":  [
                                                                                   "detect_glm_usage",
                                                                                   "find_stan_block",
@@ -6670,9 +6712,9 @@
                                  "extract_response_from_formula":  [
                                                                        "parse_nonlinear_manually"
                                                                    ],
-                                 "extract_and_rename_trend_parameters":  [
-                                                                             "extract_trend_stanvars_from_setup"
-                                                                         ],
+                                 "validate_trend_covariates":  [
+                                                                   "setup_brms_lightweight"
+                                                               ],
                                  "extract_hierarchical_info":  [
                                                                    "detect_glm_usage",
                                                                    "find_stan_block",
@@ -6768,9 +6810,17 @@
                                  "get_default_trend_parameter_prior":  [
                                                                            "create_trend_parameter_prior"
                                                                        ],
+                                 "validate_trend_invariance":  [
+                                                                   "setup_brms_lightweight"
+                                                               ],
                                  "extract_time_information":  [
                                                                   "extract_mvgam_components"
                                                               ],
+                                 "process_variable":  [
+                                                          "detect_glm_usage",
+                                                          "find_stan_block",
+                                                          "find_prior_only_insertion_point"
+                                                      ],
                                  "analyze_assignment_type":  [
                                                                  "analyze_expression_structure"
                                                              ],
@@ -6836,11 +6886,12 @@
                                  "validate_trend_formula_brms":  [
                                                                      "parse_multivariate_trends"
                                                                  ],
-                                 "process_variable":  [
-                                                          "detect_glm_usage",
-                                                          "find_stan_block",
-                                                          "find_prior_only_insertion_point"
-                                                      ],
+                                 "extract_trend_data":  [
+                                                            "setup_brms_lightweight"
+                                                        ],
+                                 "extract_and_rename_trend_parameters":  [
+                                                                             "extract_trend_stanvars_from_setup"
+                                                                         ],
                                  "normalize_trend_type":  [
                                                               "generate_monitor_params"
                                                           ],
@@ -6867,6 +6918,11 @@
                                                                  "analyze_variable_relationships_comprehensive",
                                                                  "extract_expression_variables_comprehensive"
                                                              ],
+                                 "extract_computed_variables":  [
+                                                                    "detect_glm_usage",
+                                                                    "find_stan_block",
+                                                                    "find_prior_only_insertion_point"
+                                                                ],
                                  "apply_rubins_rules":  [
                                                             "pool_mvgam_fits"
                                                         ],
@@ -6952,22 +7008,22 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-09-23 14:05:08",
+                     "generated":  "2025-09-24 16:15:21",
                      "commit_hash":  "pending",
-                     "cached_files":  53,
+                     "cached_files":  55,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
-                     "total_functions":  424,
+                     "total_functions":  427,
                      "exported_functions":  56,
                      "s3_methods_count":  37,
                      "s3_classes_count":  24,
                      "dynamic_references":  30,
                      "package_name":  "mvgam",
                      "potentially_unused_functions":  27,
-                     "changed_files":  2,
+                     "changed_files":  0,
                      "total_files":  55,
-                     "zero_dependency_functions":  333
+                     "zero_dependency_functions":  336
                  },
     "dependencies":  {
 
@@ -7085,9 +7141,12 @@
                                   "setup_brms_lightweight":  [
                                                                  "extract_brmsterms_from_setup",
                                                                  "extract_prior_from_setup",
+                                                                 "extract_trend_data",
                                                                  "parse_multivariate_trends",
                                                                  "validate_brms_formula",
-                                                                 "validate_setup_components"
+                                                                 "validate_setup_components",
+                                                                 "validate_trend_covariates",
+                                                                 "validate_trend_invariance"
                                                              ],
                                   "apply_rubins_rules":  "pool_parameter_estimates",
                                   "validate_list_trend_formula":  [

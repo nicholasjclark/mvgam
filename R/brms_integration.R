@@ -75,12 +75,11 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
 
   # Trend context handling - validate and reduce data if this is trend setup
   if (is_trend_setup && !is.null(trend_formula)) {
-    # Validate trend covariates using new infrastructure
-    validate_trend_covariates(trend_formula, response_vars, data)
-    validate_trend_invariance(data, trend_formula, time_var, series_var)
-    
-    # Extract reduced trend data (one row per time-series combination)
-    data <- extract_trend_data(data, trend_formula, time_var, series_var)
+    # Use consolidated validation and data extraction with metadata capture
+    result <- extract_trend_data(data, trend_formula, time_var, series_var,
+                                response_vars = response_vars, .return_metadata = TRUE)
+    data <- result$trend_data
+    trend_metadata <- result$metadata
     
     # Use trend formula as main formula for brms processing
     formula <- trend_formula
@@ -148,6 +147,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     brmsterms = extract_brmsterms_from_setup(mock_setup),
     brmsfit = mock_setup,  # Keep the mock brmsfit for prediction
     trend_specs = trend_specs,  # Include parsed trend specifications
+    trend_metadata = if (exists("trend_metadata")) trend_metadata else NULL,  # Include trend metadata if available
     setup_time = system.time({})[["elapsed"]] # Track performance
   )
 

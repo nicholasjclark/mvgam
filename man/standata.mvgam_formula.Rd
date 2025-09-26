@@ -54,13 +54,21 @@ variables, parameters, or functions.}
 }
 \value{
 A named list containing all data for Stan model including observation
-and trend data components. Structure matches what would be passed to Stan
-during fitting.
+and trend data components. Structure matches exactly what would be passed to
+Stan during fitting by \code{mvgam()}. This data is generated using the same
+shared infrastructure as \code{mvgam()}, ensuring complete consistency.
 }
 \description{
 Generate complete Stan data list for an \code{mvgam_formula} object before
 model fitting. This allows users to inspect the generated data structure for
 debugging, understanding, or modification purposes.
+}
+\details{
+This function uses the shared Stan data generation infrastructure
+(\code{generate_stan_components_mvgam_formula()}) to ensure identical output
+to what \code{mvgam()} uses internally. The returned data structure includes
+all observation data, trend mappings, dimensions, and stanvars needed for
+model compilation and fitting.
 }
 \examples{
 \dontrun{

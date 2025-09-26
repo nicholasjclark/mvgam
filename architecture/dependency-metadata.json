@@ -21,20 +21,20 @@
                                   "rstantools",
                                   "tibble"
                               ],
-    "generated":  "2025-09-23 14:05:08",
+    "generated":  "2025-09-24 16:15:21",
     "commit_hash":  "pending",
-    "cached_files":  53,
+    "cached_files":  55,
     "version":  "2.0.0",
     "commit_message":  "pre-commit analysis",
     "unanalyzed_functions":  0,
-    "total_functions":  424,
+    "total_functions":  427,
     "exported_functions":  56,
     "s3_methods_count":  37,
     "s3_classes_count":  24,
     "dynamic_references":  30,
     "package_name":  "mvgam",
     "potentially_unused_functions":  27,
-    "changed_files":  2,
+    "changed_files":  0,
     "total_files":  55,
-    "zero_dependency_functions":  333
+    "zero_dependency_functions":  336
 }
