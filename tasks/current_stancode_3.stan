@@ -274,12 +274,11 @@ model {
                                                           * N_lv_trend);
   init_trend ~ multi_normal(mu_init_trend, Omega_trend);
   array[N_trend] vector[N_lv_trend] mu_t_trend;
-  array[N_trend] vector[N_lv_trend] ma_error_trend;
   for (t in 1 : N_trend) {
     mu_t_trend[t] = rep_vector(0.0, N_lv_trend);
     for (i in 1 : 2) {
       if (t - i <= 0) {
-        int init_idx = 2 - (t - i) + 1;
+        int init_idx = 2 + 1 - i;
         if (init_idx > 0 && init_idx <= 2) {
           vector[N_lv_trend] lagged_lv;
           int start_idx = (init_idx - 1) * N_lv_trend + 1;
@@ -294,12 +293,12 @@ model {
     if (t - 1 <= 0) {
       mu_t_trend[t] += D_trend[1] * ma_init_trend;
     } else {
-      mu_t_trend[t] += D_trend[1] * ma_error_trend[t - 1];
+      mu_t_trend[t] += D_trend[1]
+                       * (lv_trend[t - 1,  : ]' - mu_t_trend[t - 1]);
     }
   }
   for (t in 1 : N_trend) {
     lv_trend[t,  : ]' ~ multi_normal(mu_t_trend[t], Sigma_trend);
-    ma_error_trend[t] = lv_trend[t,  : ]' - mu_t_trend[t];
   }
   for (lag in 1 : 2) {
     diagonal(A_raw_trend[lag]) ~ normal(Amu_trend[1, lag],

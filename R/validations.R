@@ -3109,7 +3109,6 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
     data <- ensure_mvgam_variables(data, parsed_trend, time_var, series_var, response_vars,
                                    metadata = list(trend_specs = trend_specs))
 
-    # Consolidated validation logic replacing scattered calls
     # Validate trend covariates don't include response variables
     if (!is.null(response_vars) && length(trend_variables) > 0) {
       offending_vars <- intersect(trend_variables, response_vars)
@@ -3134,9 +3133,20 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
                         identical(parsed_trend$trend_model$trend, "CAR")
 
       if (!skip_invariance) {
+        # Extract accessor values once to avoid duplication
+        time_vals <- get_time_for_grouping(data)
+        series_vals <- get_series_for_grouping(data)
+        
+        # Create temporary columns with unique names to avoid collisions
+        validation_data <- data %>%
+          dplyr::mutate(
+            .validation_time_temp = time_vals,
+            .validation_series_temp = series_vals
+          )
+        
         # Determine grouping structure from trend metadata
-        validation_grouping_vars <- c(time_var)
-
+        validation_grouping_vars <- character(0)
+        
         if (!is.null(parsed_trend$trend_model)) {
           has_gr <- !is.null(parsed_trend$trend_model$gr) &&
                     parsed_trend$trend_model$gr != "NA"
@@ -3144,49 +3154,50 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
                        parsed_trend$trend_model$subgr != "NA"
 
           if (has_gr && has_subgr) {
-            validation_grouping_vars <- c(validation_grouping_vars,
+            validation_grouping_vars <- c(".validation_time_temp",
                                          parsed_trend$trend_model$gr,
                                          parsed_trend$trend_model$subgr)
-            grouping_desc <- paste0("(", time_var, ", ",
+            grouping_desc <- paste0("(time, ",
                                    parsed_trend$trend_model$gr, ", ",
                                    parsed_trend$trend_model$subgr, ")")
           } else if (has_gr) {
-            validation_grouping_vars <- c(validation_grouping_vars,
+            validation_grouping_vars <- c(".validation_time_temp",
                                          parsed_trend$trend_model$gr)
-            grouping_desc <- paste0("(", time_var, ", ",
+            grouping_desc <- paste0("(time, ",
                                    parsed_trend$trend_model$gr, ")")
           } else {
-            # Only include series_var if it exists in data (not created via attributes)
-            if (series_var %in% names(data)) {
-              validation_grouping_vars <- c(validation_grouping_vars, series_var)
-            }
-            grouping_desc <- paste0("(", time_var, ", ", series_var, ")")
+            # Always use time and series from attributes
+            validation_grouping_vars <- c(".validation_time_temp", 
+                                         ".validation_series_temp")
+            grouping_desc <- "(time, series)"
           }
         } else {
-          # Only include series_var if it exists in data (not created via attributes)
-          if (series_var %in% names(data)) {
-            validation_grouping_vars <- c(validation_grouping_vars, series_var)
-          }
-          grouping_desc <- paste0("(", time_var, ", ", series_var, ")")
+          # Always use time and series from attributes
+          validation_grouping_vars <- c(".validation_time_temp", 
+                                       ".validation_series_temp")
+          grouping_desc <- "(time, series)"
         }
 
-        # Validate all required variables exist in data
-        required_vars <- unique(c(validation_grouping_vars, trend_variables))
-        missing_vars <- setdiff(required_vars, names(data))
-        if (length(missing_vars) > 0) {
+        # Validate trend variables exist (grouping vars are temporary)
+        missing_trend_vars <- setdiff(trend_variables, names(validation_data))
+        if (length(missing_trend_vars) > 0) {
           stop(insight::format_error(
             c(
-              "Required variables for trend validation not found in data:",
+              "Required trend variables not found in data:",
               "x" = paste("Missing: {.field",
-                         paste(missing_vars, collapse = "}, {.field"), "}"),
-              "i" = paste("Available:", paste(names(data), collapse = ", "))
+                         paste(missing_trend_vars, collapse = "}, {.field"), 
+                         "}"),
+              "i" = paste("Available:", 
+                         paste(names(data), collapse = ", "))
             )
           ), call. = FALSE)
         }
 
-        # Dynamic invariance validation using dplyr pattern
-        varying_covariates <- data %>%
-          dplyr::group_by(dplyr::across(dplyr::all_of(validation_grouping_vars))) %>%
+        # Dynamic invariance validation with proper line breaks
+        varying_covariates <- validation_data %>%
+          dplyr::group_by(
+            dplyr::across(dplyr::all_of(validation_grouping_vars))
+          ) %>%
           dplyr::summarise(
             dplyr::across(dplyr::all_of(trend_variables),
                          ~ length(unique(.x)) > 1),
@@ -3203,14 +3214,11 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
               paste0("Trend covariates must be constant within ",
                     grouping_desc, " groups:"),
               "x" = paste("Varying covariates: {.field",
-                         paste(varying_covariates, collapse = "}, {.field"), "}"),
+                         paste(varying_covariates, collapse = "}, {.field"), 
+                         "}"),
               "i" = paste0("Each ", grouping_desc,
                           " combination must have identical covariate values."),
-              "i" = if (grepl("series", grouping_desc)) {
-                "Consider aggregating data or using observation-level effects instead."
-              } else {
-                "Consider different grouping structure or observation-level effects."
-              },
+              "i" = "Consider aggregating data or using observation-level effects instead.",
               ">" = "See ?mvgam_data_structure for data preparation guidance."
             )
           ), call. = FALSE)

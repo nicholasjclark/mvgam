@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-09-26 12:39:35  
+**Generated:** 2025-09-26 22:05:26  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 55
-- **Total Functions:** 430
+- **Total Functions:** 432
 - **Exported Functions:** 56
-- **Internal Functions:** 388
+- **Internal Functions:** 390
 - **S3 Methods:** 37
 - **S3 Classes:** 24
 
@@ -138,8 +138,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/portal_data.R`** (0 functions) - Data documentation and loading
 
 ### Validation Files
-- **`R/validations.R`** (69 functions) - Input validation and checks
-  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_list_trend_formula, validate_single_trend_formula, validate_nonlinear_trend_compatibility, validate_required_variables (+ 54 more)
+- **`R/validations.R`** (71 functions) - Input validation and checks
+  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_list_trend_formula, validate_single_trend_formula, validate_nonlinear_trend_compatibility, validate_required_variables (+ 56 more)
 
 ### Core Files
 - **`R/mvgam_core.R`** (25 functions) - Core package functionality
@@ -745,10 +745,12 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **are_braces_balanced()** (internal)
 - **as_one_logical()** (internal)
 - **cache_formula_latent_params()** (internal)
+- **create_multivariate_series()** (internal)
 - **deparse0()** (internal)
 - **ensure_mvgam_variables()** (internal)
 - **eval_silent()** (internal)
 - **extract_all_bf_formulas()** (internal)
+- **extract_and_validate_trend_components()** (internal)
 - **extract_time_series_dimensions()** (internal)
 - **extract_trend_data()** (internal)
 - **filter_required_variables()** (internal)

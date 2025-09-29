@@ -3610,6 +3610,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Create transpose strings to avoid quote escaping issues in glue
   lv_transpose <- "lv_trend[t, :]'"
   lv_transpose_lag <- "lv_trend[t - i, :]'"
+  lv_transpose_prev <- "lv_trend[t - 1, :]'"
   
   var_model_stanvar <- brms::stanvar(
     name = "var_model",
@@ -3622,7 +3623,6 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
       // Conditional means for VARMA dynamics
       vector[N_lv_trend] mu_t_trend[N_trend];
-      {if(is_varma) glue::glue('vector[N_lv_trend] ma_error_trend[N_trend];  // MA error terms') else ''}
 
       // Compute conditional means for all time points
       for (t in 1:N_trend) {{
@@ -3632,7 +3632,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         for (i in 1:{lags}) {{
           if (t - i <= 0) {{
             // Use values from earlier than series start (from init_trend)
-            int init_idx = {lags} - (t - i) + 1;
+            int init_idx = {lags} + 1 - i;
             if (init_idx > 0 && init_idx <= {lags}) {{
               vector[N_lv_trend] lagged_lv;
               int start_idx = (init_idx - 1) * N_lv_trend + 1;
@@ -3652,8 +3652,8 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
           // Use initial MA error for first time point
           mu_t_trend[t] += D_trend[1] * ma_init_trend;
         }} else {{
-          // Use computed MA error from previous time point
-          mu_t_trend[t] += D_trend[1] * ma_error_trend[t - 1];
+          // Compute MA error inline (eliminates circular dependency)
+          mu_t_trend[t] += D_trend[1] * ({lv_transpose_prev} - mu_t_trend[t - 1]);
         }}
         ') else ''}
       }}
@@ -3661,7 +3661,6 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       // Latent variable dynamics
       for (t in 1:N_trend) {{
         {lv_transpose} ~ multi_normal(mu_t_trend[t], Sigma_trend);
-        {if(is_varma) paste0('// Compute MA error for next iteration\n        ma_error_trend[t] = ', lv_transpose, ' - mu_t_trend[t];') else ''}
       }}
 
       {var_priors_block}

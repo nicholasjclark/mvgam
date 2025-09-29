@@ -1,7 +1,7 @@
 ---
 name: stan-code-expert
 description: Always use this agent when Stan code needs inspection for syntax, performance, or style issues. Triggers: "review Stan code", "check Stan syntax", "Stan performance issues", "optimize Stan model", "Stan best practices". DO NOT invoke this agent for writing new models, explaining Stan concepts, or general Stan help. Agent provides structured code analysis with specific recommendations.
-tools: Read, web_search, mcp__context7, gh
+tools: Read, Grep, Glob, LS, repl, web_search, mcp__context7, gh
 color: purple
 ---
 
