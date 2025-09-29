@@ -242,44 +242,70 @@ ZMVN()            # trend = 'ZMVN'
 # Base type used for ALL dispatch throughout system
 ```
 
-### 4. Variable Name Management Architecture
+### 4. Attribute-Based Variable System Architecture
 
-- Store variable names in final mvgam object for clean downstream processing
+**Design Decision**: Use attribute-based time and series variable storage for universal (time, series) grouping without data contamination.
+
+**Key Principles**:
+- **Universal Grouping**: All trend processing uses (time, series) grouping via attribute accessors
+- **Zero Contamination**: Original data never modified - variables stored as attributes only
+- **Universal Implicit Time**: ALL models use sequential time indices (1, 2, 3, ...) with original time preserved
+- **Three Series Strategies**: Explicit, hierarchical, and multivariate series creation
+- **Dual Context**: Same logic for fitting (data + trend_formula) and prediction (mvgam_object + newdata)
+
+**Implementation Pattern**:
 ```r
-# Stored in final mvgam object
-variable_info = list(
-  trend = list(
-    series = "actual_series_col",    # from trend constructor
-    time = "actual_time_col",        # from trend constructor  
-    gr = "group_col",                # NULL if not specified
-    subgr = "subgroup_col"           # NULL if not specified
-  ),
-  response = list(
-    y = c("count", "biomass"),       # response variable names
-    # any other observation-specific variables
-  )
+# Step 1: Create attributes for time and series
+data <- ensure_mvgam_variables(data, parsed_trend, time_var, series_var, response_vars)
+
+# Step 2: Universal grouping using accessors
+data %>% group_by(
+  time = get_time_for_grouping(data),      # Sequential indices (1, 2, 3, ...)
+  series = get_series_for_grouping(data)   # Explicit/hierarchical/multivariate
 )
+
+# Step 3: Clean up attributes
+data <- remove_mvgam_variables(data)
 ```
 
-**Implementation Strategy**:
-- Validation functions use variable names from trend constructors
-- Final mvgam object stores complete variable mapping
-- Post-processing methods reference `variable_info`
+**Time Creation Strategy (Universal)**:
+- **Implicit Time**: `attr(data, "mvgam_time") <- sequential indices mapped from unique times`
+- **Original Preserved**: `attr(data, "mvgam_original_time") <- data[[time_var]]` for CAR distance calculations
 
-### 5. Data Ordering Architecture
+**Series Creation Strategies**:
+- **Explicit**: `attr(data, "mvgam_series") <- data[[series_var]]`
+- **Hierarchical**: `attr(data, "mvgam_series") <- interaction(gr, subgr, sep='_')`
+- **Multivariate**: `attr(data, "mvgam_series") <- factor(rep(response_vars, each = n_obs_per_response))`
 
-- Explicit data ordering for Stan without data pollution
-- **Separation of Concerns**: Keep validation logic separate from ordering logic
-- **No Data Pollution**: Never add tracking columns to the user's data
-- **Explicit Stan Requirements**: Data must be ordered by series then time for efficient Stan computation
-- **Metadata Preservation**: Store ordering information separately for post-processing restoration
-- **Single Point of Truth**: One function responsible for Stan data ordering
+**Core Functions (R/validations.R)**:
+- `ensure_mvgam_variables()`: Creates time and series attributes using appropriate strategy
+- `get_time_for_grouping()`: Universal time accessor for all grouping operations
+- `get_series_for_grouping()`: Universal series accessor for all grouping operations
+- `has_mvgam_variables()`: Checks if attributes are ready for processing
+- `remove_mvgam_variables()`: Cleans up all mvgam-related attributes
+
+**Benefits**:
+- **Consistent Stan indexing**: All models use sequential time indices
+- **CAR model support**: Original time values available for distance matrices  
+- **Multivariate series creation**: Handles missing series column by creating from response structure
+- **Zero data pollution**: Original data frame completely unmodified
+- **Prediction consistency**: Same attribute creation logic for fitting and prediction
+
+### 5. Data Ordering and Validation Architecture
+
+**Data Ordering for Stan**:
+- **Attribute-Based Ordering**: Uses `get_time_for_grouping()` and `get_series_for_grouping()` for consistent ordering
+- **Zero Data Pollution**: Original data never modified - all processing via attributes
+- **Stan Requirements**: Data ordered by series then time using attribute-based indices
+- **Metadata Preservation**: Original variable names and ordering stored separately for post-processing
+- **Single Point of Truth**: `ensure_mvgam_variables()` responsible for all variable standardization
 
 ### 6. Data Validation System for Trends
-**Entry Point**: `validate_time_series_for_trends()` calls `validate_series_time()` using variable names from trend constructors  
-**Core Validation**: `validate_series_time()` ensures time/series exist as factors, then calls `validate_grouping_structure()` for gr/subgr  
-**Factor Management**: `validate_factor_levels()` checks for unused levels; `validate_complete_grouping()` ensures hierarchical consistency  
-**Stan Preparation**: Data auto-dropping of unused levels and ordering (series-first, time-within-series) for efficient computation
+**Entry Point**: `validate_time_series_for_trends()` uses pre-computed dimensions and attribute-based variables
+**Attribute Creation**: `ensure_mvgam_variables()` creates time/series attributes using appropriate strategy (explicit/hierarchical/multivariate)
+**Core Validation**: `validate_series_time()` works with attribute-based variables via accessor functions
+**Factor Management**: `validate_factor_levels()` and `validate_complete_grouping()` ensure data consistency using attributes
+**Stan Preparation**: Data preparation uses attribute-based grouping for efficient Stan computation with original data preservation
 
 ### 7. Stanvars Combination Architecture
 
