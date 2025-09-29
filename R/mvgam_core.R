@@ -93,13 +93,78 @@ mvgam_single_dataset <- function(formula, trend_formula, data, backend,
     ...
   )
 
-  # Fit the combined model
-  combined_fit <- fit_mvgam_model(
-    stancode = stan_components$combined_components$stancode,
-    standata = stan_components$combined_components$standata,
+  # Fit the combined model using backend functions directly
+  dots <- list(...)
+  
+  # Extract fitting parameters with defaults
+  algorithm <- dots$algorithm %||% "sampling"
+  iter <- dots$iter %||% 2000
+  warmup <- dots$warmup %||% (iter %/% 2)
+  thin <- dots$thin %||% 1
+  chains <- dots$chains %||% 4
+  cores <- dots$cores %||% 1
+  threads <- dots$threads %||% NULL
+  opencl <- dots$opencl %||% NULL
+  init <- dots$init %||% "random"
+  exclude <- dots$exclude %||% NULL
+  seed <- dots$seed %||% sample.int(.Machine$integer.max, 1)
+  control <- dots$control %||% NULL
+  silent <- dots$silent %||% 1
+  future <- dots$future %||% FALSE
+  
+  # Validate and normalize parameters
+  silent <- validate_silent(silent)
+  threads <- validate_threads(threads)
+  opencl <- validate_opencl(opencl)
+  
+  # Parse/validate Stan code
+  validated_code <- parse_model(
+    model = stan_components$combined_components$stancode,
     backend = backend,
-    ...
+    silent = silent
   )
+  
+  # Compile Stan model
+  if (silent < 2) {
+    message("Compiling Stan model...")
+  }
+  compiled_model <- compile_model(
+    model = validated_code,
+    backend = backend,
+    threads = threads,
+    opencl = opencl,
+    silent = silent
+  )
+  
+  # Fit Stan model
+  if (silent < 2) {
+    message("Fitting Stan model...")
+  }
+  combined_fit <- fit_model(
+    model = compiled_model,
+    backend = backend,
+    sdata = stan_components$combined_components$standata,
+    algorithm = algorithm,
+    iter = iter,
+    warmup = warmup,
+    thin = thin,
+    chains = chains,
+    cores = cores,
+    threads = threads,
+    opencl = opencl,
+    init = init,
+    exclude = exclude,
+    seed = seed,
+    control = control,
+    silent = silent,
+    future = future
+  )
+  
+  # Store backend information for later use
+  attr(combined_fit, "backend") <- backend
+  attr(combined_fit, "algorithm") <- algorithm
+  attr(combined_fit, "mvgam_version") <- utils::packageVersion("mvgam")
+  attr(combined_fit, "fit_time") <- Sys.time()
 
   # Create mvgam object from combined fit - now we have all required components
   mvgam_object <- create_mvgam_from_combined_fit(
@@ -164,19 +229,6 @@ generate_combined_stancode_and_data <- function(obs_setup, trend_setup, mv_spec,
 # Orchestrates the actual Stan model fitting using the appropriate backend
 # while maintaining compatibility with both rstan and cmdstanr.
 
-#' Fit mvgam Model Using Stan
-#' @param stancode Stan model code
-#' @param standata Stan data list
-#' @param backend Stan backend to use
-#' @param ... Additional Stan fitting arguments
-#' @return Stan fit object
-#' @noRd
-fit_mvgam_model <- function(stancode, standata, backend = "cmdstanr", ...) {
-
-  # This is a placeholder for actual Stan fitting
-  # Real implementation would use rstan or cmdstanr to fit the model
-  stop("This function is not yet operational")
-}
 
 # ==============================================================================
 # DUAL OBJECT SYSTEM: BRMSFIT-LIKE STRUCTURE FROM COMBINED FIT

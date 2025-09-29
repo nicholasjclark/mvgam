@@ -60,12 +60,10 @@ Suggests:
     knitr, 
     collapse,
     rmarkdown, 
-    rjags,
-    coda,
-    runjags,
     usethis,
     testthat,
-    colorspace
+    colorspace,
+    future
 Enhances:
     gratia (>= 0.9.0),
     tidyr
