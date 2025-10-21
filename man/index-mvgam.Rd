@@ -20,8 +20,7 @@
 \item{...}{Arguments passed to individual methods (if applicable).}
 }
 \value{
-a \code{list} object of the variables that can be extracted, along
-with their aliases
+a character vector of parameter names
 }
 \description{
 Index \code{mvgam} objects

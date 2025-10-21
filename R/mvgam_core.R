@@ -27,10 +27,8 @@
 #' @export
 mvgam <- function(formula, trend_formula = NULL, data = NULL,
                            backend = getOption("brms.backend", "cmdstanr"),
-                           combine = TRUE, family = poisson(), ...) {
+                           combine = TRUE, family = gaussian(), ...) {
 
-  # Input validation
-  checkmate::assert_formula(formula)
   checkmate::assert(
     checkmate::check_data_frame(data),
     checkmate::check_list(data, types = "data.frame"),
@@ -51,7 +49,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   }
 
   # Single dataset processing
-  mvgam_object <- mvgam_single_dataset(
+  mvgam_object <- mvgam_single(
     formula = formula,
     trend_formula = trend_formula,
     data = data,
@@ -78,8 +76,8 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
 #' @param ... Additional arguments
 #' @return mvgam object
 #' @noRd
-mvgam_single_dataset <- function(formula, trend_formula, data, backend,
-                                family, ...) {
+mvgam_single <- function(formula, trend_formula, data, backend,
+                        family, ...) {
 
   # Create mvgam_formula object for shared processing
   mvgam_formula_obj <- mvgam_formula(formula, trend_formula)
@@ -231,25 +229,18 @@ generate_combined_stancode_and_data <- function(obs_setup, trend_setup, mv_spec,
 
 
 # ==============================================================================
-# DUAL OBJECT SYSTEM: BRMSFIT-LIKE STRUCTURE FROM COMBINED FIT
+# MVGAM OBJECT CREATION FROM COMBINED FIT
 # ==============================================================================
-# Creates the dual-object mvgam structure that provides separate brmsfit-like
-# interfaces for observation and trend components while maintaining ecosystem
-# compatibility and enabling specialized plotting/prediction methods.
+# Creates mvgam object from combined Stan fit with complete parameter map.
 
 #' Create mvgam Object from Combined Stan Fit
 #'
-#' @description
-#' Creates the dual-object mvgam structure from a single Stan fit containing
-#' both observation and trend components. This enables seamless brms ecosystem
-#' integration while preserving mvgam-specific functionality.
-#'
 #' @param combined_fit Stan fit object from combined model
-#' @param obs_setup brms setup components for observation model
-#' @param trend_setup brms setup components for trend model
-#' @param mv_spec Multivariate trend specification from
-#'   parse_multivariate_trends()
-#' @return mvgam object with dual brmsfit-like structure
+#' @param obs_setup Observation model setup components
+#' @param trend_setup Trend model setup components
+#' @param mv_spec Multivariate trend specification
+#' @param trend_metadata Trend metadata for prediction
+#' @return mvgam object
 #' @noRd
 create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
                                           trend_setup = NULL,
@@ -261,52 +252,30 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
   checkmate::assert_list(mv_spec, names = "named", null.ok = TRUE)
   checkmate::assert_list(trend_metadata, names = "named", null.ok = TRUE)
 
-  # Create observation brmsfit-like object
-  obs_fit <- create_observation_brmsfit(combined_fit, obs_setup, mv_spec)
-
-  # Create trend brmsfit-like object (if trends exist)
-  trend_fit <- if (!is.null(trend_setup) && !is.null(mv_spec$has_trends) &&
-                  mv_spec$has_trends) {
-    create_trend_brmsfit(combined_fit, trend_setup, mv_spec)
-  } else {
-    NULL
-  }
-
-  # Extract mvgam-specific components
   mvgam_components <- extract_mvgam_components(combined_fit, obs_setup,
                                               trend_setup, mv_spec)
 
-  # Create main mvgam object
+  backend <- attr(combined_fit, "backend") %||% "rstan"
+
   mvgam_object <- structure(
     list(
-      # Core components
-      obs_fit = obs_fit,
-      trend_fit = trend_fit,
-      combined_fit = combined_fit,
-
-      # Model specifications
+      fit = combined_fit,
       formula = obs_setup$formula,
       trend_formula = if (!is.null(trend_setup)) trend_setup$formula else NULL,
       family = obs_setup$family,
-
-      # Data and setup
+      prior = obs_setup$prior,
       data = obs_setup$data,
       stancode = obs_setup$stancode,
       standata = obs_setup$standata,
-
-      # Multivariate specifications
+      exclude = c("lprior", "lp__"),
       mv_spec = mv_spec,
       response_names = mv_spec$response_names %||% NULL,
-
-      # mvgam-specific components
       trend_components = mvgam_components$trend_components,
       series_info = mvgam_components$series_info,
       time_info = mvgam_components$time_info,
-
-      # Trend metadata for prediction validation
       trend_metadata = trend_metadata,
-
-      # Compatibility metadata
+      backend = backend,
+      algorithm = combined_fit@sim$algorithm %||% "sampling",
       brms_version = utils::packageVersion("brms"),
       mvgam_version = utils::packageVersion("mvgam"),
       creation_time = Sys.time()
@@ -314,202 +283,14 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
     class = c("mvgam", "brmsfit")
   )
 
-  # Add model comparison methods compatibility
   mvgam_object$criteria <- list()
-
-  # Store call information
   mvgam_object$call <- match.call(sys.function(sys.parent()),
                                  sys.call(sys.parent()))
 
   return(mvgam_object)
 }
 
-# ------------------------------------------------------------------------------
-# OBSERVATION BRMSFIT CREATION
-# ------------------------------------------------------------------------------
-# Creates brmsfit-like objects for observation model components, enabling
-# full compatibility with brms ecosystem tools and methods.
 
-#' Create Observation brmsfit-like Object
-#' @param combined_fit Stan fit with combined model
-#' @param obs_setup Observation model setup components
-#' @param mv_spec Multivariate specification
-#' @return brmsfit-like object for observations
-#' @noRd
-create_observation_brmsfit <- function(combined_fit, obs_setup, mv_spec) {
-  # Extract observation-specific parameters from combined fit
-  obs_params <- extract_observation_parameters(combined_fit)
-
-  # Create brmsfit structure
-  obs_brmsfit <- structure(
-    list(
-      # Stan fit with observation parameters only
-      fit = subset_stanfit_parameters(combined_fit, obs_params$names),
-
-      # Model components
-      formula = obs_setup$formula,
-      data = obs_setup$data,
-      family = obs_setup$family,
-      prior = obs_setup$prior,
-
-      # Stan components (observation-focused)
-      stancode = obs_setup$stancode,
-      standata = obs_setup$standata,
-
-      # Metadata
-      algorithm = combined_fit@sim$algorithm %||% "sampling",
-      backend = "cmdstanr", # Will be updated based on actual backend
-      version = brms::brms_version()
-    ),
-    class = c("brmsfit")
-  )
-
-  return(obs_brmsfit)
-}
-
-# ------------------------------------------------------------------------------
-# TREND BRMSFIT CREATION
-# ------------------------------------------------------------------------------
-# Creates brmsfit-like objects for trend model components, allowing specialized
-# trend analysis while maintaining brms ecosystem compatibility.
-
-#' Create Trend brmsfit-like Object
-#' @param combined_fit Stan fit with combined model
-#' @param trend_setup Trend model setup components
-#' @param mv_spec Multivariate specification
-#' @return brmsfit-like object for trends
-#' @noRd
-create_trend_brmsfit <- function(combined_fit, trend_setup, mv_spec) {
-  # Extract trend-specific parameters from combined fit
-  trend_params <- extract_trend_parameters(combined_fit, mv_spec)
-
-  # Create brmsfit structure for trends
-  trend_brmsfit <- structure(
-    list(
-      # Stan fit with trend parameters only
-      fit = subset_stanfit_parameters(combined_fit, trend_params$names),
-
-      # Model components
-      formula = trend_setup$formula,
-      data = trend_setup$data,
-      family = gaussian(), # Trends are typically gaussian processes
-      prior = trend_setup$prior,
-
-      # Stan components (trend-focused)
-      stancode = trend_setup$stancode,
-      standata = trend_setup$standata,
-
-      # Trend-specific metadata
-      trend_specs = mv_spec$trend_specs,
-      trend_types = trend_params$types,
-
-      # Standard metadata
-      algorithm = combined_fit@sim$algorithm %||% "sampling",
-      backend = "cmdstanr",
-      version = brms::brms_version()
-    ),
-    class = c("brmsfit")
-  )
-
-  return(trend_brmsfit)
-}
-
-# ------------------------------------------------------------------------------
-# PARAMETER EXTRACTION
-# ------------------------------------------------------------------------------
-# Extracts and categorizes parameters from combined Stan fit to enable proper
-# separation into observation and trend components for ecosystem compatibility.
-
-#' Extract Observation Parameters from Combined Fit
-#' @param combined_fit Stan fit object
-#' @return List with observation parameter names and metadata
-#' @noRd
-extract_observation_parameters <- function(combined_fit) {
-  all_params <- combined_fit@sim$pars_oi
-
-  # Identify observation parameters (brms conventions)
-  # NOTE: These parameter naming patterns are based on brms 2.x conventions.
-  # brms 3.0 may introduce naming changes
-  # (see: https://github.com/paul-buerkner/brms/milestone/20)
-  # This extraction logic should be reviewed and updated when brms 3.0 is
-  # released to ensure compatibility with any new parameter naming schemes.
-  obs_patterns <- c(
-    "^b_",          # Fixed effects
-    "^sd_",         # Random effects standard deviations
-    "^cor_",        # Correlations
-    "^r_",          # Random effects
-    "^s_",          # Smooth terms
-    "^sds_",        # Smooth standard deviations
-    "^sigma",       # Error terms
-    "^shape",       # Shape parameters
-    "^nu",          # Degrees of freedom
-    "^phi",         # Dispersion parameters
-    "lp__",         # Log posterior
-    "lprior"        # Log prior
-  )
-
-  obs_params <- all_params[grepl(paste(obs_patterns, collapse = "|"),
-                                all_params)]
-
-  return(list(
-    names = obs_params,
-    count = length(obs_params)
-  ))
-}
-
-#' Extract Trend Parameters from Combined Fit
-#' @param combined_fit Stan fit object
-#' @param mv_spec Multivariate specification
-#' @return List with trend parameter names and metadata
-#' @noRd
-extract_trend_parameters <- function(combined_fit, mv_spec) {
-  all_params <- combined_fit@sim$pars_oi
-
-  # Identify trend parameters (mvgam conventions)
-  trend_patterns <- c(
-    "^trend",        # Trend states
-    "^sigma_trend",  # Trend innovations
-    "^ar_trend",     # AR coefficients
-    "^A_trend",      # VAR coefficients
-    "^theta_trend",  # MA coefficients
-    "^mu_trend",     # Trend linear predictors
-    "^L_trend",      # Cholesky factors for correlations
-    "^rho_trend"     # Correlation parameters
-  )
-
-  trend_params <- all_params[grepl(paste(trend_patterns, collapse = "|"),
-                                  all_params)]
-
-  # Identify trend types from specifications
-  trend_types <- if (!is.null(mv_spec$trend_specs)) {
-    sapply(mv_spec$trend_specs, function(spec) {
-      if (inherits(spec, "mvgam_trend")) {
-        spec$trend_type
-      } else {
-        "unknown"
-      }
-    })
-  } else {
-    NULL
-  }
-
-  return(list(
-    names = trend_params,
-    count = length(trend_params),
-    types = trend_types
-  ))
-}
-
-#' Subset Stan Fit to Specific Parameters
-#' @param stanfit Original Stan fit object
-#' @param param_names Character vector of parameter names to keep
-#' @return Stan fit object with subset of parameters
-#' @noRd
-subset_stanfit_parameters <- function(stanfit, param_names) {
-  # This is a placeholder - actual implementation would require
-  # creating a new stanfit object with subset of parameters
-  stop("This function is not yet operational")
-}
 
 # ------------------------------------------------------------------------------
 # COMPONENT EXTRACTION
@@ -640,7 +421,6 @@ extract_trend_component_info <- function(combined_fit, mv_spec) {
 #' @noRd
 mvgam_multiple <- function(formula, trend_formula = NULL, data_list,
                           backend = NULL, combine = TRUE, ...) {
-  checkmate::assert_formula(formula)
   checkmate::assert_list(data_list, min.len = 2, types = "data.frame")
   checkmate::assert_logical(combine, len = 1)
 

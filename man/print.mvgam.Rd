@@ -4,23 +4,22 @@
 \alias{print.mvgam}
 \title{Print a fitted \pkg{mvgam} object}
 \usage{
-\method{print}{mvgam}(x, ...)
+\method{print}{mvgam}(x, digits = 2, ...)
 }
 \arguments{
-\item{x}{\code{list} object returned from \code{mvgam}}
+\item{x}{\code{mvgam} object returned from \code{mvgam()}}
 
-\item{...}{Ignored}
+\item{digits}{Integer for decimal places. Currently unused for
+consistency with brms.}
+
+\item{...}{Additional arguments (unused)}
 }
 \value{
-A \code{list} is printed on-screen
+The \code{mvgam} object is returned invisibly.
 }
 \description{
-This function takes a fitted \code{mvgam} or \code{jsdgam} object and prints
-a quick summary.
+Print a fitted \pkg{mvgam} object
 }
-\details{
-A brief summary of the model's call is printed
-}
-\author{
-Nicholas J Clark
+\seealso{
+\code{\link{summary.mvgam}}, \code{\link{mvgam}}
 }

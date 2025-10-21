@@ -1,27 +1,69 @@
 #' Print a fitted \pkg{mvgam} object
 #'
-#' This function takes a fitted \code{mvgam} or \code{jsdgam} object and prints
-#' a quick summary.
+#' @param x \code{mvgam} object returned from \code{mvgam()}
+#' @param digits Integer for decimal places. Currently unused for
+#'   consistency with brms.
+#' @param ... Additional arguments (unused)
 #'
-#' @param x \code{list} object returned from \code{mvgam}
-#' @param ... Ignored
-#' @details A brief summary of the model's call is printed
-#' @return A \code{list} is printed on-screen
-#' @author Nicholas J Clark
+#' @return The \code{mvgam} object is returned invisibly.
+#'
+#' @seealso \code{\link{summary.mvgam}}, \code{\link{mvgam}}
 #'
 #' @export
-print.mvgam = function(x, ...) {
-  object <- x
+print.mvgam <- function(x, digits = 2, ...) {
+  checkmate::assert_class(x, "mvgam")
+  checkmate::assert_int(digits, lower = 0)
 
-  # Use shared extractor functions to eliminate code duplication
-  model_spec <- extract_model_spec(object)
-  sampling_info <- extract_sampling_info(object)
+  # Section 1: Formulas (distinguish observation vs process)
+  if (!is.null(x$trend_formula)) {
+    cat("GAM observation formula:\n")
+    print(formula(x))
+    cat("\nGAM process formula:\n")
+    print(x$trend_formula)
+  } else {
+    cat("GAM formula:\n")
+    print(formula(x))
+  }
 
-  # Print model specification with simplified logic for print.mvgam
-  print_model_specification_simple(model_spec)
+  # Section 2: Family and link
+  fam <- family(x)
+  cat("\n\nFamily:\n")
+  cat(fam$family, '\n')
+  cat("\nLink function:\n")
+  cat(fam$link, '\n')
 
-  # Print sampling information using shared helper
-  print_sampling_information(sampling_info)
+  # Section 3: Trend model (if present)
+  if (!is.null(x$trend_formula)) {
+    cat("\n\nTrend model:\n")
+    trend_comps <- x$trend_components
+    if (!is.null(trend_comps) && !is.null(trend_comps$types)) {
+      cat(trend_comps$types[[1]], '\n')
+    } else {
+      cat("None\n")
+    }
+  }
+
+  # Section 4: N series
+  if (!is.null(x$series_info) &&
+      !is.null(x$series_info$n_series)) {
+    cat('\n\nN series:\n')
+    cat(x$series_info$n_series, '\n')
+  }
+
+  # Section 5: N timepoints
+  if (!is.null(x$time_info) &&
+      !is.null(x$time_info$n_timepoints)) {
+    cat('\n\nN timepoints:\n')
+    cat(x$time_info$n_timepoints, '\n')
+  }
+
+  # Section 6: Sampling status
+  cat('\n\nStatus:\n')
+  sim_info <- extract_mcmc_info(x)
+  cat(sim_info$chains, 'chains, each with iter =', sim_info$iter, '\n')
+  cat('  Total post-warmup draws =', sim_info$total_draws, '\n')
+
+  invisible(x)
 }
 
 #' Print method for mvgam_formula objects
@@ -116,6 +158,97 @@ print.mvgam_prefit = function(x, ...) {
   # Add prefit-specific status message
   cat('\nStatus:\n')
   cat('Not fitted', '\n')
+}
+
+#' Extract family from mvgam object
+#'
+#' @param object mvgam object
+#' @param ... Additional arguments (unused)
+#' @return Family object
+#' @export
+family.mvgam <- function(object, ...) {
+  checkmate::assert_class(object, "mvgam")
+
+  if (is.null(object$family)) {
+    insight::format_error(
+      "Family not found in mvgam object.",
+      "The object may be corrupted or from an incompatible version."
+    )
+  }
+
+  return(object$family)
+}
+
+#' Extract formula from mvgam object
+#'
+#' @param x mvgam object
+#' @param ... Additional arguments (unused)
+#' @return Formula object
+#' @export
+formula.mvgam <- function(x, ...) {
+  checkmate::assert_class(x, "mvgam")
+
+  if (is.null(x$formula)) {
+    insight::format_error(
+      "Formula not found in mvgam object.",
+      "The object may be corrupted or from an incompatible version."
+    )
+  }
+
+  return(x$formula)
+}
+
+#' Extract number of observations from mvgam object
+#'
+#' @param object mvgam object
+#' @param ... Additional arguments (unused)
+#' @return Integer number of observations
+#' @export
+nobs.mvgam <- function(object, ...) {
+  checkmate::assert_class(object, "mvgam")
+
+  if (!is.null(object$data)) {
+    return(nrow(object$data))
+  } else if (!is.null(object$standata) &&
+             !is.null(object$standata$N)) {
+    return(object$standata$N)
+  } else {
+    insight::format_error(
+      "Cannot determine number of observations.",
+      paste("Neither {.field data} nor {.field standata$N}",
+            "found in mvgam object.")
+    )
+  }
+}
+
+#' Extract MCMC sampling information from mvgam object
+#'
+#' Uses posterior package for robust extraction across backends. Returns
+#' only information that can be reliably extracted (chains, post-warmup
+#' iterations, total draws).
+#'
+#' @param mvgam_obj mvgam object
+#' @return List with chains (integer), iter (post-warmup iterations per
+#'   chain), and total_draws (total across all chains)
+#' @noRd
+extract_mcmc_info <- function(mvgam_obj) {
+  checkmate::assert_class(mvgam_obj, "mvgam")
+
+  if (is.null(mvgam_obj$fit)) {
+    insight::format_error(
+      "Stan fit not found in mvgam object.",
+      "The object may be corrupted or incomplete."
+    )
+  }
+
+  # Use posterior package (backend-independent)
+  draws_obj <- posterior::as_draws(mvgam_obj$fit)
+
+  return(list(
+    chains = posterior::nchains(draws_obj),
+    iter = posterior::niterations(draws_obj),
+    total_draws = posterior::ndraws(draws_obj)
+  ))
 }
 
 #' Extract Stan Code from mvgam Objects

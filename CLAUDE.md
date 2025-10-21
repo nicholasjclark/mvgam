@@ -73,6 +73,7 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - **Roxygen Documentation**: Use 2-space indentation for continuation lines
 - When commenting complex logic, add above line `# Reason` comment explaining the why, not just the what
 - **Comment Style**: Use sentence case, avoid ALL CAPS in comments
+- **Comment Quality**: Keep comments professional and interpretable in isolation. Avoid verbose notes like "Note: delegated to X for DRY consistency". If delegation is the pattern, the code should be self-documenting
 - **Function Names**: Use snake_case
 
 ### Validation and Error Handling

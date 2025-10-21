@@ -79,53 +79,38 @@
   - [x] 1.1.19 Verified architecture refactor: Targets 1,4,5,6 successfully fit models and pass structure checks, reach print method
   - [x] 1.1.20 Architecture verification complete: Core fitting infrastructure operational, models compile and sample correctly, next blockers are print/summary methods (Task 2.0+)
 
-- [ ] **2.0 Comprehensive Summary Method with Tests [IMPLEMENT FIRST - print() depends on this]**
-  - [x] 2.1 Research completed: brms print() delegates to summary() for parameter display, so summary must be implemented first
-  - [x] 2.2 Create new file `R/summary.mvgam.R` with roxygen2 header and checkmate imports
-  - [x] 2.3 Read brms summary method using r-package-analyzer agent to understand mvgam_summary structure and expected columns (Estimate, Est.Error, Q2.5, Q97.5, Rhat, Bulk_ESS, Tail_ESS)
-  - [x] 2.4 Used code-reviewer agent to review proposed implementation - identified 6 HIGH PRIORITY issues requiring research before implementation
-  - [x] 2.5 Fixed variables.mvgam() to use posterior::as_draws() intermediary - resolved stanfit method error
-  - [x] 2.6 Created research script tasks/research/research_parameter_patterns.R to fit 5 representative models
-  - [x] 2.7 Changed mvgam() default family from poisson() to gaussian() to match brms conventions
-  - [x] 2.8 Research script successfully fitted 5 models and extracted parameter patterns (Targets 1-5 completed, output saved to tasks/research/fitted_models/)
-  - [x] 2.9 Analyzed research output and documented findings in tasks/research/PARAMETER_NAMING_FINDINGS.md - determined lowercase column names (q2.5, q97.5), smooth patterns (s_*, sds_*), multivariate uses response names (sigma_count not sigma_y1), trend parameters have _trend suffix
-  - [x] 2.10 Fixed rename_summary_cols() to correctly handle posterior output (q2.5 → 2.5%, rhat → Rhat, ess_bulk → Bulk_ESS)
-  - [x] 2.11 Implemented all parameter matching functions: match_fixed_pars(), match_smooth_pars(), match_random_pars(), match_family_pars(), match_trend_pars(), match_z_loadings() - all pattern-based using research findings
-  - [x] 2.12 Implemented efficient single-pass summarization architecture: compute_all_summaries() computes once, then filters by category (more efficient than multiple posterior::summarise_draws() calls)
-  - [x] 2.13 Added checkmate input validation to all functions including probs ordering check (assert_true(probs[1] < probs[2]))
-  - [x] 2.14 Implemented summary.mvgam() with proper S3 structure, metadata extraction, and parameter categorization by type (fixed, smooth, random, spec, trend, loadings)
-  - [x] 2.15 Implemented print.mvgam_summary() with organized output following brms conventions (Population-Level Effects, Smooth Terms, Family Specific Parameters, Trend Parameters, Factor Loadings)
-  - [x] 2.16 Added include_states parameter to control display of latent state parameters (trend[i,s], lv_trend[i,k]) - excluded by default
-  - [x] 2.17 Regenerated roxygen2 documentation with devtools::document() - summary.mvgam.Rd and print.mvgam_summary.Rd created
-  - [x] 2.18 Code-reviewer approved implementation after addressing all HIGH PRIORITY issues (S3 naming, efficiency, formula display, documentation sync)
-  - [x] 2.19 Refactored summary.mvgam() to use rownames for parameters (not 'variable' column), fixed column naming to "l-95% CI" format, implemented round_numeric() and print_param_section() helpers for DRY code
-  - [x] 2.20 Write test "summary.mvgam includes MCMC diagnostics" in `test-models-single.R` that checks for Rhat, Bulk_ESS, Tail_ESS columns, rownames structure, and credible interval naming - test passing
-  - [x] 2.21 Enhanced research script tasks/research/research_parameter_patterns.R with test_summary_implementation() helper that verifies class, structure, column names, rownames, CI naming, and custom prob argument for all 5 target models - all validation checks passing
-  - [x] 2.22 Write test "summary.mvgam respects prob argument" that verifies 95%, 90%, 99%, and custom (80%) intervals are computed correctly with different prob values - test verifies column naming adapts correctly and interval widths increase/decrease as expected - all 13 assertions passing
-  - [x] 2.23 Refactored test file to fit models ONCE (fit1, fit2, fit3) and reuse across tests for efficiency - wrote comprehensive parameter categorization test verifying $fixed, $smooth, $spec, $trend sections populated correctly and parameters properly separated by category - all 11 assertions passing
-  - [x] 2.24 Update summary.mvgam() to store mvgam-specific metadata in output structure (completed - added trend_formula, trend_model, n_series, n_timepoints to summary output at lines 131-153)
-  - [x] 2.25 Update print.mvgam_summary() to follow old mvgam pattern (completed - implemented 6 sections with proper labels at lines 416-464)
+- [ ] **2.0 Basic Print Method with Tests**
+  - [ ] 2.1 Read existing `R/print.mvgam.R` to understand current implementation (error shows `extract_model_spec()` is missing)
+  - [ ] 2.2 Use r-package-analyzer agent to research brms print.brmsfit() implementation: understand delegation pattern, helper functions used, output sections
+  - [ ] 2.3 Determine helper functions needed based on brms pattern (not prescribed - discover what's actually needed)
+  - [ ] 2.4 Implement/fix helper functions following brms conventions (may include extract_model_spec, format helpers, etc.)
+  - [ ] 2.5 Implement clean print.mvgam() following brms pattern: family, formula, data, draws info, parameter summaries (no CIs/diagnostics)
+  - [ ] 2.6 Add roxygen2 documentation following brms print.brmsfit documentation style
+  - [ ] 2.7 Write test capturing print output and checking for key sections (Family, Formula, parameters)
+  - [ ] 2.8 Verify test confirms print output does NOT include CIs or Rhat (those belong in summary)
+  - [ ] 2.9 Run tests and fix any failures
 
-- [ ] **3.0 Basic Print Method with Tests [INDEPENDENT from summary - old mvgam pattern]**
-  - [x] 3.1 Read existing `R/print.mvgam.R` to understand current implementation (completed - found broken references)
-  - [x] 3.2 Use r-package-analyzer to research brms print.brmsfit() (completed - confirmed independent from summary)
-  - [x] 3.3 Use general-purpose agent to research old mvgam pattern from GitHub (completed - identified section labels and formatting)
-  - [x] 3.4 Implement family.mvgam() helper with code-reviewer approval (completed - extracts family object)
-  - [x] 3.5 Implement formula.mvgam() helper with code-reviewer approval (completed - extracts formula object)
-  - [x] 3.6 Implement nobs.mvgam() helper with code-reviewer approval (completed - returns total observations)
-  - [x] 3.7 Implement extract_mcmc_info() helper with code-reviewer approval (completed - uses posterior package)
-  - [x] 3.8 Implement print.mvgam() main function with code-reviewer approval (completed - replaced broken implementation at lines 13-67 with working 6-section pattern using family(), formula(), extract_mcmc_info() helpers)
-  - [x] 3.9 Add roxygen2 documentation to print.mvgam() (completed - included in implementation)
-  - [x] 3.10 Write test "print.mvgam displays all required sections" checking all 6 sections present (lines 436-461)
-  - [x] 3.11 Write test "print.mvgam returns object invisibly" verifying S3 convention (lines 463-472)
-  - [x] 3.12 Write test "print.mvgam_summary displays mvgam-specific metadata" verifying metadata and parameter tables (lines 474-489)
-  - [x] 3.13 Write test "print.mvgam displays correct values" verifying actual content accuracy with exact values from fit1 object (lines 491-529)
-  - [ ] 3.14 Run tests and verify all print tests pass
-
-
+- [ ] **3.0 Comprehensive Summary Method with Tests**
+  - [ ] 3.1 Create new file `R/summary.mvgam.R` with roxygen2 header and checkmate imports
+  - [ ] 3.2 Read brms summary method using r-package-analyzer agent to understand mvgam_summary structure and expected columns (Estimate, Est.Error, l-CI, u-CI, Rhat, Bulk_ESS, Tail_ESS)
+  - [ ] 3.3 Create S3 class definition comment for mvgam_summary structure following TRD Section 3.5 specification
+  - [ ] 3.4 Create helper function `extract_observation_summaries()` in `R/summary.mvgam.R` to extract observation model parameters from summarise_draws output
+  - [ ] 3.5 Create helper function `extract_trend_summaries()` in `R/summary.mvgam.R` to extract trend model parameters from summarise_draws output
+  - [ ] 3.6 Create helper function `compute_summary_stats()` in `R/summary.mvgam.R` using `posterior::summarise_draws()` with mean, sd, quantile, and convergence measures
+  - [ ] 3.7 Implement `summary.mvgam()` function signature with parameters: object, priors = FALSE, prob = 0.95, robust = FALSE, mc_se = FALSE
+  - [ ] 3.8 Add input validation to `summary.mvgam()` using checkmate assertions for all parameters
+  - [ ] 3.9 Add code to extract posterior draws using `posterior::as_draws_df()` from object$model_output
+  - [ ] 3.10 Add code to compute summaries via `posterior::summarise_draws()` with appropriate quantiles based on prob argument
+  - [ ] 3.11 Add code to organize summaries by parameter category (observation vs trend) using helper functions
+  - [ ] 3.12 Create mvgam_summary list structure with all components from TRD Section 3.5 and assign class "mvgam_summary"
+  - [ ] 3.13 Create `print.mvgam_summary()` function that prints model specification and parameter tables with diagnostics
+  - [ ] 3.14 Add roxygen2 documentation to `summary.mvgam()` following TRD Section 10 template with detailed `@details` explaining columns
+  - [ ] 3.15 Write test "summary.mvgam includes MCMC diagnostics" in `test-models-single.R` that checks for Rhat, Bulk_ESS, Tail_ESS columns in output
+  - [ ] 3.16 Write test "summary.mvgam respects prob argument" that verifies 90% and 99% intervals are computed correctly
+  - [ ] 3.17 Run tests and verify summary output includes credible intervals and diagnostics
 
 - [ ] **4.0 Convergence Warnings and Diagnostic Integration**
-  - [ ] 4.1 Create new file `R/diagnostics.mvgam.R` with roxygen2 header and understand brms rhat, neff_ratio and other diagnostic methods using r-package-analyzer agent
+  - [ ] 4.1 Create new file `R/diagnostics.mvgam.R` with roxygen2 header and understand brms rhat methods using r-package-analyzer agent
   - [ ] 4.2 Create `rhat.mvgam()` function that delegates to `rhat(object$model_output, pars = pars, ...)` following TRD Section 3.7
   - [ ] 4.3 Create `neff_ratio.mvgam()` function that delegates to `neff_ratio(object$model_output, pars = pars, ...)` following TRD Section 3.7
   - [ ] 4.4 Create `nuts_params.mvgam()` function that delegates to `nuts_params(object$model_output, pars = pars, ...)` for NUTS diagnostics

@@ -1,26 +1,71 @@
 ﻿{
     "s3_methods":  {
-
+                       "is":  [
+                                  "mvgam",
+                                  "stanfit",
+                                  "brmsthreads",
+                                  "brmsopencl"
+                              ]
                    },
     "functions":  [
-                      "repair_names",
-                      "repair_stanfit",
+                      "is.mvgam",
+                      "is.stanfit",
+                      "nlist",
+                      "parse_model",
+                      "compile_model",
+                      "fit_model",
+                      "compiled_model",
+                      "needs_recompilation",
+                      "elapsed_time",
+                      "backend_choices",
+                      "algorithm_choices",
+                      "require_backend",
+                      "is.brmsthreads",
+                      "validate_threads",
+                      "use_threading",
+                      "is.brmsopencl",
+                      "validate_opencl",
+                      "use_opencl",
+                      "validate_silent",
                       "repair_variable_names",
-                      "is_equal",
+                      "repair_stanfit",
+                      "file_refit_options",
                       "ulapply",
-                      "seq_rows"
+                      "require_package",
+                      "is_equal",
+                      "is_NA"
                   ],
     "purpose":  "",
     "function_dependencies":  {
 
                               },
     "function_signatures":  {
+                                "is.brmsthreads":  "is.brmsthreads \u003c- function(x) {",
                                 "ulapply":  "ulapply \u003c- function(X, FUN, ..., recursive = TRUE, use.names = TRUE) {",
+                                "validate_opencl":  "validate_opencl \u003c- function(opencl) {",
+                                "fit_model":  "fit_model \u003c- function(model, backend, ...) {",
+                                "validate_threads":  "validate_threads \u003c- function(threads) {",
+                                "require_backend":  "require_backend \u003c- function(backend, x) {",
+                                "is_NA":  "is_NA \u003c- function(x) {",
                                 "repair_stanfit":  "repair_stanfit \u003c- function(x) {",
-                                "repair_names":  "repair_names \u003c- function(x) {",
+                                "use_opencl":  "use_opencl \u003c- function(opencl) {",
+                                "compiled_model":  "compiled_model \u003c- function(x) {",
+                                "nlist":  "nlist \u003c- function(...) {",
+                                "parse_model":  "parse_model \u003c- function(model, backend, ...) {",
+                                "validate_silent":  "validate_silent \u003c- function(silent) {",
+                                "require_package":  "require_package \u003c- function(package, version = NULL) {",
                                 "repair_variable_names":  "repair_variable_names \u003c- function(x) {",
-                                "seq_rows":  "seq_rows = function(x) {",
-                                "is_equal":  "is_equal \u003c- function(x, y, check.attributes = FALSE, ...) {"
+                                "is.brmsopencl":  "is.brmsopencl \u003c- function(x) {",
+                                "compile_model":  "compile_model \u003c- function(model, backend, ...) {",
+                                "file_refit_options":  "file_refit_options \u003c- function() {",
+                                "backend_choices":  "backend_choices \u003c- function() {",
+                                "use_threading":  "use_threading \u003c- function(threads, force = FALSE) {",
+                                "is.stanfit":  "is.stanfit \u003c- function(x) {",
+                                "algorithm_choices":  "algorithm_choices \u003c- function() {",
+                                "is.mvgam":  "is.mvgam \u003c- function(x) {",
+                                "is_equal":  "is_equal \u003c- function(x, y, check.attributes = FALSE, ...) {",
+                                "needs_recompilation":  "needs_recompilation \u003c- function(x) {",
+                                "elapsed_time":  "elapsed_time \u003c- function(x) {"
                             },
     "file":  "R/backends.R"
 }

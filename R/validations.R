@@ -1235,12 +1235,12 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1, respo
       "Check that extract_and_validate_trend_components() is passing dimensions correctly."
     ), call. = FALSE)
   }
-  
+
   dimensions <- .precomputed_dimensions
 
   # ARCHITECTURAL FIX: Three-phase validation replacing circular validation chain
   # Phase 1: Input validation (already done by extract_time_series_dimensions above)
-  
+
   # Phase 2: Verify attribute creation succeeded
   if (!has_mvgam_variables(data)) {
     stop(insight::format_error(
@@ -1248,7 +1248,7 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1, respo
       "mvgam time and series attributes are missing from data."
     ), call. = FALSE)
   }
-  
+
   # Phase 3: Context-specific validations (only what's essential)
   if (trend_type != "CAR") {
     # Only validate regular time intervals for non-CAR trends using original time values
@@ -1257,7 +1257,7 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1, respo
       validate_regular_time_intervals(original_times, time_var)
     }
   }
-  
+
   if (Sys.getenv("MVGAM_DEBUG") == "TRUE") {
     cat("\n[DEBUG] Three-phase validation completed:\n")
     cat("  - Phase 1: Input validation ✓ (done by extract_time_series_dimensions)\n")
@@ -1350,7 +1350,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     cat("  - response_vars:", if(!is.null(response_vars)) paste(response_vars, collapse=", ") else "NULL", "\n")
     cat("  - trend_specs type:", class(trend_specs), "\n")
   }
-  
+
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_string(time_var)
   checkmate::assert_string(series_var)
@@ -1362,7 +1362,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     checkmate::assert_character(response_vars, min.len = 1, any.missing = FALSE)
   }
 
-  
+
   # Validate required variables exist - only require time_var since series can be created via attributes
   formula_to_use <- if (!is.null(cached_formulas)) cached_formulas$formula else NULL
   filtered_vars <- filter_required_variables(time_var, formula_to_use)  # Only require time_var
@@ -1371,7 +1371,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   # Calculate core dimensions from data using attribute-based accessors
   time_vals <- get_time_for_grouping(data)
   series_vals <- get_series_for_grouping(data)
-  
+
   unique_times <- unique(time_vals)
   unique_series <- unique(series_vals)
   min_time <- min(time_vals, na.rm = TRUE)
@@ -1404,7 +1404,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     # Use attribute-based accessors for series and time data
     time_vals <- get_time_for_grouping(data)
     series_vals <- get_series_for_grouping(data)
-    
+
     series_time_info <- data.frame(
       series = series_vals,
       time = time_vals,
@@ -1636,7 +1636,7 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
 
   # Extract time and series indices for non-missing observations
   obs_data <- data[non_missing_idx, , drop = FALSE]
-  
+
   # Preserve mvgam attributes after subsetting with correct lengths
   # Vector attributes must be subsetted to match obs_data length
   vector_attrs <- c("mvgam_time", "mvgam_series", "mvgam_original_time")
@@ -1645,7 +1645,7 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
       attr(obs_data, attr_name) <- attr(data, attr_name)[non_missing_idx]
     }
   }
-  
+
   # Scalar attributes can be copied as-is
   scalar_attrs <- c("mvgam_time_source", "mvgam_series_source")
   for (attr_name in scalar_attrs) {
@@ -1664,7 +1664,7 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
   # For series: use processed values from attributes (handles all creation strategies)
   original_time_values <- attr(obs_data, "mvgam_original_time")
   series_values <- get_series_for_grouping(obs_data)
-  
+
   obs_trend_time <- match(original_time_values, sorted_unique_times)
   obs_trend_series <- match(series_values, sorted_unique_series)
 
@@ -2108,7 +2108,7 @@ validate_series_time = function(
     mvgam_series = attr(data, "mvgam_series"),
     mvgam_series_source = attr(data, "mvgam_series_source")
   )
-  
+
   # Ungroup any grouped data
   data %>%
     dplyr::ungroup() -> data
@@ -2227,10 +2227,10 @@ validate_univariate_series_time <- function(data, name, time_var, series_var, ch
     # Use attribute-based accessors for series and time data
     time_vals <- get_time_for_grouping(data)
     series_vals <- get_series_for_grouping(data)
-    
+
     min_time <- as.numeric(min(time_vals))
     max_time <- as.numeric(max(time_vals))
-    
+
     data.frame(series = series_vals, time = time_vals) %>%
       dplyr::group_by(series) %>%
       dplyr::summarise(
@@ -2615,34 +2615,16 @@ is_trend_term <- function(expr, trend_patterns) {
   }, logical(1)))
 }
 
-#' Extract Trend Data for Model Fitting or Prediction (Dual-Context)
-#'
-#' @description
-#' Dual-context function that extracts trend-relevant data for either:
-#' - Model fitting: extracts from raw data using trend_formula
-#' - Prediction: extracts from newdata using stored metadata from fitted object
-#'
-#' Creates appropriate grouping structure based on trend type (standard vs hierarchical).
-#'
-#' @param data Data frame containing observations (fitting context only)
-#' @param trend_formula Formula object for trend specification (fitting context only)
-#' @param time_var Character name of time variable (fitting context only)
-#' @param series_var Character name of series variable (fitting context only)
-#' @param mvgam_object Fitted mvgam object with stored metadata (prediction context only)
-#' @param newdata New data for prediction (prediction context only)
-#' @return Data frame with trend-relevant variables and appropriate grouping structure
-#' @noRd
-
 #' Create universal time and series attributes for mvgam grouping
-#' 
-#' Sets up attribute-based time and series variables for consistent (time, series) 
-#' grouping across all mvgam trend processing. Creates implicit time mapping and 
+#'
+#' Sets up attribute-based time and series variables for consistent (time, series)
+#' grouping across all mvgam trend processing. Creates implicit time mapping and
 #' handles three series creation strategies. Works in both fitting and prediction contexts.
-#' 
+#'
 #' @param data Data frame containing trend data
 #' @param parsed_trend Parsed trend formula object with trend_model component (fitting context)
 #' @param time_var Character name of time variable column
-#' @param series_var Character name of series variable column  
+#' @param series_var Character name of series variable column
 #' @param response_vars Character vector of response variable names (for multivariate series creation)
 #' @param metadata Trend metadata object for prediction context series recreation
 #' @return Data frame with mvgam time and series attributes added
@@ -2656,7 +2638,7 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
     cat("  - data columns:", paste(names(data), collapse=", "), "\n")
     cat("  - nrow(data):", nrow(data), "\n")
   }
-  
+
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_string(time_var)
   checkmate::assert_string(series_var)
@@ -2669,7 +2651,7 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
       checkmate::assert_list(metadata$variables, names = "named")
     }
   }
-  
+
   # Always create implicit time mapping for consistency
   checkmate::assert_names(names(data), must.include = time_var)
   unique_times <- unique(data[[time_var]])
@@ -2677,15 +2659,15 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
   attr(data, "mvgam_time") <- time_mapping[as.character(data[[time_var]])]
   attr(data, "mvgam_time_source") <- "implicit"
   attr(data, "mvgam_original_time") <- data[[time_var]]  # Store original for distance calculations
-  
+
   # Helper function to eliminate duplication between strategies
-  create_multivariate_series <- function(response_vars, n_obs, 
+  create_multivariate_series <- function(response_vars, n_obs,
                                          trend_specs = NULL) {
-    checkmate::assert_character(response_vars, min.len = 1, 
+    checkmate::assert_character(response_vars, min.len = 1,
                                 any.missing = FALSE, min.chars = 1)
     checkmate::assert_integerish(n_obs, len = 1, lower = 1)
     checkmate::assert_list(trend_specs, null.ok = TRUE)
-    
+
     # Check if observations can be evenly divided across responses
     if (n_obs %% length(response_vars) != 0) {
       stop(insight::format_error(
@@ -2694,9 +2676,9 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
         "Expected equal observations per response for series creation."
       ), call. = FALSE)
     }
-    
+
     n_obs_per_response <- n_obs / length(response_vars)
-    
+
     # Detect shared trends using existing pattern from stan_assembly.R
     is_shared_trend <- FALSE
     if (!is.null(trend_specs) && is.list(trend_specs)) {
@@ -2709,9 +2691,9 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
         }))
       }
     }
-    
+
     if (is_shared_trend) {
-      # Shared trend: create single series for all responses  
+      # Shared trend: create single series for all responses
       list(
         series_values = factor(rep("shared", n_obs)),
         series_source = "multivariate_shared"
@@ -2724,21 +2706,21 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
       )
     }
   }
-  
+
   # Four series creation strategies (including prediction context)
   series_values <- NULL
   series_source <- NULL
-  
+
   # Strategy 1: Prediction context - use stored metadata to recreate series
   if (!is.null(metadata)) {
     stored_source <- metadata$series_source %||% "explicit"
-    
+
     if (stored_source == "hierarchical" && !is.null(metadata$variables)) {
       gr_var <- metadata$variables$gr_var
       subgr_var <- metadata$variables$subgr_var
-      
-      if (!is.null(gr_var) && !is.null(subgr_var) && 
-          !is.na(gr_var) && !is.na(subgr_var) && 
+
+      if (!is.null(gr_var) && !is.null(subgr_var) &&
+          !is.na(gr_var) && !is.na(subgr_var) &&
           gr_var != "NA" && subgr_var != "NA") {
         checkmate::assert_names(names(data), must.include = c(gr_var, subgr_var))
         series_values <- interaction(data[[gr_var]], data[[subgr_var]], drop = TRUE, sep = '_', lex.order = TRUE)
@@ -2752,25 +2734,25 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
     }
     # If prediction context but explicit series, fall through to Strategy 3
   }
-  
+
   # Strategy 2: Hierarchical series (gr + subgr present in fitting context)
   if (is.null(series_values) && !is.null(parsed_trend$trend_model)) {
     gr_var <- if (!is.null(parsed_trend$trend_model$gr) && parsed_trend$trend_model$gr != "NA") parsed_trend$trend_model$gr else NULL
     subgr_var <- if (!is.null(parsed_trend$trend_model$subgr) && parsed_trend$trend_model$subgr != "NA") parsed_trend$trend_model$subgr else NULL
-    
+
     if (!is.null(gr_var) && !is.null(subgr_var)) {
       checkmate::assert_names(names(data), must.include = c(gr_var, subgr_var))
       series_values <- interaction(data[[gr_var]], data[[subgr_var]], drop = TRUE, sep = '_', lex.order = TRUE)
       series_source <- "hierarchical"
     }
   }
-  
+
   # Strategy 3: Explicit series (column exists)
   if (is.null(series_values) && series_var %in% names(data)) {
     series_values <- data[[series_var]]
     series_source <- "explicit"
   }
-  
+
   # Strategy 4: Missing series (create from multivariate structure in fitting context)
   if (is.null(series_values)) {
     if (!is.null(response_vars) && length(response_vars) > 1) {
@@ -2786,30 +2768,30 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
       ), call. = FALSE)
     }
   }
-  
+
   # Store series as attribute
   attr(data, "mvgam_series") <- series_values
   attr(data, "mvgam_series_source") <- series_source
-  
+
   if (Sys.getenv("MVGAM_DEBUG") == "TRUE") {
     cat("  - series_source:", series_source, "\n")
     cat("  - series values (first 5):", paste(head(series_values, 5), collapse=", "), "\n")
     cat("  - unique series count:", length(unique(series_values)), "\n")
   }
-  
+
   return(data)
 }
 
 #' Get time variable for grouping operations
-#' 
+#'
 #' Retrieves implicit time indices from data attributes for consistent grouping
-#' 
+#'
 #' @param data Data frame with mvgam time attributes
 #' @return Numeric vector of sequential time indices (1, 2, 3, ...)
 #' @noRd
 get_time_for_grouping <- function(data) {
   checkmate::assert_data_frame(data, min.rows = 1)
-  
+
   time_values <- attr(data, "mvgam_time")
   if (is.null(time_values)) {
     if (Sys.getenv("MVGAM_DEBUG") == "TRUE") {
@@ -2822,20 +2804,20 @@ get_time_for_grouping <- function(data) {
       "Call ensure_mvgam_variables() first to create time attributes."
     ), call. = FALSE)
   }
-  
+
   return(time_values)
 }
 
 #' Get series variable for grouping operations
-#' 
+#'
 #' Retrieves series values from data attributes for consistent grouping
-#' 
+#'
 #' @param data Data frame with mvgam series attributes
 #' @return Factor or character vector of series identifiers
 #' @noRd
 get_series_for_grouping <- function(data) {
   checkmate::assert_data_frame(data, min.rows = 1)
-  
+
   series_values <- attr(data, "mvgam_series")
   if (is.null(series_values)) {
     stop(insight::format_error(
@@ -2843,14 +2825,14 @@ get_series_for_grouping <- function(data) {
       "Call ensure_mvgam_variables() first to create series attributes."
     ), call. = FALSE)
   }
-  
+
   return(series_values)
 }
 
 #' Check if mvgam variables are ready
-#' 
+#'
 #' Verifies that both time and series attributes exist on data object
-#' 
+#'
 #' @param data Data frame to check for mvgam attributes
 #' @return Logical indicating if both time and series attributes exist
 #' @noRd
@@ -2860,9 +2842,9 @@ has_mvgam_variables <- function(data) {
 }
 
 #' Remove mvgam variable attributes
-#' 
+#'
 #' Cleans up all mvgam-related attributes from data object
-#' 
+#'
 #' @param data Data frame with mvgam attributes to remove
 #' @return Data frame with mvgam attributes removed
 #' @noRd
@@ -2881,22 +2863,22 @@ remove_mvgam_variables <- function(data) {
 #' @description
 #' Consolidates dual path trend processing by combining data extraction,
 #' validation, and dimension injection into a single comprehensive operation.
-#' Replaces separate calls to extract_trend_data() and 
-#' validate_time_series_for_trends() to eliminate redundant 
+#' Replaces separate calls to extract_trend_data() and
+#' validate_time_series_for_trends() to eliminate redundant
 #' extract_time_series_dimensions() computation.
 #'
 #' @param data Data frame containing time series data
-#' @param mv_spec Multivariate specification object with base_formula and 
-#'   trend_specs  
+#' @param mv_spec Multivariate specification object with base_formula and
+#'   trend_specs
 #' @param response_vars Character vector of response variable names
 #' @param time_var Name of time variable column (default: "time")
 #' @param series_var Name of series variable column (default: "series")
-#' @return List with trend_data, enhanced_mv_spec, metadata, and 
+#' @return List with trend_data, enhanced_mv_spec, metadata, and
 #'   validation_passed
 #' @noRd
-extract_and_validate_trend_components <- function(data, mv_spec, 
-                                                  response_vars, 
-                                                  time_var = "time", 
+extract_and_validate_trend_components <- function(data, mv_spec,
+                                                  response_vars,
+                                                  time_var = "time",
                                                   series_var = "series",
                                                   trend_formula = NULL) {
   # Parameter validation per CLAUDE.md standards
@@ -2926,14 +2908,14 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   } else {
     mv_spec$trend_specs
   }
-  data <- ensure_mvgam_variables(data, parsed_trend, time_var, series_var, 
+  data <- ensure_mvgam_variables(data, parsed_trend, time_var, series_var,
                                 response_vars)
 
   # Compute dimensions once to eliminate redundant calls
   dimensions <- extract_time_series_dimensions(
-    data, 
-    time_var, 
-    series_var, 
+    data,
+    time_var,
+    series_var,
     trend_specs = mv_spec$trend_specs,
     response_vars = response_vars,
     cached_formulas = mv_spec$cached_formulas
@@ -2943,10 +2925,10 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   trend_variables <- character(0)
   if (!is.null(trend_formula)) {
     # Use existing parse_trend_formula with precomputed dimensions to avoid redundant computation
-    parsed_trend_result <- parse_trend_formula(trend_formula, data, response_vars, 
+    parsed_trend_result <- parse_trend_formula(trend_formula, data, response_vars,
                                              .precomputed_dimensions = dimensions)
     regular_terms <- parsed_trend_result$regular_terms %||% character(0)
-    
+
     # Extract actual variable names from function calls like mo(income), s(x), gp(time)
     for (term in regular_terms) {
       term_formula <- as.formula(paste("~", term))
@@ -2954,7 +2936,7 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     }
     trend_variables <- unique(trend_variables)
   }
-  
+
   # Add extracted trend variables to dimensions metadata for extract_trend_data
   if (is.null(dimensions$metadata)) {
     dimensions$metadata <- list()
@@ -2964,7 +2946,7 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   # Data extraction using precomputed dimensions and existing tested functionality
   trend_data <- data
   trend_metadata <- NULL
-  
+
   if (!is.null(response_vars) && length(response_vars) > 0) {
     # Call existing extract_trend_data with precomputed dimensions to avoid redundant computation
     # This reuses tested logic for proper data reduction to unique (time, series) combinations
@@ -2973,27 +2955,27 @@ extract_and_validate_trend_components <- function(data, mv_spec,
       response_vars = response_vars, .return_metadata = TRUE,
       .precomputed_dimensions = dimensions, trend_specs = mv_spec$trend_specs
     )
-    
+
     if (!is.list(result) || !all(c("trend_data", "metadata") %in% names(result))) {
       stop(insight::format_error(
         "Invalid result from trend data extraction.",
         "Expected list with {.field trend_data} and {.field metadata} fields."
       ), call. = FALSE)
     }
-    
+
     trend_data <- result$trend_data
     trend_metadata <- result$metadata
   }
-  
+
   # Validation using precomputed dimensions
   validation_result <- validate_time_series_for_trends(
-    data, 
+    data,
     mv_spec$trend_specs,
     response_vars = response_vars,
     cached_formulas = mv_spec$cached_formulas,
     .precomputed_dimensions = dimensions
   )
-  
+
   if (is.null(validation_result) || is.null(validation_result$dimensions)) {
     stop(insight::format_error(
       "Validation returned invalid results.",
@@ -3100,7 +3082,7 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
         "Check that extract_and_validate_trend_components() is passing dimensions correctly."
       ), call. = FALSE)
     }
-    
+
     # Extract everything from precomputed dimensions - skip parse_trend_formula entirely
     trend_variables <- .precomputed_dimensions$metadata$covariates %||% character(0)
     parsed_trend <- list(trend_model = NULL)  # Minimal structure for compatibility
@@ -3136,17 +3118,17 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
         # Extract accessor values once to avoid duplication
         time_vals <- get_time_for_grouping(data)
         series_vals <- get_series_for_grouping(data)
-        
+
         # Create temporary columns with unique names to avoid collisions
         validation_data <- data %>%
           dplyr::mutate(
             .validation_time_temp = time_vals,
             .validation_series_temp = series_vals
           )
-        
+
         # Determine grouping structure from trend metadata
         validation_grouping_vars <- character(0)
-        
+
         if (!is.null(parsed_trend$trend_model)) {
           has_gr <- !is.null(parsed_trend$trend_model$gr) &&
                     parsed_trend$trend_model$gr != "NA"
@@ -3167,13 +3149,13 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
                                    parsed_trend$trend_model$gr, ")")
           } else {
             # Always use time and series from attributes
-            validation_grouping_vars <- c(".validation_time_temp", 
+            validation_grouping_vars <- c(".validation_time_temp",
                                          ".validation_series_temp")
             grouping_desc <- "(time, series)"
           }
         } else {
           # Always use time and series from attributes
-          validation_grouping_vars <- c(".validation_time_temp", 
+          validation_grouping_vars <- c(".validation_time_temp",
                                        ".validation_series_temp")
           grouping_desc <- "(time, series)"
         }
@@ -3185,9 +3167,9 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
             c(
               "Required trend variables not found in data:",
               "x" = paste("Missing: {.field",
-                         paste(missing_trend_vars, collapse = "}, {.field"), 
+                         paste(missing_trend_vars, collapse = "}, {.field"),
                          "}"),
-              "i" = paste("Available:", 
+              "i" = paste("Available:",
                          paste(names(data), collapse = ", "))
             )
           ), call. = FALSE)
@@ -3214,7 +3196,7 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
               paste0("Trend covariates must be constant within ",
                     grouping_desc, " groups:"),
               "x" = paste("Varying covariates: {.field",
-                         paste(varying_covariates, collapse = "}, {.field"), 
+                         paste(varying_covariates, collapse = "}, {.field"),
                          "}"),
               "i" = paste0("Each ", grouping_desc,
                           " combination must have identical covariate values."),
@@ -3240,11 +3222,11 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
 
   # Universal (time, series) grouping using attribute-based accessors
   # Following dplyr best practices: mutate first, then group_by with .data pronouns
-  
+
   # Extract attribute values with validation
   time_vals <- get_time_for_grouping(data)
   series_vals <- get_series_for_grouping(data)
-  
+
   if (length(trend_variables) > 0) {
     trend_data <- data %>%
       dplyr::mutate(
@@ -3257,8 +3239,8 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
         .groups = "drop"
       ) %>%
       dplyr::arrange(.data$time, .data$series)
-      
-    # Clean up attributes after processing  
+
+    # Clean up attributes after processing
     trend_data <- remove_mvgam_variables(trend_data)
   } else {
     # Handle no covariates case with same attribute approach
@@ -3272,7 +3254,7 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
       dplyr::ungroup() %>%
       dplyr::arrange(.data$time, .data$series) %>%
       dplyr::select(.data$time, .data$series)
-      
+
     trend_data <- remove_mvgam_variables(trend_data)
   }
 

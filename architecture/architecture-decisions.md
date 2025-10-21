@@ -4,12 +4,14 @@
 
 ## Foundation Decisions
 
-### 1. Single-Fit Dual-Object Architecture
-- One mvgam object containing two brmsfit-like objects for post-processing  
+### 1. Single-Fit Lazy Categorization Architecture
+- mvgam object stores complete stanfit from combined model in `fit` slot
+- Parameter categorization computed on-demand at extraction time
+- Simple `exclude` field for parameter filtering
+- Pattern: Store complete, categorize lazily, filter on demand
 - brms generates linear predictors (`mu`, `mu_trend`) from two formulae
-- Stan models from two brmsfit objects (using `backend = "mock"`) are combined to contain observation + trend components
+- Stan models from two brmsfit objects (using `backend = "mock"`) are combined
 - Combined Stan model passed to Stan for joint estimation
-- IMPORTANT: This is a complete overhaul. Avoid backward compatibility unless specifically requested by the user
 
 ### 2. Formula-Centric Interface Design
 **Decision**: Extend brms formula syntax with `trend_formula` parameter  
@@ -182,11 +184,65 @@ mu_biomass += mu_biomass_trend;
 
 ## Ecosystem Integration Principles
 
-### 1. brms Method Compatibility
-**Requirement**: All brms ecosystem methods must work with mvgam objects
-**Strategy**: Dual brmsfit-like objects enable method dispatch to brms infrastructure
+### 1. Lazy Parameter Categorization System
 
-### 2. Stan Optimization Preservation
+**Design Decision**: Store complete stanfit, compute parameter categorization on-demand.
+
+**Storage Pattern**:
+```r
+mvgam_object$fit <- stanfit  # Complete stanfit
+mvgam_object$exclude <- c("lprior", "lp__")  # Parameters to hide
+```
+
+**Categorization Patterns** (computed dynamically):
+1. **observation**: Fixed effects, random effects, smooths, family parameters (`b_`, `sd_`, `r_`, `s_`, `sigma`, `shape`, `nu`, `phi`)
+2. **trend**: Trend states, innovations, AR/VAR coefficients, correlations (`_trend` suffix, `trend[`, `lv_trend`, `mu_trend`)
+3. **factor_loadings**: Loading matrices and vectors (`Z[`, `z_loading`)
+4. **diagnostic**: Log posterior and prior (`lp__`, `lprior`)
+
+**Lazy Evaluation Pattern**:
+```r
+# Variables method delegates to fit
+variables.mvgam <- function(x, ...) {
+  variables(x$fit, ...)
+}
+
+# Categorization computed when needed
+categorize_parameters <- function(x, category = NULL) {
+  all_pars <- variables(x$fit)
+  all_pars <- setdiff(all_pars, x$exclude)
+
+  if (is.null(category)) {
+    return(all_pars)
+  }
+
+  # Apply category patterns dynamically
+  patterns <- get_category_patterns(category)
+  all_pars[grepl(paste(patterns, collapse = "|"), all_pars)]
+}
+
+# Parameter extraction applies filtering
+as_draws.mvgam <- function(x, variable = NULL, ...) {
+  draws <- as_draws(x$fit, ...)
+  if (!is.null(variable)) {
+    draws <- subset_draws(draws, variable = variable)
+  }
+  draws <- rename_pars(draws, x)
+  draws
+}
+```
+
+**Benefits**:
+- Minimal storage overhead
+- Parameter info always current with fit object
+- Consistent with ecosystem patterns
+- Simplified object construction
+
+### 2. brms Method Compatibility
+**Requirement**: All brms ecosystem methods must work with mvgam objects
+**Strategy**: mvgam inherits from brmsfit, delegates to fit slot
+
+### 3. Stan Optimization Preservation
 **Principle**: Preserve all brms Stan optimizations (GLM primitives, threading, etc.)
 **Implementation**: Let brms handle observation model complexity entirely
 

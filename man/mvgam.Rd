@@ -10,7 +10,7 @@ mvgam(
   data = NULL,
   backend = getOption("brms.backend", "cmdstanr"),
   combine = TRUE,
-  family = poisson(),
+  family = gaussian(),
   ...
 )
 }
