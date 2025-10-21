@@ -38,7 +38,8 @@
       "WebFetch(domain:ecogambler.netlify.app)",
       "WebFetch(domain:mathmarecol.github.io)",
       "WebFetch(domain:www.physalia-courses.org)",
-      "WebFetch(domain:seonixbio.com)"
+      "WebFetch(domain:seonixbio.com)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": [],
