@@ -12,7 +12,7 @@
 
                               },
     "function_signatures":  {
-                                "variables.mvgam":  "variables.mvgam = function(x, ...) {"
+                                "variables.mvgam":  "variables.mvgam \u003c- function(x, ...) {"
                             },
     "file":  "R/index-mvgam.R"
 }

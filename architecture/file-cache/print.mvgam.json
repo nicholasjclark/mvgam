@@ -1,23 +1,36 @@
 ﻿{
     "s3_methods":  {
+                       "stancode":  [
+                                        "mvgam",
+                                        "mvgam_prefit"
+                                    ],
+                       "nobs":  [
+                                    "mvgam"
+                                ],
+                       "formula":  [
+                                       "mvgam"
+                                   ],
                        "print":  [
                                      "mvgam",
                                      "mvgam_formula",
                                      "mvgam_prefit",
                                      "mvgamstancode"
                                  ],
-                       "stancode":  [
-                                        "mvgam",
-                                        "mvgam_prefit"
-                                    ]
+                       "family":  [
+                                      "mvgam"
+                                  ]
                    },
     "functions":  [
+                      "print.mvgam",
                       "print.mvgam_formula",
                       "print_model_specification_simple",
+                      "family.mvgam",
+                      "formula.mvgam",
+                      "nobs.mvgam",
+                      "extract_mcmc_info",
                       "stancode.mvgam",
                       "stancode.mvgam_prefit",
                       "print.mvgamstancode",
-                      "print.mvgam",
                       "print.mvgam_prefit"
                   ],
     "purpose":  "Print methods for objects",
@@ -25,12 +38,16 @@
 
                               },
     "function_signatures":  {
-                                "print.mvgam":  "print.mvgam = function(x, ...) {",
+                                "print.mvgam":  "print.mvgam \u003c- function(x, digits = 2, ...) {",
                                 "print_model_specification_simple":  "print_model_specification_simple \u003c- function(model_spec) {",
-                                "stancode.mvgam_prefit":  "stancode.mvgam_prefit \u003c- function(object, ...) {",
-                                "print.mvgam_formula":  "print.mvgam_formula \u003c- function(x, ...) {",
                                 "print.mvgam_prefit":  "print.mvgam_prefit = function(x, ...) {",
+                                "extract_mcmc_info":  "extract_mcmc_info \u003c- function(mvgam_obj) {",
+                                "print.mvgam_formula":  "print.mvgam_formula \u003c- function(x, ...) {",
+                                "formula.mvgam":  "formula.mvgam \u003c- function(x, ...) {",
+                                "family.mvgam":  "family.mvgam \u003c- function(object, ...) {",
+                                "stancode.mvgam_prefit":  "stancode.mvgam_prefit \u003c- function(object, ...) {",
                                 "stancode.mvgam":  "stancode.mvgam \u003c- function(object, ...) {",
+                                "nobs.mvgam":  "nobs.mvgam \u003c- function(object, ...) {",
                                 "print.mvgamstancode":  "print.mvgamstancode \u003c- function(x, ...) {"
                             },
     "file":  "R/print.mvgam.R"

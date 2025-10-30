@@ -97,6 +97,9 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     ndraws = posterior::ndraws(draws_obj)
   )
 
+  # Check convergence and warn if issues detected
+  check_mvgam_convergence(all_summaries, nchains = out$nchains)
+
   # Organize summaries by parameter category
   obs_fixed_idx <- match_fixed_pars(pars)
   if (any(obs_fixed_idx)) {
@@ -461,4 +464,135 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   print_param_section(x$loadings, "Factor Loadings", digits)
 
   invisible(x)
+}
+
+# ==============================================================================
+# CONVERGENCE CHECKING (Internal Helper)
+# ==============================================================================
+
+#' Check convergence diagnostics and issue warnings
+#'
+#' @description
+#' Checks Rhat and ESS diagnostics from posterior summaries and issues
+#' warnings if convergence issues are detected. Follows brms pattern of
+#' checking thresholds and providing remediation suggestions.
+#'
+#' @param all_summaries Data frame with posterior summaries including
+#'   Rhat, Bulk_ESS, and Tail_ESS columns (after renaming)
+#' @param nchains Number of MCMC chains used for fitting
+#'
+#' @details
+#' Checks the following thresholds:
+#' \itemize{
+#'   \item Rhat > 1.05: Indicates lack of convergence
+#'   \item Bulk_ESS < 100 * nchains: Insufficient bulk effective sample
+#'     size
+#'   \item Tail_ESS < 100 * nchains: Insufficient tail effective sample
+#'     size
+#' }
+#'
+#' Warnings are issued at most once per session using
+#' rlang::warn(.frequency = "once").
+#'
+#' @noRd
+check_mvgam_convergence <- function(all_summaries, nchains) {
+  # Input validation
+  checkmate::assert_data_frame(all_summaries)
+  checkmate::assert_int(nchains, lower = 1)
+
+  # Suppress warnings during testing
+  if (identical(Sys.getenv("TESTTHAT"), "true")) {
+    return(invisible(NULL))
+  }
+
+  # Extract diagnostic columns (using renamed column names)
+  rhats <- all_summaries$Rhat
+  bulk_ess <- all_summaries$Bulk_ESS
+  tail_ess <- all_summaries$Tail_ESS
+
+  # Check Rhat convergence (threshold: 1.05)
+  if (!is.null(rhats) && any(!is.na(rhats))) {
+    max_rhat <- max(rhats, na.rm = TRUE)
+    if (max_rhat > 1.05) {
+      # Find problematic parameters
+      bad_pars <- rownames(all_summaries)[rhats > 1.05 & !is.na(rhats)]
+
+      msg_parts <- c(
+        sprintf(
+          "Some Rhat values exceed 1.05 (max = %.3f).",
+          max_rhat
+        ),
+        "The model may not have converged.",
+        sprintf(
+          "Problematic parameters (%d): %s",
+          length(bad_pars),
+          paste(head(bad_pars, 5), collapse = ", ")
+        )
+      )
+
+      if (length(bad_pars) > 5) {
+        msg_parts <- c(
+          msg_parts,
+          sprintf("... and %d more.", length(bad_pars) - 5)
+        )
+      }
+
+      msg_parts <- c(
+        msg_parts,
+        "Consider:",
+        "- Increasing 'iter' or 'warmup' arguments",
+        "- Increasing 'chains' for better convergence assessment",
+        "- Checking for model misspecification"
+      )
+
+      rlang::warn(
+        insight::format_warning(msg_parts),
+        .frequency = "once"
+      )
+    }
+  }
+
+  # Check Bulk ESS (threshold: 100 per chain)
+  if (!is.null(bulk_ess) && any(!is.na(bulk_ess))) {
+    min_bulk <- min(bulk_ess, na.rm = TRUE)
+    ess_threshold <- 100 * nchains
+
+    if (min_bulk < ess_threshold) {
+      rlang::warn(
+        insight::format_warning(
+          sprintf(
+            "Bulk ESS too low (min = %.0f, should be > %.0f).",
+            min_bulk,
+            ess_threshold
+          ),
+          "Parameter estimates may be unreliable.",
+          "Consider increasing 'iter' to improve effective sample size."
+        ),
+        .frequency = "once"
+      )
+    }
+  }
+
+  # Check Tail ESS (threshold: 100 per chain)
+  if (!is.null(tail_ess) && any(!is.na(tail_ess))) {
+    min_tail <- min(tail_ess, na.rm = TRUE)
+    ess_threshold <- 100 * nchains
+
+    if (min_tail < ess_threshold) {
+      rlang::warn(
+        insight::format_warning(
+          sprintf(
+            "Tail ESS too low (min = %.0f, should be > %.0f).",
+            min_tail,
+            ess_threshold
+          ),
+          "Tail quantile estimates may be unreliable.",
+          "Consider increasing 'iter' to improve tail ESS."
+        ),
+        .frequency = "once"
+      )
+    }
+  }
+
+  invisible(NULL)
 }

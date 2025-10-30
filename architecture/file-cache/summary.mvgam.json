@@ -1,0 +1,43 @@
+﻿{
+    "s3_methods":  {
+                       "summary":  [
+                                       "mvgam"
+                                   ],
+                       "print":  [
+                                     "mvgam_summary"
+                                 ]
+                   },
+    "functions":  [
+                      "summary.mvgam",
+                      "compute_all_summaries",
+                      "rename_summary_cols",
+                      "match_fixed_pars",
+                      "match_smooth_pars",
+                      "match_random_pars",
+                      "match_family_pars",
+                      "match_trend_pars",
+                      "match_z_loadings",
+                      "round_numeric",
+                      "print_param_section",
+                      "print.mvgam_summary"
+                  ],
+    "purpose":  "Summary methods",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "round_numeric":  "round_numeric \u003c- function(x, digits = 2) {",
+                                "match_family_pars":  "match_family_pars \u003c- function(pars) {",
+                                "match_smooth_pars":  "match_smooth_pars \u003c- function(pars) {",
+                                "match_z_loadings":  "match_z_loadings \u003c- function(pars) {",
+                                "match_trend_pars":  "match_trend_pars \u003c- function(pars) {",
+                                "print.mvgam_summary":  "print.mvgam_summary \u003c- function(x, digits = 2, ...) {",
+                                "print_param_section":  "print_param_section \u003c- function(table, header, digits = 2) {",
+                                "rename_summary_cols":  "rename_summary_cols \u003c- function(col_names, probs, robust) {",
+                                "match_random_pars":  "match_random_pars \u003c- function(pars) {",
+                                "compute_all_summaries":  "compute_all_summaries \u003c- function(object, probs, robust) {",
+                                "match_fixed_pars":  "match_fixed_pars \u003c- function(pars) {",
+                                "summary.mvgam":  "summary.mvgam \u003c- function(object, probs = c(0.025, 0.975), robust = FALSE, include_states = FALSE, ...) {"
+                            },
+    "file":  "R/summary.mvgam.R"
+}

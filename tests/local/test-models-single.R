@@ -527,3 +527,48 @@ test_that("print.mvgam displays correct values", {
     expect_match(output_text, fit1$trend_components$types[1])
   }
 })
+
+test_that("variables.mvgam returns all parameter names", {
+  vars1 <- variables(fit1)
+
+  # Return type is character vector
+  expect_type(vars1, "character")
+  expect_true(length(vars1) > 0)
+
+  # No duplicates in parameter names
+  expect_equal(length(vars1), length(unique(vars1)))
+
+  # Key observation parameters present
+  expect_true(any(grepl("^Intercept$|^b_Intercept$", vars1)))
+
+  # Family-specific parameters present for gaussian
+  expect_true(any(grepl("^sigma$", vars1)))
+})
+
+test_that("variables.mvgam includes trend parameters", {
+  vars1 <- variables(fit1)
+
+  # Parameters with "_trend" suffix present
+  trend_params <- vars1[grepl("_trend", vars1)]
+  expect_true(length(trend_params) > 0)
+
+  # RW model has sigma_trend
+  expect_true(any(grepl("sigma_trend", trend_params)))
+
+  # Trend states present (trend[i,s])
+  expect_true(any(grepl("^trend\\[", vars1)))
+})
+
+test_that("variables.mvgam works with multivariate models", {
+  vars2 <- variables(fit2)
+
+  # Return type is character vector
+  expect_type(vars2, "character")
+  expect_true(length(vars2) > 0)
+
+  # Multivariate models have response-specific sigma
+  expect_true(any(grepl("sigma_count|sigma_biomass", vars2)))
+
+  # Response-specific parameters present
+  expect_true(any(grepl("count|biomass", vars2)))
+})
