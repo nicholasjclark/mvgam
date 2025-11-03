@@ -528,47 +528,101 @@ test_that("print.mvgam displays correct values", {
   }
 })
 
-test_that("variables.mvgam returns all parameter names", {
+test_that("variables.mvgam returns correct structure and delegates properly", {
   vars1 <- variables(fit1)
 
-  # Return type is character vector
+  # Correct structure: unnamed character vector
   expect_type(vars1, "character")
+  expect_true(is.vector(vars1))
+  expect_false(is.list(vars1))
+  expect_null(names(vars1))
   expect_true(length(vars1) > 0)
 
   # No duplicates in parameter names
   expect_equal(length(vars1), length(unique(vars1)))
 
-  # Key observation parameters present
-  expect_true(any(grepl("^Intercept$|^b_Intercept$", vars1)))
-
-  # Family-specific parameters present for gaussian
-  expect_true(any(grepl("^sigma$", vars1)))
+  # Definitive test: should equal underlying fit minus exclusions
+  raw_vars <- posterior::variables(posterior::as_draws(fit1$fit))
+  expected_vars <- setdiff(raw_vars, fit1$exclude)
+  expect_setequal(vars1, expected_vars)
 })
 
-test_that("variables.mvgam includes trend parameters", {
+test_that("variables.mvgam correctly excludes diagnostic parameters", {
+  vars1 <- variables(fit1)
+
+  # Excluded parameters should not appear
+  expect_false("lprior" %in% vars1)
+  expect_false("lp__" %in% vars1)
+
+  # Verify exclusion list is actually used
+  if (!is.null(fit1$exclude) && length(fit1$exclude) > 0) {
+    expect_true(all(!fit1$exclude %in% vars1))
+  }
+})
+
+test_that("variables.mvgam includes required observation parameters", {
+  vars1 <- variables(fit1)
+
+  # Gaussian family requires sigma
+  expect_true("sigma" %in% vars1)
+
+  # Intercept parameter (brms names it "Intercept" not "b_Intercept")
+  expect_true("Intercept" %in% vars1)
+
+  # Should have smooth parameters for s(season)
+  smooth_params <- vars1[grepl("^s_", vars1)]
+  expect_true(length(smooth_params) > 0)
+})
+
+test_that("variables.mvgam includes required trend parameters", {
   vars1 <- variables(fit1)
 
   # Parameters with "_trend" suffix present
   trend_params <- vars1[grepl("_trend", vars1)]
   expect_true(length(trend_params) > 0)
 
-  # RW model has sigma_trend
-  expect_true(any(grepl("sigma_trend", trend_params)))
+  # RW model must have sigma_trend
+  expect_true("sigma_trend" %in% vars1)
 
   # Trend states present (trend[i,s])
-  expect_true(any(grepl("^trend\\[", vars1)))
+  trend_states <- vars1[grepl("^trend\\[", vars1)]
+  expect_true(length(trend_states) > 0)
+
+  # Latent variables for trend (lv_trend[i,k])
+  lv_trend <- vars1[grepl("^lv_trend\\[", vars1)]
+  expect_true(length(lv_trend) > 0)
 })
 
 test_that("variables.mvgam works with multivariate models", {
   vars2 <- variables(fit2)
 
-  # Return type is character vector
+  # Correct structure
   expect_type(vars2, "character")
-  expect_true(length(vars2) > 0)
+  expect_true(is.vector(vars2))
+  expect_null(names(vars2))
 
-  # Multivariate models have response-specific sigma
-  expect_true(any(grepl("sigma_count|sigma_biomass", vars2)))
+  # Definitive test
+  raw_vars <- posterior::variables(posterior::as_draws(fit2$fit))
+  expected_vars <- setdiff(raw_vars, fit2$exclude)
+  expect_setequal(vars2, expected_vars)
 
-  # Response-specific parameters present
-  expect_true(any(grepl("count|biomass", vars2)))
+  # Multivariate models have response-specific sigma (not sigma_y1)
+  expect_true("sigma_count" %in% vars2)
+  expect_true("sigma_biomass" %in% vars2)
+
+  # Response-specific intercepts
+  expect_true("Intercept_count" %in% vars2 || "b_count_Intercept" %in% vars2)
+  expect_true("Intercept_biomass" %in% vars2 || "b_biomass_Intercept" %in% vars2)
+})
+
+test_that("variables.mvgam works with smooth parameters", {
+  vars3 <- variables(fit3)
+
+  # Should have smooth coefficients s_*
+  smooth_params <- vars3[grepl("^s_", vars3)]
+  expect_true(length(smooth_params) > 0)
+
+  # Should have smooth SDs sds_*
+  smooth_sds <- vars3[grepl("^sds_", vars3)]
+  expect_true(length(smooth_sds) > 0)
 })

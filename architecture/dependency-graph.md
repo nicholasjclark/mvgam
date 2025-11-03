@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-10-21 17:11:37  
+**Generated:** 2025-10-30 16:19:47  
 **Package:** mvgam v2.0.0  
 **Commit:**   
 
 ## Summary
 
 - **Total Files:** 57
-- **Total Functions:** 468
+- **Total Functions:** 469
 - **Exported Functions:** 56
-- **Internal Functions:** 426
+- **Internal Functions:** 427
 - **S3 Methods:** 40
 - **S3 Classes:** 28
 
@@ -144,8 +144,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### Core Files
 - **`R/mvgam_core.R`** (19 functions) - Core package functionality
   - Key functions: mvgam, mvgam_single, generate_combined_stancode_and_data, create_mvgam_from_combined_fit, extract_mvgam_components, mvgam_multiple, validate_multiple_imputation_datasets, fit_multiple_imputation_models, mvgam_single_imputation, pool_mvgam_fits, apply_rubins_rules, create_pooled_mvgam, extract_trend_component_info, validate_missing_patterns (+ 5 more)
-- **`R/summary.mvgam.R`** (12 functions) - Summary methods
-  - Key functions: match_trend_parssummary.mvgam compute_all_summaries rename_summary_cols match_fixed_pars match_smooth_pars match_random_pars match_family_pars match_z_loadings round_numeric (+ 11 more)
+- **`R/summary.mvgam.R`** (13 functions) - Summary methods
+  - Key functions: match_trend_pars, check_mvgam_convergence, summary.mvgam, compute_all_summaries, rename_summary_cols, match_fixed_pars, match_smooth_pars, match_random_pars, match_family_pars, match_z_loadings (+ 3 more)
 - **`R/print.mvgam.R`** (11 functions) - Print methods for objects
   - Key functions: stancode.mvgam, stancode.mvgam_prefit, print.mvgamstancode, print.mvgam, print.mvgam_formula, print_model_specification_simple, family.mvgam, formula.mvgam, nobs.mvgam, extract_mcmc_info (+ 1 more)
 - **`R/as.data.frame.mvgam.R`** (10 functions) - Data documentation and loading
@@ -719,6 +719,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **update_stan_header()** (internal)
 
 ### `R/summary.mvgam.R`:
+- **check_mvgam_convergence()** (internal)
 - **compute_all_summaries()** (internal)
 - **match_family_pars()** (internal)
 - **match_fixed_pars()** (internal)

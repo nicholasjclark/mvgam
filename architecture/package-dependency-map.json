@@ -3242,6 +3242,16 @@
                                                                               "is_s3_method":  false,
                                                                               "arguments":  "expr"
                                                                           },
+                              "check_mvgam_convergence":  {
+                                                              "s3_class":  "",
+                                                              "s3_method":  "",
+                                                              "signature":  "check_mvgam_convergence \u003c- function(all_summaries, nchains) {",
+                                                              "is_s3_method":  false,
+                                                              "arguments":  [
+                                                                                "all_summaries",
+                                                                                "nchains"
+                                                                            ]
+                                                          },
                               "count_mathematical_operators":  {
                                                                    "s3_class":  "",
                                                                    "s3_method":  "",
@@ -4819,7 +4829,8 @@
                                                   "match_z_loadings",
                                                   "round_numeric",
                                                   "print_param_section",
-                                                  "print.mvgam_summary"
+                                                  "print.mvgam_summary",
+                                                  "check_mvgam_convergence"
                                               ],
                         "R/plot_mvgam_resids.R":  [
                                                       "plot_mvgam_resids"
@@ -5591,6 +5602,7 @@
                       "needs_recompilation":  "R/backends.R",
                       "build_execution_dependency_plan":  "R/mu_expression_analysis.R",
                       "is_NA":  "R/backends.R",
+                      "check_mvgam_convergence":  "R/summary.mvgam.R",
                       "get_default_incompatibility_reason":  "R/trend_system.R",
                       "extract_brmsterms_from_setup":  "R/brms_integration.R",
                       "extract_prior_from_setup":  "R/brms_integration.R",
@@ -5930,7 +5942,6 @@
                                      "extract_time_information":  "R/mvgam_core.R",
                                      "car_trend_properties":  "R/trend_system.R",
                                      "variables.mvgam":  "R/index-mvgam.R",
-                                     "as_one_logical":  "R/validations.R",
                                      "is.mvgam":  "R/backends.R",
                                      "generate_times_trend_matrices":  "R/stan_assembly.R",
                                      "Predict.matrix.moi.smooth":  "R/monotonic.R",
@@ -5990,10 +6001,11 @@
                                      "fevd_df":  "R/mvgam_fevd-class.R",
                                      "plot_time_series":  "R/plot_mvgam_series.R",
                                      "is_NA":  "R/backends.R",
+                                     "check_mvgam_convergence":  "R/summary.mvgam.R",
                                      "extract_brmsterms_from_setup":  "R/brms_integration.R",
                                      "generate_var_trend_stanvars":  "R/stan_assembly.R",
                                      "get_time_for_grouping":  "R/validations.R",
-                                     "build_execution_dependency_plan":  "R/mu_expression_analysis.R",
+                                     "as_one_logical":  "R/validations.R",
                                      "process_capacity_parameter":  "R/validations.R",
                                      "validate_plot_data":  "R/plot_mvgam_series.R",
                                      "formula.mvgam":  "R/print.mvgam.R",
@@ -6001,6 +6013,7 @@
                                      "extract_assignment_target":  "R/mu_expression_analysis.R",
                                      "plot_mvgam_randomeffects":  "R/plot_mvgam_randomeffects.R",
                                      "validate_univariate_series_time":  "R/validations.R",
+                                     "build_execution_dependency_plan":  "R/mu_expression_analysis.R",
                                      "stancode.mvgam":  "R/print.mvgam.R",
                                      "match_trend_pars":  "R/summary.mvgam.R",
                                      "handle_nonlinear_trend_injection":  "R/stan_assembly.R",
@@ -6477,6 +6490,7 @@
                                 "needs_recompilation":  "needs_recompilation \u003c- function(x) {",
                                 "build_execution_dependency_plan":  "build_execution_dependency_plan \u003c- function(classified_expressions) {",
                                 "is_NA":  "is_NA \u003c- function(x) {",
+                                "check_mvgam_convergence":  "check_mvgam_convergence \u003c- function(all_summaries, nchains) {",
                                 "get_default_incompatibility_reason":  "get_default_incompatibility_reason \u003c- function(name) {",
                                 "extract_brmsterms_from_setup":  "extract_brmsterms_from_setup \u003c- function(setup_object) {",
                                 "extract_prior_from_setup":  "extract_prior_from_setup \u003c- function(setup_object) {",
@@ -7534,22 +7548,22 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-10-21 17:11:37",
+                     "generated":  "2025-10-30 16:19:47",
                      "commit_hash":  "",
-                     "cached_files":  51,
+                     "cached_files":  56,
                      "version":  "2.0.0",
                      "commit_message":  "",
                      "unanalyzed_functions":  0,
-                     "total_functions":  468,
+                     "total_functions":  469,
                      "exported_functions":  56,
                      "s3_methods_count":  40,
                      "s3_classes_count":  28,
                      "dynamic_references":  32,
                      "package_name":  "mvgam",
                      "potentially_unused_functions":  33,
-                     "changed_files":  6,
+                     "changed_files":  1,
                      "total_files":  57,
-                     "zero_dependency_functions":  379
+                     "zero_dependency_functions":  380
                  },
     "dependencies":  {
 

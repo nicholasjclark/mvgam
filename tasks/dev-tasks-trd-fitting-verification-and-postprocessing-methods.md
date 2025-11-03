@@ -138,7 +138,7 @@
   - [x] 4.11 All 121 tests passing - convergence checking working correctly without test failures
   - [x] NOTE: Tasks 4.2-4.5 from original TRD were not implemented because brms research showed they don't exist in brms - delegation to posterior package is the correct pattern
 
-- [ ] **5.0 Parameter Discovery and Additional Tests**
+- [x] **5.0 Parameter Discovery and Additional Tests**
   - [x] 5.1 Check if `R/variables.mvgam.R` file exists; if not, check `R/index-mvgam.R` for existing `variables.mvgam()` function - found in R/index-mvgam.R
   - [x] 5.2 Read existing `variables.mvgam()` implementation to understand current functionality - already completed in Task 1.1 (delegation pattern implemented)
   - [x] 5.3 Implement simple Phase 1 version of `variables.mvgam()` that delegates to `variables(x$fit, ...)` - already completed in Task 1.1
@@ -151,7 +151,7 @@
   - [x] 5.10 Add assertions to factor model test verifying Z matrix parameters - covered in existing Target 4 test
   - [x] 5.11 Create test for CAR model - already covered in Task 1.16 (Target 6: CAR + GP)
   - [x] 5.12 Create test for PW model - already covered in Task 1.15 (Target 5: PW trends)
-  - [ ] 5.13 Run all tests in `test-models-single.R` and verify comprehensive coverage of trend types - running in background
+  - [x] 5.13 Run all tests in `test-models-single.R` and verify comprehensive coverage of trend types - all tests passing
   - [x] 5.14 Add test for VAR model - already covered in Task 1.13 (Target 3: VARMA)
   - [x] 5.15 Ensure all tests check both print and summary methods work correctly - all tests include print()/summary() checks
 
@@ -207,7 +207,6 @@
     - [ ] 6.9.2 Document the posterior combination approach in function docs
     - [ ] 6.9.3 Run devtools::document() to generate man pages
     - [ ] 6.9.4 Update NAMESPACE if needed
-  - [ ] 6.10 DECISION POINT: After 6.5, evaluate if MI is needed for this release or defer to future work
 
 - [ ] **7.0 Final Documentation and Integration Testing**
   - [ ] 7.1 Run `devtools::document()` to generate all roxygen2 documentation and update NAMESPACE
