@@ -599,3 +599,295 @@ check_mvgam_convergence <- function(all_summaries, nchains) {
 
   invisible(NULL)
 }
+
+# ==============================================================================
+# MULTIPLE IMPUTATION SUMMARY METHOD
+# ==============================================================================
+
+#' Summary method for multiple imputation mvgam models
+#'
+#' @description
+#' Provides posterior summary statistics for multiple imputation mvgam
+#' models, with additional diagnostics about the imputation process and
+#' combined posterior draws.
+#'
+#' @param object An object of class \code{mvgam_pooled}.
+#' @param probs Numeric vector of length 2 specifying quantile
+#'   probabilities for credible intervals. Default is \code{c(0.025,
+#'   0.975)} for 95% intervals.
+#' @param robust Logical; if \code{TRUE}, use median and MAD instead of
+#'   mean and SD. Default is \code{FALSE}.
+#' @param include_states Logical; if \code{TRUE}, include latent state
+#'   parameters. Default is \code{FALSE}.
+#' @param ... Additional arguments passed to \code{\link{summary.mvgam}}.
+#'
+#' @return An object of class \code{c("mvgam_pooled_summary",
+#'   "mvgam_summary")} containing standard summary components plus
+#'   multiple imputation diagnostics.
+#'
+#' @details
+#' This method extends the standard \code{summary.mvgam} output with
+#' multiple imputation specific information:
+#' \itemize{
+#'   \item{Number of imputations}
+#'   \item{Total posterior draws (combined across all imputations)}
+#'   \item{Per-imputation convergence summaries}
+#'   \item{Information about the combination method}
+#' }
+#'
+#' The combined posteriors are created using
+#' \code{rstan::sflist2stanfit()}, which concatenates posterior draws
+#' from all imputed datasets at the Stan level. Parameter estimates
+#' reflect uncertainty from both the model and the imputation process.
+#'
+#' @seealso \code{\link{summary.mvgam}}, \code{\link{mvgam_multiple}},
+#'   \code{\link{pool_mvgam_fits}}
+#'
+#' @examples
+#' \dontrun{
+#' # Fit models to multiply imputed datasets
+#' pooled_fit <- mvgam_multiple(
+#'   y ~ x,
+#'   trend_formula = ~ RW(),
+#'   data_list = list(imp1, imp2, imp3),
+#'   combine = TRUE
+#' )
+#'
+#' # Get enhanced summary with MI diagnostics
+#' summary(pooled_fit)
+#' }
+#'
+#' @export
+summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
+                                  robust = FALSE, include_states = FALSE,
+                                  ...) {
+  # Input validation
+  checkmate::assert_class(object, "mvgam_pooled")
+  checkmate::assert_numeric(probs, len = 2, lower = 0, upper = 1)
+  checkmate::assert_true(probs[1] < probs[2])
+  checkmate::assert_logical(robust, len = 1)
+  checkmate::assert_logical(include_states, len = 1)
+
+  # Call parent method to get standard summary
+  base_summary <- NextMethod("summary")
+
+  # Extract MI-specific metadata from object attributes
+  individual_fits <- attr(object, "individual_fits")
+  n_imputations <- attr(object, "n_imputations")
+  combination_method <- attr(object, "combination_method")
+
+  if (is.null(individual_fits) || is.null(n_imputations)) {
+    insight::format_warning(
+      "Missing multiple imputation metadata in pooled object.",
+      "Summary will proceed without MI diagnostics."
+    )
+
+    # Return standard summary if metadata missing
+    return(base_summary)
+  }
+
+  # Validate consistency between metadata and actual fits
+  if (length(individual_fits) != n_imputations) {
+    insight::format_warning(
+      sprintf(
+        "Mismatch: {.field n_imputations} = %d but %d fits stored.",
+        n_imputations, length(individual_fits)
+      ),
+      "Using actual number of stored fits."
+    )
+    n_imputations <- length(individual_fits)
+  }
+
+  # Calculate total draws across all imputations
+  total_draws <- posterior::ndraws(posterior::as_draws(object$fit))
+  draws_per_imp <- if (length(individual_fits) > 0) {
+    posterior::ndraws(posterior::as_draws(individual_fits[[1]]$fit))
+  } else {
+    NA_integer_
+  }
+
+  # Extract per-imputation convergence diagnostics
+  imp_convergence <- lapply(seq_along(individual_fits), function(i) {
+    fit <- individual_fits[[i]]
+
+    # Safely extract draws and compute diagnostics
+    draws <- tryCatch(
+      posterior::as_draws(fit$fit),
+      error = function(e) NULL
+    )
+
+    if (is.null(draws) || posterior::ndraws(draws) == 0) {
+      return(list(
+        imputation = i,
+        max_rhat = NA_real_,
+        min_bulk_ess = NA_real_,
+        min_tail_ess = NA_real_,
+        n_params = NA_integer_,
+        error = "Failed to extract draws"
+      ))
+    }
+
+    # Compute convergence diagnostics only
+    summ <- posterior::summarise_draws(
+      draws,
+      posterior::default_convergence_measures()
+    )
+
+    list(
+      imputation = i,
+      max_rhat = max(summ$rhat, na.rm = TRUE),
+      min_bulk_ess = min(summ$ess_bulk, na.rm = TRUE),
+      min_tail_ess = min(summ$ess_tail, na.rm = TRUE),
+      n_params = nrow(summ)
+    )
+  })
+
+  # Calculate summary statistics across imputations
+  max_rhat_across_imps <- max(
+    sapply(imp_convergence, function(x) x$max_rhat, USE.NAMES = FALSE),
+    na.rm = TRUE
+  )
+  min_ess_across_imps <- min(
+    sapply(imp_convergence, function(x) x$min_bulk_ess,
+           USE.NAMES = FALSE),
+    na.rm = TRUE
+  )
+
+  # Add MI diagnostics to summary object
+  base_summary$mi_diagnostics <- list(
+    n_imputations = n_imputations,
+    total_draws = total_draws,
+    draws_per_imputation = draws_per_imp,
+    combination_method = if (is.null(combination_method)) {
+      "sflist2stanfit"
+    } else {
+      combination_method
+    },
+    per_imputation_convergence = imp_convergence,
+    max_rhat_across_imputations = max_rhat_across_imps,
+    min_ess_across_imputations = min_ess_across_imps
+  )
+
+  # Set enhanced class
+  class(base_summary) <- c("mvgam_pooled_summary", "mvgam_summary")
+
+  return(base_summary)
+}
+
+# ==============================================================================
+# MULTIPLE IMPUTATION PRINT METHOD
+# ==============================================================================
+
+#' Print method for multiple imputation summary objects
+#'
+#' @description
+#' Prints a summary of a multiple imputation mvgam model, including
+#' standard parameter estimates and multiple imputation diagnostics.
+#'
+#' @param x An object of class \code{mvgam_pooled_summary}.
+#' @param digits Integer indicating number of decimal places. Default 2.
+#' @param ... Additional arguments passed to
+#'   \code{\link{print.mvgam_summary}}.
+#'
+#' @return The \code{mvgam_pooled_summary} object is returned
+#'   invisibly.
+#'
+#' @details
+#' This method extends \code{print.mvgam_summary} by adding a footer
+#' section with multiple imputation diagnostics. The combined
+#' posteriors are created using \code{rstan::sflist2stanfit()}, which
+#' concatenates draws from all imputations at the Stan level.
+#'
+#' Diagnostics include:
+#' \itemize{
+#'   \item{Number of imputations and total draws}
+#'   \item{Per-imputation convergence summaries (Rhat, ESS)}
+#'   \item{Overall convergence metrics across imputations}
+#' }
+#'
+#' @seealso \code{\link{print.mvgam_summary}},
+#'   \code{\link{summary.mvgam_pooled}}
+#'
+#' @export
+print.mvgam_pooled_summary <- function(x, digits = 2, ...) {
+  # Input validation
+  checkmate::assert_class(x, "mvgam_pooled_summary")
+  checkmate::assert_int(digits, lower = 0)
+
+  # Print standard summary using parent method
+  NextMethod()
+
+  # Add MI diagnostics section if available
+  if (!is.null(x$mi_diagnostics)) {
+    cat("\n")
+    cat(strrep("=", 70), "\n")
+    cat("Multiple Imputation Diagnostics\n")
+    cat(strrep("=", 70), "\n\n")
+
+    mi <- x$mi_diagnostics
+
+    # Basic imputation information
+    cat("  Number of imputations:", mi$n_imputations, "\n")
+    cat("  Total posterior draws:", mi$total_draws, "\n")
+
+    if (!is.na(mi$draws_per_imputation)) {
+      cat("  Draws per imputation:", mi$draws_per_imputation, "\n")
+    }
+
+    cat("  Combination method:", mi$combination_method, "\n\n")
+
+    # Overall convergence across imputations
+    cat("  Convergence Summary Across Imputations:\n")
+
+    if (!is.infinite(mi$max_rhat_across_imputations) &&
+        !is.na(mi$max_rhat_across_imputations)) {
+      cat(sprintf(
+        "    Maximum Rhat: %.3f\n",
+        mi$max_rhat_across_imputations
+      ))
+    }
+
+    if (!is.infinite(mi$min_ess_across_imputations) &&
+        !is.na(mi$min_ess_across_imputations)) {
+      cat(sprintf(
+        "    Minimum Bulk ESS: %.0f\n",
+        mi$min_ess_across_imputations
+      ))
+    }
+
+    # Per-imputation table if available
+    if (!is.null(mi$per_imputation_convergence) &&
+        length(mi$per_imputation_convergence) > 0) {
+
+      cat("\n  Per-Imputation Convergence:\n")
+
+      # Build table
+      imp_df <- do.call(rbind, lapply(
+        mi$per_imputation_convergence,
+        function(imp) {
+          data.frame(
+            Imputation = imp$imputation,
+            Max_Rhat = sprintf("%.3f", imp$max_rhat),
+            Min_Bulk_ESS = sprintf("%.0f", imp$min_bulk_ess),
+            Min_Tail_ESS = sprintf("%.0f", imp$min_tail_ess),
+            stringsAsFactors = FALSE
+          )
+        }
+      ))
+
+      # Print table with proper alignment
+      cat("    ")
+      print(imp_df, row.names = FALSE, right = TRUE)
+    }
+
+    cat("\n")
+    cat(strrep("-", 70), "\n")
+    cat("Note: Parameter estimates combine draws from all ",
+        "imputations.\n", sep = "")
+    cat("      Uncertainty reflects both model and imputation ",
+        "process.\n", sep = "")
+    cat(strrep("=", 70), "\n")
+  }
+
+  invisible(x)
+}

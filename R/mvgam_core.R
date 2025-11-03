@@ -407,29 +407,125 @@ extract_trend_component_info <- function(combined_fit, mv_spec) {
 
 #' Fit mvgam Models to Multiple Imputation Datasets
 #'
-#' @param formula Model formula (observation model)
-#' @param trend_formula Optional trend formula (state-space dynamics)
-#' @param data_list List of imputed data frames or mids object from mice
-#' @param backend Character string specifying Stan backend
-#' @param combine Logical; if TRUE, combine posteriors. If FALSE, return list
-#' @param check_data Logical; validate data consistency across imputations
-#' @param ... Additional arguments passed to mvgam_single()
+#' @description
+#' Fits Bayesian state-space models to multiply imputed datasets,
+#' combining posteriors across imputations for proper uncertainty
+#' quantification when dealing with missing data.
 #'
-#' @return If combine=TRUE, returns mvgam_multiple object. If combine=FALSE,
-#'   returns list of individual mvgam objects.
+#' @details
+#' This function processes multiple imputed datasets in two modes:
+#'
+#' **Combined Mode (combine=TRUE)**:
+#' Fits separate models to each imputed dataset, then combines
+#' posteriors using `rstan::sflist2stanfit()` to create a pooled
+#' posterior distribution. Returns an object of class
+#' `c("mvgam_pooled", "mvgam", "brmsfit")` with MI-specific
+#' attributes and methods.
+#'
+#' **List Mode (combine=FALSE)**:
+#' Returns a list of individual mvgam fits, one per imputation,
+#' allowing manual posterior combination or separate analysis.
+#'
+#' **Posterior Combination Approach**:
+#' Uses `rstan::sflist2stanfit()` (validated brms pattern) to
+#' concatenate draws from all imputations at the Stan level,
+#' properly accounting for between-imputation and
+#' within-imputation variance. This approach ensures valid
+#' uncertainty quantification following proper multiple imputation
+#' principles.
+#'
+#' **MI Diagnostics**:
+#' Pooled objects include convergence diagnostics per imputation
+#' (Rhat, ESS) accessible via `summary()`. The print method
+#' displays comprehensive MI diagnostics including total draws,
+#' draws per imputation, and convergence summaries.
+#'
+#' @param formula Model formula (observation model). Supports brms
+#'   formula syntax including smooths and random effects.
+#' @param trend_formula Optional trend formula specifying
+#'   state-space dynamics. Can be response-specific in multivariate
+#'   models.
+#' @param data_list List of imputed data frames. Each element must
+#'   have identical structure (same variables, same ordering).
+#'   Alternatively, a `mids` object from the mice package.
+#' @param backend Character string specifying Stan backend:
+#'   "cmdstanr" or "rstan". Defaults to
+#'   `getOption("brms.backend", "cmdstanr")`.
+#' @param combine Logical; if `TRUE` (default), combines posteriors
+#'   into a pooled mvgam_pooled object. If `FALSE`, returns list of
+#'   individual fits.
+#' @param check_data Logical; if `TRUE` (default), validates
+#'   consistency across imputations (same column names, types,
+#'   rows).
+#' @param ... Additional arguments passed to `mvgam()` for each
+#'   imputation (e.g., chains, iter, family, priors).
+#'
+#' @return
+#' If `combine=TRUE`: An object of class
+#' `c("mvgam_pooled", "mvgam", "brmsfit")` containing:
+#' \itemize{
+#'   \item{Pooled posterior draws from all imputations}
+#'   \item{Attribute `individual_fits`: List of per-imputation
+#'     mvgam objects}
+#'   \item{Attribute `n_imputations`: Number of imputations}
+#'   \item{Attribute `combination_method`: "sflist2stanfit"}
+#' }
+#'
+#' If `combine=FALSE`: A list of mvgam objects, one per imputation.
+#'
+#' @examples
+#' \dontrun{
+#' # Create pseudo-imputed data (3 imputations)
+#' base_data <- data.frame(
+#'   time = 1:24,
+#'   series = factor(rep("series1", 24)),
+#'   y = rnorm(24, mean = 3, sd = 1),
+#'   season = 1:24
+#' )
+#'
+#' imputed_list <- lapply(1:3, function(i) {
+#'   data_copy <- base_data
+#'   data_copy$y <- data_copy$y + rnorm(nrow(data_copy), 0, 0.1)
+#'   data_copy
+#' })
+#'
+#' # Fit with combined posteriors (recommended)
+#' fit_pooled <- mvgam_multiple(
+#'   formula = y ~ s(season, bs = "cc", k = 5),
+#'   trend_formula = ~ 1,
+#'   data_list = imputed_list,
+#'   family = gaussian(),
+#'   combine = TRUE
+#' )
+#'
+#' # Check MI diagnostics
+#' summary(fit_pooled)
+#' print(fit_pooled)
+#'
+#' # Fit separately (for advanced use cases)
+#' fit_list <- mvgam_multiple(
+#'   formula = y ~ s(season, bs = "cc", k = 5),
+#'   trend_formula = ~ 1,
+#'   data_list = imputed_list,
+#'   family = gaussian(),
+#'   combine = FALSE
+#' )
+#' }
+#'
+#' @seealso \code{\link{summary.mvgam_pooled}},
+#'   \code{\link{print.mvgam_pooled_summary}}, \code{\link{mvgam}}
 #'
 #' @export
 mvgam_multiple <- function(formula,
                            trend_formula = NULL,
                            data_list,
-                           backend = NULL,
+                           backend = getOption("brms.backend", "cmdstanr"),
                            combine = TRUE,
                            check_data = TRUE,
                            ...) {
   # Input validation
   checkmate::assert_list(data_list, min.len = 2)
-  checkmate::assert_character(backend, len = 1, null.ok = TRUE,
-                              any.missing = FALSE)
+  checkmate::assert_character(backend, len = 1, any.missing = FALSE)
   checkmate::assert_logical(combine, len = 1, any.missing = FALSE)
   checkmate::assert_logical(check_data, len = 1, any.missing = FALSE)
 
