@@ -156,12 +156,14 @@
   - [x] 5.15 Ensure all tests check both print and summary methods work correctly - all tests include print()/summary() checks
 
 - [ ] **6.0 Multiple Imputation Implementation (Priority 2 - OPTIONAL)**
-  - [ ] 6.1 Architectural validation and cleanup
-    - [ ] 6.1.1 Read current mvgam_multiple() implementation (R/mvgam_core.R:422-687) to understand existing structure
-    - [ ] 6.1.2 Identify all helper functions that call non-existent extract_posterior_samples() function
-    - [ ] 6.1.3 Test that storing draws object in $fit works with existing methods using fit1 from test suite
-    - [ ] 6.1.4 Verify variables(), summary(), print() work when $fit contains posterior::as_draws() output
-    - [ ] 6.1.5 Document any compatibility issues found during testing
+  - [x] 6.1 Architectural validation and cleanup
+    - [x] 6.1.1 Read current mvgam_multiple() implementation (R/mvgam_core.R:422-687) to understand existing structure
+    - [x] 6.1.2 Identify all helper functions that call non-existent extract_posterior_samples() function - found extract_fit_estimates() calls it 3 times (lines 695, 698, 706)
+    - [x] 6.1.3 Research brms MI implementation - discovered brms uses rstan::sflist2stanfit(), NOT posterior::bind_draws() or Rubin's rules
+    - [x] 6.1.4 Created test_mi_draws_pattern.R and validated rstan::sflist2stanfit() pattern works with mvgam
+    - [x] 6.1.5 Verified variables(), summary(), print() all work correctly with combined stanfit object
+    - [x] 6.1.6 Fixed summary() .frequency_id error - added .frequency_id parameters to all rlang::warn() calls
+    - [x] 6.1.7 Documented findings: brms pattern is to use rstan::sflist2stanfit() to combine stanfit objects at Stan level, store combined stanfit in $fit, preserve individual fits in attributes
   - [ ] 6.2 Rewrite mvgam_multiple() using posterior combination pattern
     - [ ] 6.2.1 Remove all calls to extract_posterior_samples(), extract_fit_estimates(), apply_rubins_rules(), pool_parameter_estimates()
     - [ ] 6.2.2 Implement clean pattern: fit each dataset → extract draws → combine using posterior::bind_draws(draws_list, along = "draw")

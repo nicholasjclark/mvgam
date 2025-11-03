@@ -547,7 +547,8 @@ check_mvgam_convergence <- function(all_summaries, nchains) {
 
       rlang::warn(
         insight::format_warning(msg_parts),
-        .frequency = "once"
+        .frequency = "once",
+        .frequency_id = "mvgam_rhat_convergence"
       )
     }
   }
@@ -568,7 +569,8 @@ check_mvgam_convergence <- function(all_summaries, nchains) {
           "Parameter estimates may be unreliable.",
           "Consider increasing 'iter' to improve effective sample size."
         ),
-        .frequency = "once"
+        .frequency = "once",
+        .frequency_id = "mvgam_bulk_ess"
       )
     }
   }
@@ -589,7 +591,8 @@ check_mvgam_convergence <- function(all_summaries, nchains) {
           "Tail quantile estimates may be unreliable.",
           "Consider increasing 'iter' to improve tail ESS."
         ),
-        .frequency = "once"
+        .frequency = "once",
+        .frequency_id = "mvgam_tail_ess"
       )
     }
   }
