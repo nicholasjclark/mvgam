@@ -1,6 +1,6 @@
 # Setup models for tests locally
 library("testthat")
-library("mvgam")
+devtools::load_all()
 set.seed(123)
 
 expect_match2 <- function(object, regexp) {

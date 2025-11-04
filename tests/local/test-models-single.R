@@ -42,7 +42,7 @@ setup_stan_test_data <- function() {
 test_data <- setup_stan_test_data()
 
 # ==============================================================================
-# FIT MODELS ONCE (reused across multiple tests)
+# FIT MODELS
 # ==============================================================================
 
 # Fit Target 1: Basic RW model

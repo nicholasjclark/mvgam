@@ -383,12 +383,20 @@ extract_trend_component_info <- function(combined_fit, mv_spec) {
 
   if (!is.null(mv_spec$trend_specs)) {
     trend_info$specifications <- mv_spec$trend_specs
-    trend_info$n_trends <- length(mv_spec$trend_specs)
+
+    # Handle both single spec and list of specs
+    specs_list <- if (inherits(mv_spec$trend_specs, "mvgam_trend")) {
+      list(mv_spec$trend_specs)
+    } else {
+      mv_spec$trend_specs
+    }
+
+    trend_info$n_trends <- length(specs_list)
 
     # Extract trend types
-    trend_info$types <- sapply(mv_spec$trend_specs, function(spec) {
+    trend_info$types <- sapply(specs_list, function(spec) {
       if (inherits(spec, "mvgam_trend")) {
-        spec$trend_type
+        spec$trend
       } else {
         "custom"
       }

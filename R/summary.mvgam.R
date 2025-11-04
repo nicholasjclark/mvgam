@@ -74,18 +74,18 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
 
   # Exclude latent states unless requested
   if (!include_states) {
-    state_pattern <- "^(trend|lv_trend)\\["
-    pars_to_keep <- !grepl(state_pattern, pars)
+    pars_to_keep <- !is_latent_state_param(pars)
     all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
     pars <- rownames(all_summaries)
   }
 
-  # Exclude lprior and lp__
-  if (!is.null(object$exclude)) {
-    pars_to_keep <- !(rownames(all_summaries) %in% object$exclude)
-    all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
-    pars <- rownames(all_summaries)
-  }
+  # Exclude lprior, lp__, and uncentered b_Intercept_trend
+  # brms shows only centered Intercept_trend in summaries, hiding the
+  # uncentered b_Intercept_trend generated quantity used for back-transformation
+  exclude_pars <- c(object$exclude, "b_Intercept_trend")
+  pars_to_keep <- !(rownames(all_summaries) %in% exclude_pars)
+  all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
+  pars <- rownames(all_summaries)
 
   # Build output structure with metadata
   draws_obj <- posterior::as_draws(object$fit)
@@ -97,33 +97,82 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     ndraws = posterior::ndraws(draws_obj)
   )
 
-  # Check convergence and warn if issues detected
-  check_mvgam_convergence(all_summaries, nchains = out$nchains)
+  # Organize summaries by observation vs trend formula
+  # First identify which parameters belong to trend model
+  is_trend_param <- grepl("_trend", pars)
 
-  # Organize summaries by parameter category
-  obs_fixed_idx <- match_fixed_pars(pars)
+  # Detect distributional parameters (those with formulas like sigma ~ x)
+  dpars_with_formulas <- get_dpar_names(pars)
+
+  # Observation model parameters (no _trend suffix, no dpar prefix)
+  obs_fixed_idx <- match_fixed_pars(pars) & !is_trend_param
   if (any(obs_fixed_idx)) {
     out$fixed <- all_summaries[obs_fixed_idx, , drop = FALSE]
+    # Clean names: b_Intercept → Intercept, b_x → x
+    rownames(out$fixed) <- gsub("^b_", "", rownames(out$fixed))
   }
 
-  smooth_idx <- match_smooth_pars(pars)
-  if (any(smooth_idx)) {
-    out$smooth <- all_summaries[smooth_idx, , drop = FALSE]
+  obs_smooth_idx <- match_smooth_pars(pars) & !is_trend_param
+  if (any(obs_smooth_idx)) {
+    out$smooth <- all_summaries[obs_smooth_idx, , drop = FALSE]
   }
 
-  random_idx <- match_random_pars(pars)
-  if (any(random_idx)) {
-    out$random <- all_summaries[random_idx, , drop = FALSE]
+  obs_random_idx <- match_random_pars(pars) & !is_trend_param
+  if (any(obs_random_idx)) {
+    out$random <- all_summaries[obs_random_idx, , drop = FALSE]
   }
 
-  family_idx <- match_family_pars(pars)
+  # Distributional parameters (b_{dpar}_* pattern, following brms)
+  if (length(dpars_with_formulas) > 0) {
+    for (dpar in dpars_with_formulas) {
+      # Fixed effects for this dpar
+      dpar_fixed_idx <- match_dpar_fixed_pars(pars, dpar)
+      if (any(dpar_fixed_idx)) {
+        out[[paste0("dpar_", dpar, "_fixed")]] <-
+          all_summaries[dpar_fixed_idx, , drop = FALSE]
+        # Clean names: b_sigma_Intercept → Intercept, b_sigma_x → x
+        rownames(out[[paste0("dpar_", dpar, "_fixed")]]) <-
+          gsub(paste0("^b_", dpar, "_"), "",
+               rownames(out[[paste0("dpar_", dpar, "_fixed")]]))
+      }
+
+      # Smooths for this dpar
+      dpar_smooth_idx <- match_dpar_smooth_pars(pars, dpar)
+      if (any(dpar_smooth_idx)) {
+        out[[paste0("dpar_", dpar, "_smooth")]] <-
+          all_summaries[dpar_smooth_idx, , drop = FALSE]
+      }
+    }
+  }
+
+  # Family-specific parameters WITHOUT formulas (pass dpars to exclude them)
+  family_idx <- match_family_pars(pars, has_dpar_formulas = dpars_with_formulas)
   if (any(family_idx)) {
     out$spec <- all_summaries[family_idx, , drop = FALSE]
   }
 
-  trend_idx <- match_trend_pars(pars)
-  if (any(trend_idx)) {
-    out$trend <- all_summaries[trend_idx, , drop = FALSE]
+  # Trend model parameters (subdivided by type)
+  trend_fixed_idx <- match_trend_fixed_pars(pars)
+  if (any(trend_fixed_idx)) {
+    out$trend_fixed <- all_summaries[trend_fixed_idx, , drop = FALSE]
+    # Clean names: Intercept_trend → Intercept
+    rownames(out$trend_fixed) <- gsub("_trend$", "",
+                                       rownames(out$trend_fixed))
+  }
+
+  trend_smooth_idx <- match_trend_smooth_pars(pars)
+  if (any(trend_smooth_idx)) {
+    out$trend_smooth <- all_summaries[trend_smooth_idx, , drop = FALSE]
+  }
+
+  trend_random_idx <- match_trend_random_pars(pars)
+  if (any(trend_random_idx)) {
+    out$trend_random <- all_summaries[trend_random_idx, , drop = FALSE]
+  }
+
+  trend_spec_idx <- match_trend_specific_pars(pars)
+  if (any(trend_spec_idx)) {
+    out$trend_spec <- all_summaries[trend_spec_idx, , drop = FALSE]
   }
 
   z_idx <- match_z_loadings(pars)
@@ -182,22 +231,23 @@ compute_all_summaries <- function(object, probs, robust) {
   draws <- posterior::as_draws_df(object$fit)
 
   # Compute summaries using posterior package
+  # Suppress ESS capping warnings (users can call diagnostics functions if needed)
   if (robust) {
-    out <- posterior::summarise_draws(
+    out <- suppressWarnings(posterior::summarise_draws(
       draws,
       median,
       mad,
       ~quantile(.x, probs = probs),
       posterior::default_convergence_measures()
-    )
+    ))
   } else {
-    out <- posterior::summarise_draws(
+    out <- suppressWarnings(posterior::summarise_draws(
       draws,
       mean,
       sd,
       ~quantile(.x, probs = probs),
       posterior::default_convergence_measures()
-    )
+    ))
   }
 
   # Rename columns for display
@@ -313,19 +363,33 @@ match_random_pars <- function(pars) {
 #'
 #' @description
 #' Identifies family-specific parameters (sigma, shape, nu, phi, zi, hu)
-#' excluding trend model parameters.
+#' excluding trend model parameters and distributional parameters that have
+#' formulas (e.g., if sigma ~ x exists, exclude sigma[1]).
 #'
 #' @param pars Character vector of all parameter names
+#' @param has_dpar_formulas Character vector of distributional parameter names
+#'   that have formulas (from get_dpar_names())
 #' @return Logical vector indicating which parameters are family parameters
 #'
 #' @noRd
-match_family_pars <- function(pars) {
+match_family_pars <- function(pars, has_dpar_formulas = character()) {
+  checkmate::assert_character(pars)
+  checkmate::assert_character(has_dpar_formulas)
+
   # Match family parameter patterns
-  is_family <- grepl("^(sigma|shape|nu|phi|zi|hu)(_|$)", pars)
+  is_family <- grepl("^(sigma|shape|nu|phi|zi|hu)(_|\\[|$)", pars)
   # Exclude trend parameters
   is_trend <- grepl("_trend", pars)
 
-  is_family & !is_trend
+  # Exclude distributional parameters that have formulas
+  is_dpar_with_formula <- FALSE
+  if (length(has_dpar_formulas) > 0) {
+    # If sigma has a formula (b_sigma_*), exclude sigma[1], sigma[2], etc.
+    pattern <- paste0("^(", paste(has_dpar_formulas, collapse = "|"), ")(\\[|$)")
+    is_dpar_with_formula <- grepl(pattern, pars)
+  }
+
+  is_family & !is_trend & !is_dpar_with_formula
 }
 
 #' Match trend parameter names
@@ -347,6 +411,91 @@ match_trend_pars <- function(pars) {
   is_trend & !is_state
 }
 
+#' Match trend fixed effect parameter names
+#'
+#' @description
+#' Identifies population-level effects for trend formula, following brms
+#' convention of showing only centered Intercept_trend (not b_Intercept_trend).
+#'
+#' @param pars Character vector of all parameter names
+#' @return Logical vector indicating which parameters are trend fixed effects
+#'
+#' @noRd
+match_trend_fixed_pars <- function(pars) {
+  checkmate::assert_character(pars)
+  if (length(pars) == 0) return(logical(0))
+
+  # Match centered Intercept_trend (brms shows only centered, not b_Intercept_trend)
+  is_intercept <- pars == "Intercept_trend"
+
+  # Match b_trend[i] array elements (coefficients for predictors)
+  is_coef <- grepl("^b_trend\\[", pars)
+
+  is_intercept | is_coef
+}
+
+#' Match trend smooth parameter names
+#'
+#' @description
+#' Identifies smooth terms (GAM splines) in trend formula.
+#'
+#' @param pars Character vector of all parameter names
+#' @return Logical vector indicating which parameters are trend smooths
+#'
+#' @noRd
+match_trend_smooth_pars <- function(pars) {
+  checkmate::assert_character(pars)
+  if (length(pars) == 0) return(logical(0))
+  grepl("^s(ds)?_.*_trend", pars)
+}
+
+#' Match trend random effect parameter names
+#'
+#' @description
+#' Identifies group-level effects (random effects) in trend formula.
+#'
+#' @param pars Character vector of all parameter names
+#' @return Logical vector indicating which parameters are trend random effects
+#'
+#' @noRd
+match_trend_random_pars <- function(pars) {
+  checkmate::assert_character(pars)
+  if (length(pars) == 0) return(logical(0))
+  grepl("^(sd_|r_).*_trend", pars)
+}
+
+#' Match trend-specific parameter names
+#'
+#' @description
+#' Identifies trend dynamics parameters (sigma_trend, ar1_trend, etc.) that
+#' aren't fixed/smooth/random effects.
+#'
+#' @param pars Character vector of all parameter names
+#' @return Logical vector indicating which parameters are trend-specific
+#'
+#' @noRd
+match_trend_specific_pars <- function(pars) {
+  checkmate::assert_character(pars)
+  if (length(pars) == 0) return(logical(0))
+
+  # Parameters with _trend that aren't formula effects or states
+  is_trend <- grepl("_trend", pars)
+
+  # Not fixed effects (not Intercept_trend or b_trend[i])
+  is_not_fixed <- pars != "Intercept_trend" & !grepl("^b_trend\\[", pars)
+
+  # Not smooths (not s_*_trend or sds_*_trend)
+  is_not_smooth <- !grepl("^s(ds)?_.*_trend", pars)
+
+  # Not random effects (not sd_*_trend or r_*_trend)
+  is_not_random <- !grepl("^(sd_|r_).*_trend", pars)
+
+  # Not latent states
+  is_not_state <- !is_latent_state_param(pars)
+
+  is_trend & is_not_fixed & is_not_smooth & is_not_random & is_not_state
+}
+
 #' Match factor loading parameter names
 #'
 #' @description
@@ -358,6 +507,109 @@ match_trend_pars <- function(pars) {
 #' @noRd
 match_z_loadings <- function(pars) {
   grepl("^Z\\[", pars)
+}
+
+#' Get distributional parameter names
+#'
+#' @description
+#' Extracts unique distributional parameter names from parameter vector
+#' following brms pattern (b_sigma_*, b_phi_*, etc.). Returns names of
+#' distributional parameters that have formulas.
+#'
+#' @param pars Character vector of parameter names
+#' @return Character vector of unique distributional parameter names
+#'
+#' @noRd
+get_dpar_names <- function(pars) {
+  checkmate::assert_character(pars, min.len = 0)
+
+  # Match b_{dpar}_ pattern (e.g., b_sigma_Intercept, b_phi_x)
+  # Exclude trend parameters (b_trend)
+  dpar_pars <- pars[grepl("^b_[a-z][a-z0-9_]*_", pars) & !grepl("_trend", pars)]
+
+  if (length(dpar_pars) == 0) {
+    return(character(0))
+  }
+
+  # Extract dpar names (sigma, phi, nu, etc.)
+  dpars <- gsub("^b_([a-z][a-z0-9_]*)_.*", "\\1", dpar_pars)
+  dpars <- unique(dpars)
+  checkmate::assert_character(dpars, min.chars = 1, any.missing = FALSE)
+
+  dpars
+}
+
+#' Match distributional parameter fixed effects
+#'
+#' @description
+#' Identifies fixed effects for a specific distributional parameter
+#' (e.g., b_sigma_Intercept, b_sigma_x for sigma).
+#'
+#' @param pars Character vector of parameter names
+#' @param dpar Distributional parameter name (e.g., "sigma", "phi")
+#' @return Logical vector indicating matching parameters
+#'
+#' @noRd
+match_dpar_fixed_pars <- function(pars, dpar) {
+  checkmate::assert_character(pars, min.len = 0)
+  checkmate::assert_string(dpar, min.chars = 1)
+  if (length(pars) == 0) return(logical(0))
+
+  # Match b_{dpar}_* pattern
+  grepl(paste0("^b_", dpar, "_"), pars)
+}
+
+#' Match distributional parameter smooth terms
+#'
+#' @description
+#' Identifies smooth terms for distributional parameters
+#' (e.g., s_sigma_x_1[1] for sigma ~ s(x)).
+#'
+#' @param pars Character vector of parameter names
+#' @param dpar Distributional parameter name (e.g., "sigma", "phi")
+#' @return Logical vector indicating matching parameters
+#'
+#' @noRd
+match_dpar_smooth_pars <- function(pars, dpar) {
+  checkmate::assert_character(pars, min.len = 0)
+  checkmate::assert_string(dpar, min.chars = 1)
+  if (length(pars) == 0) return(logical(0))
+
+  # Match s_{dpar}_* or sds_{dpar}_* patterns
+  grepl(paste0("^s(ds)?_", dpar, "_"), pars)
+}
+
+#' Identify latent state parameters
+#'
+#' @description
+#' Helper to identify time-indexed latent state parameters from state-space
+#' model dynamics that should be excluded from summary output by default.
+#' These are the actual trend evolution states and intermediate computations
+#' that are numerous and typically not of direct interest. Excludes
+#' hyperparameters (sigma_trend, ar1_trend) and trend formula effects
+#' (Intercept_trend, b_*_trend) which are summarized separately.
+#'
+#' @param pars Character vector of parameter names
+#' @return Logical vector indicating which parameters are latent states
+#'
+#' @details
+#' Matches the following array-indexed parameters:
+#' \itemize{
+#'   \item{\code{trend[i,s]}}{Main state matrix for each series}
+#'   \item{\code{lv_trend[i,k]}}{Latent variable states}
+#'   \item{\code{innovations_trend[i,s]}}{Raw innovations}
+#'   \item{\code{mu_trend[i]}}{Trend formula linear predictor}
+#'   \item{\code{scaled_innovations_trend[i,s]}}{Scaled innovations}
+#' }
+#'
+#' @noRd
+is_latent_state_param <- function(pars) {
+  checkmate::assert_character(pars)
+
+  grepl(
+    "^(trend|lv_trend|innovations_trend|mu_trend|scaled_innovations_trend)\\[",
+    pars
+  )
 }
 
 # ==============================================================================
@@ -391,13 +643,15 @@ round_numeric <- function(x, digits = 2) {
 #' Helper to print a parameter table with header if the table exists.
 #'
 #' @param table Data frame or NULL
-#' @param header Character string for section header
+#' @param header Character string for section header or NULL for no header
 #' @param digits Number of decimal places
 #'
 #' @noRd
 print_param_section <- function(table, header, digits = 2) {
   if (!is.null(table) && nrow(table) > 0) {
-    cat(header, ":\n", sep = "")
+    if (!is.null(header)) {
+      cat(header, ":\n", sep = "")
+    }
     print(round_numeric(table, digits = digits), quote = FALSE)
     cat("\n")
   }
@@ -420,48 +674,146 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   checkmate::assert_class(x, "mvgam_summary")
   checkmate::assert_int(digits, lower = 0)
 
-  # Section 1: Formulas (distinguish observation vs process)
-  if (!is.null(x$trend_formula)) {
-    cat("GAM observation formula:\n")
-    print(x$formula)
-    cat("\nGAM process formula:\n")
-    print(x$trend_formula)
+  # Header formatting (brms style with fixed padding)
+
+  # Section 1: Family and Links (aligned with fixed spacing)
+  # Detect multivariate models by checking for mvbrmsformula with multiple forms
+  is_multivariate <- inherits(x$formula, "mvbrmsformula") &&
+    !is.null(x$formula$forms) &&
+    length(x$formula$forms) > 1
+
+  if (is_multivariate) {
+    # Multivariate model with response-specific families and links
+    # Extract response names and family info from formula$forms
+    resp_names <- x$formula$responses
+    families <- sapply(x$formula$forms, function(f) f$family$family)
+    links <- sapply(x$formula$forms, function(f) f$family$link)
+
+    # Format families following brms convention
+    # Pattern: "resp1: family1 \n          resp2: family2"
+    # Separator: " \n          " (space + newline + 10 spaces)
+    family_str <- paste0(resp_names, ": ", families)
+    family_str <- paste0(family_str, collapse = " \n          ")
+    cat("Family: ", family_str, " \n", sep = "")
+
+    # Format links following brms convention
+    # Pattern: "resp1: link1 \n        resp2: link2"
+    # Separator: " \n        " (space + newline + 8 spaces)
+    link_str <- paste0(resp_names, ": ", links)
+    link_str <- paste0(link_str, collapse = " \n        ")
+    cat("Links:  ", link_str, " \n", sep = "")
   } else {
-    cat("GAM formula:\n")
-    print(x$formula)
+    # Univariate model
+    cat("Family: ", x$family$family, " \n", sep = "")
+    cat("  Links: mu = ", x$family$link, " \n", sep = "")
   }
 
-  # Section 2: Family
-  cat("\nFamily:\n")
-  cat(format(x$family), '\n')
-
-  # Section 3: Trend model (if present)
-  if (!is.null(x$trend_model)) {
-    cat("\nTrend model:\n")
-    cat(x$trend_model, '\n')
+  # Section 2: Formula
+  if (is_multivariate) {
+    # For multivariate, format each response formula separately
+    # Extract formula from each form (not the entire form object)
+    formulas <- sapply(x$formula$forms, function(f) format(f$formula))
+    # Join with newline + 9 spaces to align with "Formula: "
+    formulas_str <- paste0(formulas, collapse = " \n         ")
+    cat("Formula: ", formulas_str, " \n", sep = "")
+  } else {
+    cat("Formula: ", format(x$formula), " \n", sep = "")
   }
 
-  # Section 4: Dimensions
-  if (!is.null(x$n_series)) {
-    cat('\nN series:\n')
-    cat(x$n_series, '\n')
+  # Section 3: Data and dimensions (brms style)
+  nobs <- x$n_series * x$n_timepoints
+  cat("   Data: (Number of observations: ", nobs, ") \n", sep = "")
+
+  # Add series count if multiple series
+  if (!is.null(x$n_series) && x$n_series > 1) {
+    cat(" Series: ", x$n_series, " \n", sep = "")
   }
 
-  if (!is.null(x$n_timepoints)) {
-    cat('\nN timepoints:\n')
-    cat(x$n_timepoints, '\n')
+  # Section 4: Trend information
+  if (!is.null(x$trend_formula) || !is.null(x$trend_model)) {
+    if (!is.null(x$trend_model)) {
+      cat(" Trends: ", x$trend_model, "()", sep = "")
+      # Add trend formula if it has predictors
+      if (!is.null(x$trend_formula)) {
+        trend_rhs <- if (length(x$trend_formula) == 3) {
+          formula(delete.response(terms(x$trend_formula)))
+        } else {
+          x$trend_formula
+        }
+        trend_str <- format(trend_rhs)
+        # Only show if not just ~1
+        if (!grepl("^~\\s*1\\s*$", trend_str)) {
+          cat("; formula: ", trend_str, sep = "")
+        }
+      }
+      cat(" \n", sep = "")
+    }
   }
 
-  # Section 5: Sampling information
-  cat('\nDraws:', x$ndraws, 'from', x$nchains, 'chains\n\n')
+  # Section 5: Sampling information (brms style with continuation line)
+  warmup <- floor(x$niter / 2)
+  cat(" Draws: ", x$nchains, " chains, each with iter = ", x$niter,
+      "; warmup = ", warmup, "; thin = 1; \n", sep = "")
+  cat("         total post-warmup draws = ", x$ndraws, "\n\n", sep = "")
 
-  # Section 6: Parameter tables
-  print_param_section(x$fixed, "Population-Level Effects", digits)
-  print_param_section(x$smooth, "Smooth Terms", digits)
-  print_param_section(x$random, "Group-Level Effects", digits)
-  print_param_section(x$spec, "Family Specific Parameters", digits)
-  print_param_section(x$trend, "Trend Parameters", digits)
-  print_param_section(x$loadings, "Factor Loadings", digits)
+  # Section 6: Observation Model Parameters
+  has_obs_params <- !is.null(x$fixed) || !is.null(x$smooth) ||
+                     !is.null(x$random)
+
+  if (has_obs_params) {
+    cat("== Observation Model ==\n")
+    print_param_section(x$fixed, "Population-Level Effects", digits)
+    print_param_section(x$smooth, "Smooth Terms", digits)
+    print_param_section(x$random, "Group-Level Effects", digits)
+  }
+
+  # Section 7: Distributional Parameters (brms style)
+  # Find all dpar sections (dpar_{name}_fixed, dpar_{name}_smooth)
+  dpar_sections <- names(x)[grepl("^dpar_", names(x))]
+  if (length(dpar_sections) > 0) {
+    # Extract unique dpar names
+    dpar_names <- unique(gsub("^dpar_([^_]+)_.*", "\\1", dpar_sections))
+
+    for (dpar_name in dpar_names) {
+      fixed_key <- paste0("dpar_", dpar_name, "_fixed")
+      smooth_key <- paste0("dpar_", dpar_name, "_smooth")
+
+      if (!is.null(x[[fixed_key]]) || !is.null(x[[smooth_key]])) {
+        cat(paste0("Coefficients for '", dpar_name, "':\n"))
+        if (!is.null(x[[fixed_key]])) {
+          print(round_numeric(x[[fixed_key]], digits), quote = FALSE)
+          cat("\n")
+        }
+        if (!is.null(x[[smooth_key]])) {
+          print(round_numeric(x[[smooth_key]], digits), quote = FALSE)
+          cat("\n")
+        }
+      }
+    }
+  }
+
+  # Section 8: Further Distributional Parameters (brms convention)
+  # These are family-specific parameters WITHOUT formulas
+  print_param_section(x$spec, "Further Distributional Parameters", digits)
+
+  # Section 9: Trend Model Parameters
+  has_trend_params <- !is.null(x$trend_fixed) || !is.null(x$trend_smooth) ||
+                      !is.null(x$trend_random) || !is.null(x$trend_spec) ||
+                      !is.null(x$loadings)
+
+  if (has_trend_params) {
+    cat("== Trend Model ==\n")
+    print_param_section(x$trend_fixed, "Population-Level Effects", digits)
+    print_param_section(x$trend_smooth, "Smooth Terms", digits)
+    print_param_section(x$trend_random, "Group-Level Effects", digits)
+    print_param_section(x$trend_spec, "Trend Specific Parameters", digits)
+    print_param_section(x$loadings, "Factor Loadings", digits)
+  }
+
+  # Section 10: Footer (brms style)
+  cat("Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS\n")
+  cat("and Tail_ESS are effective sample size measures, and Rhat is the potential\n")
+  cat("scale reduction factor on split chains (at convergence, Rhat = 1).\n")
 
   invisible(x)
 }
