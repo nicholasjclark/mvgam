@@ -428,14 +428,15 @@
                               "mvgam_single":  {
                                                    "s3_class":  "",
                                                    "s3_method":  "",
-                                                   "signature":  "mvgam_single \u003c- function(formula, trend_formula, data, backend, family, ...) {",
+                                                   "signature":  "mvgam_single \u003c- function(formula, trend_formula, data, backend, family, data_name = NULL, ...) {",
                                                    "is_s3_method":  false,
                                                    "arguments":  [
                                                                      "formula",
                                                                      "trend_formula",
                                                                      "data",
                                                                      "backend",
-                                                                     "family"
+                                                                     "family",
+                                                                     "data_name"
                                                                  ]
                                                },
                               "parse_data_declarations":  {
@@ -3325,14 +3326,15 @@
                               "create_mvgam_from_combined_fit":  {
                                                                      "s3_class":  "",
                                                                      "s3_method":  "",
-                                                                     "signature":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL, trend_metadata = NULL) {",
+                                                                     "signature":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL, trend_metadata = NULL, data_name = NULL) {",
                                                                      "is_s3_method":  false,
                                                                      "arguments":  [
                                                                                        "combined_fit",
                                                                                        "obs_setup",
                                                                                        "trend_setup",
                                                                                        "mv_spec",
-                                                                                       "trend_metadata"
+                                                                                       "trend_metadata",
+                                                                                       "data_name"
                                                                                    ]
                                                                  },
                               "require_package":  {
@@ -6243,7 +6245,7 @@
                                 "handle_response_trend_injection":  "handle_response_trend_injection \u003c- function(code_lines, resp_name) {",
                                 "reorganize_target_statements":  "reorganize_target_statements \u003c- function(lines) {",
                                 "map_prior_to_stan_string":  "map_prior_to_stan_string \u003c- function(prior_row) {",
-                                "mvgam_single":  "mvgam_single \u003c- function(formula, trend_formula, data, backend, family, ...) {",
+                                "mvgam_single":  "mvgam_single \u003c- function(formula, trend_formula, data, backend, family, data_name = NULL, ...) {",
                                 "parse_data_declarations":  "parse_data_declarations \u003c- function(data_block) {",
                                 "plot_time_series":  "plot_time_series \u003c- function( dat, lines = TRUE, log_scale = FALSE, ylab = \u0027y\u0027, series = \u0027all\u0027 ) {",
                                 "validate_nonlinear_trend_compatibility":  "validate_nonlinear_trend_compatibility \u003c- function(nl_components, trend_specs) {",
@@ -6563,7 +6565,7 @@
                                 "extract_brmsterms_from_setup":  "extract_brmsterms_from_setup \u003c- function(setup_object) {",
                                 "extract_prior_from_setup":  "extract_prior_from_setup \u003c- function(setup_object) {",
                                 "generate_var_trend_stanvars":  "generate_var_trend_stanvars \u003c- function(trend_specs, data_info, prior = NULL) {",
-                                "create_mvgam_from_combined_fit":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL, trend_metadata = NULL) {",
+                                "create_mvgam_from_combined_fit":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL, trend_metadata = NULL, data_name = NULL) {",
                                 "require_package":  "require_package \u003c- function(package, version = NULL) {",
                                 "as_one_logical":  "as_one_logical = function(x, allow_na = FALSE) {",
                                 "reorganize_model_block_statements":  "reorganize_model_block_statements \u003c- function(lines) {",
@@ -7599,7 +7601,7 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-11-04 13:06:43",
+                     "generated":  "2025-11-04 15:18:34",
                      "commit_hash":  "pending",
                      "cached_files":  55,
                      "version":  "2.0.0",

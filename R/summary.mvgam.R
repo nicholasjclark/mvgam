@@ -697,17 +697,17 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     # Separator: " \n          " (space + newline + 10 spaces)
     family_str <- paste0(resp_names, ": ", families)
     family_str <- paste0(family_str, collapse = " \n          ")
-    cat("Family: ", family_str, " \n", sep = "")
+    cat(" Family: ", family_str, " \n", sep = "")
 
     # Format links following brms convention
     # Pattern: "resp1: link1 \n        resp2: link2"
     # Separator: " \n        " (space + newline + 8 spaces)
     link_str <- paste0(resp_names, ": ", links)
     link_str <- paste0(link_str, collapse = " \n        ")
-    cat("Links:  ", link_str, " \n", sep = "")
+    cat("  Links: ", link_str, " \n", sep = "")
   } else {
     # Univariate model
-    cat("Family: ", x$family$family, " \n", sep = "")
+    cat(" Family: ", x$family$family, " \n", sep = "")
     cat("  Links: mu = ", x$family$link, " \n", sep = "")
   }
 
@@ -760,7 +760,7 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
 
   # Section 5: Sampling information (brms style with continuation line)
   warmup <- floor(x$niter / 2)
-  cat(" Draws: ", x$nchains, " chains, each with iter = ", x$niter,
+  cat("  Draws: ", x$nchains, " chains, each with iter = ", x$niter,
       "; warmup = ", warmup, "; thin = 1; \n", sep = "")
   cat("         total post-warmup draws = ", x$ndraws, "\n\n", sep = "")
 
