@@ -37,14 +37,17 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   checkmate::assert_character(backend, len = 1)
   checkmate::assert_logical(combine, len = 1)
 
+  # Capture data name from user's call (before passing to internal functions)
+  data_name <- deparse(match.call()$data)
+
   # Handle multiple imputation input
   if (is.list(data) && !is.data.frame(data)) {
     if (combine) {
       return(mvgam_multiple(formula, trend_formula, data, backend,
-                           combine = TRUE, ...))
+                           combine = TRUE, data_name = data_name, ...))
     } else {
       return(mvgam_multiple(formula, trend_formula, data, backend,
-                           combine = FALSE, ...))
+                           combine = FALSE, data_name = data_name, ...))
     }
   }
 
@@ -55,6 +58,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
     data = data,
     backend = backend,
     family = family,
+    data_name = data_name,
     ...
   )
 
@@ -77,7 +81,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
 #' @return mvgam object
 #' @noRd
 mvgam_single <- function(formula, trend_formula, data, backend,
-                        family, ...) {
+                        family, data_name = NULL, ...) {
 
   # Create mvgam_formula object for shared processing
   mvgam_formula_obj <- mvgam_formula(formula, trend_formula)
@@ -170,7 +174,8 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     obs_setup = stan_components$obs_setup,
     trend_setup = stan_components$trend_setup,
     mv_spec = stan_components$mv_spec,
-    trend_metadata = stan_components$trend_metadata
+    trend_metadata = stan_components$trend_metadata,
+    data_name = data_name
   )
 
   return(mvgam_object)
@@ -245,7 +250,8 @@ generate_combined_stancode_and_data <- function(obs_setup, trend_setup, mv_spec,
 create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
                                           trend_setup = NULL,
                                           mv_spec = NULL,
-                                          trend_metadata = NULL) {
+                                          trend_metadata = NULL,
+                                          data_name = NULL) {
   checkmate::assert_class(combined_fit, "stanfit")
   checkmate::assert_list(obs_setup, names = "named")
   checkmate::assert_list(trend_setup, names = "named", null.ok = TRUE)
@@ -265,6 +271,7 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       family = obs_setup$family,
       prior = obs_setup$prior,
       data = obs_setup$data,
+      data.name = data_name,
       stancode = obs_setup$stancode,
       standata = obs_setup$standata,
       exclude = c("lprior", "lp__"),

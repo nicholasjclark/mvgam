@@ -204,6 +204,9 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     NULL
   }
 
+  # Store data name (captured at top-level mvgam() call)
+  out$data_name <- object$data.name
+
   structure(out, class = "mvgam_summary")
 }
 
@@ -722,7 +725,12 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
 
   # Section 3: Data and dimensions (brms style)
   nobs <- x$n_series * x$n_timepoints
-  cat("   Data: (Number of observations: ", nobs, ") \n", sep = "")
+  if (!is.null(x$data_name)) {
+    cat("   Data: ", x$data_name, " (Number of observations: ", nobs, ") \n",
+        sep = "")
+  } else {
+    cat("   Data: (Number of observations: ", nobs, ") \n", sep = "")
+  }
 
   # Add series count if multiple series
   if (!is.null(x$n_series) && x$n_series > 1) {

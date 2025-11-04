@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-11-04 10:20:48  
+**Generated:** 2025-11-04 13:06:43  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 57
-- **Total Functions:** 466
+- **Total Functions:** 474
 - **Exported Functions:** 57
-- **Internal Functions:** 423
+- **Internal Functions:** 431
 - **S3 Methods:** 40
 - **S3 Classes:** 30
 
@@ -142,8 +142,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_list_trend_formula, validate_single_trend_formula, validate_nonlinear_trend_compatibility, validate_required_variables (+ 56 more)
 
 ### Core Files
-- **`R/summary.mvgam.R`** (16 functions) - Summary methods
-  - Key functions: match_trend_pars, check_mvgam_convergence, summary.mvgam, compute_all_summaries, rename_summary_cols, match_fixed_pars, match_smooth_pars, match_random_pars, match_family_pars, match_z_loadings (+ 6 more)
+- **`R/summary.mvgam.R`** (24 functions) - Summary methods
+  - Key functions: match_trend_pars, match_trend_fixed_pars, match_trend_smooth_pars, match_trend_random_pars, match_trend_specific_pars, check_mvgam_convergence, summary.mvgam, compute_all_summaries, rename_summary_cols, match_fixed_pars (+ 14 more)
 - **`R/mvgam_core.R`** (13 functions) - Core package functionality
   - Key functions: mvgam, mvgam_multiple, mvgam_single, generate_combined_stancode_and_data, create_mvgam_from_combined_fit, extract_mvgam_components, validate_multiple_imputation_datasets, fit_multiple_imputation_models, extract_trend_component_info, validate_missing_patterns (+ 3 more)
 - **`R/print.mvgam.R`** (11 functions) - Print methods for objects
@@ -352,6 +352,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 
 ### `R/sim_mvgam.R` (1 potentially unused):
 - **sim_seasonal()** (internal, never called)
+
+### `R/summary.mvgam.R` (2 potentially unused):
+- **check_mvgam_convergence()** (internal, never called)
+- **match_trend_pars()** (internal, never called)
 
 ### `R/trend_system.R` (11 potentially unused):
 - **ar_trend_properties()** (internal, never called)
@@ -720,11 +724,19 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **check_mvgam_convergence()** (internal)
 - **compute_all_summaries()** (internal)
 - **error()** (internal)
+- **get_dpar_names()** (internal)
+- **is_latent_state_param()** (internal)
+- **match_dpar_fixed_pars()** (internal)
+- **match_dpar_smooth_pars()** (internal)
 - **match_family_pars()** (internal)
 - **match_fixed_pars()** (internal)
 - **match_random_pars()** (internal)
 - **match_smooth_pars()** (internal)
+- **match_trend_fixed_pars()** (internal)
 - **match_trend_pars()** (internal)
+- **match_trend_random_pars()** (internal)
+- **match_trend_smooth_pars()** (internal)
+- **match_trend_specific_pars()** (internal)
 - **match_z_loadings()** (internal)
 - **print.mvgam_pooled_summary()** (internal)
 - **print.mvgam_summary()** (internal)
