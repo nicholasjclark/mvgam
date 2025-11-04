@@ -170,3 +170,62 @@ test_that("mvgam_multiple with combine=FALSE returns list", {
   expect_s3_class(summ1, "mvgam_summary")
   expect_false(inherits(summ1, "mvgam_pooled_summary"))
 })
+
+# ==============================================================================
+# Test 6: Documentation @examples code runs without errors
+# ==============================================================================
+
+test_that("mvgam_multiple() @examples code runs correctly", {
+  # Create pseudo-imputed data (3 imputations) - exact code from @examples
+  base_data <- data.frame(
+    time = 1:24,
+    series = factor(rep("series1", 24)),
+    y = rnorm(24, mean = 3, sd = 1),
+    season = 1:24
+  )
+
+  imputed_list <- lapply(1:3, function(i) {
+    data_copy <- base_data
+    data_copy$y <- data_copy$y + rnorm(nrow(data_copy), 0, 0.1)
+    data_copy
+  })
+
+  # Fit with combined posteriors (recommended) - from @examples
+  fit_pooled_doc <- SW(SM(mvgam_multiple(
+    formula = y ~ s(season, bs = "cc", k = 5),
+    trend_formula = ~ 1,
+    data_list = imputed_list,
+    family = gaussian(),
+    backend = "rstan",
+    combine = TRUE,
+    chains = 2,
+    iter = 500,
+    silent = 2
+  )))
+
+  # Check MI diagnostics - from @examples
+  summ <- summary(fit_pooled_doc)
+  expect_s3_class(summ, "mvgam_pooled_summary")
+  expect_true(!is.null(summ$mi_diagnostics))
+
+  # Check print works - from @examples
+  expect_output(print(fit_pooled_doc), "Family:")
+
+  # Fit separately (for advanced use cases) - from @examples
+  fit_list_doc <- SW(SM(mvgam_multiple(
+    formula = y ~ s(season, bs = "cc", k = 5),
+    trend_formula = ~ 1,
+    data_list = imputed_list,
+    family = gaussian(),
+    backend = "rstan",
+    combine = FALSE,
+    chains = 2,
+    iter = 500,
+    silent = 2
+  )))
+
+  # Verify list structure - implied by @examples
+  expect_type(fit_list_doc, "list")
+  expect_length(fit_list_doc, 3)
+  expect_true(all(sapply(fit_list_doc, inherits, "mvgam")))
+})

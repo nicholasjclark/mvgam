@@ -1,17 +1,17 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-11-04 07:45:22  
+**Generated:** 2025-11-04 09:47:03  
 **Package:** mvgam v2.0.0  
 **Commit:**   
 
 ## Summary
 
 - **Total Files:** 57
-- **Total Functions:** 469
-- **Exported Functions:** 56
-- **Internal Functions:** 427
+- **Total Functions:** 466
+- **Exported Functions:** 57
+- **Internal Functions:** 423
 - **S3 Methods:** 40
-- **S3 Classes:** 28
+- **S3 Classes:** 30
 
 ## External Dependencies
 - bayesplot
@@ -46,7 +46,7 @@
 ## S3 Object System
 
 ### S3 Classes
-- array.mvgam, brmsformula, brmsopencl, brmsthreads, construct.mod.smooth.spec, construct.moi.smooth.spec, data.frame.mvgam, default, formula, how_to_cite, jsdgam, matrix.mod.smooth, matrix.moi.smooth, matrix.mvgam, mvgam, mvgam_fevd, mvgam_forecast, mvgam_formula, mvgam_irf, mvgam_lfo, mvgam_prefit, mvgam_residcor, mvgam_summary, mvgam_trend, mvgamstancode, stanfit, to.ts, trend_param
+- array.mvgam, brmsformula, brmsopencl, brmsthreads, construct.mod.smooth.spec, construct.moi.smooth.spec, data.frame.mvgam, default, formula, how_to_cite, jsdgam, matrix.mod.smooth, matrix.moi.smooth, matrix.mvgam, mvgam, mvgam_fevd, mvgam_forecast, mvgam_formula, mvgam_irf, mvgam_lfo, mvgam_pooled, mvgam_pooled_summary, mvgam_prefit, mvgam_residcor, mvgam_summary, mvgam_trend, mvgamstancode, stanfit, to.ts, trend_param
 
 ### Key S3 Methods
 - **as()**: array.mvgam, data.frame.mvgam, matrix.mvgam
@@ -54,12 +54,12 @@
 - **is()**: brmsopencl, brmsthreads, mvgam, mvgam_trend, stanfit, trend_param
 - **plot()**: mvgam, mvgam_fevd, mvgam_forecast, mvgam_irf, mvgam_lfo, mvgam_residcor
 - **Predict()**: matrix.mod.smooth, matrix.moi.smooth
-- **print()**: how_to_cite, mvgam, mvgam_formula, mvgam_prefit, mvgam_summary, mvgam_trend, mvgamstancode, trend_param
+- **print()**: how_to_cite, mvgam, mvgam_formula, mvgam_pooled_summary, mvgam_prefit, mvgam_summary, mvgam_trend, mvgamstancode, trend_param
 - **residual_cor()**: jsdgam, mvgam
 - **residuals()**: mvgam
 - **smooth()**: construct.mod.smooth.spec, construct.moi.smooth.spec
 - **stancode()**: mvgam, mvgam_formula, mvgam_prefit
-- **summary()**: mvgam, mvgam_fevd, mvgam_forecast, mvgam_irf
+- **summary()**: mvgam, mvgam_fevd, mvgam_forecast, mvgam_irf, mvgam_pooled
 
 ## Core Data Structures
 - **mvgam object**: Fitted model with data, parameters, and predictions
@@ -70,8 +70,6 @@
 ## Function Dependencies & Architecture
 
 ### Priority Integration Functions (Stan/brms/Core/Validation)
-- **create_pooled_mvgam()** (`R/mvgam_core.R`)
-  - Internal calls: extract_pooling_diagnostics
 - **extract_response_names()** (`R/brms_integration.R`)
   - Internal calls: extract_mvbind_responses
 - **extract_prior_from_setup()** (`R/brms_integration.R`)
@@ -82,6 +80,8 @@
   - Internal calls: formula2str_mvgam, get_trend_validation_patterns, mvgam, RW
 - **mvgam_formula()** (`R/priors.R`)
   - Internal calls: validate_single_trend_formula
+- **extract_nonlinear_components()** (`R/brms_integration.R`)
+  - Internal calls: parse_nonlinear_manually
 
 ### Core Workflow Functions (Prior/Trend/Stan Assembly Systems)
 - **mvgam_formula()** (`R/priors.R`)
@@ -142,10 +142,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_list_trend_formula, validate_single_trend_formula, validate_nonlinear_trend_compatibility, validate_required_variables (+ 56 more)
 
 ### Core Files
-- **`R/mvgam_core.R`** (19 functions) - Core package functionality
-  - Key functions: mvgam, mvgam_single, generate_combined_stancode_and_data, create_mvgam_from_combined_fit, extract_mvgam_components, mvgam_multiple, validate_multiple_imputation_datasets, fit_multiple_imputation_models, mvgam_single_imputation, pool_mvgam_fits, apply_rubins_rules, create_pooled_mvgam, extract_trend_component_info, validate_missing_patterns (+ 5 more)
-- **`R/summary.mvgam.R`** (13 functions) - Summary methods
-  - Key functions: match_trend_pars, check_mvgam_convergence, summary.mvgam, compute_all_summaries, rename_summary_cols, match_fixed_pars, match_smooth_pars, match_random_pars, match_family_pars, match_z_loadings (+ 3 more)
+- **`R/summary.mvgam.R`** (16 functions) - Summary methods
+  - Key functions: match_trend_pars, check_mvgam_convergence, summary.mvgam, compute_all_summaries, rename_summary_cols, match_fixed_pars, match_smooth_pars, match_random_pars, match_family_pars, match_z_loadings (+ 6 more)
+- **`R/mvgam_core.R`** (13 functions) - Core package functionality
+  - Key functions: mvgam, mvgam_multiple, mvgam_single, generate_combined_stancode_and_data, create_mvgam_from_combined_fit, extract_mvgam_components, validate_multiple_imputation_datasets, fit_multiple_imputation_models, extract_trend_component_info, validate_missing_patterns (+ 3 more)
 - **`R/print.mvgam.R`** (11 functions) - Print methods for objects
   - Key functions: stancode.mvgam, stancode.mvgam_prefit, print.mvgamstancode, print.mvgam, print.mvgam_formula, print_model_specification_simple, family.mvgam, formula.mvgam, nobs.mvgam, extract_mcmc_info (+ 1 more)
 - **`R/as.data.frame.mvgam.R`** (10 functions) - Data documentation and loading
@@ -263,7 +263,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/irf.mvgam.R`**: irf
 - **`R/lfo_cv.mvgam.R`**: lfo_cv
 - **`R/lv_correlations.R`**: lv_correlations
-- **`R/mvgam_core.R`**: mvgam
+- **`R/mvgam_core.R`**: mvgam, mvgam_multiple
 - **`R/ordinate.jsdgam.R`**: ordinate
 - **`R/plot_mvgam_factors.R`**: plot_mvgam_factors
 - **`R/plot_mvgam_fc.R`**: plot_mvgam_fc
@@ -504,12 +504,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **normalize_mu_expression()** (internal)
 
 ### `R/mvgam_core.R`:
-- **extract_fit_estimates()** (internal)
-- **extract_pooling_diagnostics()** (internal)
 - **extract_series_information()** (internal)
 - **extract_time_information()** (internal)
 - **extract_trend_component_info()** (internal)
-- **pool_parameter_estimates()** (internal)
+- **pool_mvgam_fits()** (internal)
 - **validate_missing_patterns()** (internal)
 
 ### `R/mvgam_fevd-class.R`:
@@ -721,17 +719,20 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### `R/summary.mvgam.R`:
 - **check_mvgam_convergence()** (internal)
 - **compute_all_summaries()** (internal)
+- **error()** (internal)
 - **match_family_pars()** (internal)
 - **match_fixed_pars()** (internal)
 - **match_random_pars()** (internal)
 - **match_smooth_pars()** (internal)
 - **match_trend_pars()** (internal)
 - **match_z_loadings()** (internal)
+- **print.mvgam_pooled_summary()** (internal)
 - **print.mvgam_summary()** (internal)
 - **print_param_section()** (internal)
 - **rename_summary_cols()** (internal)
 - **round_numeric()** (internal)
 - **summary.mvgam()** (internal)
+- **summary.mvgam_pooled()** (internal)
 
 ### `R/tidier_methods.R`:
 - **augment.mvgam()** (internal)

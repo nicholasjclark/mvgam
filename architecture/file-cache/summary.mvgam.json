@@ -1,10 +1,12 @@
 ﻿{
     "s3_methods":  {
                        "summary":  [
-                                       "mvgam"
+                                       "mvgam",
+                                       "mvgam_pooled"
                                    ],
                        "print":  [
-                                     "mvgam_summary"
+                                     "mvgam_summary",
+                                     "mvgam_pooled_summary"
                                  ]
                    },
     "functions":  [
@@ -20,7 +22,10 @@
                       "round_numeric",
                       "print_param_section",
                       "print.mvgam_summary",
-                      "check_mvgam_convergence"
+                      "check_mvgam_convergence",
+                      "summary.mvgam_pooled",
+                      "print.mvgam_pooled_summary",
+                      "error"
                   ],
     "purpose":  "Summary methods",
     "function_dependencies":  {
@@ -34,10 +39,13 @@
                                 "print_param_section":  "print_param_section \u003c- function(table, header, digits = 2) {",
                                 "summary.mvgam":  "summary.mvgam \u003c- function(object, probs = c(0.025, 0.975), robust = FALSE, include_states = FALSE, ...) {",
                                 "check_mvgam_convergence":  "check_mvgam_convergence \u003c- function(all_summaries, nchains) {",
+                                "print.mvgam_pooled_summary":  "print.mvgam_pooled_summary \u003c- function(x, digits = 2, ...) {",
                                 "match_z_loadings":  "match_z_loadings \u003c- function(pars) {",
                                 "match_family_pars":  "match_family_pars \u003c- function(pars) {",
                                 "match_random_pars":  "match_random_pars \u003c- function(pars) {",
+                                "summary.mvgam_pooled":  "summary.mvgam_pooled \u003c- function(object, probs = c(0.025, 0.975), robust = FALSE, include_states = FALSE, ...) {",
                                 "compute_all_summaries":  "compute_all_summaries \u003c- function(object, probs, robust) {",
+                                "error":  "error = function(e) NULL",
                                 "print.mvgam_summary":  "print.mvgam_summary \u003c- function(x, digits = 2, ...) {",
                                 "match_smooth_pars":  "match_smooth_pars \u003c- function(pars) {"
                             },
