@@ -65,11 +65,14 @@
 
 - [ ] **1.0 Foundation Infrastructure**
   - [x] 1.1 Add obs_model and trend_model storage to mvgam objects
-  - [ ] 1.2 Create S3 mock stanfit class and as_draws_matrix method
-  - [ ] 1.3 Implement observation parameter identification function
-  - [ ] 1.4 Implement trend parameter identification function
-  - [ ] 1.5 Write unit tests for parameter identification
-  - [ ] 1.6 Write unit tests for mock stanfit pattern
+  - [x] 1.2 Create S3 mock stanfit class and as_draws_matrix method
+  - [x] 1.3 Create .categorize_parameters() internal helper
+    - [ ] 1.3.1 Plan alias column implementation (map Stan to brms names)
+  - [ ] 1.4 Update validate_variables() to use .categorize_parameters()
+  - [ ] 1.5 Update tidy.mvgam() to use .categorize_parameters()
+  - [ ] 1.6 Update mcmc_plot.mvgam() and pairs.mvgam() to use helper
+  - [ ] 1.7 Write unit tests for .categorize_parameters()
+  - [ ] 1.8 Verify all affected functions work correctly
 
 - [ ] **2.0 Core Linear Predictor Computation**
   - [ ] 2.1 Create extract_linpred_from_prep() for observation model
