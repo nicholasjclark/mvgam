@@ -241,11 +241,12 @@ generate_combined_stancode_and_data <- function(obs_setup, trend_setup, mv_spec,
 #' Create mvgam Object from Combined Stan Fit
 #'
 #' @param combined_fit Stan fit object from combined model
-#' @param obs_setup Observation model setup components
-#' @param trend_setup Trend model setup components
+#' @param obs_setup Observation model setup components (must include brmsfit)
+#' @param trend_setup Trend model setup components (must include brmsfit)
 #' @param mv_spec Multivariate trend specification
 #' @param trend_metadata Trend metadata for prediction
-#' @return mvgam object
+#' @param data_name Optional name for the dataset
+#' @return mvgam object with stored brmsfit objects for prediction workflows
 #' @noRd
 create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
                                           trend_setup = NULL,
@@ -257,6 +258,23 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
   checkmate::assert_list(trend_setup, names = "named", null.ok = TRUE)
   checkmate::assert_list(mv_spec, names = "named", null.ok = TRUE)
   checkmate::assert_list(trend_metadata, names = "named", null.ok = TRUE)
+
+  # Validate brmsfit field existence for prediction system
+  if (!"brmsfit" %in% names(obs_setup)) {
+    insight::format_error(
+      "{.field obs_setup} missing required {.field brmsfit} component.",
+      "The observation model setup must include a brmsfit object for predictions.",
+      "Check setup_brms_lightweight() implementation."
+    )
+  }
+
+  if (!is.null(trend_setup) && !"brmsfit" %in% names(trend_setup)) {
+    insight::format_error(
+      "{.field trend_setup} missing required {.field brmsfit} component.",
+      "The trend model setup must include a brmsfit object for predictions.",
+      "Check setup_brms_lightweight() implementation."
+    )
+  }
 
   mvgam_components <- extract_mvgam_components(combined_fit, obs_setup,
                                               trend_setup, mv_spec)
@@ -281,6 +299,9 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       series_info = mvgam_components$series_info,
       time_info = mvgam_components$time_info,
       trend_metadata = trend_metadata,
+      # Store lightweight brmsfit objects for prediction workflows
+      obs_model = obs_setup$brmsfit,
+      trend_model = if (!is.null(trend_setup)) trend_setup$brmsfit else NULL,
       backend = backend,
       algorithm = combined_fit@sim$algorithm %||% "sampling",
       brms_version = utils::packageVersion("brms"),
