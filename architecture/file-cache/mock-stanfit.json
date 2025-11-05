@@ -1,0 +1,20 @@
+﻿{
+    "s3_methods":  {
+                       "as_draws_matrix":  [
+                                               "mock_stanfit"
+                                           ]
+                   },
+    "functions":  [
+                      "create_mock_stanfit",
+                      "as_draws_matrix.mock_stanfit"
+                  ],
+    "purpose":  "Model fitting",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "create_mock_stanfit":  "create_mock_stanfit \u003c- function(draws_matrix) {",
+                                "as_draws_matrix.mock_stanfit":  "as_draws_matrix.mock_stanfit \u003c- function(x, ...) {"
+                            },
+    "file":  "R/mock-stanfit.R"
+}

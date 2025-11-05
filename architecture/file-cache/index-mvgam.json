@@ -5,13 +5,15 @@
                                      ]
                    },
     "functions":  [
-                      "variables.mvgam"
+                      "variables.mvgam",
+                      "create_component"
                   ],
     "purpose":  "",
     "function_dependencies":  {
 
                               },
     "function_signatures":  {
+                                "create_component":  "create_component \u003c- function(pars) {",
                                 "variables.mvgam":  "variables.mvgam \u003c- function(x, ...) {"
                             },
     "file":  "R/index-mvgam.R"

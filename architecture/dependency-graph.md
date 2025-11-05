@@ -1,17 +1,17 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-11-05 11:33:05  
+**Generated:** 2025-11-05 13:21:59  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
-- **Total Files:** 57
-- **Total Functions:** 474
+- **Total Files:** 58
+- **Total Functions:** 477
 - **Exported Functions:** 57
-- **Internal Functions:** 431
+- **Internal Functions:** 434
 - **S3 Methods:** 40
-- **S3 Classes:** 30
+- **S3 Classes:** 31
 
 ## External Dependencies
 - bayesplot
@@ -46,10 +46,11 @@
 ## S3 Object System
 
 ### S3 Classes
-- array.mvgam, brmsformula, brmsopencl, brmsthreads, construct.mod.smooth.spec, construct.moi.smooth.spec, data.frame.mvgam, default, formula, how_to_cite, jsdgam, matrix.mod.smooth, matrix.moi.smooth, matrix.mvgam, mvgam, mvgam_fevd, mvgam_forecast, mvgam_formula, mvgam_irf, mvgam_lfo, mvgam_pooled, mvgam_pooled_summary, mvgam_prefit, mvgam_residcor, mvgam_summary, mvgam_trend, mvgamstancode, stanfit, to.ts, trend_param
+- array.mvgam, brmsformula, brmsopencl, brmsthreads, construct.mod.smooth.spec, construct.moi.smooth.spec, data.frame.mvgam, default, formula, how_to_cite, jsdgam, matrix.mod.smooth, matrix.moi.smooth, matrix.mvgam, mock_stanfit, mvgam, mvgam_fevd, mvgam_forecast, mvgam_formula, mvgam_irf, mvgam_lfo, mvgam_pooled, mvgam_pooled_summary, mvgam_prefit, mvgam_residcor, mvgam_summary, mvgam_trend, mvgamstancode, stanfit, to.ts, trend_param
 
 ### Key S3 Methods
 - **as()**: array.mvgam, data.frame.mvgam, matrix.mvgam
+- **as_draws_matrix()**: mock_stanfit, mvgam
 - **get_prior()**: brmsformula, default, formula, mvgam_formula
 - **is()**: brmsopencl, brmsthreads, mvgam, mvgam_trend, stanfit, trend_param
 - **plot()**: mvgam, mvgam_fevd, mvgam_forecast, mvgam_irf, mvgam_lfo, mvgam_residcor
@@ -154,26 +155,26 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: lfo_cvlog_sum_exp log_mean_exp lfo_cv.mvgam plot.mvgam_lfo cv_split sum_rows (+ 6 more)
 - **`R/loo.mvgam.R`** (6 functions)
   - Key functions: loo.mvgam, loo_compare.mvgam, split_mod_dots, named_list, clean_ll, samp_noinf
-- **`R/sim_mvgam.R`** (5 functions)
-  - Key functions: sim_mvgamperiodic_gp lkj_corr sim_seasonal random_Sigma (+ 4 more)
 - **`R/irf.mvgam.R`** (5 functions)
   - Key functions: irfirf.mvgam gen_irf var_phi var_psi (+ 4 more)
+- **`R/sim_mvgam.R`** (5 functions)
+  - Key functions: sim_mvgamperiodic_gp lkj_corr sim_seasonal random_Sigma (+ 4 more)
 - **`R/ppc.mvgam.R`** (5 functions)
   - Key functions: ppc, pp_check.mvgam, ppc.mvgam, ecdf_plotdat, is_like_factor
 - **`R/fevd.mvgam.R`** (4 functions)
   - Key functions: fevd, fevd.mvgam, gen_fevd, var_fecov
-- **`R/series_to_mvgam.R`** (2 functions)
-  - Key functions: series_to_mvgamxts.to.ts (+ 1 more)
+- **`R/index-mvgam.R`** (2 functions)
+  - Key functions: create_componentvariables.mvgam (+ 1 more)
 - **`R/plot.mvgam.R`** (2 functions) - Plotting and visualization
   - Key functions: plot.mvgam, plottable
-- **`R/pairs.mvgam.R`** (1 functions)
-  - Key functions: pairs.mvgam
+- **`R/series_to_mvgam.R`** (2 functions)
+  - Key functions: series_to_mvgamxts.to.ts (+ 1 more)
 - **`R/residuals.mvgam.R`** (1 functions) - Residual analysis
   - Key functions: residuals.mvgam
+- **`R/pairs.mvgam.R`** (1 functions)
+  - Key functions: pairs.mvgam
 - **`R/mcmc_plot.mvgam.R`** (1 functions) - Plotting and visualization
   - Key functions: mcmc_plot.mvgam
-- **`R/index-mvgam.R`** (1 functions)
-  - Key functions: variables.mvgam
 
 ### Other Files
 - **`R/trend_system.R`** (65 functions) - Trend modeling
@@ -231,6 +232,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: polish_generated_stan_code, try_stanheaders_formatting, update_stan_header, reorganize_lprior_statements, clean_stan_comments, fix_blank_lines, add_targeted_comments, insert_comment_before_line, reorganize_target_statements, find_matching_closing_brace (+ 1 more)
 - **`R/make_stan.R`** (3 functions) - Stan model integration
   - Key functions: generate_stan_components_mvgam_formula, stancode.mvgam_formula, standata.mvgam_formula
+- **`R/mock-stanfit.R`** (2 functions) - Model fitting
+  - Key functions: create_mock_stanfit, as_draws_matrix.mock_stanfit
 
 ### Plotting Files
 - **`R/plot_mvgam_series.R`** (6 functions) - Plotting and visualization
@@ -243,14 +246,14 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: plot_mvgam_smooth
 - **`R/plot_mvgam_pterms.R`** (1 functions) - Plotting and visualization
   - Key functions: plot_mvgam_pterms
-- **`R/plot_mvgam_factors.R`** (1 functions) - Plotting and visualization
-  - Key functions: plot_mvgam_factors
+- **`R/plot_mvgam_resids.R`** (1 functions) - Plotting and visualization
+  - Key functions: plot_mvgam_resids
 - **`R/plot_mvgam_randomeffects.R`** (1 functions) - Plotting and visualization
   - Key functions: plot_mvgam_randomeffects
 - **`R/plot_mvgam_trend.R`** (1 functions) - Trend modeling
   - Key functions: plot_mvgam_trend
-- **`R/plot_mvgam_resids.R`** (1 functions) - Plotting and visualization
-  - Key functions: plot_mvgam_resids
+- **`R/plot_mvgam_factors.R`** (1 functions) - Plotting and visualization
+  - Key functions: plot_mvgam_factors
 
 ## Function Location Quick Reference
 
@@ -447,6 +450,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **print.how_to_cite()** (internal)
 
 ### `R/index-mvgam.R`:
+- **create_component()** (internal)
 - **variables.mvgam()** (internal)
 
 ### `R/irf.mvgam.R`:
@@ -483,6 +487,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 
 ### `R/mcmc_plot.mvgam.R`:
 - **mcmc_plot.mvgam()** (internal)
+
+### `R/mock-stanfit.R`:
+- **as_draws_matrix.mock_stanfit()** (internal)
+- **create_mock_stanfit()** (internal)
 
 ### `R/monotonic.R`:
 - **add_mono_model_file()** (internal)
