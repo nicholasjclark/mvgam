@@ -28,27 +28,7 @@
 
 ## Tasks
 
-- [ ] 1.0 Parameter Renaming Infrastructure for User-Facing Methods
-  - [ ] 1.1 Fix `variables.mvgam()` to return structured categorization output instead of character vector
-  - [ ] 1.2 Update all calling code that expects character vector from `variables()` to handle structured output
-  - [ ] 1.3 Research brms parameter naming patterns for coefficients (intercepts, fixed effects, interactions) using the r package analyzer
-  - [ ] 1.4 Research brms parameter naming patterns for random effects (varying intercepts, varying slopes, correlations) using the r package analyzer
-  - [ ] 1.5 Implement internal helper to extract coefficient names from brms mock model objects for observation formula
-  - [ ] 1.6 Implement internal helper to extract coefficient names from brms mock model objects for trend formula
-  - [ ] 1.7 Implement internal helper to extract random effect names from brms model structure
-  - [ ] 1.8 Implement internal helper to map Stan parameter names to brms-style names for observation coefficients
-  - [ ] 1.9 Implement internal helper to map Stan parameter names to brms-style names for trend coefficients
-  - [ ] 1.10 Implement internal helper to map Stan parameter names to brms-style names for random effects
-  - [ ] 1.11 Update `.categorize_parameters()` to populate alias column for observation_betas using coefficient mapping
-  - [ ] 1.12 Update `.categorize_parameters()` to populate alias column for trend_betas using coefficient mapping
-  - [ ] 1.13 Update `.categorize_parameters()` to populate alias column for observation_re_params using random effects mapping
-  - [ ] 1.14 Update `.categorize_parameters()` to populate alias column for trend_re_params using random effects mapping
-  - [ ] 1.15 Validate parameter aliasing works correctly with `as.data.frame.mvgam()` using test models
-  - [ ] 1.16 Validate parameter aliasing works correctly with `mcmc_plot.mvgam()` using test models
-  - [ ] 1.17 Validate parameter aliasing works correctly with `tidy.mvgam()` using test models
-  - [ ] 1.18 Test parameter extraction across test models in `tests/local/` for completeness
-  - [ ] 1.19 Ensure all posterior package methods work with renamed parameters
-  - [ ] 1.20 Update roxygen2 documentation for `variables.mvgam()` to reflect new return structure
+- [ ] 1.0 Parameter Renaming Infrastructure for User-Facing Methods (Skip for now, need to think about how to implement this efficiently)
 
 ---
 
@@ -89,5 +69,3 @@
   - Complete unit tests for all prediction functions
   - Write integration tests for end-to-end workflows
   - Create comprehensive roxygen2 documentation
-  - Write vignettes: "Prediction and Forecasting" and "marginaleffects Integration"
-  - Ensure R CMD check passes with no errors/warnings
