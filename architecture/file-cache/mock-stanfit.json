@@ -8,6 +8,7 @@
                                            ]
                    },
     "functions":  [
+                      "get_safe_dummy_value",
                       "create_mock_stanfit",
                       "as_draws_matrix.mock_stanfit",
                       "prepare_predictions.mock_stanfit"
@@ -18,8 +19,9 @@
                               },
     "function_signatures":  {
                                 "as_draws_matrix.mock_stanfit":  "as_draws_matrix.mock_stanfit \u003c- function(x, ...) {",
+                                "create_mock_stanfit":  "create_mock_stanfit \u003c- function(draws_matrix) {",
                                 "prepare_predictions.mock_stanfit":  "prepare_predictions.mock_stanfit \u003c- function(object, brmsfit, newdata = NULL, re_formula = NULL, allow_new_levels = FALSE, sample_new_levels = \"uncertainty\", ...) {",
-                                "create_mock_stanfit":  "create_mock_stanfit \u003c- function(draws_matrix) {"
+                                "get_safe_dummy_value":  "get_safe_dummy_value \u003c- function(family_obj) {"
                             },
     "file":  "R/mock-stanfit.R"
 }

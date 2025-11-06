@@ -1,0 +1,20 @@
+﻿{
+    "s3_methods":  {
+
+                   },
+    "functions":  [
+                      "extract_linpred_from_prep",
+                      "extract_linpred_univariate",
+                      "extract_linpred_multivariate"
+                  ],
+    "purpose":  "Prediction methods",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "extract_linpred_univariate":  "extract_linpred_univariate \u003c- function(prep) {",
+                                "extract_linpred_from_prep":  "extract_linpred_from_prep \u003c- function(prep, resp = NULL) {",
+                                "extract_linpred_multivariate":  "extract_linpred_multivariate \u003c- function(prep, resp = NULL) {"
+                            },
+    "file":  "R/predictions.R"
+}
