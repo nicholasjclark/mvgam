@@ -7642,9 +7642,9 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-11-06 08:57:32",
+                     "generated":  "2025-11-06 10:04:55",
                      "commit_hash":  "pending",
-                     "cached_files":  57,
+                     "cached_files":  58,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
@@ -7655,7 +7655,7 @@
                      "dynamic_references":  32,
                      "package_name":  "mvgam",
                      "potentially_unused_functions":  35,
-                     "changed_files":  1,
+                     "changed_files":  0,
                      "total_files":  58,
                      "zero_dependency_functions":  392
                  },
