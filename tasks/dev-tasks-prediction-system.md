@@ -26,15 +26,31 @@
 ### Task Files
 - `tasks/fit_and_save_models.R` - Script to generate test model fixtures
 - `tasks/test_parameter_extraction.R` - Comprehensive tests for parameter extraction helpers across 6+ models
-- `tasks/explore_prepare_predictions.R` - Exploration of brms prepare_predictions() (PENDING)
+- `tasks/explore_prepare_predictions.R` - Exploration of prepare_predictions.mock_stanfit() across fit1, fit2, fit3
+- `tasks/prep_structure_output.txt` - Full exploration output documenting prep object structure (gitignored)
 - `tasks/test_integration_local.R` - Local integration testing before final tests (PENDING)
-- `tasks/prep_exploration_notes.md` - Documentation of prep object structure findings (PENDING)
 - `tasks/fixtures/*.rds` - Fitted model fixtures for development (gitignored, 9 models)
 
 ### Notes
+- **CRITICAL**: ALWAYS use `devtools::load_all()` at the start of ALL exploration and test scripts (NOT `library(mvgam)`)
+- **Architecture Decision**: Use S3 dispatch pattern with `prepare_predictions.mock_stanfit()` method
+  - Mock stanfit holds parameter draws subset
+  - S3 method receives mock object + brmsfit metadata + newdata
+  - Avoids need to implement S4 stanfit slots
+  - Provides full control over prediction workflow
+- **brms Pattern Discovery** (via r-package-analyzer agent, 2025-01-06):
+  - brms ALWAYS adds dummy response variables before calling standata() or prepare_predictions()
+  - Pattern: `validate_newdata()` → `add_dummy_responses()` in `R/predict.R` (lines ~1850-2010)
+  - Dummy values required for formula evaluation and data structure consistency
+  - Values never used in prediction computations (can be 0 for all families)
+  - Our implementation follows this exact pattern for univariate and multivariate models
+- **prep Object Structure** (from exploration, 2025-01-06):
+  - Univariate: Single design matrices (X, Xc, Zs, etc.)
+  - Multivariate: Response-specific naming (`X_count`, `X_biomass`, `Y_count`, `Y_biomass`)
+  - Smooths: Basis matrices `Zs_<response>_<term>_<smooth>` plus `Xs_<response>` random effects
+  - Full output documented in `tasks/prep_structure_output.txt`
 - Test model patterns available in `tests/local/test-models-single.R`
 - Development fixtures stored in `tasks/fixtures/` (not version controlled)
-- Use `devtools::load_all()` before testing
 - No test errors or warnings allowed
 - Integration-test-first approach: explore → build → test locally → final tests
 
@@ -61,23 +77,21 @@
     - [x] 2.2.5 Write comprehensive tests in `tasks/test_parameter_extraction.R` using pre-saved fixtures. Test 6 models, verify no duplicates, no overlap between obs/trend, complete parameter coverage, proper exclusion of computed states, and handling of bridge parameters (Z, Z_raw without _trend suffix).
     - [x] 2.2.6 Fix categorization logic to handle all brms parameter patterns: multivariate intercepts, basis splines (bs_), standardized smooths (zs_), GP parameters (sdgp_, lscale_, zgp_), standardized RE (z_), factor loadings (Z, Z_raw), and monotonic effects (bsp_, simo_).
 
-  - [ ] **2.3 brms prepare_predictions() Exploration**
-    - [ ] 2.3.1 Create `tasks/explore_prepare_predictions.R` script. Load `tasks/fixtures/fit1.rds`, extract observation parameters using `extract_obs_parameters()`, create parameter subset with `posterior::as_draws_matrix()`, and create mock stanfit using `create_mock_stanfit()`. Document what the draws subset looks like.
-    - [ ] 2.3.2 In exploration script, replace `fit1$obs_model$fit` with mock stanfit, create simple newdata with required variables, and call `brms::prepare_predictions(fit1$obs_model, newdata = newdata)`. Print the entire structure of the returned object using `str(prep, max.level = 3)`. Explore what's available.
-    - [ ] 2.3.3 Investigate the `prep` object structure. What are the top-level components? What's nested under `prep$dpars`? Are there design matrices? If so, where and what do they look like? Document findings as comments in the exploration script without assuming we know the answer.
-    - [ ] 2.3.4 Experiment with extracting components from `prep` and matching them to parameter names from the draws. Try manual matrix operations with any matrices found. Document what works and what doesn't. Save any successful patterns as comments.
-    - [ ] 2.3.5 Repeat exploration for trend model: extract trend parameters, create mock for `fit1$trend_model$fit`, call `brms::prepare_predictions()`, and explore the returned structure. Note similarities and differences from observation model prep.
-    - [ ] 2.3.6 Test exploration workflow with fit2 (multivariate) and fit3 (smooths + VAR) fixtures from `tasks/fixtures/`. Document how the `prep` object structure changes for different model types. What's different for multivariate models? How do smooths appear?
-    - [ ] 2.3.7 Create `tasks/prep_exploration_notes.md` summarizing findings: What does `brms::prepare_predictions()` return? How are design matrices structured? How do we map parameters to matrix components? What patterns work for computing predictions? This becomes our reference for implementation.
+  - [x] **2.3 prepare_predictions.mock_stanfit() Implementation**
+    - [x] 2.3.1 Create `tasks/explore_prepare_predictions.R` script. **START WITH `devtools::load_all()`** (NOT library(mvgam)). Load multiple models from `tasks/fixtures/` (fit1, fit2, fit3), extract observation and trend parameters using `extract_obs_parameters()` and `extract_trend_parameters()`, create parameter subsets with `posterior::subset_draws()`, and create mock stanfits using `create_mock_stanfit()`. Discovered that calling `brms::prepare_predictions()` on brmsfit with mock_stanfit fails because brms tries to access S4 slots. **Solution: Create S3 method `prepare_predictions.mock_stanfit()` that dispatches on the mock object**.
+    - [x] 2.3.2 Implement `prepare_predictions.mock_stanfit(object, brmsfit, newdata, ...)` in `R/mock-stanfit.R`. **IMPLEMENTATION COMPLETE**: Uses `brms::standata(brmsfit, newdata, internal=TRUE)`. Adds dummy response variables to newdata before calling standata (following brms internal pattern in `validate_newdata()` → `add_dummy_responses()`). Handles both univariate and multivariate formulas. Extracts draws from mock using `object$draws_cache`. Returns minimal prep with sdata, draws, formula, family, newdata, nobs. Method exported via roxygen `@export` and NAMESPACE updated via `devtools::document()`.
+    - [x] 2.3.3 Test S3 method with exploration script. **VERIFIED**: Method dispatches correctly for all three model types. Returns proper brmsprep objects with class `c("brmsprep", "mvgam_prep")`. Full exploration output saved to `tasks/prep_structure_output.txt`.
+    - [x] 2.3.4 Test with fit2 (multivariate) and fit3 (smooths + VAR). **COMPLETE**: All model types tested successfully. **Key findings**: (1) Multivariate uses response-specific naming (`X_count`, `X_biomass`, `Y_count`, `Y_biomass`), (2) Smooth terms appear as `Zs_<response>_<term>_<smooth>` basis matrices and `Xs_<response>` random effect designs, (3) prep$sdata contains all design matrices needed for linear predictor computation, (4) Univariate uses single X/Y, multivariate splits by response.
+    - [ ] 2.3.5 Implement helper function `extract_linpred_from_prep(prep, resp = NULL)` in `R/predictions.R`. **Context from exploration**: Function needs to handle (1) univariate vs multivariate detection via `brms::is.mvbrmsformula(prep$formula)`, (2) extract appropriate design matrices from prep$sdata (X for fixed, Zs/Xs for smooths), (3) match parameters from prep$draws, (4) compute matrix multiplications and sum contributions, (5) return [ndraws × nobs] matrix. For multivariate, loop over responses and extract `_<resp>` suffixed components.
 
   - [ ] **2.4 Core Prediction Infrastructure (Foundation Functions)**
-    - [ ] 2.4.1 Create `R/predictions.R` file with helper function `prepare_obs_predictions(mvgam_fit, newdata, re_formula = NULL, allow_new_levels = FALSE, sample_new_levels = "uncertainty")`. Extract obs params, create mock stanfit, replace in `obs_model$fit`, call `brms::prepare_predictions()`, and return prep object. Include roxygen `@noRd` docs. Implementation based on exploration findings.
-    - [ ] 2.4.2 Add helper function `prepare_trend_predictions(mvgam_fit, newdata)` in `R/predictions.R`. Extract trend params, create mock stanfit, replace in `trend_model$fit`, call `brms::prepare_predictions()`, and return prep object. Handle NULL trend_model case (pure brms models). Implementation based on exploration findings.
-    - [ ] 2.4.3 Add `extract_linpred_from_prep(prep, draws, dpar = "mu")` function in `R/predictions.R`. Implement linear predictor computation based on what we learned in exploration. Return matrix with appropriate dimensions. Document the approach used.
+    - [ ] 2.4.1 Create `R/predictions.R` file with helper function `prepare_obs_predictions(mvgam_fit, newdata, re_formula = NULL, allow_new_levels = FALSE, sample_new_levels = "uncertainty")`. Extract obs params with `extract_obs_parameters()`, create parameter subset with `posterior::subset_draws()`, create mock stanfit, call `prepare_predictions(mock_stanfit, brmsfit = mvgam_fit$obs_model, newdata = newdata, ...)` using our S3 method. Return prep object. Include roxygen `@noRd` docs.
+    - [ ] 2.4.2 Add helper function `prepare_trend_predictions(mvgam_fit, newdata)` in `R/predictions.R`. Extract trend params, create mock stanfit, call `prepare_predictions(mock_stanfit, brmsfit = mvgam_fit$trend_model, newdata = newdata)`. Handle NULL trend_model case (pure brms models). Return prep object.
+    - [ ] 2.4.3 Add `extract_linpred_from_prep(prep, dpar = "mu")` function in `R/predictions.R`. Implement linear predictor computation using design matrices from prep object. Return matrix with dimensions ndraws × nobs. Based on exploration findings.
     - [ ] 2.4.4 Add input validation function `validate_newdata_for_predictions(mvgam_fit, newdata)` in `R/predictions.R`. Check that newdata is data.frame, check for required variables from both formulas (use `all.vars()`), check for time/series variables if trend model present. Return validated newdata or stop with informative error via `insight::format_error()`.
 
   - [ ] **2.5 Local Integration Testing (in tasks/)**
-    - [ ] 2.5.1 Create `tasks/test_integration_local.R` script. Load `tasks/fixtures/fit1.rds`, create newdata, and test the complete workflow: `prepare_obs_predictions()` → `prepare_trend_predictions()` → `extract_linpred_from_prep()` for both. Document any issues encountered.
+    - [ ] 2.5.1 Create `tasks/test_integration_local.R` script. **START WITH `devtools::load_all()`**. Load `tasks/fixtures/fit1.rds`, create newdata, and test the complete workflow: `prepare_obs_predictions()` → `prepare_trend_predictions()` → `extract_linpred_from_prep()` for both. Document any issues encountered.
     - [ ] 2.5.2 In local integration script, combine obs and trend linear predictors additively. Apply inverse link function and verify predictions are reasonable (positive values for Poisson, proper range for probabilities). Print summary statistics of predictions.
     - [ ] 2.5.3 Test workflow with fit2 (multivariate) in local script. Test with fit3 (smooths + VAR). Document any model-specific adjustments needed. Update helper functions in `R/predictions.R` if issues found.
     - [ ] 2.5.4 Test edge cases in local script: newdata with different number of rows, missing series levels, predictions at future time points. Document what works and what needs additional validation.

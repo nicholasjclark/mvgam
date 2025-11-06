@@ -13,3 +13,4 @@ desktop.ini
 .claude/backups/
 claude.exe
 tasks/fixtures/*.rds
+tasks/prep_structure_output.txt
