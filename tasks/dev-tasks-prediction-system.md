@@ -24,11 +24,12 @@
 - `/tasks/prediction-system-implementation-strategy.md` - Implementation strategy and brms integration approach
 
 ### Task Files
-- `tasks/fit_and_save_models.R` - Script to generate test model fixtures (NEW)
-- `tasks/explore_prepare_predictions.R` - Exploration of brms prepare_predictions() (NEW)
-- `tasks/test_integration_local.R` - Local integration testing before final tests (NEW)
-- `tasks/prep_exploration_notes.md` - Documentation of prep object structure findings (NEW)
-- `tasks/fixtures/*.rds` - Fitted model fixtures for development (NEW, gitignored)
+- `tasks/fit_and_save_models.R` - Script to generate test model fixtures
+- `tasks/test_parameter_extraction.R` - Comprehensive tests for parameter extraction helpers across 6+ models
+- `tasks/explore_prepare_predictions.R` - Exploration of brms prepare_predictions() (PENDING)
+- `tasks/test_integration_local.R` - Local integration testing before final tests (PENDING)
+- `tasks/prep_exploration_notes.md` - Documentation of prep object structure findings (PENDING)
+- `tasks/fixtures/*.rds` - Fitted model fixtures for development (gitignored, 9 models)
 
 ### Notes
 - Test model patterns available in `tests/local/test-models-single.R`
@@ -48,16 +49,17 @@
 - [ ] **2.0 Foundation: Parameter Extraction and Prediction Infrastructure**
 
   - [ ] **2.1 Setup: Test Model Fixtures** (Critical Path)
-    - [ ] 2.1.1 Create `tasks/fit_and_save_models.R` script that sources `tests/local/setup_tests_local.R`, fits all 9 models from `tests/local/test-models-single.R` (fit1 through fit9), and saves each as `tasks/fixtures/fit{1-9}.rds`. Include timing information and model summary prints for verification.
-    - [ ] 2.1.2 Run `fit_and_save_models.R` to generate all fixture files in `tasks/fixtures/`. Verify each .rds loads correctly with `readRDS()` and test basic methods (`print()`, `variables()`, `summary()`) work. Document total fitting time and model sizes.
-    - [ ] 2.1.3 Create `.gitignore` entry for `tasks/fixtures/*.rds` to exclude fitted models from version control (they're large and user-specific). Add `tasks/fixtures/README.md` explaining how to regenerate fixtures using the fit script.
+    - [x] 2.1.1 Create `tasks/fit_and_save_models.R` script that sources `tests/local/setup_tests_local.R`, fits all 9 models from `tests/local/test-models-single.R` (fit1 through fit9), and saves each as `tasks/fixtures/fit{1-9}.rds`. Include timing information and model summary prints for verification.
+    - [x] 2.1.2 Run `fit_and_save_models.R` to generate all fixture files in `tasks/fixtures/`. Verify each .rds loads correctly with `readRDS()` and test basic methods (`print()`, `variables()`, `summary()`) work. Document total fitting time and model sizes.
+    - [x] 2.1.3 Create `.gitignore` entry for `tasks/fixtures/*.rds` to exclude fitted models from version control (they're large and user-specific). Add `tasks/fixtures/README.md` explaining how to regenerate fixtures using the fit script.
 
-  - [ ] **2.2 Parameter Categorization Enhancement**
-    - [ ] 2.2.1 Rename `.categorize_parameters()` to `categorize_mvgam_parameters()` in `R/index-mvgam.R`. Update all internal calls in the same file. Verify `devtools::load_all()` succeeds with no errors.
-    - [ ] 2.2.2 Search for all uses of `.categorize_parameters()` across the codebase using `Grep`. Update each call to use new name `categorize_mvgam_parameters()`. Run `devtools::load_all()` after each file update to catch errors early.
-    - [ ] 2.2.3 Add helper function `extract_obs_parameters(mvgam_fit)` in `R/index-mvgam.R` that calls `categorize_mvgam_parameters()` and returns combined character vector of all observation parameter names (observation_pars + observation_betas + observation_smoothpars + observation_re_params). Include roxygen `@noRd` documentation.
-    - [ ] 2.2.4 Add helper function `extract_trend_parameters(mvgam_fit)` in `R/index-mvgam.R` that calls `categorize_mvgam_parameters()` and returns combined character vector of all trend parameter names (trend_pars + trend_betas + trend_smoothpars + trend_re_params, excluding computed trend states). Include roxygen `@noRd` documentation.
-    - [ ] 2.2.5 Write unit tests in `tests/testthat/test-index-mvgam.R` for the new extraction helpers. Fit a simple model inline (basic RW), test that `extract_obs_parameters()` returns only observation params with no `_trend` suffix, and `extract_trend_parameters()` returns only trend params with `_trend` suffix.
+  - [x] **2.2 Parameter Categorization Enhancement**
+    - [x] 2.2.1 Rename `.categorize_parameters()` to `categorize_mvgam_parameters()` in `R/index-mvgam.R`. Update all internal calls in the same file. Verify `devtools::load_all()` succeeds with no errors.
+    - [x] 2.2.2 Search for all uses of `.categorize_parameters()` across the codebase using `Grep`. Update each call to use new name `categorize_mvgam_parameters()`. Run `devtools::load_all()` after each file update to catch errors early. (None found)
+    - [x] 2.2.3 Add DRY helper function `extract_obs_parameters(mvgam_fit)` in `R/index-mvgam.R` that calls internal `extract_parameters_by_type(mvgam_fit, type = "observation")` and returns combined character vector of all observation parameter names. Include roxygen `@noRd` documentation.
+    - [x] 2.2.4 Add DRY helper function `extract_trend_parameters(mvgam_fit)` in `R/index-mvgam.R` that calls internal `extract_parameters_by_type(mvgam_fit, type = "trend")` and returns combined character vector of all trend parameter names (excluding computed trend states, including bridge parameters Z and Z_raw). Include roxygen `@noRd` documentation.
+    - [x] 2.2.5 Write comprehensive tests in `tasks/test_parameter_extraction.R` using pre-saved fixtures. Test 6 models, verify no duplicates, no overlap between obs/trend, complete parameter coverage, proper exclusion of computed states, and handling of bridge parameters (Z, Z_raw without _trend suffix).
+    - [x] 2.2.6 Fix categorization logic to handle all brms parameter patterns: multivariate intercepts, basis splines (bs_), standardized smooths (zs_), GP parameters (sdgp_, lscale_, zgp_), standardized RE (z_), factor loadings (Z, Z_raw), and monotonic effects (bsp_, simo_).
 
   - [ ] **2.3 brms prepare_predictions() Exploration**
     - [ ] 2.3.1 Create `tasks/explore_prepare_predictions.R` script. Load `tasks/fixtures/fit1.rds`, extract observation parameters using `extract_obs_parameters()`, create parameter subset with `posterior::as_draws_matrix()`, and create mock stanfit using `create_mock_stanfit()`. Document what the draws subset looks like.

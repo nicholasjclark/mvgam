@@ -12,3 +12,4 @@ desktop.ini
 .claude/logs/
 .claude/backups/
 claude.exe
+tasks/fixtures/*.rds
