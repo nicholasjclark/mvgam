@@ -6,15 +6,23 @@
                    },
     "functions":  [
                       "variables.mvgam",
-                      "create_component"
+                      "categorize_mvgam_parameters",
+                      "create_component",
+                      "extract_parameters_by_type",
+                      "extract_obs_parameters",
+                      "extract_trend_parameters"
                   ],
     "purpose":  "",
     "function_dependencies":  {
 
                               },
     "function_signatures":  {
+                                "variables.mvgam":  "variables.mvgam \u003c- function(x, ...) {",
+                                "extract_parameters_by_type":  "extract_parameters_by_type \u003c- function(mvgam_fit, type = c(\"observation\", \"trend\")) {",
+                                "extract_trend_parameters":  "extract_trend_parameters \u003c- function(mvgam_fit) {",
+                                "categorize_mvgam_parameters":  "categorize_mvgam_parameters \u003c- function(x) {",
                                 "create_component":  "create_component \u003c- function(pars) {",
-                                "variables.mvgam":  "variables.mvgam \u003c- function(x, ...) {"
+                                "extract_obs_parameters":  "extract_obs_parameters \u003c- function(mvgam_fit) {"
                             },
     "file":  "R/index-mvgam.R"
 }

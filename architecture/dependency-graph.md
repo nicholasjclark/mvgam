@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-11-06 10:06:40  
+**Generated:** 2025-11-06 11:14:05  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 58
-- **Total Functions:** 477
+- **Total Functions:** 481
 - **Exported Functions:** 57
-- **Internal Functions:** 434
+- **Internal Functions:** 438
 - **S3 Methods:** 40
 - **S3 Classes:** 31
 
@@ -155,16 +155,16 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: lfo_cvlog_sum_exp log_mean_exp lfo_cv.mvgam plot.mvgam_lfo cv_split sum_rows (+ 6 more)
 - **`R/loo.mvgam.R`** (6 functions)
   - Key functions: loo.mvgam, loo_compare.mvgam, split_mod_dots, named_list, clean_ll, samp_noinf
-- **`R/irf.mvgam.R`** (5 functions)
-  - Key functions: irfirf.mvgam gen_irf var_phi var_psi (+ 4 more)
+- **`R/index-mvgam.R`** (6 functions)
+  - Key functions: categorize_mvgam_parameters, create_component, extract_trend_parameters, variables.mvgam, extract_parameters_by_type, extract_obs_parameters
 - **`R/sim_mvgam.R`** (5 functions)
   - Key functions: sim_mvgamperiodic_gp lkj_corr sim_seasonal random_Sigma (+ 4 more)
+- **`R/irf.mvgam.R`** (5 functions)
+  - Key functions: irfirf.mvgam gen_irf var_phi var_psi (+ 4 more)
 - **`R/ppc.mvgam.R`** (5 functions)
   - Key functions: ppc, pp_check.mvgam, ppc.mvgam, ecdf_plotdat, is_like_factor
 - **`R/fevd.mvgam.R`** (4 functions)
   - Key functions: fevd, fevd.mvgam, gen_fevd, var_fecov
-- **`R/index-mvgam.R`** (2 functions)
-  - Key functions: create_componentvariables.mvgam (+ 1 more)
 - **`R/plot.mvgam.R`** (2 functions) - Plotting and visualization
   - Key functions: plot.mvgam, plottable
 - **`R/series_to_mvgam.R`** (2 functions)
@@ -451,6 +451,9 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 
 ### `R/index-mvgam.R`:
 - **create_component()** (internal)
+- **extract_obs_parameters()** (internal)
+- **extract_parameters_by_type()** (internal)
+- **extract_trend_parameters()** (internal)
 - **variables.mvgam()** (internal)
 
 ### `R/irf.mvgam.R`:
