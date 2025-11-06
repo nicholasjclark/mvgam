@@ -751,6 +751,20 @@
                                                                                     "prior"
                                                                                 ]
                                                               },
+                              "prepare_predictions.mock_stanfit":  {
+                                                                       "s3_class":  "mock_stanfit",
+                                                                       "s3_method":  "prepare_predictions",
+                                                                       "signature":  "prepare_predictions.mock_stanfit \u003c- function(object, brmsfit, newdata = NULL, re_formula = NULL, allow_new_levels = FALSE, sample_new_levels = \"uncertainty\", ...) {",
+                                                                       "is_s3_method":  true,
+                                                                       "arguments":  [
+                                                                                         "object",
+                                                                                         "brmsfit",
+                                                                                         "newdata",
+                                                                                         "re_formula",
+                                                                                         "allow_new_levels",
+                                                                                         "sample_new_levels"
+                                                                                     ]
+                                                                   },
                               "allsame":  {
                                               "s3_class":  "",
                                               "s3_method":  "",
@@ -4959,7 +4973,8 @@
                                               ],
                         "R/mock-stanfit.R":  [
                                                  "create_mock_stanfit",
-                                                 "as_draws_matrix.mock_stanfit"
+                                                 "as_draws_matrix.mock_stanfit",
+                                                 "prepare_predictions.mock_stanfit"
                                              ],
                         "R/lv_correlations.R":  [
                                                     "lv_correlations"
@@ -5222,9 +5237,9 @@
                                             "mvgam",
                                             "jsdgam"
                                         ],
-                       "loo":  [
-                                   "mvgam"
-                               ],
+                       "prepare_predictions":  [
+                                                   "mock_stanfit"
+                                               ],
                        "mcmc_plot":  [
                                          "mvgam"
                                      ],
@@ -5259,6 +5274,9 @@
                        "tidy":  [
                                     "mvgam"
                                 ],
+                       "loo":  [
+                                   "mvgam"
+                               ],
                        "add_residuals":  [
                                              "mvgam"
                                          ],
@@ -5826,7 +5844,7 @@
                       "match_smooth_pars":  "R/summary.mvgam.R",
                       "parse_multivariate_trends":  "R/brms_integration.R",
                       "as_draws_matrix.mock_stanfit":  "R/mock-stanfit.R",
-                      "split_hier_Sigma":  "R/tidier_methods.R",
+                      "prepare_predictions.mock_stanfit":  "R/mock-stanfit.R",
                       "ZMVN":  "R/trend_system.R",
                       "var_fecov":  "R/fevd.mvgam.R",
                       "filter_trend_priors":  "R/priors.R",
@@ -5837,6 +5855,7 @@
                       "extract_and_rename_standata_objects":  "R/stan_assembly.R",
                       "is_try_error":  "R/validations.R",
                       "find_trend_computation_end":  "R/stan_assembly.R",
+                      "split_hier_Sigma":  "R/tidier_methods.R",
                       "extract_and_validate_trend_components":  "R/validations.R",
                       "AR":  "R/trend_system.R",
                       "extract_stan_block_content":  "R/stan_assembly.R",
@@ -5877,6 +5896,7 @@
                                      "detect_shared_trends":  "R/stan_assembly.R",
                                      "get_trend_dispatch_function":  "R/trend_system.R",
                                      "get_default_validation_rules":  "R/trend_system.R",
+                                     "prepare_predictions.mock_stanfit":  "R/mock-stanfit.R",
                                      "ar3_recursC":  "R/RcppExports.R",
                                      "generate_innovation_model":  "R/stan_assembly.R",
                                      "residuals.mvgam":  "R/residuals.mvgam.R",
@@ -6740,7 +6760,7 @@
                                 "match_smooth_pars":  "match_smooth_pars \u003c- function(pars) {",
                                 "parse_multivariate_trends":  "parse_multivariate_trends \u003c- function(formula, trend_formula = NULL) {",
                                 "as_draws_matrix.mock_stanfit":  "as_draws_matrix.mock_stanfit \u003c- function(x, ...) {",
-                                "split_hier_Sigma":  "split_hier_Sigma \u003c- function(object, params) {",
+                                "prepare_predictions.mock_stanfit":  "prepare_predictions.mock_stanfit \u003c- function(object, brmsfit, newdata = NULL, re_formula = NULL, allow_new_levels = FALSE, sample_new_levels = \"uncertainty\", ...) {",
                                 "ZMVN":  "ZMVN = function(time = NA, series = NA, gr = NA, subgr = NA, n_lv = NULL) {",
                                 "var_fecov":  "var_fecov \u003c- function(x, h) {",
                                 "filter_trend_priors":  "filter_trend_priors \u003c- function(combined_priors) {",
@@ -6751,6 +6771,7 @@
                                 "extract_and_rename_standata_objects":  "extract_and_rename_standata_objects \u003c- function(standata, suffix, mapping, is_multivariate, response_names, n_time = NULL) {",
                                 "is_try_error":  "is_try_error \u003c- function(x) {",
                                 "find_trend_computation_end":  "find_trend_computation_end \u003c- function(stan_code_lines) {",
+                                "split_hier_Sigma":  "split_hier_Sigma \u003c- function(object, params) {",
                                 "extract_and_validate_trend_components":  "extract_and_validate_trend_components \u003c- function(data, mv_spec, response_vars, time_var = \"time\", series_var = \"series\", trend_formula = NULL) {",
                                 "AR":  "AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {",
                                 "extract_stan_block_content":  "extract_stan_block_content \u003c- function(stancode, block_name) {",
@@ -7691,22 +7712,22 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-11-06 11:19:34",
+                     "generated":  "2025-11-06 14:35:40",
                      "commit_hash":  "pending",
-                     "cached_files":  58,
+                     "cached_files":  57,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
-                     "total_functions":  481,
+                     "total_functions":  482,
                      "exported_functions":  57,
-                     "s3_methods_count":  40,
+                     "s3_methods_count":  41,
                      "s3_classes_count":  31,
                      "dynamic_references":  32,
                      "package_name":  "mvgam",
                      "potentially_unused_functions":  35,
-                     "changed_files":  0,
+                     "changed_files":  1,
                      "total_files":  58,
-                     "zero_dependency_functions":  395
+                     "zero_dependency_functions":  396
                  },
     "dependencies":  {
 

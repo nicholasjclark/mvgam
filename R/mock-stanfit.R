@@ -1,3 +1,56 @@
+#' Get Safe Dummy Value for Family
+#'
+#' Generates a safe dummy response value based on family type and bounds.
+#' Follows brms's three-tier logic: integer families get 1L, positive
+#' continuous families get 1, unconstrained families get 0.
+#'
+#' @param family_obj A brmsfamily object with type and ybounds properties
+#'
+#' @return Integer (1L) for discrete families, numeric (1 or 0) for continuous
+#'
+#' @details
+#' Implements brms dummy_y_values() logic using public family properties:
+#' 1. Integer families (type == "int"): Returns 1L
+#' 2. Positive continuous (ybounds[1] > 0): Returns 1
+#' 3. Unconstrained families: Returns 0
+#'
+#' This matches brms internal behavior without relying on unexported functions.
+#' Works with both built-in and custom families via standardized properties.
+#'
+#' @noRd
+get_safe_dummy_value <- function(family_obj) {
+  # Validate family object type
+  checkmate::assert_class(family_obj, "brmsfamily")
+
+  # Check if integer/discrete family (brms uses type = "int" or "real")
+  # Integer families need integer dummy values for Stan type checking
+  if (!is.null(family_obj$type) && family_obj$type == "int") {
+    return(1L)
+  }
+
+  # For continuous families, check lower bound
+  # Extract bounds from ybounds (brms stores as [lower, upper])
+  ybounds <- family_obj$ybounds
+
+  if (is.null(ybounds) || length(ybounds) < 2) {
+    # Fallback to 0 if ybounds not available (shouldn't happen with valid family)
+    return(0)
+  }
+
+  lb <- ybounds[1]
+
+  # Positive-constrained continuous families (gamma, weibull, exponential, etc.)
+  # Use lb >= 0 (not > 0) because families with lb=0 still need positive dummy
+  # values to pass validation (gamma requires y > 0, not y >= 0)
+  if (is.finite(lb) && lb >= 0) {
+    return(1)
+  }
+
+  # Unconstrained families (gaussian, student, etc.)
+  return(0)
+}
+
+
 #' Create Mock stanfit for Parameter Subsetting
 #'
 #' Creates a lightweight S3 object that mimics a stanfit for the purpose of
@@ -200,12 +253,23 @@ prepare_predictions.mock_stanfit <- function(object,
   }
 
   # Add dummy values for any missing response variables
-  # Values based on family type (following brms pattern)
+  # Use family-appropriate values based on bounds (never used in computation)
   for (rv in resp_vars) {
     if (!rv %in% names(newdata_with_resp)) {
-      # Add dummy response with value 0 (sufficient for all families)
-      # Actual values don't matter - never used in prediction computation
-      newdata_with_resp[[rv]] <- rep(0, nrow(newdata_with_resp))
+      # Get family for this response
+      if (brms::is.mvbrmsformula(brmsfit$formula)) {
+        family_obj <- brmsfit$family[[rv]]
+      } else {
+        family_obj <- brmsfit$family
+      }
+
+      # Generate safe dummy based on family type and bounds
+      dummy_value <- get_safe_dummy_value(family_obj)
+
+      newdata_with_resp[[rv]] <- rep(
+        dummy_value,
+        nrow(newdata_with_resp)
+      )
     }
   }
 

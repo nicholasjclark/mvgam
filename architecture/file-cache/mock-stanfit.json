@@ -1,20 +1,25 @@
 ﻿{
     "s3_methods":  {
+                       "prepare_predictions":  [
+                                                   "mock_stanfit"
+                                               ],
                        "as_draws_matrix":  [
                                                "mock_stanfit"
                                            ]
                    },
     "functions":  [
                       "create_mock_stanfit",
-                      "as_draws_matrix.mock_stanfit"
+                      "as_draws_matrix.mock_stanfit",
+                      "prepare_predictions.mock_stanfit"
                   ],
     "purpose":  "Model fitting",
     "function_dependencies":  {
 
                               },
     "function_signatures":  {
-                                "create_mock_stanfit":  "create_mock_stanfit \u003c- function(draws_matrix) {",
-                                "as_draws_matrix.mock_stanfit":  "as_draws_matrix.mock_stanfit \u003c- function(x, ...) {"
+                                "as_draws_matrix.mock_stanfit":  "as_draws_matrix.mock_stanfit \u003c- function(x, ...) {",
+                                "prepare_predictions.mock_stanfit":  "prepare_predictions.mock_stanfit \u003c- function(object, brmsfit, newdata = NULL, re_formula = NULL, allow_new_levels = FALSE, sample_new_levels = \"uncertainty\", ...) {",
+                                "create_mock_stanfit":  "create_mock_stanfit \u003c- function(draws_matrix) {"
                             },
     "file":  "R/mock-stanfit.R"
 }

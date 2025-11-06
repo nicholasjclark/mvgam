@@ -1,16 +1,16 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-11-06 11:19:34  
+**Generated:** 2025-11-06 14:35:40  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 58
-- **Total Functions:** 481
+- **Total Functions:** 482
 - **Exported Functions:** 57
-- **Internal Functions:** 438
-- **S3 Methods:** 40
+- **Internal Functions:** 439
+- **S3 Methods:** 41
 - **S3 Classes:** 31
 
 ## External Dependencies
@@ -232,8 +232,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: polish_generated_stan_code, try_stanheaders_formatting, update_stan_header, reorganize_lprior_statements, clean_stan_comments, fix_blank_lines, add_targeted_comments, insert_comment_before_line, reorganize_target_statements, find_matching_closing_brace (+ 1 more)
 - **`R/make_stan.R`** (3 functions) - Stan model integration
   - Key functions: generate_stan_components_mvgam_formula, stancode.mvgam_formula, standata.mvgam_formula
-- **`R/mock-stanfit.R`** (2 functions) - Model fitting
-  - Key functions: create_mock_stanfit, as_draws_matrix.mock_stanfit
+- **`R/mock-stanfit.R`** (3 functions) - Model fitting
+  - Key functions: create_mock_stanfit, as_draws_matrix.mock_stanfit, prepare_predictions.mock_stanfit
 
 ### Plotting Files
 - **`R/plot_mvgam_series.R`** (6 functions) - Plotting and visualization
@@ -494,6 +494,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### `R/mock-stanfit.R`:
 - **as_draws_matrix.mock_stanfit()** (internal)
 - **create_mock_stanfit()** (internal)
+- **prepare_predictions.mock_stanfit()** (internal)
 
 ### `R/monotonic.R`:
 - **add_mono_model_file()** (internal)
