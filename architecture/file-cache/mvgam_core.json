@@ -26,7 +26,7 @@
                                 "extract_series_information":  "extract_series_information \u003c- function(data, mv_spec) {",
                                 "mvgam_single":  "mvgam_single \u003c- function(formula, trend_formula, data, backend, family, data_name = NULL, ...) {",
                                 "mvgam":  "mvgam \u003c- function(formula, trend_formula = NULL, data = NULL, backend = getOption(\"brms.backend\", \"cmdstanr\"), combine = TRUE, family = gaussian(), ...) {",
-                                "create_mvgam_from_combined_fit":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL, trend_metadata = NULL, data_name = NULL) {",
+                                "create_mvgam_from_combined_fit":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL, trend_metadata = NULL, data_name = NULL, combined_stancode = NULL, combined_standata = NULL) {",
                                 "extract_trend_component_info":  "extract_trend_component_info \u003c- function(combined_fit, mv_spec) {",
                                 "validate_missing_patterns":  "validate_missing_patterns \u003c- function(data_list) {",
                                 "extract_mvgam_components":  "extract_mvgam_components \u003c- function(combined_fit, obs_setup, trend_setup, mv_spec) {",

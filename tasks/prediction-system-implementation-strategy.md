@@ -10,7 +10,7 @@
 
 This document outlines the **empirically verified** strategy for implementing the mvgam prediction system. All approaches have been tested against brms 2.22.0 and confirmed to work.
 
-**Key Decision**: Use `brms:::prepare_predictions()` to create design matrices, then extract and multiply with our combined parameter draws. No need for complex stanfit mocking.
+**Key Decision**: Use `brms::prepare_predictions()` to create design matrices, then extract and multiply with our combined parameter draws. No need for complex stanfit mocking.
 
 ---
 
@@ -185,7 +185,7 @@ predict_mvgam_internal <- function(mvgam_fit, newdata,
   trend_brmsfit$fit <- mock_trend
 
   # Step 6: Get design matrices via prepare_predictions
-  prep_obs <- brms:::prepare_predictions(
+  prep_obs <- brms::prepare_predictions(
     obs_brmsfit,
     newdata = newdata,
     re_formula = re_formula,
@@ -193,7 +193,7 @@ predict_mvgam_internal <- function(mvgam_fit, newdata,
     sample_new_levels = sample_new_levels
   )
 
-  prep_trend <- brms:::prepare_predictions(
+  prep_trend <- brms::prepare_predictions(
     trend_brmsfit,
     newdata = newdata  # Might need trend-specific data
   )
@@ -226,7 +226,7 @@ predict_mvgam_internal <- function(mvgam_fit, newdata,
 `prepare_predictions()` returns an object with this structure:
 
 ```r
-prep <- brms:::prepare_predictions(fit, newdata)
+prep <- brms::prepare_predictions(fit, newdata)
 
 prep$dpars$mu$int        # Boolean: has intercept?
 prep$dpars$mu$fe         # Fixed effects
@@ -499,7 +499,7 @@ for (i in seq_len(n_series)) {
   newdata_i <- filter(newdata, series == series_names[i])
 
   # Get prep objects
-  prep_obs_i <- brms:::prepare_predictions(
+  prep_obs_i <- brms::prepare_predictions(
     obs_brmsfit,
     newdata = newdata_i,
     resp = series_names[i]  # If using mvbind()
@@ -529,7 +529,7 @@ return(predictions)
    - Register `as_draws_matrix.mock_stanfit()` method
    - No R6 classes (following package conventions)
 
-3. **Leverage `brms:::prepare_predictions()`**
+3. **Leverage `brms::prepare_predictions()`**
    - Only way to get complex design matrices correctly
    - Tested and verified approach
 
@@ -592,7 +592,7 @@ test_that("manual linpred matches brms", {
   fit <- brm(y ~ x, data = test_data, ...)
 
   # Get prep
-  prep <- brms:::prepare_predictions(fit, newdata = newdata)
+  prep <- brms::prepare_predictions(fit, newdata = newdata)
   draws <- as_draws_matrix(fit$fit)
 
   # Manual computation

@@ -3344,7 +3344,7 @@
                               "create_mvgam_from_combined_fit":  {
                                                                      "s3_class":  "",
                                                                      "s3_method":  "",
-                                                                     "signature":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL, trend_metadata = NULL, data_name = NULL) {",
+                                                                     "signature":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL, trend_metadata = NULL, data_name = NULL, combined_stancode = NULL, combined_standata = NULL) {",
                                                                      "is_s3_method":  false,
                                                                      "arguments":  [
                                                                                        "combined_fit",
@@ -3352,7 +3352,9 @@
                                                                                        "trend_setup",
                                                                                        "mv_spec",
                                                                                        "trend_metadata",
-                                                                                       "data_name"
+                                                                                       "data_name",
+                                                                                       "combined_stancode",
+                                                                                       "combined_standata"
                                                                                    ]
                                                                  },
                               "require_package":  {
@@ -6601,7 +6603,7 @@
                                 "extract_brmsterms_from_setup":  "extract_brmsterms_from_setup \u003c- function(setup_object) {",
                                 "extract_prior_from_setup":  "extract_prior_from_setup \u003c- function(setup_object) {",
                                 "generate_var_trend_stanvars":  "generate_var_trend_stanvars \u003c- function(trend_specs, data_info, prior = NULL) {",
-                                "create_mvgam_from_combined_fit":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL, trend_metadata = NULL, data_name = NULL) {",
+                                "create_mvgam_from_combined_fit":  "create_mvgam_from_combined_fit \u003c- function(combined_fit, obs_setup, trend_setup = NULL, mv_spec = NULL, trend_metadata = NULL, data_name = NULL, combined_stancode = NULL, combined_standata = NULL) {",
                                 "require_package":  "require_package \u003c- function(package, version = NULL) {",
                                 "as_one_logical":  "as_one_logical = function(x, allow_na = FALSE) {",
                                 "reorganize_model_block_statements":  "reorganize_model_block_statements \u003c- function(lines) {",
@@ -7640,9 +7642,9 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-11-05 15:45:20",
+                     "generated":  "2025-11-06 08:57:32",
                      "commit_hash":  "pending",
-                     "cached_files":  58,
+                     "cached_files":  57,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
@@ -7653,7 +7655,7 @@
                      "dynamic_references":  32,
                      "package_name":  "mvgam",
                      "potentially_unused_functions":  35,
-                     "changed_files":  0,
+                     "changed_files":  1,
                      "total_files":  58,
                      "zero_dependency_functions":  392
                  },
