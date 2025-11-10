@@ -134,6 +134,12 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     rename = FALSE
   )
 
+  # Add version metadata to prevent restructure() from calling update()
+  # standata() and prepare_predictions() call restructure() which checks version
+  # and attempts update() if version is NULL or < "1.0". For multivariate models,
+  # update() throws an error. Adding current brms version prevents this.
+  mock_setup$version <- list(brms = utils::packageVersion("brms"))
+
   # Extract key components for mvgam integration
   setup_components <- list(
     formula = formula,

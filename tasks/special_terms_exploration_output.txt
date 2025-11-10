@@ -1,0 +1,617 @@
+ℹ Loading mvgam
+Loading required package: brms
+Loading required package: Rcpp
+Loading 'brms' package (version 2.22.9). Useful instructions
+can be found by typing help('brms'). A more detailed introduction
+to the package is available through vignette('brms_overview').
+
+Attaching package: 'brms'
+
+The following object is masked from 'package:stats':
+
+    ar
+
+Loading 'mvgam' (version 2.0.0). Useful instructions can be found by
+  typing help('mvgam'). A more detailed introduction to the package is
+  available through vignette('mvgam_overview'). Full brms compatibility is
+  now enabled.
+This is posterior version 1.6.1
+
+Attaching package: 'posterior'
+
+The following object is masked from 'package:mvgam':
+
+    sd
+
+The following objects are masked from 'package:stats':
+
+    mad, sd, var
+
+The following objects are masked from 'package:base':
+
+    %in%, match
+
+Warning message:
+package 'posterior' was built under R version 4.4.3 
+
+=== LOADING TEST FIXTURES ===
+✓ Loaded fit3: mvbind(count, biomass) ~ s(x) + VAR(p=2, ma=TRUE)
+✓ Loaded fit6: y ~ (1 | series) + CAR() with gp(x)
+✓ Loaded fit8: y ~ gp(x, k=5) + AR(p=c(1,12)) with gp(temperature, k=6)
+
+
+################################################################################
+# EXPLORATION 1: SMOOTH TERMS (fit3)
+################################################################################
+
+--- Generating prep object for observation model ---
+
+--- Generating prep object for trend model ---
+
+================================================================================
+MODEL: fit3 - Observation (Multivariate with smooths)
+================================================================================ 
+
+--- prep$sdata names ---
+ [1] "N_count"         "Y_count"         "N_biomass"       "Y_biomass"      
+ [5] "N"               "K_count"         "Kc_count"        "X_count"        
+ [9] "nb_count_1"      "Zs_count_1_1"    "knots_count_1"   "Ks_count"       
+[13] "Xs_count"        "K_biomass"       "Kc_biomass"      "X_biomass"      
+[17] "nb_biomass_1"    "Zs_biomass_1_1"  "knots_biomass_1" "Ks_biomass"     
+[21] "Xs_biomass"      "prior_only"     
+
+--- Design matrix dimensions ---
+  N_count                       : length 1
+  Y_count                       : 6
+  N_biomass                     : length 1
+  Y_biomass                     : 6
+  N                             : length 1
+  K_count                       : length 1
+  Kc_count                      : length 1
+  X_count                       : 6 × 1
+  nb_count_1                    : length 1
+  Zs_count_1_1                  : 6 × 8
+  knots_count_1                 : 1
+  Ks_count                      : length 1
+  Xs_count                      : 6 × 1
+  K_biomass                     : length 1
+  Kc_biomass                    : length 1
+  X_biomass                     : 6 × 1
+  nb_biomass_1                  : length 1
+  Zs_biomass_1_1                : 6 × 8
+  knots_biomass_1               : 1
+  Ks_biomass                    : length 1
+  Xs_biomass                    : 6 × 1
+  prior_only                    : length 1
+
+--- Parameter names in prep$draws ---
+ [1] "sigma_count"         "sigma_biomass"       "Intercept_count"    
+ [4] "bs_count[1]"         "Intercept_biomass"   "bs_biomass[1]"      
+ [7] "b_count_Intercept"   "b_biomass_Intercept" "zs_count_1_1[1]"    
+[10] "zs_count_1_1[2]"     "zs_count_1_1[3]"     "zs_count_1_1[4]"    
+[13] "zs_count_1_1[5]"     "zs_count_1_1[6]"     "zs_count_1_1[7]"    
+[16] "zs_count_1_1[8]"     "sds_count_1[1]"      "zs_biomass_1_1[1]"  
+[19] "zs_biomass_1_1[2]"   "zs_biomass_1_1[3]"   "zs_biomass_1_1[4]"  
+[22] "zs_biomass_1_1[5]"   "zs_biomass_1_1[6]"   "zs_biomass_1_1[7]"  
+[25] "zs_biomass_1_1[8]"   "sds_biomass_1[1]"    "s_count_1_1[1]"     
+[28] "s_count_1_1[2]"      "s_count_1_1[3]"      "s_count_1_1[4]"     
+[31] "s_count_1_1[5]"      "s_count_1_1[6]"      "s_count_1_1[7]"     
+[34] "s_count_1_1[8]"      "s_biomass_1_1[1]"    "s_biomass_1_1[2]"   
+[37] "s_biomass_1_1[3]"    "s_biomass_1_1[4]"    "s_biomass_1_1[5]"   
+[40] "s_biomass_1_1[6]"    "s_biomass_1_1[7]"    "s_biomass_1_1[8]"   
+
+================================================================================
+MODEL: fit3 - Trend (VAR with covariates)
+================================================================================ 
+
+--- prep$sdata names ---
+[1] "N"          "Y"          "K"          "Kc"         "X"         
+[6] "prior_only"
+
+--- Design matrix dimensions ---
+  N                             : length 1
+  Y                             : 6
+  K                             : length 1
+  Kc                            : length 1
+  X                             : 6 × 2
+  prior_only                    : length 1
+
+--- Parameter names in prep$draws ---
+ [1] "b_trend[1]"         "A_raw_trend[1,1,1]" "A_raw_trend[2,1,1]"
+ [4] "A_raw_trend[1,2,1]" "A_raw_trend[2,2,1]" "A_raw_trend[1,1,2]"
+ [7] "A_raw_trend[2,1,2]" "A_raw_trend[1,2,2]" "A_raw_trend[2,2,2]"
+[10] "sigma_trend[1]"     "sigma_trend[2]"     "L_Omega_trend[1,1]"
+[13] "L_Omega_trend[2,1]" "L_Omega_trend[1,2]" "L_Omega_trend[2,2]"
+[16] "Amu_trend[1,1]"     "Amu_trend[2,1]"     "Amu_trend[1,2]"    
+[19] "Amu_trend[2,2]"     "Aomega_trend[1,1]"  "Aomega_trend[2,1]" 
+[22] "Aomega_trend[1,2]"  "Aomega_trend[2,2]"  "init_trend[1]"     
+[25] "init_trend[2]"      "init_trend[3]"      "init_trend[4]"     
+[28] "init_trend[5]"      "init_trend[6]"      "D_raw_trend[1,1,1]"
+[31] "D_raw_trend[1,2,1]" "D_raw_trend[1,1,2]" "D_raw_trend[1,2,2]"
+[34] "Dmu_trend[1,1]"     "Dmu_trend[2,1]"     "Domega_trend[1,1]" 
+[37] "Domega_trend[2,1]"  "L_Sigma_trend[1,1]" "L_Sigma_trend[2,1]"
+[40] "L_Sigma_trend[1,2]" "L_Sigma_trend[2,2]" "Sigma_trend[1,1]"  
+[43] "Sigma_trend[2,1]"   "Sigma_trend[1,2]"   "Sigma_trend[2,2]"  
+[46] "A_trend[1,1,1]"     "A_trend[2,1,1]"     "A_trend[1,2,1]"    
+[49] "A_trend[2,2,1]"     "A_trend[1,1,2]"     "A_trend[2,1,2]"    
+[52] "A_trend[1,2,2]"     "A_trend[2,2,2]"     "D_trend[1,1,1]"    
+[55] "D_trend[1,2,1]"     "D_trend[1,1,2]"     "D_trend[1,2,2]"    
+[58] "Omega_trend[1,1]"   "Omega_trend[2,1]"   "Omega_trend[3,1]"  
+[61] "Omega_trend[4,1]"   "Omega_trend[5,1]"   "Omega_trend[6,1]"  
+[64] "Omega_trend[1,2]"   "Omega_trend[2,2]"   "Omega_trend[3,2]"  
+[67] "Omega_trend[4,2]"   "Omega_trend[5,2]"   "Omega_trend[6,2]"  
+[70] "Omega_trend[1,3]"   "Omega_trend[2,3]"   "Omega_trend[3,3]"  
+[73] "Omega_trend[4,3]"   "Omega_trend[5,3]"   "Omega_trend[6,3]"  
+[76] "Omega_trend[1,4]"   "Omega_trend[2,4]"   "Omega_trend[3,4]"  
+[79] "Omega_trend[4,4]"   "Omega_trend[5,4]"   "Omega_trend[6,4]"  
+[82] "Omega_trend[1,5]"   "Omega_trend[2,5]"   "Omega_trend[3,5]"  
+[85] "Omega_trend[4,5]"   "Omega_trend[5,5]"   "Omega_trend[6,5]"  
+[88] "Omega_trend[1,6]"   "Omega_trend[2,6]"   "Omega_trend[3,6]"  
+[91] "Omega_trend[4,6]"   "Omega_trend[5,6]"   "Omega_trend[6,6]"  
+[94] "ma_init_trend[1]"   "ma_init_trend[2]"   "Intercept_trend"   
+
+--------------------------------------------------------------------------------
+TERM TYPE: Smooth basis matrices (Zs_*) (pattern: ^Zs_)
+-------------------------------------------------------------------------------- 
+
+✓ Found 2 matching sdata elements:
+  Zs_count_1_1                            : 6 × 8
+  Zs_biomass_1_1                          : 6 × 8
+
+✗ No matching parameters found
+
+--------------------------------------------------------------------------------
+TERM TYPE: Smooth design (Xs_*) (pattern: ^Xs_)
+-------------------------------------------------------------------------------- 
+
+✓ Found 2 matching sdata elements:
+  Xs_count                                : 6 × 1
+  Xs_biomass                              : 6 × 1
+
+✗ No matching parameters found
+
+--------------------------------------------------------------------------------
+TERM TYPE: Smooth coefficients (s_*) (pattern: ^s_)
+-------------------------------------------------------------------------------- 
+
+✗ No matching sdata elements found
+
+✓ Found 16 matching parameters:
+   s_count_1_1[1], s_count_1_1[2], s_count_1_1[3], s_count_1_1[4], s_count_1_1[5], s_count_1_1[6], s_count_1_1[7], s_count_1_1[8], s_biomass_1_1[1], s_biomass_1_1[2] 
+  ... and 6 more
+
+--------------------------------------------------------------------------------
+TERM TYPE: Smooth standard deviations (sds_*) (pattern: ^sds_)
+-------------------------------------------------------------------------------- 
+
+✗ No matching sdata elements found
+
+✓ Found 2 matching parameters:
+   sds_count_1[1], sds_biomass_1[1] 
+
+--------------------------------------------------------------------------------
+TERM TYPE: Standardized smooth coefficients (zs_*) (pattern: ^zs_)
+-------------------------------------------------------------------------------- 
+
+✗ No matching sdata elements found
+
+✓ Found 16 matching parameters:
+   zs_count_1_1[1], zs_count_1_1[2], zs_count_1_1[3], zs_count_1_1[4], zs_count_1_1[5], zs_count_1_1[6], zs_count_1_1[7], zs_count_1_1[8], zs_biomass_1_1[1], zs_biomass_1_1[2] 
+  ... and 6 more
+
+
+################################################################################
+# EXPLORATION 2: RANDOM EFFECTS (fit6)
+################################################################################
+
+================================================================================
+MODEL: fit6 - Observation (Random effects)
+================================================================================ 
+
+--- prep$sdata names ---
+ [1] "N"          "Y"          "K"          "Kc"         "X"         
+ [6] "Z_1_1"      "J_1"        "N_1"        "M_1"        "NC_1"      
+[11] "prior_only"
+
+--- Design matrix dimensions ---
+  N                             : length 1
+  Y                             : 3
+  K                             : length 1
+  Kc                            : length 1
+  X                             : 3 × 1
+  Z_1_1                         : 3
+  J_1                           : 3
+  N_1                           : length 1
+  M_1                           : length 1
+  NC_1                          : length 1
+  prior_only                    : length 1
+
+--- Parameter names in prep$draws ---
+[1] "Intercept"   "b_Intercept" "sd_1[1]"     "z_1[1,1]"    "r_1_1[1]"   
+
+================================================================================
+MODEL: fit6 - Trend (CAR with GP)
+================================================================================ 
+
+--- prep$sdata names ---
+ [1] "N"               "Y"               "K"               "Kc"             
+ [5] "X"               "Dgp_1"           "Kgp_1"           "Nsubgp_1"       
+ [9] "Jgp_1"           "dmax_1"          "cmeans_1"        "Xgp_prior_1"    
+[13] "Xgp_1"           "Xgp_prior_1_old" "Xgp_1_old"       "prior_only"     
+
+--- Design matrix dimensions ---
+  N                             : length 1
+  Y                             : 3
+  K                             : length 1
+  Kc                            : length 1
+  X                             : 3 × 1
+  Dgp_1                         : length 1
+  Kgp_1                         : length 1
+  Nsubgp_1                      : length 1
+  Jgp_1                         : 3
+  dmax_1                        : length 1
+  cmeans_1                      : length 1
+  Xgp_prior_1                   : 3 × 1
+  Xgp_1                         : 3 × 1
+  Xgp_prior_1_old               : 24 × 1
+  Xgp_1_old                     : 24 × 1
+  prior_only                    : length 1
+
+--- Parameter names in prep$draws ---
+ [1] "sdgp_1_trend[1]"     "lscale_1_trend[1,1]" "zgp_1_trend[1]"     
+ [4] "zgp_1_trend[2]"      "zgp_1_trend[3]"      "zgp_1_trend[4]"     
+ [7] "zgp_1_trend[5]"      "zgp_1_trend[6]"      "zgp_1_trend[7]"     
+[10] "zgp_1_trend[8]"      "zgp_1_trend[9]"      "zgp_1_trend[10]"    
+[13] "zgp_1_trend[11]"     "zgp_1_trend[12]"     "zgp_1_trend[13]"    
+[16] "zgp_1_trend[14]"     "zgp_1_trend[15]"     "zgp_1_trend[16]"    
+[19] "zgp_1_trend[17]"     "zgp_1_trend[18]"     "zgp_1_trend[19]"    
+[22] "zgp_1_trend[20]"     "zgp_1_trend[21]"     "zgp_1_trend[22]"    
+[25] "zgp_1_trend[23]"     "zgp_1_trend[24]"     "ar1_trend[1]"       
+[28] "sigma_trend[1]"      "gp_pred_1_trend[1]"  "gp_pred_1_trend[2]" 
+[31] "gp_pred_1_trend[3]"  "gp_pred_1_trend[4]"  "gp_pred_1_trend[5]" 
+[34] "gp_pred_1_trend[6]"  "gp_pred_1_trend[7]"  "gp_pred_1_trend[8]" 
+[37] "gp_pred_1_trend[9]"  "gp_pred_1_trend[10]" "gp_pred_1_trend[11]"
+[40] "gp_pred_1_trend[12]" "gp_pred_1_trend[13]" "gp_pred_1_trend[14]"
+[43] "gp_pred_1_trend[15]" "gp_pred_1_trend[16]" "gp_pred_1_trend[17]"
+[46] "gp_pred_1_trend[18]" "gp_pred_1_trend[19]" "gp_pred_1_trend[20]"
+[49] "gp_pred_1_trend[21]" "gp_pred_1_trend[22]" "gp_pred_1_trend[23]"
+[52] "gp_pred_1_trend[24]" "Intercept_trend"    
+
+--------------------------------------------------------------------------------
+TERM TYPE: Random effects design (Z_*) (pattern: ^Z_)
+-------------------------------------------------------------------------------- 
+
+✓ Found 1 matching sdata elements:
+  Z_1_1                                   : 3
+
+✗ No matching parameters found
+
+--------------------------------------------------------------------------------
+TERM TYPE: Random effects grouping indices (J_*) (pattern: ^J_)
+-------------------------------------------------------------------------------- 
+
+✓ Found 1 matching sdata elements:
+  J_1                                     : 3
+
+✗ No matching parameters found
+
+--------------------------------------------------------------------------------
+TERM TYPE: Random effects deviations (r_*) (pattern: ^r_)
+-------------------------------------------------------------------------------- 
+
+✗ No matching sdata elements found
+
+✓ Found 1 matching parameters:
+   r_1_1[1] 
+
+--------------------------------------------------------------------------------
+TERM TYPE: Random effects standard deviations (sd_*) (pattern: ^sd_)
+-------------------------------------------------------------------------------- 
+
+✗ No matching sdata elements found
+
+✓ Found 1 matching parameters:
+   sd_1[1] 
+
+--------------------------------------------------------------------------------
+TERM TYPE: Standardized random effects (z_*) (pattern: ^z_)
+-------------------------------------------------------------------------------- 
+
+✗ No matching sdata elements found
+
+✓ Found 1 matching parameters:
+   z_1[1,1] 
+
+
+################################################################################
+# EXPLORATION 3: GAUSSIAN PROCESSES (fit6 trend, fit8 obs + trend)
+################################################################################
+
+--------------------------------------------------------------------------------
+TERM TYPE: GP terms (gp*) (pattern: gp)
+-------------------------------------------------------------------------------- 
+
+✓ Found 8 matching sdata elements:
+  Dgp_1                                   : integer
+  Kgp_1                                   : integer
+  Nsubgp_1                                : integer
+  Jgp_1                                   : 3
+  Xgp_prior_1                             : 3 × 1
+  Xgp_1                                   : 3 × 1
+  Xgp_prior_1_old                         : 24 × 1
+  Xgp_1_old                               : 24 × 1
+
+✓ Found 49 matching parameters:
+   sdgp_1_trend[1], zgp_1_trend[1], zgp_1_trend[2], zgp_1_trend[3], zgp_1_trend[4], zgp_1_trend[5], zgp_1_trend[6], zgp_1_trend[7], zgp_1_trend[8], zgp_1_trend[9] 
+  ... and 39 more
+
+--------------------------------------------------------------------------------
+TERM TYPE: GP standard deviations (sdgp_*) (pattern: ^sdgp_)
+-------------------------------------------------------------------------------- 
+
+✗ No matching sdata elements found
+
+✓ Found 1 matching parameters:
+   sdgp_1_trend[1] 
+
+--------------------------------------------------------------------------------
+TERM TYPE: GP length scales (lscale_*) (pattern: ^lscale_)
+-------------------------------------------------------------------------------- 
+
+✗ No matching sdata elements found
+
+✓ Found 1 matching parameters:
+   lscale_1_trend[1,1] 
+
+--------------------------------------------------------------------------------
+TERM TYPE: Standardized GP coefficients (zgp_*) (pattern: ^zgp_)
+-------------------------------------------------------------------------------- 
+
+✗ No matching sdata elements found
+
+✓ Found 24 matching parameters:
+   zgp_1_trend[1], zgp_1_trend[2], zgp_1_trend[3], zgp_1_trend[4], zgp_1_trend[5], zgp_1_trend[6], zgp_1_trend[7], zgp_1_trend[8], zgp_1_trend[9], zgp_1_trend[10] 
+  ... and 14 more
+
+--- Additional GP exploration with fit8 ---
+
+================================================================================
+MODEL: fit8 - Observation (GP in obs formula)
+================================================================================ 
+
+--- prep$sdata names ---
+ [1] "N"               "Y"               "K"               "Kc"             
+ [5] "X"               "Dgp_1"           "NBgp_1"          "Kgp_1"          
+ [9] "Nsubgp_1"        "Jgp_1"           "dmax_1"          "cmeans_1"       
+[13] "Xgp_prior_1"     "Lgp_1"           "Xgp_1"           "slambda_1"      
+[17] "Xgp_prior_1_old" "Xgp_1_old"       "prior_only"     
+
+--- Design matrix dimensions ---
+  N                             : length 1
+  Y                             : 3
+  K                             : length 1
+  Kc                            : length 1
+  X                             : 3 × 1
+  Dgp_1                         : length 1
+  NBgp_1                        : length 1
+  Kgp_1                         : length 1
+  Nsubgp_1                      : length 1
+  Jgp_1                         : 3
+  dmax_1                        : length 1
+  cmeans_1                      : length 1
+  Xgp_prior_1                   : 3 × 1
+  Lgp_1                         : length 1
+  Xgp_1                         : 3 × 5
+  slambda_1                     : 5 × 1
+  Xgp_prior_1_old               : 24 × 1
+  Xgp_1_old                     : 24 × 5
+  prior_only                    : length 1
+
+--- Parameter names in prep$draws ---
+[1] "Intercept"     "b_Intercept"   "sdgp_1[1]"     "lscale_1[1,1]"
+[5] "zgp_1[1]"      "zgp_1[2]"      "zgp_1[3]"      "zgp_1[4]"     
+[9] "zgp_1[5]"     
+
+================================================================================
+MODEL: fit8 - Trend (GP in trend formula)
+================================================================================ 
+
+--- prep$sdata names ---
+ [1] "N"               "Y"               "K"               "X"              
+ [5] "Dgp_1"           "NBgp_1"          "Kgp_1"           "Nsubgp_1"       
+ [9] "Jgp_1"           "dmax_1"          "cmeans_1"        "Xgp_prior_1"    
+[13] "Lgp_1"           "Xgp_1"           "slambda_1"       "Xgp_prior_1_old"
+[17] "Xgp_1_old"       "prior_only"     
+
+--- Design matrix dimensions ---
+  N                             : length 1
+  Y                             : 3
+  K                             : length 1
+  X                             : 3 × 0
+  Dgp_1                         : length 1
+  NBgp_1                        : length 1
+  Kgp_1                         : length 1
+  Nsubgp_1                      : length 1
+  Jgp_1                         : 3
+  dmax_1                        : length 1
+  cmeans_1                      : length 1
+  Xgp_prior_1                   : 3 × 1
+  Lgp_1                         : length 1
+  Xgp_1                         : 3 × 6
+  slambda_1                     : 6 × 1
+  Xgp_prior_1_old               : 24 × 1
+  Xgp_1_old                     : 24 × 6
+  prior_only                    : length 1
+
+--- Parameter names in prep$draws ---
+ [1] "sdgp_1_trend[1]"     "lscale_1_trend[1,1]" "zgp_1_trend[1]"     
+ [4] "zgp_1_trend[2]"      "zgp_1_trend[3]"      "zgp_1_trend[4]"     
+ [7] "zgp_1_trend[5]"      "zgp_1_trend[6]"      "sigma_trend[1]"     
+[10] "ar1_trend[1]"        "ar12_trend[1]"       "rgp_1_trend[1]"     
+[13] "rgp_1_trend[2]"      "rgp_1_trend[3]"      "rgp_1_trend[4]"     
+[16] "rgp_1_trend[5]"      "rgp_1_trend[6]"      "gp_pred_1_trend[1]" 
+[19] "gp_pred_1_trend[2]"  "gp_pred_1_trend[3]"  "gp_pred_1_trend[4]" 
+[22] "gp_pred_1_trend[5]"  "gp_pred_1_trend[6]"  "gp_pred_1_trend[7]" 
+[25] "gp_pred_1_trend[8]"  "gp_pred_1_trend[9]"  "gp_pred_1_trend[10]"
+[28] "gp_pred_1_trend[11]" "gp_pred_1_trend[12]" "gp_pred_1_trend[13]"
+[31] "gp_pred_1_trend[14]" "gp_pred_1_trend[15]" "gp_pred_1_trend[16]"
+[34] "gp_pred_1_trend[17]" "gp_pred_1_trend[18]" "gp_pred_1_trend[19]"
+[37] "gp_pred_1_trend[20]" "gp_pred_1_trend[21]" "gp_pred_1_trend[22]"
+[40] "gp_pred_1_trend[23]" "gp_pred_1_trend[24]"
+
+--------------------------------------------------------------------------------
+TERM TYPE: GP terms in obs (gp*) (pattern: gp)
+-------------------------------------------------------------------------------- 
+
+✓ Found 10 matching sdata elements:
+  Dgp_1                                   : integer
+  NBgp_1                                  : numeric
+  Kgp_1                                   : integer
+  Nsubgp_1                                : integer
+  Jgp_1                                   : 3
+  Xgp_prior_1                             : 3 × 1
+  Lgp_1                                   : numeric
+  Xgp_1                                   : 3 × 5
+  Xgp_prior_1_old                         : 24 × 1
+  Xgp_1_old                               : 24 × 5
+
+✓ Found 6 matching parameters:
+   sdgp_1[1], zgp_1[1], zgp_1[2], zgp_1[3], zgp_1[4], zgp_1[5] 
+
+--------------------------------------------------------------------------------
+TERM TYPE: GP terms in trend (gp*) (pattern: gp)
+-------------------------------------------------------------------------------- 
+
+✓ Found 10 matching sdata elements:
+  Dgp_1                                   : integer
+  NBgp_1                                  : numeric
+  Kgp_1                                   : integer
+  Nsubgp_1                                : integer
+  Jgp_1                                   : 3
+  Xgp_prior_1                             : 3 × 1
+  Lgp_1                                   : numeric
+  Xgp_1                                   : 3 × 6
+  Xgp_prior_1_old                         : 24 × 1
+  Xgp_1_old                               : 24 × 6
+
+✓ Found 37 matching parameters:
+   sdgp_1_trend[1], zgp_1_trend[1], zgp_1_trend[2], zgp_1_trend[3], zgp_1_trend[4], zgp_1_trend[5], zgp_1_trend[6], rgp_1_trend[1], rgp_1_trend[2], rgp_1_trend[3] 
+  ... and 27 more
+
+
+################################################################################
+# SUMMARY: KEY FINDINGS FOR IMPLEMENTATION
+################################################################################
+
+1. SMOOTH TERMS:
+   - Basis matrices: Zs_<response>_<term>_<smooth> (e.g., Zs_count_sx_1)
+   - Design matrices: Xs_<response> for random smooth effects
+   - Parameters: s_<response>_<term>_<smooth> OR zs_<response>_<term>_<smooth>
+   - Standard deviations: sds_<response>_<term>_<smooth>
+   - Computation: Sum over smooths of coef %*% t(basis_matrix)
+
+2. RANDOM EFFECTS:
+   - Design matrices: Z_<group>_<term> (e.g., Z_1_1 for first grouping)
+   - Grouping indices: J_<group> (maps observations to group levels)
+   - Parameters: r_<group>_<term> (random deviations)
+   - Standard deviations: sd_<group>_<term>
+   - Standardized form: z_<group> with sd_<group> multiplication
+   - Computation: Extract r[J[n]] for each observation n
+
+3. GAUSSIAN PROCESSES:
+   - GP predictions appear directly in prep$sdata (need to check for Jgp_*)
+   - Parameters: sdgp_<term>, lscale_<term> (hyperparameters)
+   - Coefficients: zgp_<term> (standardized)
+   - Computation: Pre-computed GP predictions indexed by Jgp
+
+4. PARAMETER NAMING:
+   - Univariate: parameter_<term> (e.g., s_sx_1)
+   - Multivariate: parameter_<response>_<term> (e.g., s_count_sx_1)
+   - Trend: parameter_<term>_trend (e.g., sdgp_1_trend)
+
+5. VECTORIZATION STRATEGY:
+   - Fixed effects: Single matrix multiplication b %*% t(X)
+   - Smooths: Sum over smooths, each as s %*% t(Zs)
+   - Random effects: Requires indexing by J, partial vectorization
+   - GPs: Direct indexing by Jgp into pre-computed predictions
+
+
+Exploration complete. Findings saved for implementation in Task 2.3.5.4.2+
+
+
+################################################################################
+# VERIFICATION: Testing Computation Formulas
+################################################################################
+
+=== VERIFICATION 1: Smooth Terms (fit3 obs - multivariate) ===
+Getting brms posterior_linpred for comparison...
+TODO for Task 2.3.5.4.2:
+  1. Extract smooth basis matrix: Zs_count_sx_1, Zs_biomass_sx_1
+  2. Extract smooth coefficients: s_count_sx_1, s_biomass_sx_1 (or zs_*)
+  3. Test computation: s %*% t(Zs) vs Zs %*% s
+  4. Verify dimensions match nobs
+  5. Handle multiple smooths per response
+  6. Compare to brms::posterior_linpred() output
+
+Smooth term matrices available:
+  Zs_count_1_1: 6 × 8
+  Zs_biomass_1_1: 6 × 8
+
+Smooth parameters available:
+   zs_count_1_1[1], zs_count_1_1[2], zs_count_1_1[3], zs_count_1_1[4], zs_count_1_1[5], zs_count_1_1[6], zs_count_1_1[7], zs_count_1_1[8], zs_biomass_1_1[1], zs_biomass_1_1[2], ... ( 32 total)
+
+=== VERIFICATION 2: Random Effects (fit6 obs) ===
+TODO for Task 2.3.5.4.3:
+  1. Extract Z matrix: Z_1_1
+  2. Extract grouping indices: J_1
+  3. Extract random deviations: r_1_1[...]
+  4. Test indexing: r[J[n]] for each observation n
+  5. Check if Z matrix multiplication is needed
+  6. Handle standardized form (z_ * sd_) if present
+  7. Compare to brms::posterior_linpred() output
+
+Random effects matrices available:
+  Z_1_1: 3
+  J_1: 3
+
+Random effects parameters available:
+   sd_1[1], z_1[1,1], r_1_1[1]
+
+=== VERIFICATION 3: Gaussian Processes (fit8 obs & trend) ===
+TODO for Task 2.3.5.4.4:
+  1. Locate GP predictions in prep$sdata
+  2. Extract indexing variable: Jgp_<term>
+  3. Extract GP parameters: sdgp_*, lscale_*, zgp_*
+  4. Test if GP contribution is pre-computed or needs calculation
+  5. Verify indexing: gp_pred[Jgp[n]]
+  6. Compare to brms::posterior_linpred() output
+
+GP-related data in obs model:
+   Dgp_1, NBgp_1, Kgp_1, Nsubgp_1, Jgp_1, Xgp_prior_1, Lgp_1, Xgp_1, Xgp_prior_1_old, Xgp_1_old 
+
+GP-related data in trend model:
+   Dgp_1, NBgp_1, Kgp_1, Nsubgp_1, Jgp_1, Xgp_prior_1, Lgp_1, Xgp_1, Xgp_prior_1_old, Xgp_1_old 
+
+GP parameters in obs:
+   sdgp_1[1], lscale_1[1,1], zgp_1[1], zgp_1[2], zgp_1[3], zgp_1[4], zgp_1[5]
+
+GP parameters in trend:
+   sdgp_1_trend[1], lscale_1_trend[1,1], zgp_1_trend[1], zgp_1_trend[2], zgp_1_trend[3], zgp_1_trend[4], zgp_1_trend[5], zgp_1_trend[6], rgp_1_trend[1], rgp_1_trend[2], ... ( 38 total)
+
+=== CRITICAL QUESTIONS FOR TASK 2.3.5.4.5 (r-package-analyzer) ===
+
+Use r-package-analyzer agent to investigate brms source code:
+  1. How does posterior_linpred.brmsfit() compute smooth contributions?
+  2. Exact formula for random effects: r[J[n]] or Z[n] * r[J[n]]?
+  3. How are GP predictions computed/indexed?
+  4. How do multiple terms combine? (intercept + fixed + smooths + RE + GP)
+  5. Are there any brms-specific optimizations we should replicate?
+
+Agent should examine:
+  - R/posterior_linpred.R in brms
+  - How brms uses prep$sdata to build linear predictors
+  - The exact matrix operations for each term type
+
+
+✓ Exploration and verification planning complete.
+Output saved to: tasks/special_terms_exploration_output.txt
