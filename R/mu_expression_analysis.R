@@ -15,18 +15,30 @@
 #' @noRd
 extract_mu_construction_with_classification <- function(stancode) {
   checkmate::assert_string(stancode, min.chars = 1)
-  
+
+  cat("\n=== DEBUG: extract_mu_construction_with_classification ===\n")
+
   # Extract model block using existing utility
   model_block <- extract_stan_block_content(stancode, "model")
-  
+  cat("DEBUG: Model block extracted, length =", nchar(model_block %||% ""), "\n")
+
   if (is.null(model_block) || nchar(trimws(model_block)) == 0) {
+    cat("DEBUG: Model block empty, returning empty result\n")
     return(create_empty_mu_result())
   }
-  
+
   # Extract mu construction lines
   mu_lines <- extract_mu_assignment_lines(model_block)
-  
+  cat("DEBUG: Found", length(mu_lines), "mu lines in model block\n")
+  if (length(mu_lines) > 0) {
+    cat("DEBUG: mu lines:\n")
+    for (i in seq_along(mu_lines)) {
+      cat("  ", i, ":", mu_lines[i], "\n")
+    }
+  }
+
   if (length(mu_lines) == 0) {
+    cat("DEBUG: No mu lines found, returning empty result\n")
     return(create_empty_mu_result())
   }
   

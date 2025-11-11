@@ -4727,9 +4727,12 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
 
     time_param <- paste0("N", suffix)
 
+    cat("\n=== DEBUG: Calling extract_mu_construction_with_classification (suffix:", suffix, ") ===\n")
     mu_construction_result <- extract_mu_construction_with_classification(stancode)
+    cat("DEBUG: Got", length(mu_construction_result$mu_construction), "mu construction lines\n")
 
     if (length(mu_construction_result$mu_construction) > 0) {
+      cat("DEBUG: Taking ENHANCED PATH (variable-tracing system)\n")
       # Store extracted mu lines AND supporting declarations to filter them from model block (DRY solution)
       extracted_mu_lines <- c(
         mu_construction_result$mu_construction,
@@ -4787,15 +4790,16 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
       create_mu_stanvar <- FALSE  # Stanvar already created above
 
     } else {
-      # Fallback cases need stanvar creation
+      cat("DEBUG: Taking FALLBACK PATH (4-case logic)\n")
       create_mu_stanvar <- TRUE
-      has_coefficients <- grepl(paste0("vector\\[.*\\]\\s+b", suffix, "[^_]"), stancode) &&
-                          (grepl(paste0("matrix\\[.*\\]\\s+Xc", suffix, "[^_]"), stancode) ||
-                           grepl(paste0("matrix\\[.*\\]\\s+X", suffix, "[^_]"), stancode))
+      has_coefficients <- grepl("vector\\[.*\\]\\s+b[^_]", stancode) &&
+                          (grepl("matrix\\[.*\\]\\s+Xc[^_]", stancode) ||
+                           grepl("matrix\\[.*\\]\\s+X[^_]", stancode))
+      cat("DEBUG: has_coefficients =", has_coefficients, "\n")
 
       if (has_coefficients) {
-        has_xc <- grepl(paste0("matrix\\[.*\\]\\s+Xc", suffix, "[^_]"), stancode) ||
-                  grepl(paste0("matrix\\[.*\\]\\s+X", suffix, "[^_]"), stancode)
+        has_xc <- grepl("matrix\\[.*\\]\\s+Xc[^_]", stancode) ||
+                  grepl("matrix\\[.*\\]\\s+X[^_]", stancode)
 
         if (!has_xc) {
           insight::format_error(
@@ -4810,11 +4814,11 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
 
         # Check parameter existence using consistent patterns
         intercept_param <- paste0("Intercept", suffix)
-        intercept_present <- grepl(paste0("real.*Intercept", suffix, "[^_]"), stancode)
+        intercept_present <- grepl("real.*Intercept[^_]", stancode)
         
         # Determine which covariate parameter is present
-        xc_present <- grepl(paste0("matrix\\[.*\\]\\s+Xc", suffix, "[^_]"), stancode)
-        x_present <- grepl(paste0("matrix\\[.*\\]\\s+X", suffix, "[^_]"), stancode)
+        xc_present <- grepl("matrix\\[.*\\]\\s+Xc[^_]", stancode)
+        x_present <- grepl("matrix\\[.*\\]\\s+X[^_]", stancode)
         covariates_present <- xc_present || x_present
         covariate_param <- if (xc_present) paste0("Xc", suffix) else paste0("X", suffix)
 
@@ -4826,30 +4830,40 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
         # Handle the 4 cases systematically
         if (!intercept_present && !covariates_present) {
           # Case 1: No terms
+          cat("DEBUG: Case 1 - No intercept, no covariates\n")
           mu_trend_code <- paste0(base_declaration, zero_vector, ";")
         } else if (intercept_present && !covariates_present) {
           # Case 2: Intercept only - use efficient rep_vector
+          cat("DEBUG: Case 2 - Intercept only\n")
           mu_trend_code <- paste0(base_declaration, intercept_vector, ";")
         } else if (!intercept_present && covariates_present) {
           # Case 3: Covariates only
-          mu_trend_code <- paste0(base_declaration, zero_vector, ";\n  mu", suffix, 
+          cat("DEBUG: Case 3 - Covariates only (", covariate_param, "* b", suffix, ")\n")
+          mu_trend_code <- paste0(base_declaration, zero_vector, ";\n  mu", suffix,
                                   " += ", covariate_param, " * b", suffix, ";")
         } else {
           # Case 4: Both intercept and covariates
+          cat("DEBUG: Case 4 - Both intercept and covariates\n")
           mu_trend_code <- paste0(base_declaration, zero_vector, ";\n  mu", suffix,
-                                  " += ", intercept_param, " + ", covariate_param, 
+                                  " += ", intercept_param, " + ", covariate_param,
                                   " * b", suffix, ";")
         }
+        cat("DEBUG: Generated mu_trend_code:\n", mu_trend_code, "\n")
       } else {
-        intercept_present <- grepl(paste0("real.*Intercept", suffix, "[^_]"), stancode)
+        cat("DEBUG: No coefficients, checking for intercept only\n")
+        intercept_present <- grepl("real.*Intercept[^_]", stancode)
+        cat("DEBUG: intercept_present =", intercept_present, "\n")
         if (intercept_present) {
+          cat("DEBUG: Using intercept-only construction\n")
           mu_trend_code <- paste0("vector[", time_param, "] mu", suffix,
                                  " = rep_vector(Intercept", suffix, ", ",
                                  time_param, ");")
         } else {
+          cat("DEBUG: Using zero-vector construction (no intercept, no covariates)\n")
           mu_trend_code <- paste0("vector[", time_param, "] mu", suffix,
                                  " = rep_vector(0.0, ", time_param, ");")
         }
+        cat("DEBUG: Generated mu_trend_code:\n", mu_trend_code, "\n")
       }
 
       # Create fallback stanvar
