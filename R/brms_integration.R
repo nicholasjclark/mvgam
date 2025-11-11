@@ -13,6 +13,54 @@
 #' - **Extension Layer**: Enhanced functionality beyond base brms capabilities
 
 # =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+#' Determine if trend formula should include intercept based on mvgam conventions
+#' 
+#' @description
+#' Analyzes trend formulas to determine intercept inclusion following mvgam 
+#' conventions rather than R's default formula behavior. Trend constructors
+#' like RW() and AR() default to no intercept unless explicitly specified.
+#' 
+#' @param formula A formula object for trend specification
+#' @return Logical indicating whether intercept should be included
+#' @noRd
+should_trend_formula_have_intercept <- function(formula) {
+  # Input validation following mvgam standards
+  checkmate::assert_formula(formula)
+  
+  # Get formula terms for analysis
+  formula_terms <- terms(formula)
+  
+  # Check R's built-in intercept attribute
+  has_r_intercept <- attr(formula_terms, 'intercept') == 1
+  
+  if (!has_r_intercept) {
+    # Explicitly excluded via ~ -1 or ~ 0 
+    return(FALSE)
+  }
+  
+  # For formulas with R intercept = 1, check if intercept was explicit
+  # Parse right-hand side of formula to detect explicit "+1" vs default behavior
+  rhs_terms <- attr(formula_terms, "term.labels")
+  
+  # If no terms on RHS beyond intercept, this is ~ 1 (explicit intercept only)
+  if (length(rhs_terms) == 0) {
+    return(TRUE)
+  }
+  
+  # Check if "1" is explicitly listed as a term (~ 1 + RW())
+  if ("1" %in% rhs_terms) {
+    return(TRUE)
+  }
+  
+  # For pure trend constructor formulas (~ RW(), ~ AR()) with default R intercept,
+  # follow mvgam convention of no intercept for trend innovations
+  return(FALSE)
+}
+
+# =============================================================================
 # SECTION 1: BRMS LIGHTWEIGHT SETUP SYSTEM
 # =============================================================================
 # WHY: Lightweight brms setup enables rapid model prototyping and validation
@@ -91,20 +139,35 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     # Check if formula lacks response variable (e.g., ~ 1, ~ x + y)
     formula_chr <- deparse(formula)
     if (!grepl("~.*~", formula_chr) && grepl("^\\s*~", formula_chr)) {
+      # DEBUG: Add debug output to trace execution
+      cat("DEBUG: Processing trend formula:", formula_chr, "\n")
+      
       # This is a trend formula without response variable
       # Add fake trend_y response variable following mvgam pattern
       data <- data
       data$trend_y <- rnorm(nrow(data))
 
       # Update formula to include trend_y response
-      if (attr(terms(formula), 'intercept') == 1) {
+      # Use mvgam-aware intercept detection for trend formulas
+      has_intercept_check <- should_trend_formula_have_intercept(formula)
+      cat("DEBUG: should_have_intercept =", has_intercept_check, "\n")
+      
+      if (has_intercept_check) {
         # Has intercept: keep intercept to get Intercept_trend prior
+        cat("DEBUG: Keeping intercept - using trend_y ~ .\n")
         formula <- update(formula, trend_y ~ .)
       } else {
         # No intercept: explicitly remove intercept
+        cat("DEBUG: Removing intercept - using trend_y ~ . - 1\n")
         formula <- update(formula, trend_y ~ . - 1)
       }
+      
+      cat("DEBUG: Final formula:", deparse(formula), "\n")
+    } else {
+      cat("DEBUG: Skipping trend formula processing - not a simple trend formula\n")
     }
+  } else {
+    cat("DEBUG: Skipping trend formula processing - wrong formula type\n")
   }
 
   # Validate brms formula compatibility
