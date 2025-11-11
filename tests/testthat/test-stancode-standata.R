@@ -429,9 +429,9 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   # lprior initialization and accumulation
   expect_true(grepl("real lprior = 0;.*prior contributions", code_with_trend))
 
-  # Trend linear predictor with presence covariate
+  # Trend linear predictor with presence covariate (no intercept since ~ presence + VAR, not ~ 1 + presence + VAR)
   expect_true(grepl("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
-  expect_true(grepl("mu_trend \\+= Intercept_trend \\+ Xc_trend \\* b_trend;", code_with_trend))
+  expect_true(grepl("mu_trend \\+= Xc_trend \\* b_trend;", code_with_trend))
 
   # Innovation covariance construction
   expect_true(grepl("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend = diag_pre_multiply\\(sigma_trend, L_Omega_trend\\);", code_with_trend))
