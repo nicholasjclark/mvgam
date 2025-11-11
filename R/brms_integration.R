@@ -139,9 +139,6 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     # Check if formula lacks response variable (e.g., ~ 1, ~ x + y)
     formula_chr <- deparse(formula)
     if (!grepl("~.*~", formula_chr) && grepl("^\\s*~", formula_chr)) {
-      # DEBUG: Add debug output to trace execution
-      cat("DEBUG: Processing trend formula:", formula_chr, "\n")
-      
       # This is a trend formula without response variable
       # Add fake trend_y response variable following mvgam pattern
       data <- data
@@ -150,24 +147,21 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
       # Update formula to include trend_y response
       # Use mvgam-aware intercept detection for trend formulas
       has_intercept_check <- should_trend_formula_have_intercept(formula)
-      cat("DEBUG: should_have_intercept =", has_intercept_check, "\n")
       
-      if (has_intercept_check) {
+      # Check formula structure
+      rhs_str <- deparse(rlang::f_rhs(formula))
+      
+      if (rhs_str == "0" || rhs_str == "-1") {
+        # Direct assignment for clean no-intercept formula
+        formula <- as.formula("trend_y ~ 0")
+      } else if (has_intercept_check) {
         # Has intercept: keep intercept to get Intercept_trend prior
-        cat("DEBUG: Keeping intercept - using trend_y ~ .\n")
         formula <- update(formula, trend_y ~ .)
       } else {
         # No intercept: explicitly remove intercept
-        cat("DEBUG: Removing intercept - using trend_y ~ . - 1\n")
-        formula <- update(formula, trend_y ~ . - 1)
+        formula <- update(formula, trend_y ~ 0 + .)
       }
-      
-      cat("DEBUG: Final formula:", deparse(formula), "\n")
-    } else {
-      cat("DEBUG: Skipping trend formula processing - not a simple trend formula\n")
     }
-  } else {
-    cat("DEBUG: Skipping trend formula processing - wrong formula type\n")
   }
 
   # Validate brms formula compatibility

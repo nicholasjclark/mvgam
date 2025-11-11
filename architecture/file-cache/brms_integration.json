@@ -3,6 +3,7 @@
 
                    },
     "functions":  [
+                      "should_trend_formula_have_intercept",
                       "setup_brms_lightweight",
                       "extract_prior_from_setup",
                       "extract_brmsterms_from_setup",
@@ -29,6 +30,7 @@
                                 "create_trend_base_formula":  "create_trend_base_formula \u003c- function(trend_specs) {",
                                 "setup_brms_lightweight":  "setup_brms_lightweight \u003c- function(formula, data, family = gaussian(), trend_formula = NULL, stanvars = NULL, prior = NULL, is_trend_setup = FALSE, response_vars = NULL, time_var = \"time\", series_var = \"series\", ...) {",
                                 "parse_nonlinear_manually":  "parse_nonlinear_manually \u003c- function(formula) {",
+                                "extract_response_from_formula":  "extract_response_from_formula \u003c- function(formula) {",
                                 "is_multivariate_formula":  "is_multivariate_formula \u003c- function(formula) {",
                                 "extract_mvbind_responses":  "extract_mvbind_responses \u003c- function(formula) {",
                                 "extract_variable_name":  "extract_variable_name \u003c- function(expr, max_depth = 10) {",
@@ -40,7 +42,7 @@
                                 "extract_brmsterms_from_setup":  "extract_brmsterms_from_setup \u003c- function(setup_object) {",
                                 "extract_response_names":  "extract_response_names \u003c- function(formula) {",
                                 "extract_prior_from_setup":  "extract_prior_from_setup \u003c- function(setup_object) {",
-                                "extract_response_from_formula":  "extract_response_from_formula \u003c- function(formula) {"
+                                "should_trend_formula_have_intercept":  "should_trend_formula_have_intercept \u003c- function(formula) {"
                             },
     "file":  "R/brms_integration.R"
 }
