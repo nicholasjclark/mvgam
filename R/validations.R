@@ -2516,7 +2516,7 @@ parse_base_formula_safe <- function(trend_formula, trend_terms) {
 
   # Handle case where all terms were removed
   if (is.null(cleaned_expr)) {
-    cleaned_expr <- quote(1)  # Default to intercept-only
+    cleaned_expr <- quote(0)  # Default to no intercept for trend models
   }
 
   # Reconstruct formula preserving environment (no lhs for trend formulas)
@@ -2547,20 +2547,45 @@ remove_trend_expressions <- function(expr, trend_patterns, depth = 0) {
     ))
   }
 
-  if (rlang::is_call(expr, "+")) {
+  # Handle minus operations first to check for unary case
+  if (rlang::is_call(expr, "-")) {
     args <- rlang::call_args(expr)
+    
+    if (length(args) == 1) {
+      # Unary minus: preserve operator with processed argument
+      arg <- remove_trend_expressions(args[[1]], trend_patterns, depth + 1)
+      return(if (is.null(arg)) NULL else rlang::call2("-", arg))
+    }
+    # Binary minus continues to shared binary logic below
+  }
+  
+  # Handle binary operations (both + and binary -)
+  if (rlang::is_call(expr, "+") || rlang::is_call(expr, "-")) {
+    op <- rlang::call_name(expr)
+    args <- rlang::call_args(expr)
+    
+    # Validate binary operation structure
+    if (length(args) != 2) {
+      stop(insight::format_error(
+        paste0("Invalid ", op, " operation in formula."),
+        "Expected binary operation with two arguments."
+      ))
+    }
+    
+    # Process both operands recursively
     lhs <- remove_trend_expressions(args[[1]], trend_patterns, depth + 1)
     rhs <- remove_trend_expressions(args[[2]], trend_patterns, depth + 1)
-
-    # Handle removal logic preserving valid expressions
+    
+    # Reconstruct based on remaining operands
     if (is.null(lhs) && is.null(rhs)) {
       return(NULL)
     } else if (is.null(lhs)) {
-      return(rhs)
+      # For subtraction with no left operand, create unary minus
+      return(if (op == "-") rlang::call2("-", rhs) else rhs)
     } else if (is.null(rhs)) {
       return(lhs)
     } else {
-      return(rlang::expr(!!lhs + !!rhs))
+      return(rlang::call2(op, lhs, rhs))
     }
   } else {
     # Check if this expression is a trend term
