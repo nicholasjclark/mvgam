@@ -838,85 +838,6 @@ transform_glm_call <- function(stan_code, glm_type, params) {
   gsub(original_pattern, replacement, stan_code)
 }
 
-#' Inject Trend into GLM Linear Predictor
-#'
-#' @description
-#' GLM-compatible trend injection that creates combined linear predictor
-#' and transforms GLM function calls.
-#'
-#' @param base_stancode Character string containing base Stan code
-#' @param trend_stanvars List of stanvars containing trend components
-#' @param glm_type Character string specifying detected GLM function type
-#' @return Modified Stan code with GLM-compatible trend injection
-#' @noRd
-inject_trend_into_glm_predictor <- function(base_stancode, trend_stanvars, glm_type) {
-  checkmate::assert_string(base_stancode, min.chars = 1)
-  checkmate::assert_list(trend_stanvars)
-  checkmate::assert_string(glm_type)
-
-  # Extract mapping arrays for trend injection
-  mapping_arrays <- list(time_arrays = character(0), series_arrays = character(0))
-
-  for (stanvar in trend_stanvars) {
-    if (is.list(stanvar) && !is.null(stanvar$name)) {
-      if (grepl("obs_trend_time", stanvar$name)) {
-        mapping_arrays$time_arrays <- c(mapping_arrays$time_arrays, stanvar$name)
-      }
-      if (grepl("obs_trend_series", stanvar$name)) {
-        mapping_arrays$series_arrays <- c(mapping_arrays$series_arrays, stanvar$name)
-      }
-    }
-  }
-
-  # Validate mapping arrays exist
-  if (length(mapping_arrays$time_arrays) == 0 || length(mapping_arrays$series_arrays) == 0) {
-    stop(insight::format_error(
-      "Missing observation-to-trend mapping arrays for GLM trend injection.",
-      "Expected obs_trend_time and obs_trend_series arrays."
-    ), call. = FALSE)
-  }
-
-  # Parse GLM parameters from existing function calls
-  params <- parse_glm_parameters(base_stancode, glm_type)
-  if (is.null(params)) {
-    stop(insight::format_error(
-      "Could not parse GLM parameters from function: {glm_type}",
-      "Unable to extract parameter structure for transformation."
-    ), call. = FALSE)
-  }
-
-  # Generate trend injection code (same logic as standard approach)
-  trend_injection_code <- generate_trend_injection_code(mapping_arrays)
-
-  # Create combined mu with observation + trend components using efficient matrix multiplication
-  combined_mu_code <- paste0(
-    "  // Efficient matrix multiplication for linear predictor\n",
-    "  vector[N] mu = ", params$design_matrix, " * ", params$coefficients, ";\n",
-    "  // Add intercept and trend components\n",
-    "  for (n in 1:N) {\n",
-    "    mu[n] += ", params$intercept, " + trend[obs_trend_time[n], obs_trend_series[n]];\n",
-    "  }"
-  )
-
-  # Create stanvar for combined mu construction in model block
-  mu_stanvar_code <- paste0(combined_mu_code, collapse = "\n")
-
-  # Extract common logic for finding prior_only insertion point
-  # This eliminates duplication between GLM and multivariate paths while
-  # using the proven robust line-by-line approach from multivariate implementation
-  code_lines <- strsplit(base_stancode, "\n")[[1]]
-  model_info <- find_stan_block(code_lines, "model")
-  insertion_point <- find_prior_only_insertion_point(code_lines, model_info)
-
-  # Insert mu code at correct location
-  code_lines <- append(code_lines, mu_stanvar_code, after = insertion_point)
-  modified_code <- paste(code_lines, collapse = "\n")
-
-  # Transform GLM function calls to use combined mu
-  final_code <- transform_glm_call(modified_code, glm_type, params)
-
-  return(final_code)
-}
 
 #' Extract Mapping Arrays from Trend Stanvars
 #'
@@ -1146,31 +1067,165 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
     return(base_stancode)
   }
 
-  # Detect GLM usage using existing detection system
-  detected_glm_types <- detect_glm_usage(base_stancode)
+  # Always use standard injection that preserves brms constructions
+  # Extract and validate mapping arrays using shared utility
+  mapping_arrays <- extract_mapping_arrays(trend_stanvars)
+  validate_mapping_arrays(mapping_arrays)
 
+  # Generate trend injection code
+  trend_injection_code <- generate_trend_injection_code(mapping_arrays)
+
+  # Parse Stan code into lines
+  code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
+
+  # Insert trend injection into model block after last mu += line
+  modified_lines <- insert_after_mu_lines_in_model_block(code_lines, trend_injection_code)
+
+  # Reconstruct modified code
+  modified_stancode <- paste(modified_lines, collapse = "\n")
+
+  # Post-process: Transform any GLM calls to work with enhanced mu
+  detected_glm_types <- detect_glm_usage(modified_stancode)
   if (length(detected_glm_types) > 0) {
-    # Use GLM-compatible approach when GLM optimization is detected
-    glm_type <- detected_glm_types[1]  # Use first detected GLM type
-    return(inject_trend_into_glm_predictor(base_stancode, trend_stanvars, glm_type))
-  } else {
-    # Use standard approach when no GLM optimization
-    # Extract and validate mapping arrays using shared utility
-    mapping_arrays <- extract_mapping_arrays(trend_stanvars)
-    validate_mapping_arrays(mapping_arrays)
-
-    # Generate trend injection code
-    trend_injection_code <- generate_trend_injection_code(mapping_arrays)
-
-    # Parse Stan code into lines
-    code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
-
-    # Insert trend injection into model block after last mu += line
-    modified_lines <- insert_after_mu_lines_in_model_block(code_lines, trend_injection_code)
-
-    # Reconstruct Stan code
-    return(paste(modified_lines, collapse = "\n"))
+    modified_stancode <- transform_glm_calls_post_processing(modified_stancode, detected_glm_types)
   }
+
+  return(modified_stancode)
+}
+
+#' Transform GLM Calls After Standard Trend Injection
+#' 
+#' @description
+#' Post-processes Stan code to transform GLM function calls to work with 
+#' trend-enhanced mu vectors. Applied after standard trend injection to
+#' ensure GLM functions use the combined linear predictor.
+#'
+#' @param stan_code Character string containing Stan code with trend components
+#' @param detected_glm_types Character vector of detected GLM function types.
+#'   Must be supported GLM types from the mvgam GLM transformation system.
+#' @return Character string with modified Stan code containing transformed GLM calls
+#' @noRd
+transform_glm_calls_post_processing <- function(stan_code, detected_glm_types) {
+  checkmate::assert_character(stan_code, min.chars = 1)
+  checkmate::assert_character(detected_glm_types, min.len = 1)
+  
+  # Validate GLM types are supported
+  supported_glm_types <- c("normal_id_glm", "poisson_log_glm", "neg_binomial_2_log_glm", 
+                          "bernoulli_logit_glm", "ordered_logistic_glm", "categorical_logit_glm")
+  invalid_types <- setdiff(detected_glm_types, supported_glm_types)
+  if (length(invalid_types) > 0) {
+    stop(insight::format_error(
+      "Unsupported GLM types detected: {.field {invalid_types}}",
+      "Supported types: {.field {supported_glm_types}}"
+    ), call. = FALSE)
+  }
+  
+  modified_code <- stan_code
+  
+  # Transform each detected GLM type
+  for (glm_type in detected_glm_types) {
+    # Parse parameters with error handling
+    params <- parse_glm_parameters(modified_code, glm_type)
+    if (is.null(params)) {
+      stop(insight::format_error(
+        "Could not parse GLM parameters for type: {.field {glm_type}}",
+        "GLM function call may be malformed or missing required structure."
+      ), call. = FALSE)
+    }
+    
+    # Transform with validation
+    previous_code <- modified_code
+    modified_code <- transform_glm_call(modified_code, glm_type, params)
+    
+    # Verify transformation occurred
+    if (identical(previous_code, modified_code)) {
+      stop(insight::format_error(
+        "GLM transformation failed for type: {.field {glm_type}}",
+        "No changes were made to the Stan code during transformation."
+      ), call. = FALSE)
+    }
+  }
+  
+  return(modified_code)
+}
+
+#' Convert GLM-Only Code to Standard Form for Trend Injection
+#' 
+#' @description
+#' Converts models with pure GLM functions (no explicit mu construction) to
+#' standard form with minimal mu construction. This enables use of existing proven 
+#' trend injection infrastructure via recursive preprocessing.
+#'
+#' @param code_lines Character vector of Stan code lines
+#' @param block_info List with start_idx and end_idx for model block  
+#' @param detected_glm_types Character vector of detected GLM function types
+#' @return Character vector with GLM calls converted to standard mu form
+#' @noRd
+convert_glm_to_standard_form <- function(code_lines, block_info, detected_glm_types) {
+  checkmate::assert_character(code_lines, min.len = 1)
+  checkmate::assert_list(block_info)
+  checkmate::assert_names(names(block_info), must.include = c("start_idx", "end_idx"))
+  checkmate::assert_integerish(block_info$start_idx, len = 1)
+  checkmate::assert_integerish(block_info$end_idx, len = 1)
+  checkmate::assert_character(detected_glm_types, min.len = 1)
+  
+  # Validate block indices
+  if (block_info$start_idx > block_info$end_idx || block_info$end_idx > length(code_lines)) {
+    stop(insight::format_error(
+      "Invalid block indices in {.field block_info}",
+      "start_idx: {block_info$start_idx}, end_idx: {block_info$end_idx}, code length: {length(code_lines)}"
+    ), call. = FALSE)
+  }
+  
+  # Work with a copy to avoid modifying the original
+  modified_lines <- code_lines
+  
+  # Get the first detected GLM type for preprocessing
+  glm_type <- detected_glm_types[1]
+  model_block_text <- paste(modified_lines[block_info$start_idx:block_info$end_idx], collapse = "\n")
+  
+  # Parse GLM parameters using existing infrastructure
+  params <- parse_glm_parameters(model_block_text, glm_type)
+  if (is.null(params)) {
+    stop(insight::format_error(
+      "Could not parse GLM parameters for type: {.field {glm_type}}",
+      "GLM function call may be malformed or missing required structure."
+    ), call. = FALSE)
+  }
+  
+  # Find GLM call line to preprocess
+  glm_pattern <- paste0(glm_type, "_l(pdf|pmf)")
+  glm_line_idx <- NULL
+  for (i in block_info$start_idx:block_info$end_idx) {
+    if (grepl(glm_pattern, modified_lines[i])) {
+      glm_line_idx <- i
+      break
+    }
+  }
+  
+  if (is.null(glm_line_idx)) {
+    stop(insight::format_error(
+      "Could not find GLM function call for type: {.field {glm_type}}",
+      "Expected pattern: {.field {glm_pattern}}"
+    ), call. = FALSE)
+  }
+  
+  # Create minimal mu construction for trend injection
+  mu_initialization <- c(
+    "    // Initialize mu for trend injection",  
+    "    vector[N] mu = rep_vector(0.0, N);",
+    paste0("    mu += ", params$design_matrix, " * ", params$coefficients, ";")
+  )
+  
+  # Handle intercept (including no-intercept models)
+  if (!is.null(params$intercept) && params$intercept != "0" && params$intercept != "0.0") {
+    mu_initialization <- c(mu_initialization, paste0("    mu += ", params$intercept, ";"))
+  }
+  
+  # Insert mu construction before GLM call
+  modified_lines[glm_line_idx] <- paste0(paste(mu_initialization, collapse = "\n"), "\n", modified_lines[glm_line_idx])
+  
+  return(modified_lines)
 }
 
 #' Insert Trend Injection Code After Last mu += Line in Model Block
@@ -1198,8 +1253,18 @@ insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_cod
   mu_line_indices <- which(grepl("\\s*mu\\s*\\+=", model_lines))
 
   if (length(mu_line_indices) == 0) {
-    # Handle nonlinear models: look for mu[n] = ... patterns inside for loops
-    return(handle_nonlinear_trend_injection(code_lines, block_info, trend_injection_code))
+    # Check if this is a GLM-only case (no explicit mu construction)
+    model_block_text <- paste(model_lines, collapse = "\n")
+    detected_glm_types <- detect_glm_usage(model_block_text)
+    
+    if (length(detected_glm_types) > 0) {
+      # GLM-only case: preprocess to standard form, then recurse
+      converted_code <- convert_glm_to_standard_form(code_lines, block_info, detected_glm_types)
+      return(insert_after_mu_lines_in_model_block(converted_code, trend_injection_code))
+    } else {
+      # Handle nonlinear models: look for mu[n] = ... patterns inside for loops
+      return(handle_nonlinear_trend_injection(code_lines, block_info, trend_injection_code))
+    }
   }
 
   # Calculate absolute position of last mu += line
