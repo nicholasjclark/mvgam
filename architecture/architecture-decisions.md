@@ -244,7 +244,7 @@ as_draws.mvgam <- function(x, variable = NULL, ...) {
 
 ### 3. Stan Optimization Preservation
 **Principle**: Preserve all brms Stan optimizations (GLM primitives, threading, etc.)
-**Implementation**: Let brms handle observation model complexity entirely
+**Implementation**: Let brms handle observation model complexity entirely. GLM injection uses recursive preprocessing to maintain efficiency.
 
 ### 3. Simplified Constructor Architecture
 -  Trend constructors become minimal object creators using `create_mvgam_trend()`
