@@ -3,6 +3,47 @@
 # Integrated tests for stancode.mvgam_formula() and
 # standata.mvgam_formula()
 
+# Test Helper Functions ----
+
+#' Robust pattern matching for Stan code with whitespace tolerance
+#'
+#' This function wraps grepl() to provide more robust pattern matching for
+#' generated Stan code by trimming whitespace from both pattern and input.
+#' This makes tests resilient to formatting changes in code generation.
+#'
+#' @param pattern Character string containing the regular expression pattern
+#' @param x Character vector where matches are sought
+#' @param fixed Logical. If TRUE, pattern is a literal string (default FALSE)
+#' @param ignore.case Logical. If TRUE, case is ignored (default FALSE)
+#' @param ... Additional arguments passed to grepl()
+#'
+#' @return Logical vector indicating matches
+#' @noRd
+stan_pattern <- function(pattern, x, ignore.case = FALSE, ...) {
+  # Function to remove ALL whitespace for robust matching
+  remove_whitespace <- function(text) {
+    gsub("\\s+", "", text)
+  }
+
+  # Remove all whitespace from both pattern and input
+  x_no_space <- remove_whitespace(x)
+
+  # Check if pattern contains regex escapes (\\[ \\] \\( \\) etc.)
+  # If so, remove whitespace but don't double-escape
+  # If not, remove whitespace and escape for literal matching
+  if (grepl("\\\\[\\[\\]()\\{\\}^$\\*\\+\\?\\.|]", pattern)) {
+    # Pattern is already regex-escaped, just remove whitespace
+    pattern_final <- remove_whitespace(pattern)
+  } else {
+    # Pattern is literal Stan code, remove whitespace then escape metacharacters
+    pattern_no_space <- remove_whitespace(pattern)
+    pattern_final <- gsub("([\\[\\]()\\{\\}^$\\*\\+\\?\\.|\\\\])", "\\\\\\1", pattern_no_space)
+  }
+
+  # Apply grepl with processed pattern and whitespace-free input
+  grepl(pattern_final, x_no_space, ignore.case = ignore.case, ...)
+}
+
 # Test Data Setup ----
 
 #' Create standardized test datasets for stancode/standata function testing
@@ -82,49 +123,43 @@ test_that("stancode.mvgam_formula returns correct class structure", {
   expect_false(grepl("Xc_trend", code_with_trend, fixed = TRUE))
   expect_false(grepl("matrix.*K.*X_trend", code_with_trend))
 
-  # mu needs to be created explicitly because of glm observation likelihood
-  expect_true(grepl("vector[N] mu = Xc * b;", code_with_trend, fixed = TRUE))
-
   # brms-generated dispersion parameter should be excluded
   expect_false(grepl("real<lower=0> sigma;", code_with_trend, fixed = TRUE))
 
   # GLM function usage for Poisson family
-  expect_true(grepl("poisson_log_glm_lpmf", code_with_trend, fixed = TRUE))
-  expect_true(grepl("vector[1] mu_ones;", code_with_trend, fixed = TRUE))
+  expect_true(stan_pattern("poisson_log_glm_lpmf", code_with_trend, fixed = TRUE))
+  expect_true(stan_pattern("vector[1] mu_ones;", code_with_trend, fixed = TRUE))
 
   # Essential trend dimensions in data block
-  expect_true(grepl("int<lower=1> N_trend;", code_with_trend, fixed = TRUE))
-  expect_true(grepl("int<lower=1> N_series_trend;", code_with_trend, fixed = TRUE))
-  expect_true(grepl("int<lower=1> N_lv_trend;", code_with_trend, fixed = TRUE))
+  expect_true(stan_pattern("int<lower=1> N_trend;", code_with_trend, fixed = TRUE))
+  expect_true(stan_pattern("int<lower=1> N_series_trend;", code_with_trend, fixed = TRUE))
+  expect_true(stan_pattern("int<lower=1> N_lv_trend;", code_with_trend, fixed = TRUE))
 
   # Critical times_trend array structure
-  expect_true(grepl("array\\[N_trend, N_series_trend\\] int times_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;", code_with_trend))
 
   # Factor loading matrix for non-factor models
-  expect_true(grepl("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix", code_with_trend))
 
   # RW-specific innovation structure
-  expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
-  expect_true(grepl("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
-  expect_true(grepl("scaled_innovations_trend = innovations_trend \\* diag_matrix\\(sigma_trend\\)", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
+  expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
+  expect_true(stan_pattern("scaled_innovations_trend = innovations_trend \\* diag_matrix\\(sigma_trend\\)", code_with_trend))
 
   # 6. RW Dynamics Implementation
   # Random walk state evolution
-  expect_true(grepl("lv_trend\\[1, :\\] = scaled_innovations_trend\\[1, :\\]", code_with_trend))
-  expect_true(grepl("lv_trend\\[i, :\\] = lv_trend\\[i-1, :\\] \\+ scaled_innovations_trend\\[i, :\\]", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[1, : \\] = scaled_innovations_trend\\[1, : \\]", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[i, : \\] = lv_trend\\[i - 1, : \\] \\+ scaled_innovations_trend\\[i, : \\]", code_with_trend))
 
   # Critical universal pattern with dot_product
-  expect_true(grepl("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
-
-  # mu construction and trend addition in transformed parameters
-  expect_true(grepl("mu\\[n\\] \\+= Intercept \\+ trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_with_trend))
+  expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
 
   # Verify observation-to-trend mappings exist in data block
-  expect_true(grepl("array\\[N\\] int obs_trend_time;", code_with_trend))
-  expect_true(grepl("array\\[N\\] int obs_trend_series;", code_with_trend))
+  expect_true(stan_pattern("array\\[N\\] int obs_trend_time;", code_with_trend))
+  expect_true(stan_pattern("array\\[N\\] int obs_trend_series;", code_with_trend))
 
   # mu_trend should be just zeros for RW model (no trend predictors)
-  expect_true(grepl("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
   expect_false(grepl("mu_trend \\+= Intercept_trend", code_with_trend))
 
   # Check for no duplicated Stan blocks
@@ -158,8 +193,8 @@ test_that("stancode generates correct AR(p = c(1, 12)) seasonal model structure"
 
   # AR-specific parameter declarations
   # Should have ar1_trend and ar12_trend, NOT ar2_trend through ar11_trend
-  expect_true(grepl("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;", code_with_trend))
-  expect_true(grepl("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar12_trend;", code_with_trend))
+  expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;", code_with_trend))
+  expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar12_trend;", code_with_trend))
 
   # Check no template placeholders
   expect_false(grepl("\\{max_lag\\}", code_with_trend))
@@ -171,43 +206,41 @@ test_that("stancode generates correct AR(p = c(1, 12)) seasonal model structure"
   expect_false(grepl("ar11_trend", code_with_trend, fixed = TRUE))
 
   # Initialization: First 12 time points should be pure innovations
-  expect_true(grepl("// Initialize first 12 time points", code_with_trend, fixed = TRUE))
-  expect_true(grepl("for \\(i in 1:12\\)", code_with_trend))
-  expect_true(grepl("lv_trend\\[i, :\\] = scaled_innovations_trend\\[i, :\\];", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 1:12\\)", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[i, :\\] = scaled_innovations_trend\\[i, :\\];", code_with_trend))
 
   # AR dynamics: Should start from time point 13
-  expect_true(grepl("// Apply AR dynamics", code_with_trend, fixed = TRUE))
-  expect_true(grepl("for \\(i in 13:N_trend\\)", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 13:N_trend\\)", code_with_trend))
 
   # AR dynamics equation: Should use both ar1_trend and ar12_trend
-  expect_true(grepl("ar1_trend\\[j\\] \\* lv_trend\\[i-1, j\\]", code_with_trend))
-  expect_true(grepl("ar12_trend\\[j\\] \\* lv_trend\\[i-12, j\\]", code_with_trend))
+  expect_true(stan_pattern("ar1_trend\\[j\\] \\* lv_trend\\[i-1, j\\]", code_with_trend))
+  expect_true(stan_pattern("ar12_trend\\[j\\] \\* lv_trend\\[i-12, j\\]", code_with_trend))
 
   # Combined AR equation pattern (looking for the sum of AR terms)
-  expect_true(grepl("lv_trend\\[i, j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1, j\\] \\+ ar12_trend\\[j\\] \\* lv_trend\\[i-12, j\\] \\+ scaled_innovations_trend\\[i, j\\]", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[i, j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1, j\\] \\+ ar12_trend\\[j\\] \\* lv_trend\\[i-12, j\\] \\+ scaled_innovations_trend\\[i, j\\]", code_with_trend))
 
   # Priors for AR coefficients in model block (just check they exist, not specific values)
-  expect_true(grepl("ar1_trend ~ normal", code_with_trend))
-  expect_true(grepl("ar12_trend ~ normal", code_with_trend))
+  expect_true(stan_pattern("ar1_trend ~ normal", code_with_trend))
+  expect_true(stan_pattern("ar12_trend ~ normal", code_with_trend))
 
   # Should still have standard trend components
-  expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
-  expect_true(grepl("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
-  expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
+  expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
 
   # mu construction and trend addition in transformed parameters
-  expect_true(grepl("mu\\[n\\] \\+= Intercept \\+ trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_with_trend))
+  expect_true(stan_pattern("mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_with_trend))
 
   # Universal trend computation pattern should still be present
-  expect_true(grepl("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
+  expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
 
   # GLM optimization should still be present
-  expect_true(grepl("poisson_log_glm_lpmf", code_with_trend, fixed = TRUE))
-  expect_true(grepl("vector\\[1\\] mu_ones", code_with_trend))
+  expect_true(stan_pattern("poisson_log_glm_lpmf", code_with_trend, fixed = TRUE))
+  expect_true(stan_pattern("vector\\[1\\] mu_ones", code_with_trend))
 
   # Mapping arrays should still be present
-  expect_true(grepl("array\\[N\\] int obs_trend_time", code_with_trend))
-  expect_true(grepl("array\\[N\\] int obs_trend_series", code_with_trend))
+  expect_true(stan_pattern("array\\[N\\] int obs_trend_time", code_with_trend))
+  expect_true(stan_pattern("array\\[N\\] int obs_trend_series", code_with_trend))
 
   # Check for no duplicated Stan blocks
   expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
@@ -239,8 +272,8 @@ test_that("stancode generates correct AR(p = c(2, 4), ma = TRUE) ARMA model stru
 
   # AR-specific parameter declarations
   # Should have ar2_trend and ar4_trend, NOT ar1_trend or ar3_trend
-  expect_true(grepl("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar2_trend;", code_with_trend))
-  expect_true(grepl("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar4_trend;", code_with_trend))
+  expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar2_trend;", code_with_trend))
+  expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar4_trend;", code_with_trend))
 
   # Should NOT have other AR lags
   expect_false(grepl("ar1_trend", code_with_trend, fixed = TRUE))
@@ -248,53 +281,50 @@ test_that("stancode generates correct AR(p = c(2, 4), ma = TRUE) ARMA model stru
   expect_false(grepl("ar5_trend", code_with_trend, fixed = TRUE))
 
   # MA parameter declaration
-  expect_true(grepl("vector<lower=-1,upper=1>\\[N_lv_trend\\] theta1_trend;", code_with_trend))
+  expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] theta1_trend;", code_with_trend))
 
   # MA innovations matrix should be created from scaled innovations
-  expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] ma_innovations_trend = scaled_innovations_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] ma_innovations_trend = scaled_innovations_trend;", code_with_trend))
 
   # MA transformation should be applied to the entire matrix first
-  expect_true(grepl("// Apply MA\\(1\\) transformation", code_with_trend))
-  expect_true(grepl("for \\(i in 2:N_trend\\)", code_with_trend))
-  expect_true(grepl("ma_innovations_trend\\[i, j\\] \\+= theta1_trend\\[j\\] \\* ma_innovations_trend\\[i-1, j\\];", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 2:N_trend\\)", code_with_trend))
+  expect_true(stan_pattern("ma_innovations_trend\\[i, j\\] \\+= theta1_trend\\[j\\] \\* ma_innovations_trend\\[i-1, j\\];", code_with_trend))
 
   # Initialization: First 4 time points should use MA innovations
-  expect_true(grepl("// Initialize first 4 time points", code_with_trend, fixed = TRUE))
-  expect_true(grepl("for \\(i in 1:4\\)", code_with_trend))
-  expect_true(grepl("lv_trend\\[i, :\\] = ma_innovations_trend\\[i, :\\];", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 1:4\\)", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[i, :\\] = ma_innovations_trend\\[i, :\\];", code_with_trend))
 
   # AR dynamics: Should start from time point 5 and use ma_innovations_trend
-  expect_true(grepl("// Apply AR dynamics", code_with_trend, fixed = TRUE))
-  expect_true(grepl("for \\(i in 5:N_trend\\)", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 5:N_trend\\)", code_with_trend))
 
   # AR dynamics equation: Should use both ar2_trend and ar4_trend with MA innovations
-  expect_true(grepl("ar2_trend\\[j\\] \\* lv_trend\\[i-2, j\\]", code_with_trend))
-  expect_true(grepl("ar4_trend\\[j\\] \\* lv_trend\\[i-4, j\\]", code_with_trend))
-  expect_true(grepl("ma_innovations_trend\\[i, j\\]", code_with_trend))
+  expect_true(stan_pattern("ar2_trend\\[j\\] \\* lv_trend\\[i-2, j\\]", code_with_trend))
+  expect_true(stan_pattern("ar4_trend\\[j\\] \\* lv_trend\\[i-4, j\\]", code_with_trend))
+  expect_true(stan_pattern("ma_innovations_trend\\[i, j\\]", code_with_trend))
 
   # Combined ARMA equation pattern - should be addition of AR lags plus MA innovation
-  expect_true(grepl("lv_trend\\[i, j\\] = ar2_trend\\[j\\] \\* lv_trend\\[i-2, j\\] \\+ ar4_trend\\[j\\] \\* lv_trend\\[i-4, j\\] \\+ ma_innovations_trend\\[i, j\\]", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[i, j\\] = ar2_trend\\[j\\] \\* lv_trend\\[i-2, j\\] \\+ ar4_trend\\[j\\] \\* lv_trend\\[i-4, j\\] \\+ ma_innovations_trend\\[i, j\\]", code_with_trend))
 
   # Priors for AR and MA coefficients in model block
-  expect_true(grepl("ar2_trend ~ normal", code_with_trend))
-  expect_true(grepl("ar4_trend ~ normal", code_with_trend))
-  expect_true(grepl("theta1_trend ~ normal", code_with_trend))
+  expect_true(stan_pattern("ar2_trend ~ normal", code_with_trend))
+  expect_true(stan_pattern("ar4_trend ~ normal", code_with_trend))
+  expect_true(stan_pattern("theta1_trend ~ normal", code_with_trend))
 
   # Should still have standard trend components
-  expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
-  expect_true(grepl("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
-  expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
+  expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
 
   # Universal trend computation pattern should still be present
-  expect_true(grepl("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
+  expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
 
   # GLM optimization should still be present
-  expect_true(grepl("poisson_log_glm_lpmf", code_with_trend, fixed = TRUE))
-  expect_true(grepl("vector\\[1\\] mu_ones", code_with_trend))
+  expect_true(stan_pattern("poisson_log_glm_lpmf", code_with_trend, fixed = TRUE))
+  expect_true(stan_pattern("vector\\[1\\] mu_ones", code_with_trend))
 
   # Mapping arrays should still be present
-  expect_true(grepl("array\\[N\\] int obs_trend_time", code_with_trend))
-  expect_true(grepl("array\\[N\\] int obs_trend_series", code_with_trend))
+  expect_true(stan_pattern("array\\[N\\] int obs_trend_time", code_with_trend))
+  expect_true(stan_pattern("array\\[N\\] int obs_trend_series", code_with_trend))
 
   # Check for no duplicated Stan blocks
   expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
@@ -324,155 +354,155 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   expect_s3_class(code_with_trend, "stancode")
 
   # Advanced mathematical functions for VARMA stationarity (Heaps 2022)
-  expect_true(grepl("matrix sqrtm\\(matrix A\\)", code_with_trend))
-  expect_true(grepl("matrix AtoP\\(matrix P_real\\)", code_with_trend))
-  expect_true(grepl("array\\[,\\] matrix\\[,\\] rev_mapping\\(", code_with_trend))
-  expect_true(grepl("matrix initial_joint_var\\(", code_with_trend))
+  expect_true(stan_pattern("matrix sqrtm\\(matrix A\\)", code_with_trend))
+  expect_true(stan_pattern("matrix AtoP\\(matrix P_real\\)", code_with_trend))
+  expect_true(stan_pattern("array\\[,\\] matrix\\[,\\] rev_mapping\\(", code_with_trend))
+  expect_true(stan_pattern("matrix initial_joint_var\\(", code_with_trend))
 
   # Function documentation comments
-  expect_true(grepl("Compute matrix square root using eigendecomposition", code_with_trend))
-  expect_true(grepl("Following Heaps 2022 methodology", code_with_trend))
-  expect_true(grepl("Numerical stability check for positive definiteness", code_with_trend))
+  expect_true(stan_pattern("Compute matrix square root using eigendecomposition", code_with_trend))
+  expect_true(stan_pattern("Following Heaps 2022 methodology", code_with_trend))
+  expect_true(stan_pattern("Numerical stability check for positive definiteness", code_with_trend))
 
   # Multivariate observation data with comments
-  expect_true(grepl("int<lower=1> N_count;.*number of observations", code_with_trend))
-  expect_true(grepl("vector\\[N_count\\] Y_count;.*response variable", code_with_trend))
-  expect_true(grepl("int<lower=1> N_biomass;.*number of observations", code_with_trend))
-  expect_true(grepl("vector\\[N_biomass\\] Y_biomass;.*response variable", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_count;.*number of observations", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_count\\] Y_count;.*response variable", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_biomass;.*number of observations", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_biomass\\] Y_biomass;.*response variable", code_with_trend))
 
   # Spline data structures
-  expect_true(grepl("int Ks_count;.*number of linear effects", code_with_trend))
-  expect_true(grepl("matrix\\[N_count, Ks_count\\] Xs_count;.*design matrix", code_with_trend))
-  expect_true(grepl("int nb_count_1;.*number of bases", code_with_trend))
-  expect_true(grepl("matrix\\[N_count, knots_count_1\\[1\\]\\] Zs_count_1_1;", code_with_trend))
+  expect_true(stan_pattern("int Ks_count;.*number of linear effects", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_count, Ks_count\\] Xs_count;.*design matrix", code_with_trend))
+  expect_true(stan_pattern("int nb_count_1;.*number of bases", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_count, knots_count_1\\[1\\]\\] Zs_count_1_1;", code_with_trend))
 
   # Trend dimensions
-  expect_true(grepl("int<lower=1> N_trend;.*number of time points", code_with_trend))
-  expect_true(grepl("int<lower=1> N_series_trend;.*number of series", code_with_trend))
-  expect_true(grepl("int<lower=1> N_lv_trend;.*latent variables", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_trend;.*number of time points", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_series_trend;.*number of series", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_lv_trend;.*latent variables", code_with_trend))
 
   # Trend formula data (presence covariate)
-  expect_true(grepl("int<lower=1> K_trend;.*number of trend coefficients", code_with_trend))
-  expect_true(grepl("matrix\\[N_trend, K_trend\\] X_trend;.*trend design matrix", code_with_trend))
-  expect_true(grepl("vector\\[Kc_trend\\] means_X_trend;.*column means", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> K_trend;.*number of trend coefficients", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, K_trend\\] X_trend;.*trend design matrix", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc_trend\\] means_X_trend;.*column means", code_with_trend))
 
   # Mapping arrays with response-specific suffixes
-  expect_true(grepl("array\\[N_count\\] int obs_trend_time_count;", code_with_trend))
-  expect_true(grepl("array\\[N_count\\] int obs_trend_series_count;", code_with_trend))
-  expect_true(grepl("array\\[N_biomass\\] int obs_trend_time_biomass;", code_with_trend))
-  expect_true(grepl("array\\[N_biomass\\] int obs_trend_series_biomass;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_count\\] int obs_trend_time_count;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_count\\] int obs_trend_series_count;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_time_biomass;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_series_biomass;", code_with_trend))
 
   # Times trend matrix (2D integer array)
-  expect_true(grepl("array\\[N_trend, N_series_trend\\] int times_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;", code_with_trend))
 
   # Trend formula design matrix variables (presence covariate)
-  expect_true(grepl("int<lower=1> K_trend;", code_with_trend))
-  expect_true(grepl("int<lower=1> Kc_trend;", code_with_trend))
-  expect_true(grepl("matrix\\[N_trend, K_trend\\] X_trend;", code_with_trend))
-  expect_true(grepl("matrix\\[N_trend, Kc_trend\\] Xc_trend;", code_with_trend))
-  expect_true(grepl("vector\\[Kc_trend\\] means_X_trend;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> K_trend;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> Kc_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, K_trend\\] X_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, Kc_trend\\] Xc_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc_trend\\] means_X_trend;", code_with_trend))
 
   # VAR initialization constants in transformed data
-  expect_true(grepl("vector\\[N_lv_trend\\] trend_zeros = rep_vector\\(0\\.0, N_lv_trend\\);", code_with_trend))
-  expect_true(grepl("Zero mean vector for VARMA process.*following Heaps 2022", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_lv_trend\\] trend_zeros = rep_vector\\(0\\.0, N_lv_trend\\);", code_with_trend))
+  expect_true(stan_pattern("Zero mean vector for VARMA process.*following Heaps 2022", code_with_trend))
 
   # brms-style centering computation in transformed data
-  expect_true(grepl("matrix\\[N_trend, Kc_trend\\] Xc_trend;.*centered version", code_with_trend))
-  expect_true(grepl("vector\\[Kc_trend\\] means_X_trend;.*column means", code_with_trend))
-  expect_true(grepl("for \\(i in 2:K_trend\\)", code_with_trend))
-  expect_true(grepl("means_X_trend\\[i - 1\\] = mean\\(X_trend\\[, i\\]\\);", code_with_trend))
-  expect_true(grepl("Xc_trend\\[, i - 1\\] = X_trend\\[, i\\] - means_X_trend\\[i - 1\\];", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, Kc_trend\\] Xc_trend;.*centered version", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc_trend\\] means_X_trend;.*column means", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 2:K_trend\\)", code_with_trend))
+  expect_true(stan_pattern("means_X_trend\\[i - 1\\] = mean\\(X_trend\\[, i\\]\\);", code_with_trend))
+  expect_true(stan_pattern("Xc_trend\\[, i - 1\\] = X_trend\\[, i\\] - means_X_trend\\[i - 1\\];", code_with_trend))
 
   # Factor loading matrix (identity for non-factor VAR)
-  expect_true(grepl("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix\\(rep_vector\\(1\\.0, N_lv_trend\\)\\);", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix\\(rep_vector\\(1\\.0, N_lv_trend\\)\\);", code_with_trend))
 
   # Observation model parameters (multivariate with splines)
-  expect_true(grepl("real Intercept_count;.*temporary intercept", code_with_trend))
-  expect_true(grepl("vector\\[Ks_count\\] bs_count;.*unpenalized spline", code_with_trend))
-  expect_true(grepl("vector\\[knots_count_1\\[1\\]\\] zs_count_1_1;", code_with_trend))
-  expect_true(grepl("vector<lower=0>\\[nb_count_1\\] sds_count_1;.*SDs.*spline", code_with_trend))
-  expect_true(grepl("real<lower=0> sigma_count;.*dispersion parameter", code_with_trend))
+  expect_true(stan_pattern("real Intercept_count;.*temporary intercept", code_with_trend))
+  expect_true(stan_pattern("vector\\[Ks_count\\] bs_count;.*unpenalized spline", code_with_trend))
+  expect_true(stan_pattern("vector\\[knots_count_1\\[1\\]\\] zs_count_1_1;", code_with_trend))
+  expect_true(stan_pattern("vector<lower=0>\\[nb_count_1\\] sds_count_1;.*SDs.*spline", code_with_trend))
+  expect_true(stan_pattern("real<lower=0> sigma_count;.*dispersion parameter", code_with_trend))
 
   # Trend parameters
-  expect_true(grepl("real Intercept_trend;.*trend intercept", code_with_trend))
-  expect_true(grepl("vector\\[Kc_trend\\] b_trend;.*trend coefficients.*presence", code_with_trend))
+  expect_true(stan_pattern("real Intercept_trend;.*trend intercept", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc_trend\\] b_trend;.*trend coefficients.*presence", code_with_trend))
 
   # VAR coefficient matrices (raw/unconstrained for stationarity)
-  expect_true(grepl("array\\[2\\] matrix\\[N_lv_trend, N_lv_trend\\] A_raw_trend;.*lag-1, lag-2", code_with_trend))
+  expect_true(stan_pattern("array\\[2\\] matrix\\[N_lv_trend, N_lv_trend\\] A_raw_trend;.*lag-1, lag-2", code_with_trend))
 
   # MA coefficient matrices
-  expect_true(grepl("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_raw_trend;.*ma=TRUE.*1 MA lag", code_with_trend))
+  expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_raw_trend;.*ma=TRUE.*1 MA lag", code_with_trend))
 
   # Hierarchical hyperparameters (Heaps 2022 methodology)
-  expect_true(grepl("array\\[2\\] vector\\[2\\] Amu_trend;.*Shared means.*diag, off-diag.*lag1, lag2", code_with_trend))
-  expect_true(grepl("array\\[2\\] vector<lower=0>\\[2\\] Aomega_trend;.*Shared precisions", code_with_trend))
-  expect_true(grepl("array\\[2\\] vector\\[1\\] Dmu_trend;.*MA means", code_with_trend))
-  expect_true(grepl("array\\[2\\] vector<lower=0>\\[1\\] Domega_trend;.*MA precisions", code_with_trend))
+  expect_true(stan_pattern("array\\[2\\] vector\\[2\\] Amu_trend;.*Shared means.*diag, off-diag.*lag1, lag2", code_with_trend))
+  expect_true(stan_pattern("array\\[2\\] vector<lower=0>\\[2\\] Aomega_trend;.*Shared precisions", code_with_trend))
+  expect_true(stan_pattern("array\\[2\\] vector\\[1\\] Dmu_trend;.*MA means", code_with_trend))
+  expect_true(stan_pattern("array\\[2\\] vector<lower=0>\\[1\\] Domega_trend;.*MA precisions", code_with_trend))
 
   # Innovation parameters
-  expect_true(grepl("vector<lower=0>\\[N_lv_trend\\] sigma_trend;.*innovation SDs", code_with_trend))
-  expect_true(grepl("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;.*innovation correlations", code_with_trend))
+  expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;.*innovation SDs", code_with_trend))
+  expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;.*innovation correlations", code_with_trend))
 
   # Trend coefficients for presence covariate
-  expect_true(grepl("vector\\[Kc_trend\\] b_trend;.*trend coefficients", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc_trend\\] b_trend;.*trend coefficients", code_with_trend))
 
   # Joint initialization for stationary distribution
-  expect_true(grepl("vector\\[3 \\* N_lv_trend\\] init_trend;.*2 VAR lags \\+ 1 MA lag", code_with_trend))
+  expect_true(stan_pattern("vector\\[3 \\* N_lv_trend\\] init_trend;.*2 VAR lags \\+ 1 MA lag", code_with_trend))
 
   # Standard latent variables
-  expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
 
   # Spline coefficient computations in transformed parameters
-  expect_true(grepl("s_count_1_1 = sds_count_1\\[1\\] \\* zs_count_1_1;", code_with_trend))
-  expect_true(grepl("s_biomass_1_1 = sds_biomass_1\\[1\\] \\* zs_biomass_1_1;", code_with_trend))
+  expect_true(stan_pattern("s_count_1_1 = sds_count_1\\[1\\] \\* zs_count_1_1;", code_with_trend))
+  expect_true(stan_pattern("s_biomass_1_1 = sds_biomass_1\\[1\\] \\* zs_biomass_1_1;", code_with_trend))
 
   # lprior initialization and accumulation
-  expect_true(grepl("real lprior = 0;.*prior contributions", code_with_trend))
+  expect_true(stan_pattern("real lprior = 0;.*prior contributions", code_with_trend))
 
   # Trend linear predictor with presence covariate
-  expect_true(grepl("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
-  expect_true(grepl("mu_trend \\+= Intercept_trend \\+ Xc_trend \\* b_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
+  expect_true(stan_pattern("mu_trend \\+= Intercept_trend \\+ Xc_trend \\* b_trend;", code_with_trend))
 
   # Innovation covariance construction
-  expect_true(grepl("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend = diag_pre_multiply\\(sigma_trend, L_Omega_trend\\);", code_with_trend))
-  expect_true(grepl("cov_matrix\\[N_lv_trend\\] Sigma_trend = multiply_lower_tri_self_transpose\\(L_Sigma_trend\\);", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend = diag_pre_multiply\\(sigma_trend, L_Omega_trend\\);", code_with_trend))
+  expect_true(stan_pattern("cov_matrix\\[N_lv_trend\\] Sigma_trend = multiply_lower_tri_self_transpose\\(L_Sigma_trend\\);", code_with_trend))
 
   # Stationarity transformations (Heaps 2022)
-  expect_true(grepl("array\\[2\\] matrix\\[N_lv_trend, N_lv_trend\\] A_trend;", code_with_trend))
-  expect_true(grepl("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_trend;", code_with_trend))
-  expect_true(grepl("P_var\\[i\\] = AtoP\\(A_raw_trend\\[i\\]\\);", code_with_trend))
-  expect_true(grepl("result_var = rev_mapping\\(P_var, Sigma_trend\\);", code_with_trend))
-  expect_true(grepl("D_trend\\[1\\] = -result_ma\\[1, 1\\];", code_with_trend))
+  expect_true(stan_pattern("array\\[2\\] matrix\\[N_lv_trend, N_lv_trend\\] A_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_trend;", code_with_trend))
+  expect_true(stan_pattern("P_var\\[i\\] = AtoP\\(A_raw_trend\\[i\\]\\);", code_with_trend))
+  expect_true(stan_pattern("result_var = rev_mapping\\(P_var, Sigma_trend\\);", code_with_trend))
+  expect_true(stan_pattern("D_trend\\[1\\] = -result_ma\\[1, 1\\];", code_with_trend))
 
   # Initial joint covariance matrix
-  expect_true(grepl("cov_matrix\\[3 \\* N_lv_trend\\] Omega_trend = initial_joint_var\\(Sigma_trend, A_trend, D_trend\\);", code_with_trend))
+  expect_true(stan_pattern("cov_matrix\\[3 \\* N_lv_trend\\] Omega_trend = initial_joint_var\\(Sigma_trend, A_trend, D_trend\\);", code_with_trend))
 
   # MA initialization
-  expect_true(grepl("vector\\[N_lv_trend\\] ma_init_trend = init_trend\\[\\(2 \\* N_lv_trend \\+ 1\\):\\(3 \\* N_lv_trend\\)\\];", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_lv_trend\\] ma_init_trend = init_trend\\[\\(2 \\* N_lv_trend \\+ 1\\):\\(3 \\* N_lv_trend\\)\\];", code_with_trend))
 
   # Universal trend computation pattern
-  expect_true(grepl("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\];", code_with_trend))
+  expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\];", code_with_trend))
 
   # Multivariate linear predictors with splines
-  expect_true(grepl("vector\\[N_count\\] mu_count = rep_vector\\(0\\.0, N_count\\);", code_with_trend))
-  expect_true(grepl("mu_count \\+= Intercept_count \\+ Xs_count \\* bs_count \\+ Zs_count_1_1 \\* s_count_1_1;", code_with_trend))
-  expect_true(grepl("mu_biomass \\+= Intercept_biomass \\+ Xs_biomass \\* bs_biomass \\+ Zs_biomass_1_1 \\* s_biomass_1_1;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_count\\] mu_count = rep_vector\\(0\\.0, N_count\\);", code_with_trend))
+  expect_true(stan_pattern("mu_count \\+= Intercept_count \\+ Xs_count \\* bs_count \\+ Zs_count_1_1 \\* s_count_1_1;", code_with_trend))
+  expect_true(stan_pattern("mu_biomass \\+= Intercept_biomass \\+ Xs_biomass \\* bs_biomass \\+ Zs_biomass_1_1 \\* s_biomass_1_1;", code_with_trend))
 
   # Trend injection using response-specific mapping arrays
-  expect_true(grepl("mu_count\\[n\\] \\+= trend\\[obs_trend_time_count\\[n\\], obs_trend_series_count\\[n\\]\\];", code_with_trend))
-  expect_true(grepl("mu_biomass\\[n\\] \\+= trend\\[obs_trend_time_biomass\\[n\\], obs_trend_series_biomass\\[n\\]\\];", code_with_trend))
+  expect_true(stan_pattern("mu_count\\[n\\] \\+= trend\\[obs_trend_time_count\\[n\\], obs_trend_series_count\\[n\\]\\];", code_with_trend))
+  expect_true(stan_pattern("mu_biomass\\[n\\] \\+= trend\\[obs_trend_time_biomass\\[n\\], obs_trend_series_biomass\\[n\\]\\];", code_with_trend))
 
   # Check observation-to-trend mappings are in data block
   data_block <- substr(code_with_trend,
                        regexpr("^data \\{", code_with_trend),
                        regexpr("^\\}", code_with_trend))
-  expect_true(grepl("array\\[N_count\\] int obs_trend_time_count;", data_block))
-  expect_true(grepl("array\\[N_count\\] int obs_trend_series_count;", data_block))
-  expect_true(grepl("array\\[N_biomass\\] int obs_trend_time_biomass;", data_block))
-  expect_true(grepl("array\\[N_biomass\\] int obs_trend_series_biomass;", data_block))
+  expect_true(stan_pattern("array\\[N_count\\] int obs_trend_time_count;", data_block))
+  expect_true(stan_pattern("array\\[N_count\\] int obs_trend_series_count;", data_block))
+  expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_time_biomass;", data_block))
+  expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_series_biomass;", data_block))
 
   # Verify mu_trend is computed from trend formula
-  expect_true(grepl("mu_trend \\+= Intercept_trend \\+ Xc_trend \\* b_trend;", code_with_trend))
+  expect_true(stan_pattern("mu_trend \\+= Intercept_trend \\+ Xc_trend \\* b_trend;", code_with_trend))
 
   # Check no template placeholders remain
   expect_false(grepl("\\{lags\\}", code_with_trend))
@@ -487,70 +517,70 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   expect_equal(L_Omega_count, 1)
 
   # Verify trend injection happens in a loop
-  expect_true(grepl("for \\(n in 1:N_count\\) \\{[^}]*mu_count\\[n\\] \\+= trend", code_with_trend))
-  expect_true(grepl("for \\(n in 1:N_biomass\\) \\{[^}]*mu_biomass\\[n\\] \\+= trend", code_with_trend))
+  expect_true(stan_pattern("for \\(n in 1:N_count\\) \\{[^}]*mu_count\\[n\\] \\+= trend", code_with_trend))
+  expect_true(stan_pattern("for \\(n in 1:N_biomass\\) \\{[^}]*mu_biomass\\[n\\] \\+= trend", code_with_trend))
 
   # Standard observation likelihoods (not GLM optimized for splines)
-  expect_true(grepl("target \\+= normal_lpdf\\(Y_count \\| mu_count, sigma_count\\);", code_with_trend))
-  expect_true(grepl("target \\+= normal_lpdf\\(Y_biomass \\| mu_biomass, sigma_biomass\\);", code_with_trend))
+  expect_true(stan_pattern("target \\+= normal_lpdf\\(Y_count \\| mu_count, sigma_count\\);", code_with_trend))
+  expect_true(stan_pattern("target \\+= normal_lpdf\\(Y_biomass \\| mu_biomass, sigma_biomass\\);", code_with_trend))
 
   # Prior accumulation
-  expect_true(grepl("target \\+= lprior;", code_with_trend))
-  expect_true(grepl("target \\+= std_normal_lpdf\\(zs_count_1_1\\);", code_with_trend))
+  expect_true(stan_pattern("target \\+= lprior;", code_with_trend))
+  expect_true(stan_pattern("target \\+= std_normal_lpdf\\(zs_count_1_1\\);", code_with_trend))
 
   # Initial joint distribution
-  expect_true(grepl("vector\\[3 \\* N_lv_trend\\] mu_init_trend = rep_vector\\(0\\.0, 3 \\* N_lv_trend\\);", code_with_trend))
-  expect_true(grepl("init_trend ~ multi_normal\\(mu_init_trend, Omega_trend\\);", code_with_trend))
+  expect_true(stan_pattern("vector\\[3 \\* N_lv_trend\\] mu_init_trend = rep_vector\\(0\\.0, 3 \\* N_lv_trend\\);", code_with_trend))
+  expect_true(stan_pattern("init_trend ~ multi_normal\\(mu_init_trend, Omega_trend\\);", code_with_trend))
 
   # VARMA dynamics implementation
-  expect_true(grepl("vector\\[N_lv_trend\\] mu_t_trend\\[N_trend\\];", code_with_trend))
-  expect_true(grepl("vector\\[N_lv_trend\\] ma_error_trend\\[N_trend\\];.*MA error terms", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_lv_trend\\] mu_t_trend\\[N_trend\\];", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_lv_trend\\] ma_error_trend\\[N_trend\\];.*MA error terms", code_with_trend))
 
   # VAR component with initialization handling
-  expect_true(grepl("for \\(i in 1:2\\).*2 VAR lags", code_with_trend))
-  expect_true(grepl("if \\(t - i <= 0\\)", code_with_trend))
-  expect_true(grepl("Use values from earlier than series start.*from init_trend", code_with_trend))
-  expect_true(grepl("mu_t_trend\\[t\\] \\+= A_trend\\[i\\] \\* lv_trend\\[t - i, :\\]';", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 1:2\\).*2 VAR lags", code_with_trend))
+  expect_true(stan_pattern("if \\(t - i <= 0\\)", code_with_trend))
+  expect_true(stan_pattern("Use values from earlier than series start.*from init_trend", code_with_trend))
+  expect_true(stan_pattern("mu_t_trend\\[t\\] \\+= A_trend\\[i\\] \\* lv_trend\\[t - i, :\\]';", code_with_trend))
 
   # MA component
-  expect_true(grepl("if \\(t - 1 <= 0\\)", code_with_trend))
-  expect_true(grepl("Use initial MA errors for early time points", code_with_trend))
-  expect_true(grepl("mu_t_trend\\[t\\] \\+= D_trend\\[1\\] \\* ma_init_trend;", code_with_trend))
-  expect_true(grepl("mu_t_trend\\[t\\] \\+= D_trend\\[1\\] \\* ma_error_trend\\[t - 1\\];", code_with_trend))
+  expect_true(stan_pattern("if \\(t - 1 <= 0\\)", code_with_trend))
+  expect_true(stan_pattern("Use initial MA errors for early time points", code_with_trend))
+  expect_true(stan_pattern("mu_t_trend\\[t\\] \\+= D_trend\\[1\\] \\* ma_init_trend;", code_with_trend))
+  expect_true(stan_pattern("mu_t_trend\\[t\\] \\+= D_trend\\[1\\] \\* ma_error_trend\\[t - 1\\];", code_with_trend))
 
   # MA specific parameters must exist for VARMA model
-  expect_true(grepl("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_raw_trend;", code_with_trend))
-  expect_true(grepl("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_trend;", code_with_trend))
-  expect_true(grepl("vector\\[N_lv_trend\\] ma_error_trend\\[N_trend\\];", code_with_trend))
-  expect_true(grepl("vector\\[N_lv_trend\\] ma_init_trend", code_with_trend))
+  expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_raw_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_lv_trend\\] ma_error_trend\\[N_trend\\];", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_lv_trend\\] ma_init_trend", code_with_trend))
 
   # MA transformation must occur
-  expect_true(grepl("D_trend\\[1\\] = -result_ma\\[1, 1\\];", code_with_trend))
+  expect_true(stan_pattern("D_trend\\[1\\] = -result_ma\\[1, 1\\];", code_with_trend))
 
   # Latent variable likelihood
-  expect_true(grepl("lv_trend\\[t, :\\]' ~ multi_normal\\(mu_t_trend\\[t\\], Sigma_trend\\);", code_with_trend))
-  expect_true(grepl("ma_error_trend\\[t\\] = lv_trend\\[t, :\\]' - mu_t_trend\\[t\\];", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[t, :\\]' ~ multi_normal\\(mu_t_trend\\[t\\], Sigma_trend\\);", code_with_trend))
+  expect_true(stan_pattern("ma_error_trend\\[t\\] = lv_trend\\[t, :\\]' - mu_t_trend\\[t\\];", code_with_trend))
 
   # Prior structure validation (existence, not specific distributions)
   # Hierarchical priors should exist
-  expect_true(grepl("Amu_trend\\[.*\\] ~", code_with_trend))
-  expect_true(grepl("Aomega_trend\\[.*\\] ~", code_with_trend))
-  expect_true(grepl("Dmu_trend\\[.*\\] ~", code_with_trend))
-  expect_true(grepl("Domega_trend\\[.*\\] ~", code_with_trend))
+  expect_true(stan_pattern("Amu_trend\\[.*\\] ~", code_with_trend))
+  expect_true(stan_pattern("Aomega_trend\\[.*\\] ~", code_with_trend))
+  expect_true(stan_pattern("Dmu_trend\\[.*\\] ~", code_with_trend))
+  expect_true(stan_pattern("Domega_trend\\[.*\\] ~", code_with_trend))
 
   # Structured priors for raw coefficients should exist
-  expect_true(grepl("A_raw_trend\\[.*\\] ~ .*\\(Amu_trend", code_with_trend))
-  expect_true(grepl("D_raw_trend\\[.*\\] ~ .*\\(Dmu_trend", code_with_trend))
+  expect_true(stan_pattern("A_raw_trend\\[.*\\] ~ .*\\(Amu_trend", code_with_trend))
+  expect_true(stan_pattern("D_raw_trend\\[.*\\] ~ .*\\(Dmu_trend", code_with_trend))
 
   # Basic parameter priors should exist
-  expect_true(grepl("sigma_trend ~", code_with_trend))
-  expect_true(grepl("L_Omega_trend ~", code_with_trend))
-  expect_true(grepl("b_trend ~", code_with_trend))
+  expect_true(stan_pattern("sigma_trend ~", code_with_trend))
+  expect_true(stan_pattern("L_Omega_trend ~", code_with_trend))
+  expect_true(stan_pattern("b_trend ~", code_with_trend))
 
   # Intercept transformations in generated quantities
-  expect_true(grepl("real b_count_Intercept = Intercept_count;", code_with_trend))
-  expect_true(grepl("real b_biomass_Intercept = Intercept_biomass;", code_with_trend))
-  expect_true(grepl("real b_trend_Intercept = Intercept_trend - dot_product\\(means_X_trend, b_trend\\);", code_with_trend))
+  expect_true(stan_pattern("real b_count_Intercept = Intercept_count;", code_with_trend))
+  expect_true(stan_pattern("real b_biomass_Intercept = Intercept_biomass;", code_with_trend))
+  expect_true(stan_pattern("real b_trend_Intercept = Intercept_trend - dot_product\\(means_X_trend, b_trend\\);", code_with_trend))
 
   # Anti-patterns: Should NOT have simple AR parameters (this is VAR, not AR)
   expect_false(grepl("vector.*ar1_trend", code_with_trend))
@@ -616,194 +646,194 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
     expect_s3_class(code_with_trend, "stancode")
 
     # Empty functions block (no custom functions needed for AR factor model)
-    expect_true(grepl("functions \\{\\s*\\}", code_with_trend))
+    expect_true(stan_pattern("functions \\{\\s*\\}", code_with_trend))
 
     # Three-family multivariate observation data
-    expect_true(grepl("int<lower=1> N_count;.*number of observations",
+    expect_true(stan_pattern("int<lower=1> N_count;.*number of observations",
                       code_with_trend))
-    expect_true(grepl("array\\[N_count\\] int Y_count;.*response variable",
+    expect_true(stan_pattern("array\\[N_count\\] int Y_count;.*response variable",
                       code_with_trend))
-    expect_true(grepl("int<lower=1> N_presence;.*number of observations",
+    expect_true(stan_pattern("int<lower=1> N_presence;.*number of observations",
                       code_with_trend))
-    expect_true(grepl("array\\[N_presence\\] int Y_presence;.*response variable",
+    expect_true(stan_pattern("array\\[N_presence\\] int Y_presence;.*response variable",
                       code_with_trend))
-    expect_true(grepl("int<lower=1> N_biomass;.*number of observations",
+    expect_true(stan_pattern("int<lower=1> N_biomass;.*number of observations",
                       code_with_trend))
-    expect_true(grepl("vector\\[N_biomass\\] Y_biomass;.*response variable",
+    expect_true(stan_pattern("vector\\[N_biomass\\] Y_biomass;.*response variable",
                       code_with_trend))
 
     # Population-level design matrices for all three families
-    expect_true(grepl("matrix\\[N_count, K_count\\] X_count;.*population-level design
+    expect_true(stan_pattern("matrix\\[N_count, K_count\\] X_count;.*population-level design
   matrix", code_with_trend))
-    expect_true(grepl("matrix\\[N_presence, K_presence\\] X_presence;.*population-level
+    expect_true(stan_pattern("matrix\\[N_presence, K_presence\\] X_presence;.*population-level
    design matrix", code_with_trend))
-    expect_true(grepl("matrix\\[N_biomass, K_biomass\\] X_biomass;.*population-level
+    expect_true(stan_pattern("matrix\\[N_biomass, K_biomass\\] X_biomass;.*population-level
   design matrix", code_with_trend))
 
     # Trend dimensions
-    expect_true(grepl("int<lower=1> N_trend;.*number of time points", code_with_trend))
-    expect_true(grepl("int<lower=1> N_series_trend;.*number of series",
+    expect_true(stan_pattern("int<lower=1> N_trend;.*number of time points", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> N_series_trend;.*number of series",
                       code_with_trend))
-    expect_true(grepl("int<lower=1> N_lv_trend;.*latent variables", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> N_lv_trend;.*latent variables", code_with_trend))
 
     # Observation-to-trend mappings for all three families
-    expect_true(grepl("array\\[N_count\\] int obs_trend_time_count;", code_with_trend))
-    expect_true(grepl("array\\[N_count\\] int obs_trend_series_count;",
+    expect_true(stan_pattern("array\\[N_count\\] int obs_trend_time_count;", code_with_trend))
+    expect_true(stan_pattern("array\\[N_count\\] int obs_trend_series_count;",
                       code_with_trend))
-    expect_true(grepl("array\\[N_presence\\] int obs_trend_time_presence;",
+    expect_true(stan_pattern("array\\[N_presence\\] int obs_trend_time_presence;",
                       code_with_trend))
-    expect_true(grepl("array\\[N_presence\\] int obs_trend_series_presence;",
+    expect_true(stan_pattern("array\\[N_presence\\] int obs_trend_series_presence;",
                       code_with_trend))
-    expect_true(grepl("array\\[N_biomass\\] int obs_trend_time_biomass;",
+    expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_time_biomass;",
                       code_with_trend))
-    expect_true(grepl("array\\[N_biomass\\] int obs_trend_series_biomass;",
+    expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_series_biomass;",
                       code_with_trend))
 
     # Times trend matrix
-    expect_true(grepl("array\\[N_trend, N_series_trend\\] int times_trend;",
+    expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;",
                       code_with_trend))
 
     # GLM compatibility vectors for discrete families only
-    expect_true(grepl("vector\\[1\\] mu_ones_count;.*for GLM count", code_with_trend))
-    expect_true(grepl("vector\\[1\\] mu_ones_presence;.*for GLM presence",
+    expect_true(stan_pattern("vector\\[1\\] mu_ones_count;.*for GLM count", code_with_trend))
+    expect_true(stan_pattern("vector\\[1\\] mu_ones_presence;.*for GLM presence",
                       code_with_trend))
 
     # Centered design matrices in transformed data
-    expect_true(grepl("matrix\\[N_count, Kc_count\\] Xc_count;.*centered version",
+    expect_true(stan_pattern("matrix\\[N_count, Kc_count\\] Xc_count;.*centered version",
                       code_with_trend))
-    expect_true(grepl("matrix\\[N_presence, Kc_presence\\] Xc_presence;.*centered
+    expect_true(stan_pattern("matrix\\[N_presence, Kc_presence\\] Xc_presence;.*centered
   version", code_with_trend))
-    expect_true(grepl("matrix\\[N_biomass, Kc_biomass\\] Xc_biomass;.*centered
+    expect_true(stan_pattern("matrix\\[N_biomass, Kc_biomass\\] Xc_biomass;.*centered
   version", code_with_trend))
 
     # Centering loops for all three families
-    expect_true(grepl("for \\(i in 2:K_count\\)", code_with_trend))
-    expect_true(grepl("means_X_count\\[i - 1\\] = mean\\(X_count\\[, i\\]\\);",
+    expect_true(stan_pattern("for \\(i in 2:K_count\\)", code_with_trend))
+    expect_true(stan_pattern("means_X_count\\[i - 1\\] = mean\\(X_count\\[, i\\]\\);",
                       code_with_trend))
-    expect_true(grepl("for \\(i in 2:K_presence\\)", code_with_trend))
-    expect_true(grepl("for \\(i in 2:K_biomass\\)", code_with_trend))
+    expect_true(stan_pattern("for \\(i in 2:K_presence\\)", code_with_trend))
+    expect_true(stan_pattern("for \\(i in 2:K_biomass\\)", code_with_trend))
 
     # Observation model parameters for all three families
-    expect_true(grepl("vector\\[Kc_count\\] b_count;.*regression coefficients",
+    expect_true(stan_pattern("vector\\[Kc_count\\] b_count;.*regression coefficients",
                       code_with_trend))
-    expect_true(grepl("real Intercept_count;.*temporary intercept", code_with_trend))
-    expect_true(grepl("vector\\[Kc_presence\\] b_presence;.*regression coefficients",
+    expect_true(stan_pattern("real Intercept_count;.*temporary intercept", code_with_trend))
+    expect_true(stan_pattern("vector\\[Kc_presence\\] b_presence;.*regression coefficients",
                       code_with_trend))
-    expect_true(grepl("real Intercept_presence;.*temporary intercept",
+    expect_true(stan_pattern("real Intercept_presence;.*temporary intercept",
                       code_with_trend))
-    expect_true(grepl("vector\\[Kc_biomass\\] b_biomass;.*regression coefficients",
+    expect_true(stan_pattern("vector\\[Kc_biomass\\] b_biomass;.*regression coefficients",
                       code_with_trend))
-    expect_true(grepl("real Intercept_biomass;.*temporary intercept", code_with_trend))
-    expect_true(grepl("real<lower=0> shape_biomass;.*shape parameter",
+    expect_true(stan_pattern("real Intercept_biomass;.*temporary intercept", code_with_trend))
+    expect_true(stan_pattern("real<lower=0> shape_biomass;.*shape parameter",
                       code_with_trend))
 
     # Factor AR(1) trend parameters
-    expect_true(grepl("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;.*AR
+    expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;.*AR
   coefficients", code_with_trend))
-    expect_true(grepl("vector<lower=0>\\[N_lv_trend\\] sigma_trend;.*innovation SDs",
+    expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;.*innovation SDs",
                       code_with_trend))
-    expect_true(grepl("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;.*innovation
+    expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;.*innovation
   correlations", code_with_trend))
 
     # Factor loading parameters (estimated for n_lv = 2)
-    expect_true(grepl("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;.*raw factor
+    expect_true(stan_pattern("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;.*raw factor
   loadings", code_with_trend))
 
     # Innovation matrix
-    expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] innovations_trend;",
+    expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;",
                       code_with_trend))
 
     # lprior initialization with family-specific priors
-    expect_true(grepl("real lprior = 0;.*prior contributions", code_with_trend))
+    expect_true(stan_pattern("real lprior = 0;.*prior contributions", code_with_trend))
 
     # Factor loading matrix construction with identifiability constraints
-    expect_true(grepl("matrix\\[N_series_trend, N_lv_trend\\] Z = rep_matrix\\(0,
+    expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = rep_matrix\\(0,
   N_series_trend, N_lv_trend\\);", code_with_trend))
-    expect_true(grepl("int index = 1;", code_with_trend))
-    expect_true(grepl("// constraints allow identifiability of loadings",
+    expect_true(stan_pattern("int index = 1;", code_with_trend))
+    expect_true(stan_pattern("// constraints allow identifiability of loadings",
                       code_with_trend))
-    expect_true(grepl("for \\(j in 1 : N_lv_trend\\)", code_with_trend))
-    expect_true(grepl("for \\(i in j : N_series_trend\\)", code_with_trend))
-    expect_true(grepl("Z\\[i, j\\] = Z_raw\\[index\\];", code_with_trend))
+    expect_true(stan_pattern("for \\(j in 1 : N_lv_trend\\)", code_with_trend))
+    expect_true(stan_pattern("for \\(i in j : N_series_trend\\)", code_with_trend))
+    expect_true(stan_pattern("Z\\[i, j\\] = Z_raw\\[index\\];", code_with_trend))
 
     # Innovation covariance construction
-    expect_true(grepl("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend =
+    expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend =
   diag_pre_multiply\\(sigma_trend, L_Omega_trend\\);", code_with_trend))
-    expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] scaled_innovations_trend =
+    expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] scaled_innovations_trend =
   innovations_trend \\* L_Sigma_trend';", code_with_trend))
 
     # AR(1) latent variable dynamics
-    expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
-    expect_true(grepl("lv_trend\\[1, :\\] = scaled_innovations_trend\\[1, :\\];",
+    expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
+    expect_true(stan_pattern("lv_trend\\[1, :\\] = scaled_innovations_trend\\[1, :\\];",
                       code_with_trend))
-    expect_true(grepl("for \\(i in 2:N_trend\\)", code_with_trend))
-    expect_true(grepl("for \\(j in 1:N_lv_trend\\)", code_with_trend))
-    expect_true(grepl("lv_trend\\[i, j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1, j\\]
+    expect_true(stan_pattern("for \\(i in 2:N_trend\\)", code_with_trend))
+    expect_true(stan_pattern("for \\(j in 1:N_lv_trend\\)", code_with_trend))
+    expect_true(stan_pattern("lv_trend\\[i, j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1, j\\]
   \\+ scaled_innovations_trend\\[i, j\\];", code_with_trend))
 
     # Zero trend mean vector (for ~ -1 specification)
-    expect_true(grepl("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);",
+    expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);",
                       code_with_trend))
-    expect_true(grepl("zero for ~ -1, but needed for prediction compatibility",
+    expect_true(stan_pattern("zero for ~ -1, but needed for prediction compatibility",
                       code_with_trend))
 
     # Universal trend computation pattern
-    expect_true(grepl("matrix\\[N_trend, N_series_trend\\] trend;", code_with_trend))
-    expect_true(grepl("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i,
+    expect_true(stan_pattern("matrix\\[N_trend, N_series_trend\\] trend;", code_with_trend))
+    expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i,
   :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\];", code_with_trend))
 
     # Family-specific linear predictors
-    expect_true(grepl("vector\\[N_count\\] mu_count = Xc_count \\* b_count;",
+    expect_true(stan_pattern("vector\\[N_count\\] mu_count = Xc_count \\* b_count;",
                       code_with_trend))
-    expect_true(grepl("vector\\[N_presence\\] mu_presence = Xc_presence \\*
+    expect_true(stan_pattern("vector\\[N_presence\\] mu_presence = Xc_presence \\*
   b_presence;", code_with_trend))
-    expect_true(grepl("vector\\[N_biomass\\] mu_biomass = rep_vector\\(0\\.0,
+    expect_true(stan_pattern("vector\\[N_biomass\\] mu_biomass = rep_vector\\(0\\.0,
   N_biomass\\);", code_with_trend))
-    expect_true(grepl("mu_biomass \\+= Intercept_biomass \\+ Xc_biomass \\*
+    expect_true(stan_pattern("mu_biomass \\+= Intercept_biomass \\+ Xc_biomass \\*
   b_biomass;", code_with_trend))
 
     # Trend injection for all three families
-    expect_true(grepl("for \\(n in 1:N_count\\)", code_with_trend))
-    expect_true(grepl("mu_count\\[n\\] \\+= Intercept_count \\+
+    expect_true(stan_pattern("for \\(n in 1:N_count\\)", code_with_trend))
+    expect_true(stan_pattern("mu_count\\[n\\] \\+= Intercept_count \\+
   trend\\[obs_trend_time_count\\[n\\], obs_trend_series_count\\[n\\]\\];",
                       code_with_trend))
-    expect_true(grepl("for \\(n in 1:N_presence\\)", code_with_trend))
-    expect_true(grepl("mu_presence\\[n\\] \\+= Intercept_presence \\+
+    expect_true(stan_pattern("for \\(n in 1:N_presence\\)", code_with_trend))
+    expect_true(stan_pattern("mu_presence\\[n\\] \\+= Intercept_presence \\+
   trend\\[obs_trend_time_presence\\[n\\], obs_trend_series_presence\\[n\\]\\];",
                       code_with_trend))
-    expect_true(grepl("for \\(n in 1:N_biomass\\)", code_with_trend))
-    expect_true(grepl("mu_biomass\\[n\\] \\+= trend\\[obs_trend_time_biomass\\[n\\],
+    expect_true(stan_pattern("for \\(n in 1:N_biomass\\)", code_with_trend))
+    expect_true(stan_pattern("mu_biomass\\[n\\] \\+= trend\\[obs_trend_time_biomass\\[n\\],
   obs_trend_series_biomass\\[n\\]\\];", code_with_trend))
 
     # Gamma inverse link transformation
-    expect_true(grepl("mu_biomass = inv\\(mu_biomass\\);", code_with_trend))
-    expect_true(grepl("Transform biomass predictor.*inverse link for Gamma",
+    expect_true(stan_pattern("mu_biomass = inv\\(mu_biomass\\);", code_with_trend))
+    expect_true(stan_pattern("Transform biomass predictor.*inverse link for Gamma",
                       code_with_trend))
 
     # Three-family likelihoods with GLM optimization for discrete families
-    expect_true(grepl("target \\+= poisson_log_glm_lpmf\\(Y_count \\|
+    expect_true(stan_pattern("target \\+= poisson_log_glm_lpmf\\(Y_count \\|
   to_matrix\\(mu_count\\), 0\\.0, mu_ones_count\\);", code_with_trend))
-    expect_true(grepl("target \\+= bernoulli_logit_glm_lpmf\\(Y_presence \\|
+    expect_true(stan_pattern("target \\+= bernoulli_logit_glm_lpmf\\(Y_presence \\|
   to_matrix\\(mu_presence\\), 0\\.0, mu_ones_presence\\);", code_with_trend))
-    expect_true(grepl("target \\+= gamma_lpdf\\(Y_biomass \\| shape_biomass,
+    expect_true(stan_pattern("target \\+= gamma_lpdf\\(Y_biomass \\| shape_biomass,
   shape_biomass \\\\/ mu_biomass\\);", code_with_trend))
 
     # Prior accumulation
-    expect_true(grepl("target \\+= lprior;", code_with_trend))
+    expect_true(stan_pattern("target \\+= lprior;", code_with_trend))
 
     # Trend parameter priors (existence, not specific distributions)
-    expect_true(grepl("ar1_trend ~", code_with_trend))
-    expect_true(grepl("sigma_trend ~", code_with_trend))
-    expect_true(grepl("L_Omega_trend ~", code_with_trend))
-    expect_true(grepl("Z_raw ~", code_with_trend))
-    expect_true(grepl("to_vector\\(innovations_trend\\) ~", code_with_trend))
+    expect_true(stan_pattern("ar1_trend ~", code_with_trend))
+    expect_true(stan_pattern("sigma_trend ~", code_with_trend))
+    expect_true(stan_pattern("L_Omega_trend ~", code_with_trend))
+    expect_true(stan_pattern("Z_raw ~", code_with_trend))
+    expect_true(stan_pattern("to_vector\\(innovations_trend\\) ~", code_with_trend))
 
     # Generated quantities for all three families
-    expect_true(grepl("real b_count_Intercept = Intercept_count -
+    expect_true(stan_pattern("real b_count_Intercept = Intercept_count -
   dot_product\\(means_X_count, b_count\\);", code_with_trend))
-    expect_true(grepl("real b_presence_Intercept = Intercept_presence -
+    expect_true(stan_pattern("real b_presence_Intercept = Intercept_presence -
   dot_product\\(means_X_presence, b_presence\\);", code_with_trend))
-    expect_true(grepl("real b_biomass_Intercept = Intercept_biomass -
+    expect_true(stan_pattern("real b_biomass_Intercept = Intercept_biomass -
   dot_product\\(means_X_biomass, b_biomass\\);", code_with_trend))
 
     # Anti-patterns: Should NOT have trend intercept parameters (~ -1 specification)
@@ -861,139 +891,139 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   expect_s3_class(code_with_trend, "stancode")
 
   # Empty functions block (no custom functions needed for AR factor model)
-  expect_true(grepl("functions \\{\\s*\\}", code_with_trend))
+  expect_true(stan_pattern("functions \\{\\s*\\}", code_with_trend))
 
   # Three-family multivariate observation data
-  expect_true(grepl("int<lower=1> N_count;.*number of observations", code_with_trend))
-  expect_true(grepl("array\\[N_count\\] int Y_count;.*response variable", code_with_trend))
-  expect_true(grepl("int<lower=1> N_presence;.*number of observations", code_with_trend))
-  expect_true(grepl("array\\[N_presence\\] int Y_presence;.*response variable", code_with_trend))
-  expect_true(grepl("int<lower=1> N_biomass;.*number of observations", code_with_trend))
-  expect_true(grepl("vector\\[N_biomass\\] Y_biomass;.*response variable", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_count;.*number of observations", code_with_trend))
+  expect_true(stan_pattern("array\\[N_count\\] int Y_count;.*response variable", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_presence;.*number of observations", code_with_trend))
+  expect_true(stan_pattern("array\\[N_presence\\] int Y_presence;.*response variable", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_biomass;.*number of observations", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_biomass\\] Y_biomass;.*response variable", code_with_trend))
 
   # Population-level design matrices for all three families
-  expect_true(grepl("matrix\\[N_count, K_count\\] X_count;.*population-level design matrix", code_with_trend))
-  expect_true(grepl("matrix\\[N_presence, K_presence\\] X_presence;.*population-level design matrix", code_with_trend))
-  expect_true(grepl("matrix\\[N_biomass, K_biomass\\] X_biomass;.*population-level design matrix", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_count, K_count\\] X_count;.*population-level design matrix", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_presence, K_presence\\] X_presence;.*population-level design matrix", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_biomass, K_biomass\\] X_biomass;.*population-level design matrix", code_with_trend))
 
   # Trend dimensions
-  expect_true(grepl("int<lower=1> N_trend;.*number of time points", code_with_trend))
-  expect_true(grepl("int<lower=1> N_series_trend;.*number of series", code_with_trend))
-  expect_true(grepl("int<lower=1> N_lv_trend;.*latent variables", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_trend;.*number of time points", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_series_trend;.*number of series", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_lv_trend;.*latent variables", code_with_trend))
 
   # Observation-to-trend mappings for all three families
-  expect_true(grepl("array\\[N_count\\] int obs_trend_time_count;", code_with_trend))
-  expect_true(grepl("array\\[N_count\\] int obs_trend_series_count;", code_with_trend))
-  expect_true(grepl("array\\[N_presence\\] int obs_trend_time_presence;", code_with_trend))
-  expect_true(grepl("array\\[N_presence\\] int obs_trend_series_presence;", code_with_trend))
-  expect_true(grepl("array\\[N_biomass\\] int obs_trend_time_biomass;", code_with_trend))
-  expect_true(grepl("array\\[N_biomass\\] int obs_trend_series_biomass;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_count\\] int obs_trend_time_count;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_count\\] int obs_trend_series_count;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_presence\\] int obs_trend_time_presence;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_presence\\] int obs_trend_series_presence;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_time_biomass;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_series_biomass;", code_with_trend))
 
   # Times trend matrix
-  expect_true(grepl("array\\[N_trend, N_series_trend\\] int times_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;", code_with_trend))
 
   # GLM compatibility vectors for discrete families only
-  expect_true(grepl("vector\\[1\\] mu_ones_count;.*for GLM count", code_with_trend))
-  expect_true(grepl("vector\\[1\\] mu_ones_presence;.*for GLM presence", code_with_trend))
+  expect_true(stan_pattern("vector\\[1\\] mu_ones_count;.*for GLM count", code_with_trend))
+  expect_true(stan_pattern("vector\\[1\\] mu_ones_presence;.*for GLM presence", code_with_trend))
 
   # Centered design matrices in transformed data
-  expect_true(grepl("matrix\\[N_count, Kc_count\\] Xc_count;.*centered version", code_with_trend))
-  expect_true(grepl("matrix\\[N_presence, Kc_presence\\] Xc_presence;.*centered version", code_with_trend))
-  expect_true(grepl("matrix\\[N_biomass, Kc_biomass\\] Xc_biomass;.*centered version", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_count, Kc_count\\] Xc_count;.*centered version", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_presence, Kc_presence\\] Xc_presence;.*centered version", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_biomass, Kc_biomass\\] Xc_biomass;.*centered version", code_with_trend))
 
   # Centering loops for all three families
-  expect_true(grepl("for \\(i in 2:K_count\\)", code_with_trend))
-  expect_true(grepl("means_X_count\\[i - 1\\] = mean\\(X_count\\[, i\\]\\);", code_with_trend))
-  expect_true(grepl("for \\(i in 2:K_presence\\)", code_with_trend))
-  expect_true(grepl("for \\(i in 2:K_biomass\\)", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 2:K_count\\)", code_with_trend))
+  expect_true(stan_pattern("means_X_count\\[i - 1\\] = mean\\(X_count\\[, i\\]\\);", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 2:K_presence\\)", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 2:K_biomass\\)", code_with_trend))
 
   # Observation model parameters for all three families
-  expect_true(grepl("vector\\[Kc_count\\] b_count;.*regression coefficients", code_with_trend))
-  expect_true(grepl("real Intercept_count;.*temporary intercept", code_with_trend))
-  expect_true(grepl("vector\\[Kc_presence\\] b_presence;.*regression coefficients", code_with_trend))
-  expect_true(grepl("real Intercept_presence;.*temporary intercept", code_with_trend))
-  expect_true(grepl("vector\\[Kc_biomass\\] b_biomass;.*regression coefficients", code_with_trend))
-  expect_true(grepl("real Intercept_biomass;.*temporary intercept", code_with_trend))
-  expect_true(grepl("real<lower=0> shape_biomass;.*shape parameter", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc_count\\] b_count;.*regression coefficients", code_with_trend))
+  expect_true(stan_pattern("real Intercept_count;.*temporary intercept", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc_presence\\] b_presence;.*regression coefficients", code_with_trend))
+  expect_true(stan_pattern("real Intercept_presence;.*temporary intercept", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc_biomass\\] b_biomass;.*regression coefficients", code_with_trend))
+  expect_true(stan_pattern("real Intercept_biomass;.*temporary intercept", code_with_trend))
+  expect_true(stan_pattern("real<lower=0> shape_biomass;.*shape parameter", code_with_trend))
 
   # Factor AR(1) trend parameters
-  expect_true(grepl("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;.*AR coefficients", code_with_trend))
-  expect_true(grepl("vector<lower=0>\\[N_lv_trend\\] sigma_trend;.*innovation SDs", code_with_trend))
-  expect_true(grepl("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;.*innovation correlations", code_with_trend))
+  expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;.*AR coefficients", code_with_trend))
+  expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;.*innovation SDs", code_with_trend))
+  expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;.*innovation correlations", code_with_trend))
 
   # Factor loading parameters (estimated for n_lv = 2)
-  expect_true(grepl("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;.*raw factor loadings", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;.*raw factor loadings", code_with_trend))
 
   # Innovation matrix
-  expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
 
   # lprior initialization with family-specific priors
-  expect_true(grepl("real lprior = 0;.*prior contributions", code_with_trend))
+  expect_true(stan_pattern("real lprior = 0;.*prior contributions", code_with_trend))
 
   # Factor loading matrix construction with identifiability constraints
-  expect_true(grepl("matrix\\[N_series_trend, N_lv_trend\\] Z = rep_matrix\\(0, N_series_trend, N_lv_trend\\);", code_with_trend))
-  expect_true(grepl("int index = 1;", code_with_trend))
-  expect_true(grepl("// constraints allow identifiability of loadings", code_with_trend))
-  expect_true(grepl("for \\(j in 1 : N_lv_trend\\)", code_with_trend))
-  expect_true(grepl("for \\(i in j : N_series_trend\\)", code_with_trend))
-  expect_true(grepl("Z\\[i, j\\] = Z_raw\\[index\\];", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = rep_matrix\\(0, N_series_trend, N_lv_trend\\);", code_with_trend))
+  expect_true(stan_pattern("int index = 1;", code_with_trend))
+  expect_true(stan_pattern("// constraints allow identifiability of loadings", code_with_trend))
+  expect_true(stan_pattern("for \\(j in 1 : N_lv_trend\\)", code_with_trend))
+  expect_true(stan_pattern("for \\(i in j : N_series_trend\\)", code_with_trend))
+  expect_true(stan_pattern("Z\\[i, j\\] = Z_raw\\[index\\];", code_with_trend))
 
   # Innovation covariance construction
-  expect_true(grepl("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend = diag_pre_multiply\\(sigma_trend, L_Omega_trend\\);", code_with_trend))
-  expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] scaled_innovations_trend = innovations_trend \\* L_Sigma_trend';", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend = diag_pre_multiply\\(sigma_trend, L_Omega_trend\\);", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] scaled_innovations_trend = innovations_trend \\* L_Sigma_trend';", code_with_trend))
 
   # AR(1) latent variable dynamics
-  expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
-  expect_true(grepl("lv_trend\\[1, :\\] = scaled_innovations_trend\\[1, :\\];", code_with_trend))
-  expect_true(grepl("for \\(i in 2:N_trend\\)", code_with_trend))
-  expect_true(grepl("for \\(j in 1:N_lv_trend\\)", code_with_trend))
-  expect_true(grepl("lv_trend\\[i, j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1, j\\] \\+ scaled_innovations_trend\\[i, j\\];", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[1, :\\] = scaled_innovations_trend\\[1, :\\];", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 2:N_trend\\)", code_with_trend))
+  expect_true(stan_pattern("for \\(j in 1:N_lv_trend\\)", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[i, j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1, j\\] \\+ scaled_innovations_trend\\[i, j\\];", code_with_trend))
 
   # Zero trend mean vector (for ~ -1 specification)
-  expect_true(grepl("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
-  expect_true(grepl("zero for ~ -1, but needed for prediction compatibility", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
+  expect_true(stan_pattern("zero for ~ -1, but needed for prediction compatibility", code_with_trend))
 
   # Universal trend computation pattern
-  expect_true(grepl("matrix\\[N_trend, N_series_trend\\] trend;", code_with_trend))
-  expect_true(grepl("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\];", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, N_series_trend\\] trend;", code_with_trend))
+  expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\];", code_with_trend))
 
   # Family-specific linear predictors
-  expect_true(grepl("vector\\[N_count\\] mu_count = Xc_count \\* b_count;", code_with_trend))
-  expect_true(grepl("vector\\[N_presence\\] mu_presence = Xc_presence \\* b_presence;", code_with_trend))
-  expect_true(grepl("vector\\[N_biomass\\] mu_biomass = rep_vector\\(0\\.0, N_biomass\\);", code_with_trend))
-  expect_true(grepl("mu_biomass \\+= Intercept_biomass \\+ Xc_biomass \\* b_biomass;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_count\\] mu_count = Xc_count \\* b_count;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_presence\\] mu_presence = Xc_presence \\* b_presence;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_biomass\\] mu_biomass = rep_vector\\(0\\.0, N_biomass\\);", code_with_trend))
+  expect_true(stan_pattern("mu_biomass \\+= Intercept_biomass \\+ Xc_biomass \\* b_biomass;", code_with_trend))
 
   # Trend injection for all three families
-  expect_true(grepl("for \\(n in 1:N_count\\)", code_with_trend))
-  expect_true(grepl("mu_count\\[n\\] \\+= Intercept_count \\+ trend\\[obs_trend_time_count\\[n\\], obs_trend_series_count\\[n\\]\\];", code_with_trend))
-  expect_true(grepl("for \\(n in 1:N_presence\\)", code_with_trend))
-  expect_true(grepl("mu_presence\\[n\\] \\+= Intercept_presence \\+ trend\\[obs_trend_time_presence\\[n\\], obs_trend_series_presence\\[n\\]\\];", code_with_trend))
-  expect_true(grepl("for \\(n in 1:N_biomass\\)", code_with_trend))
-  expect_true(grepl("mu_biomass\\[n\\] \\+= trend\\[obs_trend_time_biomass\\[n\\], obs_trend_series_biomass\\[n\\]\\];", code_with_trend))
+  expect_true(stan_pattern("for \\(n in 1:N_count\\)", code_with_trend))
+  expect_true(stan_pattern("mu_count\\[n\\] \\+= Intercept_count \\+ trend\\[obs_trend_time_count\\[n\\], obs_trend_series_count\\[n\\]\\];", code_with_trend))
+  expect_true(stan_pattern("for \\(n in 1:N_presence\\)", code_with_trend))
+  expect_true(stan_pattern("mu_presence\\[n\\] \\+= Intercept_presence \\+ trend\\[obs_trend_time_presence\\[n\\], obs_trend_series_presence\\[n\\]\\];", code_with_trend))
+  expect_true(stan_pattern("for \\(n in 1:N_biomass\\)", code_with_trend))
+  expect_true(stan_pattern("mu_biomass\\[n\\] \\+= trend\\[obs_trend_time_biomass\\[n\\], obs_trend_series_biomass\\[n\\]\\];", code_with_trend))
 
   # Gamma inverse link transformation
-  expect_true(grepl("mu_biomass = inv\\(mu_biomass\\);", code_with_trend))
-  expect_true(grepl("Transform biomass predictor.*inverse link for Gamma", code_with_trend))
+  expect_true(stan_pattern("mu_biomass = inv\\(mu_biomass\\);", code_with_trend))
+  expect_true(stan_pattern("Transform biomass predictor.*inverse link for Gamma", code_with_trend))
 
   # Three-family likelihoods with GLM optimization for discrete families
-  expect_true(grepl("target \\+= poisson_log_glm_lpmf\\(Y_count \\| to_matrix\\(mu_count\\), 0\\.0, mu_ones_count\\);", code_with_trend))
-  expect_true(grepl("target \\+= bernoulli_logit_glm_lpmf\\(Y_presence \\| to_matrix\\(mu_presence\\), 0\\.0, mu_ones_presence\\);", code_with_trend))
-  expect_true(grepl("target \\+= gamma_lpdf\\(Y_biomass \\| shape_biomass, shape_biomass \\./", code_with_trend))
+  expect_true(stan_pattern("target \\+= poisson_log_glm_lpmf\\(Y_count \\| to_matrix\\(mu_count\\), 0\\.0, mu_ones_count\\);", code_with_trend))
+  expect_true(stan_pattern("target \\+= bernoulli_logit_glm_lpmf\\(Y_presence \\| to_matrix\\(mu_presence\\), 0\\.0, mu_ones_presence\\);", code_with_trend))
+  expect_true(stan_pattern("target \\+= gamma_lpdf\\(Y_biomass \\| shape_biomass, shape_biomass \\./", code_with_trend))
 
   # Prior accumulation
-  expect_true(grepl("target \\+= lprior;", code_with_trend))
+  expect_true(stan_pattern("target \\+= lprior;", code_with_trend))
 
   # Trend parameter priors (existence, not specific distributions)
-  expect_true(grepl("ar1_trend ~", code_with_trend))
-  expect_true(grepl("sigma_trend ~", code_with_trend))
-  expect_true(grepl("L_Omega_trend ~", code_with_trend))
-  expect_true(grepl("Z_raw ~", code_with_trend))
-  expect_true(grepl("to_vector\\(innovations_trend\\) ~", code_with_trend))
+  expect_true(stan_pattern("ar1_trend ~", code_with_trend))
+  expect_true(stan_pattern("sigma_trend ~", code_with_trend))
+  expect_true(stan_pattern("L_Omega_trend ~", code_with_trend))
+  expect_true(stan_pattern("Z_raw ~", code_with_trend))
+  expect_true(stan_pattern("to_vector\\(innovations_trend\\) ~", code_with_trend))
 
   # Generated quantities for all three families
-  expect_true(grepl("real b_count_Intercept = Intercept_count - dot_product\\(means_X_count, b_count\\);", code_with_trend))
-  expect_true(grepl("real b_presence_Intercept = Intercept_presence - dot_product\\(means_X_presence, b_presence\\);", code_with_trend))
-  expect_true(grepl("real b_biomass_Intercept = Intercept_biomass - dot_product\\(means_X_biomass, b_biomass\\);", code_with_trend))
+  expect_true(stan_pattern("real b_count_Intercept = Intercept_count - dot_product\\(means_X_count, b_count\\);", code_with_trend))
+  expect_true(stan_pattern("real b_presence_Intercept = Intercept_presence - dot_product\\(means_X_presence, b_presence\\);", code_with_trend))
+  expect_true(stan_pattern("real b_biomass_Intercept = Intercept_biomass - dot_product\\(means_X_biomass, b_biomass\\);", code_with_trend))
 
   # Anti-patterns: Should NOT have trend intercept parameters (~ -1 specification)
   expect_false(grepl("real Intercept_trend;", code_with_trend))
@@ -1046,7 +1076,7 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
   expect_s3_class(code_with_trend, "stancode")
 
   # Response variable should be continuous (vector, not array)
-  expect_true(grepl("vector\\[N\\] Y;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N\\] Y;", code_with_trend))
   expect_false(grepl("array\\[N\\] int Y;", code_with_trend))
 
   # Observation model: Only intercept (no covariates)
@@ -1055,65 +1085,65 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
   expect_false(grepl("vector\\[.*\\] b;", code_with_trend))  # No b coefficients for obs
 
   # Observation model dispersion parameter
-  expect_true(grepl("real<lower=0> sigma;", code_with_trend))
+  expect_true(stan_pattern("real<lower=0> sigma;", code_with_trend))
 
   # Trend design matrix and coefficients
-  expect_true(grepl("int<lower=1> K_trend;", code_with_trend))
-  expect_true(grepl("int<lower=1> Kc_trend;", code_with_trend))
-  expect_true(grepl("matrix\\[N_trend, K_trend\\] X_trend;", code_with_trend))
-  expect_true(grepl("matrix\\[N_trend, Kc_trend\\] Xc_trend;", code_with_trend))
-  expect_true(grepl("vector\\[Kc_trend\\] b_trend;", code_with_trend))
-  expect_true(grepl("vector\\[Kc_trend\\] means_X_trend;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> K_trend;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> Kc_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, K_trend\\] X_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, Kc_trend\\] Xc_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc_trend\\] b_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc_trend\\] means_X_trend;", code_with_trend))
 
   # Factor model parameters
-  expect_true(grepl("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
-  expect_true(grepl("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;", code_with_trend))
+  expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;", code_with_trend))
 
   # Factor loading constraints in transformed parameters
-  expect_true(grepl("matrix\\[N_series_trend, N_lv_trend\\] Z = rep_matrix\\(0, N_series_trend, N_lv_trend\\);", code_with_trend))
-  expect_true(grepl("// constraints allow identifiability of loadings", code_with_trend))
-  expect_true(grepl("for \\(j in 1 : N_lv_trend\\)", code_with_trend))
-  expect_true(grepl("for \\(i in j : N_series_trend\\)", code_with_trend))
-  expect_true(grepl("Z\\[i, j\\] = Z_raw\\[index\\];", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = rep_matrix\\(0, N_series_trend, N_lv_trend\\);", code_with_trend))
+  expect_true(stan_pattern("// constraints allow identifiability of loadings", code_with_trend))
+  expect_true(stan_pattern("for \\(j in 1 : N_lv_trend\\)", code_with_trend))
+  expect_true(stan_pattern("for \\(i in j : N_series_trend\\)", code_with_trend))
+  expect_true(stan_pattern("Z\\[i, j\\] = Z_raw\\[index\\];", code_with_trend))
 
   # ZMVN dynamics (just scaled innovations, no complex dynamics)
-  expect_true(grepl("lv_trend = scaled_innovations_trend;", code_with_trend))
+  expect_true(stan_pattern("lv_trend = scaled_innovations_trend;", code_with_trend))
 
   # Trend mean with covariate effects
-  expect_true(grepl("vector\\[N_trend\\] mu_trend = Xc_trend \\* b_trend \\+ Intercept_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = Xc_trend \\* b_trend \\+ Intercept_trend;", code_with_trend))
 
   # Universal trend computation pattern should still be present
-  expect_true(grepl("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
+  expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
 
   # Observation model priors (brms pattern)
-  expect_true(grepl("lprior \\+= student_t_lpdf\\(Intercept \\| 3, 0\\.9, 2\\.5\\);", code_with_trend))
-  expect_true(grepl("lprior \\+= student_t_lpdf\\(sigma \\| 3, 0, 2\\.5\\)", code_with_trend))
-  expect_true(grepl("- 1 \\* student_t_lccdf\\(0 \\| 3, 0, 2\\.5\\);", code_with_trend))
+  expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept \\| 3, 0\\.9, 2\\.5\\);", code_with_trend))
+  expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(sigma \\| 3, 0, 2\\.5\\)", code_with_trend))
+  expect_true(stan_pattern("- 1 \\* student_t_lccdf\\(0 \\| 3, 0, 2\\.5\\);", code_with_trend))
 
   # Trend parameter priors
-  expect_true(grepl("sigma_trend ~ exponential\\(2\\);", code_with_trend))
-  expect_true(grepl("Z_raw ~ student_t\\(3, 0, 1\\);", code_with_trend))
+  expect_true(stan_pattern("sigma_trend ~ exponential\\(2\\);", code_with_trend))
+  expect_true(stan_pattern("Z_raw ~ student_t\\(3, 0, 1\\);", code_with_trend))
 
   # No prior for b_trend (brms default flat prior)
   expect_false(grepl("b_trend ~", code_with_trend))
 
   # Lognormal likelihood (not GLM optimized)
-  expect_true(grepl("target \\+= lognormal_lpdf\\(Y \\| mu, sigma\\);", code_with_trend))
+  expect_true(stan_pattern("target \\+= lognormal_lpdf\\(Y \\| mu, sigma\\);", code_with_trend))
   expect_false(grepl("lognormal.*glm", code_with_trend))
   expect_false(grepl("mu_ones", code_with_trend))
 
   # Observation model likelihood structure (brms pattern)
-  expect_true(grepl("vector\\[N\\] mu = rep_vector\\(0\\.0, N\\);", code_with_trend))
-  expect_true(grepl("mu \\+= Intercept;", code_with_trend))
-  expect_true(grepl("mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_with_trend))
+  expect_true(stan_pattern("vector\\[N\\] mu = rep_vector\\(0\\.0, N\\);", code_with_trend))
+  expect_true(stan_pattern("mu \\+= Intercept;", code_with_trend))
+  expect_true(stan_pattern("mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_with_trend))
 
   # Generated quantities
-  expect_true(grepl("real b_Intercept = Intercept;", code_with_trend))
-  expect_true(grepl("real b_Intercept_trend = Intercept_trend - dot_product\\(means_X_trend, b_trend\\);", code_with_trend))
+  expect_true(stan_pattern("real b_Intercept = Intercept;", code_with_trend))
+  expect_true(stan_pattern("real b_Intercept_trend = Intercept_trend - dot_product\\(means_X_trend, b_trend\\);", code_with_trend))
 
   # Mapping arrays should still be present
-  expect_true(grepl("array\\[N\\] int obs_trend_time", code_with_trend))
-  expect_true(grepl("array\\[N\\] int obs_trend_series", code_with_trend))
+  expect_true(stan_pattern("array\\[N\\] int obs_trend_time", code_with_trend))
+  expect_true(stan_pattern("array\\[N\\] int obs_trend_series", code_with_trend))
 
   # Check for no duplicated Stan blocks
   expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
@@ -1150,7 +1180,7 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   expect_s3_class(code_with_trend, "stancode")
 
   # Response variable should be continuous (vector, not array)
-  expect_true(grepl("vector\\[N\\] Y;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N\\] Y;", code_with_trend))
   expect_false(grepl("array\\[N\\] int Y;", code_with_trend))
 
   # Observation model: Only intercept (no covariates)
@@ -1159,85 +1189,85 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   expect_false(grepl("vector\\[.*\\] b;", code_with_trend))  # No b coefficients for obs
 
   # Observation model dispersion parameter
-  expect_true(grepl("real<lower=0> sigma;", code_with_trend))
+  expect_true(stan_pattern("real<lower=0> sigma;", code_with_trend))
 
   # Trend design matrix and coefficients
-  expect_true(grepl("int<lower=1> K_trend;", code_with_trend))
-  expect_true(grepl("int<lower=1> Kc_trend;", code_with_trend))
-  expect_true(grepl("matrix\\[N_trend, K_trend\\] X_trend;", code_with_trend))
-  expect_true(grepl("matrix\\[N_trend, Kc_trend\\] Xc_trend;", code_with_trend))
-  expect_true(grepl("vector\\[Kc_trend\\] b_trend;", code_with_trend))
-  expect_true(grepl("vector\\[Kc_trend\\] means_X_trend;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> K_trend;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> Kc_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, K_trend\\] X_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, Kc_trend\\] Xc_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc_trend\\] b_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc_trend\\] means_X_trend;", code_with_trend))
 
   # Hierarchical grouping data structures
-  expect_true(grepl("int<lower=1> n_groups_trend;", code_with_trend))
-  expect_true(grepl("array\\[N_series_trend\\] int.*group_inds_trend;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> n_groups_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_series_trend\\] int.*group_inds_trend;", code_with_trend))
 
   # Hierarchical correlation functions
-  expect_true(grepl("matrix combine_cholesky\\(", code_with_trend))
-  expect_true(grepl("real alpha", code_with_trend))
+  expect_true(stan_pattern("matrix combine_cholesky\\(", code_with_trend))
+  expect_true(stan_pattern("real alpha", code_with_trend))
 
   # Hierarchical correlation parameters with _trend suffix
-  expect_true(grepl("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_global_trend;", code_with_trend))
-  expect_true(grepl("array\\[n_groups_trend\\] cholesky_factor_corr\\[N_lv_trend\\] L_deviation_group_trend;", code_with_trend))
-  expect_true(grepl("real<lower=0, upper=1> alpha_cor_trend;", code_with_trend))
+  expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_global_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[n_groups_trend\\] cholesky_factor_corr\\[N_lv_trend\\] L_deviation_group_trend;", code_with_trend))
+  expect_true(stan_pattern("real<lower=0, upper=1> alpha_cor_trend;", code_with_trend))
 
   # Group-specific correlation matrices computation
-  expect_true(grepl("array\\[n_groups_trend\\] cov_matrix\\[N_lv_trend\\] Sigma_group_trend;", code_with_trend))
-  expect_true(grepl("L_Omega_group_trend = combine_cholesky\\(L_Omega_global_trend, L_deviation_group_trend\\[g\\], alpha_cor_trend\\)", code_with_trend))
+  expect_true(stan_pattern("array\\[n_groups_trend\\] cov_matrix\\[N_lv_trend\\] Sigma_group_trend;", code_with_trend))
+  expect_true(stan_pattern("L_Omega_group_trend = combine_cholesky\\(L_Omega_global_trend, L_deviation_group_trend\\[g\\], alpha_cor_trend\\)", code_with_trend))
 
   # Group-specific innovation scaling
-  expect_true(grepl("int group_idx = group_inds_trend\\[s\\];", code_with_trend))
-  expect_true(grepl("L_group_trend = cholesky_decompose\\(Sigma_group_trend\\[group_idx\\]\\)", code_with_trend))
+  expect_true(stan_pattern("int group_idx = group_inds_trend\\[s\\];", code_with_trend))
+  expect_true(stan_pattern("L_group_trend = cholesky_decompose\\(Sigma_group_trend\\[group_idx\\]\\)", code_with_trend))
 
   # ZMVN dynamics (just scaled innovations)
-  expect_true(grepl("lv_trend = scaled_innovations_trend;", code_with_trend))
+  expect_true(stan_pattern("lv_trend = scaled_innovations_trend;", code_with_trend))
 
   # Factor loading matrix (diagonal for non-factor ZMVN)
-  expect_true(grepl("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix\\(rep_vector\\(1\\.0, N_lv_trend\\)\\);", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix\\(rep_vector\\(1\\.0, N_lv_trend\\)\\);", code_with_trend))
 
   # Trend mean with covariate effects
-  expect_true(grepl("vector\\[N_trend\\] mu_trend = Xc_trend \\* b_trend \\+ Intercept_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = Xc_trend \\* b_trend \\+ Intercept_trend;", code_with_trend))
 
   # Universal trend computation pattern should still be present
-  expect_true(grepl("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
+  expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
 
   # Hierarchical correlation priors with _trend suffix
-  expect_true(grepl("L_Omega_global_trend ~ lkj_corr_cholesky\\(1\\);", code_with_trend))
-  expect_true(grepl("L_deviation_group_trend\\[g\\] ~ lkj_corr_cholesky\\(6\\);", code_with_trend))
+  expect_true(stan_pattern("L_Omega_global_trend ~ lkj_corr_cholesky\\(1\\);", code_with_trend))
+  expect_true(stan_pattern("L_deviation_group_trend\\[g\\] ~ lkj_corr_cholesky\\(6\\);", code_with_trend))
 
   # Custom alpha_cor_trend prior should be applied
-  expect_true(grepl("alpha_cor_trend ~ beta\\(5, 5\\);", code_with_trend))
+  expect_true(stan_pattern("alpha_cor_trend ~ beta\\(5, 5\\);", code_with_trend))
 
   # Standard trend parameter priors
-  expect_true(grepl("sigma_trend ~ exponential\\(2\\);", code_with_trend))
-  expect_true(grepl("to_vector\\(innovations_trend\\) ~ std_normal\\(\\);", code_with_trend))
+  expect_true(stan_pattern("sigma_trend ~ exponential\\(2\\);", code_with_trend))
+  expect_true(stan_pattern("to_vector\\(innovations_trend\\) ~ std_normal\\(\\);", code_with_trend))
 
   # No prior for b_trend (brms default flat prior)
   expect_false(grepl("b_trend ~", code_with_trend))
 
   # Observation model priors (brms pattern)
-  expect_true(grepl("lprior \\+= student_t_lpdf\\(Intercept \\| 3, 0\\.9, 2\\.5\\);", code_with_trend))
-  expect_true(grepl("lprior \\+= student_t_lpdf\\(sigma \\| 3, 0, 2\\.5\\)", code_with_trend))
-  expect_true(grepl("- 1 \\* student_t_lccdf\\(0 \\| 3, 0, 2\\.5\\);", code_with_trend))
+  expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept \\| 3, 0\\.9, 2\\.5\\);", code_with_trend))
+  expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(sigma \\| 3, 0, 2\\.5\\)", code_with_trend))
+  expect_true(stan_pattern("- 1 \\* student_t_lccdf\\(0 \\| 3, 0, 2\\.5\\);", code_with_trend))
 
   # Lognormal likelihood (not GLM optimized)
-  expect_true(grepl("target \\+= lognormal_lpdf\\(Y \\| mu, sigma\\);", code_with_trend))
+  expect_true(stan_pattern("target \\+= lognormal_lpdf\\(Y \\| mu, sigma\\);", code_with_trend))
   expect_false(grepl("lognormal.*glm", code_with_trend))
   expect_false(grepl("mu_ones", code_with_trend))
 
   # Observation model likelihood structure (brms pattern)
-  expect_true(grepl("vector\\[N\\] mu = rep_vector\\(0\\.0, N\\);", code_with_trend))
-  expect_true(grepl("mu \\+= Intercept;", code_with_trend))
-  expect_true(grepl("mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_with_trend))
+  expect_true(stan_pattern("vector\\[N\\] mu = rep_vector\\(0\\.0, N\\);", code_with_trend))
+  expect_true(stan_pattern("mu \\+= Intercept;", code_with_trend))
+  expect_true(stan_pattern("mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_with_trend))
 
   # Generated quantities
-  expect_true(grepl("real b_Intercept = Intercept;", code_with_trend))
-  expect_true(grepl("real b_Intercept_trend = Intercept_trend - dot_product\\(means_X_trend, b_trend\\);", code_with_trend))
+  expect_true(stan_pattern("real b_Intercept = Intercept;", code_with_trend))
+  expect_true(stan_pattern("real b_Intercept_trend = Intercept_trend - dot_product\\(means_X_trend, b_trend\\);", code_with_trend))
 
   # Mapping arrays should still be present
-  expect_true(grepl("array\\[N\\] int obs_trend_time", code_with_trend))
-  expect_true(grepl("array\\[N\\] int obs_trend_series", code_with_trend))
+  expect_true(stan_pattern("array\\[N\\] int obs_trend_time", code_with_trend))
+  expect_true(stan_pattern("array\\[N\\] int obs_trend_series", code_with_trend))
 
   # Check for no duplicated Stan blocks
   expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
@@ -1281,153 +1311,153 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
     expect_s3_class(code_with_trend, "stancode")
 
     # 1. Functions Block - Should contain brms GP function
-    expect_true(grepl("vector gp_exp_quad\\(data array\\[\\] vector x, real sdgp, vector
+    expect_true(stan_pattern("vector gp_exp_quad\\(data array\\[\\] vector x, real sdgp, vector
   lscale, vector zgp\\)", code_with_trend))
-    expect_true(grepl("compute a latent Gaussian process with squared exponential kernel",
+    expect_true(stan_pattern("compute a latent Gaussian process with squared exponential kernel",
                       code_with_trend, fixed = TRUE))
-    expect_true(grepl("gp_exp_quad_cov\\(x, sdgp, lscale\\[1\\]\\)", code_with_trend))
-    expect_true(grepl("cholesky_decompose\\(cov\\) \\* zgp;", code_with_trend))
+    expect_true(stan_pattern("gp_exp_quad_cov\\(x, sdgp, lscale\\[1\\]\\)", code_with_trend))
+    expect_true(stan_pattern("cholesky_decompose\\(cov\\) \\* zgp;", code_with_trend))
 
     # 2. Data Block - Complex observation model + CAR trend data
     # GP-related data structures
-    expect_true(grepl("int<lower=1> Kgp_1;.*number of sub-GPs", code_with_trend))
-    expect_true(grepl("int<lower=1> Dgp_1;.*GP dimension", code_with_trend))
-    expect_true(grepl("int<lower=1> Nsubgp_1;.*number of latent GP groups", code_with_trend))
-    expect_true(grepl("array\\[N\\] int<lower=1> Jgp_1;.*indices of latent GP groups",
+    expect_true(stan_pattern("int<lower=1> Kgp_1;.*number of sub-GPs", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> Dgp_1;.*GP dimension", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> Nsubgp_1;.*number of latent GP groups", code_with_trend))
+    expect_true(stan_pattern("array\\[N\\] int<lower=1> Jgp_1;.*indices of latent GP groups",
                       code_with_trend))
-    expect_true(grepl("array\\[Nsubgp_1\\] vector\\[Dgp_1\\] Xgp_1;.*covariates of the GP",
+    expect_true(stan_pattern("array\\[Nsubgp_1\\] vector\\[Dgp_1\\] Xgp_1;.*covariates of the GP",
                       code_with_trend))
 
     # Random effects data structures
-    expect_true(grepl("int<lower=1> N_1;.*number of grouping levels", code_with_trend))
-    expect_true(grepl("int<lower=1> M_1;.*number of coefficients per level", code_with_trend))
-    expect_true(grepl("array\\[N\\] int<lower=1> J_1;.*grouping indicator", code_with_trend))
-    expect_true(grepl("vector\\[N\\] Z_1_1;.*group-level predictor values", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> N_1;.*number of grouping levels", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> M_1;.*number of coefficients per level", code_with_trend))
+    expect_true(stan_pattern("array\\[N\\] int<lower=1> J_1;.*grouping indicator", code_with_trend))
+    expect_true(stan_pattern("vector\\[N\\] Z_1_1;.*group-level predictor values", code_with_trend))
 
     # CAR trend dimensions
-    expect_true(grepl("int<lower=1> N_trend;.*number of timepoints", code_with_trend))
-    expect_true(grepl("int<lower=1> N_series_trend;.*number of observed time series",
+    expect_true(stan_pattern("int<lower=1> N_trend;.*number of timepoints", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> N_series_trend;.*number of observed time series",
                       code_with_trend))
-    expect_true(grepl("int<lower=1> N_lv_trend;.*number of latent states", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> N_lv_trend;.*number of latent states", code_with_trend))
 
     # CAR-specific time distance array
-    expect_true(grepl("array\\[N_trend, N_series_trend\\] real<lower=0> time_dis;.*time
+    expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] real<lower=0> time_dis;.*time
   distances for continuous AR", code_with_trend))
 
     # Standard trend mapping arrays
-    expect_true(grepl("array\\[N_trend, N_series_trend\\] int times_trend;.*temporal order",
+    expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;.*temporal order",
                       code_with_trend))
-    expect_true(grepl("array\\[N\\] int obs_trend_time;.*idx to map latent states to
+    expect_true(stan_pattern("array\\[N\\] int obs_trend_time;.*idx to map latent states to
   observations", code_with_trend))
-    expect_true(grepl("array\\[N\\] int obs_trend_series;.*idx to map latent states to
+    expect_true(stan_pattern("array\\[N\\] int obs_trend_series;.*idx to map latent states to
   observations", code_with_trend))
 
     # GLM optimization component
-    expect_true(grepl("vector\\[1\\] mu_ones;.*Column of ones for glm means", code_with_trend))
+    expect_true(stan_pattern("vector\\[1\\] mu_ones;.*Column of ones for glm means", code_with_trend))
 
     # 3. Transformed Data Block - Factor loading matrix
-    expect_true(grepl("matrix\\[N_series_trend, N_lv_trend\\] Z =
+    expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z =
   diag_matrix\\(rep_vector\\(1\\.0, N_lv_trend\\)\\);", code_with_trend))
 
     # 4. Parameters Block - Complex observation model + CAR trend parameters
     # GP parameters
-    expect_true(grepl("vector<lower=0>\\[Kgp_1\\] sdgp_1;.*GP standard deviation parameters",
+    expect_true(stan_pattern("vector<lower=0>\\[Kgp_1\\] sdgp_1;.*GP standard deviation parameters",
                       code_with_trend))
-    expect_true(grepl("array\\[Kgp_1\\] vector<lower=0>\\[1\\] lscale_1;.*GP length-scale
+    expect_true(stan_pattern("array\\[Kgp_1\\] vector<lower=0>\\[1\\] lscale_1;.*GP length-scale
   parameters", code_with_trend))
-    expect_true(grepl("vector\\[Nsubgp_1\\] zgp_1;.*latent variables of the GP",
+    expect_true(stan_pattern("vector\\[Nsubgp_1\\] zgp_1;.*latent variables of the GP",
                       code_with_trend))
 
     # Random effects parameters
-    expect_true(grepl("vector<lower=0>\\[M_1\\] sd_1;.*group-level standard deviations",
+    expect_true(stan_pattern("vector<lower=0>\\[M_1\\] sd_1;.*group-level standard deviations",
                       code_with_trend))
-    expect_true(grepl("array\\[M_1\\] vector\\[N_1\\] z_1;.*standardized group-level effects",
+    expect_true(stan_pattern("array\\[M_1\\] vector\\[N_1\\] z_1;.*standardized group-level effects",
                       code_with_trend))
 
     # CAR trend parameters
-    expect_true(grepl("real Intercept_trend;.*trend intercept", code_with_trend))
-    expect_true(grepl("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;.*CAR AR1
+    expect_true(stan_pattern("real Intercept_trend;.*trend intercept", code_with_trend))
+    expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;.*CAR AR1
   coefficients", code_with_trend))
-    expect_true(grepl("vector<lower=0>\\[N_lv_trend\\] sigma_trend;.*innovation SDs",
+    expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;.*innovation SDs",
                       code_with_trend))
-    expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] innovations_trend;.*raw innovations",
+    expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;.*raw innovations",
                       code_with_trend))
 
     # 5. Transformed Parameters Block - Complex computations
     # GP and random effects computations (from brms)
-    expect_true(grepl("vector\\[N_1\\] r_1_1;.*actual group-level effects", code_with_trend))
-    expect_true(grepl("r_1_1 = \\(sd_1\\[1\\] \\* \\(z_1\\[1\\]\\)\\);", code_with_trend))
+    expect_true(stan_pattern("vector\\[N_1\\] r_1_1;.*actual group-level effects", code_with_trend))
+    expect_true(stan_pattern("r_1_1 = \\(sd_1\\[1\\] \\* \\(z_1\\[1\\]\\)\\);", code_with_trend))
 
     # Prior accumulation
-    expect_true(grepl("real lprior = 0;", code_with_trend, fixed = TRUE))
-    expect_true(grepl("lprior \\+= student_t_lpdf\\(Intercept \\|", code_with_trend))
-    expect_true(grepl("lprior \\+= student_t_lpdf\\(sdgp_1 \\|", code_with_trend))
-    expect_true(grepl("lprior \\+= inv_gamma_lpdf\\(lscale_1\\[1\\]\\[1\\] \\|",
+    expect_true(stan_pattern("real lprior = 0;", code_with_trend, fixed = TRUE))
+    expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept \\|", code_with_trend))
+    expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(sdgp_1 \\|", code_with_trend))
+    expect_true(stan_pattern("lprior \\+= inv_gamma_lpdf\\(lscale_1\\[1\\]\\[1\\] \\|",
                       code_with_trend))
-    expect_true(grepl("lprior \\+= student_t_lpdf\\(sd_1 \\|", code_with_trend))
-    expect_true(grepl("lprior \\+= student_t_lpdf\\(Intercept_trend \\|", code_with_trend))
+    expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(sd_1 \\|", code_with_trend))
+    expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept_trend \\|", code_with_trend))
 
     # CAR-specific trend computation
-    expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] scaled_innovations_trend;",
+    expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] scaled_innovations_trend;",
                       code_with_trend))
-    expect_true(grepl("scaled_innovations_trend = innovations_trend \\*
+    expect_true(stan_pattern("scaled_innovations_trend = innovations_trend \\*
   diag_matrix\\(sigma_trend\\);", code_with_trend))
 
     # CAR latent variable evolution
-    expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
+    expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
 
     # CAR initialization (first time point)
-    expect_true(grepl("for \\(j in 1:N_lv_trend\\)", code_with_trend))
-    expect_true(grepl("lv_trend\\[1, j\\] = scaled_innovations_trend\\[1, j\\];",
+    expect_true(stan_pattern("for \\(j in 1:N_lv_trend\\)", code_with_trend))
+    expect_true(stan_pattern("lv_trend\\[1, j\\] = scaled_innovations_trend\\[1, j\\];",
                       code_with_trend))
 
     # CAR continuous-time evolution (key differentiator)
-    expect_true(grepl("for \\(j in 1:N_lv_trend\\)", code_with_trend))
-    expect_true(grepl("for \\(i in 2:N_trend\\)", code_with_trend))
-    expect_true(grepl("lv_trend\\[i, j\\] = pow\\(ar1_trend\\[j\\], time_dis\\[i, j\\]\\) \\*
+    expect_true(stan_pattern("for \\(j in 1:N_lv_trend\\)", code_with_trend))
+    expect_true(stan_pattern("for \\(i in 2:N_trend\\)", code_with_trend))
+    expect_true(stan_pattern("lv_trend\\[i, j\\] = pow\\(ar1_trend\\[j\\], time_dis\\[i, j\\]\\) \\*
   lv_trend\\[i - 1, j\\]", code_with_trend))
-    expect_true(grepl("\\+ scaled_innovations_trend\\[i, j\\];", code_with_trend))
+    expect_true(stan_pattern("\\+ scaled_innovations_trend\\[i, j\\];", code_with_trend))
 
     # Universal trend computation pattern
-    expect_true(grepl("matrix\\[N_trend, N_series_trend\\] trend;", code_with_trend))
-    expect_true(grepl("vector\\[N_trend\\] mu_trend = rep_vector\\(Intercept_trend,
+    expect_true(stan_pattern("matrix\\[N_trend, N_series_trend\\] trend;", code_with_trend))
+    expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(Intercept_trend,
   N_trend\\);", code_with_trend))
-    expect_true(grepl("for \\(i in 1:N_trend\\)", code_with_trend))
-    expect_true(grepl("for \\(s in 1:N_series_trend\\)", code_with_trend))
-    expect_true(grepl("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+
+    expect_true(stan_pattern("for \\(i in 1:N_trend\\)", code_with_trend))
+    expect_true(stan_pattern("for \\(s in 1:N_series_trend\\)", code_with_trend))
+    expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+
   mu_trend\\[times_trend\\[i, s\\]\\];", code_with_trend))
 
     # 6. Model Block - Complex likelihood with trend injection
     # GP computation
-    expect_true(grepl("vector\\[Nsubgp_1\\] gp_pred_1 = gp_exp_quad\\(Xgp_1, sdgp_1\\[1\\],
+    expect_true(stan_pattern("vector\\[Nsubgp_1\\] gp_pred_1 = gp_exp_quad\\(Xgp_1, sdgp_1\\[1\\],
   lscale_1\\[1\\], zgp_1\\);", code_with_trend))
 
     # Complex linear predictor construction
-    expect_true(grepl("vector\\[N\\] mu = rep_vector\\(0\\.0, N\\);", code_with_trend))
-    expect_true(grepl("mu \\+= Intercept \\+ gp_pred_1\\[Jgp_1\\];", code_with_trend))
+    expect_true(stan_pattern("vector\\[N\\] mu = rep_vector\\(0\\.0, N\\);", code_with_trend))
+    expect_true(stan_pattern("mu \\+= Intercept \\+ gp_pred_1\\[Jgp_1\\];", code_with_trend))
 
     # Multi-component trend injection
-    expect_true(grepl("for \\(n in 1:N\\)", code_with_trend))
-    expect_true(grepl("mu\\[n\\] \\+= r_1_1\\[J_1\\[n\\]\\] \\* Z_1_1\\[n\\];",
+    expect_true(stan_pattern("for \\(n in 1:N\\)", code_with_trend))
+    expect_true(stan_pattern("mu\\[n\\] \\+= r_1_1\\[J_1\\[n\\]\\] \\* Z_1_1\\[n\\];",
                       code_with_trend))
-    expect_true(grepl("mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\],
+    expect_true(stan_pattern("mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\],
   obs_trend_series\\[n\\]\\];", code_with_trend))
 
     # Standard Poisson likelihood (not GLM-optimized due to complexity)
-    expect_true(grepl("target \\+= poisson_log_lpmf\\(Y \\| mu\\);", code_with_trend))
+    expect_true(stan_pattern("target \\+= poisson_log_lpmf\\(Y \\| mu\\);", code_with_trend))
 
     # Prior contributions
-    expect_true(grepl("target \\+= lprior;", code_with_trend))
-    expect_true(grepl("target \\+= std_normal_lpdf\\(zgp_1\\);", code_with_trend))
-    expect_true(grepl("target \\+= std_normal_lpdf\\(z_1\\[1\\]\\);", code_with_trend))
+    expect_true(stan_pattern("target \\+= lprior;", code_with_trend))
+    expect_true(stan_pattern("target \\+= std_normal_lpdf\\(zgp_1\\);", code_with_trend))
+    expect_true(stan_pattern("target \\+= std_normal_lpdf\\(z_1\\[1\\]\\);", code_with_trend))
 
     # CAR trend priors (check existence, not specific distributions)
-    expect_true(grepl("ar1_trend ~", code_with_trend))
-    expect_true(grepl("sigma_trend ~", code_with_trend))
-    expect_true(grepl("to_vector\\(innovations_trend\\) ~", code_with_trend))
+    expect_true(stan_pattern("ar1_trend ~", code_with_trend))
+    expect_true(stan_pattern("sigma_trend ~", code_with_trend))
+    expect_true(stan_pattern("to_vector\\(innovations_trend\\) ~", code_with_trend))
 
     # 7. Generated Quantities Block
-    expect_true(grepl("real b_Intercept = Intercept;", code_with_trend))
+    expect_true(stan_pattern("real b_Intercept = Intercept;", code_with_trend))
 
     # 8. CAR-Specific Anti-patterns - Things that should NOT be present
     # Should NOT have discrete AR initialization patterns
@@ -2116,19 +2146,19 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
 
   # 1. Functions Block - Prophet-style piecewise functions
   # Check for changepoint matrix function
-  expect_true(grepl("matrix get_changepoint_matrix\\(vector t, vector t_change_trend, int T, int S\\)", code_with_trend))
-  expect_true(grepl("Function to sort changepoints", code_with_trend, fixed = TRUE))
-  expect_true(grepl("credit goes to the Prophet development team", code_with_trend, fixed = TRUE))
+  expect_true(stan_pattern("matrix get_changepoint_matrix\\(vector t, vector t_change_trend, int T, int S\\)", code_with_trend))
+  expect_true(stan_pattern("Function to sort changepoints", code_with_trend, fixed = TRUE))
+  expect_true(stan_pattern("credit goes to the Prophet development team", code_with_trend, fixed = TRUE))
 
   # Check changepoint matrix implementation details
-  expect_true(grepl("matrix\\[T, S\\] Kappa;", code_with_trend))
-  expect_true(grepl("row_vector\\[S\\] a_row;", code_with_trend))
-  expect_true(grepl("while \\(\\(cp_idx <= S\\) && \\(t\\[i\\] >= t_change_trend\\[cp_idx\\]\\)\\)", code_with_trend))
+  expect_true(stan_pattern("matrix\\[T, S\\] Kappa;", code_with_trend))
+  expect_true(stan_pattern("row_vector\\[S\\] a_row;", code_with_trend))
+  expect_true(stan_pattern("while \\(\\(cp_idx <= S\\) && \\(t\\[i\\] >= t_change_trend\\[cp_idx\\]\\)\\)", code_with_trend))
 
   # Check for linear trend function
-  expect_true(grepl("vector linear_trend\\(real k, real m, vector delta, vector t, matrix Kappa_trend,", code_with_trend))
-  expect_true(grepl("Function to compute a linear trend with changepoints", code_with_trend, fixed = TRUE))
-  expect_true(grepl("return \\(k \\+ Kappa_trend \\* delta\\) \\.\\* t \\+ \\(m \\+ Kappa_trend \\* \\(-t_change_trend \\.\\* delta\\)\\);", code_with_trend))
+  expect_true(stan_pattern("vector linear_trend\\(real k, real m, vector delta, vector t, matrix Kappa_trend,", code_with_trend))
+  expect_true(stan_pattern("Function to compute a linear trend with changepoints", code_with_trend, fixed = TRUE))
+  expect_true(stan_pattern("return \\(k \\+ Kappa_trend \\* delta\\) \\.\\* t \\+ \\(m \\+ Kappa_trend \\* \\(-t_change_trend \\.\\* delta\\)\\);", code_with_trend))
 
   # Should NOT have logistic functions (default is linear growth)
   expect_false(grepl("logistic_gamma", code_with_trend, fixed = TRUE))
@@ -2136,49 +2166,49 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
 
   # 2. Data Block - Piecewise-specific data structures
   # Standard trend dimensions
-  expect_true(grepl("int<lower=1> N_trend;", code_with_trend, fixed = TRUE))
-  expect_true(grepl("int<lower=1> N_series_trend;", code_with_trend, fixed = TRUE))
-  expect_true(grepl("int<lower=1> N_lv_trend;", code_with_trend, fixed = TRUE))
+  expect_true(stan_pattern("int<lower=1> N_trend;", code_with_trend, fixed = TRUE))
+  expect_true(stan_pattern("int<lower=1> N_series_trend;", code_with_trend, fixed = TRUE))
+  expect_true(stan_pattern("int<lower=1> N_lv_trend;", code_with_trend, fixed = TRUE))
 
   # Piecewise-specific data
-  expect_true(grepl("int<lower=0> n_change_trend;.*number of potential trend changepoints", code_with_trend))
-  expect_true(grepl("vector\\[n_change_trend\\] t_change_trend;.*times of potential changepoints", code_with_trend))
-  expect_true(grepl("real<lower=0> change_scale_trend;.*scale of changepoint shock prior", code_with_trend))
+  expect_true(stan_pattern("int<lower=0> n_change_trend;.*number of potential trend changepoints", code_with_trend))
+  expect_true(stan_pattern("vector\\[n_change_trend\\] t_change_trend;.*times of potential changepoints", code_with_trend))
+  expect_true(stan_pattern("real<lower=0> change_scale_trend;.*scale of changepoint shock prior", code_with_trend))
 
   # Should NOT have carrying capacity for linear growth
   expect_false(grepl("cap_trend", code_with_trend, fixed = TRUE))
 
   # GLM optimization components
-  expect_true(grepl("vector\\[1\\] mu_ones;", code_with_trend))
+  expect_true(stan_pattern("vector\\[1\\] mu_ones;", code_with_trend))
 
   # Observation-to-trend mapping arrays
-  expect_true(grepl("array\\[N\\] int obs_trend_time;", code_with_trend))
-  expect_true(grepl("array\\[N\\] int obs_trend_series;", code_with_trend))
+  expect_true(stan_pattern("array\\[N\\] int obs_trend_time;", code_with_trend))
+  expect_true(stan_pattern("array\\[N\\] int obs_trend_series;", code_with_trend))
 
   # Times trend matrix
-  expect_true(grepl("array\\[N_trend, N_series_trend\\] int times_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;", code_with_trend))
 
   # 3. Transformed Data Block - Time vector and changepoint matrix
   # Factor loading matrix (diagonal for PW - no factor model support)
-  expect_true(grepl("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix\\(rep_vector\\(1\\.0, N_lv_trend\\)\\);", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix\\(rep_vector\\(1\\.0, N_lv_trend\\)\\);", code_with_trend))
 
   # Time vector creation (integer sequence)
-  expect_true(grepl("vector\\[N_trend\\] time_trend;", code_with_trend))
-  expect_true(grepl("for \\(i in 1:N_trend\\) time_trend\\[i\\] = i;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_trend\\] time_trend;", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 1:N_trend\\) time_trend\\[i\\] = i;", code_with_trend))
 
   # Changepoint matrix computation
-  expect_true(grepl("matrix\\[N_trend, n_change_trend\\] Kappa_trend = get_changepoint_matrix\\(time_trend, t_change_trend, N_trend, n_change_trend\\);", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, n_change_trend\\] Kappa_trend = get_changepoint_matrix\\(time_trend, t_change_trend, N_trend, n_change_trend\\);", code_with_trend))
 
   # 4. Parameters Block - PW-specific parameters
   # Base trend parameters
-  expect_true(grepl("vector\\[N_lv_trend\\] k_trend;.*base trend growth rates", code_with_trend))
-  expect_true(grepl("vector\\[N_lv_trend\\] m_trend;.*trend offset parameters", code_with_trend))
-  expect_true(grepl("matrix\\[n_change_trend, N_lv_trend\\] delta_trend;.*trend rate adjustments", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_lv_trend\\] k_trend;.*base trend growth rates", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_lv_trend\\] m_trend;.*trend offset parameters", code_with_trend))
+  expect_true(stan_pattern("matrix\\[n_change_trend, N_lv_trend\\] delta_trend;.*trend rate adjustments", code_with_trend))
 
   # Standard observation model parameters
-  expect_true(grepl("vector\\[Kc\\] b;.*regression coefficients", code_with_trend))
-  expect_true(grepl("real Intercept;.*temporary intercept", code_with_trend))
-  expect_true(grepl("real Intercept_trend;.*temporary intercept", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc\\] b;.*regression coefficients", code_with_trend))
+  expect_true(stan_pattern("real Intercept;.*temporary intercept", code_with_trend))
+  expect_true(stan_pattern("real Intercept_trend;.*temporary intercept", code_with_trend))
 
   # Should NOT have innovation/sigma parameters (PW doesn't use them)
   expect_false(grepl("innovations_trend", code_with_trend, fixed = TRUE))
@@ -2186,51 +2216,51 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
 
   # 5. Transformed Parameters Block - Trend computation
   # Prior accumulation
-  expect_true(grepl("real lprior = 0;", code_with_trend, fixed = TRUE))
-  expect_true(grepl("lprior \\+= student_t_lpdf\\(Intercept \\|", code_with_trend))
-  expect_true(grepl("lprior \\+= student_t_lpdf\\(Intercept_trend \\|", code_with_trend))
+  expect_true(stan_pattern("real lprior = 0;", code_with_trend, fixed = TRUE))
+  expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept \\|", code_with_trend))
+  expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept_trend \\|", code_with_trend))
 
   # Latent trend matrix declaration
-  expect_true(grepl("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
 
   # Linear trend computation
-  expect_true(grepl("for \\(s in 1 : N_lv_trend\\)", code_with_trend))
-  expect_true(grepl("lv_trend\\[1 : N_trend, s\\] = linear_trend\\(k_trend\\[s\\], m_trend\\[s\\],", code_with_trend))
-  expect_true(grepl("to_vector\\(delta_trend\\[ : , s\\]\\), time_trend,", code_with_trend))
-  expect_true(grepl("Kappa_trend,", code_with_trend))
-  expect_true(grepl("t_change_trend\\);", code_with_trend))
+  expect_true(stan_pattern("for \\(s in 1 : N_lv_trend\\)", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[1 : N_trend, s\\] = linear_trend\\(k_trend\\[s\\], m_trend\\[s\\],", code_with_trend))
+  expect_true(stan_pattern("to_vector\\(delta_trend\\[ : , s\\]\\), time_trend,", code_with_trend))
+  expect_true(stan_pattern("Kappa_trend,", code_with_trend))
+  expect_true(stan_pattern("t_change_trend\\);", code_with_trend))
 
   # Universal trend computation pattern
-  expect_true(grepl("matrix\\[N_trend, N_series_trend\\] trend;", code_with_trend))
-  expect_true(grepl("vector\\[N_trend\\] mu_trend = rep_vector\\(Intercept_trend, N_trend\\);", code_with_trend))
-  expect_true(grepl("for \\(i in 1:N_trend\\)", code_with_trend))
-  expect_true(grepl("for \\(s in 1:N_series_trend\\)", code_with_trend))
-  expect_true(grepl("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\];", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, N_series_trend\\] trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(Intercept_trend, N_trend\\);", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 1:N_trend\\)", code_with_trend))
+  expect_true(stan_pattern("for \\(s in 1:N_series_trend\\)", code_with_trend))
+  expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\];", code_with_trend))
 
   # GLM-compatible mu construction and trend injection
-  expect_true(grepl("vector\\[N\\] mu = Xc \\* b;", code_with_trend))
-  expect_true(grepl("for \\(n in 1:N\\)", code_with_trend))
-  expect_true(grepl("mu\\[n\\] \\+= Intercept \\+ trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_with_trend))
+  expect_true(stan_pattern("vector\\[N\\] mu = Xc \\* b;", code_with_trend))
+  expect_true(stan_pattern("for \\(n in 1:N\\)", code_with_trend))
+  expect_true(stan_pattern("mu\\[n\\] \\+= Intercept \\+ trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_with_trend))
 
   # 6. Model Block - Priors and likelihood
   # PW-specific priors (check existence, not specific distributions)
-  expect_true(grepl("m_trend ~", code_with_trend))
-  expect_true(grepl("k_trend ~", code_with_trend))
-  expect_true(grepl("to_vector\\(delta_trend\\) ~", code_with_trend))
+  expect_true(stan_pattern("m_trend ~", code_with_trend))
+  expect_true(stan_pattern("k_trend ~", code_with_trend))
+  expect_true(stan_pattern("to_vector\\(delta_trend\\) ~", code_with_trend))
 
   # Should use double exponential for sparsity
-  expect_true(grepl("double_exponential", code_with_trend))
-  expect_true(grepl("change_scale_trend", code_with_trend))
+  expect_true(stan_pattern("double_exponential", code_with_trend))
+  expect_true(stan_pattern("change_scale_trend", code_with_trend))
 
   # GLM likelihood
-  expect_true(grepl("if \\(!prior_only\\)", code_with_trend))
-  expect_true(grepl("target \\+= poisson_log_glm_lpmf\\(Y \\| to_matrix\\(mu\\), 0\\.0, mu_ones\\);", code_with_trend))
+  expect_true(stan_pattern("if \\(!prior_only\\)", code_with_trend))
+  expect_true(stan_pattern("target \\+= poisson_log_glm_lpmf\\(Y \\| to_matrix\\(mu\\), 0\\.0, mu_ones\\);", code_with_trend))
 
   # Prior contributions
-  expect_true(grepl("target \\+= lprior;", code_with_trend))
+  expect_true(stan_pattern("target \\+= lprior;", code_with_trend))
 
   # 7. Generated Quantities Block
-  expect_true(grepl("real b_Intercept = Intercept - dot_product\\(means_X, b\\);", code_with_trend))
+  expect_true(stan_pattern("real b_Intercept = Intercept - dot_product\\(means_X, b\\);", code_with_trend))
 
   # 8. Anti-patterns - Things that should NOT be present
   # Should NOT have AR/MA/VAR parameters

@@ -265,6 +265,56 @@ saveRDS(fit9, "tasks/fixtures/fit9.rds")
 cat("Saved to tasks/fixtures/fit9.rds\n")
 
 # ==============================================================================
+# FIT 10: Nested random effects in observation formula
+# ==============================================================================
+cat("\n=== Fitting Model 10: Nested RE in observation ===\n")
+start_time <- Sys.time()
+
+# Extend multivariate data with nested grouping structure
+test_data$multivariate$site <- factor(rep(c("A", "B", "C"), each = nrow(test_data$multivariate)/3))
+test_data$multivariate$plot <- factor(paste0(test_data$multivariate$site, "_", rep(1:2, length.out = nrow(test_data$multivariate))))
+
+fit10 <- SW(SM(mvgam(
+  bf(mvbind(count, biomass) ~ x + (1 | site) + (1 | plot)) + set_rescor(FALSE),
+  trend_formula = ~ RW(cor = TRUE),
+  data = test_data$multivariate,
+  chains = 2,
+  iter = 500,
+  silent = 2
+)))
+
+elapsed <- difftime(Sys.time(), start_time, units = "secs")
+cat(sprintf("Fit 10 completed in %.1f seconds\n", elapsed))
+print(fit10)
+saveRDS(fit10, "tasks/fixtures/fit10.rds")
+cat("Saved to tasks/fixtures/fit10.rds\n")
+
+# ==============================================================================
+# FIT 11: Correlated random effects in trend formula
+# ==============================================================================
+cat("\n=== Fitting Model 11: Correlated RE in trend ===\n")
+start_time <- Sys.time()
+
+# Add site variable to univariate data for RE in trend formula
+test_data$univariate$site <- factor(rep(c("A", "B", "C"), each = nrow(test_data$univariate)/3))
+
+fit11 <- SW(SM(mvgam(
+  y ~ x,
+  trend_formula = ~ x + (x | site) + AR(p = 1),
+  data = test_data$univariate,
+  family = poisson(),
+  chains = 2,
+  iter = 500,
+  silent = 2
+)))
+
+elapsed <- difftime(Sys.time(), start_time, units = "secs")
+cat(sprintf("Fit 11 completed in %.1f seconds\n", elapsed))
+print(fit11)
+saveRDS(fit11, "tasks/fixtures/fit11.rds")
+cat("Saved to tasks/fixtures/fit11.rds\n")
+
+# ==============================================================================
 # Summary
 # ==============================================================================
 total_elapsed <- difftime(Sys.time(), total_start, units = "mins")
@@ -273,7 +323,7 @@ cat(sprintf("Total time: %.1f minutes\n", total_elapsed))
 
 # Verify all files exist and report sizes
 cat("\nFixture file sizes:\n")
-for (i in 1:9) {
+for (i in 1:11) {
   file_path <- sprintf("tasks/fixtures/fit%d.rds", i)
   if (file.exists(file_path)) {
     size_mb <- file.size(file_path) / 1024^2
