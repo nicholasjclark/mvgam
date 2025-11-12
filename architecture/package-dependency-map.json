@@ -6948,7 +6948,6 @@
                                             "generate_combined_stancode",
                                             "detect_glm_usage",
                                             "find_stan_block",
-                                            "find_prior_only_insertion_point",
                                             "validate_obs_formula_brms",
                                             "validate_list_trend_formula",
                                             "validate_single_trend_formula"
@@ -6967,8 +6966,7 @@
                                                                ],
                                  "parse_stan_functions":  [
                                                               "detect_glm_usage",
-                                                              "find_stan_block",
-                                                              "find_prior_only_insertion_point"
+                                                              "find_stan_block"
                                                           ],
                                  "inject_multivariate_trends_into_linear_predictors":  [
                                                                                            "generate_combined_stancode"
@@ -6978,8 +6976,7 @@
                                                                ],
                                  "filter_block_content":  [
                                                               "detect_glm_usage",
-                                                              "find_stan_block",
-                                                              "find_prior_only_insertion_point"
+                                                              "find_stan_block"
                                                           ],
                                  "is_multivariate_trend_specs":  [
                                                                      "generate_combined_stancode",
@@ -6997,8 +6994,7 @@
                                                             ],
                                  "generate_common_trend_data":  [
                                                                     "detect_glm_usage",
-                                                                    "find_stan_block",
-                                                                    "find_prior_only_insertion_point"
+                                                                    "find_stan_block"
                                                                 ],
                                  "fit_multiple_imputation_models":  [
                                                                         "mvgam_multiple"
@@ -7014,8 +7010,7 @@
                                                             ],
                                  "calculate_car_time_distances":  [
                                                                       "detect_glm_usage",
-                                                                      "find_stan_block",
-                                                                      "find_prior_only_insertion_point"
+                                                                      "find_stan_block"
                                                                   ],
                                  "generate_rw_monitor_params":  [
                                                                     "generate_monitor_params"
@@ -7025,8 +7020,7 @@
                                                                  ],
                                  "validate_no_factor_hierarchical":  [
                                                                          "detect_glm_usage",
-                                                                         "find_stan_block",
-                                                                         "find_prior_only_insertion_point"
+                                                                         "find_stan_block"
                                                                      ],
                                  "calculate_variable_complexity":  [
                                                                        "analyze_variable_relationships_comprehensive"
@@ -7044,8 +7038,7 @@
                                                                     "extract_mu_construction_with_classification",
                                                                     "create_analysis_context",
                                                                     "detect_glm_usage",
-                                                                    "find_stan_block",
-                                                                    "find_prior_only_insertion_point"
+                                                                    "find_stan_block"
                                                                 ],
                                  "extract_prior_string":  [
                                                               "map_trend_priors",
@@ -7087,8 +7080,7 @@
                                                                ],
                                  "apply_safe_parameter_replacement":  [
                                                                           "detect_glm_usage",
-                                                                          "find_stan_block",
-                                                                          "find_prior_only_insertion_point"
+                                                                          "find_stan_block"
                                                                       ],
                                  "extract_prior_from_setup":  [
                                                                   "setup_brms_lightweight"
@@ -7108,26 +7100,22 @@
                                               ],
                                  "generate_car_trend_stanvars":  [
                                                                      "detect_glm_usage",
-                                                                     "find_stan_block",
-                                                                     "find_prior_only_insertion_point"
+                                                                     "find_stan_block"
                                                                  ],
                                  "extract_declared_functions":  [
                                                                     "create_analysis_context"
                                                                 ],
                                  "generate_hierarchical_functions":  [
                                                                          "detect_glm_usage",
-                                                                         "find_stan_block",
-                                                                         "find_prior_only_insertion_point"
+                                                                         "find_stan_block"
                                                                      ],
                                  "extract_and_rename_standata_objects":  [
                                                                              "detect_glm_usage",
-                                                                             "find_stan_block",
-                                                                             "find_prior_only_insertion_point"
+                                                                             "find_stan_block"
                                                                          ],
                                  "extract_multivariate_standata":  [
                                                                        "detect_glm_usage",
-                                                                       "find_stan_block",
-                                                                       "find_prior_only_insertion_point"
+                                                                       "find_stan_block"
                                                                    ],
                                  "mvgam_multiple":  [
                                                         "mvgam"
@@ -7137,13 +7125,11 @@
                                                               ],
                                  "generate_hierarchical_correlation_parameters":  [
                                                                                       "detect_glm_usage",
-                                                                                      "find_stan_block",
-                                                                                      "find_prior_only_insertion_point"
+                                                                                      "find_stan_block"
                                                                                   ],
                                  "rename_parameters_in_block":  [
                                                                     "detect_glm_usage",
-                                                                    "find_stan_block",
-                                                                    "find_prior_only_insertion_point"
+                                                                    "find_stan_block"
                                                                 ],
                                  "validate_nonlinear_trend_compatibility":  [
                                                                                 "handle_nonlinear_model"
@@ -7153,8 +7139,7 @@
                                                         ],
                                  "generate_matrix_z_tdata":  [
                                                                  "detect_glm_usage",
-                                                                 "find_stan_block",
-                                                                 "find_prior_only_insertion_point"
+                                                                 "find_stan_block"
                                                              ],
                                  "parse_multivariate_trends":  [
                                                                    "setup_brms_lightweight"
@@ -7195,16 +7180,14 @@
                                                            ],
                                  "extract_non_likelihood_from_model_block":  [
                                                                                  "detect_glm_usage",
-                                                                                 "find_stan_block",
-                                                                                 "find_prior_only_insertion_point"
+                                                                                 "find_stan_block"
                                                                              ],
                                  "generate_stan_components_mvgam_formula":  [
                                                                                 "mvgam_single"
                                                                             ],
                                  "generate_zmvn_trend_stanvars":  [
                                                                       "detect_glm_usage",
-                                                                      "find_stan_block",
-                                                                      "find_prior_only_insertion_point"
+                                                                      "find_stan_block"
                                                                   ],
                                  "handle_response_trend_injection":  [
                                                                          "detect_glm_usage",
@@ -7219,8 +7202,7 @@
                                                                    ],
                                  "is_multivariate_brmsfit":  [
                                                                  "detect_glm_usage",
-                                                                 "find_stan_block",
-                                                                 "find_prior_only_insertion_point"
+                                                                 "find_stan_block"
                                                              ],
                                  "analyze_mathematical_operations_comprehensive":  [
                                                                                        "analyze_expression_structure"
@@ -7234,7 +7216,6 @@
                                             "generate_combined_stancode",
                                             "detect_glm_usage",
                                             "find_stan_block",
-                                            "find_prior_only_insertion_point",
                                             "generate_ar_monitor_params",
                                             "validate_list_trend_formula",
                                             "validate_single_trend_formula"
@@ -7248,13 +7229,11 @@
                                                    "get_prior.formula",
                                                    "get_prior.brmsformula",
                                                    "detect_glm_usage",
-                                                   "find_stan_block",
-                                                   "find_prior_only_insertion_point"
+                                                   "find_stan_block"
                                                ],
                                  "extract_and_rename_stan_blocks":  [
                                                                         "detect_glm_usage",
-                                                                        "find_stan_block",
-                                                                        "find_prior_only_insertion_point"
+                                                                        "find_stan_block"
                                                                     ],
                                  "create_trend_parameter_prior":  [
                                                                       "generate_trend_priors_from_monitor_params"
@@ -7268,7 +7247,6 @@
                                  "CAR":  [
                                              "detect_glm_usage",
                                              "find_stan_block",
-                                             "find_prior_only_insertion_point",
                                              "validate_regular_time_intervals"
                                          ],
                                  "sort_stanvars":  [
@@ -7293,18 +7271,15 @@
                                                               ],
                                  "generate_innovation_model":  [
                                                                    "detect_glm_usage",
-                                                                   "find_stan_block",
-                                                                   "find_prior_only_insertion_point"
+                                                                   "find_stan_block"
                                                                ],
                                  "extract_mu_construction_with_classification":  [
                                                                                      "detect_glm_usage",
-                                                                                     "find_stan_block",
-                                                                                     "find_prior_only_insertion_point"
+                                                                                     "find_stan_block"
                                                                                  ],
                                  "generate_trend_priors_stanvar":  [
                                                                        "detect_glm_usage",
-                                                                       "find_stan_block",
-                                                                       "find_prior_only_insertion_point"
+                                                                       "find_stan_block"
                                                                    ],
                                  "find_trend_computation_end":  [
                                                                     "detect_glm_usage",
@@ -7323,13 +7298,11 @@
                                                                                 ],
                                  "should_include_in_transformed_parameters":  [
                                                                                   "detect_glm_usage",
-                                                                                  "find_stan_block",
-                                                                                  "find_prior_only_insertion_point"
+                                                                                  "find_stan_block"
                                                                               ],
                                  "generate_pw_trend_stanvars":  [
                                                                     "detect_glm_usage",
-                                                                    "find_stan_block",
-                                                                    "find_prior_only_insertion_point"
+                                                                    "find_stan_block"
                                                                 ],
                                  "generate_obs_trend_mapping":  [
                                                                     "detect_glm_usage",
@@ -7348,8 +7321,7 @@
                                                                 ],
                                  "normalize_function_signature":  [
                                                                       "detect_glm_usage",
-                                                                      "find_stan_block",
-                                                                      "find_prior_only_insertion_point"
+                                                                      "find_stan_block"
                                                                   ],
                                  "fit_model":  [
                                                    "mvgam_single"
@@ -7359,14 +7331,12 @@
                                                              ],
                                  "get_trend_parameter_prior":  [
                                                                    "detect_glm_usage",
-                                                                   "find_stan_block",
-                                                                   "find_prior_only_insertion_point"
+                                                                   "find_stan_block"
                                                                ],
                                  "find_variable_declarations":  [
                                                                     "extract_mu_construction_with_classification",
                                                                     "detect_glm_usage",
-                                                                    "find_stan_block",
-                                                                    "find_prior_only_insertion_point"
+                                                                    "find_stan_block"
                                                                 ],
                                  "parse_glm_parameters":  [
                                                               "detect_glm_usage",
@@ -7377,8 +7347,7 @@
                                                           ],
                                  "generate_hierarchical_correlation_model":  [
                                                                                  "detect_glm_usage",
-                                                                                 "find_stan_block",
-                                                                                 "find_prior_only_insertion_point"
+                                                                                 "find_stan_block"
                                                                              ],
                                  "transform_glm_calls_post_processing":  [
                                                                              "detect_glm_usage",
@@ -7395,8 +7364,7 @@
                                                                          ],
                                  "create_times_trend_matrix":  [
                                                                    "detect_glm_usage",
-                                                                   "find_stan_block",
-                                                                   "find_prior_only_insertion_point"
+                                                                   "find_stan_block"
                                                                ],
                                  "compile_model":  [
                                                        "mvgam_single"
@@ -7406,8 +7374,7 @@
                                                              ],
                                  "extract_stan_functions_block":  [
                                                                       "detect_glm_usage",
-                                                                      "find_stan_block",
-                                                                      "find_prior_only_insertion_point"
+                                                                      "find_stan_block"
                                                                   ],
                                  "generate_trend_injection_code":  [
                                                                        "detect_glm_usage",
@@ -7426,8 +7393,7 @@
                                                                       ],
                                  "append_if_not_null":  [
                                                             "detect_glm_usage",
-                                                            "find_stan_block",
-                                                            "find_prior_only_insertion_point"
+                                                            "find_stan_block"
                                                         ],
                                  "extract_mapping_arrays":  [
                                                                 "detect_glm_usage",
@@ -7445,23 +7411,19 @@
                                  "VAR":  [
                                              "detect_glm_usage",
                                              "find_stan_block",
-                                             "find_prior_only_insertion_point",
                                              "fevd.mvgam"
                                          ],
                                  "ZMVN":  [
                                               "detect_glm_usage",
-                                              "find_stan_block",
-                                              "find_prior_only_insertion_point"
+                                              "find_stan_block"
                                           ],
                                  "generate_var_trend_stanvars":  [
                                                                      "detect_glm_usage",
-                                                                     "find_stan_block",
-                                                                     "find_prior_only_insertion_point"
+                                                                     "find_stan_block"
                                                                  ],
                                  "extract_dependencies_from_declaration":  [
                                                                                "detect_glm_usage",
-                                                                               "find_stan_block",
-                                                                               "find_prior_only_insertion_point"
+                                                                               "find_stan_block"
                                                                            ],
                                  "register_trend_type":  [
                                                              "auto_register_trend_types",
@@ -7469,13 +7431,11 @@
                                                          ],
                                  "reconstruct_mu_trend_with_renamed_vars":  [
                                                                                 "detect_glm_usage",
-                                                                                "find_stan_block",
-                                                                                "find_prior_only_insertion_point"
+                                                                                "find_stan_block"
                                                                             ],
                                  "PW":  [
                                             "detect_glm_usage",
-                                            "find_stan_block",
-                                            "find_prior_only_insertion_point"
+                                            "find_stan_block"
                                         ],
                                  "validate_silent":  [
                                                          "mvgam_single"
@@ -7497,8 +7457,7 @@
                                            ],
                                  "extract_hierarchical_info":  [
                                                                    "detect_glm_usage",
-                                                                   "find_stan_block",
-                                                                   "find_prior_only_insertion_point"
+                                                                   "find_stan_block"
                                                                ],
                                  "parse_model":  [
                                                      "mvgam_single"
@@ -7556,8 +7515,7 @@
                                  "combine_stanvars":  [
                                                           "extract_trend_stanvars_from_setup",
                                                           "detect_glm_usage",
-                                                          "find_stan_block",
-                                                          "find_prior_only_insertion_point"
+                                                          "find_stan_block"
                                                       ],
                                  "extract_response_names":  [
                                                                 "parse_multivariate_trends",
@@ -7566,26 +7524,22 @@
                                  "extract_time_series_dimensions":  [
                                                                         "extract_trend_stanvars_from_setup",
                                                                         "detect_glm_usage",
-                                                                        "find_stan_block",
-                                                                        "find_prior_only_insertion_point"
+                                                                        "find_stan_block"
                                                                     ],
                                  "filter_required_variables":  [
                                                                    "validate_trend_grouping"
                                                                ],
                                  "normalize_function_body":  [
                                                                  "detect_glm_usage",
-                                                                 "find_stan_block",
-                                                                 "find_prior_only_insertion_point"
+                                                                 "find_stan_block"
                                                              ],
                                  "extract_response_names_from_brmsfit":  [
                                                                              "detect_glm_usage",
-                                                                             "find_stan_block",
-                                                                             "find_prior_only_insertion_point"
+                                                                             "find_stan_block"
                                                                          ],
                                  "filter_renameable_identifiers":  [
                                                                        "detect_glm_usage",
-                                                                       "find_stan_block",
-                                                                       "find_prior_only_insertion_point"
+                                                                       "find_stan_block"
                                                                    ],
                                  "determine_execution_order_from_type":  [
                                                                              "classify_single_mu_expression_structurally"
@@ -7601,8 +7555,7 @@
                                                       ],
                                  "generate_rw_trend_stanvars":  [
                                                                     "detect_glm_usage",
-                                                                    "find_stan_block",
-                                                                    "find_prior_only_insertion_point"
+                                                                    "find_stan_block"
                                                                 ],
                                  "cache_formula_latent_params":  [
                                                                      "parse_multivariate_trends"
@@ -7618,8 +7571,7 @@
                                                              ],
                                  "generate_matrix_z_parameters":  [
                                                                       "detect_glm_usage",
-                                                                      "find_stan_block",
-                                                                      "find_prior_only_insertion_point"
+                                                                      "find_stan_block"
                                                                   ],
                                  "validate_multiple_imputation_datasets":  [
                                                                                "mvgam_multiple"
@@ -7641,36 +7593,30 @@
                                                         ],
                                  "generate_trend_computation_tparameters":  [
                                                                                 "detect_glm_usage",
-                                                                                "find_stan_block",
-                                                                                "find_prior_only_insertion_point"
+                                                                                "find_stan_block"
                                                                             ],
                                  "generate_ar_trend_stanvars":  [
                                                                     "detect_glm_usage",
-                                                                    "find_stan_block",
-                                                                    "find_prior_only_insertion_point"
+                                                                    "find_stan_block"
                                                                 ],
                                  "generate_var_monitor_params":  [
                                                                      "generate_monitor_params"
                                                                  ],
                                  "remove_duplicate_functions":  [
                                                                     "detect_glm_usage",
-                                                                    "find_stan_block",
-                                                                    "find_prior_only_insertion_point"
+                                                                    "find_stan_block"
                                                                 ],
                                  "generate_factor_model":  [
                                                                "detect_glm_usage",
-                                                               "find_stan_block",
-                                                               "find_prior_only_insertion_point"
+                                                               "find_stan_block"
                                                            ],
                                  "generate_shared_innovation_stanvars":  [
                                                                              "detect_glm_usage",
-                                                                             "find_stan_block",
-                                                                             "find_prior_only_insertion_point"
+                                                                             "find_stan_block"
                                                                          ],
                                  "generate_matrix_z_multiblock_stanvars":  [
                                                                                "detect_glm_usage",
-                                                                               "find_stan_block",
-                                                                               "find_prior_only_insertion_point"
+                                                                               "find_stan_block"
                                                                            ],
                                  "count_mathematical_operators":  [
                                                                       "analyze_mathematical_operations_comprehensive"
@@ -7681,8 +7627,7 @@
                                  "get_stan_reserved_words":  [
                                                                  "create_analysis_context",
                                                                  "detect_glm_usage",
-                                                                 "find_stan_block",
-                                                                 "find_prior_only_insertion_point"
+                                                                 "find_stan_block"
                                                              ],
                                  "validate_multivariate_trend_constraints":  [
                                                                                  "extract_response_trends"
@@ -7698,8 +7643,7 @@
                                                         ],
                                  "process_variable":  [
                                                           "detect_glm_usage",
-                                                          "find_stan_block",
-                                                          "find_prior_only_insertion_point"
+                                                          "find_stan_block"
                                                       ],
                                  "normalize_trend_type":  [
                                                               "generate_monitor_params"
@@ -7719,8 +7663,7 @@
                                                      ],
                                  "extract_univariate_standata":  [
                                                                      "detect_glm_usage",
-                                                                     "find_stan_block",
-                                                                     "find_prior_only_insertion_point"
+                                                                     "find_stan_block"
                                                                  ],
                                  "create_component":  [
                                                           "categorize_mvgam_parameters"
@@ -7731,13 +7674,11 @@
                                                              ],
                                  "extract_computed_variables":  [
                                                                     "detect_glm_usage",
-                                                                    "find_stan_block",
-                                                                    "find_prior_only_insertion_point"
+                                                                    "find_stan_block"
                                                                 ],
                                  "reconstruct_functions_block":  [
                                                                      "detect_glm_usage",
-                                                                     "find_stan_block",
-                                                                     "find_prior_only_insertion_point"
+                                                                     "find_stan_block"
                                                                  ],
                                  "generate_trend_priors_from_monitor_params":  [
                                                                                    "generate_trend_priors"
@@ -7747,13 +7688,11 @@
                                                              ],
                                  "generate_times_trend_matrices":  [
                                                                        "detect_glm_usage",
-                                                                       "find_stan_block",
-                                                                       "find_prior_only_insertion_point"
+                                                                       "find_stan_block"
                                                                    ],
                                  "register_core_trends":  [
                                                               "detect_glm_usage",
                                                               "find_stan_block",
-                                                              "find_prior_only_insertion_point",
                                                               "ensure_registry_initialized"
                                                           ],
                                  "detect_shared_trends":  [
@@ -7764,8 +7703,7 @@
                                                                ],
                                  "apply_response_suffix_to_stanvars":  [
                                                                            "detect_glm_usage",
-                                                                           "find_stan_block",
-                                                                           "find_prior_only_insertion_point"
+                                                                           "find_stan_block"
                                                                        ],
                                  "extract_nonlinear_components":  [
                                                                       "handle_nonlinear_model"
@@ -7781,8 +7719,7 @@
                                                      ],
                                  "replace_stan_functions_block":  [
                                                                       "detect_glm_usage",
-                                                                      "find_stan_block",
-                                                                      "find_prior_only_insertion_point"
+                                                                      "find_stan_block"
                                                                   ],
                                  "analyze_indexing_patterns_comprehensive":  [
                                                                                  "analyze_expression_structure"
@@ -7792,8 +7729,7 @@
                                                                  ],
                                  "extract_stan_identifiers":  [
                                                                   "detect_glm_usage",
-                                                                  "find_stan_block",
-                                                                  "find_prior_only_insertion_point"
+                                                                  "find_stan_block"
                                                               ],
                                  "get_trend_prior_spec":  [
                                                               "map_trend_priors"
@@ -7822,9 +7758,9 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-11-12 11:46:01",
+                     "generated":  "2025-11-12 17:02:31",
                      "commit_hash":  "pending",
-                     "cached_files":  58,
+                     "cached_files":  57,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
@@ -7835,7 +7771,7 @@
                      "dynamic_references":  32,
                      "package_name":  "mvgam",
                      "potentially_unused_functions":  36,
-                     "changed_files":  1,
+                     "changed_files":  2,
                      "total_files":  59,
                      "zero_dependency_functions":  401
                  },
@@ -8141,86 +8077,22 @@
                                                                           ],
                                   "extract_mvbind_responses":  "extract_variable_name",
                                   "find_prior_only_insertion_point":  [
-                                                                          "append_if_not_null",
                                                                           "apply_correct_transformation_order",
-                                                                          "apply_response_suffix_to_stanvars",
-                                                                          "apply_safe_parameter_replacement",
-                                                                          "AR",
-                                                                          "calculate_car_time_distances",
-                                                                          "CAR",
-                                                                          "combine_stanvars",
                                                                           "convert_glm_to_standard_form",
-                                                                          "create_times_trend_matrix",
                                                                           "detect_glm_usage",
-                                                                          "extract_and_rename_stan_blocks",
-                                                                          "extract_and_rename_standata_objects",
-                                                                          "extract_computed_variables",
-                                                                          "extract_dependencies_from_declaration",
-                                                                          "extract_hierarchical_info",
                                                                           "extract_mapping_arrays",
-                                                                          "extract_mu_construction_with_classification",
-                                                                          "extract_multivariate_standata",
-                                                                          "extract_non_likelihood_from_model_block",
-                                                                          "extract_response_names_from_brmsfit",
-                                                                          "extract_stan_block_content",
-                                                                          "extract_stan_functions_block",
-                                                                          "extract_stan_identifiers",
-                                                                          "extract_time_series_dimensions",
-                                                                          "extract_univariate_standata",
-                                                                          "filter_block_content",
-                                                                          "filter_renameable_identifiers",
                                                                           "find_stan_block",
                                                                           "find_trend_computation_end",
-                                                                          "find_variable_declarations",
-                                                                          "generate_ar_trend_stanvars",
-                                                                          "generate_car_trend_stanvars",
-                                                                          "generate_common_trend_data",
-                                                                          "generate_factor_model",
-                                                                          "generate_hierarchical_correlation_model",
-                                                                          "generate_hierarchical_correlation_parameters",
-                                                                          "generate_hierarchical_functions",
-                                                                          "generate_innovation_model",
-                                                                          "generate_matrix_z_multiblock_stanvars",
-                                                                          "generate_matrix_z_parameters",
-                                                                          "generate_matrix_z_tdata",
                                                                           "generate_obs_trend_mapping",
-                                                                          "generate_pw_trend_stanvars",
-                                                                          "generate_rw_trend_stanvars",
-                                                                          "generate_shared_innovation_stanvars",
-                                                                          "generate_times_trend_matrices",
-                                                                          "generate_trend_computation_tparameters",
                                                                           "generate_trend_injection_code",
-                                                                          "generate_trend_priors_stanvar",
-                                                                          "generate_var_trend_stanvars",
-                                                                          "generate_zmvn_trend_stanvars",
-                                                                          "get_prior",
-                                                                          "get_stan_reserved_words",
-                                                                          "get_trend_parameter_prior",
                                                                           "handle_nonlinear_trend_injection",
                                                                           "handle_response_trend_injection",
                                                                           "inject_trend_into_linear_predictor",
                                                                           "insert_after_mu_lines_in_model_block",
-                                                                          "is_multivariate_brmsfit",
-                                                                          "normalize_function_body",
-                                                                          "normalize_function_signature",
                                                                           "parse_glm_parameters",
-                                                                          "parse_stan_functions",
-                                                                          "process_variable",
-                                                                          "PW",
-                                                                          "reconstruct_functions_block",
-                                                                          "reconstruct_mu_trend_with_renamed_vars",
-                                                                          "register_core_trends",
-                                                                          "remove_duplicate_functions",
-                                                                          "rename_parameters_in_block",
-                                                                          "replace_stan_functions_block",
-                                                                          "RW",
-                                                                          "should_include_in_transformed_parameters",
                                                                           "transform_glm_call",
                                                                           "transform_glm_calls_post_processing",
-                                                                          "validate_mapping_arrays",
-                                                                          "validate_no_factor_hierarchical",
-                                                                          "VAR",
-                                                                          "ZMVN"
+                                                                          "validate_mapping_arrays"
                                                                       ],
                                   "transform_glm_calls_post_processing":  [
                                                                               "parse_glm_parameters",
