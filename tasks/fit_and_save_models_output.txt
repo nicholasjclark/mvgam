@@ -1,0 +1,437 @@
+ℹ Loading mvgam
+Loading required package: brms
+Loading required package: Rcpp
+Loading 'brms' package (version 2.22.9). Useful instructions
+can be found by typing help('brms'). A more detailed introduction
+to the package is available through vignette('brms_overview').
+
+Attaching package: 'brms'
+
+The following object is masked from 'package:stats':
+
+    ar
+
+Loading 'mvgam' (version 2.0.0). Useful instructions can be found by
+  typing help('mvgam'). A more detailed introduction to the package is
+  available through vignette('mvgam_overview'). Full brms compatibility is
+  now enabled.
+Setting up test data...
+
+=== Fitting Model 1: Basic RW ===
+
+=== DEBUG: Calling extract_mu_construction_with_classification (suffix: _trend ) ===
+
+=== DEBUG: extract_mu_construction_with_classification ===
+DEBUG: Model block extracted, length = 233 
+DEBUG: Found 1 mu lines in model block
+DEBUG: mu lines:
+   1 : vector[N] mu = rep_vector(0.0, N); 
+DEBUG: Got 1 mu construction lines
+DEBUG: Taking ENHANCED PATH (variable-tracing system)
+Fit 1 completed in 38.5 seconds
+GAM observation formula:
+y ~ x
+
+GAM process formula:
+trend_y ~ 0
+<environment: 0x000001d4e7e3fb18>
+
+
+Family:
+poisson 
+
+Link function:
+log 
+
+
+Trend model:
+RW 
+
+
+N series:
+1 
+
+
+N timepoints:
+24 
+
+
+Status:
+2 chains, each with iter = 250 
+  Total post-warmup draws = 500 
+Saved to tasks/fixtures/fit1.rds
+
+=== Fitting Model 2: Multivariate shared RW ===
+
+=== DEBUG: Calling extract_mu_construction_with_classification (suffix: _trend ) ===
+
+=== DEBUG: extract_mu_construction_with_classification ===
+DEBUG: Model block extracted, length = 233 
+DEBUG: Found 1 mu lines in model block
+DEBUG: mu lines:
+   1 : vector[N] mu = rep_vector(0.0, N); 
+DEBUG: Got 1 mu construction lines
+DEBUG: Taking ENHANCED PATH (variable-tracing system)
+Fit 2 completed in 41.7 seconds
+GAM observation formula:
+count ~ x 
+biomass ~ x 
+
+GAM process formula:
+trend_y ~ 0
+<environment: 0x000001d4987b9a38>
+
+
+Family:
+gaussian 
+
+Link function:
+identity 
+
+
+Trend model:
+RW 
+
+
+N timepoints:
+24 
+
+
+Status:
+2 chains, each with iter = 250 
+  Total post-warmup draws = 500 
+Saved to tasks/fixtures/fit2.rds
+
+=== Fitting Model 3: VARMA with smooths ===
+
+=== DEBUG: Calling extract_mu_construction_with_classification (suffix: _trend ) ===
+
+=== DEBUG: extract_mu_construction_with_classification ===
+DEBUG: Model block extracted, length = 166 
+DEBUG: Found 0 mu lines in model block
+DEBUG: No mu lines found, returning empty result
+DEBUG: Got 0 mu construction lines
+DEBUG: Taking FALLBACK PATH (4-case logic)
+DEBUG: has_coefficients = TRUE 
+DEBUG: Case 3 - Covariates only ( X_trend * b _trend )
+DEBUG: Generated mu_trend_code:
+ vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+  mu_trend += X_trend * b_trend; 
+Fit 3 completed in 266.8 seconds
+GAM observation formula:
+count ~ s(x) 
+biomass ~ s(x) 
+
+GAM process formula:
+trend_y ~ presence - 1
+
+
+Family:
+gaussian 
+
+Link function:
+identity 
+
+
+Trend model:
+VAR 
+
+
+N timepoints:
+24 
+
+
+Status:
+2 chains, each with iter = 250 
+  Total post-warmup draws = 500 
+Saved to tasks/fixtures/fit3.rds
+
+=== Fitting Model 4: Factor AR ===
+
+=== DEBUG: Calling extract_mu_construction_with_classification (suffix: _trend ) ===
+
+=== DEBUG: extract_mu_construction_with_classification ===
+DEBUG: Model block extracted, length = 233 
+DEBUG: Found 1 mu lines in model block
+DEBUG: mu lines:
+   1 : vector[N] mu = rep_vector(0.0, N); 
+DEBUG: Got 1 mu construction lines
+DEBUG: Taking ENHANCED PATH (variable-tracing system)
+Fit 4 completed in 49.9 seconds
+GAM observation formula:
+count ~ x 
+presence ~ x 
+biomass ~ x 
+
+GAM process formula:
+trend_y ~ 0
+<environment: 0x000001d4e52bd5b8>
+
+
+Family:
+gaussian 
+
+Link function:
+identity 
+
+
+Trend model:
+AR 
+
+
+N timepoints:
+24 
+
+
+Status:
+2 chains, each with iter = 250 
+  Total post-warmup draws = 500 
+Saved to tasks/fixtures/fit4.rds
+
+=== Fitting Model 5: Piecewise trends ===
+
+=== DEBUG: Calling extract_mu_construction_with_classification (suffix: _trend ) ===
+
+=== DEBUG: extract_mu_construction_with_classification ===
+DEBUG: Model block extracted, length = 233 
+DEBUG: Found 1 mu lines in model block
+DEBUG: mu lines:
+   1 : vector[N] mu = rep_vector(0.0, N); 
+DEBUG: Got 1 mu construction lines
+DEBUG: Taking ENHANCED PATH (variable-tracing system)
+Fit 5 completed in 34.4 seconds
+GAM observation formula:
+y ~ x
+
+GAM process formula:
+trend_y ~ 0
+<environment: 0x000001d4e6c29e40>
+
+
+Family:
+poisson 
+
+Link function:
+log 
+
+
+Trend model:
+PW 
+
+
+N series:
+1 
+
+
+N timepoints:
+24 
+
+
+Status:
+2 chains, each with iter = 250 
+  Total post-warmup draws = 500 
+Saved to tasks/fixtures/fit5.rds
+
+=== Fitting Model 6: CAR with GP ===
+
+=== DEBUG: Calling extract_mu_construction_with_classification (suffix: _trend ) ===
+
+=== DEBUG: extract_mu_construction_with_classification ===
+DEBUG: Model block extracted, length = 381 
+DEBUG: Found 2 mu lines in model block
+DEBUG: mu lines:
+   1 : vector[N] mu = rep_vector(0.0, N); 
+   2 : mu += gp_pred_1[Jgp_1]; 
+DEBUG: Got 2 mu construction lines
+DEBUG: Taking ENHANCED PATH (variable-tracing system)
+Fit 6 completed in 54.8 seconds
+GAM observation formula:
+y ~ (1 | series)
+
+GAM process formula:
+trend_y ~ gp(x) - 1
+
+
+Family:
+poisson 
+
+Link function:
+log 
+
+
+Trend model:
+CAR 
+
+
+N series:
+1 
+
+
+N timepoints:
+24 
+
+
+Status:
+2 chains, each with iter = 250 
+  Total post-warmup draws = 500 
+Saved to tasks/fixtures/fit6.rds
+
+=== Fitting Model 7: CAR with monotonic ===
+
+=== DEBUG: Calling extract_mu_construction_with_classification (suffix: _trend ) ===
+
+=== DEBUG: extract_mu_construction_with_classification ===
+DEBUG: Model block extracted, length = 356 
+DEBUG: Found 2 mu lines in model block
+DEBUG: mu lines:
+   1 : vector[N] mu = rep_vector(0.0, N); 
+   2 : mu[n] += (bsp[1]) * mo(simo_1, Xmo_1[n]); 
+DEBUG: Got 2 mu construction lines
+DEBUG: Taking ENHANCED PATH (variable-tracing system)
+Fit 7 completed in 52.5 seconds
+GAM observation formula:
+y ~ (1 | series)
+
+GAM process formula:
+trend_y ~ mo(income) - 1
+
+
+Family:
+poisson 
+
+Link function:
+log 
+
+
+Trend model:
+CAR 
+
+
+N series:
+1 
+
+
+N timepoints:
+24 
+
+
+Status:
+2 chains, each with iter = 250 
+  Total post-warmup draws = 500 
+Saved to tasks/fixtures/fit7.rds
+
+=== Fitting Model 8: Seasonal AR ===
+
+=== DEBUG: Calling extract_mu_construction_with_classification (suffix: _trend ) ===
+
+=== DEBUG: extract_mu_construction_with_classification ===
+DEBUG: Model block extracted, length = 479 
+DEBUG: Found 2 mu lines in model block
+DEBUG: mu lines:
+   1 : vector[N] mu = rep_vector(0.0, N); 
+   2 : mu += gp_pred_1[Jgp_1]; 
+DEBUG: Got 2 mu construction lines
+DEBUG: Taking ENHANCED PATH (variable-tracing system)
+Fit 8 completed in 47.3 seconds
+GAM observation formula:
+y ~ gp(x, k = 5)
+
+GAM process formula:
+trend_y ~ gp(temperature, k = 6) - 1
+
+
+Family:
+poisson 
+
+Link function:
+log 
+
+
+Trend model:
+AR 
+
+
+N series:
+1 
+
+
+N timepoints:
+24 
+
+
+Status:
+2 chains, each with iter = 250 
+  Total post-warmup draws = 500 
+Saved to tasks/fixtures/fit8.rds
+
+=== Fitting Model 9: Nonlinear with AR ===
+
+=== DEBUG: Calling extract_mu_construction_with_classification (suffix: _trend ) ===
+
+=== DEBUG: extract_mu_construction_with_classification ===
+DEBUG: Model block extracted, length = 233 
+DEBUG: Found 1 mu lines in model block
+DEBUG: mu lines:
+   1 : vector[N] mu = rep_vector(0.0, N); 
+DEBUG: Got 1 mu construction lines
+DEBUG: Taking ENHANCED PATH (variable-tracing system)
+Fit 9 completed in 36.8 seconds
+GAM observation formula:
+y ~ b1 * exp(b2 * x) 
+b1 ~ 1
+b2 ~ 1
+
+GAM process formula:
+trend_y ~ 0
+<environment: 0x000001d4eabb9580>
+
+
+Family:
+poisson 
+
+Link function:
+log 
+
+
+Trend model:
+AR 
+
+
+N series:
+1 
+
+
+N timepoints:
+24 
+
+
+Status:
+2 chains, each with iter = 250 
+  Total post-warmup draws = 500 
+Saved to tasks/fixtures/fit9.rds
+
+=== Fitting Model 10: Nested RE in observation ===
+
+=== DEBUG: Calling extract_mu_construction_with_classification (suffix: _trend ) ===
+
+=== DEBUG: extract_mu_construction_with_classification ===
+DEBUG: Model block extracted, length = 233 
+DEBUG: Found 1 mu lines in model block
+DEBUG: mu lines:
+   1 : vector[N] mu = rep_vector(0.0, N); 
+DEBUG: Got 1 mu construction lines
+DEBUG: Taking ENHANCED PATH (variable-tracing system)
+Error in rstan::stanc(model_code = stan_code, verbose = FALSE, ...) : 0
+Semantic error in 'string', line 155, column 20 to column 28:
+   -------------------------------------------------
+   153:      }
+   154:      // initialize linear predictor term
+   155:      vector[N_count] mu_count = rep_vector(0.0, N_count);
+                             ^
+   156:      // initialize linear predictor term
+   157:      vector[N_biomass] mu_biomass = rep_vector(0.0, N_biomass);
+   -------------------------------------------------
+
+Identifier 'mu_count' is already in use.
+Calls: SW ... generate_combined_stancode -> validate_stan_code -> <Anonymous>
+Execution halted

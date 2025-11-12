@@ -2209,7 +2209,13 @@ sort_stanvars <- function(stanvars) {
   }
 
   # Evidence-based patterns from actual Stan compilation failures
-  # Level 1: mu_trend declarations (must come first)
+  # Level 0: Random effects declarations (must precede mu_trend usage)
+  re_matrix_pattern <- "matrix\\s*\\[\\s*N_[0-9]+_trend\\s*,\\s*M_[0-9]+_trend\\s*\\]\\s+r_[0-9]+_trend"
+  re_vector_pattern <- "vector\\s*\\[\\s*N_[0-9]+_trend\\s*\\]\\s+r_[0-9]+_[0-9]+_trend"
+  re_scale_r_cor_pattern <- "r_[0-9]+_trend\\s*=\\s*scale_r_cor"
+  re_extraction_pattern <- "r_[0-9]+_[0-9]+_trend\\s*=\\s*r_[0-9]+_trend\\s*\\["
+
+  # Level 1: mu_trend declarations (must come after RE but before other foundation)
   mu_trend_decl_pattern <- "vector\\s*\\[\\s*N_trend\\s*\\]\\s+mu_trend\\s*="
 
   # Level 2: Foundation variables (no dependencies on trend)
@@ -2229,6 +2235,7 @@ sort_stanvars <- function(stanvars) {
   array_with_dims_pattern <- "^\\s*array\\[.*\\b(N_series_trend|N_lv_trend)\\b.*\\]"
 
   # Initialize level collections
+  level0_re_declarations <- integer(0)
   level1_mu_trend <- integer(0)
   level2_foundation <- integer(0)
   level3_trend_comp <- integer(0)
@@ -2254,6 +2261,11 @@ sort_stanvars <- function(stanvars) {
       dimensions <- c(dimensions, i)
     } else if (grepl(array_with_dims_pattern, scode)) {
       dimension_arrays <- c(dimension_arrays, i)
+    } else if (grepl(re_matrix_pattern, scode) ||
+               grepl(re_vector_pattern, scode) ||
+               grepl(re_scale_r_cor_pattern, scode) ||
+               grepl(re_extraction_pattern, scode)) {
+      level0_re_declarations <- c(level0_re_declarations, i)
     } else if (grepl(mu_trend_decl_pattern, scode)) {
       level1_mu_trend <- c(level1_mu_trend, i)
     } else if (grepl(lv_trend_pattern, scode) ||
@@ -2269,11 +2281,11 @@ sort_stanvars <- function(stanvars) {
   }
 
   # All other stanvars (priors, etc.)
-  categorized <- c(dimensions, dimension_arrays, level1_mu_trend, level2_foundation, level3_trend_comp, level4_mu_inject)
+  categorized <- c(dimensions, dimension_arrays, level0_re_declarations, level1_mu_trend, level2_foundation, level3_trend_comp, level4_mu_inject)
   others <- setdiff(seq_along(stanvars), categorized)
 
   # Dependency-respecting order
-  sort_order <- c(dimensions, level1_mu_trend, level2_foundation, dimension_arrays, others, level3_trend_comp, level4_mu_inject)
+  sort_order <- c(dimensions, level0_re_declarations, level1_mu_trend, level2_foundation, dimension_arrays, others, level3_trend_comp, level4_mu_inject)
 
   # Validate sort_order indices are within bounds
   checkmate::assert_integerish(sort_order, lower = 1, upper = length(stanvars),
@@ -4629,11 +4641,26 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
 
   stanvar_list <- list()
 
-  # 0. Extract functions block content (without headers) and store for later combination
-  # Functions block doesn't need parameter renaming since functions are global
-  # Position: Must be first to satisfy Stan's requirement that functions be declared before use
+  # 0. Extract functions block content (without headers) and store for later
+  # combination. Parse custom function names to prevent them from being renamed
+  # with _trend suffix (e.g., scale_r_cor, multiply_lower_tri_self_transpose).
+  # Functions block doesn't need parameter renaming since functions are global.
+  # Position: Must be first to satisfy Stan's requirement that functions be
+  # declared before use
   functions_block <- extract_stan_block_content(stancode, "functions")
   if (!is.null(functions_block) && nchar(functions_block) > 0) {
+    # Parse custom function names to prevent renaming
+    # brms generates different custom functions based on formula structure
+    # (e.g., scale_r_cor for correlated random effects)
+    functions_list <- parse_stan_functions(functions_block)
+    if (length(functions_list) > 0) {
+      mapping$custom_functions <- vapply(
+        functions_list,
+        function(f) f$name,
+        character(1)
+      )
+    }
+
     stanvar_list[["trend_functions"]] <- brms::stanvar(
       scode = functions_block,
       block = "functions"
@@ -5615,20 +5642,24 @@ extract_stan_block_content <- function(stancode, block_name) {
 
       # Check for block end using Stan's mandatory block order
       if (in_block) {
-        # Determine next block pattern based on current block
+        # For generated quantities (last block), collect everything until end
+        if (tolower(gsub("\\s+", " ", trimws(block_name))) == "generated quantities") {
+          content_lines <- c(content_lines, line)
+          next
+        }
+
+        # For other blocks, detect next block boundary
         next_block_pattern <- switch(tolower(gsub("\\s+", " ", trimws(block_name))),
           "data" = "^\\s*transformed\\s+data\\s*\\{",
           "transformed data" = "^\\s*parameters\\s*\\{",
           "parameters" = "^\\s*transformed\\s+parameters\\s*\\{",
           "transformed parameters" = "^\\s*model\\s*\\{",
-          "model" = "^\\s*generated\\s+quantities\\s*\\{",
-          "generated quantities" = "^\\s*\\}\\s*$"  # Last block ends at final brace
+          "model" = "^\\s*generated\\s+quantities\\s*\\{"
         )
 
         if (!is.null(next_block_pattern) && grepl(next_block_pattern, line, ignore.case = TRUE)) {
-          # Remove trailing brace if present (except for generated quantities)
-          if (tolower(gsub("\\s+", " ", trimws(block_name))) != "generated quantities" &&
-              length(content_lines) > 0 &&
+          # Remove trailing brace if present
+          if (length(content_lines) > 0 &&
               grepl("^\\s*\\}\\s*$", content_lines[length(content_lines)])) {
             content_lines <- content_lines[-length(content_lines)]
           }
@@ -5645,6 +5676,14 @@ extract_stan_block_content <- function(stancode, block_name) {
     # Handle case where block wasn't found
     if (length(content_lines) == 0 && !in_block) {
       return(NULL)  # Block not found
+    }
+
+    # For generated quantities (last block), remove trailing closing brace
+    if (tolower(gsub("\\s+", " ", trimws(block_name))) == "generated quantities" &&
+        length(content_lines) > 0) {
+      if (grepl("^\\s*\\}\\s*$", content_lines[length(content_lines)])) {
+        content_lines <- content_lines[-length(content_lines)]
+      }
     }
 
     return(paste(content_lines, collapse = "\n"))
@@ -5680,7 +5719,11 @@ rename_parameters_in_block <- function(block_code, suffix, mapping, block_type, 
 
   if (length(all_identifiers) > 0) {
     # Filter to get identifiers that should be renamed
-    renameable_identifiers <- filter_renameable_identifiers(all_identifiers)
+    # Pass mapping to exclude custom functions from functions block
+    renameable_identifiers <- filter_renameable_identifiers(
+      all_identifiers,
+      mapping = mapping
+    )
 
     # Sort by length (descending) to avoid partial replacements
     sorted_identifiers <- renameable_identifiers[order(-nchar(renameable_identifiers))]
@@ -5743,6 +5786,12 @@ get_stan_reserved_words <- function() {
     # brms internal variables
     "prior_only", "lprior", "temp_intercept", "temp_Intercept",
 
+    # brms custom functions (generated in functions block)
+    # These are detected dynamically but kept here as defensive programming
+    "scale_r_cor",  # Generated for correlated random effects (x | group)
+    "multiply_lower_tri_self_transpose",  # Correlation matrix from Cholesky
+    "choose",  # Binomial coefficient function
+
     # Stan mathematical functions
     "abs", "acos", "acosh", "asin", "asinh", "atan", "atan2", "atanh",
     "cos", "cosh", "sin", "sinh", "tan", "tanh", "exp", "exp2", "expm1",
@@ -5768,7 +5817,8 @@ get_stan_reserved_words <- function() {
     "one_hot_row_vector", "identity_matrix", "diag_matrix",
     "diag_pre_multiply", "diag_post_multiply", "block", "sub_col",
     "sub_row", "head", "tail", "segment", "append_array", "append_col",
-    "append_row",
+    "append_row", "to_vector", "to_row_vector", "to_matrix", "to_array_1d",
+    "to_array_2d",
 
     # Stan probability distributions (lpdf/lpmf)
     "normal_lpdf", "std_normal_lpdf", "normal_id_glm_lpdf", "student_t_lpdf", "cauchy_lpdf",
@@ -5962,11 +6012,20 @@ extract_computed_variables <- function(stan_code) {
 #' @param identifiers Character vector of identifiers to filter
 #' @return Character vector of identifiers that are safe to rename
 #' @noRd
-filter_renameable_identifiers <- function(identifiers) {
+filter_renameable_identifiers <- function(identifiers,
+                                          mapping = NULL) {
   checkmate::assert_character(identifiers)
+  checkmate::assert_list(mapping, null.ok = TRUE)
 
   # Get comprehensive Stan reserved words
   reserved_words <- get_stan_reserved_words()
+
+  # Add custom functions from mapping if available
+  # These are brms-generated functions (e.g., scale_r_cor) that should not be
+  # renamed
+  if (!is.null(mapping) && !is.null(mapping$custom_functions)) {
+    reserved_words <- c(reserved_words, mapping$custom_functions)
+  }
 
   # Filter out reserved words (case-sensitive comparison)
   non_reserved <- identifiers[!identifiers %in% reserved_words]
@@ -6076,7 +6135,10 @@ extract_univariate_standata <- function(standata, suffix, mapping, n_time = NULL
 
   # Get all standata names and filter using comprehensive approach
   all_data_names <- names(standata)
-  renameable_data_names <- filter_renameable_identifiers(all_data_names)
+  renameable_data_names <- filter_renameable_identifiers(
+    all_data_names,
+    mapping = mapping
+  )
 
   # Pre-parse declaration lines for efficiency
   declaration_lines <- NULL
