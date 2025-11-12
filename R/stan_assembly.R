@@ -196,6 +196,8 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
 
   # Determine if we have multivariate trends
   is_multivariate <- is_multivariate_trend_specs(trend_specs)
+  
+  
   responses_with_trends <- c()
 
 
@@ -1699,12 +1701,54 @@ inject_multivariate_trends_into_linear_predictors <- function(
         }
 
         # Create mu computation code for GLM responses
-        mu_computation <- c(
-          paste0("    vector[N_", resp_name, "] mu_", resp_name, " = Xc_", resp_name, " * b_", resp_name, ";"),
-          paste0("    for (n in 1:N_", resp_name, ") {"),
-          paste0("      mu_", resp_name, "[n] += Intercept_", resp_name, " + trend[obs_trend_time_", resp_name, "[n], obs_trend_series_", resp_name, "[n]];"),
-          paste0("    }")
-        )
+        # Check if this variable already exists in base_stancode
+        existing_mu_pattern <- paste0("vector\\[N_", resp_name, "\\]\\s+mu_", resp_name)
+        existing_mu_lines <- grep(existing_mu_pattern, code_lines, value = TRUE)
+        
+        if (length(existing_mu_lines) > 0) {
+          # Existing mu variable found - add trend effects to it
+          
+          # Find the for loop that modifies mu_resp and insert after its closing brace
+          for_loop_pattern <- paste0("for \\(n in 1:N_", resp_name, "\\)")
+          for_loop_lines <- which(grepl(for_loop_pattern, code_lines))
+          
+          if (length(for_loop_lines) > 0) {
+            # Find the closing brace of the for loop
+            for_start <- max(for_loop_lines)
+            
+            # Look for the next standalone closing brace after the for loop
+            insert_point <- for_start
+            for (i in (for_start + 1):length(code_lines)) {
+              if (grepl("^\\s*}\\s*$", code_lines[i])) {
+                insert_point <- i
+                break
+              }
+            }
+          } else {
+            # Fallback: insert after mu declaration
+            mu_decl_lines <- which(grepl(existing_mu_pattern, code_lines))
+            insert_point <- max(mu_decl_lines)
+          }
+          
+          # Create trend addition code with different loop variable to avoid collision
+          mu_computation <- c(
+            paste0("    // Add trend effects to existing mu_", resp_name),
+            paste0("    for (i in 1:N_", resp_name, ") {"),
+            paste0("      mu_", resp_name, "[i] += trend[obs_trend_time_", resp_name, "[i], obs_trend_series_", resp_name, "[i]];"),
+            paste0("    }")
+          )
+          
+        } else {
+          # No existing mu variable found - create from scratch
+          
+          # Create full mu computation with declaration
+          mu_computation <- c(
+            paste0("    vector[N_", resp_name, "] mu_", resp_name, " = Xc_", resp_name, " * b_", resp_name, ";"),
+            paste0("    for (n in 1:N_", resp_name, ") {"),
+            paste0("      mu_", resp_name, "[n] += Intercept_", resp_name, " + trend[obs_trend_time_", resp_name, "[n], obs_trend_series_", resp_name, "[n]];"),
+            paste0("    }")
+          )
+        }
 
         # Insert mu computation 
         code_lines <- c(
@@ -4754,12 +4798,9 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
 
     time_param <- paste0("N", suffix)
 
-    cat("\n=== DEBUG: Calling extract_mu_construction_with_classification (suffix:", suffix, ") ===\n")
     mu_construction_result <- extract_mu_construction_with_classification(stancode)
-    cat("DEBUG: Got", length(mu_construction_result$mu_construction), "mu construction lines\n")
 
     if (length(mu_construction_result$mu_construction) > 0) {
-      cat("DEBUG: Taking ENHANCED PATH (variable-tracing system)\n")
       # Store extracted mu lines AND supporting declarations to filter them from model block (DRY solution)
       extracted_mu_lines <- c(
         mu_construction_result$mu_construction,

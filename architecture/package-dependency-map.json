@@ -4417,9 +4417,12 @@
                               "filter_renameable_identifiers":  {
                                                                     "s3_class":  "",
                                                                     "s3_method":  "",
-                                                                    "signature":  "filter_renameable_identifiers \u003c- function(identifiers) {",
+                                                                    "signature":  "filter_renameable_identifiers \u003c- function(identifiers, mapping = NULL) {",
                                                                     "is_s3_method":  false,
-                                                                    "arguments":  "identifiers"
+                                                                    "arguments":  [
+                                                                                      "identifiers",
+                                                                                      "mapping"
+                                                                                  ]
                                                                 },
                               "build_ar_prior_spec":  {
                                                           "s3_class":  "",
@@ -6857,7 +6860,7 @@
                                 "ZMVN":  "ZMVN = function(time = NA, series = NA, gr = NA, subgr = NA, n_lv = NULL) {",
                                 "var_fecov":  "var_fecov \u003c- function(x, h) {",
                                 "filter_trend_priors":  "filter_trend_priors \u003c- function(combined_priors) {",
-                                "filter_renameable_identifiers":  "filter_renameable_identifiers \u003c- function(identifiers) {",
+                                "filter_renameable_identifiers":  "filter_renameable_identifiers \u003c- function(identifiers, mapping = NULL) {",
                                 "log_sum_exp":  "log_sum_exp \u003c- function(x) {",
                                 "dispatch_validation_rule":  "dispatch_validation_rule \u003c- function(rule, trend_spec, data) {",
                                 "compute_all_summaries":  "compute_all_summaries \u003c- function(object, probs, robust) {",
@@ -7819,9 +7822,9 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-11-12 09:43:11",
+                     "generated":  "2025-11-12 11:46:01",
                      "commit_hash":  "pending",
-                     "cached_files":  57,
+                     "cached_files":  58,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
@@ -7832,7 +7835,7 @@
                      "dynamic_references":  32,
                      "package_name":  "mvgam",
                      "potentially_unused_functions":  36,
-                     "changed_files":  2,
+                     "changed_files":  1,
                      "total_files":  59,
                      "zero_dependency_functions":  401
                  },
