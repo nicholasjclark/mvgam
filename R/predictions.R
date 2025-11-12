@@ -275,79 +275,58 @@ extract_linpred_univariate <- function(prep) {
     eta <- eta + sm_coef %*% t(Zs)
   }
 
-  # Add random effects
-  re_matrices <- grep("^Z_", names(prep$sdata), value = TRUE)
+  # Add random effects (vectorized)
+  # Each Z_<group>_<term> is a single vector with corresponding
+  # r_<group>_<term> parameter vector
+  re_vectors <- grep("^Z_", names(prep$sdata), value = TRUE)
 
-  for (z_name in re_matrices) {
+  for (z_name in re_vectors) {
     # Extract group and term IDs from Z_<group>_<term> pattern
     parts <- strsplit(z_name, "_")[[1]]
     if (length(parts) < 3) next
-    
+
     group_id <- parts[2]
     term_id <- parts[3]
-    
-    # Get design matrix and validate structure
-    Z <- prep$sdata[[z_name]]
-    if (is.vector(Z)) {
-      Z <- matrix(Z, ncol = 1)
-    }
-    
-    if (!is.matrix(Z)) {
+
+    # Get design vector (single column per term in brms)
+    Z <- as.vector(prep$sdata[[z_name]])
+
+    if (length(Z) != n_obs) {
       stop(insight::format_error(
-        "Random effects design matrix {.field {z_name}} must be matrix or vector."
+        "Random effects design vector {.field {z_name}} has {length(Z)} ",
+        "elements but expected {n_obs} observations."
       ))
     }
-    
-    if (nrow(Z) != n_obs) {
-      stop(insight::format_error(
-        "Random effects design matrix {.field {z_name}} has {nrow(Z)} rows ",
-        "but expected {n_obs} observations."
-      ))
-    }
-    
-    # Get grouping indices and validate
+
+    # Get grouping indices
     J_name <- paste0("J_", group_id)
     if (!J_name %in% names(prep$sdata)) {
       next
     }
-    
-    J <- as.vector(prep$sdata[[J_name]])
+
+    J <- as.integer(prep$sdata[[J_name]])
     if (length(J) != n_obs) {
       stop(insight::format_error(
         "Grouping indices {.field {J_name}} length {length(J)} ",
         "does not match {n_obs} observations."
       ))
     }
-    
-    # Get number of groups
-    N_name <- paste0("N_", group_id)
-    if (N_name %in% names(prep$sdata)) {
-      n_groups <- prep$sdata[[N_name]]
-    } else {
-      n_groups <- max(J)
-    }
-    
-    # Apply random effects for each coefficient (column) in Z
-    for (coef_idx in seq_len(ncol(Z))) {
-      # Apply random effects for each group level
-      for (level in seq_len(n_groups)) {
-        # Construct parameter name: r_<group>_<term>[<level>]
-        r_param <- paste0("r_", group_id, "_", term_id, "[", level, "]")
-        
-        if (r_param %in% colnames(draws_mat)) {
-          # Get random effects draws for this parameter
-          r_draws <- draws_mat[, r_param, drop = FALSE]
-          
-          # Find observations belonging to this group level
-          obs_mask <- (J == level)
-          
-          if (any(obs_mask)) {
-            # Apply random effect: eta[, obs] += Z[obs, coef] * r[, level]
-            eta[, obs_mask] <- eta[, obs_mask] + 
-              (Z[obs_mask, coef_idx] * r_draws[, 1])
-          }
-        }
-      }
+
+    # Extract all group-level parameters for this term
+    # Pattern matches: r_1_1[1], r_1_1[2], etc.
+    r_pattern <- paste0("^r_", group_id, "_", term_id, "\\[")
+    r_names <- grep(r_pattern, colnames(draws_mat), value = TRUE)
+
+    if (length(r_names) > 0) {
+      # Get random effects: [n_draws × n_groups]
+      r_draws <- draws_mat[, r_names, drop = FALSE]
+
+      # Vectorized indexing and multiplication following Stan pattern:
+      # mu[n] += r_group[J[n]] * Z[n]
+      # r_draws[, J] gives [n_draws × n_obs] via column indexing
+      # Z broadcast to [n_draws × n_obs] via matrix replication
+      eta <- eta + r_draws[, J, drop = FALSE] *
+        matrix(Z, nrow = n_draws, ncol = n_obs, byrow = TRUE)
     }
   }
 
@@ -509,80 +488,99 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
       eta <- eta + sm_coef %*% t(Zs)
     }
 
-    # Add random effects for this response
-    re_matrices <- grep("^Z_", names(prep$sdata), value = TRUE)
+    # Add random effects for this response (vectorized)
+    # Multivariate brms uses Z_<group>_<response>_<term> naming
+    # Filter Z matrices for this response only
+    resp_pattern <- paste0("_", resp_name, "_")
+    re_vectors <- grep(resp_pattern, names(prep$sdata), value = TRUE)
+    re_vectors <- grep("^Z_", re_vectors, value = TRUE)
 
-    for (z_name in re_matrices) {
-      # Extract group and term IDs from Z_<group>_<term> pattern
+    for (z_name in re_vectors) {
+      # Parse Z_<group>_<response>_<term> pattern
+      # Example: Z_1_y1_1 -> group=1, response=y1, term=1
       parts <- strsplit(z_name, "_")[[1]]
-      if (length(parts) < 3) next
-      
+      if (length(parts) < 4) next
+
       group_id <- parts[2]
-      term_id <- parts[3]
-      
-      # Get design matrix and validate structure
-      Z <- prep$sdata[[z_name]]
-      if (is.vector(Z)) {
-        Z <- matrix(Z, ncol = 1)
-      }
-      
-      if (!is.matrix(Z)) {
+      # parts[3] is response name (already filtered above)
+      term_id <- parts[4]
+
+      # Get design vector (single column per term in brms)
+      Z <- as.vector(prep$sdata[[z_name]])
+
+      if (length(Z) != n_obs) {
         stop(insight::format_error(
-          "Random effects design matrix {.field {z_name}} must be matrix or vector."
+          "Random effects design vector {.field {z_name}} has {length(Z)} ",
+          "elements but expected {n_obs} observations for ",
+          "response {.val {resp_name}}."
         ))
       }
-      
-      if (nrow(Z) != n_obs) {
-        stop(insight::format_error(
-          "Random effects design matrix {.field {z_name}} has {nrow(Z)} rows ",
-          "but expected {n_obs} observations for response {.val {resp_name}}."
-        ))
-      }
-      
-      # Get grouping indices and validate
-      J_name <- paste0("J_", group_id)
+
+      # Get grouping indices with response-specific naming
+      # Pattern: J_<group>_<response>
+      J_name <- paste0("J_", group_id, "_", resp_name)
       if (!J_name %in% names(prep$sdata)) {
         next
       }
-      
-      J <- as.vector(prep$sdata[[J_name]])
+
+      J <- as.integer(prep$sdata[[J_name]])
       if (length(J) != n_obs) {
         stop(insight::format_error(
           "Grouping indices {.field {J_name}} length {length(J)} ",
-          "does not match {n_obs} observations for response {.val {resp_name}}."
+          "does not match {n_obs} observations for ",
+          "response {.val {resp_name}}."
         ))
       }
-      
-      # Get number of groups
-      N_name <- paste0("N_", group_id)
-      if (N_name %in% names(prep$sdata)) {
-        n_groups <- prep$sdata[[N_name]]
-      } else {
-        n_groups <- max(J)
+
+      # Extract group-level parameters for this response and Z matrix
+      # Multivariate pattern: r_<groupname>__<response>[level,termname]
+      # Example: r_group__y1[1,Intercept], r_group__y1[1,x]
+      #
+      # Each Z matrix corresponds to one term. The term_id in Z name (e.g.,
+      # Z_1_y1_2) corresponds to term order. Extract all term names and match
+      # by position.
+
+      r_pattern <- paste0("^r_.*__", resp_name, "\\[")
+      r_names_all <- grep(r_pattern, colnames(draws_mat), value = TRUE)
+
+      if (length(r_names_all) == 0) {
+        next
       }
-      
-      # Apply random effects for each coefficient (column) in Z
-      for (coef_idx in seq_len(ncol(Z))) {
-        # Apply random effects for each group level
-        for (level in seq_len(n_groups)) {
-          # Construct parameter name: r_<group>_<term>[<level>]
-          r_param <- paste0("r_", group_id, "_", term_id, "[", level, "]")
-          
-          if (r_param %in% colnames(draws_mat)) {
-            # Get random effects draws for this parameter
-            r_draws <- draws_mat[, r_param, drop = FALSE]
-            
-            # Find observations belonging to this group level
-            obs_mask <- (J == level)
-            
-            if (any(obs_mask)) {
-              # Apply random effect: eta[, obs] += Z[obs, coef] * r[, level]
-              eta[, obs_mask] <- eta[, obs_mask] + 
-                (Z[obs_mask, coef_idx] * r_draws[, 1])
-            }
-          }
-        }
+
+      # Extract unique term names from parameters (sorted alphabetically)
+      # r_group__y1[1,Intercept] -> "Intercept"
+      # r_group__y1[1,x] -> "x"
+      term_names <- sort(unique(sub(".*,(.*)\\]$", "\\1", r_names_all)))
+
+      # Map term_id to term_name (term_id=1 -> first term, etc.)
+      term_idx <- as.integer(term_id)
+      if (term_idx < 1 || term_idx > length(term_names)) {
+        next
       }
+
+      term_name <- term_names[term_idx]
+
+      # Extract parameters for this specific term across all levels
+      # Pattern: r_group__y1[<any_level>,<term_name>]
+      term_pattern <- paste0(
+        "^r_.*__", resp_name, "\\[\\d+,",
+        gsub("([.()\\[\\]{}^$*+?|])", "\\\\\\1", term_name),  # Escape regex
+        "\\]$"
+      )
+      r_names_term <- grep(term_pattern, colnames(draws_mat), value = TRUE)
+
+      if (length(r_names_term) == 0) {
+        next
+      }
+
+      # Extract r values: [n_draws × n_groups]
+      r_draws_term <- draws_mat[, r_names_term, drop = FALSE]
+
+      # Apply to linear predictor using vectorized indexing
+      # r_draws_term[, J] gives [n_draws × n_obs] via column indexing
+      # Z broadcast to [n_draws × n_obs] via matrix replication
+      eta <- eta + r_draws_term[, J, drop = FALSE] *
+        matrix(Z, nrow = n_draws, ncol = n_obs, byrow = TRUE)
     }
 
     result[[resp_name]] <- eta

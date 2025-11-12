@@ -1,0 +1,218 @@
+ℹ Loading mvgam
+Loading required package: brms
+Loading required package: Rcpp
+Loading 'brms' package (version 2.22.9). Useful instructions
+can be found by typing help('brms'). A more detailed introduction
+to the package is available through vignette('brms_overview').
+
+Attaching package: 'brms'
+
+The following object is masked from 'package:stats':
+
+    ar
+
+Loading 'mvgam' (version 2.0.0). Useful instructions can be found by
+  typing help('mvgam'). A more detailed introduction to the package is
+  available through vignette('mvgam_overview'). Full brms compatibility is
+  now enabled.
+
+================================================================================
+TEST 1: Univariate Simple Random Intercepts (1 | group)
+================================================================================
+Compiling Stan program...
+Start sampling
+Warning messages:
+1: There were 4 divergent transitions after warmup. See
+https://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup
+to find out why this is a problem and how to eliminate them. 
+2: Examine the pairs() plot to diagnose sampling problems
+ 
+3: Bulk Effective Samples Size (ESS) is too low, indicating posterior means and medians may be unreliable.
+Running the chains for more iterations may help. See
+https://mc-stan.org/misc/warnings.html#bulk-ess 
+4: Tail Effective Samples Size (ESS) is too low, indicating posterior variances and tail quantiles may be unreliable.
+Running the chains for more iterations may help. See
+https://mc-stan.org/misc/warnings.html#tail-ess 
+
+Standata structure for simple RE:
+Z matrices:
+[1] "Z_1_1"
+
+J indices:
+[1] "J_1"
+
+N groups:
+[1] "N_1"
+
+
+Parameter names for simple RE:
+r_ parameters:
+[1] "r_group[1,Intercept]" "r_group[2,Intercept]" "r_group[3,Intercept]"
+[4] "r_group[4,Intercept]" "r_group[5,Intercept]"
+
+sd_ parameters:
+[1] "sd_group__Intercept"
+
+================================================================================
+TEST 2: Univariate Correlated Random Effects (x | group)
+================================================================================
+Compiling Stan program...
+Start sampling
+Warning messages:
+1: Bulk Effective Samples Size (ESS) is too low, indicating posterior means and medians may be unreliable.
+Running the chains for more iterations may help. See
+https://mc-stan.org/misc/warnings.html#bulk-ess 
+2: Tail Effective Samples Size (ESS) is too low, indicating posterior variances and tail quantiles may be unreliable.
+Running the chains for more iterations may help. See
+https://mc-stan.org/misc/warnings.html#tail-ess 
+
+Standata structure for correlated RE:
+Z matrices:
+[1] "Z_1_1" "Z_1_2"
+
+J indices:
+[1] "J_1"
+
+
+Parameter names for correlated RE:
+r_ parameters:
+ [1] "r_group[1,Intercept]" "r_group[2,Intercept]" "r_group[3,Intercept]"
+ [4] "r_group[4,Intercept]" "r_group[5,Intercept]" "r_group[1,x]"        
+ [7] "r_group[2,x]"         "r_group[3,x]"         "r_group[4,x]"        
+[10] "r_group[5,x]"        
+
+sd_ parameters:
+[1] "sd_group__Intercept" "sd_group__x"        
+
+z_ parameters:
+character(0)
+
+L_ parameters:
+character(0)
+
+Cor_ parameters:
+[1] "cor_group__Intercept__x"
+
+
+Parameter dimensions:
+sd_1 dimensions: 500 0 
+z_1 dimensions: 500 0 
+L_1 dimensions: 500 0 
+
+================================================================================
+TEST 3: Multivariate Simple Random Intercepts
+================================================================================
+Setting 'rescor' to TRUE by default for this model
+Compiling Stan program...
+Start sampling
+Warning messages:
+1: In the future, 'rescor' will be set to FALSE by default for all models. It is thus recommended to explicitely set 'rescor' via 'set_rescor' instead of using the default. 
+2: There were 33 divergent transitions after warmup. See
+https://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup
+to find out why this is a problem and how to eliminate them. 
+3: Examine the pairs() plot to diagnose sampling problems
+ 
+4: The largest R-hat is 1.21, indicating chains have not mixed.
+Running the chains for more iterations may help. See
+https://mc-stan.org/misc/warnings.html#r-hat 
+5: Bulk Effective Samples Size (ESS) is too low, indicating posterior means and medians may be unreliable.
+Running the chains for more iterations may help. See
+https://mc-stan.org/misc/warnings.html#bulk-ess 
+6: Tail Effective Samples Size (ESS) is too low, indicating posterior variances and tail quantiles may be unreliable.
+Running the chains for more iterations may help. See
+https://mc-stan.org/misc/warnings.html#tail-ess 
+
+Standata structure for multivariate simple RE:
+Z matrices:
+[1] "Z_1_y1_1" "Z_2_y2_1"
+
+J indices:
+[1] "J_1_y1" "J_2_y2"
+
+N_ fields:
+[1] "N_y1" "N_y2" "N_1"  "N_2" 
+
+
+Parameter names for multivariate simple RE:
+r_ parameters:
+ [1] "r_group__y1[1,Intercept]" "r_group__y1[2,Intercept]"
+ [3] "r_group__y1[3,Intercept]" "r_group__y1[4,Intercept]"
+ [5] "r_group__y1[5,Intercept]" "r_group__y2[1,Intercept]"
+ [7] "r_group__y2[2,Intercept]" "r_group__y2[3,Intercept]"
+ [9] "r_group__y2[4,Intercept]" "r_group__y2[5,Intercept]"
+
+sd_ parameters:
+[1] "sd_group__y1_Intercept" "sd_group__y2_Intercept"
+
+================================================================================
+TEST 4: Multivariate Correlated Random Effects
+================================================================================
+Setting 'rescor' to TRUE by default for this model
+Compiling Stan program...
+Start sampling
+Warning messages:
+1: In the future, 'rescor' will be set to FALSE by default for all models. It is thus recommended to explicitely set 'rescor' via 'set_rescor' instead of using the default. 
+2: Bulk Effective Samples Size (ESS) is too low, indicating posterior means and medians may be unreliable.
+Running the chains for more iterations may help. See
+https://mc-stan.org/misc/warnings.html#bulk-ess 
+3: Tail Effective Samples Size (ESS) is too low, indicating posterior variances and tail quantiles may be unreliable.
+Running the chains for more iterations may help. See
+https://mc-stan.org/misc/warnings.html#tail-ess 
+
+Standata structure for multivariate correlated RE:
+Z matrices:
+[1] "Z_1_y1_1" "Z_1_y1_2" "Z_2_y2_1" "Z_2_y2_2"
+
+J indices:
+[1] "J_1_y1" "J_2_y2"
+
+
+Parameter names for multivariate correlated RE:
+r_ parameters:
+ [1] "r_group__y1[1,Intercept]" "r_group__y1[2,Intercept]"
+ [3] "r_group__y1[3,Intercept]" "r_group__y1[4,Intercept]"
+ [5] "r_group__y1[5,Intercept]" "r_group__y1[1,x]"        
+ [7] "r_group__y1[2,x]"         "r_group__y1[3,x]"        
+ [9] "r_group__y1[4,x]"         "r_group__y1[5,x]"        
+[11] "r_group__y2[1,Intercept]" "r_group__y2[2,Intercept]"
+[13] "r_group__y2[3,Intercept]" "r_group__y2[4,Intercept]"
+[15] "r_group__y2[5,Intercept]" "r_group__y2[1,x]"        
+[17] "r_group__y2[2,x]"         "r_group__y2[3,x]"        
+[19] "r_group__y2[4,x]"         "r_group__y2[5,x]"        
+
+sd_ parameters:
+[1] "sd_group__y1_Intercept" "sd_group__y1_x"         "sd_group__y2_Intercept"
+[4] "sd_group__y2_x"        
+
+z_ parameters:
+character(0)
+
+L_ parameters:
+character(0)
+
+================================================================================
+SUMMARY: brms Random Effects Parameter Structure
+================================================================================
+
+1. SIMPLE RE (1 | group):
+   - Parameters: r_<group>_<term>[level]
+   - Standata: Z_<group>_<term>, J_<group>, N_<group>
+   - Multivariate: NO response prefix in parameter names
+
+2. CORRELATED RE (x | group):
+   - Parameters: sd_<group>[term], z_<group>[...], L_<group>[...]
+   - NO r_ parameters (non-centered parameterization)
+   - Standata: Z_<group>_<term> for each term, J_<group>
+
+3. MULTIVARIATE MODELS:
+   - Standata has response-specific N_y1, N_y2
+   - BUT: RE parameters do NOT have response prefix
+   - Filtering by matching Z length to response-specific N
+
+4. STORAGE ORDER (z_ parameters):
+   - Check actual indexing from fitted models above
+
+
+Saving results for analysis...
+
+Done! Results saved to tasks/brms_re_structure_verification.rds
