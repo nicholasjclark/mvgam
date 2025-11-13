@@ -607,6 +607,85 @@ extract_linpred_from_prep <- function(prep, resp = NULL) {
 }
 
 
+#' Extract Random Effects Contribution Using Pre-computed Mapping
+#'
+#' Uses random effects mapping stored in prep object to extract correct
+#' parameter contributions. Replaces buggy manual pattern matching.
+#'
+#' @param prep A brmsprep object with re_mapping field
+#' @param draws_mat Matrix of posterior draws
+#' @param n_draws Number of draws  
+#' @param n_obs Number of observations
+#'
+#' @return Matrix [n_draws × n_obs] of random effects contributions
+#'
+#' @noRd
+extract_random_effects_contribution <- function(prep, draws_mat, n_draws, n_obs) {
+  # Initialize contribution matrix
+  re_contrib <- matrix(0, nrow = n_draws, ncol = n_obs)
+  
+  # Use pre-computed mapping from prep object
+  re_mapping <- prep$re_mapping
+  
+  if (is.null(re_mapping) || length(re_mapping) == 0) {
+    # No random effects mapping available
+    return(re_contrib)
+  }
+  
+  # Process each design matrix
+  for (z_name in names(re_mapping)) {
+    if (!z_name %in% names(prep$sdata)) {
+      # Design matrix not present in this prediction context
+      next
+    }
+    
+    # Get design vector and indexing
+    Z <- as.vector(prep$sdata[[z_name]])
+    
+    # Get corresponding J indexing (extract group number from Z_<group>_<term>)
+    group_idx <- as.numeric(strsplit(z_name, "_")[[1]][2])
+    J_name <- paste0("J_", group_idx)
+    
+    if (!J_name %in% names(prep$sdata)) {
+      stop(insight::format_error(
+        "Missing grouping index {.field {J_name}} for {.field {z_name}}."
+      ))
+    }
+    
+    J <- as.integer(prep$sdata[[J_name]])
+    
+    # Validate dimensions
+    if (length(Z) != n_obs || length(J) != n_obs) {
+      stop(insight::format_error(
+        "Dimension mismatch: Z length={length(Z)}, J length={length(J)}, ",
+        "expected n_obs={n_obs}."
+      ))
+    }
+    
+    # Get parameter names for this design matrix
+    param_names <- re_mapping[[z_name]]
+    
+    # Extract parameters (these should exist in draws_mat)
+    missing_params <- setdiff(param_names, colnames(draws_mat))
+    if (length(missing_params) > 0) {
+      stop(insight::format_error(
+        "Missing random effects parameters: {paste(missing_params, collapse=', ')}"
+      ))
+    }
+    
+    r_draws <- draws_mat[, param_names, drop = FALSE]
+    
+    # Compute contribution: vectorized indexing
+    # r_draws[, J] gives [n_draws × n_obs] via column indexing
+    # Z broadcast to [n_draws × n_obs] for element-wise multiplication
+    re_contrib <- re_contrib + 
+      r_draws[, J, drop = FALSE] * 
+      matrix(Z, nrow = n_draws, ncol = n_obs, byrow = TRUE)
+  }
+  
+  return(re_contrib)
+}
+
 #' Extract Linear Predictor for Univariate Models
 #'
 #' @param prep A brmsprep object from prepare_predictions()
@@ -708,60 +787,14 @@ extract_linpred_univariate <- function(prep) {
     eta <- eta + sm_coef %*% t(Zs)
   }
 
-  # Add random effects (vectorized)
-  # Each Z_<group>_<term> is a single vector with corresponding
-  # r_<group>_<term> parameter vector
-  re_vectors <- grep("^Z_", names(prep$sdata), value = TRUE)
-
-  for (z_name in re_vectors) {
-    # Extract group and term IDs from Z_<group>_<term> pattern
-    parts <- strsplit(z_name, "_")[[1]]
-    if (length(parts) < 3) next
-
-    group_id <- parts[2]
-    term_id <- parts[3]
-
-    # Get design vector (single column per term in brms)
-    Z <- as.vector(prep$sdata[[z_name]])
-
-    if (length(Z) != n_obs) {
-      stop(insight::format_error(
-        "Random effects design vector {.field {z_name}} has {length(Z)} ",
-        "elements but expected {n_obs} observations."
-      ))
-    }
-
-    # Get grouping indices
-    J_name <- paste0("J_", group_id)
-    if (!J_name %in% names(prep$sdata)) {
-      next
-    }
-
-    J <- as.integer(prep$sdata[[J_name]])
-    if (length(J) != n_obs) {
-      stop(insight::format_error(
-        "Grouping indices {.field {J_name}} length {length(J)} ",
-        "does not match {n_obs} observations."
-      ))
-    }
-
-    # Extract all group-level parameters for this term
-    # Pattern matches: r_1_1[1], r_1_1[2], etc.
-    r_pattern <- paste0("^r_", group_id, "_", term_id, "\\[")
-    r_names <- grep(r_pattern, colnames(draws_mat), value = TRUE)
-
-    if (length(r_names) > 0) {
-      # Get random effects: [n_draws × n_groups]
-      r_draws <- draws_mat[, r_names, drop = FALSE]
-
-      # Vectorized indexing and multiplication following Stan pattern:
-      # mu[n] += r_group[J[n]] * Z[n]
-      # r_draws[, J] gives [n_draws × n_obs] via column indexing
-      # Z broadcast to [n_draws × n_obs] via matrix replication
-      eta <- eta + r_draws[, J, drop = FALSE] *
-        matrix(Z, nrow = n_draws, ncol = n_obs, byrow = TRUE)
-    }
-  }
+  # Add random effects using pre-computed mapping (fixes parameter naming bug)
+  re_contrib <- extract_random_effects_contribution(
+    prep = prep,
+    draws_mat = draws_mat,
+    n_draws = n_draws,
+    n_obs = n_obs
+  )
+  eta <- eta + re_contrib
 
   # Add GP terms
   gp_info <- detect_gp_terms(prep)

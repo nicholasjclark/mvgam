@@ -435,6 +435,179 @@ if (!is.null(prep_obs_8) && !is.null(prep_trend_8)) {
   cat("✗ Cannot verify - prep_obs_8 or prep_trend_8 is NULL\n")
 }
 
+cat("\n=== VERIFICATION 4: Monotonic Effects (fit7) ===\n")
+
+# Load fit7 (CAR with monotonic effects in trend formula)
+cat("Loading fit7 fixture...\n")
+fit7 <- readRDS("tasks/fixtures/fit7.rds")
+
+# Extract parameters
+obs_params_7 <- extract_obs_parameters(fit7)
+trend_params_7 <- extract_trend_parameters(fit7)
+
+cat("\nfit7 has mo(income) in TREND formula, not observation formula\n")
+cat(sprintf("Observation parameters: %d\n", length(obs_params_7)))
+cat(sprintf("Trend parameters: %d\n", length(trend_params_7)))
+
+# Create parameter subsets for TREND (where mo() is located)
+trend_draws_7 <- as_draws_matrix(subset_draws(
+  as_draws(fit7$fit),
+  variable = trend_params_7
+))
+
+# Create mock stanfit for TREND
+mock_trend_7 <- create_mock_stanfit(trend_draws_7)
+
+# Create newdata with income variable
+newdata_7 <- data.frame(
+  time = 25:27,
+  series = factor(rep("series1", 3)),
+  y = rep(0L, 3),
+  x = c(0.5, 1.0, 1.5),
+  income = factor(
+    rep("20_to_40", 3),
+    levels = c("below_20", "20_to_40", "40_to_100", "greater_100"),
+    ordered = TRUE
+  )
+)
+
+# Generate prep object for TREND model (has mo())
+cat("\nGenerating prep object for TREND model (contains mo())...\n")
+prep_trend_7 <- tryCatch(
+  {
+    # Check if trend_model slot exists
+    if ("trend_model" %in% names(fit7)) {
+      prepare_predictions(mock_trend_7, brmsfit = fit7$trend_model,
+                         newdata = newdata_7)
+    } else {
+      cat("No trend_model slot - using fit7 directly\n")
+      # Try using fit7 directly with trend formula
+      NULL
+    }
+  },
+  error = function(e) {
+    cat("ERROR in prepare_predictions for trend:\n")
+    cat(conditionMessage(e), "\n")
+    NULL
+  }
+)
+
+if (!is.null(prep_trend_7)) {
+  # Explore structure
+  explore_prep_structure(prep_trend_7, "fit7 - Trend (CAR with mo(income))")
+
+  # Document monotonic effects patterns
+  cat("\n--- Searching for monotonic effects patterns ---\n")
+  document_term_pattern(prep_trend_7, "^Xmo_", "Monotonic design matrices (Xmo_*)")
+  document_term_pattern(prep_trend_7, "^bsp_", "Simplex parameters (bsp_*)")
+  document_term_pattern(prep_trend_7, "^simo_", "Monotonic effects (simo_*)")
+} else {
+  cat("\n✗ Cannot explore monotonic effects - prep_trend_7 failed\n")
+  cat("Checking trend parameters directly:\n")
+  mo_params <- grep("mo|bsp|simo", trend_params_7, value = TRUE,
+                    ignore.case = TRUE)
+  if (length(mo_params) > 0) {
+    cat("  Found monotonic parameters in trend:\n")
+    cat("  ", paste(mo_params, collapse = ", "), "\n")
+  } else {
+    cat("  No obvious monotonic parameters found\n")
+  }
+}
+
+cat("\nTODO for Task 2.3.7.1:\n")
+cat("  1. Extract Xmo matrix from prep$sdata\n")
+cat("  2. Extract bsp simplex parameters (sum to 1 constraint)\n")
+cat("  3. Extract simo monotonic effect parameters\n")
+cat("  4. Understand transformation: simo vs bsp relationship\n")
+cat("  5. Test computation: Xmo %*% simo\n")
+cat("  6. Add to univariate and multivariate extraction functions\n")
+
+cat("\n=== VERIFICATION 5: Nonlinear Formulas (fit9) ===\n")
+
+# Load fit9 (nonlinear formula with AR trends)
+cat("Loading fit9 fixture...\n")
+fit9 <- readRDS("tasks/fixtures/fit9.rds")
+
+cat("\nFormula structure:\n")
+print(fit9$formula)
+
+# Extract parameters
+obs_params_9 <- extract_obs_parameters(fit9)
+
+cat("\nObservation parameters:\n")
+cat("  ", paste(head(obs_params_9, 20), collapse = ", "))
+if (length(obs_params_9) > 20) {
+  cat(", ... (", length(obs_params_9), "total)")
+}
+cat("\n")
+
+# Check for nonlinear parameter patterns
+cat("\nNonlinear parameter patterns:\n")
+nl_params <- grep("^b_b[0-9]|nlpar", obs_params_9, value = TRUE)
+if (length(nl_params) > 0) {
+  cat("  ", paste(nl_params, collapse = ", "), "\n")
+} else {
+  cat("  No obvious nlpar patterns found\n")
+}
+
+# Create parameter subset
+obs_draws_9 <- as_draws_matrix(subset_draws(
+  as_draws(fit9$fit),
+  variable = obs_params_9
+))
+
+# Create mock stanfit
+mock_obs_9 <- create_mock_stanfit(obs_draws_9)
+
+# Create newdata
+newdata_9 <- data.frame(
+  time = 25:27,
+  series = factor(rep("series1", 3)),
+  y = rep(0L, 3),
+  x = c(0.5, 1.0, 1.5)
+)
+
+# Generate prep object
+cat("\nGenerating prep object for nonlinear model...\n")
+prep_obs_9 <- tryCatch(
+  prepare_predictions(mock_obs_9, brmsfit = fit9, newdata = newdata_9),
+  error = function(e) {
+    cat("ERROR in prepare_predictions:\n")
+    cat(conditionMessage(e), "\n")
+    NULL
+  }
+)
+
+if (!is.null(prep_obs_9)) {
+  # Explore structure
+  explore_prep_structure(prep_obs_9, "fit9 - Nonlinear formula")
+
+  # Check for dpars (distributional parameters)
+  cat("\n--- Checking prep$dpars structure ---\n")
+  if ("dpars" %in% names(prep_obs_9)) {
+    cat("prep$dpars exists with components:\n")
+    cat("  ", paste(names(prep_obs_9$dpars), collapse = ", "), "\n")
+
+    # Check if mu is pre-computed
+    if ("mu" %in% names(prep_obs_9$dpars)) {
+      mu_dims <- dim(prep_obs_9$dpars$mu)
+      cat("\nmu is pre-computed in prep$dpars:\n")
+      cat(sprintf("  Dimensions: %s\n", paste(mu_dims, collapse = " × ")))
+      cat("  This suggests nonlinear formulas bypass standard linear predictor!\n")
+    }
+  } else {
+    cat("prep$dpars does not exist\n")
+  }
+
+  cat("\nTODO for Task 2.3.7.2:\n")
+  cat("  1. Determine if nonlinear formulas use prep$dpars$mu directly\n")
+  cat("  2. Check if extract_linpred_from_prep needs special handling\n")
+  cat("  3. Test if C_* design matrices exist for nonlinear parameters\n")
+  cat("  4. Verify computation matches brms::posterior_linpred()\n")
+} else {
+  cat("\n✗ Cannot explore - prep_obs_9 failed to generate\n")
+}
+
 cat("\n=== CRITICAL QUESTIONS FOR TASK 2.3.5.4.5 (r-package-analyzer) ===\n")
 cat("\nUse r-package-analyzer agent to investigate brms source code:\n")
 cat("  1. How does posterior_linpred.brmsfit() compute smooth contributions?\n")
@@ -442,10 +615,14 @@ cat("  2. Exact formula for random effects: r[J[n]] or Z[n] * r[J[n]]?\n")
 cat("  3. How are GP predictions computed/indexed?\n")
 cat("  4. How do multiple terms combine? (intercept + fixed + smooths + RE + GP)\n")
 cat("  5. Are there any brms-specific optimizations we should replicate?\n")
+cat("  6. How are monotonic effects (mo()) computed from bsp/simo parameters?\n")
+cat("  7. Do nonlinear formulas bypass standard linear predictor construction?\n")
 cat("\nAgent should examine:\n")
 cat("  - R/posterior_linpred.R in brms\n")
 cat("  - How brms uses prep$sdata to build linear predictors\n")
 cat("  - The exact matrix operations for each term type\n")
+cat("  - Monotonic effects implementation in brms\n")
+cat("  - Nonlinear formula handling (prep$dpars$mu)\n")
 
-cat("\n\n✓ Exploration and verification planning complete.\n")
+cat("\n\n✓ Extended exploration complete (added fit7 + fit9).\n")
 cat("Output saved to: tasks/special_terms_exploration_output.txt\n")

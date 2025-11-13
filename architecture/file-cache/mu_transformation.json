@@ -1,0 +1,34 @@
+﻿{
+    "s3_methods":  {
+
+                   },
+    "functions":  [
+                      "analyze_stan_code",
+                      "detect_glm_patterns",
+                      "analyze_mu_construction",
+                      "determine_strategy",
+                      "extract_glm_params",
+                      "extract_mu_lines",
+                      "classify_pattern",
+                      "find_injection_points",
+                      "find_glm_types_for_response",
+                      "extract_glm_params_for_response"
+                  ],
+    "purpose":  "",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "determine_strategy":  "determine_strategy \u003c- function(glm_info, mu_info, is_multivariate) {",
+                                "detect_glm_patterns":  "detect_glm_patterns \u003c- function(stancode, response_names, is_multivariate) {",
+                                "extract_glm_params_for_response":  "extract_glm_params_for_response \u003c- function(stancode, response_name, glm_type) {",
+                                "analyze_stan_code":  "analyze_stan_code \u003c- function(stancode, response_names = NULL) {",
+                                "classify_pattern":  "classify_pattern \u003c- function(stancode, mu_lines, glm_info) {",
+                                "find_glm_types_for_response":  "find_glm_types_for_response \u003c- function(stancode, response_name) {",
+                                "extract_mu_lines":  "extract_mu_lines \u003c- function(stancode) {",
+                                "find_injection_points":  "find_injection_points \u003c- function(stancode, mu_lines, pattern_type) {",
+                                "analyze_mu_construction":  "analyze_mu_construction \u003c- function(stancode, glm_info) {",
+                                "extract_glm_params":  "extract_glm_params \u003c- function(stancode, glm_type) {"
+                            },
+    "file":  "R/mu_transformation.R"
+}

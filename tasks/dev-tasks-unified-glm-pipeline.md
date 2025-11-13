@@ -23,14 +23,12 @@ Replace the recursive system with a **linear pipeline** that processes Stan code
 
 ## Task Breakdown
 
-### Task 1: Single GLM Detection and Analysis ✅
-**Status**: Completed  
+### Task 1: Single GLM Detection and Analysis ⏳
+**Status**: Not Started  
 **Priority**: High - Foundation for all other tasks  
 **Estimated Effort**: Medium
 
 **Objective**: Replace multiple redundant GLM detection calls with comprehensive analysis
-
-**Implementation**: Completed `analyze_stan_code()` function in `R/mu_transformation.R` that provides unified analysis for GLM patterns, mu construction classification, and transformation strategy determination. Eliminates need for redundant GLM detection throughout the system.
 
 **Requirements**:
 - Create single analysis function that examines Stan code once

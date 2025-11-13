@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-11-12 18:36:27  
+**Generated:** 2025-11-13 16:04:39  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
-- **Total Files:** 59
-- **Total Functions:** 489
+- **Total Files:** 60
+- **Total Functions:** 505
 - **Exported Functions:** 57
-- **Internal Functions:** 446
+- **Internal Functions:** 462
 - **S3 Methods:** 41
 - **S3 Classes:** 31
 
@@ -39,7 +39,7 @@
 
 ### Main Entry Points
 - **Core Functions**: mvgam, series_to_mvgam, sim_mvgam
-- **Trend Types**: RW, GP, PW, VAR, CAR, ZMVN, AR
+- **Trend Types**: RW, GP, VAR, CAR, ZMVN, PW, AR
 - **Analysis Tools**: ppc, stability, fevd, irf, lfo_cv
 - **Plotting Functions**: plot_mvgam_fc, plot_mvgam_series, plot_mvgam_smooth, plot_mvgam_pterms, plot_mvgam_factors, plot_mvgam_trend, plot_mvgam_randomeffects, plot_mvgam_resids, plot_mvgam_uncertainty
 
@@ -185,43 +185,45 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: mvgam_formula, get_prior, extract_trend_priors, generate_trend_priors, generate_trend_priors_from_monitor_params, create_trend_parameter_prior, get_default_trend_parameter_prior, build_ar_prior_spec, extract_prior_string, map_trend_priors, get_trend_parameter_prior, get_prior.default, get_prior.formula, get_prior.brmsformula, get_parameter_type_default_prior (+ 11 more)
 - **`R/mu_expression_analysis.R`** (25 functions)
   - Key functions: extract_mu_construction_with_classification, classify_mu_expressions_structurally, create_analysis_context, classify_single_mu_expression_structurally, analyze_expression_structure, analyze_indexing_patterns_comprehensive, analyze_mathematical_operations_comprehensive, analyze_variable_relationships_comprehensive, determine_expression_type, extract_expression_variables_comprehensive, extract_comprehensive_variable_references, create_empty_mu_result, check_loop_requirement, build_execution_dependency_plan (+ 11 more)
+- **`R/mu_transformation.R`** (10 functions)
+  - Key functions: analyze_stan_code, find_injection_points, detect_glm_patterns, analyze_mu_construction, determine_strategy, extract_glm_params, extract_mu_lines, classify_pattern, find_glm_types_for_response, extract_glm_params_for_response
 - **`R/monotonic.R`** (5 functions)
   - Key functions: smooth.construct.moi.smooth.spec, smooth.construct.mod.smooth.spec, Predict.matrix.moi.smooth, Predict.matrix.mod.smooth, add_mono_model_file
-- **`R/mvgam_residcor-class.R`** (4 functions) - Class definitions and methods
-  - Key functions: gather_matrix, cluster_cormat, reorder_clusters, plot.mvgam_residcor
 - **`R/ensemble.R`** (4 functions)
   - Key functions: ensembleensemble.mvgam_forecast allsame split_fc_dots (+ 3 more)
-- **`R/how_to_cite.R`** (3 functions)
-  - Key functions: how_to_citeprint.how_to_cite how_to_cite.mvgam (+ 2 more)
+- **`R/mvgam_residcor-class.R`** (4 functions) - Class definitions and methods
+  - Key functions: gather_matrix, cluster_cormat, reorder_clusters, plot.mvgam_residcor
 - **`R/tidier_methods.R`** (3 functions) - Method implementations
   - Key functions: tidy.mvgam, split_hier_Sigma, augment.mvgam
-- **`R/mvgam_fevd-class.R`** (3 functions) - Class definitions and methods
-  - Key functions: summary.mvgam_fevd, plot.mvgam_fevd, fevd_df
 - **`R/residual_cor.R`** (3 functions) - Residual analysis
   - Key functions: residual_corresidual_cor.mvgam residual_cor.jsdgam (+ 2 more)
+- **`R/how_to_cite.R`** (3 functions)
+  - Key functions: how_to_citeprint.how_to_cite how_to_cite.mvgam (+ 2 more)
 - **`R/RcppExports.R`** (3 functions) - Exported functions
   - Key functions: ar3_recursC, var1_recursC, varma_recursC
+- **`R/mvgam_fevd-class.R`** (3 functions) - Class definitions and methods
+  - Key functions: summary.mvgam_fevd, plot.mvgam_fevd, fevd_df
+- **`R/stability.R`** (2 functions)
+  - Key functions: stabilitystability.mvgam (+ 1 more)
 - **`R/mvgam_irf-class.R`** (2 functions) - Class definitions and methods
   - Key functions: summary.mvgam_irf, plot.mvgam_irf
 - **`R/zzz.R`** (2 functions) - Package startup and attachment
   - Key functions: core_unloaded, mvgam_attach
 - **`R/ordinate.jsdgam.R`** (2 functions)
   - Key functions: ordinateordinate.jsdgam (+ 1 more)
-- **`R/stability.R`** (2 functions)
-  - Key functions: stabilitystability.mvgam (+ 1 more)
 - **`R/dynamic.R`** (1 functions)
   - Key functions: dynamic
-- **`R/mvgam_forecast-class.R`** (1 functions) - Class definitions and methods
-  - Key functions: summary.mvgam_forecast
 - **`R/lv_correlations.R`** (1 functions)
   - Key functions: lv_correlations
+- **`R/mvgam_forecast-class.R`** (1 functions) - Class definitions and methods
+  - Key functions: summary.mvgam_forecast
 - **`R/cpp_funs.R`** (0 functions)
-- **`R/mvgam-package.R`** (0 functions)
 - **`R/mvgam-class.R`** (0 functions) - Class definitions and methods
+- **`R/mvgam-package.R`** (0 functions)
 
 ### S3 Methods Files
-- **`R/predictions.R`** (4 functions) - Prediction methods
-  - Key functions: extract_smooth_coef, extract_linpred_from_prep, extract_linpred_univariate, extract_linpred_multivariate
+- **`R/predictions.R`** (9 functions) - Prediction methods
+  - Key functions: detect_gp_terms, compute_approx_gp, has_nlpars, extract_linpred_nonlinear, extract_smooth_coef, extract_linpred_from_prep, extract_random_effects_contribution, extract_linpred_univariate, extract_linpred_multivariate
 - **`R/add_residuals.R`** (2 functions) - Residual analysis
   - Key functions: add_residualsadd_residuals.mvgam (+ 1 more)
 
@@ -232,8 +234,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: should_trend_formula_have_intercept, setup_brms_lightweight, extract_prior_from_setup, parse_multivariate_trends, is_multivariate_formula, extract_response_names, extract_mvbind_responses, extract_response_trends, handle_nonlinear_model, extract_nonlinear_components, parse_nonlinear_manually, extract_brmsterms_from_setup, create_trend_base_formula, determine_trend_injection_point (+ 3 more)
 - **`R/stan_polish.R`** (11 functions) - Stan model integration
   - Key functions: polish_generated_stan_code, try_stanheaders_formatting, update_stan_header, reorganize_lprior_statements, clean_stan_comments, fix_blank_lines, add_targeted_comments, insert_comment_before_line, reorganize_target_statements, find_matching_closing_brace (+ 1 more)
-- **`R/mock-stanfit.R`** (4 functions) - Model fitting
-  - Key functions: create_mock_stanfit, as_draws_matrix.mock_stanfit, prepare_predictions.mock_stanfit, get_safe_dummy_value
+- **`R/mock-stanfit.R`** (5 functions) - Model fitting
+  - Key functions: get_brms_re_mapping, create_mock_stanfit, as_draws_matrix.mock_stanfit, prepare_predictions.mock_stanfit, get_safe_dummy_value
 - **`R/make_stan.R`** (3 functions) - Stan model integration
   - Key functions: generate_stan_components_mvgam_formula, stancode.mvgam_formula, standata.mvgam_formula
 
@@ -499,6 +501,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### `R/mock-stanfit.R`:
 - **as_draws_matrix.mock_stanfit()** (internal)
 - **create_mock_stanfit()** (internal)
+- **get_brms_re_mapping()** (internal)
 - **get_safe_dummy_value()** (internal)
 - **prepare_predictions.mock_stanfit()** (internal)
 
@@ -524,6 +527,18 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **extract_declared_functions()** (internal)
 - **extract_mu_assignment_lines()** (internal)
 - **normalize_mu_expression()** (internal)
+
+### `R/mu_transformation.R`:
+- **analyze_mu_construction()** (internal)
+- **analyze_stan_code()** (internal)
+- **classify_pattern()** (internal)
+- **detect_glm_patterns()** (internal)
+- **determine_strategy()** (internal)
+- **extract_glm_params()** (internal)
+- **extract_glm_params_for_response()** (internal)
+- **extract_mu_lines()** (internal)
+- **find_glm_types_for_response()** (internal)
+- **find_injection_points()** (internal)
 
 ### `R/mvgam_core.R`:
 - **extract_series_information()** (internal)
@@ -603,10 +618,15 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **ppc.mvgam()** (internal)
 
 ### `R/predictions.R`:
+- **compute_approx_gp()** (internal)
+- **detect_gp_terms()** (internal)
 - **extract_linpred_from_prep()** (internal)
 - **extract_linpred_multivariate()** (internal)
+- **extract_linpred_nonlinear()** (internal)
 - **extract_linpred_univariate()** (internal)
+- **extract_random_effects_contribution()** (internal)
 - **extract_smooth_coef()** (internal)
+- **has_nlpars()** (internal)
 
 ### `R/print.mvgam.R`:
 - **extract_mcmc_info()** (internal)

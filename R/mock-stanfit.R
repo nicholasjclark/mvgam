@@ -50,6 +50,60 @@ get_safe_dummy_value <- function(family_obj) {
   return(0)
 }
 
+#' Extract Random Effects Parameter Mapping from brms Object
+#' 
+#' Creates a mapping from design matrix names (Z_<id>_<id>) to actual
+#' parameter names (r_<group>[<level>,<term>]) using brms ranef structure.
+#'
+#' @param brmsfit_object A fitted brms model
+#' 
+#' @return Named list mapping Z matrix names to parameter name vectors
+#' 
+#' @noRd
+get_brms_re_mapping <- function(brmsfit_object) {
+  # Validate inputs
+  checkmate::assert_class(brmsfit_object, "brmsfit")
+  
+  # Get ranef structure (data frame with one row per grouping factor/term combination)
+  ranef_df <- brmsfit_object$ranef
+  
+  if (is.null(ranef_df) || nrow(ranef_df) == 0) {
+    # No random effects in model
+    return(list())
+  }
+  
+  mapping <- list()
+  
+  # Get levels for each group (stored as attribute)
+  group_levels <- attr(ranef_df, "levels")
+  
+  # Process each row (each group/term combination)
+  for (row_idx in 1:nrow(ranef_df)) {
+    row_info <- ranef_df[row_idx, ]
+    
+    # Extract semantic information  
+    group_name <- row_info$group    # e.g., "group"
+    term_name <- row_info$coef      # e.g., "Intercept"  
+    group_idx <- row_info$gn        # Group number (1, 2, ...)
+    term_idx <- row_info$cn         # Term number (1, 2, ...)
+    
+    # Get number of levels for this group
+    levels_for_group <- group_levels[[group_name]]
+    n_levels <- length(levels_for_group)
+    
+    # Construct design matrix name (brms internal convention)
+    z_name <- paste0("Z_", group_idx, "_", term_idx)
+    
+    # Construct parameter names (brms semantic convention)
+    param_names <- paste0("r_", group_name, "[", 1:n_levels, ",", term_name, "]")
+    
+    # Store mapping
+    mapping[[z_name]] <- param_names
+  }
+  
+  return(mapping)
+}
+
 
 #' Create Mock stanfit for Parameter Subsetting
 #'
@@ -288,6 +342,9 @@ prepare_predictions.mock_stanfit <- function(object,
   # Extract draws from mock stanfit using cached draws
   draws <- object$draws_cache
 
+  # Pre-compute random effects mapping for efficient extraction
+  re_mapping <- get_brms_re_mapping(brmsfit)
+
   # Build minimal brmsprep structure compatible with mvgam prediction workflow
   # Following brms prepare_predictions() return structure
   prep <- structure(
@@ -297,7 +354,8 @@ prepare_predictions.mock_stanfit <- function(object,
       formula = brmsfit$formula,
       family = brmsfit$family,
       newdata = prediction_data,
-      nobs = nrow(prediction_data)
+      nobs = nrow(prediction_data),
+      re_mapping = re_mapping  # Store pre-computed mapping
     ),
     class = c("brmsprep", "mvgam_prep")
   )
