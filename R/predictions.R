@@ -1,3 +1,428 @@
+#' Detect Gaussian Process Terms in Prep Object
+#'
+#' Searches a brmsprep object for Gaussian Process (GP) terms and
+#'   validates that complete GP data structures exist. Only supports
+#'   approximate GP using Hilbert space approximation (gp(x, k=5)
+#'   syntax in brms).
+#'
+#' @param prep A brmsprep object from prepare_predictions()
+#'
+#' @return NULL if no GP terms found, otherwise a list with:
+#'   - suffixes: character vector of GP term identifiers (e.g., "1",
+#'     "trend_1")
+#'   - type: always "approximate" (mvgam only supports approximate GP)
+#'   - n_terms: integer count of valid GP terms
+#'
+#' @details
+#' GP terms are identified by Xgp_* matrices in prep$sdata. Each valid
+#'   GP term must have complete data structures:
+#' - Xgp_<suffix>: basis function evaluations (N × k matrix)
+#' - Mgp_<suffix>: spectral density transformation (k × k matrix)
+#' - nb_gp_<suffix>: number of basis functions (scalar)
+#'
+#' And corresponding parameters in prep$dpars:
+#' - zgp_<suffix>: standard normal draws (ndraws × k × k array)
+#' - sdgp_<suffix>: marginal standard deviations (ndraws × k matrix)
+#' - lscale_<suffix>: length-scale parameters (ndraws × k matrix)
+#'
+#' Full GP (gp(x) without k) is not supported and will not be detected.
+#'
+#' Terms with incomplete data structures are silently skipped. If all
+#'   candidate GP terms are incomplete, returns NULL. This allows
+#'   graceful handling of partially specified models.
+#'
+#' @noRd
+detect_gp_terms <- function(prep) {
+  checkmate::assert_class(prep, "brmsprep")
+  checkmate::assert_list(prep$sdata, names = "named")
+
+  # Validate dpars if present
+  if ("dpars" %in% names(prep)) {
+    checkmate::assert_list(prep$dpars, names = "named")
+  }
+
+  # Search for Xgp_* matrices indicating GP terms
+  gp_candidates <- grep("^Xgp_", names(prep$sdata), value = TRUE)
+
+  if (length(gp_candidates) == 0) {
+    return(NULL)
+  }
+
+  # Extract suffixes (e.g., "1" from "Xgp_1", "trend_1" from "Xgp_trend_1")
+  suffixes <- sub("^Xgp_", "", gp_candidates)
+
+  # Validate each candidate has complete GP structure
+  valid_suffixes <- character()
+
+  for (suffix in suffixes) {
+    # Check required sdata components
+    required_sdata <- c(
+      paste0("Xgp_", suffix),
+      paste0("Mgp_", suffix),
+      paste0("nb_gp_", suffix)
+    )
+
+    if (!all(required_sdata %in% names(prep$sdata))) {
+      next
+    }
+
+    # Check required parameter components
+    if (!"dpars" %in% names(prep)) {
+      next
+    }
+
+    required_dpars <- c(
+      paste0("zgp_", suffix),
+      paste0("sdgp_", suffix),
+      paste0("lscale_", suffix)
+    )
+
+    if (!all(required_dpars %in% names(prep$dpars))) {
+      next
+    }
+
+    # Valid complete GP term found
+    valid_suffixes <- c(valid_suffixes, suffix)
+  }
+
+  if (length(valid_suffixes) == 0) {
+    return(NULL)
+  }
+
+  list(
+    suffixes = valid_suffixes,
+    type = "approximate",
+    n_terms = length(valid_suffixes)
+  )
+}
+
+
+#' Compute Approximate Gaussian Process Contribution
+#'
+#' Computes GP contributions to linear predictor using Hilbert space
+#'   approximation following brms Stan code formula. Implements
+#'   vectorized computation across all posterior draws.
+#'
+#' @param Xgp Matrix (N × k) of basis function evaluations at
+#'   prediction points
+#' @param Mgp Matrix (k × k) spectral density transformation matrix
+#' @param zgp Array (ndraws × k × k) of standard normal draws forming
+#'   Cholesky factors
+#' @param sdgp Matrix (ndraws × k) of marginal standard deviations
+#' @param lscale Matrix (ndraws × k) of length-scale parameters
+#'
+#' @return Matrix (ndraws × N) of GP contributions to add to linear
+#'   predictor
+#'
+#' @details
+#' Implements the brms Stan formula:
+#'   mu += Xgp * (Mgp * (sdgp .* (zgp * lscale)))
+#'
+#' Step-by-step computation per draw:
+#' 1. Transform latent factors: zgp[i,,] %*% lscale[i,]  -> (k)
+#' 2. Scale by SD: sdgp[i,] * step1  -> (k)
+#' 3. Apply spectral transform: Mgp %*% step2  -> (k)
+#' 4. Project to observations: Xgp %*% step3  -> (N)
+#'
+#' Loop required for 3D array matrix multiplication per draw.
+#'
+#' @noRd
+compute_approx_gp <- function(Xgp, Mgp, zgp, sdgp, lscale) {
+  # Validate matrix dimensions and finite values
+  checkmate::assert_matrix(Xgp, any.missing = FALSE, all.missing = FALSE)
+  checkmate::assert_matrix(Mgp, any.missing = FALSE, all.missing = FALSE)
+  checkmate::assert_array(zgp, d = 3, any.missing = FALSE)
+  checkmate::assert_matrix(sdgp, any.missing = FALSE, all.missing = FALSE)
+  checkmate::assert_matrix(
+    lscale,
+    any.missing = FALSE,
+    all.missing = FALSE
+  )
+
+  # Extract dimensions
+  n_obs <- nrow(Xgp)
+  k <- ncol(Xgp)
+  n_draws <- dim(zgp)[1]
+
+  # Validate dimension consistency
+  if (nrow(Mgp) != k || ncol(Mgp) != k) {
+    stop(insight::format_error(
+      "Dimension mismatch: {.field Mgp} has {nrow(Mgp)} rows and ",
+      "{ncol(Mgp)} columns, but expected {k} × {k} to match ",
+      "{.field Xgp} basis functions."
+    ))
+  }
+
+  if (dim(zgp)[2] != k || dim(zgp)[3] != k) {
+    stop(insight::format_error(
+      "Dimension mismatch: {.field zgp} has dimensions ",
+      "{dim(zgp)[1]} × {dim(zgp)[2]} × {dim(zgp)[3]}, but expected ",
+      "{n_draws} × {k} × {k}."
+    ))
+  }
+
+  if (nrow(sdgp) != n_draws || ncol(sdgp) != k) {
+    stop(insight::format_error(
+      "Dimension mismatch: {.field sdgp} has {nrow(sdgp)} rows and ",
+      "{ncol(sdgp)} columns, but expected {n_draws} × {k}."
+    ))
+  }
+
+  if (nrow(lscale) != n_draws || ncol(lscale) != k) {
+    stop(insight::format_error(
+      "Dimension mismatch: {.field lscale} has {nrow(lscale)} rows ",
+      "and {ncol(lscale)} columns, but expected {n_draws} × {k}."
+    ))
+  }
+
+  # Pre-allocate result matrix
+  result <- matrix(0, nrow = n_draws, ncol = n_obs)
+
+  # Compute GP contribution per draw
+  for (i in seq_len(n_draws)) {
+    # Step 1: Transform latent factors with length scales
+    # zgp[i,,] is (k × k), lscale[i,] is (k) -> result is (k)
+    step1 <- zgp[i, , ] %*% lscale[i, ]
+
+    # Step 2: Scale by marginal standard deviations
+    # sdgp[i,] is (k), step1 is (k) -> element-wise multiply gives (k)
+    step2 <- sdgp[i, ] * step1
+
+    # Step 3: Apply spectral density transformation
+    # Mgp is (k × k), step2 is (k) -> result is (k)
+    step3 <- Mgp %*% step2
+
+    # Step 4: Project onto observation space
+    # Xgp is (N × k), step3 is (k) -> result is (N)
+    result[i, ] <- Xgp %*% step3
+  }
+
+  result
+}
+
+
+#' Detect Nonlinear Formulas in Formula Object
+#'
+#' Checks if a brmsformula or mvgam model uses nonlinear formulas
+#'   (`nl = TRUE`). Nonlinear formulas evaluate R expressions
+#'   (e.g., `b1 * exp(b2 * x)`) rather than constructing linear
+#'   predictors via matrix multiplication.
+#'
+#' @param object A brmsformula, mvbrmsformula, brmsfit, or mvgam
+#'   object. For fitted objects, extracts formula automatically.
+#'
+#' @return Logical; TRUE if model uses nonlinear formulas, FALSE
+#'   otherwise
+#'
+#' @details
+#' brms handles nonlinear formulas fundamentally differently from
+#'   linear predictors:
+#' - Linear models: mu = X %*% beta (matrix multiplication)
+#' - Nonlinear models: mu = eval(expression, parameters)
+#'
+#' The prediction system extracts and reconstructs linear predictors
+#'   from components. For nonlinear models, prep$dpars$mu is already
+#'   fully evaluated and cannot be reconstructed or subset.
+#'
+#' Detection pattern: Checks the `nl` attribute on formula$formula
+#'   set by bf(..., nl = TRUE). This is brms's definitive indicator
+#'   for nonlinear models. Additional validation ensures pforms
+#'   (parameter formulas) exist, as nonlinear models must have
+#'   parameter sub-formulas.
+#'
+#' For multivariate formulas, checks each response's formula
+#'   separately and returns TRUE if ANY response uses nl = TRUE.
+#'
+#' @noRd
+has_nlpars <- function(object) {
+  # Validate input type
+  checkmate::assert(
+    checkmate::check_class(object, "mvgam"),
+    checkmate::check_class(object, "brmsfit"),
+    checkmate::check_class(object, "brmsformula"),
+    checkmate::check_class(object, "mvbrmsformula"),
+    combine = "or"
+  )
+
+  # Extract formula from fitted object if needed
+  formula_obj <- if (inherits(object, c("mvgam", "brmsfit"))) {
+    if (is.null(object$formula)) {
+      stop(insight::format_error(
+        "Object missing {.field formula} component."
+      ))
+    }
+    object$formula
+  } else {
+    object
+  }
+
+  # Handle multivariate formulas (check each response)
+  if (inherits(formula_obj, "mvbrmsformula")) {
+    if (!is.null(formula_obj$forms)) {
+      for (form in formula_obj$forms) {
+        # Check nl attribute on each response formula
+        nl_attr <- attr(form$formula, "nl")
+        has_pforms <- !is.null(form$pforms) &&
+                      length(form$pforms) > 0
+
+        if (isTRUE(nl_attr) && has_pforms) {
+          return(TRUE)
+        }
+      }
+    }
+    return(FALSE)
+  }
+
+  # Check nl attribute on formula (definitive indicator)
+  nl_attr <- attr(formula_obj$formula, "nl")
+
+  # Validate pforms exist (nonlinear models must have parameter
+  # formulas)
+  has_pforms <- !is.null(formula_obj$pforms) &&
+                length(formula_obj$pforms) > 0
+
+  return(isTRUE(nl_attr) && has_pforms)
+}
+
+
+#' Extract Linear Predictor for Nonlinear Formula Models
+#'
+#' Extracts pre-computed linear predictor (mu) from prep$dpars for
+#'   models with nonlinear formulas (`nl = TRUE`).
+#'
+#' Nonlinear models evaluate R expressions (e.g., `y ~ b1 * exp(b2 *
+#'   x)`) rather than computing linear combinations, so prep$dpars$mu
+#'   contains the evaluated predictor.
+#'
+#' @param prep A brmsprep object from prepare_predictions()
+#' @param resp Character string specifying response name for
+#'   multivariate models. If NULL, returns all responses (univariate
+#'   returns single matrix, multivariate returns named list).
+#'
+#' @return Matrix [ndraws × nobs] for univariate or single response.
+#'   Named list of matrices for multivariate models when resp = NULL.
+#'
+#' @details
+#' LIMITATION: This function returns pre-computed linear predictors
+#'   and does not support parameter subsetting. When using
+#'   mock_stanfit objects with parameter subsets, the returned mu
+#'   will still reflect the full parameter set used during prep
+#'   object creation.
+#'
+#' For linear models, mvgam reconstructs linear predictors from
+#'   components (intercept + fixed effects + smooths + random
+#'   effects), enabling parameter subsetting. Nonlinear models
+#'   evaluate arbitrary R expressions, making component
+#'   reconstruction infeasible.
+#'
+#' @noRd
+extract_linpred_nonlinear <- function(prep, resp = NULL) {
+  # Validate inputs
+  checkmate::assert_class(prep, "brmsprep")
+  checkmate::assert_string(resp, null.ok = TRUE)
+
+  if (!"dpars" %in% names(prep)) {
+    stop(insight::format_error(
+      "Nonlinear formula models require {.field dpars} component."
+    ))
+  }
+
+  if (!"mu" %in% names(prep$dpars)) {
+    stop(insight::format_error(
+      "Nonlinear formula prep missing {.field mu} in dpars."
+    ))
+  }
+
+  mu <- prep$dpars$mu
+
+  # Validate mu is matrix with correct structure
+  if (!is.matrix(mu)) {
+    stop(insight::format_error(
+      "{.field mu} must be a matrix [ndraws × nobs]."
+    ))
+  }
+
+  if (ncol(mu) != prep$nobs) {
+    stop(insight::format_error(
+      "{.field mu} has {ncol(mu)} columns but expected ",
+      "{prep$nobs} observations."
+    ))
+  }
+
+  # Check for multivariate structure
+  is_mv <- brms::is.mvbrmsformula(prep$formula)
+
+  if (!is_mv) {
+    # Univariate model
+    if (!is.null(resp)) {
+      stop(insight::format_error(
+        "{.field resp} only for multivariate models."
+      ))
+    }
+    return(mu)
+  }
+
+  # Multivariate model - split mu by response
+  if (!"responses" %in% names(prep$formula)) {
+    stop(insight::format_error(
+      "Multivariate formula must contain {.field responses}."
+    ))
+  }
+
+  response_names <- prep$formula$responses
+
+  if (is.null(response_names) || length(response_names) == 0) {
+    stop(insight::format_error(
+      "Multivariate formula has no response names."
+    ))
+  }
+
+  # Extract nobs per response using brms N_<response> pattern
+  nobs_list <- lapply(response_names, function(r) {
+    nobs_name <- paste0("N_", r)
+    if (!nobs_name %in% names(prep$sdata)) {
+      stop(insight::format_error(
+        "Missing {.field {nobs_name}} in prep$sdata."
+      ))
+    }
+    prep$sdata[[nobs_name]]
+  })
+  names(nobs_list) <- response_names
+
+  # Split mu matrix by response (column-wise)
+  mu_list <- list()
+  col_start <- 1
+
+  for (r in response_names) {
+    n_r <- nobs_list[[r]]
+    col_end <- col_start + n_r - 1
+    mu_list[[r]] <- mu[, col_start:col_end, drop = FALSE]
+    col_start <- col_end + 1
+  }
+
+  # Validate column count matches
+  if (col_start - 1 != ncol(mu)) {
+    stop(insight::format_error(
+      "Column count mismatch: split {col_start - 1} columns but ",
+      "{.field mu} has {ncol(mu)} columns."
+    ))
+  }
+
+  # Return single response if specified
+  if (!is.null(resp)) {
+    if (!resp %in% response_names) {
+      available <- paste(response_names, collapse = ", ")
+      stop(insight::format_error(
+        "Response {.field {resp}} not found. Available: {available}."
+      ))
+    }
+    return(mu_list[[resp]])
+  }
+
+  mu_list
+}
+
+
 #' Extract and Unstandardize Smooth Coefficients
 #'
 #' Extracts smooth coefficients from posterior draws, handling both
@@ -110,8 +535,9 @@ extract_smooth_coef <- function(draws_mat, smooth_label, resp = NULL,
 #' Extract Linear Predictor from Prep Object
 #'
 #' Computes linear predictors (on link scale) from a brmsprep object using
-#' fully vectorized matrix operations. Supports fixed effects and smooth
-#' terms for both univariate and multivariate models.
+#' fully vectorized matrix operations. Supports fixed effects, smooth
+#' terms, random effects, and Gaussian Process (GP) terms for both
+#' univariate and multivariate models.
 #'
 #' @param prep A brmsprep object from prepare_predictions()
 #' @param resp Optional response name for multivariate models. If NULL and
@@ -123,12 +549,14 @@ extract_smooth_coef <- function(draws_mat, smooth_label, resp = NULL,
 #'   For multivariate models with resp specified: Matrix [ndraws × nobs]
 #'
 #' @details
-#' Computes eta = Intercept + X * b + smooth terms via vectorized matrix
-#' operations. Intercept is stored as a separate parameter; X matrix
-#' contains only non-intercept predictors.
+#' Computes eta = Intercept + X * b + smooth terms + random effects +
+#'   GP terms via vectorized matrix operations. All terms are additive
+#'   on the link scale.
 #'
 #' For multivariate models, loops over responses (not draws), with each
-#' response computation fully vectorized.
+#' response computation fully vectorized. GP terms are filtered by
+#' response: response-specific GPs (e.g., Xgp_count_1) apply only to
+#' their response, while shared GPs (e.g., Xgp_1) apply to all responses.
 #'
 #' @noRd
 extract_linpred_from_prep <- function(prep, resp = NULL) {
@@ -187,6 +615,11 @@ extract_linpred_from_prep <- function(prep, resp = NULL) {
 #'
 #' @noRd
 extract_linpred_univariate <- function(prep) {
+  # Check for nonlinear formula
+  if (has_nlpars(prep$formula)) {
+    return(extract_linpred_nonlinear(prep, resp = NULL))
+  }
+
   draws_mat <- posterior::as_draws_matrix(prep$draws)
   n_draws <- nrow(draws_mat)
   n_obs <- prep$nobs
@@ -330,6 +763,99 @@ extract_linpred_univariate <- function(prep) {
     }
   }
 
+  # Add GP terms
+  gp_info <- detect_gp_terms(prep)
+  if (!is.null(gp_info)) {
+    for (suffix in gp_info$suffixes) {
+      # Extract all GP components for this term
+      Xgp <- prep$sdata[[paste0("Xgp_", suffix)]]
+      Mgp <- prep$sdata[[paste0("Mgp_", suffix)]]
+      zgp <- prep$dpars[[paste0("zgp_", suffix)]]
+      sdgp <- prep$dpars[[paste0("sdgp_", suffix)]]
+      lscale <- prep$dpars[[paste0("lscale_", suffix)]]
+
+      # Compute and add GP contribution
+      gp_contrib <- compute_approx_gp(Xgp, Mgp, zgp, sdgp, lscale)
+      eta <- eta + gp_contrib
+    }
+  }
+
+  # Add monotonic effects (mo() terms)
+  # Monotonic effects use direct parameter indexing, not matrix multiplication
+  xmo_names <- grep("^Xmo_", names(prep$sdata), value = TRUE)
+  for (xmo_name in xmo_names) {
+    # Extract monotonic term ID (univariate only: "1" from "Xmo_1")
+    term_id <- sub("^Xmo_", "", xmo_name)
+
+    # Extract and validate ordinal level indices
+    checkmate::assert_integerish(
+      prep$sdata[[xmo_name]],
+      lower = 1,
+      any.missing = FALSE
+    )
+    Xmo <- as.integer(prep$sdata[[xmo_name]])
+
+    if (length(Xmo) != n_obs) {
+      stop(insight::format_error(
+        "Monotonic design matrix {.field {xmo_name}} has ",
+        "{length(Xmo)} elements but expected {n_obs} observations."
+      ))
+    }
+
+    # Get monotonic simplex parameters
+    simo_name <- paste0("simo_", term_id)
+    simo_names <- grep(
+      paste0("^", simo_name, "\\["),
+      colnames(draws_mat),
+      value = TRUE
+    )
+
+    if (length(simo_names) == 0) {
+      next
+    }
+
+    # Extract and validate simo parameters: [n_draws × k_levels]
+    simo_draws <- draws_mat[, simo_names, drop = FALSE]
+    checkmate::assert_matrix(
+      simo_draws,
+      any.missing = FALSE,
+      all.missing = FALSE
+    )
+    k_levels <- ncol(simo_draws)
+
+    # Validate Xmo indices are within valid range
+    if (any(Xmo < 1) || any(Xmo > k_levels)) {
+      stop(insight::format_error(
+        "Monotonic design matrix {.field {xmo_name}} contains ",
+        "values outside valid range [1, {k_levels}]. ",
+        "Found range: [{min(Xmo)}, {max(Xmo)}]."
+      ))
+    }
+
+    # Compute monotonic contribution via direct indexing
+    # simo_draws[, Xmo] performs column indexing: [n_draws × n_obs]
+    # For each observation n: add simo[Xmo[n]]
+    mo_contrib <- simo_draws[, Xmo, drop = FALSE]
+    eta <- eta + mo_contrib
+  }
+
+  # Add offset terms if present
+  if ("offsets" %in% names(prep$sdata)) {
+    offsets <- prep$sdata$offsets
+
+    # Validate offset structure and finite values
+    checkmate::assert_numeric(
+      offsets,
+      any.missing = FALSE,
+      finite = TRUE,
+      len = n_obs
+    )
+
+    # Broadcast offset across all draws on link scale
+    # eta: [n_draws × n_obs], offsets: [n_obs] -> broadcast to [n_draws × n_obs]
+    eta <- eta + matrix(offsets, nrow = n_draws, ncol = n_obs, byrow = TRUE)
+  }
+
   return(eta)
 }
 
@@ -344,6 +870,11 @@ extract_linpred_univariate <- function(prep) {
 #'
 #' @noRd
 extract_linpred_multivariate <- function(prep, resp = NULL) {
+  # Check for nonlinear formula
+  if (has_nlpars(prep$formula)) {
+    return(extract_linpred_nonlinear(prep, resp = resp))
+  }
+
   # Extract response names
   if (!"responses" %in% names(prep$formula)) {
     stop(insight::format_error(
@@ -581,6 +1112,147 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
       # Z broadcast to [n_draws × n_obs] via matrix replication
       eta <- eta + r_draws_term[, J, drop = FALSE] *
         matrix(Z, nrow = n_draws, ncol = n_obs, byrow = TRUE)
+    }
+
+    # Add GP terms for this response
+    gp_info <- detect_gp_terms(prep)
+    if (!is.null(gp_info)) {
+      for (suffix in gp_info$suffixes) {
+        # Check if GP term belongs to current response
+        # Response-specific: "count_1" matches response "count"
+        # Shared: "1" applies to all responses (no letter prefix)
+        is_resp_specific <- grepl(paste0("^", resp_name, "_"), suffix)
+        is_shared <- !grepl("^[a-zA-Z]", suffix)
+
+        if (!is_resp_specific && !is_shared) {
+          next
+        }
+
+        # Extract all GP components for this term
+        Xgp <- prep$sdata[[paste0("Xgp_", suffix)]]
+        Mgp <- prep$sdata[[paste0("Mgp_", suffix)]]
+        zgp <- prep$dpars[[paste0("zgp_", suffix)]]
+        sdgp <- prep$dpars[[paste0("sdgp_", suffix)]]
+        lscale <- prep$dpars[[paste0("lscale_", suffix)]]
+
+        # Compute and add GP contribution
+        gp_contrib <- compute_approx_gp(Xgp, Mgp, zgp, sdgp, lscale)
+        eta <- eta + gp_contrib
+      }
+    }
+
+    # Add monotonic effects for this response
+    xmo_names <- grep("^Xmo_", names(prep$sdata), value = TRUE)
+    for (xmo_name in xmo_names) {
+      # Extract suffix and check if it belongs to current response
+      suffix <- sub("^Xmo_", "", xmo_name)
+
+      # Response-specific: "count_1" matches response "count"
+      # Shared: "1" applies to all responses (no letter prefix)
+      is_resp_specific <- grepl(paste0("^", resp_name, "_"), suffix)
+      is_shared <- !grepl("^[a-zA-Z]", suffix)
+
+      if (!is_resp_specific && !is_shared) {
+        next
+      }
+
+      # Extract and validate ordinal level indices
+      checkmate::assert_integerish(
+        prep$sdata[[xmo_name]],
+        lower = 1,
+        any.missing = FALSE
+      )
+      Xmo <- as.integer(prep$sdata[[xmo_name]])
+
+      if (length(Xmo) != n_obs) {
+        stop(insight::format_error(
+          "Monotonic design matrix {.field {xmo_name}} has ",
+          "{length(Xmo)} elements but expected {n_obs} observations."
+        ))
+      }
+
+      # Get monotonic simplex parameters
+      simo_name <- paste0("simo_", suffix)
+      simo_names <- grep(
+        paste0("^", simo_name, "\\["),
+        colnames(draws_mat),
+        value = TRUE
+      )
+
+      if (length(simo_names) == 0) {
+        next
+      }
+
+      # Extract and validate simo parameters: [n_draws × k_levels]
+      simo_draws <- draws_mat[, simo_names, drop = FALSE]
+      checkmate::assert_matrix(
+        simo_draws,
+        any.missing = FALSE,
+        all.missing = FALSE
+      )
+      k_levels <- ncol(simo_draws)
+
+      # Validate Xmo indices are within valid range
+      if (any(Xmo < 1) || any(Xmo > k_levels)) {
+        stop(insight::format_error(
+          "Monotonic design matrix {.field {xmo_name}} contains ",
+          "values outside valid range [1, {k_levels}]. ",
+          "Found range: [{min(Xmo)}, {max(Xmo)}]."
+        ))
+      }
+
+      # Compute monotonic contribution via direct indexing
+      # simo_draws[, Xmo] performs column indexing: [n_draws × n_obs]
+      mo_contrib <- simo_draws[, Xmo, drop = FALSE]
+      eta <- eta + mo_contrib
+    }
+
+    # Add offset terms if present for this response
+    if ("offsets" %in% names(prep$sdata)) {
+      # In multivariate models, offsets may be response-specific or shared
+      # Extract offsets for this response based on observation count
+      
+      # Calculate offset range for this response
+      # Find observation start/end positions for this response
+      resp_indices <- response_names[1:which(response_names == resp_name)]
+      n_obs_before <- sum(sapply(resp_indices[-length(resp_indices)], 
+                                function(r) {
+                                  if (length(resp_indices) == 1) return(0)
+                                  prep$sdata[[paste0("N_", r)]]
+                                }))
+      
+      offset_start <- n_obs_before + 1
+      offset_end <- n_obs_before + n_obs
+      
+      # Extract response-specific offsets
+      all_offsets <- prep$sdata$offsets
+      
+      # Validate total offset length matches total observations
+      total_obs <- sum(sapply(response_names, function(r) {
+        prep$sdata[[paste0("N_", r)]]
+      }))
+      
+      if (length(all_offsets) != total_obs) {
+        stop(insight::format_error(
+          "Offset length {length(all_offsets)} does not match total ",
+          "observations {total_obs} across all responses."
+        ))
+      }
+      
+      # Extract offsets for current response
+      resp_offsets <- all_offsets[offset_start:offset_end]
+      
+      # Validate response-specific offset structure
+      checkmate::assert_numeric(
+        resp_offsets,
+        any.missing = FALSE,
+        finite = TRUE,
+        len = n_obs
+      )
+
+      # Broadcast offset across all draws on link scale
+      # eta: [n_draws × n_obs], resp_offsets: [n_obs] -> broadcast to [n_draws × n_obs]
+      eta <- eta + matrix(resp_offsets, nrow = n_draws, ncol = n_obs, byrow = TRUE)
     }
 
     result[[resp_name]] <- eta
