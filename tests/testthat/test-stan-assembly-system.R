@@ -47,6 +47,63 @@ test_that("setup_brms_lightweight creates valid brms setup", {
   expect_gt(nchar(obs_setup$stancode), 50)
 })
 
+# Tests for GLM Analysis System ----
+
+test_that("analyze_stan detects GLM patterns correctly", {
+  # Test Stan code with GLM functions
+  stan_code_glm <- "
+  model {
+    target += poisson_log_glm_lpmf(Y | X, alpha, beta);
+  }
+  "
+  
+  analysis <- mvgam:::analyze_stan(stan_code_glm)
+  
+  expect_s3_class(analysis, "glm_analysis")
+  expect_true(analysis$glm_patterns[["poisson_log_glm"]])
+  expect_true(analysis$mu_classification$has_glm)
+  expect_equal(analysis$mu_classification$glm_types, "poisson_log_glm")
+})
+
+test_that("analyze_stan handles non-GLM code", {
+  # Test Stan code without GLM functions
+  stan_code_normal <- "
+  model {
+    target += normal_lpdf(Y | mu, sigma);
+  }
+  "
+  
+  analysis <- mvgam:::analyze_stan(stan_code_normal)
+  
+  expect_s3_class(analysis, "glm_analysis")
+  expect_false(any(analysis$glm_patterns))
+  expect_false(analysis$mu_classification$has_glm)
+  expect_equal(length(analysis$mu_classification$glm_types), 0)
+})
+
+test_that("processing_state constructor validates inputs", {
+  code_lines <- c("model {", "  target += normal_lpdf(Y | mu, sigma);", "}")
+  
+  state <- mvgam:::processing_state(code_lines)
+  
+  expect_s3_class(state, "processing_state")
+  expect_equal(state$stage, "initial")
+  expect_equal(state$code_lines, code_lines)
+  expect_equal(length(state$processed_positions), 0)
+})
+
+test_that("to_analysis transition works correctly", {
+  code_lines <- c("model {", "  target += poisson_log_glm_lpmf(Y | X, alpha, beta);", "}")
+  state <- mvgam:::processing_state(code_lines)
+  
+  analyzed_state <- mvgam:::to_analysis(state)
+  
+  expect_s3_class(analyzed_state, "processing_state")
+  expect_equal(analyzed_state$stage, "analyzed")
+  expect_s3_class(analyzed_state$analysis, "glm_analysis")
+  expect_true("glm_analysis" %in% analyzed_state$transformations_applied)
+})
+
 test_that("setup_brms_lightweight handles different families", {
   data <- setup_test_data()$simple_univariate
   data$y_count <- rpois(nrow(data), 5)  # Count data
