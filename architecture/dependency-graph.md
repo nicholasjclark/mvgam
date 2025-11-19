@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-11-20 09:01:47  
+**Generated:** 2025-11-20 09:42:14  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
-- **Total Files:** 59
-- **Total Functions:** 495
+- **Total Files:** 60
+- **Total Functions:** 510
 - **Exported Functions:** 57
-- **Internal Functions:** 452
+- **Internal Functions:** 467
 - **S3 Methods:** 41
 - **S3 Classes:** 31
 
@@ -41,7 +41,7 @@
 - **Core Functions**: mvgam, series_to_mvgam, sim_mvgam
 - **Trend Types**: RW, GP, PW, VAR, CAR, ZMVN, AR
 - **Analysis Tools**: ppc, stability, fevd, irf, lfo_cv
-- **Plotting Functions**: plot_mvgam_fc, plot_mvgam_series, plot_mvgam_smooth, plot_mvgam_pterms, plot_mvgam_factors, plot_mvgam_trend, plot_mvgam_randomeffects, plot_mvgam_resids, plot_mvgam_uncertainty
+- **Plotting Functions**: plot_mvgam_series, plot_mvgam_smooth, plot_mvgam_pterms, plot_mvgam_factors, plot_mvgam_fc, plot_mvgam_trend, plot_mvgam_randomeffects, plot_mvgam_resids, plot_mvgam_uncertainty
 
 ## S3 Object System
 
@@ -179,40 +179,42 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### Other Files
 - **`R/trend_system.R`** (65 functions) - Trend modeling
   - Key functions: register_trend_type, list_trend_types, register_custom_trend, trend_param, is.trend_param, mvgam_trend_choices, custom_trend, create_mvgam_trend, RW, AR, CAR, VAR, GP, PW, ZMVN (+ 50 more)
-- **`R/backends.R`** (26 functions)
-  - Key functions: is.stanfit, is.brmsthreads, validate_threads, is.brmsopencl, validate_opencl, validate_silent, repair_stanfit, is.mvgam, nlist, parse_model (+ 16 more)
 - **`R/priors.R`** (26 functions) - Prior specification
   - Key functions: mvgam_formula, get_prior, extract_trend_priors, generate_trend_priors, generate_trend_priors_from_monitor_params, create_trend_parameter_prior, get_default_trend_parameter_prior, build_ar_prior_spec, extract_prior_string, map_trend_priors, get_trend_parameter_prior, get_prior.default, get_prior.formula, get_prior.brmsformula, get_parameter_type_default_prior (+ 11 more)
+- **`R/backends.R`** (26 functions)
+  - Key functions: is.stanfit, is.brmsthreads, validate_threads, is.brmsopencl, validate_opencl, validate_silent, repair_stanfit, is.mvgam, nlist, parse_model (+ 16 more)
 - **`R/mu_expression_analysis.R`** (25 functions)
   - Key functions: extract_mu_construction_with_classification, classify_mu_expressions_structurally, create_analysis_context, classify_single_mu_expression_structurally, analyze_expression_structure, analyze_indexing_patterns_comprehensive, analyze_mathematical_operations_comprehensive, analyze_variable_relationships_comprehensive, determine_expression_type, extract_expression_variables_comprehensive, extract_comprehensive_variable_references, create_empty_mu_result, check_loop_requirement, build_execution_dependency_plan (+ 11 more)
+- **`R/glm_analysis.R`** (16 functions)
+  - Key functions: analyze_stan, create_response_mapping, to_injection, convert_glm_to_standard_linear, inject_trend_effects_linear, handle_nonlinear_trend_injection, detect_glm_patterns, classify_mu_patterns, determine_glm_preservation, determine_mu_construction_type (+ 6 more)
 - **`R/monotonic.R`** (5 functions)
   - Key functions: smooth.construct.moi.smooth.spec, smooth.construct.mod.smooth.spec, Predict.matrix.moi.smooth, Predict.matrix.mod.smooth, add_mono_model_file
-- **`R/mvgam_residcor-class.R`** (4 functions) - Class definitions and methods
-  - Key functions: gather_matrix, cluster_cormat, reorder_clusters, plot.mvgam_residcor
 - **`R/ensemble.R`** (4 functions)
   - Key functions: ensembleensemble.mvgam_forecast allsame split_fc_dots (+ 3 more)
-- **`R/how_to_cite.R`** (3 functions)
-  - Key functions: how_to_citeprint.how_to_cite how_to_cite.mvgam (+ 2 more)
-- **`R/tidier_methods.R`** (3 functions) - Method implementations
-  - Key functions: tidy.mvgam, split_hier_Sigma, augment.mvgam
+- **`R/mvgam_residcor-class.R`** (4 functions) - Class definitions and methods
+  - Key functions: gather_matrix, cluster_cormat, reorder_clusters, plot.mvgam_residcor
 - **`R/mvgam_fevd-class.R`** (3 functions) - Class definitions and methods
   - Key functions: summary.mvgam_fevd, plot.mvgam_fevd, fevd_df
+- **`R/tidier_methods.R`** (3 functions) - Method implementations
+  - Key functions: tidy.mvgam, split_hier_Sigma, augment.mvgam
 - **`R/residual_cor.R`** (3 functions) - Residual analysis
   - Key functions: residual_corresidual_cor.mvgam residual_cor.jsdgam (+ 2 more)
 - **`R/RcppExports.R`** (3 functions) - Exported functions
   - Key functions: ar3_recursC, var1_recursC, varma_recursC
-- **`R/mvgam_irf-class.R`** (2 functions) - Class definitions and methods
-  - Key functions: summary.mvgam_irf, plot.mvgam_irf
-- **`R/zzz.R`** (2 functions) - Package startup and attachment
-  - Key functions: core_unloaded, mvgam_attach
+- **`R/how_to_cite.R`** (3 functions)
+  - Key functions: how_to_citeprint.how_to_cite how_to_cite.mvgam (+ 2 more)
 - **`R/ordinate.jsdgam.R`** (2 functions)
   - Key functions: ordinateordinate.jsdgam (+ 1 more)
+- **`R/mvgam_irf-class.R`** (2 functions) - Class definitions and methods
+  - Key functions: summary.mvgam_irf, plot.mvgam_irf
 - **`R/stability.R`** (2 functions)
   - Key functions: stabilitystability.mvgam (+ 1 more)
-- **`R/dynamic.R`** (1 functions)
-  - Key functions: dynamic
+- **`R/zzz.R`** (2 functions) - Package startup and attachment
+  - Key functions: core_unloaded, mvgam_attach
 - **`R/mvgam_forecast-class.R`** (1 functions) - Class definitions and methods
   - Key functions: summary.mvgam_forecast
+- **`R/dynamic.R`** (1 functions)
+  - Key functions: dynamic
 - **`R/lv_correlations.R`** (1 functions)
   - Key functions: lv_correlations
 - **`R/cpp_funs.R`** (0 functions)
@@ -248,14 +250,14 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: plot_mvgam_smooth
 - **`R/plot_mvgam_pterms.R`** (1 functions) - Plotting and visualization
   - Key functions: plot_mvgam_pterms
-- **`R/plot_mvgam_resids.R`** (1 functions) - Plotting and visualization
-  - Key functions: plot_mvgam_resids
 - **`R/plot_mvgam_randomeffects.R`** (1 functions) - Plotting and visualization
   - Key functions: plot_mvgam_randomeffects
-- **`R/plot_mvgam_trend.R`** (1 functions) - Trend modeling
-  - Key functions: plot_mvgam_trend
 - **`R/plot_mvgam_factors.R`** (1 functions) - Plotting and visualization
   - Key functions: plot_mvgam_factors
+- **`R/plot_mvgam_resids.R`** (1 functions) - Plotting and visualization
+  - Key functions: plot_mvgam_resids
+- **`R/plot_mvgam_trend.R`** (1 functions) - Trend modeling
+  - Key functions: plot_mvgam_trend
 
 ## Function Location Quick Reference
 
@@ -333,6 +335,12 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 
 ### `R/brms_integration.R` (1 potentially unused):
 - **handle_nonlinear_model()** (internal, never called)
+
+### `R/glm_analysis.R` (4 potentially unused):
+- **to_analysis()** (internal, never called)
+- **to_assembly()** (internal, never called)
+- **to_conversion()** (internal, never called)
+- **to_injection()** (internal, never called)
 
 ### `R/loo.mvgam.R` (1 potentially unused):
 - **samp_noinf()** (internal, never called)
@@ -448,6 +456,23 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **fevd()** (exported)
 - **gen_fevd()** (internal)
 - **var_fecov()** (internal)
+
+### `R/glm_analysis.R`:
+- **analyze_stan()** (internal)
+- **classify_mu_patterns()** (internal)
+- **convert_glm_to_standard_linear()** (internal)
+- **create_response_mapping()** (internal)
+- **detect_glm_patterns()** (internal)
+- **determine_glm_preservation()** (internal)
+- **determine_mu_construction_type()** (internal)
+- **determine_optimization_reason()** (internal)
+- **inject_trend_effects_linear()** (internal)
+- **processing_state()** (internal)
+- **to_analysis()** (internal)
+- **to_assembly()** (internal)
+- **to_conversion()** (internal)
+- **to_injection()** (internal)
+- **update_model_block_positions()** (internal)
 
 ### `R/how_to_cite.R`:
 - **how_to_cite()** (exported)

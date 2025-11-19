@@ -1,0 +1,46 @@
+﻿{
+    "s3_methods":  {
+
+                   },
+    "functions":  [
+                      "analyze_stan",
+                      "detect_glm_patterns",
+                      "classify_mu_patterns",
+                      "determine_glm_preservation",
+                      "create_response_mapping",
+                      "determine_mu_construction_type",
+                      "determine_optimization_reason",
+                      "processing_state",
+                      "to_analysis",
+                      "to_conversion",
+                      "to_injection",
+                      "to_assembly",
+                      "convert_glm_to_standard_linear",
+                      "inject_trend_effects_linear",
+                      "handle_nonlinear_trend_injection",
+                      "update_model_block_positions"
+                  ],
+    "purpose":  "",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "to_assembly":  "to_assembly \u003c- function(state) {",
+                                "to_analysis":  "to_analysis \u003c- function(state, response_names = NULL, trend_info = NULL) {",
+                                "processing_state":  "processing_state \u003c- function(code_lines, processed_positions = integer(0), model_block = list(start = NA_integer_, end = NA_integer_), transformations_applied = character(0), stage = \"initial\") {",
+                                "determine_optimization_reason":  "determine_optimization_reason \u003c- function(has_glm, has_trends) {",
+                                "to_conversion":  "to_conversion \u003c- function(state) {",
+                                "convert_glm_to_standard_linear":  "convert_glm_to_standard_linear \u003c- function(code_lines, analysis) {",
+                                "classify_mu_patterns":  "classify_mu_patterns \u003c- function(stan_code, glm_patterns) {",
+                                "create_response_mapping":  "create_response_mapping \u003c- function(stan_code, response_names, glm_patterns) {",
+                                "detect_glm_patterns":  "detect_glm_patterns \u003c- function(stan_code) {",
+                                "determine_glm_preservation":  "determine_glm_preservation \u003c- function(glm_patterns, trend_info = NULL) {",
+                                "inject_trend_effects_linear":  "inject_trend_effects_linear \u003c- function(stan_code, trend_injection_code) {",
+                                "analyze_stan":  "analyze_stan \u003c- function(stan_code, response_names = NULL, trend_info = NULL) {",
+                                "handle_nonlinear_trend_injection":  "handle_nonlinear_trend_injection \u003c- function(stan_code, trend_injection_code) {",
+                                "update_model_block_positions":  "update_model_block_positions \u003c- function(model_block, conversion_result) {",
+                                "to_injection":  "to_injection \u003c- function(state, trend_injection_code) {",
+                                "determine_mu_construction_type":  "determine_mu_construction_type \u003c- function(stan_code, has_glm) {"
+                            },
+    "file":  "R/glm_analysis.R"
+}
