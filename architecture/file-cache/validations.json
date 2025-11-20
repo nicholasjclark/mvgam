@@ -69,6 +69,7 @@
                       "remove_mvgam_variables",
                       "extract_and_validate_trend_components",
                       "extract_trend_data",
+                      "format_pipeline_error",
                       "patterns",
                       "patterns",
                       "patterns",
@@ -84,6 +85,7 @@
     "function_signatures":  {
                                 "validate_mvgam_trend":  "validate_mvgam_trend \u003c- function(trend_obj) {",
                                 "validate_multivariate_series_time":  "validate_multivariate_series_time \u003c- function(data, name, time_var, check_times) {",
+                                "format_pipeline_error":  "format_pipeline_error \u003c- function(message, context = NULL) {",
                                 "has_mvgam_variables":  "has_mvgam_variables \u003c- function(data) {",
                                 "filter_required_variables":  "filter_required_variables \u003c- function(required_vars, formula = NULL) {",
                                 "validate_and_process_trend_parameters":  "validate_and_process_trend_parameters \u003c- function(trend_spec, data) {",

@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-11-20 09:42:14  
+**Generated:** 2025-11-20 10:52:57  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 60
-- **Total Functions:** 510
+- **Total Functions:** 515
 - **Exported Functions:** 57
-- **Internal Functions:** 467
+- **Internal Functions:** 472
 - **S3 Methods:** 41
 - **S3 Classes:** 31
 
@@ -41,7 +41,7 @@
 - **Core Functions**: mvgam, series_to_mvgam, sim_mvgam
 - **Trend Types**: RW, GP, PW, VAR, CAR, ZMVN, AR
 - **Analysis Tools**: ppc, stability, fevd, irf, lfo_cv
-- **Plotting Functions**: plot_mvgam_series, plot_mvgam_smooth, plot_mvgam_pterms, plot_mvgam_factors, plot_mvgam_fc, plot_mvgam_trend, plot_mvgam_randomeffects, plot_mvgam_resids, plot_mvgam_uncertainty
+- **Plotting Functions**: plot_mvgam_fc, plot_mvgam_series, plot_mvgam_smooth, plot_mvgam_pterms, plot_mvgam_factors, plot_mvgam_trend, plot_mvgam_randomeffects, plot_mvgam_resids, plot_mvgam_uncertainty
 
 ## S3 Object System
 
@@ -139,8 +139,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/portal_data.R`** (0 functions) - Data documentation and loading
 
 ### Validation Files
-- **`R/validations.R`** (71 functions) - Input validation and checks
-  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_list_trend_formula, validate_single_trend_formula, validate_nonlinear_trend_compatibility, validate_required_variables (+ 56 more)
+- **`R/validations.R`** (72 functions) - Input validation and checks
+  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_list_trend_formula, validate_single_trend_formula, validate_nonlinear_trend_compatibility, validate_required_variables (+ 57 more)
 
 ### Core Files
 - **`R/summary.mvgam.R`** (24 functions) - Summary methods
@@ -185,8 +185,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: is.stanfit, is.brmsthreads, validate_threads, is.brmsopencl, validate_opencl, validate_silent, repair_stanfit, is.mvgam, nlist, parse_model (+ 16 more)
 - **`R/mu_expression_analysis.R`** (25 functions)
   - Key functions: extract_mu_construction_with_classification, classify_mu_expressions_structurally, create_analysis_context, classify_single_mu_expression_structurally, analyze_expression_structure, analyze_indexing_patterns_comprehensive, analyze_mathematical_operations_comprehensive, analyze_variable_relationships_comprehensive, determine_expression_type, extract_expression_variables_comprehensive, extract_comprehensive_variable_references, create_empty_mu_result, check_loop_requirement, build_execution_dependency_plan (+ 11 more)
-- **`R/glm_analysis.R`** (16 functions)
-  - Key functions: analyze_stan, create_response_mapping, to_injection, convert_glm_to_standard_linear, inject_trend_effects_linear, handle_nonlinear_trend_injection, detect_glm_patterns, classify_mu_patterns, determine_glm_preservation, determine_mu_construction_type (+ 6 more)
+- **`R/glm_analysis.R`** (19 functions)
+  - Key functions: analyze_stan, create_response_mapping, to_injection, convert_glm_to_standard_linear, inject_trend_effects_linear, detect_glm_patterns, classify_mu_patterns, determine_glm_preservation, determine_mu_construction_type, determine_optimization_reason (+ 9 more)
 - **`R/monotonic.R`** (5 functions)
   - Key functions: smooth.construct.moi.smooth.spec, smooth.construct.mod.smooth.spec, Predict.matrix.moi.smooth, Predict.matrix.mod.smooth, add_mono_model_file
 - **`R/ensemble.R`** (4 functions)
@@ -336,11 +336,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### `R/brms_integration.R` (1 potentially unused):
 - **handle_nonlinear_model()** (internal, never called)
 
-### `R/glm_analysis.R` (4 potentially unused):
-- **to_analysis()** (internal, never called)
-- **to_assembly()** (internal, never called)
-- **to_conversion()** (internal, never called)
-- **to_injection()** (internal, never called)
+### `R/glm_analysis.R` (1 potentially unused):
+- **get_operations_summary()** (internal, never called)
 
 ### `R/loo.mvgam.R` (1 potentially unused):
 - **samp_noinf()** (internal, never called)
@@ -466,12 +463,16 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **determine_glm_preservation()** (internal)
 - **determine_mu_construction_type()** (internal)
 - **determine_optimization_reason()** (internal)
+- **get_operations_summary()** (internal)
 - **inject_trend_effects_linear()** (internal)
 - **processing_state()** (internal)
 - **to_analysis()** (internal)
 - **to_assembly()** (internal)
 - **to_conversion()** (internal)
 - **to_injection()** (internal)
+- **track_operations()** (internal)
+- **transform_glm_code()** (internal)
+- **transition_with_tracking()** (internal)
 - **update_model_block_positions()** (internal)
 
 ### `R/how_to_cite.R`:
@@ -879,6 +880,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **extract_time_series_dimensions()** (internal)
 - **extract_trend_data()** (internal)
 - **filter_required_variables()** (internal)
+- **format_pipeline_error()** (internal)
 - **formula2str_mvgam()** (internal)
 - **generate_obs_trend_mapping()** (internal)
 - **get_series_for_grouping()** (internal)
