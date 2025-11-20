@@ -314,7 +314,7 @@ parse_glm_parameters_from_line <- function(glm_line, glm_type) {
   params <- trimws(params)
   
   # Extract response name for mu variable
-  resp_name <- gsub("Y_", "", y_var)
+  resp_name <- if (y_var == "Y") "" else gsub("Y_", "", y_var)
   
   result <- list(
     y_var = y_var,
@@ -345,20 +345,22 @@ build_mu_with_trend_effects <- function(glm_params, trend_injection_code) {
   checkmate::assert_character(trend_injection_code, len = 1)
   
   resp_name <- glm_params$response_name
+  # Create mu variable name: "mu" for univariate, "mu_response" for multivariate
+  mu_var <- if (resp_name == "") "mu" else paste0("mu_", resp_name)
   
   mu_lines <- c(
-    paste0("  vector[N] mu_", resp_name, ";"),
-    paste0("  mu_", resp_name, " = rep_vector(0.0, N);"),
+    paste0("  vector[N] ", mu_var, ";"),
+    paste0("  ", mu_var, " = rep_vector(0.0, N);"),
     "",
     paste0("  // Add fixed effects"),
-    paste0("  mu_", resp_name, " += ", glm_params$design_matrix, " * ", glm_params$coefficients, ";"),
-    paste0("  mu_", resp_name, " += ", glm_params$intercept, ";"),
+    paste0("  ", mu_var, " += ", glm_params$design_matrix, " * ", glm_params$coefficients, ";"),
+    paste0("  ", mu_var, " += ", glm_params$intercept, ";"),
     ""
   )
   
   # Parse and add trend effects
   trend_lines <- strsplit(trend_injection_code, "\n")[[1]]
-  trend_lines <- gsub("mu\\[n\\]", paste0("mu_", resp_name, "[n]"), trend_lines)
+  trend_lines <- gsub("mu\\[n\\]", paste0(mu_var, "[n]"), trend_lines)
   
   mu_lines <- c(mu_lines, trend_lines)
   
@@ -380,19 +382,22 @@ transform_glm_call_to_mu_format <- function(glm_line, glm_type, glm_params) {
   checkmate::assert_list(glm_params)
   
   resp_name <- glm_params$response_name
+  # Create mu variable name: "mu" for univariate, "mu_response" for multivariate
+  mu_var <- if (resp_name == "") "mu" else paste0("mu_", resp_name)
+  mu_ones_var <- if (resp_name == "") "mu_ones" else paste0("mu_ones_", resp_name)
   
   # Build transformed call based on GLM type
   if (glm_type == "normal_id") {
     transformed_call <- paste0(
       "  target += normal_id_glm_lpdf(", glm_params$y_var, 
-      " | to_matrix(mu_", resp_name, "), 0.0, mu_ones", 
+      " | to_matrix(", mu_var, "), 0.0, ", mu_ones_var, 
       ", ", glm_params$sigma, ");"
     )
   } else {
     glm_function <- paste0(glm_type, "_glm_lpmf")
     transformed_call <- paste0(
       "  target += ", glm_function, "(", glm_params$y_var,
-      " | to_matrix(mu_", resp_name, "), 0.0, mu_ones);"
+      " | to_matrix(", mu_var, "), 0.0, ", mu_ones_var, ");"
     )
   }
   
