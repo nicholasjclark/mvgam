@@ -3320,3 +3320,38 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
     return(trend_data)
   }
 }
+
+#' Format Pipeline Error with Context
+#'
+#' @description
+#' Creates detailed error message with context information for debugging
+#' pipeline failures. Follows established validation.R error patterns.
+#'
+#' @param message Character string with base error message
+#' @param context List with optional debugging context (default: NULL)
+#'
+#' @return Stops execution with formatted error
+#'
+#' @noRd
+format_pipeline_error <- function(message, context = NULL) {
+  checkmate::assert_character(message, len = 1, min.chars = 1)
+  checkmate::assert_list(context, null.ok = TRUE)
+  
+  # Build error message components
+  error_components <- c(message)
+  
+  # Add context information if provided
+  if (!is.null(context) && length(context) > 0) {
+    for (name in names(context)) {
+      if (!is.null(context[[name]])) {
+        context_info <- sprintf("%s: {.field %s}", name, 
+                               as.character(context[[name]])[1])
+        error_components <- c(error_components, context_info)
+      }
+    }
+  }
+  
+  # Format and stop with error
+  full_message <- paste(error_components, collapse = ". ")
+  stop(insight::format_error(full_message), call. = FALSE)
+}

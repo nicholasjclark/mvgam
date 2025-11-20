@@ -67,11 +67,11 @@
 
 - [ ] **3.0 Linear Processing Pipeline Implementation**
   - **Note**: Use r-package-analyzer agent to examine how brms handles GLM optimization decisions and integration patterns
-  - [ ] 3.1 Create `process_stan()` main pipeline function that chains state transitions linearly: analysis → conversion → injection → assembly
-  - [ ] 3.2 Integrate with existing `extract_mu_construction_with_classification()` by calling it in `to_injection()` transition
-  - [ ] 3.3 Implement `skip_glm_conversion()` logic that preserves GLM optimization when no trends require standard parameterization
-  - [ ] 3.4 Add `track_operations()` function that maintains immutable list of completed operations for debugging and validation
-  - [ ] 3.5 Create error handling using `insight::format_error()` with clear state information when pipeline transitions fail
+  - [x] 3.1 Create `transform_glm_code()` main pipeline function that chains state transitions linearly: analysis → conversion → injection → assembly
+  - [x] 3.2 Integrate with existing `extract_mu_construction_with_classification()` by calling it in `to_injection()` transition
+  - [x] 3.3 Implement `skip_glm_conversion()` logic that preserves GLM optimization when no trends require standard parameterization
+  - [x] 3.4 Add `track_operations()` function that maintains immutable list of completed operations for debugging and validation
+  - [x] 3.5 Create error handling using `insight::format_error()` with clear state information when pipeline transitions fail
 
 - [ ] **4.0 DRY Code Consolidation**
   - **Note**: Use pathfinder agent to locate all duplicate GLM processing functions and identify consolidation opportunities

@@ -270,7 +270,8 @@ determine_optimization_reason <- function(has_glm, has_trends) {
 processing_state <- function(code_lines, processed_positions = integer(0), 
                             model_block = list(start = NA_integer_, end = NA_integer_),
                             transformations_applied = character(0),
-                            stage = "initial") {
+                            stage = "initial",
+                            operations_log = NULL) {
   
   checkmate::assert_character(code_lines, min.len = 1)
   checkmate::assert_integerish(processed_positions, null.ok = TRUE)
@@ -292,7 +293,9 @@ processing_state <- function(code_lines, processed_positions = integer(0),
       model_block = model_block,
       transformations_applied = transformations_applied,
       stage = stage,
-      analysis = NULL
+      analysis = NULL,
+      mu_analysis = NULL,
+      operations_log = operations_log
     ),
     class = "processing_state"
   )
@@ -315,7 +318,14 @@ to_analysis <- function(state, response_names = NULL, trend_info = NULL) {
   checkmate::assert_character(response_names, null.ok = TRUE)
   
   if (state$stage != "initial") {
-    insight::format_error("State must be in 'initial' stage for analysis")
+    format_pipeline_error(
+      "Invalid state for GLM analysis",
+      list(
+        expected_stage = "initial",
+        actual_stage = state$stage,
+        operation = "to_analysis"
+      )
+    )
   }
   
   stan_code <- paste(state$code_lines, collapse = "\n")
@@ -348,28 +358,40 @@ to_conversion <- function(state) {
   checkmate::assert_class(state, "processing_state")
   
   if (state$stage != "analyzed") {
-    insight::format_error("State must be in 'analyzed' stage for conversion")
+    format_pipeline_error(
+      "Invalid state for GLM conversion",
+      list(
+        expected_stage = "analyzed",
+        actual_stage = state$stage,
+        operation = "to_conversion"
+      )
+    )
   }
   
   if (!state$analysis$optimization_plan$convert_to_standard) {
-    return(processing_state(
+    new_state <- processing_state(
       code_lines = state$code_lines,
       processed_positions = state$processed_positions,
       model_block = state$model_block,
       transformations_applied = c(state$transformations_applied, "conversion_skipped"),
       stage = "converted"
-    ))
+    )
+    new_state$analysis <- state$analysis
+    return(new_state)
   }
   
   conversion_result <- convert_glm_to_standard_linear(state$code_lines, state$analysis)
   
-  processing_state(
+  new_state <- processing_state(
     code_lines = conversion_result$updated_code,
     processed_positions = conversion_result$new_positions,
     model_block = update_model_block_positions(state$model_block, conversion_result),
     transformations_applied = c(state$transformations_applied, "glm_converted"),
     stage = "converted"
   )
+  new_state$analysis <- state$analysis
+  
+  return(new_state)
 }
 
 #' Transition to Injection Stage
@@ -388,20 +410,35 @@ to_injection <- function(state, trend_injection_code) {
   checkmate::assert_character(trend_injection_code, len = 1)
   
   if (state$stage != "converted") {
-    insight::format_error("State must be in 'converted' stage for injection")
+    format_pipeline_error(
+      "Invalid state for trend injection",
+      list(
+        expected_stage = "converted",
+        actual_stage = state$stage,
+        operation = "to_injection"
+      )
+    )
   }
   
   stan_code <- paste(state$code_lines, collapse = "\n")
+  
+  # Extract mu construction with classification for smart injection
+  mu_analysis <- extract_mu_construction_with_classification(stan_code)
+  
   injected_code <- inject_trend_effects_linear(stan_code, trend_injection_code)
   injected_lines <- strsplit(injected_code, "\n")[[1]]
   
-  processing_state(
+  new_state <- processing_state(
     code_lines = injected_lines,
     processed_positions = state$processed_positions,
     model_block = state$model_block,
-    transformations_applied = c(state$transformations_applied, "trend_injected"),
+    transformations_applied = c(state$transformations_applied, "mu_analyzed", "trend_injected"),
     stage = "injected"
   )
+  new_state$analysis <- state$analysis
+  new_state$mu_analysis <- mu_analysis
+  
+  return(new_state)
 }
 
 #' Transition to Assembly Stage
@@ -418,7 +455,14 @@ to_assembly <- function(state) {
   checkmate::assert_class(state, "processing_state")
   
   if (state$stage != "injected") {
-    insight::format_error("State must be in 'injected' stage for assembly")
+    format_pipeline_error(
+      "Invalid state for code assembly",
+      list(
+        expected_stage = "injected",
+        actual_stage = state$stage,
+        operation = "to_assembly"
+      )
+    )
   }
   
   final_code <- paste(state$code_lines, collapse = "\n")
@@ -446,7 +490,13 @@ convert_glm_to_standard_linear <- function(code_lines, analysis) {
   
   block_info <- find_stan_block(code_lines, "model")
   if (is.null(block_info)) {
-    insight::format_error("Model block not found in Stan code")
+    format_pipeline_error(
+      "Model block missing from Stan code",
+      list(
+        operation = "glm_conversion",
+        code_length = length(code_lines)
+      )
+    )
   }
   
   if (block_info$start_idx > block_info$end_idx || block_info$end_idx > length(code_lines)) {
@@ -539,7 +589,13 @@ inject_trend_effects_linear <- function(stan_code, trend_injection_code) {
   
   block_info <- find_stan_block(code_lines, "model")
   if (is.null(block_info)) {
-    insight::format_error("Model block not found in Stan code")
+    format_pipeline_error(
+      "Model block missing from Stan code",
+      list(
+        operation = "trend_injection",
+        code_length = length(code_lines)
+      )
+    )
   }
   
   model_lines <- code_lines[block_info$start_idx:block_info$end_idx]
@@ -559,43 +615,179 @@ inject_trend_effects_linear <- function(stan_code, trend_injection_code) {
     
     return(paste(updated_lines, collapse = "\n"))
   } else {
-    return(handle_nonlinear_trend_injection(stan_code, trend_injection_code))
+    code_lines <- strsplit(stan_code, "\n")[[1]]
+    block_info <- find_stan_block(code_lines, "model")
+    if (is.null(block_info)) {
+      return(stan_code)
+    }
+    
+    trend_lines <- strsplit(trend_injection_code, "\n")[[1]]
+    modified_lines <- handle_nonlinear_trend_injection(code_lines, block_info, trend_lines)
+    return(paste(modified_lines, collapse = "\n"))
   }
 }
 
-#' Handle Nonlinear Trend Injection
+#' Transition State with Operation Tracking
 #'
 #' @description
-#' Fallback for trend injection when no mu lines found.
-#' Inserts trend code at start of model block.
+#' Creates new state with stage transition and operation tracking in one call.
+#' Eliminates duplicate pattern across state transition functions.
 #'
-#' @param stan_code Character string containing Stan code
-#' @param trend_injection_code Character string containing trend injection code
+#' @param state Object of class "processing_state"
+#' @param new_stage Character string for new processing stage
+#' @param operation Character string describing the operation performed
+#' @param details List with additional operation details (optional)
+#' @param modifications List with state field modifications (optional)
 #'
-#' @return Character string with trend effects injected
+#' @return New "processing_state" object with transition and operation logged
+#'
+#' @examples
+#' \dontrun{
+#' state <- transition_with_tracking(state, "analyzed", "glm_analysis",
+#'                                  list(patterns = 3),
+#'                                  list(analysis = analysis_result))
+#' }
 #'
 #' @noRd
-handle_nonlinear_trend_injection <- function(stan_code, trend_injection_code) {
-  checkmate::assert_character(stan_code, len = 1)
-  checkmate::assert_character(trend_injection_code, len = 1)
+transition_with_tracking <- function(state, new_stage, operation, 
+                                   details = list(), modifications = list()) {
+  checkmate::assert_class(state, "processing_state")
+  checkmate::assert_character(new_stage, len = 1)
+  checkmate::assert_character(operation, len = 1, min.chars = 1)
+  checkmate::assert_list(details)
+  checkmate::assert_list(modifications)
   
-  code_lines <- strsplit(stan_code, "\n")[[1]]
-  
-  block_info <- find_stan_block(code_lines, "model")
-  if (is.null(block_info)) {
-    return(stan_code)
+  # Verify all original state fields exist and are not NULL
+  required_fields <- c("code_lines", "processed_positions", "model_block", 
+                      "transformations_applied", "stage", "analysis", 
+                      "mu_analysis")
+  missing_fields <- required_fields[!required_fields %in% names(state)]
+  if (length(missing_fields) > 0) {
+    insight::format_error("State object missing required {.field {missing_fields}}")
   }
   
-  insertion_point <- block_info$start_idx + 1
-  trend_lines <- strsplit(trend_injection_code, "\n")[[1]]
-  
-  updated_lines <- c(
-    code_lines[1:insertion_point],
-    trend_lines,
-    code_lines[(insertion_point + 1):length(code_lines)]
+  # Apply modifications or use existing values
+  new_state <- processing_state(
+    code_lines = modifications$code_lines %||% state$code_lines,
+    processed_positions = modifications$processed_positions %||% state$processed_positions,
+    model_block = modifications$model_block %||% state$model_block,
+    transformations_applied = c(state$transformations_applied, operation),
+    stage = new_stage,
+    operations_log = state$operations_log
   )
   
-  return(paste(updated_lines, collapse = "\n"))
+  # Apply additional field modifications
+  if (!is.null(modifications$analysis)) {
+    new_state$analysis <- modifications$analysis
+  } else if (!is.null(state$analysis)) {
+    new_state$analysis <- state$analysis
+  }
+  
+  if (!is.null(modifications$mu_analysis)) {
+    new_state$mu_analysis <- modifications$mu_analysis
+  } else if (!is.null(state$mu_analysis)) {
+    new_state$mu_analysis <- state$mu_analysis
+  }
+  
+  # Track operation with details
+  track_operations(new_state, operation, details)
+}
+
+#' Track Processing Operations
+#'
+#' @description
+#' Adds operation tracking to processing state for debugging and validation.
+#' Maintains immutable list of completed operations with timestamps.
+#'
+#' @param state Object of class "processing_state"
+#' @param operation Character string describing the operation performed
+#' @param details List with additional operation details (optional)
+#'
+#' @return New "processing_state" object with operation logged
+#'
+#' @examples
+#' \dontrun{
+#' state <- processing_state(code_lines)
+#' state <- track_operations(state, "glm_analysis", 
+#'                          list(patterns_found = 3))
+#' }
+#'
+#' @noRd
+track_operations <- function(state, operation, details = list()) {
+  checkmate::assert_class(state, "processing_state")
+  checkmate::assert_character(operation, len = 1, min.chars = 1)
+  checkmate::assert_list(details)
+  
+  # Verify all original state fields are preserved
+  required_fields <- c("code_lines", "processed_positions", "model_block", 
+                      "transformations_applied", "stage", "analysis", 
+                      "mu_analysis")
+  if (!all(required_fields %in% names(state))) {
+    insight::format_error("State object missing required fields")
+  }
+  
+  operation_entry <- list(
+    operation = operation,
+    stage = state$stage,
+    timestamp = Sys.time(),
+    details = details
+  )
+  
+  new_transformations <- c(state$transformations_applied, operation)
+  
+  operations_log <- if (is.null(state$operations_log)) {
+    list(operation_entry)
+  } else {
+    c(state$operations_log, list(operation_entry))
+  }
+  
+  structure(
+    list(
+      code_lines = state$code_lines,
+      processed_positions = state$processed_positions,
+      model_block = state$model_block,
+      transformations_applied = new_transformations,
+      stage = state$stage,
+      analysis = state$analysis,
+      mu_analysis = state$mu_analysis,
+      operations_log = operations_log
+    ),
+    class = "processing_state"
+  )
+}
+
+#' Get Operations Summary
+#'
+#' @description
+#' Extracts operations summary from processing state for debugging.
+#'
+#' @param state Object of class "processing_state"
+#'
+#' @return Data frame with operations summary
+#'
+#' @noRd
+get_operations_summary <- function(state) {
+  checkmate::assert_class(state, "processing_state")
+  
+  if (is.null(state$operations_log) || length(state$operations_log) == 0) {
+    return(data.frame(
+      operation = character(0),
+      stage = character(0),
+      timestamp = Sys.time()[0],
+      stringsAsFactors = FALSE
+    ))
+  }
+  
+  operations_df <- data.frame(
+    operation = vapply(state$operations_log, function(x) x$operation, 
+                      character(1)),
+    stage = vapply(state$operations_log, function(x) x$stage, character(1)),
+    timestamp = do.call(c, lapply(state$operations_log, 
+                                 function(x) x$timestamp)),
+    stringsAsFactors = FALSE
+  )
+  
+  return(operations_df)
 }
 
 #' Update Model Block Positions
@@ -614,4 +806,44 @@ update_model_block_positions <- function(model_block, conversion_result) {
   checkmate::assert_list(conversion_result)
   
   return(model_block)
+}
+
+#' Transform GLM Code Through Linear Pipeline
+#'
+#' @description
+#' Main pipeline function that chains state transitions linearly:
+#' analysis → conversion → injection → assembly.
+#'
+#' @param stan_code Character string containing Stan code to process
+#' @param trend_injection_code Character string containing trend injection code
+#' @param response_names Character vector of response variable names (optional)
+#' @param trend_info List containing trend information (optional)
+#'
+#' @return Character string containing processed Stan code
+#'
+#' @examples
+#' \dontrun{
+#' stan_code <- "model { target += poisson_log_glm_lpmf(Y | X, alpha, beta); }"
+#' processed <- transform_glm_code(stan_code, "mu += trend;")
+#' }
+#'
+#' @noRd
+transform_glm_code <- function(stan_code, trend_injection_code, response_names = NULL, trend_info = NULL) {
+  checkmate::assert_character(stan_code, len = 1)
+  checkmate::assert_character(trend_injection_code, len = 1)
+  checkmate::assert_character(response_names, null.ok = TRUE)
+  checkmate::assert_list(trend_info, null.ok = TRUE)
+  
+  if (nchar(stan_code) == 0) {
+    insight::format_error("Stan code cannot be empty for parameter {.field stan_code}")
+  }
+  
+  # Chain state transitions
+  code_lines <- strsplit(stan_code, "\n")[[1]]
+  state <- processing_state(code_lines, stage = "initial")
+  state <- to_analysis(state, response_names, trend_info)
+  state <- to_conversion(state)
+  state <- to_injection(state, trend_injection_code)
+  
+  return(to_assembly(state))
 }
