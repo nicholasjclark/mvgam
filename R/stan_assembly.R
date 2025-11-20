@@ -774,7 +774,7 @@ detect_glm_usage <- function(stan_code, response_names = NULL, skip_lines = inte
 #' @param glm_type Character string specifying GLM function base name
 #' @return List with extracted parameter names
 #' @noRd
-parse_glm_parameters <- function(stan_code, glm_type) {
+parse_glm_parameters_single <- function(stan_code, glm_type) {
   checkmate::assert_character(stan_code, min.len = 1)
   checkmate::assert_string(glm_type)
 
@@ -1120,43 +1120,16 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
     return(base_stancode)
   }
 
-  # Always use standard injection that preserves brms constructions
-  # Extract and validate mapping arrays using shared utility
+  # Extract and validate mapping arrays
   mapping_arrays <- extract_mapping_arrays(trend_stanvars)
   validate_mapping_arrays(mapping_arrays)
 
   # Generate trend injection code
   trend_injection_code <- generate_trend_injection_code(mapping_arrays)
+  trend_injection_string <- paste(trend_injection_code, collapse = "\n")
 
-  # Parse Stan code into lines
-  code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
-
-  # Insert trend injection into model block with proper GLM conversion tracking
-  injection_result <- insert_after_mu_lines_in_model_block(
-    code_lines, 
-    trend_injection_code,
-    processed_glm_lines = integer(0)  # Start with empty tracking
-  )
-  
-  # Reconstruct modified code
-  modified_stancode <- paste(injection_result$code_lines, collapse = "\n")
-  processed_lines <- injection_result$processed_glm_lines
-
-  # Only do post-processing if no GLM conversion occurred during injection
-  if (length(processed_lines) == 0) {
-    detected_glm_types <- detect_glm_usage(modified_stancode)
-    if (length(detected_glm_types) > 0) {
-      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-        cat("  Applying GLM post-processing (no conversion occurred during injection)\n")
-      }
-      modified_stancode <- transform_glm_calls_post_processing(modified_stancode, detected_glm_types)
-    }
-  } else {
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      cat("  Skipping GLM post-processing: conversion already occurred during injection\n")
-      cat("  Processed GLM lines:", paste(processed_lines, collapse = ", "), "\n")
-    }
-  }
+  # Apply linear transformation pipeline for GLM handling and trend injection
+  modified_stancode <- transform_glm_code(base_stancode, trend_injection_string)
 
   return(modified_stancode)
 }
@@ -1192,14 +1165,14 @@ transform_glm_calls_post_processing <- function(stan_code, detected_glm_types) {
   
   # Transform each detected GLM type
   for (glm_type in detected_glm_types) {
-    # Parse parameters with error handling
-    params <- parse_glm_parameters(modified_code, glm_type)
-    if (is.null(params)) {
+    # Use cached parameters from analysis (required)
+    if (is.null(analysis$glm_parameters[[glm_type]])) {
       stop(insight::format_error(
-        "Could not parse GLM parameters for type: {.field {glm_type}}",
-        "GLM function call may be malformed or missing required structure."
+        "GLM parameters not found in analysis for type: {.field {glm_type}}",
+        "Analysis object must contain pre-parsed GLM parameters."
       ), call. = FALSE)
     }
+    params <- analysis$glm_parameters[[glm_type]]
     
     # Transform with validation
     previous_code <- modified_code
@@ -1229,7 +1202,7 @@ transform_glm_calls_post_processing <- function(stan_code, detected_glm_types) {
 #' @param detected_glm_types Character vector of detected GLM function types
 #' @return Character vector with GLM calls converted to standard mu form
 #' @noRd
-convert_glm_to_standard_form <- function(code_lines, block_info, detected_glm_types, processed_glm_lines = integer(0)) {
+convert_glm_to_standard_form <- function(code_lines, block_info, detected_glm_types, analysis, processed_glm_lines = integer(0)) {
   checkmate::assert_character(code_lines, min.len = 1)
   checkmate::assert_list(block_info)
   checkmate::assert_names(names(block_info), must.include = c("start_idx", "end_idx"))
@@ -1237,6 +1210,10 @@ convert_glm_to_standard_form <- function(code_lines, block_info, detected_glm_ty
   checkmate::assert_integerish(block_info$end_idx, len = 1)
   checkmate::assert_character(detected_glm_types, min.len = 1)
   checkmate::assert_integerish(processed_glm_lines, null.ok = TRUE)
+  
+  # Validate required analysis object
+  checkmate::assert_class(analysis, "glm_analysis")
+  checkmate::assert_list(analysis$glm_parameters)
   
   # Validate block indices
   if (block_info$start_idx > block_info$end_idx || block_info$end_idx > length(code_lines)) {
@@ -1251,16 +1228,15 @@ convert_glm_to_standard_form <- function(code_lines, block_info, detected_glm_ty
   
   # Get the first detected GLM type for preprocessing
   glm_type <- detected_glm_types[1]
-  model_block_text <- paste(modified_lines[block_info$start_idx:block_info$end_idx], collapse = "\n")
   
-  # Parse GLM parameters using existing infrastructure
-  params <- parse_glm_parameters(model_block_text, glm_type)
-  if (is.null(params)) {
+  # Use cached parameters from analysis
+  if (is.null(analysis$glm_parameters[[glm_type]])) {
     stop(insight::format_error(
-      "Could not parse GLM parameters for type: {.field {glm_type}}",
-      "GLM function call may be malformed or missing required structure."
+      "GLM parameters not found in analysis for type: {.field {glm_type}}",
+      "Analysis object must contain pre-parsed GLM parameters."
     ), call. = FALSE)
   }
+  params <- analysis$glm_parameters[[glm_type]]
   
   # Find GLM call line to preprocess (skip already processed lines)
   glm_pattern <- paste0(glm_type, "_l(pdf|pmf)")
