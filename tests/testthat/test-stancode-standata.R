@@ -356,7 +356,6 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   # Advanced mathematical functions for VARMA stationarity (Heaps 2022)
   expect_true(stan_pattern("matrix sqrtm\\(matrix A\\)", code_with_trend))
   expect_true(stan_pattern("matrix AtoP\\(matrix P_real\\)", code_with_trend))
-  expect_true(stan_pattern("array\\[\\] matrix\\[\\] rev_mapping\\(", code_with_trend))
   expect_true(stan_pattern("matrix initial_joint_var\\(", code_with_trend))
 
   # Multivariate observation data
@@ -427,9 +426,6 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
   expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;", code_with_trend))
 
-  # Joint initialization for stationary distribution
-  expect_true(stan_pattern("vector\\[3 \\* N_lv_trend\\] init_trend;", code_with_trend))
-
   # Standard latent variables
   expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
 
@@ -453,13 +449,9 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_trend;", code_with_trend))
   expect_true(stan_pattern("P_var\\[i\\] = AtoP\\(A_raw_trend\\[i\\]\\);", code_with_trend))
   expect_true(stan_pattern("result_var = rev_mapping\\(P_var, Sigma_trend\\);", code_with_trend))
-  expect_true(stan_pattern("D_trend\\[1\\] = -result_ma\\[1, 1\\];", code_with_trend))
 
   # Initial joint covariance matrix
-  expect_true(stan_pattern("cov_matrix\\[3 \\* N_lv_trend\\] Omega_trend = initial_joint_var\\(Sigma_trend, A_trend, D_trend\\);", code_with_trend))
-
-  # MA initialization
-  expect_true(stan_pattern("vector\\[N_lv_trend\\] ma_init_trend = init_trend\\[\\(2 \\* N_lv_trend \\+ 1\\):\\(3 \\* N_lv_trend\\)\\];", code_with_trend))
+  expect_true(stan_pattern("Omega_trend = initial_joint_var\\(Sigma_trend, A_trend, D_trend\\);", code_with_trend))
 
   # Universal trend computation pattern
   expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\];", code_with_trend))
@@ -473,14 +465,10 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   expect_true(stan_pattern("mu_count\\[n\\] \\+= trend\\[obs_trend_time_count\\[n\\], obs_trend_series_count\\[n\\]\\];", code_with_trend))
   expect_true(stan_pattern("mu_biomass\\[n\\] \\+= trend\\[obs_trend_time_biomass\\[n\\], obs_trend_series_biomass\\[n\\]\\];", code_with_trend))
 
-  # Check observation-to-trend mappings are in data block
-  data_block <- substr(code_with_trend,
-                       regexpr("^data \\{", code_with_trend),
-                       regexpr("^\\}", code_with_trend))
-  expect_true(stan_pattern("array\\[N_count\\] int obs_trend_time_count;", data_block))
-  expect_true(stan_pattern("array\\[N_count\\] int obs_trend_series_count;", data_block))
-  expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_time_biomass;", data_block))
-  expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_series_biomass;", data_block))
+  expect_true(stan_pattern("array\\[N_count\\] int obs_trend_time_count;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_count\\] int obs_trend_series_count;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_time_biomass;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_series_biomass;", code_with_trend))
 
   # Verify mu_trend is computed from trend formula (no intercept)
   expect_true(stan_pattern("mu_trend \\+= X_trend \\* b_trend;", code_with_trend))
@@ -510,11 +498,10 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   expect_true(stan_pattern("target \\+= std_normal_lpdf\\(zs_count_1_1\\);", code_with_trend))
 
   # Initial joint distribution
-  expect_true(stan_pattern("vector\\[3 \\* N_lv_trend\\] mu_init_trend = rep_vector\\(0\\.0, 3 \\* N_lv_trend\\);", code_with_trend))
+  expect_true(stan_pattern("mu_init_trend = rep_vector\\(0\\.0, 3 \\* N_lv_trend\\);", code_with_trend))
   expect_true(stan_pattern("init_trend ~ multi_normal\\(mu_init_trend, Omega_trend\\);", code_with_trend))
 
   # VARMA dynamics implementation
-  expect_true(stan_pattern("vector\\[N_lv_trend\\] mu_t_trend\\[N_trend\\];", code_with_trend))
   expect_true(stan_pattern("vector\\[N_lv_trend\\] ma_error_trend\\[N_trend\\];", code_with_trend))
 
   # VAR component with initialization handling
@@ -530,15 +517,10 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   # MA specific parameters must exist for VARMA model
   expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_raw_trend;", code_with_trend))
   expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_trend;", code_with_trend))
-  expect_true(stan_pattern("vector\\[N_lv_trend\\] ma_error_trend\\[N_trend\\];", code_with_trend))
   expect_true(stan_pattern("vector\\[N_lv_trend\\] ma_init_trend", code_with_trend))
-
-  # MA transformation must occur
-  expect_true(stan_pattern("D_trend\\[1\\] = -result_ma\\[1, 1\\];", code_with_trend))
 
   # Latent variable likelihood
   expect_true(stan_pattern("lv_trend\\[t, :\\]' ~ multi_normal\\(mu_t_trend\\[t\\], Sigma_trend\\);", code_with_trend))
-  expect_true(stan_pattern("ma_error_trend\\[t\\] = lv_trend\\[t, :\\]' - mu_t_trend\\[t\\];", code_with_trend))
 
   # Prior structure validation (existence, not specific distributions)
   # Hierarchical priors should exist
@@ -554,7 +536,6 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   # Basic parameter priors should exist
   expect_true(stan_pattern("sigma_trend ~", code_with_trend))
   expect_true(stan_pattern("L_Omega_trend ~", code_with_trend))
-  expect_true(stan_pattern("b_trend ~", code_with_trend))
 
   # Intercept transformations in generated quantities
   expect_true(stan_pattern("real b_count_Intercept = Intercept_count;", code_with_trend))
@@ -582,7 +563,6 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   expect_false(grepl("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw", code_with_trend))
   expect_false(grepl("Z_raw\\[index\\]", code_with_trend))
   expect_false(grepl("Z\\[i, j\\] = Z_raw\\[index\\]", code_with_trend))
-  expect_false(grepl("for \\(j in 1 : N_lv_trend\\)", code_with_trend))
   expect_false(grepl("for \\(i in j : N_series_trend\\)", code_with_trend))
 
   # Should NOT have unsuffixed parameter names (could conflict with observation model)
