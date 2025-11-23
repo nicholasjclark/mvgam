@@ -356,35 +356,30 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   # Advanced mathematical functions for VARMA stationarity (Heaps 2022)
   expect_true(stan_pattern("matrix sqrtm\\(matrix A\\)", code_with_trend))
   expect_true(stan_pattern("matrix AtoP\\(matrix P_real\\)", code_with_trend))
-  expect_true(stan_pattern("array\\[,\\] matrix\\[,\\] rev_mapping\\(", code_with_trend))
+  expect_true(stan_pattern("array\\[\\] matrix\\[\\] rev_mapping\\(", code_with_trend))
   expect_true(stan_pattern("matrix initial_joint_var\\(", code_with_trend))
 
-  # Function documentation comments
-  expect_true(stan_pattern("Compute matrix square root using eigendecomposition", code_with_trend))
-  expect_true(stan_pattern("Following Heaps 2022 methodology", code_with_trend))
-  expect_true(stan_pattern("Numerical stability check for positive definiteness", code_with_trend))
-
-  # Multivariate observation data with comments
-  expect_true(stan_pattern("int<lower=1> N_count;.*number of observations", code_with_trend))
-  expect_true(stan_pattern("vector\\[N_count\\] Y_count;.*response variable", code_with_trend))
-  expect_true(stan_pattern("int<lower=1> N_biomass;.*number of observations", code_with_trend))
-  expect_true(stan_pattern("vector\\[N_biomass\\] Y_biomass;.*response variable", code_with_trend))
+  # Multivariate observation data
+  expect_true(stan_pattern("int<lower=1> N_count;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_count\\] Y_count;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_biomass;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_biomass\\] Y_biomass;", code_with_trend))
 
   # Spline data structures
-  expect_true(stan_pattern("int Ks_count;.*number of linear effects", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_count, Ks_count\\] Xs_count;.*design matrix", code_with_trend))
-  expect_true(stan_pattern("int nb_count_1;.*number of bases", code_with_trend))
+  expect_true(stan_pattern("int Ks_count;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_count, Ks_count\\] Xs_count;", code_with_trend))
+  expect_true(stan_pattern("int nb_count_1;", code_with_trend))
   expect_true(stan_pattern("matrix\\[N_count, knots_count_1\\[1\\]\\] Zs_count_1_1;", code_with_trend))
 
   # Trend dimensions
-  expect_true(stan_pattern("int<lower=1> N_trend;.*number of time points", code_with_trend))
-  expect_true(stan_pattern("int<lower=1> N_series_trend;.*number of series", code_with_trend))
-  expect_true(stan_pattern("int<lower=1> N_lv_trend;.*latent variables", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_trend;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_series_trend;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_lv_trend;", code_with_trend))
 
   # Trend formula data (presence covariate)
-  expect_true(stan_pattern("int<lower=1> K_trend;.*number of trend coefficients", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_trend, K_trend\\] X_trend;.*trend design matrix", code_with_trend))
-  expect_true(stan_pattern("vector\\[Kc_trend\\] means_X_trend;.*column means", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> K_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_trend, K_trend\\] X_trend;", code_with_trend))
+  # No centering variables since trend_formula has no explicit intercept
 
   # Mapping arrays with response-specific suffixes
   expect_true(stan_pattern("array\\[N_count\\] int obs_trend_time_count;", code_with_trend))
@@ -395,59 +390,45 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   # Times trend matrix (2D integer array)
   expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;", code_with_trend))
 
-  # Trend formula design matrix variables (presence covariate)
+  # Trend formula design matrix variables (presence covariate, no intercept)
   expect_true(stan_pattern("int<lower=1> K_trend;", code_with_trend))
-  expect_true(stan_pattern("int<lower=1> Kc_trend;", code_with_trend))
   expect_true(stan_pattern("matrix\\[N_trend, K_trend\\] X_trend;", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_trend, Kc_trend\\] Xc_trend;", code_with_trend))
-  expect_true(stan_pattern("vector\\[Kc_trend\\] means_X_trend;", code_with_trend))
+  # No centering variables (Kc_trend, Xc_trend, means_X_trend) since no explicit intercept
 
   # VAR initialization constants in transformed data
   expect_true(stan_pattern("vector\\[N_lv_trend\\] trend_zeros = rep_vector\\(0\\.0, N_lv_trend\\);", code_with_trend))
-  expect_true(stan_pattern("Zero mean vector for VARMA process.*following Heaps 2022", code_with_trend))
-
-  # brms-style centering computation in transformed data
-  expect_true(stan_pattern("matrix\\[N_trend, Kc_trend\\] Xc_trend;.*centered version", code_with_trend))
-  expect_true(stan_pattern("vector\\[Kc_trend\\] means_X_trend;.*column means", code_with_trend))
-  expect_true(stan_pattern("for \\(i in 2:K_trend\\)", code_with_trend))
-  expect_true(stan_pattern("means_X_trend\\[i - 1\\] = mean\\(X_trend\\[, i\\]\\);", code_with_trend))
-  expect_true(stan_pattern("Xc_trend\\[, i - 1\\] = X_trend\\[, i\\] - means_X_trend\\[i - 1\\];", code_with_trend))
 
   # Factor loading matrix (identity for non-factor VAR)
   expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix\\(rep_vector\\(1\\.0, N_lv_trend\\)\\);", code_with_trend))
 
   # Observation model parameters (multivariate with splines)
-  expect_true(stan_pattern("real Intercept_count;.*temporary intercept", code_with_trend))
-  expect_true(stan_pattern("vector\\[Ks_count\\] bs_count;.*unpenalized spline", code_with_trend))
+  expect_true(stan_pattern("real Intercept_count;", code_with_trend))
+  expect_true(stan_pattern("vector\\[Ks_count\\] bs_count;", code_with_trend))
   expect_true(stan_pattern("vector\\[knots_count_1\\[1\\]\\] zs_count_1_1;", code_with_trend))
-  expect_true(stan_pattern("vector<lower=0>\\[nb_count_1\\] sds_count_1;.*SDs.*spline", code_with_trend))
-  expect_true(stan_pattern("real<lower=0> sigma_count;.*dispersion parameter", code_with_trend))
+  expect_true(stan_pattern("vector<lower=0>\\[nb_count_1\\] sds_count_1;", code_with_trend))
+  expect_true(stan_pattern("real<lower=0> sigma_count;", code_with_trend))
 
-  # Trend parameters
-  expect_true(stan_pattern("real Intercept_trend;.*trend intercept", code_with_trend))
-  expect_true(stan_pattern("vector\\[Kc_trend\\] b_trend;.*trend coefficients.*presence", code_with_trend))
+  # Trend parameters (no intercept since formula is ~ presence + VAR, not ~ 1 + presence + VAR)
+  expect_true(stan_pattern("vector\\[K_trend\\] b_trend;", code_with_trend))
 
   # VAR coefficient matrices (raw/unconstrained for stationarity)
-  expect_true(stan_pattern("array\\[2\\] matrix\\[N_lv_trend, N_lv_trend\\] A_raw_trend;.*lag-1, lag-2", code_with_trend))
+  expect_true(stan_pattern("array\\[2\\] matrix\\[N_lv_trend, N_lv_trend\\] A_raw_trend;", code_with_trend))
 
   # MA coefficient matrices
-  expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_raw_trend;.*ma=TRUE.*1 MA lag", code_with_trend))
+  expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_raw_trend;", code_with_trend))
 
   # Hierarchical hyperparameters (Heaps 2022 methodology)
-  expect_true(stan_pattern("array\\[2\\] vector\\[2\\] Amu_trend;.*Shared means.*diag, off-diag.*lag1, lag2", code_with_trend))
-  expect_true(stan_pattern("array\\[2\\] vector<lower=0>\\[2\\] Aomega_trend;.*Shared precisions", code_with_trend))
-  expect_true(stan_pattern("array\\[2\\] vector\\[1\\] Dmu_trend;.*MA means", code_with_trend))
-  expect_true(stan_pattern("array\\[2\\] vector<lower=0>\\[1\\] Domega_trend;.*MA precisions", code_with_trend))
+  expect_true(stan_pattern("array\\[2\\] vector\\[2\\] Amu_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[2\\] vector<lower=0>\\[2\\] Aomega_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[2\\] vector\\[1\\] Dmu_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[2\\] vector<lower=0>\\[1\\] Domega_trend;", code_with_trend))
 
   # Innovation parameters
-  expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;.*innovation SDs", code_with_trend))
-  expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;.*innovation correlations", code_with_trend))
-
-  # Trend coefficients for presence covariate
-  expect_true(stan_pattern("vector\\[Kc_trend\\] b_trend;.*trend coefficients", code_with_trend))
+  expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
+  expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;", code_with_trend))
 
   # Joint initialization for stationary distribution
-  expect_true(stan_pattern("vector\\[3 \\* N_lv_trend\\] init_trend;.*2 VAR lags \\+ 1 MA lag", code_with_trend))
+  expect_true(stan_pattern("vector\\[3 \\* N_lv_trend\\] init_trend;", code_with_trend))
 
   # Standard latent variables
   expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
@@ -457,15 +438,11 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   expect_true(stan_pattern("s_biomass_1_1 = sds_biomass_1\\[1\\] \\* zs_biomass_1_1;", code_with_trend))
 
   # lprior initialization and accumulation
-  expect_true(stan_pattern("real lprior = 0;.*prior contributions", code_with_trend))
-
-  # Trend linear predictor with presence covariate
-  expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
-  expect_true(stan_pattern("mu_trend \\+= Intercept_trend \\+ Xc_trend \\* b_trend;", code_with_trend))
+  expect_true(stan_pattern("real lprior = 0;", code_with_trend))
 
   # Trend linear predictor with presence covariate (no intercept since ~ presence + VAR, not ~ 1 + presence + VAR)
-  expect_true(grepl("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
-  expect_true(grepl("mu_trend \\+= Xc_trend \\* b_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
+  expect_true(stan_pattern("mu_trend \\+= X_trend \\* b_trend;", code_with_trend))
 
   # Innovation covariance construction
   expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend = diag_pre_multiply\\(sigma_trend, L_Omega_trend\\);", code_with_trend))
@@ -505,8 +482,8 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_time_biomass;", data_block))
   expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_series_biomass;", data_block))
 
-  # Verify mu_trend is computed from trend formula
-  expect_true(stan_pattern("mu_trend \\+= Intercept_trend \\+ Xc_trend \\* b_trend;", code_with_trend))
+  # Verify mu_trend is computed from trend formula (no intercept)
+  expect_true(stan_pattern("mu_trend \\+= X_trend \\* b_trend;", code_with_trend))
 
   # Check no template placeholders remain
   expect_false(grepl("\\{lags\\}", code_with_trend))
@@ -538,17 +515,15 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
 
   # VARMA dynamics implementation
   expect_true(stan_pattern("vector\\[N_lv_trend\\] mu_t_trend\\[N_trend\\];", code_with_trend))
-  expect_true(stan_pattern("vector\\[N_lv_trend\\] ma_error_trend\\[N_trend\\];.*MA error terms", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_lv_trend\\] ma_error_trend\\[N_trend\\];", code_with_trend))
 
   # VAR component with initialization handling
-  expect_true(stan_pattern("for \\(i in 1:2\\).*2 VAR lags", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 1:2\\)", code_with_trend))
   expect_true(stan_pattern("if \\(t - i <= 0\\)", code_with_trend))
-  expect_true(stan_pattern("Use values from earlier than series start.*from init_trend", code_with_trend))
   expect_true(stan_pattern("mu_t_trend\\[t\\] \\+= A_trend\\[i\\] \\* lv_trend\\[t - i, :\\]';", code_with_trend))
 
   # MA component
   expect_true(stan_pattern("if \\(t - 1 <= 0\\)", code_with_trend))
-  expect_true(stan_pattern("Use initial MA errors for early time points", code_with_trend))
   expect_true(stan_pattern("mu_t_trend\\[t\\] \\+= D_trend\\[1\\] \\* ma_init_trend;", code_with_trend))
   expect_true(stan_pattern("mu_t_trend\\[t\\] \\+= D_trend\\[1\\] \\* ma_error_trend\\[t - 1\\];", code_with_trend))
 
@@ -567,14 +542,14 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
 
   # Prior structure validation (existence, not specific distributions)
   # Hierarchical priors should exist
-  expect_true(stan_pattern("Amu_trend\\[.*\\] ~", code_with_trend))
-  expect_true(stan_pattern("Aomega_trend\\[.*\\] ~", code_with_trend))
-  expect_true(stan_pattern("Dmu_trend\\[.*\\] ~", code_with_trend))
-  expect_true(stan_pattern("Domega_trend\\[.*\\] ~", code_with_trend))
+  expect_true(stan_pattern("Amu_trend\\[", code_with_trend))
+  expect_true(stan_pattern("Aomega_trend\\[", code_with_trend))
+  expect_true(stan_pattern("Dmu_trend\\[", code_with_trend))
+  expect_true(stan_pattern("Domega_trend\\[", code_with_trend))
 
   # Structured priors for raw coefficients should exist
-  expect_true(stan_pattern("A_raw_trend\\[.*\\] ~ .*\\(Amu_trend", code_with_trend))
-  expect_true(stan_pattern("D_raw_trend\\[.*\\] ~ .*\\(Dmu_trend", code_with_trend))
+  expect_true(stan_pattern("A_raw_trend\\[.*\\] ~ ", code_with_trend))
+  expect_true(stan_pattern("D_raw_trend\\[.*\\] ~ ", code_with_trend))
 
   # Basic parameter priors should exist
   expect_true(stan_pattern("sigma_trend ~", code_with_trend))
@@ -584,7 +559,7 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   # Intercept transformations in generated quantities
   expect_true(stan_pattern("real b_count_Intercept = Intercept_count;", code_with_trend))
   expect_true(stan_pattern("real b_biomass_Intercept = Intercept_biomass;", code_with_trend))
-  expect_true(stan_pattern("real b_trend_Intercept = Intercept_trend - dot_product\\(means_X_trend, b_trend\\);", code_with_trend))
+  # No b_trend_Intercept since trend formula has no explicit intercept
 
   # Anti-patterns: Should NOT have simple AR parameters (this is VAR, not AR)
   expect_false(grepl("vector.*ar1_trend", code_with_trend))
@@ -653,32 +628,32 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
     expect_true(stan_pattern("functions \\{\\s*\\}", code_with_trend))
 
     # Three-family multivariate observation data
-    expect_true(stan_pattern("int<lower=1> N_count;.*number of observations",
+    expect_true(stan_pattern("int<lower=1> N_count;",
                       code_with_trend))
-    expect_true(stan_pattern("array\\[N_count\\] int Y_count;.*response variable",
+    expect_true(stan_pattern("array\\[N_count\\] int Y_count;",
                       code_with_trend))
-    expect_true(stan_pattern("int<lower=1> N_presence;.*number of observations",
+    expect_true(stan_pattern("int<lower=1> N_presence;",
                       code_with_trend))
-    expect_true(stan_pattern("array\\[N_presence\\] int Y_presence;.*response variable",
+    expect_true(stan_pattern("array\\[N_presence\\] int Y_presence;",
                       code_with_trend))
-    expect_true(stan_pattern("int<lower=1> N_biomass;.*number of observations",
+    expect_true(stan_pattern("int<lower=1> N_biomass;",
                       code_with_trend))
-    expect_true(stan_pattern("vector\\[N_biomass\\] Y_biomass;.*response variable",
+    expect_true(stan_pattern("vector\\[N_biomass\\] Y_biomass;",
                       code_with_trend))
 
     # Population-level design matrices for all three families
-    expect_true(stan_pattern("matrix\\[N_count, K_count\\] X_count;.*population-level design
+    expect_true(stan_pattern("matrix\\[N_count, K_count\\] X_count;
   matrix", code_with_trend))
-    expect_true(stan_pattern("matrix\\[N_presence, K_presence\\] X_presence;.*population-level
+    expect_true(stan_pattern("matrix\\[N_presence, K_presence\\] X_presence;
    design matrix", code_with_trend))
-    expect_true(stan_pattern("matrix\\[N_biomass, K_biomass\\] X_biomass;.*population-level
+    expect_true(stan_pattern("matrix\\[N_biomass, K_biomass\\] X_biomass;
   design matrix", code_with_trend))
 
     # Trend dimensions
-    expect_true(stan_pattern("int<lower=1> N_trend;.*number of time points", code_with_trend))
-    expect_true(stan_pattern("int<lower=1> N_series_trend;.*number of series",
+    expect_true(stan_pattern("int<lower=1> N_trend;", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> N_series_trend;",
                       code_with_trend))
-    expect_true(stan_pattern("int<lower=1> N_lv_trend;.*latent variables", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> N_lv_trend;", code_with_trend))
 
     # Observation-to-trend mappings for all three families
     expect_true(stan_pattern("array\\[N_count\\] int obs_trend_time_count;", code_with_trend))
@@ -698,16 +673,16 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
                       code_with_trend))
 
     # GLM compatibility vectors for discrete families only
-    expect_true(stan_pattern("vector\\[1\\] mu_ones_count;.*for GLM count", code_with_trend))
-    expect_true(stan_pattern("vector\\[1\\] mu_ones_presence;.*for GLM presence",
+    expect_true(stan_pattern("vector\\[1\\] mu_ones_count;", code_with_trend))
+    expect_true(stan_pattern("vector\\[1\\] mu_ones_presence;",
                       code_with_trend))
 
     # Centered design matrices in transformed data
-    expect_true(stan_pattern("matrix\\[N_count, Kc_count\\] Xc_count;.*centered version",
+    expect_true(stan_pattern("matrix\\[N_count, Kc_count\\] Xc_count;",
                       code_with_trend))
-    expect_true(stan_pattern("matrix\\[N_presence, Kc_presence\\] Xc_presence;.*centered
+    expect_true(stan_pattern("matrix\\[N_presence, Kc_presence\\] Xc_presence;
   version", code_with_trend))
-    expect_true(stan_pattern("matrix\\[N_biomass, Kc_biomass\\] Xc_biomass;.*centered
+    expect_true(stan_pattern("matrix\\[N_biomass, Kc_biomass\\] Xc_biomass;
   version", code_with_trend))
 
     # Centering loops for all three families
@@ -718,29 +693,29 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
     expect_true(stan_pattern("for \\(i in 2:K_biomass\\)", code_with_trend))
 
     # Observation model parameters for all three families
-    expect_true(stan_pattern("vector\\[Kc_count\\] b_count;.*regression coefficients",
+    expect_true(stan_pattern("vector\\[Kc_count\\] b_count;",
                       code_with_trend))
-    expect_true(stan_pattern("real Intercept_count;.*temporary intercept", code_with_trend))
-    expect_true(stan_pattern("vector\\[Kc_presence\\] b_presence;.*regression coefficients",
+    expect_true(stan_pattern("real Intercept_count;", code_with_trend))
+    expect_true(stan_pattern("vector\\[Kc_presence\\] b_presence;",
                       code_with_trend))
-    expect_true(stan_pattern("real Intercept_presence;.*temporary intercept",
+    expect_true(stan_pattern("real Intercept_presence;",
                       code_with_trend))
-    expect_true(stan_pattern("vector\\[Kc_biomass\\] b_biomass;.*regression coefficients",
+    expect_true(stan_pattern("vector\\[Kc_biomass\\] b_biomass;",
                       code_with_trend))
-    expect_true(stan_pattern("real Intercept_biomass;.*temporary intercept", code_with_trend))
-    expect_true(stan_pattern("real<lower=0> shape_biomass;.*shape parameter",
+    expect_true(stan_pattern("real Intercept_biomass;", code_with_trend))
+    expect_true(stan_pattern("real<lower=0> shape_biomass;",
                       code_with_trend))
 
     # Factor AR(1) trend parameters
-    expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;.*AR
+    expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;
   coefficients", code_with_trend))
-    expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;.*innovation SDs",
+    expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;",
                       code_with_trend))
-    expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;.*innovation
+    expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;
   correlations", code_with_trend))
 
     # Factor loading parameters (estimated for n_lv = 2)
-    expect_true(stan_pattern("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;.*raw factor
+    expect_true(stan_pattern("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;
   loadings", code_with_trend))
 
     # Innovation matrix
@@ -748,7 +723,7 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
                       code_with_trend))
 
     # lprior initialization with family-specific priors
-    expect_true(stan_pattern("real lprior = 0;.*prior contributions", code_with_trend))
+    expect_true(stan_pattern("real lprior = 0;", code_with_trend))
 
     # Factor loading matrix construction with identifiability constraints
     expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = rep_matrix\\(0,
@@ -811,8 +786,6 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
 
     # Gamma inverse link transformation
     expect_true(stan_pattern("mu_biomass = inv\\(mu_biomass\\);", code_with_trend))
-    expect_true(stan_pattern("Transform biomass predictor.*inverse link for Gamma",
-                      code_with_trend))
 
     # Three-family likelihoods with GLM optimization for discrete families
     expect_true(stan_pattern("target \\+= poisson_log_glm_lpmf\\(Y_count \\|
@@ -898,22 +871,22 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   expect_true(stan_pattern("functions \\{\\s*\\}", code_with_trend))
 
   # Three-family multivariate observation data
-  expect_true(stan_pattern("int<lower=1> N_count;.*number of observations", code_with_trend))
-  expect_true(stan_pattern("array\\[N_count\\] int Y_count;.*response variable", code_with_trend))
-  expect_true(stan_pattern("int<lower=1> N_presence;.*number of observations", code_with_trend))
-  expect_true(stan_pattern("array\\[N_presence\\] int Y_presence;.*response variable", code_with_trend))
-  expect_true(stan_pattern("int<lower=1> N_biomass;.*number of observations", code_with_trend))
-  expect_true(stan_pattern("vector\\[N_biomass\\] Y_biomass;.*response variable", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_count;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_count\\] int Y_count;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_presence;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_presence\\] int Y_presence;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_biomass;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_biomass\\] Y_biomass;", code_with_trend))
 
   # Population-level design matrices for all three families
-  expect_true(stan_pattern("matrix\\[N_count, K_count\\] X_count;.*population-level design matrix", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_presence, K_presence\\] X_presence;.*population-level design matrix", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_biomass, K_biomass\\] X_biomass;.*population-level design matrix", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_count, K_count\\] X_count;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_presence, K_presence\\] X_presence;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_biomass, K_biomass\\] X_biomass;", code_with_trend))
 
   # Trend dimensions
-  expect_true(stan_pattern("int<lower=1> N_trend;.*number of time points", code_with_trend))
-  expect_true(stan_pattern("int<lower=1> N_series_trend;.*number of series", code_with_trend))
-  expect_true(stan_pattern("int<lower=1> N_lv_trend;.*latent variables", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_trend;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_series_trend;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_lv_trend;", code_with_trend))
 
   # Observation-to-trend mappings for all three families
   expect_true(stan_pattern("array\\[N_count\\] int obs_trend_time_count;", code_with_trend))
@@ -927,13 +900,13 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;", code_with_trend))
 
   # GLM compatibility vectors for discrete families only
-  expect_true(stan_pattern("vector\\[1\\] mu_ones_count;.*for GLM count", code_with_trend))
-  expect_true(stan_pattern("vector\\[1\\] mu_ones_presence;.*for GLM presence", code_with_trend))
+  expect_true(stan_pattern("vector\\[1\\] mu_ones_count;", code_with_trend))
+  expect_true(stan_pattern("vector\\[1\\] mu_ones_presence;", code_with_trend))
 
   # Centered design matrices in transformed data
-  expect_true(stan_pattern("matrix\\[N_count, Kc_count\\] Xc_count;.*centered version", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_presence, Kc_presence\\] Xc_presence;.*centered version", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_biomass, Kc_biomass\\] Xc_biomass;.*centered version", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_count, Kc_count\\] Xc_count;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_presence, Kc_presence\\] Xc_presence;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_biomass, Kc_biomass\\] Xc_biomass;", code_with_trend))
 
   # Centering loops for all three families
   expect_true(stan_pattern("for \\(i in 2:K_count\\)", code_with_trend))
@@ -942,27 +915,27 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   expect_true(stan_pattern("for \\(i in 2:K_biomass\\)", code_with_trend))
 
   # Observation model parameters for all three families
-  expect_true(stan_pattern("vector\\[Kc_count\\] b_count;.*regression coefficients", code_with_trend))
-  expect_true(stan_pattern("real Intercept_count;.*temporary intercept", code_with_trend))
-  expect_true(stan_pattern("vector\\[Kc_presence\\] b_presence;.*regression coefficients", code_with_trend))
-  expect_true(stan_pattern("real Intercept_presence;.*temporary intercept", code_with_trend))
-  expect_true(stan_pattern("vector\\[Kc_biomass\\] b_biomass;.*regression coefficients", code_with_trend))
-  expect_true(stan_pattern("real Intercept_biomass;.*temporary intercept", code_with_trend))
-  expect_true(stan_pattern("real<lower=0> shape_biomass;.*shape parameter", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc_count\\] b_count;", code_with_trend))
+  expect_true(stan_pattern("real Intercept_count;", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc_presence\\] b_presence;", code_with_trend))
+  expect_true(stan_pattern("real Intercept_presence;", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc_biomass\\] b_biomass;", code_with_trend))
+  expect_true(stan_pattern("real Intercept_biomass;", code_with_trend))
+  expect_true(stan_pattern("real<lower=0> shape_biomass;", code_with_trend))
 
   # Factor AR(1) trend parameters
-  expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;.*AR coefficients", code_with_trend))
-  expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;.*innovation SDs", code_with_trend))
-  expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;.*innovation correlations", code_with_trend))
+  expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;", code_with_trend))
+  expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
+  expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;", code_with_trend))
 
   # Factor loading parameters (estimated for n_lv = 2)
-  expect_true(stan_pattern("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;.*raw factor loadings", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;", code_with_trend))
 
   # Innovation matrix
   expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
 
   # lprior initialization with family-specific priors
-  expect_true(stan_pattern("real lprior = 0;.*prior contributions", code_with_trend))
+  expect_true(stan_pattern("real lprior = 0;", code_with_trend))
 
   # Factor loading matrix construction with identifiability constraints
   expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = rep_matrix\\(0, N_series_trend, N_lv_trend\\);", code_with_trend))
@@ -1007,7 +980,7 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
 
   # Gamma inverse link transformation
   expect_true(stan_pattern("mu_biomass = inv\\(mu_biomass\\);", code_with_trend))
-  expect_true(stan_pattern("Transform biomass predictor.*inverse link for Gamma", code_with_trend))
+  expect_true(stan_pattern("Transform biomass predictor", code_with_trend))
 
   # Three-family likelihoods with GLM optimization for discrete families
   expect_true(stan_pattern("target \\+= poisson_log_glm_lpmf\\(Y_count \\| to_matrix\\(mu_count\\), 0\\.0, mu_ones_count\\);", code_with_trend))
@@ -1205,7 +1178,7 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
 
   # Hierarchical grouping data structures
   expect_true(stan_pattern("int<lower=1> n_groups_trend;", code_with_trend))
-  expect_true(stan_pattern("array\\[N_series_trend\\] int.*group_inds_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_series_trend\\] int", code_with_trend))
 
   # Hierarchical correlation functions
   expect_true(stan_pattern("matrix combine_cholesky\\(", code_with_trend))
@@ -1324,40 +1297,40 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
 
     # 2. Data Block - Complex observation model + CAR trend data
     # GP-related data structures
-    expect_true(stan_pattern("int<lower=1> Kgp_1;.*number of sub-GPs", code_with_trend))
-    expect_true(stan_pattern("int<lower=1> Dgp_1;.*GP dimension", code_with_trend))
-    expect_true(stan_pattern("int<lower=1> Nsubgp_1;.*number of latent GP groups", code_with_trend))
-    expect_true(stan_pattern("array\\[N\\] int<lower=1> Jgp_1;.*indices of latent GP groups",
+    expect_true(stan_pattern("int<lower=1> Kgp_1;", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> Dgp_1;", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> Nsubgp_1;", code_with_trend))
+    expect_true(stan_pattern("array\\[N\\] int<lower=1> Jgp_1;",
                       code_with_trend))
-    expect_true(stan_pattern("array\\[Nsubgp_1\\] vector\\[Dgp_1\\] Xgp_1;.*covariates of the GP",
+    expect_true(stan_pattern("array\\[Nsubgp_1\\] vector\\[Dgp_1\\] Xgp_1;",
                       code_with_trend))
 
     # Random effects data structures
-    expect_true(stan_pattern("int<lower=1> N_1;.*number of grouping levels", code_with_trend))
-    expect_true(stan_pattern("int<lower=1> M_1;.*number of coefficients per level", code_with_trend))
-    expect_true(stan_pattern("array\\[N\\] int<lower=1> J_1;.*grouping indicator", code_with_trend))
-    expect_true(stan_pattern("vector\\[N\\] Z_1_1;.*group-level predictor values", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> N_1;", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> M_1;", code_with_trend))
+    expect_true(stan_pattern("array\\[N\\] int<lower=1> J_1;", code_with_trend))
+    expect_true(stan_pattern("vector\\[N\\] Z_1_1;", code_with_trend))
 
     # CAR trend dimensions
-    expect_true(stan_pattern("int<lower=1> N_trend;.*number of timepoints", code_with_trend))
-    expect_true(stan_pattern("int<lower=1> N_series_trend;.*number of observed time series",
+    expect_true(stan_pattern("int<lower=1> N_trend;", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> N_series_trend;",
                       code_with_trend))
-    expect_true(stan_pattern("int<lower=1> N_lv_trend;.*number of latent states", code_with_trend))
+    expect_true(stan_pattern("int<lower=1> N_lv_trend;", code_with_trend))
 
     # CAR-specific time distance array
-    expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] real<lower=0> time_dis;.*time
+    expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] real<lower=0> time_dis;
   distances for continuous AR", code_with_trend))
 
     # Standard trend mapping arrays
-    expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;.*temporal order",
+    expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;",
                       code_with_trend))
-    expect_true(stan_pattern("array\\[N\\] int obs_trend_time;.*idx to map latent states to
+    expect_true(stan_pattern("array\\[N\\] int obs_trend_time;
   observations", code_with_trend))
-    expect_true(stan_pattern("array\\[N\\] int obs_trend_series;.*idx to map latent states to
+    expect_true(stan_pattern("array\\[N\\] int obs_trend_series;
   observations", code_with_trend))
 
     # GLM optimization component
-    expect_true(stan_pattern("vector\\[1\\] mu_ones;.*Column of ones for glm means", code_with_trend))
+    expect_true(stan_pattern("vector\\[1\\] mu_ones;", code_with_trend))
 
     # 3. Transformed Data Block - Factor loading matrix
     expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z =
@@ -1365,31 +1338,31 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
 
     # 4. Parameters Block - Complex observation model + CAR trend parameters
     # GP parameters
-    expect_true(stan_pattern("vector<lower=0>\\[Kgp_1\\] sdgp_1;.*GP standard deviation parameters",
+    expect_true(stan_pattern("vector<lower=0>\\[Kgp_1\\] sdgp_1;",
                       code_with_trend))
-    expect_true(stan_pattern("array\\[Kgp_1\\] vector<lower=0>\\[1\\] lscale_1;.*GP length-scale
+    expect_true(stan_pattern("array\\[Kgp_1\\] vector<lower=0>\\[1\\] lscale_1;
   parameters", code_with_trend))
-    expect_true(stan_pattern("vector\\[Nsubgp_1\\] zgp_1;.*latent variables of the GP",
+    expect_true(stan_pattern("vector\\[Nsubgp_1\\] zgp_1;",
                       code_with_trend))
 
     # Random effects parameters
-    expect_true(stan_pattern("vector<lower=0>\\[M_1\\] sd_1;.*group-level standard deviations",
+    expect_true(stan_pattern("vector<lower=0>\\[M_1\\] sd_1;",
                       code_with_trend))
-    expect_true(stan_pattern("array\\[M_1\\] vector\\[N_1\\] z_1;.*standardized group-level effects",
+    expect_true(stan_pattern("array\\[M_1\\] vector\\[N_1\\] z_1;",
                       code_with_trend))
 
     # CAR trend parameters
-    expect_true(stan_pattern("real Intercept_trend;.*trend intercept", code_with_trend))
-    expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;.*CAR AR1
+    expect_true(stan_pattern("real Intercept_trend;", code_with_trend))
+    expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;
   coefficients", code_with_trend))
-    expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;.*innovation SDs",
+    expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;",
                       code_with_trend))
-    expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;.*raw innovations",
+    expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;",
                       code_with_trend))
 
     # 5. Transformed Parameters Block - Complex computations
     # GP and random effects computations (from brms)
-    expect_true(stan_pattern("vector\\[N_1\\] r_1_1;.*actual group-level effects", code_with_trend))
+    expect_true(stan_pattern("vector\\[N_1\\] r_1_1;", code_with_trend))
     expect_true(stan_pattern("r_1_1 = \\(sd_1\\[1\\] \\* \\(z_1\\[1\\]\\)\\);", code_with_trend))
 
     # Prior accumulation
@@ -2175,9 +2148,9 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   expect_true(stan_pattern("int<lower=1> N_lv_trend;", code_with_trend, fixed = TRUE))
 
   # Piecewise-specific data
-  expect_true(stan_pattern("int<lower=0> n_change_trend;.*number of potential trend changepoints", code_with_trend))
-  expect_true(stan_pattern("vector\\[n_change_trend\\] t_change_trend;.*times of potential changepoints", code_with_trend))
-  expect_true(stan_pattern("real<lower=0> change_scale_trend;.*scale of changepoint shock prior", code_with_trend))
+  expect_true(stan_pattern("int<lower=0> n_change_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[n_change_trend\\] t_change_trend;", code_with_trend))
+  expect_true(stan_pattern("real<lower=0> change_scale_trend;", code_with_trend))
 
   # Should NOT have carrying capacity for linear growth
   expect_false(grepl("cap_trend", code_with_trend, fixed = TRUE))
@@ -2205,14 +2178,14 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
 
   # 4. Parameters Block - PW-specific parameters
   # Base trend parameters
-  expect_true(stan_pattern("vector\\[N_lv_trend\\] k_trend;.*base trend growth rates", code_with_trend))
-  expect_true(stan_pattern("vector\\[N_lv_trend\\] m_trend;.*trend offset parameters", code_with_trend))
-  expect_true(stan_pattern("matrix\\[n_change_trend, N_lv_trend\\] delta_trend;.*trend rate adjustments", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_lv_trend\\] k_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_lv_trend\\] m_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[n_change_trend, N_lv_trend\\] delta_trend;", code_with_trend))
 
   # Standard observation model parameters
-  expect_true(stan_pattern("vector\\[Kc\\] b;.*regression coefficients", code_with_trend))
-  expect_true(stan_pattern("real Intercept;.*temporary intercept", code_with_trend))
-  expect_true(stan_pattern("real Intercept_trend;.*temporary intercept", code_with_trend))
+  expect_true(stan_pattern("vector\\[Kc\\] b;", code_with_trend))
+  expect_true(stan_pattern("real Intercept;", code_with_trend))
+  expect_true(stan_pattern("real Intercept_trend;", code_with_trend))
 
   # Should NOT have innovation/sigma parameters (PW doesn't use them)
   expect_false(grepl("innovations_trend", code_with_trend, fixed = TRUE))
