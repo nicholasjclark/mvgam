@@ -33,6 +33,7 @@
                       "generate_shared_innovation_stanvars",
                       "generate_innovation_model",
                       "extract_hierarchical_info",
+                      "add_hierarchical_support",
                       "generate_common_trend_data",
                       "sort_stanvars",
                       "generate_matrix_z_parameters",
@@ -89,6 +90,7 @@
                               },
     "function_signatures":  {
                                 "extract_and_rename_standata_objects":  "extract_and_rename_standata_objects \u003c- function(standata, suffix, mapping, is_multivariate, response_names, n_time = NULL) {",
+                                "add_hierarchical_support":  "add_hierarchical_support \u003c- function(components, trend_specs, data_info) {",
                                 "apply_correct_transformation_order":  "apply_correct_transformation_order \u003c- function(code_lines, insert_pos, trend_injection_code, transform_pattern, block_info) {",
                                 "calculate_car_time_distances":  "calculate_car_time_distances \u003c- function(data_info) {",
                                 "extract_stan_block_content":  "extract_stan_block_content \u003c- function(stancode, block_name) {",

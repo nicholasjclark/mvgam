@@ -1137,7 +1137,7 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   expect_true(stan_pattern("vector\\[Kc_trend\\] means_X_trend;", code_with_trend))
 
   # Hierarchical grouping data structures
-  expect_true(stan_pattern("int<lower=1> n_groups_trend;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> n_groups_trend;", s))
   expect_true(stan_pattern("array\\[N_series_trend\\] int", code_with_trend))
 
   # Hierarchical correlation functions
