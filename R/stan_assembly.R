@@ -492,19 +492,25 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
     # Extract timing information from pre-calculated dimensions
     n_obs <- dimensions$n_obs
     n_time <- dimensions$n_time
+    # Create basic data_info first
     data_info <- list(
       n_obs = n_obs,
       n_series = dimensions$n_series,
       n_lv = trend_specs$n_lv,
       n_time = n_time,
-      n_groups = trend_specs$n_groups,
-      n_subgroups = trend_specs$n_subgroups,
       time_var = dimensions$time_var,
       series_var = dimensions$series_var,
       unique_times = dimensions$unique_times,
       unique_series = dimensions$unique_series,
-      data = trend_setup$data  # Add actual data for CAR time distance calculations
+      data = obs_setup$data %||% trend_setup$data  # Use original data for hierarchical grouping and CAR calculations
     )
+
+    # Compute hierarchical parameters if grouping specified
+    hierarchical_info <- extract_hierarchical_info(data_info, trend_specs)
+
+    # Add computed values to data_info
+    data_info$n_groups <- hierarchical_info$n_groups %||% NULL
+    data_info$n_subgroups <- hierarchical_info$n_subgroups %||% NULL
 
     # Extract brms parameters (handles mu_trend creation/extraction) + generate trend stanvars
     brms_stanvars <- extract_and_rename_trend_parameters(
@@ -2123,14 +2129,16 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     // Scaled innovations after applying hierarchical correlations
     matrix[N_trend, ", effective_dim, "] scaled_innovations_trend;
 
+    // Derived group-specific correlation matrices (declared once outside loops)
+    array[n_groups_trend] cholesky_factor_corr[", effective_dim, "] L_Omega_group_trend;
+    
+    // Compute group correlations using existing combine_cholesky
+    for (g_idx in 1:n_groups_trend) {
+      L_Omega_group_trend[g_idx] = combine_cholesky(L_Omega_global_trend, L_deviation_group_trend[g_idx], alpha_cor_trend);
+    }
+
     // Apply group-specific correlations to raw innovations
     for (g in 1:n_groups_trend) {
-      // Derived group-specific correlation matrices (using existing combine_cholesky)
-      array[n_groups_trend] cholesky_factor_corr[", effective_dim, "] L_Omega_group_trend;
-      for (g_idx in 1:n_groups_trend) {
-        L_Omega_group_trend[g_idx] = combine_cholesky(L_Omega_global_trend, L_deviation_group_trend[g_idx], alpha_cor_trend);
-      }
-
       // Transform raw innovations using group correlations
       matrix[", effective_dim, ", ", effective_dim, "] Sigma_group = diag_pre_multiply(sigma_trend, L_Omega_group_trend[g]);
       // Apply to group time points (individual generators will specify the indexing)
@@ -2223,16 +2231,29 @@ generate_innovation_model <- function(effective_dim, cor = FALSE, is_hierarchica
 #' @return List with hierarchical structure information
 #' @noRd
 extract_hierarchical_info <- function(data_info, trend_specs) {
-
+  # Input validation following project standards
+  checkmate::assert_list(data_info, names = "named")
+  checkmate::assert_list(trend_specs, names = "named")
+  
   has_groups <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
 
   if (!has_groups) {
     return(NULL)
   }
+  
+  # Compute n_groups from actual data using established pattern from validations.R
+  unique_groups <- sort(unique(data_info$data[[trend_specs$gr]]))
+  n_groups <- length(unique_groups)
+  
+  if (n_groups < 1) {
+    stop(insight::format_error(
+      "Grouping variable {.field {trend_specs$gr}} has no unique values"
+    ))
+  }
 
   list(
     has_groups = TRUE,
-    n_groups = data_info$n_groups %||% 1,
+    n_groups = n_groups,
     n_subgroups = data_info$n_subgroups %||% data_info$n_lv %||% data_info$n_series,
     gr_var = trend_specs$gr,
     subgr_var = trend_specs$subgr %||% 'NA'
@@ -2264,17 +2285,21 @@ add_hierarchical_support <- function(components, trend_specs, data_info) {
     return(components)
   }
   
-  # Extract validated hierarchical parameters
+  # Generate data structures before parameters
+  hierarchical_data <- generate_hierarchical_data_structures(hierarchical_info, data_info)
+  
+  # Extract parameters
   n_groups <- hierarchical_info$n_groups
   n_subgroups <- hierarchical_info$n_subgroups
   
-  # Generate hierarchical infrastructure using existing functions
+  # Generate infrastructure components
   hierarchical_functions <- generate_hierarchical_functions()
   hierarchical_params <- generate_hierarchical_correlation_parameters(n_groups, n_subgroups)
   hierarchical_priors <- generate_hierarchical_correlation_model(n_groups)
   
-  # Add components using established pattern
+  # Add components in dependency order
   components <- append_if_not_null(components, list(
+    hierarchical_data,
     hierarchical_functions, 
     hierarchical_params, 
     hierarchical_priors
@@ -2669,6 +2694,57 @@ generate_hierarchical_functions <- function() {
     ",
     block = "functions"
   ))
+}
+
+#' Generate Hierarchical Data Structure Stanvars
+#'
+#' Creates Stan data block declarations for hierarchical grouping structures.
+#' Generates n_groups_trend dimension and group_inds_trend mapping array
+#' following established stanvar patterns from generate_common_trend_data().
+#'
+#' @param hierarchical_info List from extract_hierarchical_info() containing
+#'   validated n_groups, n_subgroups, and grouping variable information
+#' @param data_info Data information list containing actual data for mapping creation
+#' @return Combined stanvars for hierarchical data structures
+#' @noRd
+generate_hierarchical_data_structures <- function(hierarchical_info, data_info) {
+  # Input validation following project standards with field existence checks
+  checkmate::assert_list(hierarchical_info, names = "named")
+  checkmate::assert_list(data_info, names = "named")
+  checkmate::assert_names(names(hierarchical_info), 
+                          must.include = c("n_groups", "n_subgroups", "gr_var"))
+  checkmate::assert_number(hierarchical_info$n_groups, lower = 1)
+  checkmate::assert_number(hierarchical_info$n_subgroups, lower = 1)
+  
+  # Validate grouping variable is specified
+  checkmate::assert_string(hierarchical_info$gr_var)
+  
+  n_groups <- hierarchical_info$n_groups
+  gr_var <- hierarchical_info$gr_var
+  
+  # Generate n_groups_trend dimension following generate_common_trend_data pattern
+  n_groups_stanvar <- brms::stanvar(
+    x = n_groups,
+    name = "n_groups_trend",
+    scode = "int<lower=1> n_groups_trend;",
+    block = "data",
+    position = "start"  # Dimensions go first
+  )
+  
+  # Create group index mapping from data (follows validations.R pattern)
+  group_levels <- sort(unique(data_info$data[[gr_var]]))
+  group_inds_array <- match(data_info$data[[gr_var]], group_levels)
+  
+  # Generate group_inds_trend array (corrected: array per group, not per series)
+  group_inds_stanvar <- brms::stanvar(
+    x = group_inds_array,
+    name = "group_inds_trend", 
+    scode = "array[n_groups_trend] int<lower=1> group_inds_trend;",
+    block = "data"
+  )
+  
+  # Return combined stanvars following established pattern
+  return(combine_stanvars(n_groups_stanvar, group_inds_stanvar))
 }
 
 #' Generate Parameters Block Injections for Hierarchical Correlations
@@ -3352,10 +3428,13 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   if (is_hierarchical) {
     # Cross-cutting validation handled by injection function
 
-    # Extract hierarchical grouping information from data_info
-    # Expect data_info to contain sorted dataframe information for group indexing
-    n_groups <- data_info$n_groups %||% stop("Missing n_groups in data_info for hierarchical VAR")
-    n_subgroups <- data_info$n_subgroups %||% stop("Missing n_subgroups in data_info for hierarchical VAR")
+    # Get hierarchical parameters using existing extraction function
+    hierarchical_info <- extract_hierarchical_info(data_info, trend_specs)
+    if (is.null(hierarchical_info)) {
+      stop(insight::format_error("Hierarchical VAR requires grouping specification"))
+    }
+    n_groups <- hierarchical_info$n_groups
+    n_subgroups <- hierarchical_info$n_subgroups
 
     # Generate group_inds matrix: maps (group, subgroup) -> series index
     # Based on sorted data where series = interaction(gr, subgr)
