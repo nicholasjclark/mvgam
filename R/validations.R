@@ -1220,12 +1220,6 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1, respo
   parsed_trend <- if (is_multivariate_trend_specs(trend_specs)) trend_specs[[1]] else trend_specs
   data <- ensure_mvgam_variables(data, parsed_trend, time_var, series_var, response_vars)
 
-  if (Sys.getenv("MVGAM_DEBUG") == "TRUE") {
-    cat("\n[DEBUG] Created mvgam attributes for validation\n")
-    cat("  - mvgam_time attr: ", !is.null(attr(data, "mvgam_time")), "\n")
-    cat("  - mvgam_series attr: ", !is.null(attr(data, "mvgam_series")), "\n")
-    cat("  - series_source: ", attr(data, "mvgam_series_source"), "\n")
-  }
 
   # Use precomputed dimensions - no fallback in ultra-DRY architecture
   if (is.null(.precomputed_dimensions)) {
@@ -1258,14 +1252,6 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1, respo
     }
   }
 
-  if (Sys.getenv("MVGAM_DEBUG") == "TRUE") {
-    cat("\n[DEBUG] Three-phase validation completed:\n")
-    cat("  - Phase 1: Input validation ✓ (done by extract_time_series_dimensions)\n")
-    cat("  - Phase 2: Attribute validation ✓ has mvgam_time attr:", !is.null(attr(data, "mvgam_time")), "\n")
-    cat("  - Phase 2: Attribute validation ✓ has mvgam_series attr:", !is.null(attr(data, "mvgam_series")), "\n")
-    cat("  - Phase 3: Context validation ✓ trend_type:", trend_type %||% "NULL", "\n")
-    cat("  - Series source:", attr(data, "mvgam_series_source"), "\n")
-  }
 
   # Return data with preserved attributes and dimensions
   invisible(list(
@@ -1343,13 +1329,6 @@ validate_trend_components <- function(trend_components) {
 #' @return List with time series dimensions and optional enhanced metadata
 #' @noRd
 extract_time_series_dimensions <- function(data, time_var = "time", series_var = "series", trend_type = NULL, trend_specs = NULL, response_vars = NULL, cached_formulas = NULL) {
-  if (Sys.getenv("MVGAM_DEBUG") == "TRUE") {
-    cat("\n[DEBUG] extract_time_series_dimensions called:\n")
-    cat("  - time_var:", time_var, "\n")
-    cat("  - series_var:", series_var, "\n")
-    cat("  - response_vars:", if(!is.null(response_vars)) paste(response_vars, collapse=", ") else "NULL", "\n")
-    cat("  - trend_specs type:", class(trend_specs), "\n")
-  }
 
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_string(time_var)
@@ -2655,14 +2634,6 @@ is_trend_term <- function(expr, trend_patterns) {
 #' @return Data frame with mvgam time and series attributes added
 #' @noRd
 ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time", series_var = "series", response_vars = NULL, metadata = NULL) {
-  if (Sys.getenv("MVGAM_DEBUG") == "TRUE") {
-    cat("\n[DEBUG] ensure_mvgam_variables called:\n")
-    cat("  - time_var:", time_var, "\n")
-    cat("  - series_var:", series_var, "\n")
-    cat("  - response_vars:", if(!is.null(response_vars)) paste(response_vars, collapse=", ") else "NULL", "\n")
-    cat("  - data columns:", paste(names(data), collapse=", "), "\n")
-    cat("  - nrow(data):", nrow(data), "\n")
-  }
 
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_string(time_var)
@@ -2819,11 +2790,6 @@ get_time_for_grouping <- function(data) {
 
   time_values <- attr(data, "mvgam_time")
   if (is.null(time_values)) {
-    if (Sys.getenv("MVGAM_DEBUG") == "TRUE") {
-      cat("\n[DEBUG] get_time_for_grouping ERROR:\n")
-      cat("  - Available attributes:", paste(names(attributes(data)), collapse=", "), "\n")
-      cat("  - Data columns:", paste(names(data), collapse=", "), "\n")
-    }
     stop(insight::format_error(
       "No time variable attribute found.",
       "Call ensure_mvgam_variables() first to create time attributes."

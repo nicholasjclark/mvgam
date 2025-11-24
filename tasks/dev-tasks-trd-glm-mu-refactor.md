@@ -93,6 +93,15 @@
   - [ ] 5.8 **Add unit tests for new GLM functions**: Create focused unit tests for `inject_trends_into_glm_calls()`, `parse_glm_parameters_from_line()`, `build_mu_with_trend_effects()`, `transform_glm_call_to_mu_format()`. Task complete when new functions have >90% code coverage.
   - [ ] 5.9 **Run all 13 models from fit_and_save_models.R**: Validate functional equivalence with new system across all model types. Task complete when all 13 models generate valid Stan code and compile successfully.
 
+- [ ] **6.0 Hierarchical ZMVN Stan Code Generation Fixes**
+  - **Note**: Analysis shows hierarchical ZMVN test failures due to missing data structures and variable naming issues. 28 tests fail because Stan code generates parameters without underlying data declarations.
+  - [ ] 6.1 **Fix `extract_hierarchical_info()` to compute actual group counts**: Update function at line 2225 to compute `n_groups` from actual data (`unique(data_info$data[[gr_var]])`) instead of assuming it exists in `data_info`. Task complete when function correctly extracts group counts from `habitat` variable.
+  - [ ] 6.2 **Create `generate_hierarchical_data_structures()` function**: Add new function that generates missing Stan data block declarations (`int<lower=1> n_groups_trend;` and `array[N_series_trend] int group_inds_trend;`) from trend specifications. Task complete when function creates proper data mapping for series-to-group assignments.
+  - [ ] 6.3 **Update `add_hierarchical_support()` to include data generation**: Modify function at line 2253 to call `generate_hierarchical_data_structures()` and include data stanvar in component list. Task complete when hierarchical support includes both parameters AND data structures.
+  - [ ] 6.4 **Fix variable naming in Stan code generation**: Restructure hierarchical innovation code at lines 2127-2137 to use `n_groups_trend` consistently and move array declarations outside loops. Task complete when generated Stan code uses consistent variable names throughout.
+  - [ ] 6.5 **Add custom prior support to hierarchical functions**: Update `generate_hierarchical_correlation_model()` function signature to accept `prior` parameter and apply custom priors (e.g., `alpha_cor_trend ~ beta(5, 5)`) instead of hardcoded defaults. Task complete when custom priors are correctly applied in hierarchical models.
+  - [ ] 6.6 **Validate hierarchical ZMVN test passage**: Run debug script (`debug_hierarchical_zmvn.R`) and verify all expected patterns exist in generated Stan code. Task complete when "stancode generates correct hierarchical ZMVN(gr = habitat) model with custom prior" test passes with all pattern checks returning TRUE.
+
 ## Implementation Guidelines
 
 ### Phase 1: Foundation (Tasks 1.0-2.0)
