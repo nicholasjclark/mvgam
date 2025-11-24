@@ -3,6 +3,7 @@ name: code-reviewer
 description: Deploy for comprehensive review of R code changes to ensure fail-fast validation, prevent code duplication, maintain consistency, and eliminate prohibited patterns. Use PROACTIVELY before merging any R code. Accepts R files, functions, or diffs. Automatically inspects CLAUDE.md standards.
 tools: Read, Grep, Glob, LS, repl, conversation_search, web_search, mcp__context7
 color: green
+model haiku 4.5
 ---
 
 # R Code Reviewer
