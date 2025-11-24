@@ -751,8 +751,15 @@ generate_car_monitor_params <- function(trend_spec) {
 #' @return Character vector of ZMVN-specific parameters
 #' @noRd
 generate_zmvn_monitor_params <- function(trend_spec) {
-  # ZMVN only needs base variance/correlation parameters
-  return(character(0))
+  params <- character(0)
+  
+  # Add hierarchical correlation parameters if grouping is specified
+  # Hierarchical ZMVN models include global correlation structure + group deviations
+  if (!is.null(trend_spec$gr) && trend_spec$gr != "NA") {
+    params <- c(params, "alpha_cor_trend", "L_Omega_global_trend", "L_deviation_group_trend")
+  }
+  
+  return(params)
 }
 
 #' Generate PW-specific monitor parameters

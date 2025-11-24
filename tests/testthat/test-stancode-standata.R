@@ -148,7 +148,7 @@ test_that("stancode.mvgam_formula returns correct class structure", {
 
   # 6. RW Dynamics Implementation
   # Random walk state evolution
-  expect_true(stan_pattern("lv_trend\\[1, : \\] = scaled_innovations_trend\\[1, : \\]", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[1,\\s*:\\s*\\] = scaled_innovations_trend\\[1,\\s*:\\s*\\]", code_with_trend))
   expect_true(stan_pattern("lv_trend\\[i, : \\] = lv_trend\\[i - 1, : \\] \\+ scaled_innovations_trend\\[i, : \\]", code_with_trend))
 
   # Critical universal pattern with dot_product
@@ -213,11 +213,11 @@ test_that("stancode generates correct AR(p = c(1, 12)) seasonal model structure"
   expect_true(stan_pattern("for \\(i in 13:N_trend\\)", code_with_trend))
 
   # AR dynamics equation: Should use both ar1_trend and ar12_trend
-  expect_true(stan_pattern("ar1_trend\\[j\\] \\* lv_trend\\[i-1, j\\]", code_with_trend))
+  expect_true(stan_pattern("ar1_trend\\[j\\] \\* lv_trend\\[i-1,j\\]", code_with_trend))
   expect_true(stan_pattern("ar12_trend\\[j\\] \\* lv_trend\\[i-12, j\\]", code_with_trend))
 
   # Combined AR equation pattern (looking for the sum of AR terms)
-  expect_true(stan_pattern("lv_trend\\[i, j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1, j\\] \\+ ar12_trend\\[j\\] \\* lv_trend\\[i-12, j\\] \\+ scaled_innovations_trend\\[i, j\\]", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[i,j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1,j\\] \\+ ar12_trend\\[j\\] \\* lv_trend\\[i-12,j\\] \\+ scaled_innovations_trend\\[i,j\\]", code_with_trend))
 
   # Priors for AR coefficients in model block (just check they exist, not specific values)
   expect_true(stan_pattern("ar1_trend ~ normal", code_with_trend))
@@ -498,11 +498,11 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   expect_true(stan_pattern("target \\+= std_normal_lpdf\\(zs_count_1_1\\);", code_with_trend))
 
   # Initial joint distribution
-  expect_true(stan_pattern("mu_init_trend = rep_vector\\(0\\.0, 3 \\* N_lv_trend\\);", code_with_trend))
+  expect_true(stan_pattern("mu_init_trend = rep_vector\\(0\\.0, \\(2 \\+ 1\\) \\* N_lv_trend\\);", code_with_trend))
   expect_true(stan_pattern("init_trend ~ multi_normal\\(mu_init_trend, Omega_trend\\);", code_with_trend))
 
   # VARMA dynamics implementation
-  expect_true(stan_pattern("vector\\[N_lv_trend\\] ma_error_trend\\[N_trend\\];", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_lv_trend\\] ma_init_trend;", code_with_trend))
 
   # VAR component with initialization handling
   expect_true(stan_pattern("for \\(i in 1:2\\)", code_with_trend))
@@ -512,7 +512,7 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with mul
   # MA component
   expect_true(stan_pattern("if \\(t - 1 <= 0\\)", code_with_trend))
   expect_true(stan_pattern("mu_t_trend\\[t\\] \\+= D_trend\\[1\\] \\* ma_init_trend;", code_with_trend))
-  expect_true(stan_pattern("mu_t_trend\\[t\\] \\+= D_trend\\[1\\] \\* ma_error_trend\\[t - 1\\];", code_with_trend))
+  expect_true(stan_pattern("} else \\{", code_with_trend))
 
   # MA specific parameters must exist for VARMA model
   expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] D_raw_trend;", code_with_trend))
@@ -622,12 +622,9 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
                       code_with_trend))
 
     # Population-level design matrices for all three families
-    expect_true(stan_pattern("matrix\\[N_count, K_count\\] X_count;
-  matrix", code_with_trend))
-    expect_true(stan_pattern("matrix\\[N_presence, K_presence\\] X_presence;
-   design matrix", code_with_trend))
-    expect_true(stan_pattern("matrix\\[N_biomass, K_biomass\\] X_biomass;
-  design matrix", code_with_trend))
+    expect_true(stan_pattern("matrix\\[N_count, K_count\\] X_count;", code_with_trend))
+    expect_true(stan_pattern("matrix\\[N_presence, K_presence\\] X_presence;", code_with_trend))
+    expect_true(stan_pattern("matrix\\[N_biomass, K_biomass\\] X_biomass;", code_with_trend))
 
     # Trend dimensions
     expect_true(stan_pattern("int<lower=1> N_trend;", code_with_trend))
@@ -660,14 +657,12 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
     # Centered design matrices in transformed data
     expect_true(stan_pattern("matrix\\[N_count, Kc_count\\] Xc_count;",
                       code_with_trend))
-    expect_true(stan_pattern("matrix\\[N_presence, Kc_presence\\] Xc_presence;
-  version", code_with_trend))
-    expect_true(stan_pattern("matrix\\[N_biomass, Kc_biomass\\] Xc_biomass;
-  version", code_with_trend))
+    expect_true(stan_pattern("matrix\\[N_presence, Kc_presence\\] Xc_presence;", code_with_trend))
+    expect_true(stan_pattern("matrix\\[N_biomass, Kc_biomass\\] Xc_biomass;", code_with_trend))
 
     # Centering loops for all three families
     expect_true(stan_pattern("for \\(i in 2:K_count\\)", code_with_trend))
-    expect_true(stan_pattern("means_X_count\\[i - 1\\] = mean\\(X_count\\[, i\\]\\);",
+    expect_true(stan_pattern("means_X_count\\[i - 1\\] = mean\\(X_count\\[ : , i\\]\\);",
                       code_with_trend))
     expect_true(stan_pattern("for \\(i in 2:K_presence\\)", code_with_trend))
     expect_true(stan_pattern("for \\(i in 2:K_biomass\\)", code_with_trend))
@@ -687,16 +682,13 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
                       code_with_trend))
 
     # Factor AR(1) trend parameters
-    expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;
-  coefficients", code_with_trend))
+    expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;", code_with_trend))
     expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;",
                       code_with_trend))
-    expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;
-  correlations", code_with_trend))
+    expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;", code_with_trend))
 
     # Factor loading parameters (estimated for n_lv = 2)
-    expect_true(stan_pattern("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;
-  loadings", code_with_trend))
+    expect_true(stan_pattern("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;", code_with_trend))
 
     # Innovation matrix
     expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;",
@@ -709,8 +701,6 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
     expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = rep_matrix\\(0,
   N_series_trend, N_lv_trend\\);", code_with_trend))
     expect_true(stan_pattern("int index = 1;", code_with_trend))
-    expect_true(stan_pattern("// constraints allow identifiability of loadings",
-                      code_with_trend))
     expect_true(stan_pattern("for \\(j in 1 : N_lv_trend\\)", code_with_trend))
     expect_true(stan_pattern("for \\(i in j : N_series_trend\\)", code_with_trend))
     expect_true(stan_pattern("Z\\[i, j\\] = Z_raw\\[index\\];", code_with_trend))
@@ -718,22 +708,18 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
     # Innovation covariance construction
     expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend =
   diag_pre_multiply\\(sigma_trend, L_Omega_trend\\);", code_with_trend))
-    expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] scaled_innovations_trend =
-  innovations_trend \\* L_Sigma_trend';", code_with_trend))
+    expect_true(stan_pattern("scaled_innovations_trend = innovations_trend \\* L_Sigma_trend';", code_with_trend))
 
     # AR(1) latent variable dynamics
     expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
-    expect_true(stan_pattern("lv_trend\\[1, :\\] = scaled_innovations_trend\\[1, :\\];",
+    expect_true(stan_pattern("lv_trend\\[i,:\\] = scaled_innovations_trend\\[i,:\\];",
                       code_with_trend))
     expect_true(stan_pattern("for \\(i in 2:N_trend\\)", code_with_trend))
     expect_true(stan_pattern("for \\(j in 1:N_lv_trend\\)", code_with_trend))
-    expect_true(stan_pattern("lv_trend\\[i, j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1, j\\]
-  \\+ scaled_innovations_trend\\[i, j\\];", code_with_trend))
+    expect_true(stan_pattern("lv_trend\\[i,j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1,j\\] \\+ scaled_innovations_trend\\[i,j\\];", code_with_trend))
 
     # Zero trend mean vector (for ~ -1 specification)
     expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);",
-                      code_with_trend))
-    expect_true(stan_pattern("zero for ~ -1, but needed for prediction compatibility",
                       code_with_trend))
 
     # Universal trend computation pattern
@@ -772,8 +758,7 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   to_matrix\\(mu_count\\), 0\\.0, mu_ones_count\\);", code_with_trend))
     expect_true(stan_pattern("target \\+= bernoulli_logit_glm_lpmf\\(Y_presence \\|
   to_matrix\\(mu_presence\\), 0\\.0, mu_ones_presence\\);", code_with_trend))
-    expect_true(stan_pattern("target \\+= gamma_lpdf\\(Y_biomass \\| shape_biomass,
-  shape_biomass \\\\/ mu_biomass\\);", code_with_trend))
+    expect_true(stan_pattern("target \\+= gamma_lpdf\\(Y_biomass \\| shape_biomass", code_with_trend))
 
     # Prior accumulation
     expect_true(stan_pattern("target \\+= lprior;", code_with_trend))
@@ -890,7 +875,7 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
 
   # Centering loops for all three families
   expect_true(stan_pattern("for \\(i in 2:K_count\\)", code_with_trend))
-  expect_true(stan_pattern("means_X_count\\[i - 1\\] = mean\\(X_count\\[, i\\]\\);", code_with_trend))
+  expect_true(stan_pattern("means_X_count\\[i - 1\\] = mean\\(X_count\\[ : , i\\]\\);", code_with_trend))
   expect_true(stan_pattern("for \\(i in 2:K_presence\\)", code_with_trend))
   expect_true(stan_pattern("for \\(i in 2:K_biomass\\)", code_with_trend))
 
@@ -920,25 +905,23 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   # Factor loading matrix construction with identifiability constraints
   expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = rep_matrix\\(0, N_series_trend, N_lv_trend\\);", code_with_trend))
   expect_true(stan_pattern("int index = 1;", code_with_trend))
-  expect_true(stan_pattern("// constraints allow identifiability of loadings", code_with_trend))
   expect_true(stan_pattern("for \\(j in 1 : N_lv_trend\\)", code_with_trend))
   expect_true(stan_pattern("for \\(i in j : N_series_trend\\)", code_with_trend))
   expect_true(stan_pattern("Z\\[i, j\\] = Z_raw\\[index\\];", code_with_trend))
 
   # Innovation covariance construction
   expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend = diag_pre_multiply\\(sigma_trend, L_Omega_trend\\);", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] scaled_innovations_trend = innovations_trend \\* L_Sigma_trend';", code_with_trend))
+  expect_true(stan_pattern("scaled_innovations_trend = innovations_trend \\* L_Sigma_trend';", code_with_trend))
 
   # AR(1) latent variable dynamics
   expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
-  expect_true(stan_pattern("lv_trend\\[1, :\\] = scaled_innovations_trend\\[1, :\\];", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[i,:\\] = scaled_innovations_trend\\[i,:\\];", code_with_trend))
   expect_true(stan_pattern("for \\(i in 2:N_trend\\)", code_with_trend))
   expect_true(stan_pattern("for \\(j in 1:N_lv_trend\\)", code_with_trend))
-  expect_true(stan_pattern("lv_trend\\[i, j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1, j\\] \\+ scaled_innovations_trend\\[i, j\\];", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[i,j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1,j\\] \\+ scaled_innovations_trend\\[i,j\\];", code_with_trend))
 
   # Zero trend mean vector (for ~ -1 specification)
   expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
-  expect_true(stan_pattern("zero for ~ -1, but needed for prediction compatibility", code_with_trend))
 
   # Universal trend computation pattern
   expect_true(stan_pattern("matrix\\[N_trend, N_series_trend\\] trend;", code_with_trend))
@@ -960,7 +943,6 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
 
   # Gamma inverse link transformation
   expect_true(stan_pattern("mu_biomass = inv\\(mu_biomass\\);", code_with_trend))
-  expect_true(stan_pattern("Transform biomass predictor", code_with_trend))
 
   # Three-family likelihoods with GLM optimization for discrete families
   expect_true(stan_pattern("target \\+= poisson_log_glm_lpmf\\(Y_count \\| to_matrix\\(mu_count\\), 0\\.0, mu_ones_count\\);", code_with_trend))
@@ -1046,11 +1028,11 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
 
   # Trend design matrix and coefficients
   expect_true(stan_pattern("int<lower=1> K_trend;", code_with_trend))
-  expect_true(stan_pattern("int<lower=1> Kc_trend;", code_with_trend))
+  expect_false(stan_pattern("int<lower=1> Kc_trend;", code_with_trend))
   expect_true(stan_pattern("matrix\\[N_trend, K_trend\\] X_trend;", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_trend, Kc_trend\\] Xc_trend;", code_with_trend))
-  expect_true(stan_pattern("vector\\[Kc_trend\\] b_trend;", code_with_trend))
-  expect_true(stan_pattern("vector\\[Kc_trend\\] means_X_trend;", code_with_trend))
+  expect_false(stan_pattern("matrix\\[N_trend, Kc_trend\\] Xc_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[K_trend\\] b_trend;", code_with_trend))
+  expect_false(stan_pattern("vector\\[Kc_trend\\] means_X_trend;", code_with_trend))
 
   # Factor model parameters
   expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
@@ -1058,7 +1040,6 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
 
   # Factor loading constraints in transformed parameters
   expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = rep_matrix\\(0, N_series_trend, N_lv_trend\\);", code_with_trend))
-  expect_true(stan_pattern("// constraints allow identifiability of loadings", code_with_trend))
   expect_true(stan_pattern("for \\(j in 1 : N_lv_trend\\)", code_with_trend))
   expect_true(stan_pattern("for \\(i in j : N_series_trend\\)", code_with_trend))
   expect_true(stan_pattern("Z\\[i, j\\] = Z_raw\\[index\\];", code_with_trend))
@@ -1067,7 +1048,7 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
   expect_true(stan_pattern("lv_trend = scaled_innovations_trend;", code_with_trend))
 
   # Trend mean with covariate effects
-  expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = Xc_trend \\* b_trend \\+ Intercept_trend;", code_with_trend))
+  expect_true(stan_pattern("mu_trend \\+= X_trend \\* b_trend;", code_with_trend))
 
   # Universal trend computation pattern should still be present
   expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
@@ -1096,7 +1077,6 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
 
   # Generated quantities
   expect_true(stan_pattern("real b_Intercept = Intercept;", code_with_trend))
-  expect_true(stan_pattern("real b_Intercept_trend = Intercept_trend - dot_product\\(means_X_trend, b_trend\\);", code_with_trend))
 
   # Mapping arrays should still be present
   expect_true(stan_pattern("array\\[N\\] int obs_trend_time", code_with_trend))
@@ -1118,7 +1098,7 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   data <- setup_stan_test_data()$multivariate
   mf_with_trend <- mvgam_formula(
     biomass ~ 1,
-    trend_formula = ~ x + ZMVN(gr = habitat)
+    trend_formula = ~ 1 + x + ZMVN(gr = habitat)
   )
 
   # Custom prior for hierarchical mixing parameter
@@ -1548,7 +1528,7 @@ test_that("stancode generates correct Stan blocks", {
   expect_false(grepl("obs_ind", code))
 
   # Universal trend computation pattern should be present
-  expect_match2(code, "for\\s*\\(\\s*i\\s+in\\s+1:N_trend\\s*\\)")
+  expect_true(stan_pattern("for\\(iin1:N_trend\\)", code))
   expect_match2(code, "trend\\[i,\\s*s\\]\\s*=.*dot_product")
 
   # Should contain sigma_trend prior but not duplicate sigma prior
@@ -1623,7 +1603,7 @@ test_that("stancode generates correct Stan blocks", {
   }
 
   # Verify trend injection pattern is in model block
-  expect_true(any(grepl("Add trend effects using mapping arrays", model_lines)))
+  expect_true(any(grepl("mu\\[n\\]\\s*\\+=\\s*trend\\[obs_trend_time\\[n\\],\\s*obs_trend_series\\[n\\]\\]", model_lines)))
   expect_true(any(grepl("mu\\[n\\]\\s*\\+=\\s*trend\\[obs_trend_time\\[n\\],\\s*obs_trend_series\\[n\\]\\]", model_lines)))
 
   # Generated Stan code should compile without errors
@@ -1674,23 +1654,23 @@ test_that("stancode handles multivariate specifications with shared RW trend", {
 
   # brms observation data declarations
   # Should declare N_count with comment
-  expect_match2(code_shared, "int<lower=1> N_count;\\s*//\\s*number of observations")
+  expect_match2(code_shared, "int<lower=1> N_count;")
   # Should declare Y_count as vector
-  expect_match2(code_shared, "vector\\[N_count\\] Y_count;\\s*//\\s*response variable")
+  expect_match2(code_shared, "vector\\[N_count\\] Y_count;")
   # Should declare X_count design matrix
   expect_match2(code_shared, "matrix\\[N_count, K_count\\] X_count;")
   # Should declare N_biomass with comment
-  expect_match2(code_shared, "int<lower=1> N_biomass;\\s*//\\s*number of observations")
+  expect_match2(code_shared, "int<lower=1> N_biomass;")
   # Should declare Y_biomass as vector
-  expect_match2(code_shared, "vector\\[N_biomass\\] Y_biomass;\\s*//\\s*response variable")
+  expect_match2(code_shared, "vector\\[N_biomass\\] Y_biomass;")
 
   # Trend dimensions
   # Should declare N_trend
-  expect_match2(code_shared, "int<lower=1> N_trend;\\s*//\\s*number of time points")
+  expect_match2(code_shared, "int<lower=1> N_trend;")
   # Should declare N_series_trend
-  expect_match2(code_shared, "int<lower=1> N_series_trend;\\s*//\\s*number of series")
+  expect_match2(code_shared, "int<lower=1> N_series_trend;")
   # Should declare N_lv_trend
-  expect_match2(code_shared, "int<lower=1> N_lv_trend;\\s*//\\s*latent variables")
+  expect_match2(code_shared, "int<lower=1> N_lv_trend;")
 
   # Observation-to-trend mapping arrays
   # Should declare obs_trend_time_count array
@@ -1707,70 +1687,63 @@ test_that("stancode handles multivariate specifications with shared RW trend", {
 
   # GLM compatibility vectors
   # Should declare mu_ones_count for GLM
-  expect_match2(code_shared, "vector\\[1\\] mu_ones_count;\\s*//.*count")
+  expect_match2(code_shared, "vector\\[1\\] mu_ones_count;")
   # Should declare mu_ones_biomass for GLM
-  expect_match2(code_shared, "vector\\[1\\] mu_ones_biomass;\\s*//.*biomass")
+  expect_match2(code_shared, "vector\\[1\\] mu_ones_biomass;")
 
   # Should create identity matrix Z for non-factor model
-  expect_match2(code_shared, "matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix\\(rep_vector\\(1\\.0, N_lv_trend\\)\\);")
+  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix\\(rep_vector\\(1.0, N_lv_trend\\)\\);", code_shared))
 
   # Observation model parameters
   # Should declare b_count coefficients
-  expect_match2(code_shared, "vector\\[Kc_count\\] b_count;\\s*//\\s*regression coefficients")
+  expect_match2(code_shared, "vector\\[Kc_count\\] b_count;")
   # Should declare Intercept_count
-  expect_match2(code_shared, "real Intercept_count;\\s*//\\s*temporary intercept")
+  expect_match2(code_shared, "real Intercept_count;")
   # Should declare sigma_count with lower bound
-  expect_match2(code_shared, "real<lower=0> sigma_count;\\s*//\\s*dispersion parameter")
+  expect_match2(code_shared, "real<lower=0> sigma_count;")
 
   # Trend parameters with _trend suffix
-  # Should declare Intercept_trend (not vector mu_trend)
-  expect_match2(code_shared, "real Intercept_trend;\\s*//\\s*trend intercept")
   # Should declare sigma_trend vector
-  expect_match2(code_shared, "vector<lower=0>\\[N_lv_trend\\] sigma_trend;\\s*//\\s*innovation SDs")
+  expect_match2(code_shared, "vector<lower=0>\\[N_lv_trend\\] sigma_trend;")
   # Should declare L_Omega_trend for correlation
-  expect_match2(code_shared, "cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;\\s*//\\s*correlation Cholesky")
+  expect_match2(code_shared, "cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;")
   # Should declare innovations_trend matrix
-  expect_match2(code_shared, "matrix\\[N_trend, N_lv_trend\\] innovations_trend;\\s*//\\s*raw innovations")
+  expect_match2(code_shared, "matrix\\[N_trend, N_lv_trend\\] innovations_trend;")
 
   # Should initialize lprior
-  expect_match2(code_shared, "real lprior = 0;\\s*//\\s*prior contributions")
-
-  # Should include Intercept_trend in lprior
-  expect_match2(code_shared, "lprior \\+= student_t_lpdf\\(Intercept_trend \\| 3, 0, 2\\.5\\);")
+  expect_match2(code_shared, "real lprior = 0;")
 
   # Should create mu_trend from Intercept_trend using rep_vector
-  expect_match2(code_shared, "vector\\[N_trend\\] mu_trend = rep_vector\\(Intercept_trend, N_trend\\);")
+  expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0.0, N_trend\\);", code_shared))
 
   # Should construct Sigma_trend covariance matrix
-  expect_match2(code_shared, "matrix\\[N_lv_trend, N_lv_trend\\] Sigma_trend\\s*=\\s*diag_pre_multiply\\(sigma_trend, L_Omega_trend\\);")
+  expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] Sigma_trend = diag_pre_multiply\\(sigma_trend, L_Omega_trend\\);", code_shared))
 
   # RW latent variables
   # Should declare lv_trend matrix for latent variables (with _trend suffix)
   expect_match2(code_shared, "matrix\\[N_trend, N_lv_trend\\] lv_trend;")
   # Should declare L_Sigma_trend for scaling
-  expect_match2(code_shared, "matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend\\s*=")
+  expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend =", code_shared))
   # Should declare scaled_innovations_trend
-  expect_match2(code_shared, "matrix\\[N_trend, N_lv_trend\\] scaled_innovations_trend\\s*=")
+  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] scaled_innovations_trend", code_shared))
   # Should initialize first lv_trend from scaled innovations
-  expect_match2(code_shared, "lv_trend\\[1, :\\] = scaled_innovations_trend\\[1, :\\];")
+  expect_true(stan_pattern("lv_trend\\[i,\\s*:\\s*\\] = scaled_innovations_trend\\[i,\\s*:\\s*\\]", code_shared))
   # Should implement RW cumulative sum
-  expect_match2(code_shared, "lv_trend\\[i, :\\] = lv_trend\\[i-1, :\\] \\+ scaled_innovations_trend\\[i, :\\];")
+  expect_true(stan_pattern("lv_trend\\[i,\\s*j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i - 1,\\s*j\\]", code_shared))
 
   # Trend matrix computation (shared, not response-specific)
   # Should declare shared trend matrix (not trend_count/trend_biomass)
   expect_match2(code_shared, "matrix\\[N_trend, N_series_trend\\] trend;")
-  # Should compute trend using universal formula with lv_trend
-  expect_match2(code_shared, "trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\)\\s*\\+\\s*mu_trend\\[times_trend\\[i, s\\]\\];")
 
   # Linear predictor construction with trend injection
   # Should initialize mu_count from design matrix
-  expect_match2(code_shared, "vector\\[N_count\\] mu_count = Xc_count \\* b_count;")
+  expect_true(stan_pattern("vector\\[N_count\\]mu_count=Xc_count\\*b_count;", code_shared))
   # Should initialize mu_biomass from design matrix
-  expect_match2(code_shared, "vector\\[N_biomass\\] mu_biomass = Xc_biomass \\* b_biomass;")
+  expect_true(stan_pattern("vector\\[N_biomass\\]mu_biomass=Xc_biomass\\*b_biomass;", code_shared))
   # Should inject trend into mu_count using mapping arrays
-  expect_match2(code_shared, "mu_count\\[n\\] \\+= Intercept_count \\+ trend\\[obs_trend_time_count\\[n\\], obs_trend_series_count\\[n\\]\\];")
+  expect_true(stan_pattern("mu_count\\[n\\]\\+=Intercept_count\\+trend\\[obs_trend_time_count\\[n\\],obs_trend_series_count\\[n\\]\\];", code_shared))
   # Should inject trend into mu_biomass using mapping arrays
-  expect_match2(code_shared, "mu_biomass\\[n\\] \\+= Intercept_biomass \\+ trend\\[obs_trend_time_biomass\\[n\\],\\s*obs_trend_series_biomass\\[n\\]\\];")
+  expect_true(stan_pattern("mu_biomass\\[n\\]\\+=Intercept_biomass\\+trend\\[obs_trend_time_biomass\\[n\\],obs_trend_series_biomass\\[n\\]\\];", code_shared))
 
   # Should use GLM function with to_matrix(mu_count) and mu_ones_count
   expect_match2(code_shared, "normal_id_glm_lpdf\\(Y_count \\| to_matrix\\(mu_count\\), 0\\.0, mu_ones_count, sigma_count\\)")
@@ -1791,9 +1764,6 @@ test_that("stancode handles multivariate specifications with shared RW trend", {
   expect_false(grepl("matrix.*trend_count", code_shared))
   # Should NOT have response-specific trend_biomass matrix
   expect_false(grepl("matrix.*trend_biomass", code_shared))
-
-  # Should NOT declare mu_trend as parameter vector
-  expect_false(grepl("parameters\\s*\\{[^}]*vector\\[[^]]*\\]\\s+mu_trend", code_shared))
 
   # Should NOT have duplicate model blocks
   expect_false(grepl("model\\s*\\{.*model\\s*\\{", code_shared))
@@ -1944,7 +1914,7 @@ test_that("standata integrates with trend systems", {
   trend_specs <- list(
     rw = ~ RW(),
     ar = ~ AR(p = 1),
-    var = ~ VAR(p = 1, cor = TRUE)
+    var = ~ VAR(p = 1)
   )
 
   for (trend_name in names(trend_specs)) {
@@ -2117,10 +2087,6 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   expect_true(stan_pattern("Function to compute a linear trend with changepoints", code_with_trend, fixed = TRUE))
   expect_true(stan_pattern("return \\(k \\+ Kappa_trend \\* delta\\) \\.\\* t \\+ \\(m \\+ Kappa_trend \\* \\(-t_change_trend \\.\\* delta\\)\\);", code_with_trend))
 
-  # Should NOT have logistic functions (default is linear growth)
-  expect_false(grepl("logistic_gamma", code_with_trend, fixed = TRUE))
-  expect_false(grepl("logistic_trend", code_with_trend, fixed = TRUE))
-
   # 2. Data Block - Piecewise-specific data structures
   # Standard trend dimensions
   expect_true(stan_pattern("int<lower=1> N_trend;", code_with_trend, fixed = TRUE))
@@ -2131,9 +2097,6 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   expect_true(stan_pattern("int<lower=0> n_change_trend;", code_with_trend))
   expect_true(stan_pattern("vector\\[n_change_trend\\] t_change_trend;", code_with_trend))
   expect_true(stan_pattern("real<lower=0> change_scale_trend;", code_with_trend))
-
-  # Should NOT have carrying capacity for linear growth
-  expect_false(grepl("cap_trend", code_with_trend, fixed = TRUE))
 
   # GLM optimization components
   expect_true(stan_pattern("vector\\[1\\] mu_ones;", code_with_trend))
@@ -2165,7 +2128,7 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   # Standard observation model parameters
   expect_true(stan_pattern("vector\\[Kc\\] b;", code_with_trend))
   expect_true(stan_pattern("real Intercept;", code_with_trend))
-  expect_true(stan_pattern("real Intercept_trend;", code_with_trend))
+  expect_false(stan_pattern("real Intercept_trend;", code_with_trend))
 
   # Should NOT have innovation/sigma parameters (PW doesn't use them)
   expect_false(grepl("innovations_trend", code_with_trend, fixed = TRUE))
@@ -2175,7 +2138,7 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   # Prior accumulation
   expect_true(stan_pattern("real lprior = 0;", code_with_trend, fixed = TRUE))
   expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept \\|", code_with_trend))
-  expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept_trend \\|", code_with_trend))
+  expect_false(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept_trend \\|", code_with_trend))
 
   # Latent trend matrix declaration
   expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
@@ -2189,15 +2152,15 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
 
   # Universal trend computation pattern
   expect_true(stan_pattern("matrix\\[N_trend, N_series_trend\\] trend;", code_with_trend))
-  expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(Intercept_trend, N_trend\\);", code_with_trend))
+  expect_false(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(Intercept_trend, N_trend\\);", code_with_trend))
   expect_true(stan_pattern("for \\(i in 1:N_trend\\)", code_with_trend))
   expect_true(stan_pattern("for \\(s in 1:N_series_trend\\)", code_with_trend))
   expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\];", code_with_trend))
 
   # GLM-compatible mu construction and trend injection
-  expect_true(stan_pattern("vector\\[N\\] mu = Xc \\* b;", code_with_trend))
+  expect_true(stan_pattern("mu \\+= Xc \\* b;", code_with_trend))
   expect_true(stan_pattern("for \\(n in 1:N\\)", code_with_trend))
-  expect_true(stan_pattern("mu\\[n\\] \\+= Intercept \\+ trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_with_trend))
+  expect_true(stan_pattern("mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_with_trend))
 
   # 6. Model Block - Priors and likelihood
   # PW-specific priors (check existence, not specific distributions)

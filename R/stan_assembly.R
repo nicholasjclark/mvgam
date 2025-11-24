@@ -2194,8 +2194,8 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
 
     // Apply correlation transformation using efficient non-centered parameterization
     {
-      matrix[", effective_dim, ", ", effective_dim, "] L_Sigma = diag_pre_multiply(sigma_trend, L_Omega_trend);
-      scaled_innovations_trend = innovations_trend * L_Sigma';
+      matrix[", effective_dim, ", ", effective_dim, "] L_Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend);
+      scaled_innovations_trend = innovations_trend * L_Sigma_trend';
     }")
   } else {
     # Uncorrelated case

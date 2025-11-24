@@ -385,6 +385,9 @@ get_parameter_type_default_prior <- function(param_name) {
   } else if (grepl("theta.*_trend$", param_name)) {
     # Theta parameters (e.g., CAR): typically bounded [0, 1]
     return(list(prior = "", lb = "0", ub = "1"))
+  } else if (grepl("alpha_cor.*_trend$", param_name)) {
+    # Alpha correlation parameters (hierarchical mixing): bounded [0, 1]
+    return(list(prior = "", lb = "0", ub = "1"))
   } else if (grepl("A[0-9]+_trend$", param_name)) {
     # VAR coefficient matrices
     return(list(prior = "", lb = "", ub = ""))
@@ -567,6 +570,83 @@ filter_trend_priors <- function(combined_priors) {
   
   # Return standard brms prior object
   structure(trend_priors, class = c("brmsprior", "data.frame"))
+}
+
+#' Get all mvgam-generated trend parameters using trend system infrastructure
+#'
+#' @param trend_specs List of trend specifications from mv_spec
+#' @return Character vector of all mvgam-generated parameter names
+#' @noRd
+get_all_mvgam_trend_parameters <- function(trend_specs) {
+  if (is.null(trend_specs)) {
+    return(character(0))
+  }
+  
+  # Ensure trend registry is initialized
+  ensure_registry_initialized()
+  
+  all_mvgam_params <- character(0)
+  
+  # Handle both single trend specs and multivariate trend specs
+  if (is_multivariate_trend_specs(trend_specs)) {
+    # Multivariate: extract trend models from each response
+    for (response_name in names(trend_specs)) {
+      trend_spec <- trend_specs[[response_name]]
+      if (inherits(trend_spec, "mvgam_trend")) {
+        monitor_params <- generate_monitor_params(trend_spec)
+        all_mvgam_params <- c(all_mvgam_params, monitor_params)
+      }
+    }
+  } else {
+    # Single trend spec
+    if (inherits(trend_specs, "mvgam_trend")) {
+      monitor_params <- generate_monitor_params(trend_specs)
+      all_mvgam_params <- c(all_mvgam_params, monitor_params)
+    }
+  }
+  
+  # Add base parameters that all trends have
+  all_mvgam_params <- c(all_mvgam_params, "sigma_trend")
+  
+  unique(all_mvgam_params)
+}
+
+#' Filter trend priors using trend system as source of truth
+#'
+#' Uses mvgam's trend registry and parameter generation system to automatically
+#' distinguish mvgam-generated dynamics parameters from brms formula parameters.
+#' 
+#' @param trend_priors A brmsprior object containing trend parameters
+#' @param trend_specs Trend specifications from mv_spec  
+#' @param base_formula The trend formula with mvgam constructors removed
+#' @param data Data for brms prior validation
+#' @return A brmsprior object with only brms-compatible parameters, suffixes removed
+#' @noRd
+remove_trend_suffix_from_priors <- function(trend_priors, trend_specs, base_formula, data) {
+  checkmate::assert_class(trend_priors, "brmsprior", null.ok = TRUE)
+  checkmate::assert_list(trend_specs, null.ok = TRUE)
+  checkmate::assert_class(base_formula, "formula")
+  checkmate::assert_data_frame(data, min.rows = 1)
+  
+  if (is.null(trend_priors) || nrow(trend_priors) == 0) {
+    return(NULL)
+  }
+  
+  # Get all mvgam-generated parameters from trend system
+  mvgam_generated_params <- get_all_mvgam_trend_parameters(trend_specs)
+  
+  # Filter out mvgam-generated parameters - they belong to mvgam, not brms
+  is_brms_compatible <- !trend_priors$class %in% mvgam_generated_params
+  
+  if (!any(is_brms_compatible)) {
+    return(NULL)
+  }
+  
+  # Keep only brms-compatible parameters and remove _trend suffix
+  result <- trend_priors[is_brms_compatible, , drop = FALSE]
+  result$class <- gsub("_trend$", "", result$class)
+  
+  structure(result, class = c("brmsprior", "data.frame"))
 }
 
 #' Get Complete Prior Specification for a Trend Type
