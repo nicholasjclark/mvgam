@@ -124,6 +124,9 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
     )
   }
 
+  # Initialize trend_priors outside conditional block
+  trend_priors <- NULL
+  
   # Setup trend model if trends are specified
   trend_setup <- if (mv_spec$has_trends) {
     # Validate trend model prerequisites
@@ -190,7 +193,8 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
     obs_setup = obs_setup,
     trend_setup = trend_setup,
     mv_spec = mv_spec,
-    validate = validate
+    validate = validate,
+    prior = trend_priors  # Pass unfiltered trend priors to mvgam functions
   )
 
   # Validate result structure with specific error locations

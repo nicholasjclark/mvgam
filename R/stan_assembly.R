@@ -244,7 +244,8 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
         shared_trend_spec,
         response_suffix = "",  # No suffix for shared trends
         response_name = NULL,  # Shared across all responses
-        obs_setup = obs_setup
+        obs_setup = obs_setup,
+        prior = prior
       )
     } else {
       # Response-specific trends: generate stanvars for each response separately
@@ -267,7 +268,8 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
           resp_trend_specs,
           response_suffix = paste0("_", resp_name),
           response_name = resp_name,
-          obs_setup = obs_setup
+          obs_setup = obs_setup,
+          prior = prior
         )
 
         if (!is.null(resp_stanvars)) {
@@ -300,7 +302,8 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
       trend_specs = trend_specs,
       response_suffix = "",
       response_name = response_name,
-      obs_setup = obs_setup
+      obs_setup = obs_setup,
+      prior = prior
     )
     responses_with_trends <- "main"  # Mark univariate model
   }
@@ -461,7 +464,8 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
 extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
                                               response_suffix = "",
                                               response_name = NULL,
-                                              obs_setup = NULL) {
+                                              obs_setup = NULL,
+                                              prior = NULL) {
   checkmate::assert_list(trend_setup, names = "named")
   checkmate::assert_list(trend_specs, names = "named")
   checkmate::assert_string(response_suffix)
@@ -608,7 +612,7 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
     }
 
     # Generate trend-specific stanvars (without common components)
-    trend_stanvars <- generate_trend_specific_stanvars(trend_specs, data_info, response_suffix)
+    trend_stanvars <- generate_trend_specific_stanvars(trend_specs, data_info, response_suffix, prior = prior)
 
     # Combine all stanvars: brms parameters + mapping + trend-specific
     combine_stanvars(brms_stanvars, mapping_stanvars, trend_stanvars)
@@ -2129,20 +2133,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     // Scaled innovations after applying hierarchical correlations
     matrix[N_trend, ", effective_dim, "] scaled_innovations_trend;
 
-    // Derived group-specific correlation matrices (declared once outside loops)
-    array[n_groups_trend] cholesky_factor_corr[", effective_dim, "] L_Omega_group_trend;
-    
-    // Compute group correlations using existing combine_cholesky
-    for (g_idx in 1:n_groups_trend) {
-      L_Omega_group_trend[g_idx] = combine_cholesky(L_Omega_global_trend, L_deviation_group_trend[g_idx], alpha_cor_trend);
-    }
-
-    // Apply group-specific correlations to raw innovations
-    for (g in 1:n_groups_trend) {
-      // Transform raw innovations using group correlations
-      matrix[", effective_dim, ", ", effective_dim, "] Sigma_group = diag_pre_multiply(sigma_trend, L_Omega_group_trend[g]);
-      // Apply to group time points (individual generators will specify the indexing)
-    }")
+    ")
   } else if (cor && effective_dim > 1) {
     # Simple correlated case
     final_innovations_code <- paste0("
@@ -2271,7 +2262,7 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
 #' @param data_info Data information list
 #' @return Updated components list with hierarchical support added if applicable
 #' @noRd
-add_hierarchical_support <- function(components, trend_specs, data_info) {
+add_hierarchical_support <- function(components, trend_specs, data_info, prior = NULL) {
   # Input validation following project standards
   checkmate::assert_list(components)
   checkmate::assert_list(trend_specs, names = "named") 
@@ -2279,6 +2270,7 @@ add_hierarchical_support <- function(components, trend_specs, data_info) {
   
   # Use existing hierarchical extraction logic instead of reimplementing
   hierarchical_info <- extract_hierarchical_info(data_info, trend_specs)
+  
   
   # Early return if no hierarchical structure needed
   if (is.null(hierarchical_info)) {
@@ -2295,7 +2287,7 @@ add_hierarchical_support <- function(components, trend_specs, data_info) {
   # Generate infrastructure components
   hierarchical_functions <- generate_hierarchical_functions()
   hierarchical_params <- generate_hierarchical_correlation_parameters(n_groups, n_subgroups)
-  hierarchical_priors <- generate_hierarchical_correlation_model(n_groups)
+  hierarchical_priors <- generate_hierarchical_correlation_model(n_groups, prior)
   
   # Add components in dependency order
   components <- append_if_not_null(components, list(
@@ -2699,7 +2691,7 @@ generate_hierarchical_functions <- function() {
 #' Generate Hierarchical Data Structure Stanvars
 #'
 #' Creates Stan data block declarations for hierarchical grouping structures.
-#' Generates n_groups_trend dimension and group_inds_trend mapping array
+#' Generates N_groups_trend dimension and group_inds_trend mapping array
 #' following established stanvar patterns from generate_common_trend_data().
 #'
 #' @param hierarchical_info List from extract_hierarchical_info() containing
@@ -2722,29 +2714,45 @@ generate_hierarchical_data_structures <- function(hierarchical_info, data_info) 
   n_groups <- hierarchical_info$n_groups
   gr_var <- hierarchical_info$gr_var
   
-  # Generate n_groups_trend dimension following generate_common_trend_data pattern
+  # Generate N_groups_trend dimension following generate_common_trend_data pattern
   n_groups_stanvar <- brms::stanvar(
     x = n_groups,
-    name = "n_groups_trend",
-    scode = "int<lower=1> n_groups_trend;",
+    name = "N_groups_trend",
+    scode = "int<lower=1> N_groups_trend;",
     block = "data",
     position = "start"  # Dimensions go first
   )
   
-  # Create group index mapping from data (follows validations.R pattern)
-  group_levels <- sort(unique(data_info$data[[gr_var]]))
-  group_inds_array <- match(data_info$data[[gr_var]], group_levels)
+  # Generate N_subgroups_trend dimension (number of series within each group)
+  # Calculate from hierarchical_info (already computed in extract_hierarchical_info)
+  n_subgroups <- hierarchical_info$n_subgroups
+  n_subgroups_stanvar <- brms::stanvar(
+    x = n_subgroups,
+    name = "N_subgroups_trend", 
+    scode = "int<lower=1> N_subgroups_trend;",
+    block = "data",
+    position = "start"  # Dimensions go first
+  )
   
-  # Generate group_inds_trend array (corrected: array per group, not per series)
+  # Create series-to-group mapping (one entry per series, not per observation)
+  series_var <- data_info$series_var %||% "series"
+  group_levels <- sort(unique(data_info$data[[gr_var]]))
+  
+  # Extract unique series-group combinations to create proper mapping
+  unique_series_data <- data_info$data[!duplicated(data_info$data[[series_var]]), ]
+  series_groups <- unique_series_data[[gr_var]]
+  group_inds_array <- match(series_groups, group_levels)
+  
+  # Generate group_inds_trend array (maps each series to its group)
   group_inds_stanvar <- brms::stanvar(
     x = group_inds_array,
     name = "group_inds_trend", 
-    scode = "array[n_groups_trend] int<lower=1> group_inds_trend;",
+    scode = "array[N_series_trend] int<lower=1> group_inds_trend;",
     block = "data"
   )
   
   # Return combined stanvars following established pattern
-  return(combine_stanvars(n_groups_stanvar, group_inds_stanvar))
+  return(combine_stanvars(n_groups_stanvar, n_subgroups_stanvar, group_inds_stanvar))
 }
 
 #' Generate Parameters Block Injections for Hierarchical Correlations
@@ -2757,13 +2765,13 @@ generate_hierarchical_data_structures <- function(hierarchical_info, data_info) 
 generate_hierarchical_correlation_parameters <- function(n_groups, n_subgroups) {
   l_omega_global <- brms::stanvar(
     name = "L_Omega_global_trend",
-    scode = glue::glue("cholesky_factor_corr[{n_subgroups}] L_Omega_global_trend;"),
+    scode = "cholesky_factor_corr[N_subgroups_trend] L_Omega_global_trend;",
     block = "parameters"
   )
 
   l_deviation_group <- brms::stanvar(
     name = "L_deviation_group_trend",
-    scode = glue::glue("array[n_groups_trend] cholesky_factor_corr[{n_subgroups}] L_deviation_group_trend;"),
+    scode = "array[N_groups_trend] cholesky_factor_corr[N_subgroups_trend] L_deviation_group_trend;",
     block = "parameters"
   )
 
@@ -2773,7 +2781,38 @@ generate_hierarchical_correlation_parameters <- function(n_groups, n_subgroups) 
     block = "parameters"
   )
 
-  return(combine_stanvars(l_omega_global, l_deviation_group, alpha_cor))
+  l_omega_group <- brms::stanvar(
+    name = "L_Omega_group_trend",
+    scode = glue::glue("array[N_groups_trend] cholesky_factor_corr[N_subgroups_trend] L_Omega_group_trend;"),
+    block = "tparameters"
+  )
+
+  sigma_group <- brms::stanvar(
+    name = "Sigma_group_trend", 
+    scode = glue::glue("array[N_groups_trend] cov_matrix[N_subgroups_trend] Sigma_group_trend;"),
+    block = "tparameters"
+  )
+  
+  # Add computation logic for hierarchical correlation matrices
+  computation <- brms::stanvar(
+    name = "hierarchical_correlation_computation",
+    scode = "
+  // Compute group-specific correlation matrices using shared infrastructure
+  for (g_idx in 1:N_groups_trend) {
+    L_Omega_group_trend[g_idx] = combine_cholesky(
+      L_Omega_global_trend, 
+      L_deviation_group_trend[g_idx], 
+      alpha_cor_trend
+    );
+    
+    Sigma_group_trend[g_idx] = multiply_lower_tri_self_transpose(
+      diag_pre_multiply(sigma_trend, L_Omega_group_trend[g_idx])
+    );
+  }",
+    block = "tparameters"
+  )
+
+  return(combine_stanvars(l_omega_global, l_deviation_group, alpha_cor, l_omega_group, sigma_group, computation))
 }
 
 #' Generate Model Block Injections for Hierarchical Correlation Priors
@@ -2782,10 +2821,11 @@ generate_hierarchical_correlation_parameters <- function(n_groups, n_subgroups) 
 #' @param n_groups Number of groups for hierarchical modeling
 #' @return List of model block stanvars
 #' @noRd
-generate_hierarchical_correlation_model <- function(n_groups) {
+generate_hierarchical_correlation_model <- function(n_groups, prior = NULL) {
+  
   alpha_cor_prior <- brms::stanvar(
     name = "alpha_cor_trend_prior",
-    scode = "alpha_cor_trend ~ beta(3, 2);",
+    scode = glue::glue("alpha_cor_trend ~ {get_trend_parameter_prior(prior, 'alpha_cor_trend')};"),
     block = "model"
   )
 
@@ -2797,7 +2837,7 @@ generate_hierarchical_correlation_model <- function(n_groups) {
 
   l_deviation_group_prior <- brms::stanvar(
     name = "L_deviation_group_trend_prior",
-    scode = "for (g in 1:n_groups_trend) { L_deviation_group_trend[g] ~ lkj_corr_cholesky(6); }",
+    scode = "for (g_idx in 1:N_groups_trend) { L_deviation_group_trend[g_idx] ~ lkj_corr_cholesky(6); }",
     block = "model"
   )
 
@@ -3314,7 +3354,7 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   }
 
   # 6. Add hierarchical correlation support if applicable
-  components <- add_hierarchical_support(components, trend_specs, data_info)
+  components <- add_hierarchical_support(components, trend_specs, data_info, prior)
 
   # Use the robust combine_stanvars function
   return(do.call(combine_stanvars, components))
@@ -3688,18 +3728,6 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       // Zero mean vector for VARMA process (following Heaps 2022)
       vector[N_lv_trend] trend_zeros = rep_vector(0.0, N_lv_trend);
 
-      {if(is_hierarchical) glue::glue('
-      // Hierarchical grouping data structures
-      int<lower=0> n_groups_trend = {n_groups};
-      int<lower=0> n_subgroups_trend = {n_subgroups};
-
-      // Group indexing matrix: maps (group, subgroup) -> series index
-      // Populated from sorted data where series = interaction(gr, subgr)
-      array[{n_groups}, {n_subgroups}] int<lower=1> group_inds_trend;
-      {{
-        {group_inds_code}
-      }}
-      ') else ''}
   ")
 
   var_tdata_stanvar <- brms::stanvar(
@@ -4064,7 +4092,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   components <- append_if_not_null(base_components, trend_computation)
 
   # Add hierarchical correlation support if applicable
-  components <- add_hierarchical_support(components, trend_specs, data_info)
+  components <- add_hierarchical_support(components, trend_specs, data_info, prior)
 
   # Add factor model support if applicable
   if (is_factor_model) {
@@ -4434,7 +4462,7 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   }
 
   # Add hierarchical correlation support if applicable
-  components <- add_hierarchical_support(components, trend_specs, data_info)
+  components <- add_hierarchical_support(components, trend_specs, data_info, prior)
 
   # ZMVN doesn't need additional priors (shared system handles all priors)
 

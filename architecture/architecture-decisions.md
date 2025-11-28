@@ -168,6 +168,10 @@ mu_biomass += mu_biomass_trend;
 2. **Code Deduplication**: Shared utility functions ensure consistent hierarchical patterns
 3. **Flexible Grouping**: Works with any unit variable (time, site, etc.) and grouping structure
 4. **Partial Pooling**: Alpha parameter controls mixing between global and group-specific correlations
+5. **Dimension Architecture**: Hierarchical models use two critical dimensions:
+   - `N_lv_trend`: Total series across ALL groups (system-wide, e.g., 3 groups × 2 series = 6)
+   - `N_subgroups_trend`: Series within EACH group (within-group, e.g., 2 series per group)
+6. **Matrix Dimensioning**: Group-specific matrices use `N_subgroups_trend`, system-wide matrices use `N_lv_trend`
 
 ## Validation Framework Principles
 

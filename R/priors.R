@@ -82,6 +82,12 @@ common_trend_priors <- list(
     dimension = "vector"
   ),
 
+  alpha_cor_trend = list(
+    default = "beta(3, 2)",
+    bounds = c(0, 1),
+    description = "Hierarchical correlation mixing parameter",
+    dimension = "scalar"
+  ),
 
   Z = list(
     default = "std_normal()",

@@ -636,7 +636,7 @@ test_that("AR trend supports hierarchical correlations", {
 
   # Check for hierarchical correlation components in generated code
   expect_true(grepl("L_Omega_global", combined_code))
-  expect_true(grepl("alpha_cor", combined_code))
+  expect_true(grepl("alpha_cor_trend", combined_code))
 
   validation_result <- mvgam:::validate_stan_code(
     combined_code,
@@ -686,7 +686,7 @@ test_that("RW trend ignores grouping parameter", {
 
     # Should not contain hierarchical correlation components
     expect_false(grepl("L_Omega_global", combined_code))
-    expect_false(grepl("alpha_cor", combined_code))
+    expect_false(grepl("alpha_cor_trend", combined_code))
 
   }, "correlations.*ignored")
 })

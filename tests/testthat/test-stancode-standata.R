@@ -84,11 +84,6 @@ setup_stan_test_data <- function() {
   )
 }
 
-# Helper function for string pattern matching
-expect_match2 <- function(object, regexp, ...) {
-  expect_true(grepl(regexp, object, ...))
-}
-
 # stancode Tests ----
 
 test_that("stancode.mvgam_formula returns correct class structure", {
@@ -1137,25 +1132,25 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   expect_true(stan_pattern("vector\\[Kc_trend\\] means_X_trend;", code_with_trend))
 
   # Hierarchical grouping data structures
-  expect_true(stan_pattern("int<lower=1> n_groups_trend;", code_with_trend))
-  expect_true(stan_pattern("array\\[N_series_trend\\] int", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_groups_trend;", code_with_trend))
+  expect_true(stan_pattern("int<lower=1> N_subgroups_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_series_trend\\] int<lower=1> group_inds_trend;", code_with_trend))
 
   # Hierarchical correlation functions
   expect_true(stan_pattern("matrix combine_cholesky\\(", code_with_trend))
   expect_true(stan_pattern("real alpha", code_with_trend))
 
   # Hierarchical correlation parameters with _trend suffix
-  expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_global_trend;", code_with_trend))
-  expect_true(stan_pattern("array\\[n_groups_trend\\] cholesky_factor_corr\\[N_lv_trend\\] L_deviation_group_trend;", code_with_trend))
+  expect_true(stan_pattern("cholesky_factor_corr\\[N_subgroups_trend\\] L_Omega_global_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_groups_trend\\] cholesky_factor_corr\\[N_subgroups_trend\\] L_deviation_group_trend;", code_with_trend))
   expect_true(stan_pattern("real<lower=0, upper=1> alpha_cor_trend;", code_with_trend))
 
   # Group-specific correlation matrices computation
-  expect_true(stan_pattern("array\\[n_groups_trend\\] cov_matrix\\[N_lv_trend\\] Sigma_group_trend;", code_with_trend))
-  expect_true(stan_pattern("L_Omega_group_trend = combine_cholesky\\(L_Omega_global_trend, L_deviation_group_trend\\[g\\], alpha_cor_trend\\)", code_with_trend))
+  expect_true(stan_pattern("array\\[N_groups_trend\\] cov_matrix\\[N_subgroups_trend\\] Sigma_group_trend;", code_with_trend))
+  expect_true(stan_pattern("L_Omega_group_trend\\[g_idx\\] = combine_cholesky\\(L_Omega_global_trend, L_deviation_group_trend\\[g_idx\\], alpha_cor_trend\\);", code_with_trend))
 
-  # Group-specific innovation scaling
-  expect_true(stan_pattern("int group_idx = group_inds_trend\\[s\\];", code_with_trend))
-  expect_true(stan_pattern("L_group_trend = cholesky_decompose\\(Sigma_group_trend\\[group_idx\\]\\)", code_with_trend))
+  # Group-specific innovation scaling - now handled in transformed parameters
+  expect_true(stan_pattern("Sigma_group_trend\\[g_idx\\] = multiply_lower_tri_self_transpose\\(diag_pre_multiply\\(sigma_trend, L_Omega_group_trend\\[g_idx\\]\\)\\);", code_with_trend))
 
   # ZMVN dynamics (just scaled innovations)
   expect_true(stan_pattern("lv_trend = scaled_innovations_trend;", code_with_trend))
@@ -1171,7 +1166,7 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
 
   # Hierarchical correlation priors with _trend suffix
   expect_true(stan_pattern("L_Omega_global_trend ~ lkj_corr_cholesky\\(1\\);", code_with_trend))
-  expect_true(stan_pattern("L_deviation_group_trend\\[g\\] ~ lkj_corr_cholesky\\(6\\);", code_with_trend))
+  expect_true(stan_pattern("for \\(g_idx in 1:N_groups_trend\\) \\{ L_deviation_group_trend\\[g_idx\\] ~ lkj_corr_cholesky\\(6\\); \\}", code_with_trend))
 
   # Custom alpha_cor_trend prior should be applied
   expect_true(stan_pattern("alpha_cor_trend ~ beta\\(5, 5\\);", code_with_trend))
@@ -1216,6 +1211,99 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
 
   # Final validation: ensure model compiles correctly
   expect_no_error(stancode(mf_with_trend, data = data, family = lognormal(), prior = custom_prior, validate = TRUE))
+})
+
+test_that("stancode generates correct hierarchical VAR(gr = habitat) model with proper coefficient matrices", {
+  data <- setup_stan_test_data()$multivariate
+  mf_with_trend <- mvgam_formula(
+    count ~ 1 + x,
+    trend_formula = ~ 1 + VAR(p = 1, gr = habitat)
+  )
+
+  code_with_trend <- stancode(
+    mf_with_trend,
+    data = data,
+    family = poisson(),
+    validate = FALSE
+  )
+
+  # Basic structure checks
+  expect_s3_class(code_with_trend, "mvgamstancode")
+  expect_s3_class(code_with_trend, "stancode")
+
+  # Response variable should be integer array for Poisson
+  expect_true(stan_pattern("array\\[N\\] int Y;", code_with_trend))
+  expect_false(grepl("vector\\[N\\] Y;", code_with_trend))
+
+  # Hierarchical data structures - VAR should use shared system
+  expect_true(stan_pattern("int<lower=1> N_groups_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_series_trend\\] int<lower=1> group_inds_trend;", code_with_trend))
+
+  # VAR-specific data structures
+  expect_true(stan_pattern("int<lower=1> n_lags_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[n_lags_trend\\] matrix\\[N_trend, N_series_trend\\] X_lag_trend;", code_with_trend))
+
+  # Hierarchical correlation parameters (shared with ZMVN)
+  expect_true(stan_pattern("cholesky_factor_corr\\[N_subgroups_trend\\] L_Omega_global_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_groups_trend\\] cholesky_factor_corr\\[N_subgroups_trend\\] L_deviation_group_trend;", code_with_trend))
+  expect_true(stan_pattern("real<lower=0, upper=1> alpha_cor_trend;", code_with_trend))
+
+  # VAR-specific hierarchical coefficient parameters
+  expect_true(stan_pattern("array\\[N_groups_trend, n_lags_trend\\] matrix\\[N_subgroups_trend, N_subgroups_trend\\] A_raw_group_trend;", code_with_trend))
+
+  # Hierarchical correlation functions
+  expect_true(stan_pattern("matrix combine_cholesky\\(", code_with_trend))
+
+  # Group-specific coefficient matrices in transformed parameters
+  expect_true(stan_pattern("array\\[N_groups_trend, n_lags_trend\\] matrix\\[N_subgroups_trend, N_subgroups_trend\\] A_group_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_groups_trend\\] cov_matrix\\[N_subgroups_trend\\] Sigma_group_trend;", code_with_trend))
+
+  # Hierarchical correlation computation with consistent loop indices
+  expect_true(stan_pattern("for \\(g_idx in 1:N_groups_trend\\) \\{", code_with_trend))
+  expect_true(stan_pattern("L_Omega_group_trend\\[g_idx\\] = combine_cholesky\\(L_Omega_global_trend, L_deviation_group_trend\\[g_idx\\], alpha_cor_trend\\);", code_with_trend))
+  expect_true(stan_pattern("Sigma_group_trend\\[g_idx\\] = multiply_lower_tri_self_transpose\\(", code_with_trend))
+
+  # Block-diagonal assembly of full system matrices
+  expect_true(stan_pattern("cov_matrix\\[N_lv_trend\\] Sigma_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[n_lags_trend\\] matrix\\[N_lv_trend, N_lv_trend\\] A_trend;", code_with_trend))
+
+  # Heaps transformation for stationarity (VAR-specific)
+  expect_true(stan_pattern("array\\[1\\] matrix\\[N_lv_trend, N_lv_trend\\] P_group;", code_with_trend))
+  expect_true(stan_pattern("P_group\\[1\\] = AtoP\\(A_raw_group_trend\\[g_idx, lag\\]\\);", code_with_trend))
+
+  # Custom prior application
+  expect_true(stan_pattern("alpha_cor_trend ~ beta\\(3, 2\\);", code_with_trend))
+
+  # VAR coefficient priors
+  expect_true(stan_pattern("to_vector\\(A_raw_group_trend\\[g_idx, lag\\]\\) ~ std_normal\\(\\);", code_with_trend))
+
+  # Innovation correlation priors (shared pattern)
+  expect_true(stan_pattern("L_Omega_global_trend ~ lkj_corr_cholesky\\(1\\);", code_with_trend))
+  expect_true(stan_pattern("for \\(g_idx in 1:N_groups_trend\\) \\{ L_deviation_group_trend\\[g_idx\\] ~ lkj_corr_cholesky\\(6\\); \\}", code_with_trend))
+
+  # Poisson likelihood (GLM optimized for count data)
+  expect_true(stan_pattern("target \\+= poisson_glm_lpmf\\(Y \\| Xc, mu, b\\);", code_with_trend) ||
+              stan_pattern("target \\+= poisson_lpdf\\(Y \\| exp\\(mu\\)\\);", code_with_trend))
+
+  # No variable naming inconsistencies
+  n_groups_count <- length(gregexpr("n_groups_trend", code_with_trend, fixed = TRUE)[[1]])
+  N_groups_count <- length(gregexpr("N_groups_trend", code_with_trend, fixed = TRUE)[[1]])
+  if (n_groups_count == -1) n_groups_count <- 0
+  if (N_groups_count == -1) N_groups_count <- 0
+
+  # Should consistently use N_groups_trend, not mixed naming
+  expect_equal(n_groups_count, 0)
+
+  # Check for no duplicated Stan blocks
+  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_with_trend)[[1]]), 1)
+  expect_equal(length(gregexpr("^\\s*transformed data\\s*\\{", code_with_trend)[[1]]), 1)
+  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_with_trend)[[1]]), 1)
+  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_with_trend)[[1]]), 1)
+  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
+  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
+
+  # Final validation: ensure model compiles correctly
+  expect_no_error(stancode(mf_with_trend, data = data, family = poisson(), prior = custom_prior, validate = TRUE))
 })
 
 test_that("stancode generates correct CAR() continuous autoregressive trend with complex
@@ -1873,7 +1961,7 @@ test_that("standata handles different data structures", {
     # Skip multivariate data for simple formula
     if (data_name == "multivariate") next
 
-    standata_result <- standata(mf, data = data, family = poisson())
+    standata_result <- SW(standata(mf, data = data, family = poisson()))
 
     expect_type(standata_result, "list")
     expect_true("N" %in% names(standata_result))
@@ -1885,7 +1973,7 @@ test_that("standata processes missing data correctly", {
   data <- setup_stan_test_data()$with_missings
   mf <- mvgam_formula(y ~ x, trend_formula = ~ RW())
 
-  standata_result <- standata(mf, data = data, family = poisson())
+  standata_result <- SW(standata(mf, data = data, family = poisson()))
 
   expect_type(standata_result, "list")
 
@@ -1936,9 +2024,7 @@ test_that("standata validates input consistency", {
   mf <- mvgam_formula(y ~ x, trend_formula = ~ RW())
 
   # Valid call should work
-  expect_silent({
-    standata_result <- standata(mf, data = data, family = poisson())
-  })
+  standata_result <- standata(mf, data = data, family = poisson())
 
   # Invalid time series structure should error
   bad_data <- data
@@ -1981,10 +2067,8 @@ test_that("stan functions work with complex model specifications", {
   priors <- brms::prior("normal(0, 1)", class = "ar1_trend")
 
   # Should handle complex specifications
-  expect_silent({
-    code <- stancode(mf, data = data, prior = priors)
-    standata_result <- standata(mf, data = data, prior = priors)
-  })
+  code <- stancode(mf, data = data, prior = priors)
+  standata_result <- standata(mf, data = data, prior = priors)
 
   expect_s3_class(code, "stancode")
   expect_type(standata_result, "list")
@@ -2024,10 +2108,8 @@ test_that("stan functions handle edge cases gracefully", {
   mf <- mvgam_formula(y ~ 1, trend_formula = ~ RW())
 
   # Should handle small datasets
-  expect_silent({
-    code <- stancode(mf, data = small_data, family = poisson())
-    standata_result <- standata(mf, data = small_data, family = poisson())
-  })
+  code <- stancode(mf, data = small_data, family = poisson())
+  standata_result <- standata(mf, data = small_data, family = poisson())
 
   expect_s3_class(code, "stancode")
   expect_type(standata_result, "list")

@@ -643,7 +643,7 @@ generate_monitor_params <- function(trend_spec) {
     "AR" = generate_ar_monitor_params(trend_spec),
     "VAR" = generate_var_monitor_params(trend_spec),
     "CAR" = generate_car_monitor_params(trend_spec),
-    "ZMVN" = generate_zmvn_monitor_params(trend_spec),
+    "ZMVN" = character(0),
     "PW" = generate_pw_monitor_params(trend_spec),
     stop(insight::format_error(
       "Unknown trend type: {.field {trend_type}}",
@@ -667,8 +667,15 @@ generate_monitor_params <- function(trend_spec) {
     character(0)
   }
 
+  # Add hierarchical correlation parameters if grouping is specified
+  hierarchical_params <- if (!is.null(trend_spec$gr) && trend_spec$gr != "NA") {
+    c("alpha_cor_trend", "L_Omega_global_trend", "L_deviation_group_trend", "sigma_group_trend")
+  } else {
+    character(0)
+  }
+
   # Combine all parameters
-  all_params <- unique(c(base_params, trend_specific, correlation_params, factor_params))
+  all_params <- unique(c(base_params, trend_specific, correlation_params, factor_params, hierarchical_params))
 
   return(all_params)
 }
@@ -726,10 +733,6 @@ generate_var_monitor_params <- function(trend_spec) {
     var_params <- c(var_params, "Dmu_trend", "Domega_trend")
   }
 
-  # Add group-specific parameters if hierarchical
-  if (!is.null(trend_spec$gr) && trend_spec$gr != "NA") {
-    var_params <- c(var_params, "sigma_group_trend")
-  }
 
   # VAR uses variance-correlation decomposition (sigma_trend + L_Omega_trend)
   # These are handled by base_params and correlation_params in the main function
@@ -746,21 +749,6 @@ generate_car_monitor_params <- function(trend_spec) {
   return(c("ar1_trend"))
 }
 
-#' Generate ZMVN-specific monitor parameters
-#' @param trend_spec ZMVN trend specification
-#' @return Character vector of ZMVN-specific parameters
-#' @noRd
-generate_zmvn_monitor_params <- function(trend_spec) {
-  params <- character(0)
-  
-  # Add hierarchical correlation parameters if grouping is specified
-  # Hierarchical ZMVN models include global correlation structure + group deviations
-  if (!is.null(trend_spec$gr) && trend_spec$gr != "NA") {
-    params <- c(params, "alpha_cor_trend", "L_Omega_global_trend", "L_deviation_group_trend")
-  }
-  
-  return(params)
-}
 
 #' Generate PW-specific monitor parameters
 #' @param trend_spec PW trend specification
@@ -2350,7 +2338,7 @@ print.mvgam_trend <- function(x, ...) {
 #' conditional_effects(mod, type = "link")
 #'
 #' # Inspect posterior estimates for the correlation weighting parameter
-#' mcmc_plot(mod, variable = "alpha_cor", type = "hist")
+#' mcmc_plot(mod, variable = "alpha_cor_trend", type = "hist")
 #' }
 #' @export
 RW = function(
