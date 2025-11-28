@@ -32,7 +32,7 @@
                                 "extract_mvgam_components":  "extract_mvgam_components \u003c- function(combined_fit, obs_setup, trend_setup, mv_spec) {",
                                 "mvgam_multiple":  "mvgam_multiple \u003c- function(formula, trend_formula = NULL, data_list, backend = getOption(\"brms.backend\", \"cmdstanr\"), combine = TRUE, check_data = TRUE, ...) {",
                                 "extract_time_information":  "extract_time_information \u003c- function(data) {",
-                                "generate_combined_stancode_and_data":  "generate_combined_stancode_and_data \u003c- function(obs_setup, trend_setup, mv_spec, validate = TRUE) {",
+                                "generate_combined_stancode_and_data":  "generate_combined_stancode_and_data \u003c- function(obs_setup, trend_setup, mv_spec, validate = TRUE, prior = NULL) {",
                                 "pool_mvgam_fits":  "pool_mvgam_fits \u003c- function(fits) {",
                                 "validate_multiple_imputation_datasets":  "validate_multiple_imputation_datasets \u003c- function(data_list) {"
                             },
