@@ -154,10 +154,11 @@ data {
   int<lower=1> N_series_trend;
   int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
+  array[N_series_trend] int<lower=1> group_inds_trend;
   array[N] int obs_trend_time;
   array[N] int obs_trend_series;
-  int<lower=1> n_groups_trend;
-  array[n_groups_trend] int<lower=1> group_inds_trend;
+  int<lower=1> N_groups_trend;
+  int<lower=1> N_subgroups_trend;
   vector[1] mu_ones;
 }
 transformed data {
@@ -166,13 +167,6 @@ transformed data {
   // Factor loadings matrix: maps latent variables to observed series
   matrix[N_series_trend, N_lv_trend] Z = diag_matrix(rep_vector(1.0, N_lv_trend));
     vector[N_lv_trend] trend_zeros = rep_vector(0.0, N_lv_trend);
-int<lower=0> n_groups_trend = 2;
-int<lower=0> n_subgroups_trend = 3;
-array[2, 3] int<lower=1> group_inds_trend;
-{
-  group_inds_trend[1] = {1, 2, 3};
-        group_inds_trend[2] = {4, 5, 6};
-}
   for (i in 2:K) {
     means_X[i - 1] = mean(X[, i]);
     Xc[, i - 1] = X[, i] - means_X[i - 1];
@@ -185,13 +179,13 @@ parameters {
   matrix[N_trend, N_lv_trend] lv_trend;
   real Intercept_trend;
       array[2, 1] matrix[3, 3] A_raw_group_trend;
-      array[2] vector<lower=0>[3] sigma_group_trend;
   array[2] vector[1] Amu_trend;
   array[2] vector<lower=0>[1] Aomega_trend;
   vector[1 * N_lv_trend] init_trend;
-  cholesky_factor_corr[3] L_Omega_global_trend;
-  array[n_groups_trend] cholesky_factor_corr[3] L_deviation_group_trend;
+  cholesky_factor_corr[N_subgroups_trend] L_Omega_global_trend;
+  array[N_groups_trend] cholesky_factor_corr[N_subgroups_trend] L_deviation_group_trend;
   real<lower=0, upper=1> alpha_cor_trend;
+  array[N_groups_trend] vector<lower=0>[N_subgroups_trend] sigma_group_trend;
 }
 transformed parameters {
   // Prior log-probability accumulator
@@ -204,7 +198,7 @@ mu_trend += Intercept_trend;
       array[2, 1] matrix[3, 3] A_group_trend;
       for (g in 1:2) {
         matrix[3, 3] L_Omega_group_trend =
-          cholesky_compose(alpha_cor_trend * multiply_lower_tri_self_transpose(L_Omega_global_trend) +
+          cholesky_decompose(alpha_cor_trend * multiply_lower_tri_self_transpose(L_Omega_global_trend) +
                            (1 - alpha_cor_trend) * multiply_lower_tri_self_transpose(L_deviation_group_trend[g]));
         Sigma_group_trend[g] = multiply_lower_tri_self_transpose(
           diag_pre_multiply(sigma_group_trend[g], L_Omega_group_trend));
@@ -229,6 +223,38 @@ mu_trend += Intercept_trend;
       }
   cov_matrix[1 * N_lv_trend] Omega_trend;
   array[1] matrix[N_lv_trend, N_lv_trend] empty_theta; empty_theta[1] = rep_matrix(0.0, N_lv_trend, N_lv_trend); Omega_trend = initial_joint_var(Sigma_trend, A_trend, empty_theta[1:0]);
+  array[N_groups_trend] cholesky_factor_corr[N_subgroups_trend] L_Omega_group_trend;
+  array[N_groups_trend] cov_matrix[N_subgroups_trend] Sigma_group_trend;
+  array[N_groups_trend] matrix[N_subgroups_trend, N_subgroups_trend] L_group_trend;
+  for (g_idx in 1:N_groups_trend) {
+    L_Omega_group_trend[g_idx] = combine_cholesky(
+      L_Omega_global_trend, 
+      L_deviation_group_trend[g_idx], 
+      alpha_cor_trend
+    );
+    L_group_trend[g_idx] = diag_pre_multiply(sigma_group_trend[g_idx], L_Omega_group_trend[g_idx]);
+    Sigma_group_trend[g_idx] = multiply_lower_tri_self_transpose(L_group_trend[g_idx]);
+  }
+  for (t in 1:N_trend) {
+    for (g_idx in 1:N_groups_trend) {
+      vector[N_subgroups_trend] group_innov;
+      int k = 0;
+      for (s in 1:N_lv_trend) {
+        if (group_inds_trend[s] == g_idx) {
+          k += 1;
+          group_innov[k] = innovations_trend[t, s];
+        }
+      }
+      vector[N_subgroups_trend] scaled = L_group_trend[g_idx] * group_innov;
+      k = 0;
+      for (s in 1:N_lv_trend) {
+        if (group_inds_trend[s] == g_idx) {
+          k += 1;
+          scaled_innovations_trend[t, s] = scaled[k];
+        }
+      }
+    }
+  }
   // Final trend values for each time point and series
   matrix[N_trend, N_series_trend] trend;
   // Map latent variables to trend values via factor loadings
@@ -274,15 +300,14 @@ model {
           }
         }
       }
-  L_Omega_trend ~ lkj_corr_cholesky(2);
   for (lag in 1:2) {
     Amu_trend[lag] ~ normal(0, sqrt(0.455));
     Aomega_trend[lag] ~ gamma(1.365, 0.071175);
   }
-  alpha_cor_trend ~ beta(3, 2);
+  alpha_cor_trend ~ beta(2, 8);
   L_Omega_global_trend ~ lkj_corr_cholesky(1);
-  for (g in 1:n_groups_trend) { L_deviation_group_trend[g] ~ lkj_corr_cholesky(6); }
-  sigma_trend ~ exponential(2);
+  for (g_idx in 1:N_groups_trend) { L_deviation_group_trend[g_idx] ~ lkj_corr_cholesky(6); }
+  for (g_idx in 1:N_groups_trend) { to_vector(sigma_group_trend[g_idx]) ~ exponential(2); }
 
   // Observation linear predictors and likelihoods (skipped when sampling from prior only)
   if (!prior_only) {

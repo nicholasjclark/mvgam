@@ -13,6 +13,7 @@ array[N_series_trend] int<lower=1> group_inds_trend;   // Maps series to groups
 cholesky_factor_corr[N_subgroups_trend] L_Omega_global_trend;
 array[N_groups_trend] cholesky_factor_corr[N_subgroups_trend] L_deviation_group_trend;
 real<lower=0, upper=1> alpha_cor_trend;
+array[N_groups_trend] vector<lower=0>[N_subgroups_trend] sigma_group_trend;
 ```
 
 ### Functions Block
@@ -28,6 +29,7 @@ matrix combine_cholesky(matrix global_chol_cor, matrix local_chol_cor, real alph
 ### Transformed Parameters Block
 ```stan
 array[N_groups_trend] cholesky_factor_corr[N_subgroups_trend] L_Omega_group_trend;
+array[N_groups_trend] matrix[N_subgroups_trend, N_subgroups_trend] L_group_trend;
 array[N_groups_trend] cov_matrix[N_subgroups_trend] Sigma_group_trend;
 
 for (g_idx in 1:N_groups_trend) {
@@ -37,9 +39,11 @@ for (g_idx in 1:N_groups_trend) {
     alpha_cor_trend
   );
   
-  Sigma_group_trend[g_idx] = multiply_lower_tri_self_transpose(
-    diag_pre_multiply(sigma_trend, L_Omega_group_trend[g_idx])
-  );
+  // Cholesky factor for innovation scaling
+  L_group_trend[g_idx] = diag_pre_multiply(sigma_group_trend[g_idx], L_Omega_group_trend[g_idx]);
+  
+  // Full covariance matrix for VAR coefficient transformations
+  Sigma_group_trend[g_idx] = multiply_lower_tri_self_transpose(L_group_trend[g_idx]);
 }
 ```
 
@@ -54,20 +58,38 @@ for (g_idx in 1:N_groups_trend) {
 
 ## How Different Trend Types Use Sigma_group_trend
 
-### AR/ZMVN Models (Simple Innovation Scaling)
+### AR/ZMVN Models (Group-Based Innovation Scaling)
 ```stan
-// Direct application to innovations at each time point
-for (t in 1:N_time_trend) {
-  for (s in 1:N_series_trend) {
-    int group_id = group_inds_trend[s];
-    // Scale innovations using group-specific covariance
-    scaled_innovations_trend[t, s] = 
-      (Sigma_group_trend[group_id] * raw_innovations_trend[t, :]')[s];
+// Apply group-specific Cholesky scaling (mathematically correct approach)
+for (t in 1:N_trend) {
+  for (g_idx in 1:N_groups_trend) {
+    vector[N_subgroups_trend] group_innov;
+    
+    // Collect innovations for this group's series  
+    int k = 0;
+    for (s in 1:N_lv_trend) {
+      if (group_inds_trend[s] == g_idx) {
+        k += 1;
+        group_innov[k] = innovations_trend[t, s];
+      }
+    }
+    
+    // Scale using Cholesky factor and distribute back
+    vector[N_subgroups_trend] scaled = L_group_trend[g_idx] * group_innov;
+    k = 0;
+    for (s in 1:N_lv_trend) {
+      if (group_inds_trend[s] == g_idx) {
+        k += 1;
+        scaled_innovations_trend[t, s] = scaled[k];
+      }
+    }
   }
 }
 ```
 
-### VAR Models (Coefficient Matrix Transformation + Innovation Scaling)
+### VAR Models (Coefficient Matrix Transformation ONLY - No Innovation Scaling)
+**CRITICAL**: VAR models do NOT use `innovations_trend` parameter or innovation scaling. They have their own latent variable dynamics.
+
 ```stan
 // Step 1: Group-specific coefficient matrices with stationarity constraints
 array[N_groups_trend, N_lags_trend] matrix[N_subgroups_trend, N_subgroups_trend] A_group_trend;
@@ -96,6 +118,23 @@ for (g_idx in 1:N_groups_trend) {
   }
 }
 ```
+
+## Architectural Distinction: Innovation Scaling vs Coefficient Transformation
+
+### AR/ZMVN Models: Use Innovation Scaling
+- **Have `innovations_trend` parameter**: Raw innovations that need scaling
+- **Use `L_group_trend`**: Cholesky factors for innovation scaling
+- **Pattern**: Scale innovations → Apply AR dynamics or direct assignment to `lv_trend`
+
+### VAR Models: Use Coefficient Transformation ONLY  
+- **No `innovations_trend` parameter**: Latent variables have their own dynamics
+- **Use `Sigma_group_trend`**: Full covariance matrices for coefficient transformations
+- **Pattern**: Transform coefficients using group covariances → VAR dynamics applied to `lv_trend`
+
+### Implementation Rule
+- **Innovation scaling code**: Only generated for AR/ZMVN trends
+- **Coefficient transformation code**: Only generated for VAR trends
+- **Group correlation computation**: Generated for ALL hierarchical trends
 
 ## Critical Dimension Distinction
 

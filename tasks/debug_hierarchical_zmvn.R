@@ -60,8 +60,8 @@ tryCatch({
   cat("Writing Stan code to file for analysis...\n")
   
   # Write the generated Stan code to a file for examination
-  writeLines(code_with_trend, "hierarchical_zmvn_model.stan")
-  cat("Stan code written to: hierarchical_zmvn_model.stan\n")
+  writeLines(code_with_trend, "tasks/hierarchical_zmvn_model.stan")
+  cat("Stan code written to: tasks/hierarchical_zmvn_model.stan\n")
   
   # Check for some key patterns that the test expects
   cat("\n=== Checking for expected patterns ===\n")
@@ -147,7 +147,7 @@ tryCatch({
   cat("  means_X_trend:", stan_pattern("means_X_trend", code_with_trend), "\n")
   
   cat("\n=== Analysis complete ===\n")
-  cat("Check hierarchical_zmvn_model.stan for detailed Stan code inspection.\n")
+  cat("Check tasks/hierarchical_zmvn_model.stan for detailed Stan code inspection.\n")
   
   # Also generate Stan data to check what's being passed
   cat("\n=== Generating Stan data ===\n")
@@ -204,21 +204,21 @@ models <- list(
   ar_hier = list(
     formula = mvgam_formula(count ~ 1 + x, trend_formula = ~ 1 + AR(gr = habitat)),
     family = poisson(),
-    filename = "ar_hier.stan",
+    filename = "tasks/ar_hier.stan",
     description = "AR hierarchical (non-factor) with custom alpha_cor_trend ~ uniform(0, 1)",
     prior = brms::prior("uniform(0, 1)", class = "alpha_cor_trend")
   ),
   var_hier = list(
     formula = mvgam_formula(count ~ 1 + x, trend_formula = ~ 1 + VAR(p = 1, gr = habitat)),
     family = poisson(),
-    filename = "var_hier.stan", 
+    filename = "tasks/var_hier.stan", 
     description = "VAR hierarchical (non-factor) with custom alpha_cor_trend ~ beta(2, 8)",
     prior = brms::prior("beta(2, 8)", class = "alpha_cor_trend")
   ),
   zmvn_hier = list(
     formula = mvgam_formula(biomass ~ 1, trend_formula = ~ 1 + x + ZMVN(gr = habitat)),
     family = lognormal(),
-    filename = "zmvn_hier.stan",
+    filename = "tasks/zmvn_hier.stan",
     description = "ZMVN hierarchical (non-factor) with DEFAULT alpha_cor_trend prior (should be beta(3, 2))",
     prior = NULL  # No custom prior - should use common_trend_priors default
   ),
@@ -227,7 +227,7 @@ models <- list(
   ar_hier_factor = list(
     formula = mvgam_formula(count ~ 1 + x, trend_formula = ~ 1 + AR(gr = habitat, n_lv = 2)),
     family = poisson(),
-    filename = "ar_hier_factor.stan",
+    filename = "tasks/ar_hier_factor.stan",
     description = "AR hierarchical with factor structure (n_lv = 2) - SHOULD FAIL",
     prior = NULL,
     expect_error = TRUE
@@ -235,7 +235,7 @@ models <- list(
   var_hier_factor = list(
     formula = mvgam_formula(count ~ 1 + x, trend_formula = ~ 1 + VAR(p = 1, gr = habitat, n_lv = 2)),
     family = poisson(),
-    filename = "var_hier_factor.stan",
+    filename = "tasks/var_hier_factor.stan",
     description = "VAR hierarchical with factor structure (n_lv = 2) - SHOULD FAIL",
     prior = NULL,
     expect_error = TRUE
@@ -243,7 +243,7 @@ models <- list(
   zmvn_hier_factor = list(
     formula = mvgam_formula(biomass ~ 1, trend_formula = ~ 1 + x + ZMVN(gr = habitat, n_lv = 2)),
     family = lognormal(),
-    filename = "zmvn_hier_factor.stan", 
+    filename = "tasks/zmvn_hier_factor.stan", 
     description = "ZMVN hierarchical with factor structure (n_lv = 2) - SHOULD FAIL",
     prior = NULL,
     expect_error = TRUE
@@ -354,10 +354,10 @@ if (length(errors_encountered) > 0) {
 cat("\nTotal files generated:", length(generated_files), "out of 6\n")
 
 # Preserve original ZMVN analysis for reference
-if ("zmvn_hier.stan" %in% generated_files) {
+if ("tasks/zmvn_hier.stan" %in% generated_files) {
   cat("\n--- Original ZMVN analysis ---\n")
   cat("(ZMVN model completed as part of 6-model generation)\n")
-  cat("File written to: zmvn_hier.stan\n")
+  cat("File written to: tasks/zmvn_hier.stan\n")
 }
 
 cat("\nTask 6.5 generation complete. Ready for stan-code-expert analysis.\n")

@@ -2065,16 +2065,8 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
   stanvar_components <- list()
 
   if (is_hierarchical) {
-    # Hierarchical case: individual trend generators handle all hierarchical infrastructure
-    # via add_hierarchical_support(). This system only handles innovations.
-
-    # Add sigma_trend parameter (innovation-specific, not hierarchical infrastructure)
-    sigma_stanvar <- brms::stanvar(
-      name = "sigma_trend",
-      scode = paste0("vector<lower=0>[", effective_dim, "] sigma_trend;"),
-      block = "parameters"
-    )
-    stanvar_components <- append(stanvar_components, list(sigma_stanvar))
+    # Hierarchical case: add_hierarchical_support() handles variance parameters
+    # This system generates innovations but no sigma_trend parameter
 
   } else {
     # Simple case: non-hierarchical innovations
@@ -2128,12 +2120,10 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
 
   # 5. Final innovations in transformed parameters (after correlation/MA transformation)
   if (is_hierarchical) {
-    # Hierarchical case: innovations depend on group structure
+    # Hierarchical case: only declare scaled_innovations_trend, hierarchical system will compute it
     final_innovations_code <- paste0("
-    // Scaled innovations after applying hierarchical correlations
-    matrix[N_trend, ", effective_dim, "] scaled_innovations_trend;
-
-    ")
+    // Scaled innovations declaration (computation handled by hierarchical system)
+    matrix[N_trend, ", effective_dim, "] scaled_innovations_trend;")
   } else if (cor && effective_dim > 1) {
     # Simple correlated case
     final_innovations_code <- paste0("
@@ -2787,9 +2777,23 @@ generate_hierarchical_correlation_parameters <- function(n_groups, n_subgroups) 
     block = "tparameters"
   )
 
+  # Group-specific innovation variances (one vector per group)
+  sigma_group_params <- brms::stanvar(
+    name = "sigma_group_trend",
+    scode = glue::glue("array[N_groups_trend] vector<lower=0>[N_subgroups_trend] sigma_group_trend;"),
+    block = "parameters"
+  )
+  
   sigma_group <- brms::stanvar(
     name = "Sigma_group_trend", 
     scode = glue::glue("array[N_groups_trend] cov_matrix[N_subgroups_trend] Sigma_group_trend;"),
+    block = "tparameters"
+  )
+  
+  # Cholesky factors for innovation scaling
+  l_group <- brms::stanvar(
+    name = "L_group_trend",
+    scode = glue::glue("array[N_groups_trend] matrix[N_subgroups_trend, N_subgroups_trend] L_group_trend;"),
     block = "tparameters"
   )
   
@@ -2805,14 +2809,42 @@ generate_hierarchical_correlation_parameters <- function(n_groups, n_subgroups) 
       alpha_cor_trend
     );
     
-    Sigma_group_trend[g_idx] = multiply_lower_tri_self_transpose(
-      diag_pre_multiply(sigma_trend, L_Omega_group_trend[g_idx])
-    );
+    // Cholesky factor for innovation scaling
+    L_group_trend[g_idx] = diag_pre_multiply(sigma_group_trend[g_idx], L_Omega_group_trend[g_idx]);
+    
+    // Full covariance matrix for VAR models
+    Sigma_group_trend[g_idx] = multiply_lower_tri_self_transpose(L_group_trend[g_idx]);
+  }
+  
+  // Apply group-specific innovation scaling (after L_group_trend computed)
+  for (t in 1:N_trend) {
+    for (g_idx in 1:N_groups_trend) {
+      vector[N_subgroups_trend] group_innov;
+      
+      // Collect innovations for this group's series  
+      int k = 0;
+      for (s in 1:N_lv_trend) {
+        if (group_inds_trend[s] == g_idx) {
+          k += 1;
+          group_innov[k] = innovations_trend[t, s];
+        }
+      }
+      
+      // Scale using Cholesky factor and distribute back
+      vector[N_subgroups_trend] scaled = L_group_trend[g_idx] * group_innov;
+      k = 0;
+      for (s in 1:N_lv_trend) {
+        if (group_inds_trend[s] == g_idx) {
+          k += 1;
+          scaled_innovations_trend[t, s] = scaled[k];
+        }
+      }
+    }
   }",
     block = "tparameters"
   )
 
-  return(combine_stanvars(l_omega_global, l_deviation_group, alpha_cor, l_omega_group, sigma_group, computation))
+  return(combine_stanvars(l_omega_global, l_deviation_group, alpha_cor, sigma_group_params, l_omega_group, sigma_group, l_group, computation))
 }
 
 #' Generate Model Block Injections for Hierarchical Correlation Priors
@@ -2841,7 +2873,14 @@ generate_hierarchical_correlation_model <- function(n_groups, prior = NULL) {
     block = "model"
   )
 
-  return(combine_stanvars(alpha_cor_prior, l_omega_global_prior, l_deviation_group_prior))
+  # Prior for group-specific innovation variances
+  sigma_group_prior <- brms::stanvar(
+    name = "sigma_group_trend_prior",
+    scode = glue::glue("for (g_idx in 1:N_groups_trend) {{ to_vector(sigma_group_trend[g_idx]) ~ {get_trend_parameter_prior(prior, 'sigma_trend')}; }}"),
+    block = "model"
+  )
+
+  return(combine_stanvars(alpha_cor_prior, l_omega_global_prior, l_deviation_group_prior, sigma_group_prior))
 }
 
 #' Generate Trend Injection Stanvars
@@ -3741,9 +3780,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   var_specific_params <- if(is_hierarchical) {
     paste0(
       "      // Hierarchical VAR: group-specific raw matrices with shared hyperpriors\n",
-      "      array[", n_groups, ", ", lags, "] matrix[", n_subgroups, ", ", n_subgroups, "] A_raw_group_trend;\n\n",
-      "      // Group-specific variance parameters (for hierarchical correlations)\n",
-      "      array[", n_groups, "] vector<lower=0>[", n_subgroups, "] sigma_group_trend;"
+      "      array[", n_groups, ", ", lags, "] matrix[", n_subgroups, ", ", n_subgroups, "] A_raw_group_trend;"
     )
   } else {
     paste0(
@@ -3806,7 +3843,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       "      for (g in 1:", n_groups, ") {\n",
       "        // Combine global and local correlations using existing hierarchical infrastructure\n",
       "        matrix[", n_subgroups, ", ", n_subgroups, "] L_Omega_group_trend =\n",
-      "          cholesky_compose(alpha_cor_trend * multiply_lower_tri_self_transpose(L_Omega_global_trend) +\n",
+      "          cholesky_decompose(alpha_cor_trend * multiply_lower_tri_self_transpose(L_Omega_global_trend) +\n",
       "                           (1 - alpha_cor_trend) * multiply_lower_tri_self_transpose(L_deviation_group_trend[g]));\n",
       "        Sigma_group_trend[g] = multiply_lower_tri_self_transpose(\n",
       "          diag_pre_multiply(sigma_group_trend[g], L_Omega_group_trend));\n\n",
@@ -3977,6 +4014,13 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   lv_transpose_lag <- "lv_trend[t - i, :]'"
   lv_transpose_prev <- "lv_trend[t - 1, :]'"
   
+  # Conditional correlation prior for hierarchical vs non-hierarchical
+  omega_prior <- if(!is_hierarchical) {
+    "// LKJ correlation prior on Cholesky factor\n      L_Omega_trend ~ lkj_corr_cholesky(2);"
+  } else {
+    "// Hierarchical correlation priors handled by add_hierarchical_support()"
+  }
+  
   var_model_stanvar <- brms::stanvar(
     name = "var_model",
     scode = glue::glue("
@@ -4032,8 +4076,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
       {varma_ma_priors}
 
-      // LKJ correlation prior on Cholesky factor
-      L_Omega_trend ~ lkj_corr_cholesky(2);
+      {omega_prior}
 
       // Hyperpriors for hierarchical VAR coefficient means and precisions
       for (lag in 1:2) {{
@@ -4047,11 +4090,12 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Generate centralized priors for trend parameters
   # Standard parameters: sigma_trend (L_Omega_trend handled by LKJ in model block)
   # Hierarchical hyperparameters: Amu_trend, Aomega_trend, and conditional MA/group parameters
-  var_params_to_prior <- c("sigma_trend", "Amu_trend", "Aomega_trend")
-
-  # Add hierarchical group parameters
   if (is_hierarchical) {
-    var_params_to_prior <- c(var_params_to_prior, "sigma_group_trend")
+    # Hierarchical models: sigma_group_trend handled by shared hierarchical system
+    var_params_to_prior <- c("Amu_trend", "Aomega_trend")
+  } else {
+    # Non-hierarchical models use sigma_trend
+    var_params_to_prior <- c("sigma_trend", "Amu_trend", "Aomega_trend")
   }
 
   # Add VARMA MA hyperparameters
