@@ -1923,11 +1923,6 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
       stanvars = stanvars
     )
 
-  # Fix N value for trend models - should be n_time not n_obs
-  if ("N" %in% names(standata) && "time" %in% names(data)) {
-    n_time <- length(unique(data$time))
-    standata$N <- n_time
-  }
 
   return(standata)
 }
@@ -2274,9 +2269,29 @@ add_hierarchical_support <- function(components, trend_specs, data_info, prior =
   n_groups <- hierarchical_info$n_groups
   n_subgroups <- hierarchical_info$n_subgroups
   
+  # Extract trend type for conditional innovation scaling
+  # Prefer trend_specs$trend over trend_specs$type for backward compatibility
+  trend_type <- trend_specs$trend %||% trend_specs$type
+  
+  # Validate trend type against registry if present
+  if (!is.null(trend_type)) {
+    # Ensure registry is loaded
+    ensure_registry_initialized()
+    trend_info <- list_trend_types()
+    valid_trends <- trend_info$trend_type
+    
+    if (!trend_type %in% valid_trends) {
+      stop(insight::format_error(
+        paste0("Unknown trend type {.field ", trend_type, "}."),
+        paste0("Valid trend types are: {.field ", paste(valid_trends, collapse = ", "), "}"),
+        "Check spelling or register custom trend type first."
+      ))
+    }
+  }
+  
   # Generate infrastructure components
   hierarchical_functions <- generate_hierarchical_functions()
-  hierarchical_params <- generate_hierarchical_correlation_parameters(n_groups, n_subgroups)
+  hierarchical_params <- generate_hierarchical_correlation_parameters(n_groups, n_subgroups, trend_type)
   hierarchical_priors <- generate_hierarchical_correlation_model(n_groups, prior)
   
   # Add components in dependency order
@@ -2747,12 +2762,20 @@ generate_hierarchical_data_structures <- function(hierarchical_info, data_info) 
 
 #' Generate Parameters Block Injections for Hierarchical Correlations
 #'
-#'
 #' @param n_groups Number of groups for hierarchical modeling
 #' @param n_subgroups Number of subgroups (typically n_lv)
+#' @param trend_type Trend type for conditional parameter generation (VAR, AR, etc.)
+#' @param exclude_computed Logical. If TRUE, exclude computed parameters (Sigma_group_trend, L_group_trend) 
+#'   for trends that handle their own local computation (e.g., VAR). Defaults to FALSE.
 #' @return List of parameters block stanvars
 #' @noRd
-generate_hierarchical_correlation_parameters <- function(n_groups, n_subgroups) {
+generate_hierarchical_correlation_parameters <- function(n_groups, n_subgroups, trend_type = NULL, exclude_computed = FALSE) {
+  # Validate inputs following project patterns
+  checkmate::assert_integer(n_groups, len = 1, lower = 1)
+  checkmate::assert_integer(n_subgroups, len = 1, lower = 1)
+  checkmate::assert_character(trend_type, len = 1, null.ok = TRUE)
+  checkmate::assert_logical(exclude_computed, len = 1)
+  
   l_omega_global <- brms::stanvar(
     name = "L_Omega_global_trend",
     scode = "cholesky_factor_corr[N_subgroups_trend] L_Omega_global_trend;",
@@ -2784,23 +2807,30 @@ generate_hierarchical_correlation_parameters <- function(n_groups, n_subgroups) 
     block = "parameters"
   )
   
-  sigma_group <- brms::stanvar(
-    name = "Sigma_group_trend", 
-    scode = glue::glue("array[N_groups_trend] cov_matrix[N_subgroups_trend] Sigma_group_trend;"),
-    block = "tparameters"
-  )
+  # Conditionally create computed parameters (exclude for VAR)
+  computed_stanvars <- list()
+  if (!exclude_computed) {
+    sigma_group <- brms::stanvar(
+      name = "Sigma_group_trend", 
+      scode = glue::glue("array[N_groups_trend] cov_matrix[N_subgroups_trend] Sigma_group_trend;"),
+      block = "tparameters"
+    )
+    
+    # Cholesky factors for innovation scaling
+    l_group <- brms::stanvar(
+      name = "L_group_trend",
+      scode = glue::glue("array[N_groups_trend] matrix[N_subgroups_trend, N_subgroups_trend] L_group_trend;"),
+      block = "tparameters"
+    )
   
-  # Cholesky factors for innovation scaling
-  l_group <- brms::stanvar(
-    name = "L_group_trend",
-    scode = glue::glue("array[N_groups_trend] matrix[N_subgroups_trend, N_subgroups_trend] L_group_trend;"),
-    block = "tparameters"
-  )
+  # Determine if innovation scaling is needed
+  # VAR, CAR, and PW sample directly using multi_normal, bypassing innovation scaling
+  # AR, RW, and ZMVN use innovation scaling through L_group_trend matrices
+  needs_innovation_scaling <- !is.null(trend_type) && 
+                              !(trend_type %in% c("VAR", "CAR", "PW"))
   
-  # Add computation logic for hierarchical correlation matrices
-  computation <- brms::stanvar(
-    name = "hierarchical_correlation_computation",
-    scode = "
+  # Common correlation matrix computation for all hierarchical models
+  common_correlation_code <- "
   // Compute group-specific correlation matrices using shared infrastructure
   for (g_idx in 1:N_groups_trend) {
     L_Omega_group_trend[g_idx] = combine_cholesky(
@@ -2809,14 +2839,18 @@ generate_hierarchical_correlation_parameters <- function(n_groups, n_subgroups) 
       alpha_cor_trend
     );
     
-    // Cholesky factor for innovation scaling
+    // Cholesky factor for group-specific covariance matrices
     L_group_trend[g_idx] = diag_pre_multiply(sigma_group_trend[g_idx], L_Omega_group_trend[g_idx]);
     
-    // Full covariance matrix for VAR models
+    // Full covariance matrix for group-specific components
     Sigma_group_trend[g_idx] = multiply_lower_tri_self_transpose(L_group_trend[g_idx]);
-  }
+  }"
   
-  // Apply group-specific innovation scaling (after L_group_trend computed)
+  # Conditionally add innovation scaling for AR/RW/ZMVN models
+  innovation_scaling_code <- if (needs_innovation_scaling) {
+    "
+  
+  // Apply group-specific innovation scaling (only for AR/RW/ZMVN models)
   for (t in 1:N_trend) {
     for (g_idx in 1:N_groups_trend) {
       vector[N_subgroups_trend] group_innov;
@@ -2840,11 +2874,33 @@ generate_hierarchical_correlation_parameters <- function(n_groups, n_subgroups) 
         }
       }
     }
-  }",
-    block = "tparameters"
-  )
+  }"
+  } else {
+    # VAR/CAR/PW models sample directly, no innovation scaling needed
+    ""
+  }
+  
+    # Combine common and conditional code
+    computation_code <- paste0(common_correlation_code, innovation_scaling_code)
+    
+    # Add computation logic for hierarchical correlation matrices
+    computation <- brms::stanvar(
+      name = "hierarchical_correlation_computation",
+      scode = computation_code,
+      block = "tparameters"
+    )
+    
+    computed_stanvars <- list(sigma_group, l_group, computation)
+  }
 
-  return(combine_stanvars(l_omega_global, l_deviation_group, alpha_cor, sigma_group_params, l_omega_group, sigma_group, l_group, computation))
+  # Return combined stanvars with conditional computed parameters
+  base_stanvars <- if (exclude_computed) {
+    list(l_omega_global, l_deviation_group, alpha_cor, sigma_group_params)
+  } else {
+    list(l_omega_global, l_deviation_group, alpha_cor, sigma_group_params, l_omega_group)
+  }
+  all_stanvars <- append(base_stanvars, computed_stanvars)
+  do.call(combine_stanvars, all_stanvars)
 }
 
 #' Generate Model Block Injections for Hierarchical Correlation Priors
@@ -3303,6 +3359,9 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   matrix_z <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
   components <- append_if_not_null(components, matrix_z)
 
+  # STEP 3: Add hierarchical correlation support if applicable (BEFORE AR dynamics)
+  components <- add_hierarchical_support(components, trend_specs, data_info, prior)
+
   # 1. PARAMETERS block - AR trend-specific parameters
   ar_param_declarations <- sapply(ar_lags, function(lag) {
     glue::glue("vector<lower=-1,upper=1>[N_lv_trend] ar{lag}_trend;")
@@ -3391,9 +3450,6 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     factor_priors <- generate_factor_model(is_factor_model, n_lv)
     components <- append_if_not_null(components, factor_priors)
   }
-
-  # 6. Add hierarchical correlation support if applicable
-  components <- add_hierarchical_support(components, trend_specs, data_info, prior)
 
   # Use the robust combine_stanvars function
   return(do.call(combine_stanvars, components))
@@ -3774,13 +3830,21 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     scode = dynamic_part,
     block = "tdata"
   )
+  
+  # Add lag count as data variable to eliminate hardcoded loop bounds
+  var_data_stanvar <- brms::stanvar(
+    x = lags,
+    name = "N_lags_trend",
+    scode = "int<lower=1> N_lags_trend;",
+    block = "data"
+  )
 
   # Core VAR parameters block with conditional VARMA extensions
   # Pre-compute string literals to avoid nested glue::glue() scoping issues
   var_specific_params <- if(is_hierarchical) {
     paste0(
       "      // Hierarchical VAR: group-specific raw matrices with shared hyperpriors\n",
-      "      array[", n_groups, ", ", lags, "] matrix[", n_subgroups, ", ", n_subgroups, "] A_raw_group_trend;"
+      "      array[N_groups_trend, ", lags, "] matrix[N_subgroups_trend, N_subgroups_trend] A_raw_group_trend;"
     )
   } else {
     paste0(
@@ -3837,35 +3901,49 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     paste0(
       "      // Hierarchical VAR: group-specific computations then block assembly\n\n",
       "      // Group-specific hierarchical correlations and covariances\n",
-      "      array[", n_groups, "] cov_matrix[", n_subgroups, "] Sigma_group_trend;\n",
-      "      array[", n_groups, ", ", lags, "] matrix[", n_subgroups, ", ", n_subgroups, "] A_group_trend;\n\n",
+      "      array[N_groups_trend] cov_matrix[N_subgroups_trend] Sigma_group_trend;\n",
+      "      array[N_groups_trend, ", lags, "] matrix[N_subgroups_trend, N_subgroups_trend] A_group_trend;\n\n",
       "      // Compute group-specific covariances using hierarchical correlation structure\n",
-      "      for (g in 1:", n_groups, ") {\n",
-      "        // Combine global and local correlations using existing hierarchical infrastructure\n",
-      "        matrix[", n_subgroups, ", ", n_subgroups, "] L_Omega_group_trend =\n",
-      "          cholesky_decompose(alpha_cor_trend * multiply_lower_tri_self_transpose(L_Omega_global_trend) +\n",
-      "                           (1 - alpha_cor_trend) * multiply_lower_tri_self_transpose(L_deviation_group_trend[g]));\n",
-      "        Sigma_group_trend[g] = multiply_lower_tri_self_transpose(\n",
-      "          diag_pre_multiply(sigma_group_trend[g], L_Omega_group_trend));\n\n",
+      "      for (g_idx in 1:N_groups_trend) {\n",
+      "        // Use shared combine_cholesky function to eliminate duplication\n",
+      "        matrix[N_subgroups_trend, N_subgroups_trend] L_Omega_group_trend =\n",
+      "          combine_cholesky(L_Omega_global_trend, L_deviation_group_trend[g_idx], alpha_cor_trend);\n",
+      "        Sigma_group_trend[g_idx] = multiply_lower_tri_self_transpose(\n",
+      "          diag_pre_multiply(sigma_group_trend[g_idx], L_Omega_group_trend));\n\n",
       "        // Apply Heaps transformation per group\n",
-      "        for (lag in 1:", lags, ") {\n",
-      "          array[1] matrix[", n_subgroups, ", ", n_subgroups, "] P_group;\n",
-      "          P_group[1] = AtoP(A_raw_group_trend[g, lag]);\n",
-      "          array[2, 1] matrix[", n_subgroups, ", ", n_subgroups, "] result_group =\n",
-      "            rev_mapping(P_group, Sigma_group_trend[g]);\n",
-      "          A_group_trend[g, lag] = result_group[1, 1];\n",
+      "        for (lag in 1:N_lags_trend) {\n",
+      "          array[1] matrix[N_subgroups_trend, N_subgroups_trend] P_group;\n",
+      "          P_group[1] = AtoP(A_raw_group_trend[g_idx, lag]);\n",
+      "          array[2, 1] matrix[N_subgroups_trend, N_subgroups_trend] result_group =\n",
+      "            rev_mapping(P_group, Sigma_group_trend[g_idx]);\n",
+      "          A_group_trend[g_idx, lag] = result_group[1, 1];\n",
       "        }\n",
       "      }\n\n",
       "      // Build block-structured full matrices (groups do not interact)\n",
       "      cov_matrix[N_lv_trend] Sigma_trend = rep_matrix(0, N_lv_trend, N_lv_trend);\n",
-      "      array[", lags, "] matrix[N_lv_trend, N_lv_trend] A_trend;\n",
-      "      for (lag in 1:", lags, ") {\n",
+      "      array[N_lags_trend] matrix[N_lv_trend, N_lv_trend] A_trend;\n",
+      "      for (lag in 1:N_lags_trend) {\n",
       "        A_trend[lag] = rep_matrix(0, N_lv_trend, N_lv_trend);\n",
       "      }\n\n",
-      "      for (g in 1:", n_groups, ") {\n",
-      "        Sigma_trend[group_inds_trend[g], group_inds_trend[g]] = Sigma_group_trend[g];\n",
-      "        for (lag in 1:", lags, ") {\n",
-      "          A_trend[lag][group_inds_trend[g], group_inds_trend[g]] = A_group_trend[g, lag];\n",
+      "      // Block-diagonal assembly using series-iteration pattern\n",
+      "      for (g_idx in 1:N_groups_trend) {\n",
+      "        // Collect series indices for this group\n", 
+      "        int group_series[N_subgroups_trend];\n",
+      "        int k = 0;\n",
+      "        for (s in 1:N_lv_trend) {\n",
+      "          if (group_inds_trend[s] == g_idx) {\n",
+      "            k += 1;\n",
+      "            group_series[k] = s;\n",
+      "          }\n",
+      "        }\n\n",
+      "        // Insert group matrices into appropriate blocks\n",
+      "        for (i in 1:k) {\n",
+      "          for (j in 1:k) {\n",
+      "            Sigma_trend[group_series[i], group_series[j]] = Sigma_group_trend[g_idx][i, j];\n",
+      "            for (lag in 1:N_lags_trend) {\n",
+      "              A_trend[lag][group_series[i], group_series[j]] = A_group_trend[g_idx, lag][i, j];\n",
+      "            }\n",
+      "          }\n",
       "        }\n",
       "      }"
     )
@@ -3951,15 +4029,15 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   var_priors_block <- if(is_hierarchical) {
     paste0(
       "      // Hierarchical VAR: group-specific priors with shared hyperpriors\n",
-      "      for (g in 1:", n_groups, ") {\n",
-      "        for (lag in 1:", lags, ") {\n",
+      "      for (g_idx in 1:N_groups_trend) {\n",
+      "        for (lag in 1:N_lags_trend) {\n",
       "          // Diagonal elements prior (shared across all groups)\n",
-      "          diagonal(A_raw_group_trend[g, lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));\n\n",
+      "          diagonal(A_raw_group_trend[g_idx, lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));\n\n",
       "          // Off-diagonal elements prior (shared across all groups)\n",
-      "          for (i in 1:", n_subgroups, ") {\n",
-      "            for (j in 1:", n_subgroups, ") {\n",
+      "          for (i in 1:N_subgroups_trend) {\n",
+      "            for (j in 1:N_subgroups_trend) {\n",
       "              if (i != j) {\n",
-      "                A_raw_group_trend[g, lag, i, j] ~ normal(Amu_trend[2, lag], 1 / sqrt(Aomega_trend[2, lag]));\n",
+      "                A_raw_group_trend[g_idx, lag, i, j] ~ normal(Amu_trend[2, lag], 1 / sqrt(Aomega_trend[2, lag]));\n",
       "              }\n",
       "            }\n",
       "          }\n",
@@ -3969,7 +4047,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   } else {
     paste0(
       "      // Standard VAR: single matrix priors\n",
-      "      for (lag in 1:", lags, ") {\n",
+      "      for (lag in 1:N_lags_trend) {\n",
       "        // Diagonal elements prior\n",
       "        diagonal(A_raw_trend[lag]) ~ normal(Amu_trend[1, lag], 1 / sqrt(Aomega_trend[1, lag]));\n\n",
       "        // Off-diagonal elements prior\n",
@@ -4122,21 +4200,46 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # Create components list based on model type
   base_components <- if (is_varma) {
-    # VARMA case: include MA parameters (7 components: Z + var-specific)
-    list(matrix_z, var_functions_stanvar, var_tdata_stanvar,
+    # VARMA case: include MA parameters (8 components: Z + var-specific + data)
+    list(matrix_z, var_functions_stanvar, var_tdata_stanvar, var_data_stanvar,
          var_parameters_stanvar, var_ma_parameters_stanvar,
          var_tparameters_stanvar, var_model_stanvar)
   } else {
-    # VAR-only case: no MA parameters (6 components: Z + var-specific)
-    list(matrix_z, var_functions_stanvar, var_tdata_stanvar, var_parameters_stanvar,
-         var_tparameters_stanvar, var_model_stanvar)
+    # VAR-only case: no MA parameters (7 components: Z + var-specific + data)
+    list(matrix_z, var_functions_stanvar, var_tdata_stanvar, var_data_stanvar,
+         var_parameters_stanvar, var_tparameters_stanvar, var_model_stanvar)
   }
 
   # Add trend computation (required for all VAR models)
   components <- append_if_not_null(base_components, trend_computation)
 
-  # Add hierarchical correlation support if applicable
-  components <- add_hierarchical_support(components, trend_specs, data_info, prior)
+  # Add VAR hierarchical correlation parameters required for compilation
+  # Use DRY approach via selective calls to avoid architectural conflicts from add_hierarchical_support() 
+  if (is_hierarchical && !is.null(hierarchical_info)) {
+    # Validate hierarchical_info has required fields
+    checkmate::assert_names(names(hierarchical_info), 
+                            must.include = c("n_groups", "n_subgroups"))
+    
+    # Add data structures (dimensions and mappings)
+    hierarchical_data <- generate_hierarchical_data_structures(hierarchical_info, data_info)
+    components <- append_if_not_null(components, hierarchical_data)
+    
+    # Add correlation parameters (alpha_cor_trend, L_Omega_global_trend, etc.)
+    # Exclude computed parameters since VAR handles Sigma_group_trend locally
+    hierarchical_params <- generate_hierarchical_correlation_parameters(
+      hierarchical_info$n_groups, 
+      hierarchical_info$n_subgroups, 
+      "VAR",  # trend_type for conditional logic
+      exclude_computed = TRUE  # VAR handles Sigma_group_trend locally
+    )
+    components <- append_if_not_null(components, hierarchical_params)
+    
+    # Add priors and functions
+    hierarchical_priors <- generate_hierarchical_correlation_model(hierarchical_info$n_groups, prior)
+    hierarchical_functions <- generate_hierarchical_functions()
+    components <- append_if_not_null(components, hierarchical_priors)
+    components <- append_if_not_null(components, hierarchical_functions)
+  }
 
   # Add factor model support if applicable
   if (is_factor_model) {
@@ -4468,6 +4571,9 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   matrix_z <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
   components <- append_if_not_null(components, matrix_z)
 
+  # STEP 3: Add hierarchical correlation support if applicable (BEFORE ZMVN stanvars)
+  components <- add_hierarchical_support(components, trend_specs, data_info, prior)
+
   # Shared innovations handled by injection function (no duplication)
 
   # ZMVN parameters (empty for simple case - correlation handled by shared system)
@@ -4504,9 +4610,6 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     factor_priors <- generate_factor_model(is_factor_model, n_lv)
     components <- append_if_not_null(components, factor_priors)
   }
-
-  # Add hierarchical correlation support if applicable
-  components <- add_hierarchical_support(components, trend_specs, data_info, prior)
 
   # ZMVN doesn't need additional priors (shared system handles all priors)
 

@@ -1639,12 +1639,12 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
 
   # Create time and series index mappings using attribute-based system
   # These map each observation to its position in the trend matrix
-  # For time: use original values stored in attributes (needed for matching)
+  # For time: use processed values from attributes (matches dimension calculation)
   # For series: use processed values from attributes (handles all creation strategies)
-  original_time_values <- attr(obs_data, "mvgam_original_time")
+  time_values <- get_time_for_grouping(obs_data)
   series_values <- get_series_for_grouping(obs_data)
 
-  obs_trend_time <- match(original_time_values, sorted_unique_times)
+  obs_trend_time <- match(time_values, sorted_unique_times)
   obs_trend_series <- match(series_values, sorted_unique_series)
 
   # Validate the mappings
