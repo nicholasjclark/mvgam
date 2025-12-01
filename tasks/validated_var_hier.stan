@@ -209,19 +209,19 @@ transformed parameters {
   mu_trend += Intercept_trend;
   array[N_groups_trend] cov_matrix[N_subgroups_trend] Sigma_group_trend;
   array[N_groups_trend, 1] matrix[N_subgroups_trend, N_subgroups_trend] A_group_trend;
-  for (g in 1 : N_groups_trend) {
+  for (g_idx in 1 : N_groups_trend) {
     matrix[N_subgroups_trend, N_subgroups_trend] L_Omega_group_trend = combine_cholesky(L_Omega_global_trend,
-                                                                    L_deviation_group_trend[g],
+                                                                    L_deviation_group_trend[g_idx],
                                                                     alpha_cor_trend);
-    Sigma_group_trend[g] = multiply_lower_tri_self_transpose(diag_pre_multiply(
-                                                             sigma_group_trend[g],
-                                                             L_Omega_group_trend));
+    Sigma_group_trend[g_idx] = multiply_lower_tri_self_transpose(diag_pre_multiply(
+                                                                 sigma_group_trend[g_idx],
+                                                                 L_Omega_group_trend));
     for (lag in 1 : N_lags_trend) {
       array[1] matrix[N_subgroups_trend, N_subgroups_trend] P_group;
-      P_group[1] = AtoP(A_raw_group_trend[g, lag]);
+      P_group[1] = AtoP(A_raw_group_trend[g_idx, lag]);
       array[2, 1] matrix[N_subgroups_trend, N_subgroups_trend] result_group = rev_mapping(P_group,
-                                                                    Sigma_group_trend[g]);
-      A_group_trend[g, lag] = result_group[1, 1];
+                                                                    Sigma_group_trend[g_idx]);
+      A_group_trend[g_idx, lag] = result_group[1, 1];
     }
   }
   cov_matrix[N_lv_trend] Sigma_trend = rep_matrix(0, N_lv_trend, N_lv_trend);
@@ -285,17 +285,17 @@ model {
   for (t in 1 : N_trend) {
     lv_trend[t,  : ]' ~ multi_normal(mu_t_trend[t], Sigma_trend);
   }
-  for (g in 1 : N_groups_trend) {
+  for (g_idx in 1 : N_groups_trend) {
     for (lag in 1 : N_lags_trend) {
-      diagonal(A_raw_group_trend[g, lag]) ~ normal(Amu_trend[1, lag],
-                                                   1
-                                                   / sqrt(Aomega_trend[1, lag]));
+      diagonal(A_raw_group_trend[g_idx, lag]) ~ normal(Amu_trend[1, lag],
+                                                       1
+                                                       / sqrt(Aomega_trend[1, lag]));
       for (i in 1 : N_subgroups_trend) {
         for (j in 1 : N_subgroups_trend) {
           if (i != j) {
-            A_raw_group_trend[g, lag, i, j] ~ normal(Amu_trend[2, lag],
-                                                     1
-                                                     / sqrt(Aomega_trend[2, lag]));
+            A_raw_group_trend[g_idx, lag, i, j] ~ normal(Amu_trend[2, lag],
+                                                         1
+                                                         / sqrt(Aomega_trend[2, lag]));
           }
         }
       }

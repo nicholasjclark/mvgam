@@ -145,7 +145,7 @@
                                 "create_times_trend_matrix":  "create_times_trend_matrix \u003c- function(n_time, n_series, unique_times, unique_series, matrix_name) {",
                                 "apply_suffix_to_stan_code":  "apply_suffix_to_stan_code \u003c- function(stan_code, patterns, suffix) {",
                                 "filter_renameable_identifiers":  "filter_renameable_identifiers \u003c- function(identifiers, mapping = NULL) {",
-                                "generate_hierarchical_correlation_parameters":  "generate_hierarchical_correlation_parameters \u003c- function(n_groups, n_subgroups) {",
+                                "generate_hierarchical_correlation_parameters":  "generate_hierarchical_correlation_parameters \u003c- function(n_groups, n_subgroups, trend_type = NULL, exclude_computed = FALSE) {",
                                 "detect_shared_trends":  "detect_shared_trends \u003c- function(specs) {",
                                 "extract_univariate_standata":  "extract_univariate_standata \u003c- function(standata, suffix, mapping, n_time = NULL) {",
                                 "generate_rw_trend_stanvars":  "generate_rw_trend_stanvars \u003c- function(trend_specs, data_info, prior = NULL) {",

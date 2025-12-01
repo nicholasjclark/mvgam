@@ -676,7 +676,7 @@ test_that("validate_trend_covariates prevents response variables in trend formul
 
   # Test valid trend formula (no response variables)
   expect_silent(
-    mvgam:::extract_trend_data(test_data, ~ temperature, "time", "series", 
+    mvgam:::extract_trend_data(test_data, ~ temperature, "time", "series",
                               response_vars = c("count", "biomass"))
   )
 

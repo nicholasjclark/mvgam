@@ -1956,11 +1956,13 @@
                               "generate_hierarchical_correlation_parameters":  {
                                                                                    "s3_class":  "",
                                                                                    "s3_method":  "",
-                                                                                   "signature":  "generate_hierarchical_correlation_parameters \u003c- function(n_groups, n_subgroups) {",
+                                                                                   "signature":  "generate_hierarchical_correlation_parameters \u003c- function(n_groups, n_subgroups, trend_type = NULL, exclude_computed = FALSE) {",
                                                                                    "is_s3_method":  false,
                                                                                    "arguments":  [
                                                                                                      "n_groups",
-                                                                                                     "n_subgroups"
+                                                                                                     "n_subgroups",
+                                                                                                     "trend_type",
+                                                                                                     "exclude_computed"
                                                                                                  ]
                                                                                },
                               "analyze_expression_structure":  {
@@ -7378,7 +7380,7 @@
                                 "filter_renameable_identifiers":  "filter_renameable_identifiers \u003c- function(identifiers, mapping = NULL) {",
                                 "log_sum_exp":  "log_sum_exp \u003c- function(x) {",
                                 "dispatch_validation_rule":  "dispatch_validation_rule \u003c- function(rule, trend_spec, data) {",
-                                "generate_hierarchical_correlation_parameters":  "generate_hierarchical_correlation_parameters \u003c- function(n_groups, n_subgroups) {",
+                                "generate_hierarchical_correlation_parameters":  "generate_hierarchical_correlation_parameters \u003c- function(n_groups, n_subgroups, trend_type = NULL, exclude_computed = FALSE) {",
                                 "determine_glm_preservation":  "determine_glm_preservation \u003c- function(glm_patterns, trend_info = NULL) {",
                                 "is_try_error":  "is_try_error \u003c- function(x) {",
                                 "find_trend_computation_end":  "find_trend_computation_end \u003c- function(stan_code_lines) {",
@@ -7516,7 +7518,9 @@
                                                                       "setup_brms_lightweight"
                                                                   ],
                                  "ensure_registry_initialized":  [
-                                                                     "get_all_mvgam_trend_parameters"
+                                                                     "get_all_mvgam_trend_parameters",
+                                                                     "detect_glm_usage",
+                                                                     "find_stan_block"
                                                                  ],
                                  "setup_brms_lightweight":  [
                                                                 "create_mvgam_from_combined_fit",
@@ -7914,6 +7918,9 @@
                                  "generate_trend_specific_stanvars":  [
                                                                           "extract_trend_stanvars_from_setup"
                                                                       ],
+                                 "validate_regular_time_intervals":  [
+                                                                         "validate_trend_time_intervals"
+                                                                     ],
                                  "append_if_not_null":  [
                                                             "detect_glm_usage",
                                                             "find_stan_block"
@@ -8169,9 +8176,10 @@
                                  "normalize_trend_type":  [
                                                               "generate_monitor_params"
                                                           ],
-                                 "validate_regular_time_intervals":  [
-                                                                         "validate_trend_time_intervals"
-                                                                     ],
+                                 "list_trend_types":  [
+                                                          "detect_glm_usage",
+                                                          "find_stan_block"
+                                                      ],
                                  "generate_hierarchical_data_structures":  [
                                                                                "detect_glm_usage",
                                                                                "find_stan_block"
@@ -8283,9 +8291,9 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-11-28 15:41:38",
+                     "generated":  "2025-12-01 15:47:44",
                      "commit_hash":  "pending",
-                     "cached_files":  59,
+                     "cached_files":  58,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
@@ -8296,7 +8304,7 @@
                      "dynamic_references":  37,
                      "package_name":  "mvgam",
                      "potentially_unused_functions":  38,
-                     "changed_files":  1,
+                     "changed_files":  2,
                      "total_files":  60,
                      "zero_dependency_functions":  437
                  },
@@ -8450,6 +8458,7 @@
                                                            "combine_stanvars",
                                                            "convert_glm_to_standard_form",
                                                            "create_times_trend_matrix",
+                                                           "ensure_registry_initialized",
                                                            "extract_and_rename_stan_blocks",
                                                            "extract_and_rename_standata_objects",
                                                            "extract_computed_variables",
@@ -8501,6 +8510,7 @@
                                                            "inject_trend_into_linear_predictor",
                                                            "insert_after_mu_lines_in_model_block",
                                                            "is_multivariate_brmsfit",
+                                                           "list_trend_types",
                                                            "normalize_function_body",
                                                            "normalize_function_signature",
                                                            "parse_stan_functions",
@@ -8657,6 +8667,7 @@
                                                           "convert_glm_to_standard_form",
                                                           "create_times_trend_matrix",
                                                           "detect_glm_usage",
+                                                          "ensure_registry_initialized",
                                                           "extract_and_rename_stan_blocks",
                                                           "extract_and_rename_standata_objects",
                                                           "extract_computed_variables",
@@ -8707,6 +8718,7 @@
                                                           "inject_trend_into_linear_predictor",
                                                           "insert_after_mu_lines_in_model_block",
                                                           "is_multivariate_brmsfit",
+                                                          "list_trend_types",
                                                           "normalize_function_body",
                                                           "normalize_function_signature",
                                                           "parse_stan_functions",

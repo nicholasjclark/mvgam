@@ -59,7 +59,8 @@ setup_stan_test_data <- function() {
     series = factor(rep("series1", n_time)),
     y = rpois(n_time, lambda = 5),
     x = rnorm(n_time),
-    temperature = rnorm(n_time, mean = 15, sd = 3)
+    temperature = rnorm(n_time, mean = 15, sd = 3),
+    site = factor(rep(c("A", "B", "C"), length.out = n_time))
   )
 
   # Multivariate dataset with balanced design
@@ -121,7 +122,7 @@ test_that("stancode.mvgam_formula returns correct class structure", {
   # brms-generated dispersion parameter should be excluded
   expect_false(grepl("real<lower=0> sigma;", code_with_trend, fixed = TRUE))
 
-  # GLM function usage for Poisson family
+  # GLM optimization enabled (fixed effects present)
   expect_true(stan_pattern("poisson_log_glm_lpmf", code_with_trend, fixed = TRUE))
   expect_true(stan_pattern("vector[1] mu_ones;", code_with_trend, fixed = TRUE))
 
@@ -168,6 +169,27 @@ test_that("stancode.mvgam_formula returns correct class structure", {
   # Final validation: ensure both models compile correctly
   expect_no_error(stancode(mf_obs_only, data = data, family = poisson(), validate = TRUE))
   expect_no_error(stancode(mf_with_trend, data = data, family = poisson(), validate = TRUE))
+})
+
+test_that("stancode uses GLM optimization with fixed effects + random effects", {
+  data <- setup_stan_test_data()$univariate
+
+  # Fixed effect + random effect - should use GLM optimization
+  mf_fixed_plus_re <- mvgam_formula(y ~ x + (1 | site))
+  code_fixed_plus_re <- stancode(mf_fixed_plus_re, data = data, family = poisson(), validate = FALSE)
+
+  # Should use GLM optimization despite random effects presence
+  expect_true(stan_pattern("poisson_log_glm_lpmf", code_fixed_plus_re))
+  expect_true(stan_pattern("poisson_log_glm_lpmf\\(Y \\| Xc, mu, b\\);", code_fixed_plus_re))
+
+  # Should still have random effects structure
+  expect_true(stan_pattern("int<lower=1> N_1;", code_fixed_plus_re))
+  expect_true(stan_pattern("vector<lower=0>\\[M_1\\] sd_1;", code_fixed_plus_re))
+  expect_true(stan_pattern("r_1_1 = \\(sd_1\\[1\\] \\* \\(z_1\\[1\\]\\)\\);", code_fixed_plus_re))
+
+  # Verify mu construction preserves both fixed and random effects
+  expect_true(stan_pattern("mu \\+= Intercept;", code_fixed_plus_re))
+  expect_true(stan_pattern("mu\\[n\\] \\+= r_1_1\\[J_1\\[n\\]\\] \\* Z_1_1\\[n\\];", code_fixed_plus_re))
 })
 
 test_that("stancode generates correct AR(p = c(1, 12)) seasonal model structure", {
@@ -1089,11 +1111,11 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
   expect_no_error(stancode(mf_with_trend, data = data, family = lognormal(), validate = TRUE))
 })
 
-test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with custom prior", {
+test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with correlated RE and custom prior", {
   data <- setup_stan_test_data()$multivariate
   mf_with_trend <- mvgam_formula(
     biomass ~ 1,
-    trend_formula = ~ 1 + x + ZMVN(gr = habitat)
+    trend_formula = ~ x + (x | habitat) + ZMVN(gr = habitat)
   )
 
   # Custom prior for hierarchical mixing parameter
@@ -1123,13 +1145,16 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   # Observation model dispersion parameter
   expect_true(stan_pattern("real<lower=0> sigma;", code_with_trend))
 
-  # Trend design matrix and coefficients
+  # Trend design matrix and coefficients (uses direct K_trend, not centering)
   expect_true(stan_pattern("int<lower=1> K_trend;", code_with_trend))
-  expect_true(stan_pattern("int<lower=1> Kc_trend;", code_with_trend))
   expect_true(stan_pattern("matrix\\[N_trend, K_trend\\] X_trend;", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_trend, Kc_trend\\] Xc_trend;", code_with_trend))
-  expect_true(stan_pattern("vector\\[Kc_trend\\] b_trend;", code_with_trend))
-  expect_true(stan_pattern("vector\\[Kc_trend\\] means_X_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[K_trend\\] b_trend;", code_with_trend))
+
+  # Correlated random effects structure for (x | habitat) in trend
+  expect_true(stan_pattern("int<lower=1> N_1_trend;", code_with_trend))  # Number of grouping factor levels
+  expect_true(stan_pattern("vector<lower=0>\\[M_1_trend\\] sd_1_trend;", code_with_trend))  # Random effects SDs
+  expect_true(stan_pattern("matrix\\[M_1_trend, N_1_trend\\] z_1_trend;", code_with_trend))  # Z-scores matrix
+  expect_true(stan_pattern("cholesky_factor_corr\\[M_1_trend\\] L_1_trend;", code_with_trend))  # Correlation matrix
 
   # Hierarchical grouping data structures
   expect_true(stan_pattern("int<lower=1> N_groups_trend;", code_with_trend))
@@ -1162,8 +1187,10 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   # Factor loading matrix (diagonal for non-factor ZMVN)
   expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix\\(rep_vector\\(1\\.0, N_lv_trend\\)\\);", code_with_trend))
 
-  # Trend mean with covariate effects
-  expect_true(stan_pattern("mu_trend \\+= Intercept_trend \\+ Xc_trend \\* b_trend;", code_with_trend))
+  # Trend mean with fixed effects and random effects computation
+  expect_true(stan_pattern("r_1_trend = scale_r_cor\\(z_1_trend, sd_1_trend, L_1_trend\\);", code_with_trend))
+  expect_true(stan_pattern("r_1_1_trend = r_1_trend\\[\\s*:\\s*, 1\\];", code_with_trend))  # Random intercepts
+  expect_true(stan_pattern("r_1_2_trend = r_1_trend\\[\\s*:\\s*, 2\\];", code_with_trend))  # Random slopes
 
   # Universal trend computation pattern should still be present
   expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
@@ -1197,9 +1224,8 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   expect_true(stan_pattern("mu \\+= Intercept;", code_with_trend))
   expect_true(stan_pattern("mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_with_trend))
 
-  # Generated quantities
+  # Generated quantities (no trend intercept centering in this model)
   expect_true(stan_pattern("real b_Intercept = Intercept;", code_with_trend))
-  expect_true(stan_pattern("real b_Intercept_trend = Intercept_trend - dot_product\\(means_X_trend, b_trend\\);", code_with_trend))
 
   # Mapping arrays should still be present
   expect_true(stan_pattern("array\\[N\\] int obs_trend_time", code_with_trend))
@@ -1305,8 +1331,7 @@ test_that("stancode generates correct hierarchical VAR(gr = habitat) model with 
   expect_no_error(stancode(mf_with_trend, data = data, family = poisson(), validate = TRUE))
 })
 
-test_that("stancode generates correct CAR() continuous autoregressive trend with complex
-  observation model", {
+test_that("stancode generates correct CAR() continuous autoregressive trend with nested RE and GP", {
     # Create test data with irregular time intervals (CAR's specialty)
     set.seed(42)
     n_time <- 20
@@ -1317,11 +1342,12 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
       series = factor(rep(paste0("series", 1:n_series), each = n_time)),
       y = rpois(n_time * n_series, lambda = 3),
       x = rnorm(n_time * n_series),  # For GP
-      group_id = factor(rep(c("A", "B", "C"), length.out = n_time * n_series))  # For random effects
+      site = factor(rep(c("A", "B", "C"), length.out = n_time * n_series)),  # For nested RE
+      plot = factor(paste0(rep(c("A", "B", "C"), length.out = n_time * n_series), "_", rep(1:2, length.out = n_time * n_series)))  # Nested within site
     )
 
     mf_with_trend <- mvgam_formula(
-      y ~ gp(x) + (1 | group_id),
+      y ~ gp(x) + (1 | site) + (1 | plot),
       trend_formula = ~ CAR()
     )
     code_with_trend <- stancode(
@@ -1352,11 +1378,15 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
     expect_true(stan_pattern("array\\[Nsubgp_1\\] vector\\[Dgp_1\\] Xgp_1;",
                       code_with_trend))
 
-    # Random effects data structures
-    expect_true(stan_pattern("int<lower=1> N_1;", code_with_trend))
-    expect_true(stan_pattern("int<lower=1> M_1;", code_with_trend))
-    expect_true(stan_pattern("array\\[N\\] int<lower=1> J_1;", code_with_trend))
-    expect_true(stan_pattern("vector\\[N\\] Z_1_1;", code_with_trend))
+    # Nested random effects data structures for (1 | site) + (1 | plot)
+    expect_true(stan_pattern("int<lower=1> N_1;", code_with_trend))  # Number of site levels
+    expect_true(stan_pattern("int<lower=1> M_1;", code_with_trend))  # Number of site RE parameters
+    expect_true(stan_pattern("int<lower=1> N_2;", code_with_trend))  # Number of plot levels
+    expect_true(stan_pattern("int<lower=1> M_2;", code_with_trend))  # Number of plot RE parameters
+    expect_true(stan_pattern("array\\[N\\] int<lower=1> J_1;", code_with_trend))  # Site indices
+    expect_true(stan_pattern("array\\[N\\] int<lower=1> J_2;", code_with_trend))  # Plot indices
+    expect_true(stan_pattern("vector\\[N\\] Z_1_1;", code_with_trend))  # Site design vector
+    expect_true(stan_pattern("vector\\[N\\] Z_2_1;", code_with_trend))  # Plot design vector
 
     # CAR trend dimensions
     expect_true(stan_pattern("int<lower=1> N_trend;", code_with_trend))
@@ -1373,7 +1403,7 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
     expect_true(stan_pattern("array\\[N\\] int obs_trend_time;", code_with_trend))
     expect_true(stan_pattern("array\\[N\\] int obs_trend_series;", code_with_trend))
 
-    # No GLM optimization component (no fixed effects)
+    # No GLM optimization (no fixed effects, only GP + random effects)
     expect_false(stan_pattern("vector\\[1\\] mu_ones;", code_with_trend))
 
     # 3. Transformed Data Block - Factor loading matrix
@@ -1388,11 +1418,11 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
     expect_true(stan_pattern("vector\\[Nsubgp_1\\] zgp_1;",
                       code_with_trend))
 
-    # Random effects parameters
-    expect_true(stan_pattern("vector<lower=0>\\[M_1\\] sd_1;",
-                      code_with_trend))
-    expect_true(stan_pattern("array\\[M_1\\] vector\\[N_1\\] z_1;",
-                      code_with_trend))
+    # Nested random effects parameters for (1 | site) + (1 | plot)
+    expect_true(stan_pattern("vector<lower=0>\\[M_1\\] sd_1;", code_with_trend))  # Site SDs
+    expect_true(stan_pattern("array\\[M_1\\] vector\\[N_1\\] z_1;", code_with_trend))  # Site z-scores
+    expect_true(stan_pattern("vector<lower=0>\\[M_2\\] sd_2;", code_with_trend))  # Plot SDs
+    expect_true(stan_pattern("array\\[M_2\\] vector\\[N_2\\] z_2;", code_with_trend))  # Plot z-scores
 
     # CAR trend parameters
     expect_false(stan_pattern("real Intercept_trend;", code_with_trend))
@@ -1403,17 +1433,19 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
                       code_with_trend))
 
     # 5. Transformed Parameters Block - Complex computations
-    # GP and random effects computations (from brms)
-    expect_true(stan_pattern("vector\\[N_1\\] r_1_1;", code_with_trend))
-    expect_true(stan_pattern("r_1_1 = \\(sd_1\\[1\\] \\* \\(z_1\\[1\\]\\)\\);", code_with_trend))
+    # GP and nested random effects computations (from brms)
+    expect_true(stan_pattern("vector\\[N_1\\] r_1_1;", code_with_trend))  # Site random effects
+    expect_true(stan_pattern("vector\\[N_2\\] r_2_1;", code_with_trend))  # Plot random effects
+    expect_true(stan_pattern("r_1_1 = \\(sd_1\\[1\\] \\* \\(z_1\\[1\\]\\)\\);", code_with_trend))  # Site computation
+    expect_true(stan_pattern("r_2_1 = \\(sd_2\\[1\\] \\* \\(z_2\\[1\\]\\)\\);", code_with_trend))  # Plot computation
 
     # Prior accumulation
     expect_true(stan_pattern("real lprior = 0;", code_with_trend, fixed = TRUE))
     expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept \\|", code_with_trend))
     expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(sdgp_1 \\|", code_with_trend))
-    expect_true(stan_pattern("lprior \\+= inv_gamma_lpdf\\(lscale_1\\[1\\]\\[1\\] \\|",
-                      code_with_trend))
-    expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(sd_1 \\|", code_with_trend))
+    expect_true(stan_pattern("lprior \\+= inv_gamma_lpdf\\(lscale_1\\[1\\]\\[1\\] \\|", code_with_trend))
+    expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(sd_1 \\|", code_with_trend))  # Site SD priors
+    expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(sd_2 \\|", code_with_trend))  # Plot SD priors
     expect_false(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept_trend \\|", code_with_trend))
 
     # CAR-specific trend computation
@@ -1455,10 +1487,9 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
     expect_true(stan_pattern("vector\\[N\\] mu = rep_vector\\(0\\.0, N\\);", code_with_trend))
     expect_true(stan_pattern("mu \\+= Intercept \\+ gp_pred_1\\[Jgp_1\\];", code_with_trend))
 
-    # Multi-component trend injection
+    # Multi-component trend injection (combined random effects)
     expect_true(stan_pattern("for \\(n in 1:N\\)", code_with_trend))
-    expect_true(stan_pattern("mu\\[n\\] \\+= r_1_1\\[J_1\\[n\\]\\] \\* Z_1_1\\[n\\];",
-                      code_with_trend))
+    expect_true(stan_pattern("mu\\[n\\] \\+= r_1_1\\[J_1\\[n\\]\\] \\* Z_1_1\\[n\\] \\+ r_2_1\\[J_2\\[n\\]\\] \\* Z_2_1\\[n\\];", code_with_trend))
     expect_true(stan_pattern("mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\],
   obs_trend_series\\[n\\]\\];", code_with_trend))
 
@@ -1689,13 +1720,17 @@ test_that("stancode generates correct Stan blocks", {
   expect_no_error(stancode(mf, data = data, family = poisson(), validate = TRUE))
 })
 
-test_that("stancode handles multivariate specifications with shared RW trend", {
+test_that("stancode handles multivariate specifications with shared RW trend and offset", {
   data <- setup_stan_test_data()$multivariate
 
-  # Multivariate with shared trend (explicitly set rescor = FALSE
+  # Add offset variables to multivariate data
+  data$log_baseline_count <- log(runif(nrow(data), min = 2, max = 5))
+  data$log_baseline_biomass <- log(runif(nrow(data), min = 1, max = 3))
+
+  # Multivariate with shared trend and offsets (explicitly set rescor = FALSE
   # to avoid brms deprecation warnings)
   mf_shared <- mvgam_formula(
-    bf(mvbind(count, biomass) ~ x) + set_rescor(FALSE),
+    bf(mvbind(count, biomass) ~ x + offset(log_baseline_count) + offset(log_baseline_biomass)) + set_rescor(FALSE),
     trend_formula = ~ RW(cor = TRUE)
   )
 
@@ -1764,6 +1799,10 @@ test_that("stancode handles multivariate specifications with shared RW trend", {
   # Times trend matrix - Should declare times_trend 2D array
   expect_match2(code_shared, "array\\[N_trend, N_series_trend\\] int times_trend;")
 
+  # Offset data structures for each response (brms consolidates them)
+  expect_match2(code_shared, "vector\\[N_count\\] offsets_count;")  # Count offsets
+  expect_match2(code_shared, "vector\\[N_biomass\\] offsets_biomass;")  # Biomass offsets
+
   # GLM compatibility vectors
   # Should declare mu_ones_count for GLM
   expect_match2(code_shared, "vector\\[1\\] mu_ones_count;")
@@ -1815,14 +1854,16 @@ test_that("stancode handles multivariate specifications with shared RW trend", {
   expect_match2(code_shared, "matrix\\[N_trend, N_series_trend\\] trend;")
 
   # Linear predictor construction with trend injection
-  # Should initialize mu_count from design matrix
-  expect_true(stan_pattern("vector\\[N_count\\]mu_count=Xc_count\\*b_count;", code_shared))
-  # Should initialize mu_biomass from design matrix
-  expect_true(stan_pattern("vector\\[N_biomass\\]mu_biomass=Xc_biomass\\*b_biomass;", code_shared))
-  # Should inject trend into mu_count using mapping arrays
-  expect_true(stan_pattern("mu_count\\[n\\]\\+=Intercept_count\\+trend\\[obs_trend_time_count\\[n\\],obs_trend_series_count\\[n\\]\\];", code_shared))
-  # Should inject trend into mu_biomass using mapping arrays
-  expect_true(stan_pattern("mu_biomass\\[n\\]\\+=Intercept_biomass\\+trend\\[obs_trend_time_biomass\\[n\\],obs_trend_series_biomass\\[n\\]\\];", code_shared))
+  # Should initialize mu vectors
+  expect_true(stan_pattern("vector\\[N_count\\] mu_count = rep_vector\\(0\\.0, N_count\\);", code_shared))
+  expect_true(stan_pattern("vector\\[N_biomass\\] mu_biomass = rep_vector\\(0\\.0, N_biomass\\);", code_shared))
+  # Should inject trend into mu using for loops
+  expect_true(stan_pattern("mu_count\\[i\\] \\+= trend\\[obs_trend_time_count\\[i\\], obs_trend_series_count\\[i\\]\\];", code_shared))
+  expect_true(stan_pattern("mu_biomass\\[i\\] \\+= trend\\[obs_trend_time_biomass\\[i\\], obs_trend_series_biomass\\[i\\]\\];", code_shared))
+
+  # Offset handling in linear predictor construction (brms consolidates offsets)
+  expect_true(stan_pattern("mu_count \\+= Intercept_count \\+ offsets_count;", code_shared))  # Count offset injection
+  expect_true(stan_pattern("mu_biomass \\+= Intercept_biomass \\+ offsets_biomass;", code_shared))  # Biomass offset injection
 
   # Should use GLM function with to_matrix(mu_count) and mu_ones_count
   expect_match2(code_shared, "normal_id_glm_lpdf\\(Y_count \\| to_matrix\\(mu_count\\), 0\\.0, mu_ones_count, sigma_count\\)")

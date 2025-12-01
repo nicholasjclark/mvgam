@@ -453,50 +453,50 @@ test_that("transition_with_tracking maintains operation log correctly", {
   stan_code <- "model { mu += X * beta; }"
   code_lines <- strsplit(stan_code, "\n")[[1]]
   initial_state <- mvgam:::processing_state(code_lines)
-  
+
   # Test transition with tracking
   analysis_details <- list(
     glm_patterns_detected = 0,
     optimization_plan = "no_glm_detected",
     test_data = TRUE
   )
-  
+
   tracked_state <- mvgam:::transition_with_tracking(
     initial_state,
-    new_stage = "analyzed", 
+    new_stage = "analyzed",
     operation = "test_analysis",
     details = analysis_details,
     modifications = list(analysis = list(test = TRUE))
   )
-  
+
   # Verify state transition occurred correctly
   expect_s3_class(tracked_state, "processing_state")
   expect_equal(tracked_state$stage, "analyzed")
   expect_true("test_analysis" %in% tracked_state$transformations_applied)
-  
+
   # Verify operation tracking
   expect_type(tracked_state$operations_log, "list")
   expect_equal(length(tracked_state$operations_log), 1)
-  
+
   # Check operation log entry structure
   log_entry <- tracked_state$operations_log[[1]]
   expect_equal(log_entry$operation, "test_analysis")
   expect_equal(log_entry$stage, "analyzed")
   expect_s3_class(log_entry$timestamp, "POSIXct")
   expect_equal(log_entry$details, analysis_details)
-  
+
   # Verify field modifications applied correctly
   expect_true(!is.null(tracked_state$analysis))
   expect_equal(tracked_state$analysis$test, TRUE)
-  
+
   # Test chaining multiple operations
   second_state <- mvgam:::transition_with_tracking(
     tracked_state,
     new_stage = "converted",
-    operation = "test_conversion", 
+    operation = "test_conversion",
     details = list(converted = TRUE)
   )
-  
+
   # Should have 2 operations logged
   expect_equal(length(second_state$operations_log), 2)
   expect_true("test_conversion" %in% second_state$transformations_applied)
@@ -508,30 +508,30 @@ test_that("format_pipeline_error provides detailed debugging context", {
     mvgam:::format_pipeline_error("Test error message"),
     "Test error message"
   )
-  
+
   # Test error with context
   context <- list(
     operation = "test_operation",
     expected_stage = "analyzed",
     actual_stage = "initial"
   )
-  
+
   expect_error(
     mvgam:::format_pipeline_error("State transition failed", context),
     "State transition failed.*operation.*test_operation.*expected_stage.*analyzed.*actual_stage.*initial"
   )
-  
+
   # Test with empty context (should not fail)
   expect_error(
     mvgam:::format_pipeline_error("Simple error", list()),
     "Simple error"
   )
-  
+
   # Test state transition validation with invalid stage
   stan_code <- "model { mu += X * beta; }"
   code_lines <- strsplit(stan_code, "\n")[[1]]
   state <- mvgam:::processing_state(code_lines, stage = "analyzed")  # Valid stage but wrong for to_analysis
-  
+
   expect_error(
     mvgam:::to_analysis(state),
     "Invalid state for GLM analysis.*expected_stage.*initial.*actual_stage.*analyzed"
@@ -543,38 +543,38 @@ test_that("get_operations_summary provides correct debugging information", {
   stan_code <- "model { target += normal_lpdf(Y | mu, sigma); }"
   code_lines <- strsplit(stan_code, "\n")[[1]]
   state <- mvgam:::processing_state(code_lines)
-  
+
   # Simulate analysis operation
   state <- mvgam:::transition_with_tracking(
-    state, 
-    "analyzed", 
+    state,
+    "analyzed",
     "glm_analysis_complete",
     list(glm_patterns_detected = 1, optimization_plan = "preserve_glm")
   )
-  
-  # Simulate conversion operation  
+
+  # Simulate conversion operation
   state <- mvgam:::transition_with_tracking(
     state,
-    "converted", 
+    "converted",
     "glm_conversion_skipped",
     list(reason = "no_trends_require_conversion")
   )
-  
+
   # Test operations summary
   summary_df <- mvgam:::get_operations_summary(state)
-  
+
   # Verify summary structure
   expect_s3_class(summary_df, "data.frame")
   expect_equal(nrow(summary_df), 2)
   expect_true(all(c("operation", "stage", "timestamp") %in% names(summary_df)))
-  
+
   # Verify summary content
   expect_equal(summary_df$operation[1], "glm_analysis_complete")
-  expect_equal(summary_df$stage[1], "analyzed") 
+  expect_equal(summary_df$stage[1], "analyzed")
   expect_equal(summary_df$operation[2], "glm_conversion_skipped")
   expect_equal(summary_df$stage[2], "converted")
   expect_s3_class(summary_df$timestamp, "POSIXct")
-  
+
   # Test empty operations log
   empty_state <- mvgam:::processing_state(code_lines)
   empty_summary <- mvgam:::get_operations_summary(empty_state)

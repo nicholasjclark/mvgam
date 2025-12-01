@@ -53,15 +53,15 @@ tryCatch({
     data = data,
     family = lognormal(),
     prior = custom_prior,
-    validate = FALSE
+    validate = TRUE
   )
   
   cat("SUCCESS: Stan code generated successfully!\n")
   cat("Writing Stan code to file for analysis...\n")
   
   # Write the generated Stan code to a file for examination
-  writeLines(code_with_trend, "tasks/hierarchical_zmvn_model.stan")
-  cat("Stan code written to: tasks/hierarchical_zmvn_model.stan\n")
+  writeLines(code_with_trend, "tasks/validated_hierarchical_zmvn_model.stan")
+  cat("Stan code written to: tasks/validated_hierarchical_zmvn_model.stan\n")
   
   # Check for some key patterns that the test expects
   cat("\n=== Checking for expected patterns ===\n")
@@ -147,7 +147,7 @@ tryCatch({
   cat("  means_X_trend:", stan_pattern("means_X_trend", code_with_trend), "\n")
   
   cat("\n=== Analysis complete ===\n")
-  cat("Check tasks/hierarchical_zmvn_model.stan for detailed Stan code inspection.\n")
+  cat("Check tasks/validated_hierarchical_zmvn_model.stan for detailed Stan code inspection.\n")
   
   # Also generate Stan data to check what's being passed
   cat("\n=== Generating Stan data ===\n")
@@ -204,21 +204,21 @@ models <- list(
   ar_hier = list(
     formula = mvgam_formula(count ~ 1 + x, trend_formula = ~ 1 + AR(gr = habitat)),
     family = poisson(),
-    filename = "tasks/ar_hier.stan",
+    filename = "tasks/validated_ar_hier.stan",
     description = "AR hierarchical (non-factor) with custom alpha_cor_trend ~ uniform(0, 1)",
     prior = brms::prior("uniform(0, 1)", class = "alpha_cor_trend")
   ),
   var_hier = list(
     formula = mvgam_formula(count ~ 1 + x, trend_formula = ~ 1 + VAR(p = 1, gr = habitat)),
     family = poisson(),
-    filename = "tasks/var_hier.stan", 
+    filename = "tasks/validated_var_hier.stan", 
     description = "VAR hierarchical (non-factor) with custom alpha_cor_trend ~ beta(2, 8)",
     prior = brms::prior("beta(2, 8)", class = "alpha_cor_trend")
   ),
   zmvn_hier = list(
     formula = mvgam_formula(biomass ~ 1, trend_formula = ~ 1 + x + ZMVN(gr = habitat)),
     family = lognormal(),
-    filename = "tasks/zmvn_hier.stan",
+    filename = "tasks/validated_zmvn_hier.stan",
     description = "ZMVN hierarchical (non-factor) with DEFAULT alpha_cor_trend prior (should be beta(3, 2))",
     prior = NULL  # No custom prior - should use common_trend_priors default
   ),
@@ -227,7 +227,7 @@ models <- list(
   ar_hier_factor = list(
     formula = mvgam_formula(count ~ 1 + x, trend_formula = ~ 1 + AR(gr = habitat, n_lv = 2)),
     family = poisson(),
-    filename = "tasks/ar_hier_factor.stan",
+    filename = "tasks/validated_ar_hier_factor.stan",
     description = "AR hierarchical with factor structure (n_lv = 2) - SHOULD FAIL",
     prior = NULL,
     expect_error = TRUE
@@ -235,7 +235,7 @@ models <- list(
   var_hier_factor = list(
     formula = mvgam_formula(count ~ 1 + x, trend_formula = ~ 1 + VAR(p = 1, gr = habitat, n_lv = 2)),
     family = poisson(),
-    filename = "tasks/var_hier_factor.stan",
+    filename = "tasks/validated_var_hier_factor.stan",
     description = "VAR hierarchical with factor structure (n_lv = 2) - SHOULD FAIL",
     prior = NULL,
     expect_error = TRUE
@@ -243,7 +243,7 @@ models <- list(
   zmvn_hier_factor = list(
     formula = mvgam_formula(biomass ~ 1, trend_formula = ~ 1 + x + ZMVN(gr = habitat, n_lv = 2)),
     family = lognormal(),
-    filename = "tasks/zmvn_hier_factor.stan", 
+    filename = "tasks/validated_zmvn_hier_factor.stan", 
     description = "ZMVN hierarchical with factor structure (n_lv = 2) - SHOULD FAIL",
     prior = NULL,
     expect_error = TRUE
@@ -280,14 +280,14 @@ for (model_name in names(models)) {
         data = data,
         family = model$family,
         prior = model$prior,
-        validate = FALSE
+        validate = TRUE
       )
     } else {
       stancode(
         model$formula,
         data = data,
         family = model$family,
-        validate = FALSE
+        validate = TRUE
       )
     }
     
@@ -354,10 +354,75 @@ if (length(errors_encountered) > 0) {
 cat("\nTotal files generated:", length(generated_files), "out of 6\n")
 
 # Preserve original ZMVN analysis for reference
-if ("tasks/zmvn_hier.stan" %in% generated_files) {
+if ("tasks/validated_zmvn_hier.stan" %in% generated_files) {
   cat("\n--- Original ZMVN analysis ---\n")
   cat("(ZMVN model completed as part of 6-model generation)\n")
-  cat("File written to: tasks/zmvn_hier.stan\n")
+  cat("File written to: tasks/validated_zmvn_hier.stan\n")
+}
+
+# Validate all generated Stan models with stanc() compilation check
+cat("\n================================================================================ \n")
+cat("STAN COMPILATION VALIDATION\n")
+cat("Task 6.8c Validation: stanc() Compilation Check for All Generated Models\n")
+cat("================================================================================ \n")
+
+if (length(generated_files) > 0) {
+  compilation_results <- list()
+  
+  for (file_path in generated_files) {
+    cat("--- Validating Stan compilation:", basename(file_path), "---\n")
+    
+    # Read Stan code from file
+    stan_code <- paste(readLines(file_path), collapse = "\n")
+    
+    # Test Stan compilation using stanc()
+    compilation_result <- tryCatch({
+      # Use rstan::stanc() for compilation validation
+      rstan::stanc(model_code = stan_code, verbose = FALSE)
+      list(success = TRUE, error = NULL)
+    }, error = function(e) {
+      list(success = FALSE, error = conditionMessage(e))
+    })
+    
+    compilation_results[[basename(file_path)]] <- compilation_result
+    
+    if (compilation_result$success) {
+      cat("✅ COMPILATION SUCCESS:", basename(file_path), "compiles without errors\n")
+    } else {
+      cat("❌ COMPILATION FAILURE:", basename(file_path), "\n")
+      cat("   Error message:", compilation_result$error, "\n")
+    }
+    cat("\n")
+  }
+  
+  # Summary of compilation results
+  cat("================================================================================ \n")
+  cat("COMPILATION SUMMARY\n")
+  cat("================================================================================ \n")
+  
+  success_count <- sum(sapply(compilation_results, function(x) x$success))
+  total_count <- length(compilation_results)
+  
+  cat("Models that compile successfully:", success_count, "/", total_count, "\n")
+  
+  if (success_count < total_count) {
+    cat("\n❌ MODELS WITH COMPILATION ERRORS:\n")
+    for (model_name in names(compilation_results)) {
+      if (!compilation_results[[model_name]]$success) {
+        cat("  -", model_name, "\n")
+      }
+    }
+    
+    cat("\n🔧 RECOMMENDED ACTIONS:\n")
+    cat("1. Fix compilation errors using Task 6.8c subtasks\n")
+    cat("2. Re-run debug script to validate fixes\n")
+    cat("3. Proceed to Task 6.9 only when all models compile\n")
+  } else {
+    cat("\n🎉 ALL MODELS COMPILE SUCCESSFULLY!\n")
+    cat("✅ Ready to proceed with Task 6.9: Update test expectations\n")
+  }
+} else {
+  cat("No Stan models were generated to validate.\n")
 }
 
 cat("\nTask 6.5 generation complete. Ready for stan-code-expert analysis.\n")
