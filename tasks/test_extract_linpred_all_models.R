@@ -1,5 +1,5 @@
 # Comprehensive tests for extract_linpred_from_prep across all model fixtures
-# Testing linear predictor extraction for all 11+ model types
+# Testing linear predictor extraction for all 13 model types
 
 # CRITICAL: Always load functions first
 devtools::load_all()
@@ -24,7 +24,8 @@ fixture_files <- c(
   "fit9.rds",   # Nonlinear model
   "fit10.rds",  # Another model
   "fit11.rds",  # Another model
-  "fit12.rds"   # Offset model
+  "fit12.rds",  # Offset model
+  "fit13.rds"   # New model
 )
 
 # Test results storage

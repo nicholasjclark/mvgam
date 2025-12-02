@@ -462,14 +462,18 @@ extract_smooth_coef <- function(draws_mat, smooth_label, resp = NULL,
     checkmate::assert_integerish(n_basis, lower = 1, len = 1)
 
     # Build parameter name patterns
+    # Extract base smooth name for sds_ parameters (e.g., "count_1" from "count_1_1")
+    # Stan generates sds parameters using base names while smooth coefficients use full labels
+    base_smooth_name <- gsub("_\\d+$", "", smooth_label)
+    
     if (!is.null(resp)) {
       zs_pattern <- paste0("^zs_", resp, "_", smooth_label, "\\[")
       s_pattern <- paste0("^s_", resp, "_", smooth_label, "\\[")
-      sds_pattern <- paste0("^sds_", resp, "_", smooth_label, "\\[")
+      sds_pattern <- paste0("^sds_", resp, "_", base_smooth_name, "\\[")
     } else {
       zs_pattern <- paste0("^zs_", smooth_label, "\\[")
       s_pattern <- paste0("^s_", smooth_label, "\\[")
-      sds_pattern <- paste0("^sds_", smooth_label, "\\[")
+      sds_pattern <- paste0("^sds_", base_smooth_name, "\\[")
     }
 
     # Try standardized form first (zs_* + sds_*)
@@ -507,8 +511,14 @@ extract_smooth_coef <- function(draws_mat, smooth_label, resp = NULL,
       # Extract sds [n_draws × 1]
       sds_draws <- draws_mat[, sds_names, drop = FALSE]
 
-      # Unstandardize via R broadcasting: [n_draws × n_basis] * [n_draws × 1]
-      sm_coef <- zs_draws * sds_draws
+      # Convert draws to matrices and apply brms unstandardization
+      # Following brms pattern: zs_draws * sds_draws with broadcasting
+      zs_mat <- matrix(as.numeric(zs_draws), nrow = nrow(zs_draws), ncol = ncol(zs_draws))
+      sds_vec <- as.vector(sds_draws)  # Convert to vector for R broadcasting
+      
+      # Unstandardize: [n_draws × n_basis] * vector[n_draws]
+      # Each column of zs multiplied by corresponding sds value per draw
+      sm_coef <- zs_mat * sds_vec
 
       return(sm_coef)
     }
