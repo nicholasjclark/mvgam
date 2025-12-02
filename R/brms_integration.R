@@ -432,15 +432,31 @@ is_multivariate_formula <- function(formula) {
     return(TRUE)
   }
 
-  # Case 2: brmsformula with additional responses (brms bf() pattern)
-  # This covers: bf(y1 ~ x, y2 ~ z) with pforms field
+  # Case 2: brmsformula with distributional parameters or multiple responses  
   if (inherits(formula, "brmsformula")) {
-    # For nonlinear formulas, pforms contain parameter definitions, not responses
+    # Nonlinear formulas already handled correctly
     if (is_nonlinear_formula(formula)) {
       return(FALSE)
     }
-
-    return(!is.null(formula$pforms) && length(formula$pforms) > 0)
+    
+    # Check pforms content
+    if (!is.null(formula$pforms) && length(formula$pforms) > 0) {
+      # brms distributional parameters (from brms source analysis)
+      distributional_params <- c(
+        "sigma", "sigma2", "shape", "nu", "phi", "kappa", "theta", 
+        "zi", "hu", "disc", "bs", "ndt", "bias", "xi", "coi", "zoi", 
+        "beta", "hurdle", "alpha", "sigma_error"
+      )
+      
+      pform_names <- names(formula$pforms)
+      # Distributional parameters = univariate, non-distributional = multivariate
+      if (all(pform_names %in% distributional_params)) {
+        return(FALSE)
+      }
+      return(TRUE)
+    }
+    
+    return(FALSE)
   }
 
   # Case 3: Standard formula with mvbind binding ONLY (corrected)

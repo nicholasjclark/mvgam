@@ -2325,3 +2325,111 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   # Final validation: ensure model compiles correctly
   expect_no_error(stancode(mf_with_trend, data = data, family = poisson(), validate = TRUE))
 })
+
+test_that("stancode handles distributional regression models correctly", {
+  data <- setup_stan_test_data()$univariate
+
+  # Distributional model: single response with distributional parameter
+  mf_distributional <- mvgam_formula(
+    bf(y ~ x, sigma ~ temperature),
+    trend_formula = ~ RW()
+  )
+
+  code_distributional <- stancode(
+    mf_distributional, data = data,
+    family = gaussian(),
+    validate = FALSE
+  )
+
+  # Basic structure checks
+  expect_s3_class(code_distributional, "mvgamstancode")
+  expect_s3_class(code_distributional, "stancode")
+
+  # 1. Classification check - should be univariate (not multivariate)
+  # Key indicator: N_trend should appear (not N_trend_y)
+  expect_true(stan_pattern("int<lower=1> N_trend;", code_distributional))
+  expect_false(grepl("N_trend_y", code_distributional))
+
+  # 2. Data Block - univariate trend structure (not response-specific)
+  expect_true(stan_pattern("int<lower=1> N_series_trend;", code_distributional))
+  expect_true(stan_pattern("int<lower=1> N_lv_trend;", code_distributional))
+  expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;", code_distributional))
+  expect_true(stan_pattern("array\\[N\\] int obs_trend_time;", code_distributional))
+  expect_true(stan_pattern("array\\[N\\] int obs_trend_series;", code_distributional))
+
+  # Should NOT have response-specific trend arrays
+  expect_false(grepl("obs_trend_time_y", code_distributional))
+  expect_false(grepl("obs_trend_series_y", code_distributional))
+
+  # 3. Distributional parameter structure for sigma
+  expect_true(stan_pattern("real Intercept_sigma;", code_distributional))
+  expect_true(stan_pattern("matrix\\[N, K_sigma\\] X_sigma;", code_distributional))
+  expect_true(stan_pattern("vector\\[Kc_sigma\\] b_sigma;", code_distributional))
+
+  # 4. Transformed Data - factor loading matrix (diagonal for univariate)
+  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix\\(rep_vector\\(1\\.0, N_lv_trend\\)\\);", code_distributional))
+
+  # 5. Parameters Block - RW trend parameters
+  expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_distributional))
+  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;", code_distributional))
+
+  # 6. Transformed Parameters - RW dynamics
+  expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_distributional))
+  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] scaled_innovations_trend;", code_distributional))
+  expect_true(stan_pattern("scaled_innovations_trend = innovations_trend \\* diag_matrix\\(sigma_trend\\);", code_distributional))
+
+  # RW state evolution
+  expect_true(stan_pattern("lv_trend\\[1, :\\] = scaled_innovations_trend\\[1, :\\];", code_distributional))
+  expect_true(stan_pattern("lv_trend\\[i, :\\] = lv_trend\\[i - 1, :\\] \\+ scaled_innovations_trend\\[i, :\\];", code_distributional))
+
+  # Final trend computation
+  expect_true(stan_pattern("matrix\\[N_trend, N_series_trend\\] trend;", code_distributional))
+  expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\];", code_distributional))
+
+  # 7. Model Block - trend injection into mu only
+  expect_true(stan_pattern("vector\\[N\\] mu = rep_vector\\(0\\.0, N\\);", code_distributional))
+  expect_true(stan_pattern("vector\\[N\\] sigma = rep_vector\\(0\\.0, N\\);", code_distributional))
+
+  # Trend should be injected into mu linear predictor
+  expect_true(stan_pattern("mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_distributional))
+
+  # Trend should NOT be injected into sigma
+  expect_false(grepl("sigma\\[n\\] \\+= trend", code_distributional))
+
+  # Sigma construction from distributional parameters
+  expect_true(stan_pattern("sigma \\+= Intercept_sigma \\+ Xc_sigma \\* b_sigma;", code_distributional))
+  expect_true(stan_pattern("sigma = exp\\(sigma\\);", code_distributional))
+
+  # 8. Likelihood - normal with both mu and sigma
+  expect_true(stan_pattern("target \\+= normal_lpdf\\(Y \\| mu, sigma\\);", code_distributional))
+
+  # 9. Prior structure
+  expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept \\|", code_distributional))
+  expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept_sigma \\|", code_distributional))
+  expect_true(stan_pattern("sigma_trend ~ exponential\\(2\\);", code_distributional))
+  expect_true(stan_pattern("to_vector\\(innovations_trend\\) ~ std_normal\\(\\);", code_distributional))
+
+  # 10. Anti-patterns - should NOT have multivariate structure
+  # No response-specific trend dimensions
+  expect_false(grepl("N_trend_y", code_distributional))
+  expect_false(grepl("N_y", code_distributional))
+
+  # No multivariate correlation structure
+  expect_false(grepl("L_Omega_trend", code_distributional))
+  expect_false(grepl("cholesky_factor_corr", code_distributional))
+
+  # No response-specific trend parameters
+  expect_false(grepl("innovations_trend_y", code_distributional))
+  expect_false(grepl("sigma_trend_y", code_distributional))
+
+  # Check for no duplicated Stan blocks
+  expect_equal(length(gregexpr("^\\s*data\\s*\\{", code_distributional)[[1]]), 1)
+  expect_equal(length(gregexpr("^\\s*transformed data\\s*\\{", code_distributional)[[1]]), 1)
+  expect_equal(length(gregexpr("^\\s*parameters\\s*\\{", code_distributional)[[1]]), 1)
+  expect_equal(length(gregexpr("^\\s*transformed parameters\\s*\\{", code_distributional)[[1]]), 1)
+  expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_distributional)[[1]]), 1)
+  expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_distributional)[[1]]), 1)
+
+  # Final validation: ensure model compiles correctly
+  expect_no_error(stancode(mf_distributional, data = data, family = gaussian(), validate = TRUE))
+})

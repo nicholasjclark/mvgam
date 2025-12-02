@@ -32,6 +32,20 @@
 #' @return Modified stanvars with response-specific parameter names
 #' @noRd
 apply_response_suffix_to_stanvars <- function(stanvars, response_suffix) {
+  # DEBUG: Track suffix application
+  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+    cat("=== APPLY SUFFIX DEBUG ===\n")
+    cat("Response suffix:", response_suffix, "\n")
+    if (!is.null(stanvars)) {
+      if (inherits(stanvars, "stanvar")) {
+        cat("Single stanvar name:", stanvars$name, "\n")
+      } else if (is.list(stanvars)) {
+        names_list <- sapply(stanvars, function(x) if(inherits(x, "stanvar")) x$name else "NULL")
+        cat("Stanvar names:", paste(names_list, collapse = ", "), "\n")
+      }
+    }
+  }
+  
   if (is.null(stanvars) || response_suffix == "" || is.null(response_suffix)) {
     return(stanvars)
   }
@@ -45,6 +59,7 @@ apply_response_suffix_to_stanvars <- function(stanvars, response_suffix) {
     "times_trend",
     "trend(?!_)",  # The computed trend matrix should be response-specific (negative lookahead to avoid matching *_trend)
     "mu_ones" # GLM compatibility stanvar should be response-specific
+    # Note: N_trend deliberately excluded - it should remain shared across responses
   )
 
   # Handle both single stanvar and list of stanvars
@@ -203,6 +218,15 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
 
   # Stage 1: Extract trend stanvars from brms setup
 
+  # DEBUG: Track routing logic
+  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+    cat("=== ROUTING DEBUG ===\n")
+    cat("is_multivariate:", is_multivariate, "\n")
+    if (is_multivariate && !is.null(trend_specs)) {
+      cat("response_names:", paste(names(trend_specs), collapse = ", "), "\n")
+    }
+  }
+  
   # Handle both univariate and multivariate cases
   if (is_multivariate) {
     # Validate multivariate trend_specs structure
@@ -262,6 +286,13 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
         # Track this response as having a trend
         responses_with_trends <- c(responses_with_trends, resp_name)
 
+        # DEBUG: Track response-specific extraction
+        if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+          cat("=== RESPONSE-SPECIFIC EXTRACTION ===\n")
+          cat("resp_name:", resp_name, "\n")
+          cat("response_suffix:", paste0("_", resp_name), "\n")
+        }
+        
         # Extract stanvars for this response with response suffix
         resp_stanvars <- extract_trend_stanvars_from_setup(
           trend_setup,
@@ -817,14 +848,6 @@ parse_glm_parameters_single <- function(stan_code, glm_type) {
   y_var <- trimws(parts[1])
   predictor_params <- trimws(strsplit(parts[2], ",")[[1]])
   
-  # DEBUG: Print extracted parameters
-  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-    cat("  Y variable:", y_var, "\n")
-    cat("  Predictor params:", paste(predictor_params, collapse = " | "), "\n")
-    cat("  Design matrix:", if (length(predictor_params) > 0) predictor_params[1] else "NULL", "\n")
-    cat("  Coefficients:", if (length(predictor_params) > 2) predictor_params[3] else "NULL", "\n")
-  }
-
   list(
     y_var = y_var,
     design_matrix = if (length(predictor_params) > 0) predictor_params[1] else NULL,

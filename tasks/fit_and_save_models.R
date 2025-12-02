@@ -486,6 +486,7 @@ set.seed(43)
 n_dist <- 50
 test_data$distributional <- data.frame(
   time = 1:n_dist,
+  series = factor(rep("series1", n_dist)),
   y = rnorm(n_dist, mean = 10, sd = 1 + 0.5 * (1:n_dist) / n_dist),
   x = rnorm(n_dist),
   temperature = rnorm(n_dist, mean = 15, sd = 3)

@@ -121,7 +121,7 @@ test_that("is_multivariate_formula correctly identifies multivariate formulas", 
   
   # Multivariate cases
   expect_true(mvgam:::is_multivariate_formula(mvbind(y1, y2) ~ x))
-  expect_true(mvgam:::is_multivariate_formula(cbind(success, failure) ~ treatment))
+  expect_false(mvgam:::is_multivariate_formula(cbind(success, failure) ~ treatment))
   expect_true(mvgam:::is_multivariate_formula(mvbind(count, biomass, presence) ~ temp + precip))
 })
 
