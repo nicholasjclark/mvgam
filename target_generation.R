@@ -38,7 +38,7 @@ setup_stan_test_data <- function() {
     count = rpois(n_time * n_series, lambda = 4),
     biomass = rlnorm(n_time * n_series, meanlog = 1, sdlog = 0.5),
     presence = rep(time_presence, n_series),  # Same presence value for each time across all series
-    x = rep(time_x, n_series),  # Same x value for each time across all series  
+    x = rep(time_x, n_series),  # Same x value for each time across all series
     habitat = rep(time_habitat, n_series)  # Same habitat for each time across all series
   )
 

@@ -40,7 +40,8 @@
       "WebFetch(domain:www.physalia-courses.org)",
       "WebFetch(domain:seonixbio.com)",
       "Bash(cat:*)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(R CMD INSTALL:*)"
     ],
     "deny": [],
     "ask": [],
