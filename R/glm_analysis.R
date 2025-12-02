@@ -232,6 +232,7 @@ inject_trends_into_glm_calls <- function(code_lines, block_info, trend_injection
   checkmate::assert_list(block_info)
   checkmate::assert_character(trend_injection_code, len = 1)
   
+  
   # Find GLM calls in model block
   model_range <- seq(block_info$start_idx, block_info$end_idx)
   glm_line_idx <- NULL
@@ -242,6 +243,7 @@ inject_trends_into_glm_calls <- function(code_lines, block_info, trend_injection
     if (grepl("_glm_lpmf|_glm_lpdf", line)) {
       glm_line_idx <- i
       
+      
       # Extract GLM type
       if (grepl("poisson_log_glm_lpmf", line)) {
         glm_type <- "poisson_log"
@@ -249,10 +251,14 @@ inject_trends_into_glm_calls <- function(code_lines, block_info, trend_injection
         glm_type <- "bernoulli_logit" 
       } else if (grepl("normal_id_glm_lpdf", line)) {
         glm_type <- "normal_id"
+      } else if (grepl("neg_binomial_2_log_glm_lpmf", line)) {
+        glm_type <- "neg_binomial_2_log"
       }
+      
       break
     }
   }
+  
   
   if (is.null(glm_line_idx) || is.null(glm_type)) {
     return(code_lines)
@@ -275,6 +281,7 @@ inject_trends_into_glm_calls <- function(code_lines, block_info, trend_injection
     transformed_glm_call,
     code_lines[(glm_line_idx + 1):length(code_lines)]
   )
+  
   
   return(modified_lines)
 }
@@ -324,9 +331,17 @@ parse_glm_parameters_from_line <- function(glm_line, glm_type) {
     coefficients = params[3] %||% "b"
   )
   
-  # Handle normal GLM which has sigma parameter
-  if (glm_type == "normal_id" && length(params) >= 4) {
-    result$sigma = params[4]
+  # Parameter specifications for GLM families requiring additional parameters
+  glm_additional_params <- list(
+    "normal_id" = list(position = 4, name = "sigma"),
+    "neg_binomial_2_log" = list(position = 4, name = "shape")
+  )
+  
+  # Handle families with additional parameters
+  if (glm_type %in% names(glm_additional_params) && 
+      length(params) >= glm_additional_params[[glm_type]]$position) {
+    param_spec <- glm_additional_params[[glm_type]]
+    result[[param_spec$name]] <- params[param_spec$position]
   }
   
   return(result)
@@ -386,20 +401,53 @@ transform_glm_call_to_mu_format <- function(glm_line, glm_type, glm_params) {
   mu_var <- if (resp_name == "") "mu" else paste0("mu_", resp_name)
   mu_ones_var <- if (resp_name == "") "mu_ones" else paste0("mu_ones_", resp_name)
   
-  # Build transformed call based on GLM type
-  if (glm_type == "normal_id") {
-    transformed_call <- paste0(
-      "  target += normal_id_glm_lpdf(", glm_params$y_var, 
-      " | to_matrix(", mu_var, "), 0.0, ", mu_ones_var, 
-      ", ", glm_params$sigma, ");"
+  # GLM family transformation configuration
+  glm_family_config <- list(
+    "normal_id" = list(
+      function_suffix = "_lpdf",
+      additional_params = function(glm_params) glm_params$sigma
+    ),
+    "neg_binomial_2_log" = list(
+      function_suffix = "_lpmf", 
+      additional_params = function(glm_params) glm_params$shape
+    ),
+    "poisson_log" = list(
+      function_suffix = "_lpmf",
+      additional_params = function(glm_params) NULL
+    ),
+    "bernoulli_logit" = list(
+      function_suffix = "_lpmf",
+      additional_params = function(glm_params) NULL
+    ),
+    "categorical_logit" = list(
+      function_suffix = "_lpmf",
+      additional_params = function(glm_params) NULL
     )
-  } else {
-    glm_function <- paste0(glm_type, "_glm_lpmf")
-    transformed_call <- paste0(
-      "  target += ", glm_function, "(", glm_params$y_var,
-      " | to_matrix(", mu_var, "), 0.0, ", mu_ones_var, ");"
-    )
+  )
+  
+  # Get configuration for GLM type
+  config <- glm_family_config[[glm_type]]
+  if (is.null(config)) {
+    insight::format_error("Unsupported GLM type: {.field {glm_type}}")
   }
+  
+  # Build function name
+  glm_function <- paste0(glm_type, "_glm", config$function_suffix)
+  
+  # Get additional parameters if any
+  additional_params <- config$additional_params(glm_params)
+  additional_str <- if (!is.null(additional_params)) {
+    paste0(", ", additional_params)
+  } else {
+    ""
+  }
+  
+  # Build transformed call uniformly
+  transformed_call <- paste0(
+    "  target += ", glm_function, "(", glm_params$y_var,
+    " | to_matrix(", mu_var, "), 0.0, ", mu_ones_var,
+    additional_str, ");"
+  )
   
   return(transformed_call)
 }
@@ -929,6 +977,7 @@ inject_trend_effects_linear <- function(stan_code, trend_injection_code) {
     model_lines <- code_lines[block_info$start_idx:block_info$end_idx] 
     has_glm_calls <- any(grepl("_glm_lpmf|_glm_lpdf", model_lines))
     
+    
     if (has_glm_calls) {
       # GLM case: inject trend by modifying GLM calls to use trend-enhanced parameters
       modified_lines <- inject_trends_into_glm_calls(code_lines, block_info, trend_injection_code)
@@ -937,6 +986,7 @@ inject_trend_effects_linear <- function(stan_code, trend_injection_code) {
       trend_lines <- strsplit(trend_injection_code, "\n")[[1]]
       modified_lines <- handle_nonlinear_trend_injection(code_lines, block_info, trend_lines)
     }
+    
     return(paste(modified_lines, collapse = "\n"))
   }
 }

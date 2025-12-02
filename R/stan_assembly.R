@@ -32,19 +32,6 @@
 #' @return Modified stanvars with response-specific parameter names
 #' @noRd
 apply_response_suffix_to_stanvars <- function(stanvars, response_suffix) {
-  # DEBUG: Track suffix application
-  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-    cat("=== APPLY SUFFIX DEBUG ===\n")
-    cat("Response suffix:", response_suffix, "\n")
-    if (!is.null(stanvars)) {
-      if (inherits(stanvars, "stanvar")) {
-        cat("Single stanvar name:", stanvars$name, "\n")
-      } else if (is.list(stanvars)) {
-        names_list <- sapply(stanvars, function(x) if(inherits(x, "stanvar")) x$name else "NULL")
-        cat("Stanvar names:", paste(names_list, collapse = ", "), "\n")
-      }
-    }
-  }
   
   if (is.null(stanvars) || response_suffix == "" || is.null(response_suffix)) {
     return(stanvars)
@@ -218,14 +205,6 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
 
   # Stage 1: Extract trend stanvars from brms setup
 
-  # DEBUG: Track routing logic
-  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-    cat("=== ROUTING DEBUG ===\n")
-    cat("is_multivariate:", is_multivariate, "\n")
-    if (is_multivariate && !is.null(trend_specs)) {
-      cat("response_names:", paste(names(trend_specs), collapse = ", "), "\n")
-    }
-  }
   
   # Handle both univariate and multivariate cases
   if (is_multivariate) {
@@ -286,12 +265,6 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
         # Track this response as having a trend
         responses_with_trends <- c(responses_with_trends, resp_name)
 
-        # DEBUG: Track response-specific extraction
-        if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-          cat("=== RESPONSE-SPECIFIC EXTRACTION ===\n")
-          cat("resp_name:", resp_name, "\n")
-          cat("response_suffix:", paste0("_", resp_name), "\n")
-        }
         
         # Extract stanvars for this response with response suffix
         resp_stanvars <- extract_trend_stanvars_from_setup(
@@ -1126,11 +1099,9 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
 
   # Early return if no trends to inject
   if (is.null(trend_stanvars) || length(trend_stanvars) == 0) {
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      cat("  Early return: No trends to inject\n")
-    }
     return(base_stancode)
   }
+
 
   # Extract and validate mapping arrays
   mapping_arrays <- extract_mapping_arrays(trend_stanvars)
@@ -1142,6 +1113,7 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
 
   # Apply linear transformation pipeline for GLM handling and trend injection
   modified_stancode <- transform_glm_code(base_stancode, trend_injection_string)
+
 
   return(modified_stancode)
 }
@@ -1373,7 +1345,9 @@ insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_cod
     }
     
     # Convert GLM calls to explicit form, then recurse to find new mu += lines
-    conversion_result <- convert_glm_to_standard_form(code_lines, block_info, detected_glm_types, processed_glm_lines)
+    # Create GLM analysis for conversion (missing parameter bug fix)
+    analysis <- analyze_stan(paste(code_lines, collapse = "\n"))
+    conversion_result <- convert_glm_to_standard_form(code_lines, block_info, detected_glm_types, analysis, processed_glm_lines)
     # Recursively call with updated tracking to prevent infinite recursion
     return(insert_after_mu_lines_in_model_block(
       conversion_result$code_lines,
