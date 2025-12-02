@@ -92,7 +92,6 @@ transformed data {
 parameters {
   vector[Kc] b;
   real Intercept;
-  real Intercept_trend;
   vector[N_lv_trend] k_trend;
   vector[N_lv_trend] m_trend;
   matrix[n_change_trend, N_lv_trend] delta_trend;
@@ -100,10 +99,8 @@ parameters {
 transformed parameters {
   // Prior log-probability accumulator
   real lprior = 0;
-  lprior += student_t_lpdf(Intercept_trend | 3, -0.4, 2.5);
   lprior += student_t_lpdf(Intercept | 3, 1.8, 2.5);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
-  mu_trend += Intercept_trend;
   // Latent variable trajectories over time
   matrix[N_trend, N_lv_trend] lv_trend;
   for (s in 1 : N_lv_trend) {
@@ -129,9 +126,12 @@ model {
   
   // Observation linear predictors and likelihoods (skipped when sampling from prior only)
   if (!prior_only) {
-    vector[N] mu = Xc * b;
+    vector[N] mu;
+    mu = rep_vector(0.0, N);
+    mu += Xc * b;
+    mu += Intercept;
     for (n in 1 : N) {
-      mu[n] += Intercept + trend[obs_trend_time[n], obs_trend_series[n]];
+      mu[n] += trend[obs_trend_time[n], obs_trend_series[n]];
     }
     // Likelihood calculations
     target += poisson_log_glm_lpmf(Y | to_matrix(mu), 0.0, mu_ones);
@@ -142,6 +142,5 @@ model {
 }
 generated quantities {
   real b_Intercept = Intercept - dot_product(means_X, b);
-  real b_Intercept_trend = Intercept_trend;
 }
 

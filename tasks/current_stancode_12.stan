@@ -8,6 +8,7 @@ data {
   int<lower=1> K;
   matrix[N, K] X;
   int<lower=1> Kc;
+  vector[N] offsets;
   int prior_only;
   int<lower=1> N_trend;
   int<lower=1> N_series_trend;
@@ -37,7 +38,7 @@ parameters {
 transformed parameters {
   // Prior log-probability accumulator
   real lprior = 0;
-  lprior += student_t_lpdf(Intercept | 3, 1.8, 2.5);
+  lprior += student_t_lpdf(Intercept | 3, 0.287084840374025, 2.5);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   matrix[N_trend, N_lv_trend] scaled_innovations_trend;
   scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);
@@ -64,15 +65,13 @@ model {
   
   // Observation linear predictors and likelihoods (skipped when sampling from prior only)
   if (!prior_only) {
-    vector[N] mu;
-    mu = rep_vector(0.0, N);
-    mu += Xc * b;
-    mu += Intercept;
+    vector[N] mu = rep_vector(0.0, N);
+    mu += Intercept + offsets;
     for (n in 1 : N) {
       mu[n] += trend[obs_trend_time[n], obs_trend_series[n]];
     }
     // Likelihood calculations
-    target += poisson_log_glm_lpmf(Y | to_matrix(mu), 0.0, mu_ones);
+    target += poisson_log_glm_lpmf(Y | Xc, mu, b);
   }
   
   // Prior contributions

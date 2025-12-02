@@ -14,6 +14,22 @@ data {
   int<lower=1> K_biomass;
   matrix[N_biomass, K_biomass] X_biomass;
   int<lower=1> Kc_biomass;
+  int<lower=1> N_1;
+  int<lower=1> M_1;
+  array[N_count] int<lower=1> J_1_count;
+  vector[N_count] Z_1_count_1;
+  int<lower=1> N_2;
+  int<lower=1> M_2;
+  array[N_count] int<lower=1> J_2_count;
+  vector[N_count] Z_2_count_1;
+  int<lower=1> N_3;
+  int<lower=1> M_3;
+  array[N_biomass] int<lower=1> J_3_biomass;
+  vector[N_biomass] Z_3_biomass_1;
+  int<lower=1> N_4;
+  int<lower=1> M_4;
+  array[N_biomass] int<lower=1> J_4_biomass;
+  vector[N_biomass] Z_4_biomass_1;
   int prior_only;
   int<lower=1> N_trend;
   int<lower=1> N_series_trend;
@@ -50,11 +66,23 @@ parameters {
   vector[Kc_biomass] b_biomass;
   real Intercept_biomass;
   real<lower=0> sigma_biomass;
+  vector<lower=0>[M_1] sd_1;
+  array[M_1] vector[N_1] z_1;
+  vector<lower=0>[M_2] sd_2;
+  array[M_2] vector[N_2] z_2;
+  vector<lower=0>[M_3] sd_3;
+  array[M_3] vector[N_3] z_3;
+  vector<lower=0>[M_4] sd_4;
+  array[M_4] vector[N_4] z_4;
   vector<lower=0>[N_lv_trend] sigma_trend;
   cholesky_factor_corr[N_lv_trend] L_Omega_trend;
   matrix[N_trend, N_lv_trend] innovations_trend;
 }
 transformed parameters {
+  vector[N_1] r_1_count_1;
+  vector[N_2] r_2_count_1;
+  vector[N_3] r_3_biomass_1;
+  vector[N_4] r_4_biomass_1;
   // Prior log-probability accumulator
   real lprior = 0;
   lprior += student_t_lpdf(Intercept_count | 3, 3, 2.5);
@@ -62,6 +90,14 @@ transformed parameters {
             - 1 * student_t_lccdf(0 | 3, 0, 2.5);
   lprior += student_t_lpdf(Intercept_biomass | 3, 2.7, 2.5);
   lprior += student_t_lpdf(sigma_biomass | 3, 0, 2.5)
+            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+  lprior += student_t_lpdf(sd_1 | 3, 0, 2.5)
+            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+  lprior += student_t_lpdf(sd_2 | 3, 0, 2.5)
+            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+  lprior += student_t_lpdf(sd_3 | 3, 0, 2.5)
+            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+  lprior += student_t_lpdf(sd_4 | 3, 0, 2.5)
             - 1 * student_t_lccdf(0 | 3, 0, 2.5);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   matrix[N_trend, N_lv_trend] scaled_innovations_trend;
@@ -88,6 +124,10 @@ transformed parameters {
                     + mu_trend[times_trend[i, s]];
     }
   }
+  r_1_count_1 = (sd_1[1] * (z_1[1]));
+  r_2_count_1 = (sd_2[1] * (z_2[1]));
+  r_3_biomass_1 = (sd_3[1] * (z_3[1]));
+  r_4_biomass_1 = (sd_4[1] * (z_4[1]));
 }
 model {
   sigma_trend ~ exponential(2);
@@ -96,15 +136,23 @@ model {
   
   // Observation linear predictors and likelihoods (skipped when sampling from prior only)
   if (!prior_only) {
-    vector[N_biomass] mu_biomass = Xc_biomass * b_biomass;
-    for (n in 1 : N_biomass) {
-      mu_biomass[n] += Intercept_biomass
-                       + trend[obs_trend_time_biomass[n], obs_trend_series_biomass[n]];
-    }
-    vector[N_count] mu_count = Xc_count * b_count;
+    vector[N_count] mu_count = rep_vector(0.0, N_count);
+    vector[N_biomass] mu_biomass = rep_vector(0.0, N_biomass);
+    mu_count += Intercept_count;
+    mu_biomass += Intercept_biomass;
     for (n in 1 : N_count) {
-      mu_count[n] += Intercept_count
-                     + trend[obs_trend_time_count[n], obs_trend_series_count[n]];
+      mu_count[n] += r_1_count_1[J_1_count[n]] * Z_1_count_1[n]
+                     + r_2_count_1[J_2_count[n]] * Z_2_count_1[n];
+    }
+    for (i in 1 : N_count) {
+      mu_count[i] += trend[obs_trend_time_count[i], obs_trend_series_count[i]];
+    }
+    for (n in 1 : N_biomass) {
+      mu_biomass[n] += r_3_biomass_1[J_3_biomass[n]] * Z_3_biomass_1[n]
+                       + r_4_biomass_1[J_4_biomass[n]] * Z_4_biomass_1[n];
+    }
+    for (i in 1 : N_biomass) {
+      mu_biomass[i] += trend[obs_trend_time_biomass[i], obs_trend_series_biomass[i]];
     }
     // Likelihood calculations
     target += normal_id_glm_lpdf(Y_count | to_matrix(mu_count), 0.0, mu_ones_count, sigma_count);
@@ -113,6 +161,10 @@ model {
   
   // Prior contributions
   target += lprior;
+  target += std_normal_lpdf(z_1[1]);
+  target += std_normal_lpdf(z_2[1]);
+  target += std_normal_lpdf(z_3[1]);
+  target += std_normal_lpdf(z_4[1]);
 }
 generated quantities {
   real b_count_Intercept = Intercept_count

@@ -166,24 +166,17 @@ data {
   int<lower=1> N_lv_trend;
   array[N_trend, N_series_trend] int times_trend;
   int<lower=1> K_trend;
-  int<lower=1> Kc_trend;
   matrix[N_trend, K_trend] X_trend;
   array[N_count] int obs_trend_time_count;
   array[N_count] int obs_trend_series_count;
   array[N_biomass] int obs_trend_time_biomass;
   array[N_biomass] int obs_trend_series_biomass;
+  int<lower=1> N_lags_trend;
 }
 transformed data {
   // Factor loadings matrix: maps latent variables to observed series
   matrix[N_series_trend, N_lv_trend] Z = diag_matrix(rep_vector(1.0,
                                                                 N_lv_trend));
-  matrix[N_trend, Kc_trend] Xc_trend;
-  vector[Kc_trend] means_X_trend;
-  for (i_trend in 2 : K_trend) {
-    means_X_trend[i_trend - 1] = mean(X_trend[ : , i_trend]);
-    Xc_trend[ : , i_trend - 1] = X_trend[ : , i_trend]
-                                 - means_X_trend[i_trend - 1];
-  }
   vector[N_lv_trend] trend_zeros = rep_vector(0.0, N_lv_trend);
 }
 parameters {
@@ -199,8 +192,7 @@ parameters {
   real<lower=0> sigma_biomass;
   // Latent variable trajectories over time
   matrix[N_trend, N_lv_trend] lv_trend;
-  vector[Kc_trend] b_trend;
-  real Intercept_trend;
+  vector[K_trend] b_trend;
   array[2] matrix[N_lv_trend, N_lv_trend] A_raw_trend;
   vector<lower=0>[N_lv_trend] sigma_trend;
   cholesky_factor_corr[N_lv_trend] L_Omega_trend;
@@ -216,7 +208,6 @@ transformed parameters {
   vector[knots_biomass_1[1]] s_biomass_1_1;
   // Prior log-probability accumulator
   real lprior = 0;
-  lprior += student_t_lpdf(Intercept_trend | 3, 0, 2.5);
   lprior += student_t_lpdf(Intercept_count | 3, 3, 2.5);
   lprior += student_t_lpdf(sds_count_1 | 3, 0, 2.5)
             - 1 * student_t_lccdf(0 | 3, 0, 2.5);
@@ -228,7 +219,7 @@ transformed parameters {
   lprior += student_t_lpdf(sigma_biomass | 3, 0, 2.5)
             - 1 * student_t_lccdf(0 | 3, 0, 2.5);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
-  mu_trend += Intercept_trend + Xc_trend * b_trend;
+  mu_trend += X_trend * b_trend;
   matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend,
                                                                    L_Omega_trend);
   cov_matrix[N_lv_trend] Sigma_trend = multiply_lower_tri_self_transpose(L_Sigma_trend);
@@ -300,7 +291,7 @@ model {
   for (t in 1 : N_trend) {
     lv_trend[t,  : ]' ~ multi_normal(mu_t_trend[t], Sigma_trend);
   }
-  for (lag in 1 : 2) {
+  for (lag in 1 : N_lags_trend) {
     diagonal(A_raw_trend[lag]) ~ normal(Amu_trend[1, lag],
                                         1 / sqrt(Aomega_trend[1, lag]));
     for (i in 1 : N_lv_trend) {
@@ -363,7 +354,5 @@ model {
 generated quantities {
   real b_count_Intercept = Intercept_count;
   real b_biomass_Intercept = Intercept_biomass;
-  real b_Intercept_trend = Intercept_trend
-                           - dot_product(means_X_trend, b_trend);
 }
 

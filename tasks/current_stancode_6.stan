@@ -60,7 +60,6 @@ parameters {
   real Intercept;
   vector<lower=0>[M_1] sd_1;
   array[M_1] vector[N_1] z_1;
-  real Intercept_trend;
   vector<lower=0>[Kgp_1_trend] sdgp_1_trend;
   array[Kgp_1_trend] vector<lower=0>[1] lscale_1_trend;
   vector[Nsubgp_1_trend] zgp_1_trend;
@@ -72,7 +71,6 @@ transformed parameters {
   vector[N_1] r_1_1;
   // Prior log-probability accumulator
   real lprior = 0;
-  lprior += student_t_lpdf(Intercept_trend | 3, 0.1, 2.5);
   lprior += student_t_lpdf(sdgp_1_trend | 3, 0, 2.5)
             - 1 * student_t_lccdf(0 | 3, 0, 2.5);
   lprior += inv_gamma_lpdf(lscale_1_trend[1][1] | 1.494197, 0.056607);
@@ -84,7 +82,7 @@ transformed parameters {
                                                        sdgp_1_trend[1],
                                                        lscale_1_trend[1],
                                                        zgp_1_trend);
-  mu_trend += Intercept_trend + gp_pred_1_trend[Jgp_1_trend];
+  mu_trend += gp_pred_1_trend[Jgp_1_trend];
   // Latent variable trajectories over time
   matrix[N_trend, N_lv_trend] lv_trend;
   matrix[N_trend, N_lv_trend] scaled_innovations_trend;
@@ -135,6 +133,5 @@ model {
 }
 generated quantities {
   real b_Intercept = Intercept;
-  real b_Intercept_trend = Intercept_trend;
 }
 

@@ -45,7 +45,6 @@ parameters {
   real Intercept;
   vector<lower=0>[M_1] sd_1;
   array[M_1] vector[N_1] z_1;
-  real Intercept_trend;
   simplex[Jmo_trend[1]] simo_1_trend;
   vector[Ksp_trend] bsp_trend;
   vector<lower=-1, upper=1>[N_lv_trend] ar1_trend;
@@ -56,13 +55,11 @@ transformed parameters {
   vector[N_1] r_1_1;
   // Prior log-probability accumulator
   real lprior = 0;
-  lprior += student_t_lpdf(Intercept_trend | 3, -0.2, 2.5);
   lprior += dirichlet_lpdf(simo_1_trend | con_simo_1_trend);
   lprior += student_t_lpdf(Intercept | 3, 1.8, 2.5);
   lprior += student_t_lpdf(sd_1 | 3, 0, 2.5)
             - 1 * student_t_lccdf(0 | 3, 0, 2.5);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
-  mu_trend += Intercept_trend;
   for (n in 1 : N_trend) {
     mu_trend[n] += (bsp_trend[1]) * mo(simo_1_trend, Xmo_1_trend[n]);
   }
@@ -115,6 +112,5 @@ model {
 }
 generated quantities {
   real b_Intercept = Intercept;
-  real b_Intercept_trend = Intercept_trend;
 }
 

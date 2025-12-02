@@ -77,9 +77,9 @@ transformed parameters {
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   matrix[N_trend, N_lv_trend] scaled_innovations_trend;
   {
-    matrix[N_lv_trend, N_lv_trend] L_Sigma = diag_pre_multiply(sigma_trend,
-                                                               L_Omega_trend);
-    scaled_innovations_trend = innovations_trend * L_Sigma';
+    matrix[N_lv_trend, N_lv_trend] L_Sigma_trend = diag_pre_multiply(sigma_trend,
+                                                                    L_Omega_trend);
+    scaled_innovations_trend = innovations_trend * L_Sigma_trend';
   }
   // Latent variable trajectories over time
   matrix[N_trend, N_lv_trend] lv_trend;

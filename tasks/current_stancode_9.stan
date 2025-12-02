@@ -4,7 +4,7 @@ functions {
 }
 data {
   int<lower=1> N;
-  vector[N] Y;
+  array[N] int Y;
   int<lower=1> K_b1;
   matrix[N, K_b1] X_b1;
   int<lower=1> K_b2;
@@ -26,8 +26,6 @@ transformed data {
 parameters {
   vector[K_b1] b_b1;
   vector[K_b2] b_b2;
-  real<lower=0> sigma;
-  real Intercept_trend;
   vector<lower=0>[N_lv_trend] sigma_trend;
   matrix[N_trend, N_lv_trend] innovations_trend;
   vector<lower=-1, upper=1>[N_lv_trend] ar1_trend;
@@ -35,13 +33,9 @@ parameters {
 transformed parameters {
   // Prior log-probability accumulator
   real lprior = 0;
-  lprior += student_t_lpdf(Intercept_trend | 3, 0.4, 2.5);
   lprior += normal_lpdf(b_b1 | 1, 2);
   lprior += normal_lpdf(b_b2 | 0, 2);
-  lprior += student_t_lpdf(sigma | 3, 0, 3)
-            - 1 * student_t_lccdf(0 | 3, 0, 3);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
-  mu_trend += Intercept_trend;
   matrix[N_trend, N_lv_trend] scaled_innovations_trend;
   scaled_innovations_trend = innovations_trend * diag_matrix(sigma_trend);
   // Latent variable trajectories over time
@@ -82,13 +76,13 @@ model {
               + trend[obs_trend_time[n], obs_trend_series[n]];
     }
     // Likelihood calculations
-    target += normal_lpdf(Y | mu, sigma);
+    target += poisson_log_lpmf(Y | mu);
   }
   
   // Prior contributions
   target += lprior;
 }
 generated quantities {
-  real b_Intercept_trend = Intercept_trend;
+  
 }
 

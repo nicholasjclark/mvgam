@@ -25,7 +25,7 @@ functions {
 }
 data {
   int<lower=1> N;
-  vector[N] Y;
+  array[N] int Y;
   int<lower=1> Kgp_1;
   int<lower=1> Dgp_1;
   int<lower=1> NBgp_1;
@@ -58,7 +58,6 @@ parameters {
   vector<lower=0>[Kgp_1] sdgp_1;
   array[Kgp_1] vector<lower=0>[1] lscale_1;
   vector[NBgp_1] zgp_1;
-  real<lower=0> sigma;
   vector<lower=0>[Kgp_1_trend] sdgp_1_trend;
   array[Kgp_1_trend] vector<lower=0>[1] lscale_1_trend;
   vector[NBgp_1_trend] zgp_1_trend;
@@ -73,12 +72,10 @@ transformed parameters {
   lprior += student_t_lpdf(sdgp_1_trend | 3, 0, 2.5)
             - 1 * student_t_lccdf(0 | 3, 0, 2.5);
   lprior += inv_gamma_lpdf(lscale_1_trend[1][1] | 1.494197, 0.056607);
-  lprior += student_t_lpdf(Intercept | 3, 6, 3);
-  lprior += student_t_lpdf(sdgp_1 | 3, 0, 3)
-            - 1 * student_t_lccdf(0 | 3, 0, 3);
+  lprior += student_t_lpdf(Intercept | 3, 1.8, 2.5);
+  lprior += student_t_lpdf(sdgp_1 | 3, 0, 2.5)
+            - 1 * student_t_lccdf(0 | 3, 0, 2.5);
   lprior += inv_gamma_lpdf(lscale_1[1][1] | 1.494197, 0.056607);
-  lprior += student_t_lpdf(sigma | 3, 0, 3)
-            - 1 * student_t_lccdf(0 | 3, 0, 3);
   vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
   vector[NBgp_1_trend] rgp_1_trend = sqrt(spd_gp_exp_quad(slambda_1_trend,
                                                           sdgp_1_trend[1],
@@ -128,7 +125,7 @@ model {
       mu[n] += trend[obs_trend_time[n], obs_trend_series[n]];
     }
     // Likelihood calculations
-    target += normal_lpdf(Y | mu, sigma);
+    target += poisson_log_lpmf(Y | mu);
   }
   
   // Prior contributions
