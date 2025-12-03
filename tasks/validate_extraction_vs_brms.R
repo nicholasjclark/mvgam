@@ -398,6 +398,135 @@ results$test4 <- run_validation(
   )
 )
 
+# -----------------------------------------------------------------------------
+# Test 5: t2() tensor product smooth
+# -----------------------------------------------------------------------------
+
+cat("\n=== Test 5: t2() tensor product smooth ===\n")
+
+# Create data with two continuous predictors for tensor product
+test_data_t2 <- test_data
+test_data_t2$w <- seq(-1, 1, length.out = n_time)
+
+brms_5 <- fit_brms_cached(
+  "ar1_t2",
+  y ~ 1 + t2(z, w, k = c(4, 4)) + ar(time = time, p = 1, cov = TRUE),
+  test_data_t2, poisson()
+)
+
+mvgam_5 <- fit_mvgam_cached(
+  "ar1_t2",
+  y ~ 1 + t2(z, w, k = c(4, 4)), ~ AR(p = 1),
+  test_data_t2, poisson()
+)
+
+results$test5 <- run_validation(
+  "AR(1) + t2() tensor smooth",
+  brms_5, mvgam_5, test_data_t2,
+  param_pairs = list(
+    c("b_Intercept", "b_Intercept", "Intercept"),
+    c("sds_t2zwk_4_4_1", "sds_1[1]", "sds_t2_1"),
+    c("sds_t2zwk_4_4_2", "sds_1[2]", "sds_t2_2"),
+    c("ar[1]", "ar1_trend[1]", "AR(1)"),
+    c("sderr", "sigma_trend[1]", "Sigma")
+  )
+)
+
+# -----------------------------------------------------------------------------
+# Test 6: Monotonic effect (mo())
+# -----------------------------------------------------------------------------
+
+cat("\n=== Test 6: Monotonic effect (mo()) ===\n")
+
+# Create ordered factor for monotonic effect
+test_data_mo <- test_data
+test_data_mo$ord_factor <- ordered(cut(test_data_mo$z, 4))
+
+brms_6 <- fit_brms_cached(
+  "ar1_mo",
+  y ~ 1 + mo(ord_factor) + ar(time = time, p = 1, cov = TRUE),
+  test_data_mo, poisson()
+)
+
+mvgam_6 <- fit_mvgam_cached(
+  "ar1_mo",
+  y ~ 1 + mo(ord_factor), ~ AR(p = 1),
+  test_data_mo, poisson()
+)
+
+results$test6 <- run_validation(
+  "AR(1) + monotonic effect",
+  brms_6, mvgam_6, test_data_mo,
+  param_pairs = list(
+    c("b_Intercept", "b_Intercept", "Intercept"),
+    c("bsp_moord_factor", "bsp[1]", "bsp_mo"),
+    c("ar[1]", "ar1_trend[1]", "AR(1)"),
+    c("sderr", "sigma_trend[1]", "Sigma")
+  )
+)
+
+# -----------------------------------------------------------------------------
+# Test 7: Correlated random effects ((x|group))
+# -----------------------------------------------------------------------------
+
+cat("\n=== Test 7: Correlated random effects ((x|group)) ===\n")
+
+brms_7 <- fit_brms_cached(
+  "ar1_cor_re",
+  y ~ 1 + x + (1 + x | group) + ar(time = time, p = 1, cov = TRUE),
+  test_data, poisson()
+)
+
+mvgam_7 <- fit_mvgam_cached(
+  "ar1_cor_re",
+  y ~ 1 + x + (1 + x | group), ~ AR(p = 1),
+  test_data, poisson()
+)
+
+results$test7 <- run_validation(
+  "AR(1) + correlated random effects",
+  brms_7, mvgam_7, test_data,
+  param_pairs = list(
+    c("b_Intercept", "b_Intercept", "Intercept"),
+    c("b_x", "b[1]", "b_x"),
+    c("sd_group__Intercept", "sd_1[1]", "sd_group_Int"),
+    c("sd_group__x", "sd_1[2]", "sd_group_x"),
+    c("cor_group__Intercept__x", "Lcorr_1[2,1]", "cor_group"),
+    c("ar[1]", "ar1_trend[1]", "AR(1)"),
+    c("sderr", "sigma_trend[1]", "Sigma")
+  )
+)
+
+# -----------------------------------------------------------------------------
+# Test 8: Gaussian Process (gp())
+# -----------------------------------------------------------------------------
+
+cat("\n=== Test 8: Gaussian Process (gp()) ===\n")
+
+brms_8 <- fit_brms_cached(
+  "ar1_gp",
+  y ~ 1 + gp(z, k = 5) + ar(time = time, p = 1, cov = TRUE),
+  test_data, poisson()
+)
+
+mvgam_8 <- fit_mvgam_cached(
+  "ar1_gp",
+  y ~ 1 + gp(z, k = 5), ~ AR(p = 1),
+  test_data, poisson()
+)
+
+results$test8 <- run_validation(
+  "AR(1) + Gaussian Process",
+  brms_8, mvgam_8, test_data,
+  param_pairs = list(
+    c("b_Intercept", "b_Intercept", "Intercept"),
+    c("sdgp_gpz", "sdgp_1[1]", "sdgp"),
+    c("lscale_gpz", "lscale_1[1]", "lscale"),
+    c("ar[1]", "ar1_trend[1]", "AR(1)"),
+    c("sderr", "sigma_trend[1]", "Sigma")
+  )
+)
+
 # =============================================================================
 # TREND FORMULA TESTS
 # Effects in trend_formula instead of observation formula

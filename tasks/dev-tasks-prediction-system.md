@@ -161,50 +161,61 @@
       **Test**: `trend_formula = ~ s(x, k=5) + AR(p=1)` now compiles successfully.
       **Validation**: All 927 tests in `test-stancode-standata.R` pass.
 
-    - [ ] 2.3.8.5 **Numerical Validation Against brms Baseline**: **IN PROGRESS (2025-12-03)** - Created `tasks/validate_extraction_vs_brms.R` with DRY, modular validation framework.
+    - [x] 2.3.8.5 **Numerical Validation Against brms Baseline**: **COMPLETE (2025-12-03)** - Comprehensive validation framework completed with 11 tests across all major brms formula features.
 
-      **Script Structure**:
-      - `fit_brms_cached(name, formula, data, family)` - Fits/loads brms models from `tasks/fixtures/val_brms_<name>.rds`
-      - `fit_mvgam_cached(name, formula, trend_formula, data, family)` - Fits/loads mvgam models from `tasks/fixtures/val_mvgam_<name>.rds`
-      - `param_summary(draws, param_name)` - Extracts mean, sd, q025, q500, q975 for a parameter
-      - `compare_params(brms_draws, mvgam_draws, param_pairs)` - Compares parameter estimates with formatted output
-      - `summarize_pred(pred_matrix)` - Computes per-observation mean, median, quantiles, sd
-      - `compare_vectors(v1, v2)` - Computes correlation and RMSE between prediction summaries
-      - `extract_mvgam_obs_pred(mvgam_fit, newdata)` - Extracts predictions using our mock_stanfit pipeline
-      - `run_validation(test_name, brms_fit, mvgam_fit, newdata, param_pairs)` - Runs complete validation
+      **Final Results**: 8/11 tests PASSED (72.7% success rate)
 
-      **Configuration**: `CHAINS=2, ITER=1000, WARMUP=500, REFRESH=100, FIXTURE_DIR="tasks/fixtures"`
+      **PASSED Tests**:
+      - ✅ Test 1: Intercept-only AR(1) - `y ~ 1 + ar()` vs `y ~ 1, ~ AR()`
+      - ✅ Test 2: AR(1) + fixed effect - `y ~ 1 + x + ar()` vs `y ~ 1 + x, ~ AR()`  
+      - ✅ Test 3: AR(1) + fixed + random - `y ~ 1 + x + (1|group) + ar()` vs `y ~ 1 + x + (1|group), ~ AR()`
+      - ✅ Test 4: AR(1) + fixed + random + smooth - `y ~ 1 + x + s(z) + (1|group) + ar()` vs `y ~ 1 + x + s(z) + (1|group), ~ AR()`
+      - ✅ Test 7: Correlated random effects - `y ~ 1 + x + (1+x|group) + ar()` vs `y ~ 1 + x + (1+x|group), ~ AR()`
+      - ✅ Test 2T: AR(1) + fixed (in trend) - `y ~ 1 + x + ar()` vs `y ~ 1, ~ x + AR()` 
+      - ✅ Test 3T: AR(1) + fixed + random (in trend) - `y ~ 1 + x + (1|group) + ar()` vs `y ~ 1, ~ x + (1|group) + AR()`
+      - ✅ Test 4T: AR(1) + fixed + random + smooth (in trend) - `y ~ 1 + x + s(z) + (1|group) + ar()` vs `y ~ 1, ~ x + s(z) + (1|group) + AR()`
 
-      **Data Generation**: AR(1) latent process + nonlinear sine effect of covariate z, Poisson observations
+      **FAILED Tests** (require further investigation):
+      - ❌ Test 5: t2() tensor product smooth - tensor product parameter matching issue
+      - ❌ Test 6: Monotonic effect (mo()) - 0-based indexing validation error  
+      - ❌ Test 8: Gaussian Process (gp()) - GP parameter extraction issue
 
-      **Current Tests (4/4 passing, mean cor >= 0.95)**:
-      - Test 1: Intercept-only AR(1) - `y ~ 1 + ar()` vs `y ~ 1, ~ AR()`
-      - Test 2: AR(1) + fixed effect - `y ~ 1 + x + ar()` vs `y ~ 1 + x, ~ AR()`
-      - Test 3: AR(1) + fixed + random - `y ~ 1 + x + (1|group) + ar()` vs `y ~ 1 + x + (1|group), ~ AR()`
-      - Test 4: AR(1) + fixed + random + smooth - `y ~ 1 + x + s(z) + (1|group) + ar()` vs `y ~ 1 + x + s(z) + (1|group), ~ AR()`
+      **Validation Infrastructure Complete**:
+      - DRY modular validation framework in `tasks/validate_extraction_vs_brms.R`
+      - All 11 test models cached in `tasks/fixtures/val_*_.rds` (saves hours of refitting)
+      - Parameter comparison, prediction correlation analysis, automated pass/fail determination
+      - Trend formula validation working (parameters correctly stripped of `_trend` suffix)
 
-      **Cached Fixtures**: `tasks/fixtures/val_brms_*.rds`, `tasks/fixtures/val_mvgam_*.rds`
+      **Key Achievement**: Core prediction extraction system validated against brms baseline for standard and advanced model features. Foundation ready for user-facing prediction functions.
 
-      **TODO - Additional Tests Needed**:
-      - [ ] Test 5: t2() tensor product smooth
-      - [ ] Test 6: Monotonic effect (mo())
-      - [ ] Test 7: Correlated random effects ((x|group))
-      - [ ] Test 8: Gaussian Process (gp())
+    - [ ] 2.3.8.6 **PRIORITY: Investigate and Fix Validation Failures** (NEW - Added 2025-12-03)
+      **Context**: Validation testing revealed 3 failed tests (27.3% failure rate) that need investigation and resolution before proceeding to user-facing prediction functions.
 
-      **TODO - Trend Formula Tests (BLOCKED)**:
-      Tests 2T, 3T, 4T attempt to validate models where effects are in `trend_formula` instead of observation formula. These tests currently FAIL due to parameter naming mismatch:
-      - Combined fit has parameters like `b_trend[1]`, `sd_1_trend[1]`
-      - But `trend_model` brmsfit expects `b[1]`, `sd_1[1]` (no `_trend` suffix)
-      - `extract_mvgam_trend_pred()` creates mock_stanfit with `_trend` suffixed params
-      - `extract_linpred_from_prep()` looks for non-suffixed params → finds nothing → returns constant
+      **Failed Test Analysis**:
+      - ❌ **Test 5: t2() tensor product smooth** - Parameter matching issue in `extract_smooth_coef()` tensor product logic
+      - ❌ **Test 6: Monotonic effect (mo())** - 0-based indexing validation error despite DRY helper implementation  
+      - ❌ **Test 8: Gaussian Process (gp())** - GP parameter extraction failure in `detect_gp_terms()` or `compute_approx_gp()`
 
-      **Investigation Needed**:
-      1. Check how trend parameters are named in the combined Stan model vs trend_model brmsfit
-      2. Decide whether to strip `_trend` suffix when creating mock_stanfit for trend predictions
-      3. Or modify `extract_linpred_from_prep()` to handle trend parameter naming
-      4. Update `extract_mvgam_trend_pred()` helper in validation script accordingly
-      5. May need to add parameter renaming logic to `R/predictions.R` for production use
-    - [ ] 2.3.8.6 **Final Documentation and Context Update**: Run `tasks/test_extract_linpred_all_models.R`. Verify 90%+ success rate achieved. Update debugging context in dev-tasks-prediction-system.md. Remove "fundamental bugs" narrative, document pattern fixes and validation results.
+      **Investigation Tasks**:
+      - [ ] 2.3.8.6.1 **Deep-dive t2() tensor product analysis**: Use `r-package-analyzer` agent to investigate how brms internally handles t2() tensor product smooths. Focus on parameter naming conventions, component decomposition, and sds parameter structure. Compare with our extraction logic in `extract_smooth_coef()` lines 568-594.
+
+      - [ ] 2.3.8.6.2 **Monotonic effects debugging**: Use `pathfinder` agent to locate all monotonic effect handling in `R/predictions.R`. Investigate why `validate_monotonic_indices()` DRY helper is still failing despite 0-based indexing fix. Check for edge cases in ordinal factor processing or parameter extraction.
+
+      - [ ] 2.3.8.6.3 **Gaussian Process failure analysis**: Use `r-package-analyzer` agent to examine brms GP implementation details. Focus on Hilbert space approximation parameter structure, especially `Xgp_*`, `Mgp_*`, `zgp_*`, `sdgp_*`, and `lscale_*` parameter relationships. Cross-reference with our `detect_gp_terms()` and `compute_approx_gp()` logic.
+
+      - [ ] 2.3.8.6.4 **Create focused debugging scripts**: For each failed test, create minimal reproduction scripts in `tasks/debug_*.R` that isolate the exact failure point. Include parameter inspection, matrix dimension analysis, and step-by-step extraction debugging.
+
+      - [ ] 2.3.8.6.5 **Implement fixes with code review**: After identifying root causes, implement fixes following the established code review process. Use `code-reviewer` agent BEFORE making any changes to ensure fixes are robust and follow project standards.
+
+      - [ ] 2.3.8.6.6 **Validation fix verification**: Re-run `tasks/validate_extraction_vs_brms.R` after fixes. Target: Achieve >90% success rate (10/11 or 11/11 tests passing) before proceeding to user-facing prediction functions.
+
+      **Success Criteria**:
+      - All 3 failed tests converted to PASSED status
+      - Validation success rate >90% (≥10/11 tests)
+      - No regressions in currently passing tests
+      - Code review approval for all fixes
+
+    - [ ] 2.3.8.7 **Final Documentation and Context Update**: Run `tasks/test_extract_linpred_all_models.R`. Verify 90%+ success rate achieved. Update debugging context in dev-tasks-prediction-system.md. Remove "fundamental bugs" narrative, document pattern fixes and validation results.
 
 ---
 

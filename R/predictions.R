@@ -455,6 +455,48 @@ extract_linpred_nonlinear <- function(prep, resp = NULL) {
 #' implements hierarchical prior: β_j ~ N(0, σ) for all j basis
 #' functions. R's recycling broadcasts sds across all coefficients.
 #'
+#' Validate Monotonic Effect Indices
+#'
+#' Validates that monotonic effect (mo()) indices are properly formatted
+#' and within valid range for brms models.
+#'
+#' @param xmo_data Integer vector of ordinal level indices from prep$sdata
+#' @param xmo_name Name of the monotonic design matrix (for error messages)
+#' @param k_levels Number of ordinal levels in the monotonic effect
+#' @param n_obs Expected number of observations
+#'
+#' @return Validated integer vector of monotonic indices
+#'
+#' @details
+#' brms uses 0-based indexing for monotonic effects, so valid indices
+#' range from 0 to k_levels-1.
+#'
+#' @noRd
+validate_monotonic_indices <- function(xmo_data, xmo_name, k_levels, n_obs) {
+  # Note: brms uses 0-based indexing for monotonic effects
+  checkmate::assert_integerish(xmo_data, lower = 0, any.missing = FALSE)
+  
+  Xmo <- as.integer(xmo_data)
+  
+  if (length(Xmo) != n_obs) {
+    stop(insight::format_error(
+      "Monotonic design matrix {.field {xmo_name}} has ",
+      "{length(Xmo)} elements but expected {n_obs} observations."
+    ))
+  }
+  
+  # Validate Xmo indices are within valid range (0-based)
+  if (any(Xmo < 0) || any(Xmo >= k_levels)) {
+    stop(insight::format_error(
+      "Monotonic design matrix {.field {xmo_name}} contains ",
+      "values outside valid range [0, {k_levels - 1}]. ",
+      "Found range: [{min(Xmo)}, {max(Xmo)}]."
+    ))
+  }
+  
+  Xmo
+}
+
 #' @noRd
 extract_smooth_coef <- function(draws_mat, smooth_label, resp = NULL,
                                 n_basis) {
@@ -504,24 +546,77 @@ extract_smooth_coef <- function(draws_mat, smooth_label, resp = NULL,
         ))
       }
 
-      if (length(sds_names) != 1) {
+      if (length(sds_names) == 1) {
+        # Single sds parameter - standard smooth (s)
+        # Extract sds [n_draws × 1]
+        sds_draws <- draws_mat[, sds_names, drop = FALSE]
+        
+        # Convert draws to matrices and apply brms unstandardization
+        # Following brms pattern: zs_draws * sds_draws with broadcasting
+        zs_mat <- matrix(as.numeric(zs_draws), nrow = nrow(zs_draws), 
+                        ncol = ncol(zs_draws))
+        sds_vec <- as.vector(sds_draws)  # Convert for R broadcasting
+        
+        # Unstandardize: [n_draws × n_basis] * vector[n_draws]
+        # Each column of zs multiplied by corresponding sds value per draw
+        sm_coef <- zs_mat * sds_vec
+      } else if (length(sds_names) > 1) {
+        # Multiple sds parameters - tensor product smooth (t2)
+        # t2() smooths generate numbered components (e.g., _1, _2) that
+        # correspond to individual sds parameters (e.g., sds_1[1], sds_1[2])
+        
+        # Match sds parameter to smooth component using direct construction
+        # For tensor products: smooth_label = "1_1" should match sds_1[1]
+        label_suffix <- sub(".*_", "", smooth_label)
+        checkmate::assert_string(label_suffix, min.chars = 1, 
+                                .var.name = "label_suffix")
+        
+        # Validate sds_names is not empty before accessing
+        if (length(sds_names) == 0) {
+          stop(insight::format_error(
+            "No {.field sds} parameters found for tensor product smooth ",
+            "{.val {smooth_label}}. Model may be corrupted."
+          ))
+        }
+        
+        # Extract base sds name from first available parameter
+        # Example: "sds_1[1]" -> "sds_1"
+        base_sds_name <- gsub("\\[.*$", "", sds_names[1])
+        
+        # Construct the specific sds parameter name directly
+        sds_name_specific <- paste0(base_sds_name, "[", label_suffix, "]")
+        
+        # Validate the constructed name exists
+        if (!sds_name_specific %in% colnames(draws_mat)) {
+          sds_name_specific <- character(0)  # Will trigger error below
+        } else {
+          sds_name_specific <- sds_name_specific
+        }
+        
+        if (length(sds_name_specific) == 1) {
+          # Found the matching sds for this component
+          sds_draws <- draws_mat[, sds_name_specific, drop = FALSE]
+          zs_mat <- matrix(as.numeric(zs_draws), nrow = nrow(zs_draws), 
+                          ncol = ncol(zs_draws))
+          sds_vec <- as.vector(sds_draws)
+          sm_coef <- zs_mat * sds_vec
+        } else {
+          # Cannot match component-level sds parameter
+          stop(insight::format_error(
+            "Found {length(sds_names)} {.field sds} parameters for tensor ",
+            "product smooth but couldn't match to component ",
+            "{.val {smooth_label}}. Available sds parameters: ",
+            "{.val {sds_names}}. Check smooth term configuration or ",
+            "contact maintainer."
+          ))
+        }
+      } else {
+        # No sds parameters found - already handled above
         stop(insight::format_error(
-          "Expected single {.field sds} parameter but found ",
-          "{length(sds_names)}. Check smooth term specification."
+          "Found {.field zs_*} parameters but missing ",
+          "{.field sds_*} standard deviations. Model may be corrupted."
         ))
       }
-
-      # Extract sds [n_draws × 1]
-      sds_draws <- draws_mat[, sds_names, drop = FALSE]
-
-      # Convert draws to matrices and apply brms unstandardization
-      # Following brms pattern: zs_draws * sds_draws with broadcasting
-      zs_mat <- matrix(as.numeric(zs_draws), nrow = nrow(zs_draws), ncol = ncol(zs_draws))
-      sds_vec <- as.vector(sds_draws)  # Convert to vector for R broadcasting
-      
-      # Unstandardize: [n_draws × n_basis] * vector[n_draws]
-      # Each column of zs multiplied by corresponding sds value per draw
-      sm_coef <- zs_mat * sds_vec
 
       return(sm_coef)
     }
@@ -842,21 +937,6 @@ extract_linpred_univariate <- function(prep) {
     # Extract monotonic term ID (univariate only: "1" from "Xmo_1")
     term_id <- sub("^Xmo_", "", xmo_name)
 
-    # Extract and validate ordinal level indices
-    checkmate::assert_integerish(
-      prep$sdata[[xmo_name]],
-      lower = 1,
-      any.missing = FALSE
-    )
-    Xmo <- as.integer(prep$sdata[[xmo_name]])
-
-    if (length(Xmo) != n_obs) {
-      stop(insight::format_error(
-        "Monotonic design matrix {.field {xmo_name}} has ",
-        "{length(Xmo)} elements but expected {n_obs} observations."
-      ))
-    }
-
     # Get monotonic simplex parameters
     simo_name <- paste0("simo_", term_id)
     simo_names <- grep(
@@ -878,14 +958,13 @@ extract_linpred_univariate <- function(prep) {
     )
     k_levels <- ncol(simo_draws)
 
-    # Validate Xmo indices are within valid range
-    if (any(Xmo < 1) || any(Xmo > k_levels)) {
-      stop(insight::format_error(
-        "Monotonic design matrix {.field {xmo_name}} contains ",
-        "values outside valid range [1, {k_levels}]. ",
-        "Found range: [{min(Xmo)}, {max(Xmo)}]."
-      ))
-    }
+    # Extract and validate ordinal level indices
+    Xmo <- validate_monotonic_indices(
+      prep$sdata[[xmo_name]], 
+      xmo_name, 
+      k_levels, 
+      n_obs
+    )
 
     # Compute monotonic contribution via direct indexing
     # simo_draws[, Xmo] performs column indexing: [n_draws × n_obs]
@@ -1211,21 +1290,6 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
         next
       }
 
-      # Extract and validate ordinal level indices
-      checkmate::assert_integerish(
-        prep$sdata[[xmo_name]],
-        lower = 1,
-        any.missing = FALSE
-      )
-      Xmo <- as.integer(prep$sdata[[xmo_name]])
-
-      if (length(Xmo) != n_obs) {
-        stop(insight::format_error(
-          "Monotonic design matrix {.field {xmo_name}} has ",
-          "{length(Xmo)} elements but expected {n_obs} observations."
-        ))
-      }
-
       # Get monotonic simplex parameters
       simo_name <- paste0("simo_", suffix)
       simo_names <- grep(
@@ -1247,14 +1311,13 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
       )
       k_levels <- ncol(simo_draws)
 
-      # Validate Xmo indices are within valid range
-      if (any(Xmo < 1) || any(Xmo > k_levels)) {
-        stop(insight::format_error(
-          "Monotonic design matrix {.field {xmo_name}} contains ",
-          "values outside valid range [1, {k_levels}]. ",
-          "Found range: [{min(Xmo)}, {max(Xmo)}]."
-        ))
-      }
+      # Extract and validate ordinal level indices
+      Xmo <- validate_monotonic_indices(
+        prep$sdata[[xmo_name]], 
+        xmo_name, 
+        k_levels, 
+        n_obs
+      )
 
       # Compute monotonic contribution via direct indexing
       # simo_draws[, Xmo] performs column indexing: [n_draws × n_obs]
