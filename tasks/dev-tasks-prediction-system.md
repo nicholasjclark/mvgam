@@ -116,7 +116,94 @@
     - [x] 2.3.8.2 **Fix Smooth Pattern Extraction Bug**: **COMPLETE** - Fixed `extract_smooth_coef()` with base smooth name extraction using `gsub("_\\d+$", "", smooth_label)` and R broadcasting fix (convert sds matrix to vector). Result: 76.9% success rate achieved (10/13 models). Models fit3 and fit13 now working.
     - [x] 2.3.8.3 **Fix Random Effects Parameter Extraction**: **COMPLETE (2025-12-03)** - Fixed `get_brms_re_mapping()` in `R/mock-stanfit.R` to use brms numeric parameter format `r_<group_num>_<term_num>[level]` instead of incorrect semantic format `r_groupname[level,termname]`. **Code Review**: Approved by code-reviewer agent with HIGH priority. **Testing**: Verification script confirms parameters now exist in fit. **Result**: 84.6% success rate achieved (11/13 models). Models fit6 and fit7 now passing.
     - [x] 2.3.8.4 **Fix Nonlinear dpars Generation**: **COMPLETE (2025-12-03)** - Implemented `compute_nonlinear_dpars()` helper function in `R/mock-stanfit.R` that replicates brms's `predictor.bprepnl()` logic. **Full attribution** to Paul-Christian Buerkner and brms development team in roxygen documentation. **Implementation**: (1) Detects nl models via `has_nlpars(brmsfit$formula)`, (2) Extracts nlpar names from `formula$pforms`, (3) Computes linear predictors for each nlpar using `b_nlpar %*% t(X_nlpar)`, (4) Handles both array notation (`b_nlpar[1]`) and underscore notation (`b_nlpar_coef`), (5) Maps covariates from `C_1, C_2, ...` to variable names from formula, (6) Broadcasts covariates to [ndraws × nobs] matrices, (7) Evaluates nonlinear formula using `eval()`, (8) Validates result dimensions. **Code Review**: Approved with all HIGH and MEDIUM priority issues addressed - removed tryCatch wrapper, added matrix dimension validation, fixed line lengths. **Testing**: Investigation script `tasks/test_nl_dpars_approach.R` verified approach with fit9. **Result**: 100% success rate achieved (13/13 models). fit9 now passes all validations!
-    - [ ] 2.3.8.5 **Numerical Validation Against brms Baseline**: **CRITICAL** - Create `tasks/validate_extraction_vs_brms.R` to verify our extraction produces numerically similar results to brms native functions. Test pure observation models (no trends) where direct comparison possible. Compare `extract_linpred_from_prep()` output vs `brms::posterior_linpred()` using correlation, RMSE, and element-wise differences. Target: >0.99 correlation for identical model components. Document any expected differences and their mathematical causes.
+  - [ ] **2.3.9 Stan Code Generation Bug Fixes** (NEW - Added 2025-12-03)
+    **Context**: Validation testing of trend_formula models revealed two Stan code generation bugs in `R/stan_assembly.R`. These block trend_formula validation tests (2T, 3T, 4T).
+
+    - [x] 2.3.9.1 **Fix: Fixed effects dropped when random effects present in trend_formula**
+      **Bug**: When trend_formula contains both fixed effects (`x`) and random effects (`(1|group)`), the fixed effects contribution `mu_trend += X_trend * b_trend` is missing from generated Stan code.
+      **Root Cause**: brms uses GLM likelihood functions (`normal_id_glm_lpdf`) where fixed effects `Xc * b` are passed to the GLM function rather than added explicitly to `mu`. Our mu extraction only found explicit mu assignment lines, missing the GLM-hidden fixed effects.
+      **Solution**: Added `add_glm_hidden_fixed_effects()` function in `R/mu_expression_analysis.R` (lines 115-193) that:
+        - Detects `normal_id_glm_lpdf` in trend model Stan code
+        - Parses GLM parameters to extract design matrix (`X`/`Xc`) and coefficients (`b`)
+        - Synthesizes missing `mu += X * b;` line when not already present
+        - Handles edge case where brms passes `mu` as intercept parameter (when RE present)
+      **Test Added**: `tests/testthat/test-stancode-standata.R` line 1233 verifies `mu_trend += X_trend * b_trend` is present in hierarchical ZMVN test with fixed + random effects in trend_formula.
+      **Validation**: Debug script `tasks/debug_trend_effects.R` confirms fix - test case 04 (fixed + random) now shows `mu uses Xb: YES`.
+
+    - [x] 2.3.9.2 **Fix: Data block declaration order bug for smooth terms in trend_formula**
+      **Bug**: `knots_1_trend` array is used in matrix declaration before it is declared, causing Stan compilation failure.
+      **Error**: `Semantic error: Identifier 'knots_1_trend' not in scope`
+      **Root Cause**: `extract_univariate_standata()` created stanvars in order of `names(standata)`, not in brms's dependency-correct declaration order.
+      **Solution** (2025-12-03): Added stanvar reordering in `extract_univariate_standata()` (R/stan_assembly.R lines 6615-6641) that maps each stanvar name to its declaration line index and sorts by that order.
+      **Status**: Data block ordering FIXED, but revealed secondary bug in transformed parameters (see 2.3.9.3).
+
+    - [x] 2.3.9.3 **Fix: Transformed parameters ordering bug for smooth terms in trend_formula** **COMPLETE (2025-12-03)**
+      **Bug**: `s_1_1_trend` (scaled smooth coefficients) used in mu_trend construction before declaration/computation.
+      **Error**: `Semantic error in 'string', line 40: Identifier 's_1_1_trend' not in scope`
+      **Affected**: Any smooth term in trend_formula (e.g., `~ s(x, k=5) + AR()`)
+      **Root Cause**: Two systems were competing to handle the same Stan code:
+        1. `trend_tparameters` stanvar (from brms tparameters block)
+        2. `trend_model_mu_creation` stanvar (from mu_construction extraction)
+
+        The `sort_stanvars()` function classifies stanvars by content patterns:
+        - Random effects (`r_*`) → `level0_re_declarations` (appears BEFORE mu_trend)
+        - mu_trend declaration → `level1_mu_trend`
+        - Smooth coefficients (`s_*`) → `others` (appears AFTER mu_trend - WRONG!)
+
+      **Solution**: Modified `reconstruct_mu_trend_with_renamed_vars()` in `R/stan_assembly.R` (lines 5669-5686):
+        1. Filter smooth coefficient declarations/assignments (`s_[0-9]+_[0-9]+`) from `trend_tparameters`
+        2. Include them in `trend_model_mu_creation` stanvar for correct ordering
+        3. Do NOT include random effects (`r_*`) - `sort_stanvars` already puts them before mu_trend
+        4. Pattern `^s_[0-9]+_[0-9]+$` matches all brms smooth coefficient names (verified for `s()`, `t2()`)
+
+      **Key Insight**: Only smooth coefficients need special handling. Random effects are correctly ordered by `sort_stanvars()` (`level0_re_declarations` before `level1_mu_trend`).
+
+      **Test**: `trend_formula = ~ s(x, k=5) + AR(p=1)` now compiles successfully.
+      **Validation**: All 927 tests in `test-stancode-standata.R` pass.
+
+    - [ ] 2.3.8.5 **Numerical Validation Against brms Baseline**: **IN PROGRESS (2025-12-03)** - Created `tasks/validate_extraction_vs_brms.R` with DRY, modular validation framework.
+
+      **Script Structure**:
+      - `fit_brms_cached(name, formula, data, family)` - Fits/loads brms models from `tasks/fixtures/val_brms_<name>.rds`
+      - `fit_mvgam_cached(name, formula, trend_formula, data, family)` - Fits/loads mvgam models from `tasks/fixtures/val_mvgam_<name>.rds`
+      - `param_summary(draws, param_name)` - Extracts mean, sd, q025, q500, q975 for a parameter
+      - `compare_params(brms_draws, mvgam_draws, param_pairs)` - Compares parameter estimates with formatted output
+      - `summarize_pred(pred_matrix)` - Computes per-observation mean, median, quantiles, sd
+      - `compare_vectors(v1, v2)` - Computes correlation and RMSE between prediction summaries
+      - `extract_mvgam_obs_pred(mvgam_fit, newdata)` - Extracts predictions using our mock_stanfit pipeline
+      - `run_validation(test_name, brms_fit, mvgam_fit, newdata, param_pairs)` - Runs complete validation
+
+      **Configuration**: `CHAINS=2, ITER=1000, WARMUP=500, REFRESH=100, FIXTURE_DIR="tasks/fixtures"`
+
+      **Data Generation**: AR(1) latent process + nonlinear sine effect of covariate z, Poisson observations
+
+      **Current Tests (4/4 passing, mean cor >= 0.95)**:
+      - Test 1: Intercept-only AR(1) - `y ~ 1 + ar()` vs `y ~ 1, ~ AR()`
+      - Test 2: AR(1) + fixed effect - `y ~ 1 + x + ar()` vs `y ~ 1 + x, ~ AR()`
+      - Test 3: AR(1) + fixed + random - `y ~ 1 + x + (1|group) + ar()` vs `y ~ 1 + x + (1|group), ~ AR()`
+      - Test 4: AR(1) + fixed + random + smooth - `y ~ 1 + x + s(z) + (1|group) + ar()` vs `y ~ 1 + x + s(z) + (1|group), ~ AR()`
+
+      **Cached Fixtures**: `tasks/fixtures/val_brms_*.rds`, `tasks/fixtures/val_mvgam_*.rds`
+
+      **TODO - Additional Tests Needed**:
+      - [ ] Test 5: t2() tensor product smooth
+      - [ ] Test 6: Monotonic effect (mo())
+      - [ ] Test 7: Correlated random effects ((x|group))
+      - [ ] Test 8: Gaussian Process (gp())
+
+      **TODO - Trend Formula Tests (BLOCKED)**:
+      Tests 2T, 3T, 4T attempt to validate models where effects are in `trend_formula` instead of observation formula. These tests currently FAIL due to parameter naming mismatch:
+      - Combined fit has parameters like `b_trend[1]`, `sd_1_trend[1]`
+      - But `trend_model` brmsfit expects `b[1]`, `sd_1[1]` (no `_trend` suffix)
+      - `extract_mvgam_trend_pred()` creates mock_stanfit with `_trend` suffixed params
+      - `extract_linpred_from_prep()` looks for non-suffixed params → finds nothing → returns constant
+
+      **Investigation Needed**:
+      1. Check how trend parameters are named in the combined Stan model vs trend_model brmsfit
+      2. Decide whether to strip `_trend` suffix when creating mock_stanfit for trend predictions
+      3. Or modify `extract_linpred_from_prep()` to handle trend parameter naming
+      4. Update `extract_mvgam_trend_pred()` helper in validation script accordingly
+      5. May need to add parameter renaming logic to `R/predictions.R` for production use
     - [ ] 2.3.8.6 **Final Documentation and Context Update**: Run `tasks/test_extract_linpred_all_models.R`. Verify 90%+ success rate achieved. Update debugging context in dev-tasks-prediction-system.md. Remove "fundamental bugs" narrative, document pattern fixes and validation results.
 
 ---

@@ -5158,8 +5158,16 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
       )
       mapping <- tparams_result$mapping  # Update mapping
 
+      # Filter smooth coefficients - handled in mu_creation stanvar for correct ordering
+      tparams_lines <- strsplit(tparams_result$code, "\n")[[1]]
+      decl_pattern <- "^\\s*vector\\s*\\[.*\\]\\s+s_[0-9]+_[0-9]+_trend\\s*;"
+      assign_pattern <- "^\\s*s_[0-9]+_[0-9]+_trend\\s*="
+      keep_lines <- !grepl(decl_pattern, tparams_lines) &
+                    !grepl(assign_pattern, tparams_lines)
+      filtered_tparams_code <- paste(tparams_lines[keep_lines], collapse = "\n")
+
       stanvar_list[["trend_tparameters"]] <- brms::stanvar(
-        scode = tparams_result$code,
+        scode = filtered_tparams_code,
         block = "tparameters"
       )
     }
@@ -5234,7 +5242,6 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
         time_param = time_param
       )
 
-      # Create stanvar from mu_trend Construction System output
       stanvar_list[["trend_model_mu_creation"]] <- brms::stanvar(
         scode = paste(mu_trend_code_lines, collapse = "\n"),
         block = "tparameters"
@@ -5504,8 +5511,8 @@ find_variable_declarations <- function(stancode, referenced_vars,
       return()
     }
 
-    # Search for current variable's declaration across all Stan blocks
-    found_declaration <- NULL
+    # Search for current variable's declaration and assignment across all blocks
+    all_matches <- character(0)
     for (block_name in blocks_to_search) {
       block_content <- extract_stan_block_content(stancode, block_name)
 
@@ -5519,35 +5526,46 @@ find_variable_declarations <- function(stancode, referenced_vars,
       lines <- lines[nchar(lines) > 0]
 
       # Create regex pattern for this variable
-      # Matches: type[dims] variable_name = expression; or type[dims] variable_name;
-      var_pattern <- paste0("^\\s*(real|int|vector|matrix|array).*?\\b",
-                           gsub("([.^$*+?{}\\[\\]()\\\\|])", "\\\\\\1", var_name),
-                           "\\b.*?[;=]")
+      # brms generates smooth coefficients as two separate statements:
+      # 1. Declaration without assignment: vector[knots_1[1]] s_1_1;
+      # 2. Assignment in model block: s_1_1 = sds_1[1] * zs_1_1;
+      # Standard declaration pattern misses (2), causing ordering errors
+      escaped_var <- gsub("([.^$*+?{}\\[\\]()\\\\|])", "\\\\\\1", var_name)
+      decl_pattern <- paste0(
+        "(real|int|vector|matrix|array).*?\\b", escaped_var, "\\b.*?[;=]"
+      )
+      # Standalone assignment: var_name = expression; (anchored to line start)
+      assign_pattern <- paste0(escaped_var, "\\s*=\\s*[^;]+;")
+      var_pattern <- paste0("^\\s*(", decl_pattern, "|", assign_pattern, ")")
 
       matches <- grep(var_pattern, lines, value = TRUE, perl = TRUE)
       if (length(matches) > 0) {
-        found_declaration <- matches[1]  # Take first match
-        break  # Found in this block, no need to search other blocks
+        # Collect all matches from this block
+        all_matches <- c(all_matches, matches)
       }
     }
 
     # Mark as processed before processing dependencies (prevents cycles)
     already_searched <<- c(already_searched, var_name)
 
-    # If declaration found, process its dependencies FIRST (depth-first)
-    if (!is.null(found_declaration)) {
-      # RECURSIVE STEP: Extract and process dependencies first
-      dependencies <- extract_dependencies_from_declaration(found_declaration)
+    # If any matches found, process dependencies and add all matches
+    if (length(all_matches) > 0) {
+      # RECURSIVE STEP: Extract and process dependencies from all matches
+      dependencies <- character(0)
+      for (match in all_matches) {
+        match_deps <- extract_dependencies_from_declaration(match)
+        dependencies <- unique(c(dependencies, match_deps))
+      }
 
-      # Process each dependency recursively before adding this declaration
+      # Process each dependency recursively before adding declarations
       for (dep_var in dependencies) {
         if (!dep_var %in% already_searched) {
           process_variable(dep_var)
         }
       }
 
-      # Now add this declaration after all its dependencies are processed
-      all_declarations <<- c(all_declarations, found_declaration)
+      # Add all matches (declaration and assignment) in order found
+      all_declarations <<- c(all_declarations, all_matches)
     }
   }
 
@@ -5603,7 +5621,7 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
 
   # Filter and rename supporting declarations - only include computed variables from model block
   renamed_supporting_decls <- character(0)
-  
+
   # Create local copy of mapping to avoid side effects
   local_mapping <- variable_mapping
   
@@ -5614,7 +5632,28 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
 
     # Only include computed variables (GP, splines, random effects, etc.) - NOT data/parameter declarations
     # Use registry-aware checking to prevent duplicates
-    if (should_include_in_transformed_parameters(decl)) {
+    include <- should_include_in_transformed_parameters(decl)
+
+    # Include smooth coefficient declarations with split declaration+assignment pattern
+    # brms generates: vector[k] s_1_1; followed by s_1_1 = sds_1[1] * zs_1_1;
+    # These need to be in mu_creation for correct ordering because sort_stanvars
+    # puts them in "others" category which appears AFTER mu_trend.
+    # Random effects (r_*) are NOT included here - sort_stanvars classifies them
+    # to level0_re_declarations which appears BEFORE mu_trend.
+    if (!include && !grepl("=", decl) &&
+        grepl("^\\s*(vector|matrix|real|int|array)", decl)) {
+      var_match <- regmatches(decl, regexec("([a-zA-Z_][a-zA-Z0-9_]*)\\s*;", decl))[[1]]
+      if (length(var_match) > 1) {
+        var_name <- var_match[2]
+        # Only include smooth coefficients (s_N_N pattern from brms)
+        if (grepl("^s_[0-9]+_[0-9]+$", var_name)) {
+          assign_pattern <- paste0("^\\s*", var_name, "\\s*=")
+          include <- any(grepl(assign_pattern, supporting_declarations))
+        }
+      }
+    }
+
+    if (include) {
       # Extract the variable being declared (if this is a declaration with assignment)
       # Pattern: type[dims] var_name = expression
       decl_pattern <- "\\b(?:vector|matrix|real|int|array)\\s*(?:\\[[^\\]]*\\])*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*="
@@ -6609,6 +6648,34 @@ extract_univariate_standata <- function(standata, suffix, mapping, n_time = NULL
       }
 
       stanvar_list[[renamed_data_name]] <- do.call(brms::stanvar, stanvar_args)
+    }
+  }
+
+  # Reorder stanvars to match brms declaration order
+
+  # This prevents Stan compilation errors where variables are used before
+  # being declared (e.g., knots_1_trend used in matrix dimension before
+  # its own declaration)
+  if (!is.null(declaration_lines) && length(stanvar_list) > 1) {
+    # Map each stanvar name to its declaration line index
+    name_to_line_idx <- vapply(names(stanvar_list), function(nm) {
+      for (i in seq_along(declaration_lines)) {
+        if (grepl(paste0("\\b", nm, "\\b"), declaration_lines[i])) {
+          return(i)
+        }
+      }
+      return(NA_integer_)
+    }, integer(1))
+
+    # Sort stanvar names by their declaration line order
+    has_decl <- !is.na(name_to_line_idx)
+    if (any(has_decl)) {
+      sorted_names <- names(stanvar_list)[has_decl]
+      sorted_names <- sorted_names[order(name_to_line_idx[has_decl])]
+
+      # Reorder list (any unmatched names preserved at end as safety)
+      unmatched <- names(stanvar_list)[!has_decl]
+      stanvar_list <- stanvar_list[c(sorted_names, unmatched)]
     }
   }
 

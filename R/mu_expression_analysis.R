@@ -28,7 +28,12 @@ extract_mu_construction_with_classification <- function(stancode) {
   if (length(mu_lines) == 0) {
     return(create_empty_mu_result())
   }
-  
+
+  # Handle GLM-hidden fixed effects: when brms uses GLM likelihood functions,
+  # fixed effects (Xc * b) are passed to the GLM function rather than added
+  # to mu. We need to add explicit mu += Xc * b when this pattern is detected.
+  mu_lines <- add_glm_hidden_fixed_effects(mu_lines, stancode)
+
   # Classify each mu expression structurally
   classified_expressions <- classify_mu_expressions_structurally(mu_lines, stancode)
   
@@ -45,8 +50,10 @@ extract_mu_construction_with_classification <- function(stancode) {
   
   # Store classification metadata for downstream use
   attr(mu_lines, "classification") <- classified_expressions
-  attr(mu_lines, "execution_plan") <- build_execution_dependency_plan(classified_expressions)
-  
+  attr(mu_lines, "execution_plan") <- build_execution_dependency_plan(
+    classified_expressions
+  )
+
   return(list(
     mu_construction = mu_lines,
     supporting_declarations = supporting_declarations,
@@ -71,21 +78,103 @@ create_empty_mu_result <- function() {
 #' @noRd
 extract_mu_assignment_lines <- function(model_block) {
   checkmate::assert_string(model_block)
-  
+
   # Split into lines and clean
   lines <- strsplit(model_block, "\n")[[1]]
   lines <- trimws(lines)
   lines <- lines[nchar(lines) > 0]
-  
+
   # Find lines that modify mu (assignment or addition)
   mu_pattern <- "\\bmu\\s*(\\[|\\+|=)"
   mu_lines <- lines[grepl(mu_pattern, lines, perl = TRUE)]
-  
+
   # Filter out likelihood calls (normal_lpdf, etc.)
   likelihood_pattern <- "_lpdf\\s*\\("
   mu_lines <- mu_lines[!grepl(likelihood_pattern, mu_lines)]
-  
+
   return(mu_lines)
+}
+
+#' Add GLM-Hidden Fixed Effects to Mu Lines
+#'
+#' When brms uses GLM likelihood functions (e.g., normal_id_glm_lpdf),
+#' fixed effects (Xc * b) are passed as function parameters rather than
+#' added explicitly to mu. This function synthesizes the missing mu lines
+#' for extraction completeness.
+#'
+#' Trend models use Gaussian likelihood, so this function only detects
+#' normal_id_glm_lpdf patterns in trend_formula contexts.
+#'
+#' @param mu_lines Character vector of existing mu assignment lines
+#' @param stancode Character string containing complete Stan model code
+#'
+#' @return Character vector with augmented mu lines including GLM-hidden
+#'   effects
+#' @noRd
+add_glm_hidden_fixed_effects <- function(mu_lines, stancode) {
+  checkmate::assert_character(mu_lines)
+  checkmate::assert_string(stancode)
+
+  # Detect GLM usage from complete Stan code
+  glm_detected <- detect_glm_usage(stancode)
+  if (length(glm_detected) == 0 || !"normal_id_glm" %in% glm_detected) {
+    return(mu_lines)
+  }
+
+  # Parse GLM parameters from stancode
+  params <- parse_glm_parameters_single(stancode, "normal_id_glm")
+  if (is.null(params)) {
+    return(mu_lines)
+  }
+
+  # Check if we have design matrix and coefficients (fixed effects)
+  has_design <- !is.null(params$design_matrix) && nchar(params$design_matrix) > 0
+  has_coef <- !is.null(params$coefficients) && nchar(params$coefficients) > 0
+  if (!has_design || !has_coef) {
+    return(mu_lines)
+  }
+
+  # Check if fixed effects already present in mu_lines
+  fixed_effects_pattern <- paste0(
+    "\\bmu\\s*\\+=\\s*",
+    params$design_matrix,
+    "\\s*\\*\\s*",
+    params$coefficients,
+    "\\b"
+  )
+  if (any(grepl(fixed_effects_pattern, mu_lines, perl = TRUE))) {
+    return(mu_lines)
+  }
+
+  # Synthesize missing lines
+  synthesized_lines <- character(0)
+
+  # Add intercept if present, non-empty, non-zero, not "mu", and not in mu_lines
+  # When brms has random effects, it passes "mu" as the intercept parameter
+  # to the GLM function, so we skip adding "mu += mu;" which would be circular
+  has_intercept <- !is.null(params$intercept) &&
+    nchar(params$intercept) > 0 &&
+    !params$intercept %in% c("0", "0.0", "0.00", "mu")
+
+  if (has_intercept) {
+    intercept_pattern <- paste0(
+      "\\bmu\\s*\\+=\\s*", params$intercept, "\\s*;"
+    )
+    if (!any(grepl(intercept_pattern, mu_lines, perl = TRUE))) {
+      synthesized_lines <- c(
+        synthesized_lines,
+        paste0("mu += ", params$intercept, ";")
+      )
+    }
+  }
+
+  # Add fixed effects line
+  synthesized_lines <- c(
+    synthesized_lines,
+    paste0("mu += ", params$design_matrix, " * ", params$coefficients, ";")
+  )
+
+  return(c(mu_lines, synthesized_lines))
 }
 
 #' Classify mu expressions by structural features  

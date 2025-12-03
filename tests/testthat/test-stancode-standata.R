@@ -1227,6 +1227,11 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   # Universal trend computation pattern should still be present
   expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
 
+  # mu_trend must include fixed effects (X_trend * b_trend) when trend_formula
+  # has both fixed effects and random effects. This validates the fix for
+  # GLM-hidden fixed effects where brms passes Xc*b to normal_id_glm_lpdf.
+  expect_true(stan_pattern("mu_trend \\+= X_trend \\* b_trend", code_with_trend))
+
   # Hierarchical correlation priors with _trend suffix
   expect_true(stan_pattern("L_Omega_global_trend ~ lkj_corr_cholesky\\(1\\);", code_with_trend))
   expect_true(stan_pattern("for \\(g_idx in 1:N_groups_trend\\) \\{ L_deviation_group_trend\\[g_idx\\] ~ lkj_corr_cholesky\\(6\\); \\}", code_with_trend))
@@ -1748,6 +1753,28 @@ test_that("stancode generates correct Stan blocks", {
 
   # Generated Stan code should compile without errors
   expect_no_error(stancode(mf, data = data, family = poisson(), validate = TRUE))
+})
+
+test_that("stancode handles smooth terms in trend_formula with correct declaration order", {
+  # Verifies fix for declaration ordering bug where knots_1_trend was used
+
+  # before declaration, causing: "Identifier 'knots_1_trend' not in scope"
+  data <- setup_stan_test_data()$univariate
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ s(x, k = 5) + AR(p = 1))
+
+  # Should compile without "Identifier not in scope" errors
+  code <- stancode(mf, data = data, family = poisson(), validate = TRUE)
+
+  # Verify smooth-related declarations are present
+  expect_true(stan_pattern("int nb_1_trend", code))
+  expect_true(stan_pattern("array\\[nb_1_trend\\] int knots_1_trend", code))
+  expect_true(stan_pattern("Zs_1_1_trend", code))
+
+  # Verify declaration order: knots must appear before Zs (which uses it)
+  code_lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
+  knots_line <- which(grepl("knots_1_trend", code_lines))[1]
+  zs_line <- which(grepl("Zs_1_1_trend", code_lines))[1]
+  expect_true(knots_line < zs_line)
 })
 
 test_that("stancode handles multivariate specifications with shared RW trend and offset", {
