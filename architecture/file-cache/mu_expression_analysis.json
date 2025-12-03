@@ -6,6 +6,7 @@
                       "extract_mu_construction_with_classification",
                       "create_empty_mu_result",
                       "extract_mu_assignment_lines",
+                      "add_glm_hidden_fixed_effects",
                       "classify_mu_expressions_structurally",
                       "create_analysis_context",
                       "extract_declared_functions",
@@ -34,6 +35,7 @@
 
                               },
     "function_signatures":  {
+                                "calculate_variable_complexity":  "calculate_variable_complexity \u003c- function(identifiers) {",
                                 "calculate_bracket_nesting_depth":  "calculate_bracket_nesting_depth \u003c- function(expr) {",
                                 "analyze_assignment_type":  "analyze_assignment_type \u003c- function(expr) {",
                                 "build_execution_dependency_plan":  "build_execution_dependency_plan \u003c- function(classified_expressions) {",
@@ -50,13 +52,13 @@
                                 "analyze_indexing_patterns_comprehensive":  "analyze_indexing_patterns_comprehensive \u003c- function(expr) {",
                                 "classify_mu_expressions_structurally":  "classify_mu_expressions_structurally \u003c- function(mu_lines, stancode) {",
                                 "extract_expression_variables_comprehensive":  "extract_expression_variables_comprehensive \u003c- function(expr, features, context) {",
-                                "extract_declared_functions":  "extract_declared_functions \u003c- function(functions_block) {",
+                                "add_glm_hidden_fixed_effects":  "add_glm_hidden_fixed_effects \u003c- function(mu_lines, stancode) {",
                                 "analyze_function_usage":  "analyze_function_usage \u003c- function(expr, context) {",
                                 "analyze_mathematical_operations_comprehensive":  "analyze_mathematical_operations_comprehensive \u003c- function(expr) {",
                                 "extract_comprehensive_variable_references":  "extract_comprehensive_variable_references \u003c- function(classified_expressions, stancode) {",
                                 "check_loop_requirement":  "check_loop_requirement \u003c- function(features, expr_type) {",
                                 "normalize_mu_expression":  "normalize_mu_expression \u003c- function(expr) {",
-                                "calculate_variable_complexity":  "calculate_variable_complexity \u003c- function(identifiers) {",
+                                "extract_declared_functions":  "extract_declared_functions \u003c- function(functions_block) {",
                                 "extract_mu_construction_with_classification":  "extract_mu_construction_with_classification \u003c- function(stancode) {",
                                 "create_analysis_context":  "create_analysis_context \u003c- function(stancode) {"
                             },

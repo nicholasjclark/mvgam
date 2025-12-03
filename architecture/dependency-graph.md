@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-12-03 10:44:21  
+**Generated:** 2025-12-03 16:40:35  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 60
-- **Total Functions:** 527
+- **Total Functions:** 528
 - **Exported Functions:** 57
-- **Internal Functions:** 484
+- **Internal Functions:** 485
 - **S3 Methods:** 41
 - **S3 Classes:** 31
 
@@ -107,8 +107,8 @@
   - Calls: AR, deduplicate_stan_functions, detect_shared_trends, extract_response_names, extract_trend_stanvars_from_setup, generate_base_brms_standata, generate_base_stancode_with_stanvars, inject_multivariate_trends_into_linear_predictors, inject_trend_into_linear_predictor, is_multivariate_trend_specs, RW, sort_stanvars, validate_stan_code
 - **mvgam_single()** (`R/mvgam_core.R`) - 9 dependencies
   - Calls: compile_model, create_mvgam_from_combined_fit, fit_model, generate_stan_components_mvgam_formula, mvgam_formula, parse_model, validate_opencl, validate_silent, validate_threads
-- **extract_mu_construction_with_classification()** (`R/mu_expression_analysis.R`) - 7 dependencies
-  - Calls: build_execution_dependency_plan, classify_mu_expressions_structurally, create_empty_mu_result, extract_comprehensive_variable_references, extract_mu_assignment_lines, extract_stan_block_content, find_variable_declarations
+- **extract_mu_construction_with_classification()** (`R/mu_expression_analysis.R`) - 8 dependencies
+  - Calls: add_glm_hidden_fixed_effects, build_execution_dependency_plan, classify_mu_expressions_structurally, create_empty_mu_result, extract_comprehensive_variable_references, extract_mu_assignment_lines, extract_stan_block_content, find_variable_declarations
 - **parse_multivariate_trends()** (`R/brms_integration.R`) - 7 dependencies
   - Calls: cache_formula_latent_params, create_trend_base_formula, extract_response_names, extract_response_trends, is_multivariate_formula, parse_trend_formula, validate_trend_formula_brms
 - **setup_brms_lightweight()** (`R/brms_integration.R`) - 7 dependencies
@@ -183,10 +183,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: analyze_stan, create_response_mapping, inject_trends_into_glm_calls, build_mu_with_trend_effects, to_injection, build_coefficient_addition_code, inject_trend_effects_linear, detect_glm_patterns, classify_mu_patterns, determine_glm_preservation (+ 21 more)
 - **`R/priors.R`** (28 functions) - Prior specification
   - Key functions: mvgam_formula, get_prior, extract_trend_priors, generate_trend_priors, generate_trend_priors_from_monitor_params, create_trend_parameter_prior, get_default_trend_parameter_prior, get_all_mvgam_trend_parameters, remove_trend_suffix_from_priors, build_ar_prior_spec, extract_prior_string, map_trend_priors, get_trend_parameter_prior, get_prior.default, get_prior.formula (+ 13 more)
+- **`R/mu_expression_analysis.R`** (26 functions)
+  - Key functions: extract_mu_construction_with_classification, add_glm_hidden_fixed_effects, classify_mu_expressions_structurally, create_analysis_context, classify_single_mu_expression_structurally, analyze_expression_structure, analyze_indexing_patterns_comprehensive, analyze_mathematical_operations_comprehensive, analyze_variable_relationships_comprehensive, determine_expression_type, extract_expression_variables_comprehensive, extract_comprehensive_variable_references, create_empty_mu_result, check_loop_requirement, build_execution_dependency_plan (+ 11 more)
 - **`R/backends.R`** (26 functions)
   - Key functions: is.stanfit, is.brmsthreads, validate_threads, is.brmsopencl, validate_opencl, validate_silent, repair_stanfit, is.mvgam, nlist, parse_model (+ 16 more)
-- **`R/mu_expression_analysis.R`** (25 functions)
-  - Key functions: extract_mu_construction_with_classification, classify_mu_expressions_structurally, create_analysis_context, classify_single_mu_expression_structurally, analyze_expression_structure, analyze_indexing_patterns_comprehensive, analyze_mathematical_operations_comprehensive, analyze_variable_relationships_comprehensive, determine_expression_type, extract_expression_variables_comprehensive, extract_comprehensive_variable_references, create_empty_mu_result, check_loop_requirement, build_execution_dependency_plan (+ 11 more)
 - **`R/monotonic.R`** (5 functions)
   - Key functions: smooth.construct.moi.smooth.spec, smooth.construct.mod.smooth.spec, Predict.matrix.moi.smooth, Predict.matrix.mod.smooth, add_mono_model_file
 - **`R/ensemble.R`** (4 functions)
@@ -347,9 +347,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 
 ### `R/plot.mvgam.R` (1 potentially unused):
 - **plottable()** (internal, never called)
-
-### `R/predictions.R` (1 potentially unused):
-- **extract_linpred_from_prep()** (internal, never called)
 
 ### `R/print.mvgam.R` (1 potentially unused):
 - **print_model_specification_simple()** (internal, never called)
