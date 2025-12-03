@@ -93,9 +93,13 @@ get_brms_re_mapping <- function(brmsfit_object) {
     
     # Construct design matrix name (brms internal convention)
     z_name <- paste0("Z_", group_idx, "_", term_idx)
-    
-    # Construct parameter names (brms semantic convention)
-    param_names <- paste0("r_", group_name, "[", 1:n_levels, ",", term_name, "]")
+
+    # Construct parameter names (brms numeric convention)
+    # brms stores parameters as r_<group_num>_<term_num>[level], not semantic
+    # names
+    param_names <- paste0(
+      "r_", group_idx, "_", term_idx, "[", 1:n_levels, "]"
+    )
     
     # Store mapping
     mapping[[z_name]] <- param_names
@@ -360,5 +364,189 @@ prepare_predictions.mock_stanfit <- function(object,
     class = c("brmsprep", "mvgam_prep")
   )
 
+  # Generate dpars component for nonlinear formula models
+  if (has_nlpars(brmsfit$formula)) {
+    prep$dpars <- compute_nonlinear_dpars(prep, brmsfit$formula)
+  }
+
   return(prep)
+}
+
+
+#' Compute dpars for Nonlinear Formula Models
+#'
+#' Replicates brms's predictor.bprepnl() logic to evaluate
+#'   nonlinear formulas and generate dpars$mu for prediction.
+#'   Handles nlpar extraction, covariate mapping, and formula
+#'   evaluation.
+#'
+#' @param prep A brmsprep object from prepare_predictions.mock_stanfit()
+#' @param formula A brmsformula object with nonlinear specification
+#'
+#' @return List with $mu component (matrix [ndraws × nobs])
+#'
+#' @details
+#' Nonlinear models use parameter formulas (pforms) to define
+#'   nonlinear parameters (nlpars), then evaluate an expression
+#'   combining these nlpars and covariates. This function:
+#'   1. Extracts nlpar names from formula$pforms
+#'   2. Computes linear predictors for each nlpar
+#'   3. Extracts and maps covariates from standata
+#'   4. Evaluates the nonlinear formula expression
+#'
+#' @section Attribution:
+#' This implementation replicates the logic from brms's
+#'   predictor.bprepnl() and get_nlpar() functions.
+#'   Full credit to Paul-Christian Buerkner and the brms
+#'   development team for the original implementation.
+#'   See: https://github.com/paul-buerkner/brms
+#'
+#' @noRd
+compute_nonlinear_dpars <- function(prep, formula) {
+  # Validate inputs
+  checkmate::assert_class(prep, "brmsprep")
+  checkmate::assert_class(formula, "brmsformula")
+
+  if (is.null(formula$pforms) || length(formula$pforms) == 0) {
+    stop(insight::format_error(
+      "Nonlinear formula must have {.field pforms} component."
+    ))
+  }
+
+  # Extract nlpar names and formula expression
+  nlpar_names <- names(formula$pforms)
+  nlform_expr <- formula$formula[[3]]
+
+  # Compute linear predictor for each nlpar
+  eta_nlpars <- list()
+
+  for (nlp in nlpar_names) {
+    # Get design matrix
+    x_name <- paste0("X_", nlp)
+    if (!x_name %in% names(prep$sdata)) {
+      stop(insight::format_error(
+        "Missing design matrix {.field {x_name}} for nlpar ",
+        "{.val {nlp}}."
+      ))
+    }
+
+    X_nlpar <- prep$sdata[[x_name]]
+
+    # Get coefficient parameters (use array notation for nl models)
+    # Array pattern: b_nlpar[1], b_nlpar[2], ...
+    # Underscore pattern: b_nlpar_coef1, b_nlpar_coef2, ...
+    array_pattern <- paste0("^b_", nlp, "\\[")
+    underscore_pattern <- paste0("^b_", nlp, "_")
+
+    array_params <- grep(
+      array_pattern,
+      colnames(prep$draws),
+      value = TRUE
+    )
+    underscore_params <- grep(
+      underscore_pattern,
+      colnames(prep$draws),
+      value = TRUE
+    )
+
+    matching_params <- c(array_params, underscore_params)
+
+    if (length(matching_params) == 0) {
+      stop(insight::format_error(
+        "No coefficients found for nlpar {.val {nlp}}. ",
+        "Expected parameters matching {.val {array_pattern}} or ",
+        "{.val {underscore_pattern}}."
+      ))
+    }
+
+    b_nlpar <- prep$draws[, matching_params, drop = FALSE]
+
+    # Validate dimensions
+    if (ncol(b_nlpar) != ncol(X_nlpar)) {
+      stop(insight::format_error(
+        "Dimension mismatch for nlpar {.val {nlp}}: ",
+        "design matrix has {ncol(X_nlpar)} columns but ",
+        "found {ncol(b_nlpar)} coefficient parameters."
+      ))
+    }
+
+    # Compute linear predictor: b %*% t(X)
+    eta_nlpars[[nlp]] <- b_nlpar %*% t(X_nlpar)
+  }
+
+  # Extract covariates from standata
+  covariates <- list()
+  c_vars <- grep("^C_", names(prep$sdata), value = TRUE)
+
+  if (length(c_vars) > 0) {
+    # Extract covariate variable names from formula
+    all_vars <- all.vars(formula$formula)
+    response_var <- as.character(formula$formula[[2]])
+    covariate_names <- setdiff(all_vars, c(response_var, nlpar_names))
+
+    if (length(covariate_names) != length(c_vars)) {
+      stop(insight::format_error(
+        "Covariate mismatch: formula has ",
+        "{length(covariate_names)} covariate(s) but standata has ",
+        "{length(c_vars)} C_* entries."
+      ))
+    }
+
+    # Map C_1, C_2, etc. to actual variable names
+    for (i in seq_along(c_vars)) {
+      cov_data <- prep$sdata[[c_vars[i]]]
+      cov_name <- covariate_names[i]
+
+      # Broadcast covariate across draws to [ndraws × nobs] matrix
+      if (is.matrix(cov_data)) {
+        # Already a matrix - validate dimensions
+        if (nrow(cov_data) != prep$nobs) {
+          stop(insight::format_error(
+            "Covariate {.field {cov_name}} has {nrow(cov_data)} ",
+            "rows but expected {prep$nobs} observations."
+          ))
+        }
+        covariates[[cov_name]] <- cov_data
+      } else if (is.array(cov_data) && length(dim(cov_data)) == 1) {
+        # Vector - broadcast to matrix
+        n_draws <- nrow(prep$draws)
+        covariates[[cov_name]] <- matrix(
+          cov_data,
+          nrow = n_draws,
+          ncol = length(cov_data),
+          byrow = TRUE
+        )
+      } else {
+        # Scalar or other type - attempt coercion
+        covariates[[cov_name]] <- cov_data
+      }
+    }
+  }
+
+  # Build args list for formula evaluation
+  args <- c(eta_nlpars, covariates)
+
+  # Evaluate nonlinear formula
+  mu <- eval(nlform_expr, envir = args)
+
+  # Validate result dimensions
+  if (!is.matrix(mu)) {
+    mu <- as.matrix(mu)
+  }
+
+  if (nrow(mu) != nrow(prep$draws)) {
+    stop(insight::format_error(
+      "Formula evaluation produced {nrow(mu)} rows but expected ",
+      "{nrow(prep$draws)} draws."
+    ))
+  }
+
+  if (ncol(mu) != prep$nobs) {
+    stop(insight::format_error(
+      "Formula evaluation produced {ncol(mu)} columns but ",
+      "expected {prep$nobs} observations."
+    ))
+  }
+
+  return(list(mu = mu))
 }
