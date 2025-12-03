@@ -12,18 +12,20 @@
                       "get_brms_re_mapping",
                       "create_mock_stanfit",
                       "as_draws_matrix.mock_stanfit",
-                      "prepare_predictions.mock_stanfit"
+                      "prepare_predictions.mock_stanfit",
+                      "compute_nonlinear_dpars"
                   ],
     "purpose":  "Model fitting",
     "function_dependencies":  {
 
                               },
     "function_signatures":  {
-                                "as_draws_matrix.mock_stanfit":  "as_draws_matrix.mock_stanfit \u003c- function(x, ...) {",
-                                "get_brms_re_mapping":  "get_brms_re_mapping \u003c- function(brmsfit_object) {",
-                                "create_mock_stanfit":  "create_mock_stanfit \u003c- function(draws_matrix) {",
                                 "prepare_predictions.mock_stanfit":  "prepare_predictions.mock_stanfit \u003c- function(object, brmsfit, newdata = NULL, re_formula = NULL, allow_new_levels = FALSE, sample_new_levels = \"uncertainty\", ...) {",
-                                "get_safe_dummy_value":  "get_safe_dummy_value \u003c- function(family_obj) {"
+                                "get_safe_dummy_value":  "get_safe_dummy_value \u003c- function(family_obj) {",
+                                "as_draws_matrix.mock_stanfit":  "as_draws_matrix.mock_stanfit \u003c- function(x, ...) {",
+                                "compute_nonlinear_dpars":  "compute_nonlinear_dpars \u003c- function(prep, formula) {",
+                                "create_mock_stanfit":  "create_mock_stanfit \u003c- function(draws_matrix) {",
+                                "get_brms_re_mapping":  "get_brms_re_mapping \u003c- function(brmsfit_object) {"
                             },
     "file":  "R/mock-stanfit.R"
 }

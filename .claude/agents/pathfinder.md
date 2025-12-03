@@ -2,7 +2,7 @@
 name: pathfinder
 description: Deploy PROACTIVELY to find specific functions in large R files and understand their dependencies before making edits. Use for locating functions by name/pattern, assessing edit safety, understanding function relationships, or planning code moves. Provides precise locations with immediate dependency context.
 color: cyan
-model: haiku 4.5
+model: claude-haiku-4-5-20251001
 ---
 
 # R Function Locator & Dependency Mapper

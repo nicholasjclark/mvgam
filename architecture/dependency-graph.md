@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-12-03 08:34:39  
+**Generated:** 2025-12-03 10:44:21  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 60
-- **Total Functions:** 526
+- **Total Functions:** 527
 - **Exported Functions:** 57
-- **Internal Functions:** 483
+- **Internal Functions:** 484
 - **S3 Methods:** 41
 - **S3 Classes:** 31
 
@@ -234,8 +234,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: should_trend_formula_have_intercept, setup_brms_lightweight, extract_prior_from_setup, parse_multivariate_trends, is_multivariate_formula, extract_response_names, extract_mvbind_responses, extract_response_trends, handle_nonlinear_model, extract_nonlinear_components, parse_nonlinear_manually, extract_brmsterms_from_setup, create_trend_base_formula, determine_trend_injection_point (+ 3 more)
 - **`R/stan_polish.R`** (11 functions) - Stan model integration
   - Key functions: polish_generated_stan_code, try_stanheaders_formatting, update_stan_header, reorganize_lprior_statements, clean_stan_comments, fix_blank_lines, add_targeted_comments, insert_comment_before_line, reorganize_target_statements, find_matching_closing_brace (+ 1 more)
-- **`R/mock-stanfit.R`** (5 functions) - Model fitting
-  - Key functions: get_brms_re_mapping, create_mock_stanfit, as_draws_matrix.mock_stanfit, prepare_predictions.mock_stanfit, get_safe_dummy_value
+- **`R/mock-stanfit.R`** (6 functions) - Model fitting
+  - Key functions: get_brms_re_mapping, create_mock_stanfit, as_draws_matrix.mock_stanfit, prepare_predictions.mock_stanfit, get_safe_dummy_value, compute_nonlinear_dpars
 - **`R/make_stan.R`** (3 functions) - Stan model integration
   - Key functions: generate_stan_components_mvgam_formula, stancode.mvgam_formula, standata.mvgam_formula
 
@@ -535,6 +535,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 
 ### `R/mock-stanfit.R`:
 - **as_draws_matrix.mock_stanfit()** (internal)
+- **compute_nonlinear_dpars()** (internal)
 - **create_mock_stanfit()** (internal)
 - **get_brms_re_mapping()** (internal)
 - **get_safe_dummy_value()** (internal)

@@ -1,7 +1,7 @@
 ---
 description: Commit and push all current changes
 allowed-tools: Bash(git checkout --branch:*), Bash(git add:*), Bash(git status:*), Bash(git push:*), Bash(git commit:*), Bash(gh pr create:*)
-model: haiku 4.5
+model: claude-haiku-4-5-20251001
 ---
 
 - Commit and push ALL changes in the project, following the explicit guidelines in CLAUDE.md. 

@@ -51,9 +51,10 @@ get_safe_dummy_value <- function(family_obj) {
 }
 
 #' Extract Random Effects Parameter Mapping from brms Object
-#' 
-#' Creates a mapping from design matrix names (Z_<id>_<id>) to actual
-#' parameter names (r_<group>[<level>,<term>]) using brms ranef structure.
+#'
+#' Creates a mapping from design matrix names to parameter names using
+#'   brms ranef structure. Maps Z_1_1 style names to r_1[level,term]
+#'   style parameter patterns.
 #'
 #' @param brmsfit_object A fitted brms model
 #' 
@@ -224,18 +225,21 @@ as_draws_matrix.mock_stanfit <- function(x, ...) {
 #'   predictions. Compatible with downstream mvgam prediction functions.
 #'
 #' @details
-#' This method implements the prepare_predictions interface for mock_stanfit
-#' objects, enabling mvgam to use brms prediction infrastructure with
-#' parameter subsets extracted from combined Stan fits.
+#' This method implements the prepare_predictions interface for
+#'   mock_stanfit objects, enabling mvgam to use brms prediction
+#'   infrastructure with parameter subsets extracted from combined
+#'   Stan fits.
 #'
-#' The function leverages brms::make_standata() to generate design matrices
-#' for fixed effects, random effects, smooths, GPs, and other special terms.
-#' This ensures compatibility with all brms formula features without manual
-#' reimplementation.
+#' The function leverages brms::standata() to generate design matrices
+#'   for fixed effects, random effects, smooths, GPs, and other special
+#'   terms. This ensures compatibility with all brms formula features.
 #'
-#' The returned brmsprep object contains all metadata needed for computing
-#' linear predictors, applying inverse link functions, and generating
-#' posterior predictive samples.
+#' For nonlinear formula models (nl = TRUE), this method automatically
+#'   calls compute_nonlinear_dpars() to evaluate the nonlinear
+#'   expression and add dpars$mu to the returned prep object.
+#'
+#' The returned brmsprep object contains all metadata needed for
+#'   computing linear predictors via extract_linpred_from_prep().
 #'
 #' @method prepare_predictions mock_stanfit
 #' @export
@@ -382,13 +386,18 @@ prepare_predictions.mock_stanfit <- function(object,
 #'
 #' @param prep A brmsprep object from prepare_predictions.mock_stanfit()
 #' @param formula A brmsformula object with nonlinear specification
+#'   (nl = TRUE)
 #'
 #' @return List with $mu component (matrix [ndraws × nobs])
 #'
 #' @details
-#' Nonlinear models use parameter formulas (pforms) to define
-#'   nonlinear parameters (nlpars), then evaluate an expression
-#'   combining these nlpars and covariates. This function:
+#' Nonlinear formulas specify R expressions combining nonlinear
+#'   parameters (nlpars) and covariates. Example:
+#'   `bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE)`
+#'   where b1 and b2 are nlpars with parameter formulas (both
+#'   intercept-only here).
+#'
+#' This function:
 #'   1. Extracts nlpar names from formula$pforms
 #'   2. Computes linear predictors for each nlpar
 #'   3. Extracts and maps covariates from standata

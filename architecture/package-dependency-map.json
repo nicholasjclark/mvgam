@@ -206,13 +206,18 @@
                                                                       "h"
                                                                   ]
                                                 },
-                              "as_draws_matrix.mock_stanfit":  {
-                                                                   "s3_class":  "mock_stanfit",
-                                                                   "s3_method":  "as_draws_matrix",
-                                                                   "signature":  "as_draws_matrix.mock_stanfit \u003c- function(x, ...) {",
-                                                                   "is_s3_method":  true,
-                                                                   "arguments":  "x"
-                                                               },
+                              "generate_base_stancode_with_stanvars":  {
+                                                                           "s3_class":  "",
+                                                                           "s3_method":  "",
+                                                                           "signature":  "generate_base_stancode_with_stanvars \u003c- function(obs_setup, trend_stanvars, backend = \"rstan\", silent = 1) {",
+                                                                           "is_s3_method":  false,
+                                                                           "arguments":  [
+                                                                                             "obs_setup",
+                                                                                             "trend_stanvars",
+                                                                                             "backend",
+                                                                                             "silent"
+                                                                                         ]
+                                                                       },
                               "filter_car_forecast_params":  {
                                                                  "s3_class":  "",
                                                                  "s3_method":  "",
@@ -676,16 +681,13 @@
                                           "is_s3_method":  false,
                                           "arguments":  "object"
                                       },
-                              "build_mu_with_trend_effects":  {
-                                                                  "s3_class":  "",
-                                                                  "s3_method":  "",
-                                                                  "signature":  "build_mu_with_trend_effects \u003c- function(glm_params, trend_injection_code) {",
-                                                                  "is_s3_method":  false,
-                                                                  "arguments":  [
-                                                                                    "glm_params",
-                                                                                    "trend_injection_code"
-                                                                                ]
-                                                              },
+                              "residual_cor":  {
+                                                   "s3_class":  "",
+                                                   "s3_method":  "",
+                                                   "signature":  "residual_cor \u003c- function(object, ...) {",
+                                                   "is_s3_method":  false,
+                                                   "arguments":  "object"
+                                               },
                               "add_targeted_comments":  {
                                                             "s3_class":  "",
                                                             "s3_method":  "",
@@ -1083,17 +1085,6 @@
                                                               "is_s3_method":  false,
                                                               "arguments":  null
                                                           },
-                              "transform_glm_call":  {
-                                                         "s3_class":  "",
-                                                         "s3_method":  "",
-                                                         "signature":  "transform_glm_call \u003c- function(stan_code, glm_type, params) {",
-                                                         "is_s3_method":  false,
-                                                         "arguments":  [
-                                                                           "stan_code",
-                                                                           "glm_type",
-                                                                           "params"
-                                                                       ]
-                                                     },
                               "summary.mvgam_pooled":  {
                                                            "s3_class":  "mvgam_pooled",
                                                            "s3_method":  "summary",
@@ -2606,6 +2597,16 @@
                                                "is_s3_method":  false,
                                                "arguments":  "object"
                                            },
+                              "compute_nonlinear_dpars":  {
+                                                              "s3_class":  "",
+                                                              "s3_method":  "",
+                                                              "signature":  "compute_nonlinear_dpars \u003c- function(prep, formula) {",
+                                                              "is_s3_method":  false,
+                                                              "arguments":  [
+                                                                                "prep",
+                                                                                "formula"
+                                                                            ]
+                                                          },
                               "filter_rw_forecast_params":  {
                                                                 "s3_class":  "",
                                                                 "s3_method":  "",
@@ -2849,6 +2850,13 @@
                                                "is_s3_method":  true,
                                                "arguments":  "x"
                                            },
+                              "as_draws_matrix.mock_stanfit":  {
+                                                                   "s3_class":  "mock_stanfit",
+                                                                   "s3_method":  "as_draws_matrix",
+                                                                   "signature":  "as_draws_matrix.mock_stanfit \u003c- function(x, ...) {",
+                                                                   "is_s3_method":  true,
+                                                                   "arguments":  "x"
+                                                               },
                               "generate_times_trend_matrices":  {
                                                                     "s3_class":  "",
                                                                     "s3_method":  "",
@@ -3332,18 +3340,16 @@
                                                                          "ylab"
                                                                      ]
                                                    },
-                              "generate_base_stancode_with_stanvars":  {
-                                                                           "s3_class":  "",
-                                                                           "s3_method":  "",
-                                                                           "signature":  "generate_base_stancode_with_stanvars \u003c- function(obs_setup, trend_stanvars, backend = \"rstan\", silent = 1) {",
-                                                                           "is_s3_method":  false,
-                                                                           "arguments":  [
-                                                                                             "obs_setup",
-                                                                                             "trend_stanvars",
-                                                                                             "backend",
-                                                                                             "silent"
-                                                                                         ]
-                                                                       },
+                              "build_mu_with_trend_effects":  {
+                                                                  "s3_class":  "",
+                                                                  "s3_method":  "",
+                                                                  "signature":  "build_mu_with_trend_effects \u003c- function(glm_params, trend_injection_code) {",
+                                                                  "is_s3_method":  false,
+                                                                  "arguments":  [
+                                                                                    "glm_params",
+                                                                                    "trend_injection_code"
+                                                                                ]
+                                                              },
                               "compile_model":  {
                                                     "s3_class":  "",
                                                     "s3_method":  "",
@@ -4734,13 +4740,17 @@
                                                              "n_lv"
                                                          ]
                                        },
-                              "residual_cor":  {
-                                                   "s3_class":  "",
-                                                   "s3_method":  "",
-                                                   "signature":  "residual_cor \u003c- function(object, ...) {",
-                                                   "is_s3_method":  false,
-                                                   "arguments":  "object"
-                                               },
+                              "transform_glm_call":  {
+                                                         "s3_class":  "",
+                                                         "s3_method":  "",
+                                                         "signature":  "transform_glm_call \u003c- function(stan_code, glm_type, params) {",
+                                                         "is_s3_method":  false,
+                                                         "arguments":  [
+                                                                           "stan_code",
+                                                                           "glm_type",
+                                                                           "params"
+                                                                       ]
+                                                     },
                               "filter_trend_priors":  {
                                                           "s3_class":  "",
                                                           "s3_method":  "",
@@ -5466,7 +5476,8 @@
                                                  "get_brms_re_mapping",
                                                  "create_mock_stanfit",
                                                  "as_draws_matrix.mock_stanfit",
-                                                 "prepare_predictions.mock_stanfit"
+                                                 "prepare_predictions.mock_stanfit",
+                                                 "compute_nonlinear_dpars"
                                              ],
                         "R/lv_correlations.R":  [
                                                     "lv_correlations"
@@ -6170,6 +6181,7 @@
                       "ordinate":  "R/ordinate.jsdgam.R",
                       "extract_mcmc_info":  "R/print.mvgam.R",
                       "is_trend_term":  "R/validations.R",
+                      "compute_nonlinear_dpars":  "R/mock-stanfit.R",
                       "filter_rw_forecast_params":  "R/trend_system.R",
                       "random_Sigma":  "R/sim_mvgam.R",
                       "extract_and_rename_stan_blocks":  "R/stan_assembly.R",
@@ -6518,7 +6530,7 @@
                                      "match_family_pars":  "R/summary.mvgam.R",
                                      "use_threading":  "R/backends.R",
                                      "is_like_factor":  "R/ppc.mvgam.R",
-                                     "extract_time_series_dimensions":  "R/validations.R",
+                                     "print_model_specification_simple":  "R/print.mvgam.R",
                                      "process_trend_params":  "R/trend_system.R",
                                      "extract_trend_component_info":  "R/mvgam_core.R",
                                      "add_hierarchical_support":  "R/stan_assembly.R",
@@ -6645,6 +6657,7 @@
                                      "parse_trend_formula":  "R/trend_system.R",
                                      "plot.mvgam_residcor":  "R/mvgam_residcor-class.R",
                                      "ordinate":  "R/ordinate.jsdgam.R",
+                                     "compute_nonlinear_dpars":  "R/mock-stanfit.R",
                                      "filter_rw_forecast_params":  "R/trend_system.R",
                                      "random_Sigma":  "R/sim_mvgam.R",
                                      "extract_and_rename_stan_blocks":  "R/stan_assembly.R",
@@ -6711,6 +6724,7 @@
                                      "ensemble":  "R/ensemble.R",
                                      "smooth.construct.mod.smooth.spec":  "R/monotonic.R",
                                      "plot.mvgam_irf":  "R/mvgam_irf-class.R",
+                                     "extract_time_series_dimensions":  "R/validations.R",
                                      "extract_parameters_by_type":  "R/index-mvgam.R",
                                      "validate_stan_code_structure":  "R/validations.R",
                                      "validate_threads":  "R/backends.R",
@@ -6838,7 +6852,6 @@
                                      "reorganize_target_statements":  "R/stan_polish.R",
                                      "extract_and_validate_trend_components":  "R/validations.R",
                                      "extract_stan_block_content":  "R/stan_assembly.R",
-                                     "print_model_specification_simple":  "R/print.mvgam.R",
                                      "sum_rows":  "R/lfo_cv.mvgam.R",
                                      "rw_trend_properties":  "R/trend_system.R",
                                      "validate_mvgam_trend":  "R/validations.R",
@@ -6961,6 +6974,7 @@
                                 "find_matching_closing_brace":  "find_matching_closing_brace \u003c- function(lines, start_line) {",
                                 "apply_response_suffix_to_stanvars":  "apply_response_suffix_to_stanvars \u003c- function(stanvars, response_suffix) {",
                                 "validate_factor_levels":  "validate_factor_levels \u003c- function(data, var_name, data_name = \"data\", auto_drop = FALSE) {",
+                                "parse_base_formula_safe":  "parse_base_formula_safe \u003c- function(trend_formula, trend_terms) {",
                                 "validate_grouping_arguments":  "validate_grouping_arguments \u003c- function(gr, subgr) {",
                                 "var_phi":  "var_phi \u003c- function(x, h = 10) {",
                                 "remove_mvgam_variables":  "remove_mvgam_variables \u003c- function(data) {",
@@ -7142,7 +7156,6 @@
                                 "fit_multiple_imputation_models":  "fit_multiple_imputation_models \u003c- function(formula, trend_formula, data_list, backend, ...) {",
                                 "are_braces_balanced":  "are_braces_balanced \u003c- function(stan_code) {",
                                 "validate_opencl":  "validate_opencl \u003c- function(opencl) {",
-                                "build_mu_with_trend_effects":  "build_mu_with_trend_effects \u003c- function(glm_params, trend_injection_code) {",
                                 "samp_noinf":  "samp_noinf = function(x) {",
                                 "to_conversion":  "to_conversion \u003c- function(state) {",
                                 "extract_random_effects_contribution":  "extract_random_effects_contribution \u003c- function(prep, draws_mat, n_draws, n_obs) {",
@@ -7178,6 +7191,7 @@
                                 "ordinate":  "ordinate \u003c- function(object, ...) {",
                                 "extract_mcmc_info":  "extract_mcmc_info \u003c- function(mvgam_obj) {",
                                 "is_trend_term":  "is_trend_term \u003c- function(expr, trend_patterns) {",
+                                "compute_nonlinear_dpars":  "compute_nonlinear_dpars \u003c- function(prep, formula) {",
                                 "filter_rw_forecast_params":  "filter_rw_forecast_params \u003c- function(monitor_params, trend_spec) {",
                                 "random_Sigma":  "random_Sigma = function(N) {",
                                 "extract_and_rename_stan_blocks":  "extract_and_rename_stan_blocks \u003c- function(stancode, suffix, mapping, is_multivariate, response_names, standata = NULL) {",
@@ -7253,7 +7267,7 @@
                                 "extract_mvbind_responses":  "extract_mvbind_responses \u003c- function(formula) {",
                                 "plot_mvgam_trend":  "plot_mvgam_trend = function( object, series = 1, newdata, data_test, realisations = FALSE, n_realisations = 15, n_cores = 1, derivatives = FALSE, xlab, ylab ) {",
                                 "generate_monitor_params":  "generate_monitor_params \u003c- function(trend_spec) {",
-                                "generate_base_stancode_with_stanvars":  "generate_base_stancode_with_stanvars \u003c- function(obs_setup, trend_stanvars, backend = \"rstan\", silent = 1) {",
+                                "build_mu_with_trend_effects":  "build_mu_with_trend_effects \u003c- function(glm_params, trend_injection_code) {",
                                 "compile_model":  "compile_model \u003c- function(model, backend, ...) {",
                                 "parse_glm_parameters_from_line":  "parse_glm_parameters_from_line \u003c- function(glm_line, glm_type) {",
                                 "extract_mvgam_components":  "extract_mvgam_components \u003c- function(combined_fit, obs_setup, trend_setup, mv_spec) {",
@@ -7383,7 +7397,7 @@
                                 "generate_ar_trend_stanvars":  "generate_ar_trend_stanvars \u003c- function(trend_specs, data_info, prior = NULL) {",
                                 "get_ar_parameter_prior":  "get_ar_parameter_prior \u003c- function(param_name, trend_obj) {",
                                 "var_psi":  "var_psi \u003c- function(x, h = 10) {",
-                                "parse_base_formula_safe":  "parse_base_formula_safe \u003c- function(trend_formula, trend_terms) {",
+                                "generate_base_stancode_with_stanvars":  "generate_base_stancode_with_stanvars \u003c- function(obs_setup, trend_stanvars, backend = \"rstan\", silent = 1) {",
                                 "stancode.mvgam_prefit":  "stancode.mvgam_prefit \u003c- function(object, ...) {",
                                 "extract_mu_construction_with_classification":  "extract_mu_construction_with_classification \u003c- function(stancode) {",
                                 "validate_factor_compatibility":  "validate_factor_compatibility \u003c- function(trend_spec) {",
@@ -8313,22 +8327,22 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-12-03 08:34:39",
+                     "generated":  "2025-12-03 10:44:21",
                      "commit_hash":  "pending",
-                     "cached_files":  0,
+                     "cached_files":  59,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
-                     "total_functions":  526,
+                     "total_functions":  527,
                      "exported_functions":  57,
                      "s3_methods_count":  41,
                      "s3_classes_count":  31,
                      "dynamic_references":  38,
                      "package_name":  "mvgam",
                      "potentially_unused_functions":  38,
-                     "changed_files":  60,
+                     "changed_files":  1,
                      "total_files":  60,
-                     "zero_dependency_functions":  438
+                     "zero_dependency_functions":  439
                  },
     "dependencies":  {
 

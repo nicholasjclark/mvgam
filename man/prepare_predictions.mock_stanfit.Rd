@@ -47,16 +47,19 @@ and prediction metadata using brmsfit formula and family information
 without requiring a full Stan fit object.
 }
 \details{
-This method implements the prepare_predictions interface for mock_stanfit
-objects, enabling mvgam to use brms prediction infrastructure with
-parameter subsets extracted from combined Stan fits.
+This method implements the prepare_predictions interface for
+mock_stanfit objects, enabling mvgam to use brms prediction
+infrastructure with parameter subsets extracted from combined
+Stan fits.
 
-The function leverages brms::make_standata() to generate design matrices
-for fixed effects, random effects, smooths, GPs, and other special terms.
-This ensures compatibility with all brms formula features without manual
-reimplementation.
+The function leverages brms::standata() to generate design matrices
+for fixed effects, random effects, smooths, GPs, and other special
+terms. This ensures compatibility with all brms formula features.
 
-The returned brmsprep object contains all metadata needed for computing
-linear predictors, applying inverse link functions, and generating
-posterior predictive samples.
+For nonlinear formula models (nl = TRUE), this method automatically
+calls compute_nonlinear_dpars() to evaluate the nonlinear
+expression and add dpars$mu to the returned prep object.
+
+The returned brmsprep object contains all metadata needed for
+computing linear predictors via extract_linpred_from_prep().
 }
