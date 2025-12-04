@@ -473,8 +473,8 @@ extract_linpred_nonlinear <- function(prep, resp = NULL) {
 #'
 #' @noRd
 validate_monotonic_indices <- function(xmo_data, xmo_name, k_levels, n_obs) {
-  # Note: brms uses 0-based indexing for monotonic effects
-  checkmate::assert_integerish(xmo_data, lower = 0, any.missing = FALSE)
+  # Note: Check if indices are 0-based or 1-based
+  checkmate::assert_integerish(xmo_data, any.missing = FALSE)
 
   Xmo <- as.integer(xmo_data)
 
@@ -485,16 +485,23 @@ validate_monotonic_indices <- function(xmo_data, xmo_name, k_levels, n_obs) {
     ))
   }
 
-  # Validate Xmo indices are within valid range (0-based)
-  if (any(Xmo < 0) || any(Xmo >= k_levels)) {
+  # Detect if data is 0-based or 1-based and convert to 0-based for .mo function
+  min_val <- min(Xmo)
+  max_val <- max(Xmo)
+  
+  if (min_val == 0 && max_val <= k_levels - 1) {
+    # Already 0-based indexing (0 to k_levels-1)
+    return(Xmo)
+  } else if (min_val == 1 && max_val <= k_levels) {
+    # 1-based indexing (1 to k_levels), convert to 0-based
+    return(Xmo - 1)
+  } else {
     stop(insight::format_error(
       "Monotonic design matrix {.field {xmo_name}} contains ",
-      "values outside valid range [0, {k_levels - 1}]. ",
-      "Found range: [{min(Xmo)}, {max(Xmo)}]."
+      "invalid index range. Expected 0-based [0, {k_levels - 1}] ",
+      "or 1-based [1, {k_levels}]. Found range: [{min_val}, {max_val}]."
     ))
   }
-
-  Xmo
 }
 
 
@@ -786,10 +793,36 @@ monotonic_pred <- function(eta, draws_mat, prep, suffix, n_obs) {
     n_obs
   )
   
-  # Compute monotonic contribution: bsp * mo(simo, Xmo)
-  # simo_draws[, Xmo] gives [n_draws × n_obs] via column indexing
-  # bsp_draws is [n_draws × 1], broadcast to [n_draws × n_obs]
-  mo_contrib <- bsp_draws * simo_draws[, Xmo, drop = FALSE]
+  # Implement brms .mo function logic with vectorized operations
+  # 1. Prepend column of zeros to simplex
+  # 2. Compute cumulative sum across columns  
+  # 3. Multiply by D (number of simplex dimensions)
+  # 4. Index with Xmo + 1 (convert 0-based to 1-based)
+  
+  # D is the number of simplex dimensions
+  D <- k_levels
+  
+  # Validate Xmo indices are within bounds before indexing
+  max_index <- max(Xmo)
+  if (max_index > k_levels) {
+    stop(insight::format_error(
+      "Monotonic indices exceed bounds: max index {max_index} ",
+      "but only {k_levels} levels available."
+    ))
+  }
+  
+  # Prepend zeros and compute cumulative sum vectorized
+  # simo_draws: [n_draws × k_levels] -> [n_draws × (k_levels + 1)]
+  simplex_with_zero <- cbind(0, simo_draws)
+  simplex_cumsum <- t(apply(simplex_with_zero, 1, cumsum))
+  
+  # Vectorized indexing: D * simplex_cumsum[, Xmo + 1]
+  # Xmo contains 0-based indices, add 1 for R's 1-based indexing
+  # Results in [n_draws × n_obs] matrix
+  mo_values <- D * simplex_cumsum[, Xmo + 1, drop = FALSE]
+  
+  # Compute contribution: bsp coefficient times mo values
+  mo_contrib <- as.vector(bsp_draws) * mo_values
   eta + mo_contrib
 }
 

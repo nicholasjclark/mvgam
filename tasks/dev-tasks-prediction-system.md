@@ -128,19 +128,20 @@
         - Synthesizes missing `mu += X * b;` line when not already present
         - Handles edge case where brms passes `mu` as intercept parameter (when RE present)
 
-    - [ ] 2.3.9.2 **URGENT: Fix monotonic effects implementation to match brms .mo function**
-      **Bug**: Current monotonic prediction `bsp * simo_draws[, Xmo]` does not match brms implementation. Missing cumulative sum logic and D multiplier from brms's `.mo` function.
-      **Root Cause**: Our implementation is incomplete. brms `.mo` function does:
-        1. `cbind(0, simplex)` - prepend 0 to simplex
-        2. `for (i in seq_cols(simplex)[-1]) simplex[, i] <- simplex[, i] + simplex[, i - 1]` - cumulative sum
-        3. `D * simplex[, X + 1]` - multiply by D (ncol) and index with X+1 (0-based to 1-based)
-      **Investigation Plan**: 
-        - Create debug script with cat statements to trace monotonic predictions vs brms
-        - Use r-package-analyzer to understand complete brms monotonic prediction pathway
-        - Compare our `monotonic_pred()` output with brms `posterior_linpred()` for mo() terms
-        - Focus on brms source: `.mo <- function(simplex, X) { ... }` implementation
-      **Implementation**: Fix `monotonic_pred()` in `R/predictions.R` to implement exact brms logic
-      **Testing**: Validate against brms baseline with mo() models to ensure exact match
+    - [x] 2.3.9.2 **URGENT: Fix monotonic effects implementation to match brms .mo function** **COMPLETE (2025-12-04)**
+      **Bug**: Current monotonic prediction `bsp * simo_draws[, Xmo]` did not match brms implementation. Missing cumulative sum logic, D multiplier, and parameter extraction.
+      **Root Cause**: Multiple issues identified and fixed:
+        1. **Parameter extraction**: `simo_` parameters were not extracted by `categorize_mvgam_parameters()`
+        2. **Cumulative sum logic**: Missing from `.mo` function implementation
+        3. **Index handling**: Needed to handle both 0-based and 1-based indexing
+        4. **Validation data**: Test script generated incompatible factor levels
+      **Solutions Implemented**:
+        1. **Fixed parameter extraction** in `R/index-mvgam.R` (line 141): Added `simo_` pattern to `obs_beta_pattern` regex
+        2. **Fixed .mo function** in `R/predictions.R` (lines 789-819): Implemented exact brms logic with cumulative sum and D multiplier
+        3. **Fixed index validation** in `R/predictions.R` (lines 475-505): Auto-detects and converts 1-based to 0-based indexing
+        4. **Fixed validation script** in `tasks/validate_extraction_vs_brms.R`: Use training data subset for monotonic test
+      **Testing Results**: ✅ **VALIDATION PASSED** - Perfect correlation (1.0000) on all prediction metrics. Overall success rate: 10/11 tests (90.9%)
+      **Status**: Monotonic effects implementation complete and validated
 
     - [x] 2.3.9.3 **Fix: Data block declaration order bug for smooth terms in trend_formula**
       **Test Added**: `tests/testthat/test-stancode-standata.R` line 1233 verifies `mu_trend += X_trend * b_trend` is present in hierarchical ZMVN test with fixed + random effects in trend_formula.
@@ -177,7 +178,7 @@
 
     - [x] 2.3.8.5 **Numerical Validation Against brms Baseline**: **COMPLETE (2025-12-03)** - Comprehensive validation framework completed with 11 tests across all major brms formula features.
 
-      **Final Results**: 9/11 tests PASSED (81.8% success rate) **UPDATED 2025-12-04**
+      **Final Results**: 10/11 tests PASSED (90.9% success rate) **UPDATED 2025-12-04**
 
       **PASSED Tests**:
       - ✅ Test 1: Intercept-only AR(1) - `y ~ 1 + ar()` vs `y ~ 1, ~ AR()`
@@ -185,14 +186,14 @@
       - ✅ Test 3: AR(1) + fixed + random - `y ~ 1 + x + (1|group) + ar()` vs `y ~ 1 + x + (1|group), ~ AR()`
       - ✅ Test 4: AR(1) + fixed + random + smooth - `y ~ 1 + x + s(z) + (1|group) + ar()` vs `y ~ 1 + x + s(z) + (1|group), ~ AR()`
       - ✅ **Test 5: t2() tensor product smooth** - **FIXED 2025-12-04** - bs[*] parameter extraction and smooth fixed effects implementation
+      - ✅ **Test 6: Monotonic effect (mo())** - **FIXED 2025-12-04** - simo parameter extraction, cumulative sum logic, and index handling implementation
       - ✅ Test 7: Correlated random effects - `y ~ 1 + x + (1+x|group) + ar()` vs `y ~ 1 + x + (1+x|group), ~ AR()`
       - ✅ Test 2T: AR(1) + fixed (in trend) - `y ~ 1 + x + ar()` vs `y ~ 1, ~ x + AR()` 
       - ✅ Test 3T: AR(1) + fixed + random (in trend) - `y ~ 1 + x + (1|group) + ar()` vs `y ~ 1, ~ x + (1|group) + AR()`
       - ✅ Test 4T: AR(1) + fixed + random + smooth (in trend) - `y ~ 1 + x + s(z) + (1|group) + ar()` vs `y ~ 1, ~ x + s(z) + (1|group) + AR()`
 
       **REMAINING FAILED Tests** (require further investigation):
-      - ❌ Test 6: Monotonic effect (mo()) - 0-based indexing validation error  
-      - ❌ Test 8: Gaussian Process (gp()) - GP parameter extraction issue
+      - ❌ Test 8: Gaussian Process (gp()) - GP parameter extraction issue (`lscale` parameter not extracted)
 
       **Validation Infrastructure Complete**:
       - DRY modular validation framework in `tasks/validate_extraction_vs_brms.R`

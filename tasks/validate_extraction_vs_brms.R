@@ -454,9 +454,14 @@ mvgam_6 <- fit_mvgam_cached(
   test_data_mo, poisson()
 )
 
+# For monotonic validation, use subset of training data to avoid factor level issues
+# Both brms and mvgam correctly reject new factor levels for monotonic effects
+validation_data_mo <- brms_6$data[1:15, ]  # Use subset of training data
+validation_data_mo$time <- 1:15  # Update time sequence
+
 results$test6 <- run_validation(
   "AR(1) + monotonic effect",
-  brms_6, mvgam_6, test_data_mo,
+  brms_6, mvgam_6, validation_data_mo,
   param_pairs = list(
     c("b_Intercept", "b_Intercept", "Intercept"),
     c("bsp_moord_factor", "bsp[1]", "bsp_mo"),

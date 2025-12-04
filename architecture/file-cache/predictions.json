@@ -4,13 +4,15 @@
                    },
     "functions":  [
                       "detect_gp_terms",
-                      "compute_approx_gp",
+                      "approx_gp_pred",
                       "has_nlpars",
                       "extract_linpred_nonlinear",
                       "validate_monotonic_indices",
-                      "extract_smooth_coef",
                       "extract_linpred_from_prep",
-                      "extract_random_effects_contribution",
+                      "population_random_pred",
+                      "smooth_fixed_pred",
+                      "monotonic_pred",
+                      "smooth_random_pred",
                       "extract_linpred_univariate",
                       "extract_linpred_multivariate"
                   ],
@@ -19,16 +21,18 @@
 
                               },
     "function_signatures":  {
-                                "extract_random_effects_contribution":  "extract_random_effects_contribution \u003c- function(prep, draws_mat, n_draws, n_obs) {",
+                                "approx_gp_pred":  "approx_gp_pred \u003c- function(Xgp, Mgp, zgp, sdgp, lscale) {",
                                 "extract_linpred_from_prep":  "extract_linpred_from_prep \u003c- function(prep, resp = NULL) {",
                                 "extract_linpred_univariate":  "extract_linpred_univariate \u003c- function(prep) {",
+                                "smooth_random_pred":  "smooth_random_pred \u003c- function(eta, draws_mat, prep, resp_prefix) {",
+                                "population_random_pred":  "population_random_pred \u003c- function(prep, draws_mat, n_draws, n_obs) {",
+                                "monotonic_pred":  "monotonic_pred \u003c- function(eta, draws_mat, prep, suffix, n_obs) {",
                                 "extract_linpred_multivariate":  "extract_linpred_multivariate \u003c- function(prep, resp = NULL) {",
-                                "extract_smooth_coef":  "extract_smooth_coef \u003c- function(draws_mat, smooth_label, resp = NULL, n_basis) {",
-                                "compute_approx_gp":  "compute_approx_gp \u003c- function(Xgp, Mgp, zgp, sdgp, lscale) {",
                                 "detect_gp_terms":  "detect_gp_terms \u003c- function(prep) {",
                                 "extract_linpred_nonlinear":  "extract_linpred_nonlinear \u003c- function(prep, resp = NULL) {",
                                 "has_nlpars":  "has_nlpars \u003c- function(object) {",
-                                "validate_monotonic_indices":  "validate_monotonic_indices \u003c- function(xmo_data, xmo_name, k_levels, n_obs) {"
+                                "validate_monotonic_indices":  "validate_monotonic_indices \u003c- function(xmo_data, xmo_name, k_levels, n_obs) {",
+                                "smooth_fixed_pred":  "smooth_fixed_pred \u003c- function(eta, draws_mat, prep) {"
                             },
     "file":  "R/predictions.R"
 }

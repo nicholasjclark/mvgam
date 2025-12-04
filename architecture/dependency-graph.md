@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-12-04 08:27:26  
+**Generated:** 2025-12-04 16:07:26  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 60
-- **Total Functions:** 529
+- **Total Functions:** 531
 - **Exported Functions:** 57
-- **Internal Functions:** 486
+- **Internal Functions:** 488
 - **S3 Methods:** 41
 - **S3 Classes:** 31
 
@@ -222,8 +222,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/mvgam-class.R`** (0 functions) - Class definitions and methods
 
 ### S3 Methods Files
-- **`R/predictions.R`** (10 functions) - Prediction methods
-  - Key functions: validate_monotonic_indicesdetect_gp_terms compute_approx_gp has_nlpars extract_linpred_nonlinear extract_smooth_coef extract_linpred_from_prep extract_random_effects_contribution extract_linpred_univariate extract_linpred_multivariate (+ 9 more)
+- **`R/predictions.R`** (12 functions) - Prediction methods
+  - Key functions: validate_monotonic_indicesdetect_gp_terms approx_gp_pred has_nlpars extract_linpred_nonlinear extract_linpred_from_prep population_random_pred smooth_fixed_pred monotonic_pred smooth_random_pred (+ 11 more)
 - **`R/add_residuals.R`** (2 functions) - Residual analysis
   - Key functions: add_residualsadd_residuals.mvgam (+ 1 more)
 
@@ -639,15 +639,17 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **ppc.mvgam()** (internal)
 
 ### `R/predictions.R`:
-- **compute_approx_gp()** (internal)
+- **approx_gp_pred()** (internal)
 - **detect_gp_terms()** (internal)
 - **extract_linpred_from_prep()** (internal)
 - **extract_linpred_multivariate()** (internal)
 - **extract_linpred_nonlinear()** (internal)
 - **extract_linpred_univariate()** (internal)
-- **extract_random_effects_contribution()** (internal)
-- **extract_smooth_coef()** (internal)
 - **has_nlpars()** (internal)
+- **monotonic_pred()** (internal)
+- **population_random_pred()** (internal)
+- **smooth_fixed_pred()** (internal)
+- **smooth_random_pred()** (internal)
 - **validate_monotonic_indices()** (internal)
 
 ### `R/print.mvgam.R`:
