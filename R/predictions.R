@@ -127,7 +127,7 @@ detect_gp_terms <- function(prep) {
 #' Loop required for 3D array matrix multiplication per draw.
 #'
 #' @noRd
-compute_approx_gp <- function(Xgp, Mgp, zgp, sdgp, lscale) {
+approx_gp_pred <- function(Xgp, Mgp, zgp, sdgp, lscale) {
   # Validate matrix dimensions and finite values
   checkmate::assert_matrix(Xgp, any.missing = FALSE, all.missing = FALSE)
   checkmate::assert_matrix(Mgp, any.missing = FALSE, all.missing = FALSE)
@@ -475,16 +475,16 @@ extract_linpred_nonlinear <- function(prep, resp = NULL) {
 validate_monotonic_indices <- function(xmo_data, xmo_name, k_levels, n_obs) {
   # Note: brms uses 0-based indexing for monotonic effects
   checkmate::assert_integerish(xmo_data, lower = 0, any.missing = FALSE)
-  
+
   Xmo <- as.integer(xmo_data)
-  
+
   if (length(Xmo) != n_obs) {
     stop(insight::format_error(
       "Monotonic design matrix {.field {xmo_name}} has ",
       "{length(Xmo)} elements but expected {n_obs} observations."
     ))
   }
-  
+
   # Validate Xmo indices are within valid range (0-based)
   if (any(Xmo < 0) || any(Xmo >= k_levels)) {
     stop(insight::format_error(
@@ -493,7 +493,7 @@ validate_monotonic_indices <- function(xmo_data, xmo_name, k_levels, n_obs) {
       "Found range: [{min(Xmo)}, {max(Xmo)}]."
     ))
   }
-  
+
   Xmo
 }
 
@@ -585,50 +585,50 @@ extract_linpred_from_prep <- function(prep, resp = NULL) {
 #' Extract Random Effects Contribution Using Pre-computed Mapping
 #'
 #' Uses random effects mapping stored in prep object to extract correct
-#' parameter contributions. Replaces buggy manual pattern matching.
+#' parameter contributions.
 #'
 #' @param prep A brmsprep object with re_mapping field
 #' @param draws_mat Matrix of posterior draws
-#' @param n_draws Number of draws  
+#' @param n_draws Number of draws
 #' @param n_obs Number of observations
 #'
 #' @return Matrix [n_draws × n_obs] of random effects contributions
 #'
 #' @noRd
-extract_random_effects_contribution <- function(prep, draws_mat, n_draws, n_obs) {
+population_random_pred <- function(prep, draws_mat, n_draws, n_obs) {
   # Initialize contribution matrix
   re_contrib <- matrix(0, nrow = n_draws, ncol = n_obs)
-  
+
   # Use pre-computed mapping from prep object
   re_mapping <- prep$re_mapping
-  
+
   if (is.null(re_mapping) || length(re_mapping) == 0) {
     # No random effects mapping available
     return(re_contrib)
   }
-  
+
   # Process each design matrix
   for (z_name in names(re_mapping)) {
     if (!z_name %in% names(prep$sdata)) {
       # Design matrix not present in this prediction context
       next
     }
-    
+
     # Get design vector and indexing
     Z <- as.vector(prep$sdata[[z_name]])
-    
+
     # Get corresponding J indexing (extract group number from Z_<group>_<term>)
     group_idx <- as.numeric(strsplit(z_name, "_")[[1]][2])
     J_name <- paste0("J_", group_idx)
-    
+
     if (!J_name %in% names(prep$sdata)) {
       stop(insight::format_error(
         "Missing grouping index {.field {J_name}} for {.field {z_name}}."
       ))
     }
-    
+
     J <- as.integer(prep$sdata[[J_name]])
-    
+
     # Validate dimensions
     if (length(Z) != n_obs || length(J) != n_obs) {
       stop(insight::format_error(
@@ -636,10 +636,10 @@ extract_random_effects_contribution <- function(prep, draws_mat, n_draws, n_obs)
         "expected n_obs={n_obs}."
       ))
     }
-    
+
     # Get parameter names for this design matrix
     param_names <- re_mapping[[z_name]]
-    
+
     # Extract parameters (these should exist in draws_mat)
     missing_params <- setdiff(param_names, colnames(draws_mat))
     if (length(missing_params) > 0) {
@@ -647,18 +647,150 @@ extract_random_effects_contribution <- function(prep, draws_mat, n_draws, n_obs)
         "Missing random effects parameters: {paste(missing_params, collapse=', ')}"
       ))
     }
-    
+
     r_draws <- draws_mat[, param_names, drop = FALSE]
-    
+
     # Compute contribution: vectorized indexing
     # r_draws[, J] gives [n_draws × n_obs] via column indexing
     # Z broadcast to [n_draws × n_obs] for element-wise multiplication
-    re_contrib <- re_contrib + 
-      r_draws[, J, drop = FALSE] * 
+    re_contrib <- re_contrib +
+      r_draws[, J, drop = FALSE] *
       matrix(Z, nrow = n_draws, ncol = n_obs, byrow = TRUE)
   }
-  
+
   return(re_contrib)
+}
+
+#' Add Smooth Fixed Effects (Xs * bs)
+#'
+#' Adds smooth fixed effects contribution to linear predictor using
+#' basis matrix multiplication. Validates parameter dimensions and
+#' provides informative error messages for mismatches.
+#'
+#' @param eta Current linear predictor matrix [n_draws × n_obs]
+#' @param draws_mat Parameter draws matrix with bs[*] coefficients
+#' @param prep Prepared prediction data containing sdata$Xs
+#'
+#' @return Updated eta matrix with smooth fixed effects added
+#'
+#' @details
+#' Implements: eta += bs_draws %*% t(Xs)
+#' where bs_draws are smooth fixed coefficients and Xs is the
+#' smooth basis matrix for fixed effects.
+#'
+#' @noRd
+smooth_fixed_pred <- function(eta, draws_mat, prep) {
+  if (!"Xs" %in% names(prep$sdata) || ncol(prep$sdata$Xs) == 0) {
+    return(eta)
+  }
+
+  Xs <- prep$sdata$Xs
+  checkmate::assert_matrix(Xs)
+
+  # Extract smooth fixed effect coefficients (bs[1], bs[2], etc.)
+  bs_names <- grep("^bs\\[", colnames(draws_mat), value = TRUE)
+
+  if (length(bs_names) == 0) {
+    return(eta)
+  }
+
+  if (length(bs_names) != ncol(Xs)) {
+    stop(insight::format_error(
+      "Smooth parameter count mismatch: {length(bs_names)} ",
+      "bs coefficient(s) but {ncol(Xs)} smooth predictor(s)."
+    ))
+  }
+
+  bs_draws <- draws_mat[, bs_names, drop = FALSE]
+  eta + bs_draws %*% t(Xs)
+}
+
+#' Add Monotonic Effects (bsp * mo(simo, Xmo))
+#'
+#' Adds monotonic effects contribution to linear predictor following
+#' Stan formula: mu[n] += (bsp[1]) * mo(simo_1, Xmo_1[n])
+#'
+#' @param eta Current linear predictor matrix [n_draws × n_obs]
+#' @param draws_mat Parameter draws matrix with bsp[*] and simo_*[*] coefficients
+#' @param prep Prepared prediction data containing sdata components
+#' @param suffix Monotonic term suffix (e.g., "1" for univariate, "count_1" for multivariate)
+#' @param n_obs Number of observations for current response
+#'
+#' @return Updated eta matrix with monotonic effects added
+#'
+#' @details
+#' Implements Stan formula: (bsp[id]) * mo(simo_id, Xmo_id[n])
+#' where bsp are monotonic coefficients, simo are simplex parameters,
+#' and Xmo are ordinal level indices.
+#' 
+#' Silent returns (unchanged eta) occur when monotonic components are
+#' missing, allowing safe use in contexts where monotonic effects
+#' may not be present.
+#'
+#' @noRd
+monotonic_pred <- function(eta, draws_mat, prep, suffix, n_obs) {
+  # Validate required parameters
+  checkmate::assert_matrix(eta, any.missing = FALSE)
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_list(prep, names = "named")
+  checkmate::assert_string(suffix, na.ok = FALSE)
+  checkmate::assert_count(n_obs, positive = TRUE)
+  
+  xmo_name <- paste0("Xmo_", suffix)
+  
+  if (!xmo_name %in% names(prep$sdata)) {
+    return(eta)
+  }
+  
+  # Get monotonic simplex parameters
+  simo_name <- paste0("simo_", suffix)
+  simo_names <- grep(
+    paste0("^", simo_name, "\\["),
+    colnames(draws_mat),
+    value = TRUE
+  )
+  
+  if (length(simo_names) == 0) {
+    return(eta)
+  }
+  
+  # Get monotonic coefficient (bsp) - exact match for suffix
+  bsp_names <- grep(
+    paste0("^bsp\\[", suffix, "\\]$|^bsp_", suffix, "$"),
+    colnames(draws_mat),
+    value = TRUE
+  )
+  
+  if (length(bsp_names) == 0) {
+    return(eta)
+  }
+  
+  # Extract and validate simo parameters: [n_draws × k_levels]
+  simo_draws <- draws_mat[, simo_names, drop = FALSE]
+  checkmate::assert_matrix(
+    simo_draws,
+    any.missing = FALSE,
+    all.missing = FALSE
+  )
+  k_levels <- ncol(simo_draws)
+  
+  # Extract and validate bsp coefficient: [n_draws × 1]
+  bsp_draws <- draws_mat[, bsp_names[1], drop = FALSE]
+  checkmate::assert_matrix(bsp_draws, ncols = 1)
+  
+  # Extract and validate ordinal level indices
+  Xmo <- validate_monotonic_indices(
+    prep$sdata[[xmo_name]],
+    xmo_name,
+    k_levels,
+    n_obs
+  )
+  
+  # Compute monotonic contribution: bsp * mo(simo, Xmo)
+  # simo_draws[, Xmo] gives [n_draws × n_obs] via column indexing
+  # bsp_draws is [n_draws × 1], broadcast to [n_draws × n_obs]
+  mo_contrib <- bsp_draws * simo_draws[, Xmo, drop = FALSE]
+  eta + mo_contrib
 }
 
 #' Add Smooth Terms Contributions Using Metadata-Driven Approach
@@ -673,19 +805,19 @@ extract_random_effects_contribution <- function(prep, draws_mat, n_draws, n_obs)
 #' @param resp_prefix Response prefix for multivariate (e.g., "y1_") or "" for univariate
 #' @return Updated eta matrix with smooth contributions added
 #' @noRd
-add_smooth_contributions_metadata <- function(eta, draws_mat, prep, resp_prefix) {
+smooth_random_pred <- function(eta, draws_mat, prep, resp_prefix) {
   # Parameter validation
   checkmate::assert_matrix(eta)
   checkmate::assert_matrix(draws_mat)
   checkmate::assert_list(prep)
   checkmate::assert_string(resp_prefix)
-  
+
   n_draws <- nrow(eta)
   n_obs <- ncol(eta)
-  
+
   # Build pattern based on response prefix
   if (resp_prefix == "") {
-    # Univariate: look for nb_<id> fields  
+    # Univariate: look for nb_<id> fields
     nb_pattern <- "^nb_"
     zs_prefix <- "Zs_"
     coef_prefix <- "s_"
@@ -696,74 +828,74 @@ add_smooth_contributions_metadata <- function(eta, draws_mat, prep, resp_prefix)
     zs_prefix <- paste0("Zs_", resp_clean, "_")
     coef_prefix <- paste0("s_", resp_clean, "_")
   }
-  
+
   nb_fields <- grep(nb_pattern, names(prep$sdata), value = TRUE)
-  
+
   for (nb_field in nb_fields) {
     # Extract smooth term ID from nb_[resp_]<id> field name
     smooth_id <- sub(nb_pattern, "", nb_field)
     n_components <- prep$sdata[[nb_field]]
-    
+
     # Validate metadata values
     checkmate::assert_integerish(n_components, lower = 1, len = 1)
-    
+
     # Initialize total contribution for this smooth term
     total_smooth_contrib <- matrix(0, nrow = n_draws, ncol = n_obs)
-    
+
     # Process all components for this smooth term
     for (component in seq_len(n_components)) {
       # Get basis matrix for this component
       zs_name <- paste0(zs_prefix, smooth_id, "_", component)
-      
+
       if (zs_name %in% names(prep$sdata)) {
         Zs <- prep$sdata[[zs_name]]
-        
+
         # Validate matrix structure
         if (!is.matrix(Zs)) {
           stop(insight::format_error(
             "Smooth basis {.field {zs_name}} must be a matrix."
           ))
         }
-        
+
         if (nrow(Zs) != n_obs) {
           stop(insight::format_error(
             "Smooth basis {.field {zs_name}} has {nrow(Zs)} rows ",
             "but expected {n_obs} observations."
           ))
         }
-        
+
         # Extract coefficients for this specific component
         component_pattern <- paste0("^", coef_prefix, smooth_id, "_", component, "\\[")
         component_params <- grep(
-          component_pattern, 
-          colnames(draws_mat), 
+          component_pattern,
+          colnames(draws_mat),
           value = TRUE
         )
-        
+
         if (length(component_params) > 0) {
           # Get coefficients for this component
           sm_coef <- draws_mat[, component_params, drop = FALSE]
-          
+
           # Add this component's contribution: [n_draws × n_obs]
-          total_smooth_contrib <- total_smooth_contrib + 
+          total_smooth_contrib <- total_smooth_contrib +
             sm_coef %*% t(Zs)
         }
       } else {
         # Component matrix missing - log warning but continue
         rlang::warn(
           paste0(
-            "Expected smooth component matrix {.field ", zs_name, "} ", 
+            "Expected smooth component matrix {.field ", zs_name, "} ",
             "not found in prep$sdata. Skipping this component."
           ),
           .frequency = "once"
         )
       }
     }
-    
+
     # Add total smooth term contribution to linear predictor
     eta <- eta + total_smooth_contrib
   }
-  
+
   return(eta)
 }
 
@@ -827,36 +959,18 @@ extract_linpred_univariate <- function(prep) {
   }
 
   # Add smooth fixed effects (Xs * bs)
-  if ("Xs" %in% names(prep$sdata) && ncol(prep$sdata$Xs) > 0) {
-    Xs <- prep$sdata$Xs
-    checkmate::assert_matrix(Xs)
-    
-    # Extract smooth fixed effect coefficients (bs[1], bs[2], etc.)
-    bs_names <- grep("^bs\\[", colnames(draws_mat), value = TRUE)
-    
-    if (length(bs_names) > 0) {
-      if (length(bs_names) != ncol(Xs)) {
-        stop(insight::format_error(
-          "Smooth parameter count mismatch: {length(bs_names)} ",
-          "bs coefficient(s) but {ncol(Xs)} smooth predictor(s)."
-        ))
-      }
-      
-      bs_draws <- draws_mat[, bs_names, drop = FALSE]
-      eta <- eta + bs_draws %*% t(Xs)
-    }
-  }
+  eta <- smooth_fixed_pred(eta, draws_mat, prep)
 
-  # Add smooth terms using metadata-driven approach
-  eta <- add_smooth_contributions_metadata(
+  # Add smooth random effects
+  eta <- smooth_random_pred(
     eta = eta,
     draws_mat = draws_mat,
     prep = prep,
     resp_prefix = ""
   )
 
-  # Add random effects using pre-computed mapping (fixes parameter naming bug)
-  re_contrib <- extract_random_effects_contribution(
+  # Add random effects
+  re_contrib <- population_random_pred(
     prep = prep,
     draws_mat = draws_mat,
     n_draws = n_draws,
@@ -876,52 +990,17 @@ extract_linpred_univariate <- function(prep) {
       lscale <- prep$dpars[[paste0("lscale_", suffix)]]
 
       # Compute and add GP contribution
-      gp_contrib <- compute_approx_gp(Xgp, Mgp, zgp, sdgp, lscale)
+      gp_contrib <- approx_gp_pred(Xgp, Mgp, zgp, sdgp, lscale)
       eta <- eta + gp_contrib
     }
   }
 
   # Add monotonic effects (mo() terms)
-  # Monotonic effects use direct parameter indexing, not matrix multiplication
   xmo_names <- grep("^Xmo_", names(prep$sdata), value = TRUE)
   for (xmo_name in xmo_names) {
     # Extract monotonic term ID (univariate only: "1" from "Xmo_1")
     term_id <- sub("^Xmo_", "", xmo_name)
-
-    # Get monotonic simplex parameters
-    simo_name <- paste0("simo_", term_id)
-    simo_names <- grep(
-      paste0("^", simo_name, "\\["),
-      colnames(draws_mat),
-      value = TRUE
-    )
-
-    if (length(simo_names) == 0) {
-      next
-    }
-
-    # Extract and validate simo parameters: [n_draws × k_levels]
-    simo_draws <- draws_mat[, simo_names, drop = FALSE]
-    checkmate::assert_matrix(
-      simo_draws,
-      any.missing = FALSE,
-      all.missing = FALSE
-    )
-    k_levels <- ncol(simo_draws)
-
-    # Extract and validate ordinal level indices
-    Xmo <- validate_monotonic_indices(
-      prep$sdata[[xmo_name]], 
-      xmo_name, 
-      k_levels, 
-      n_obs
-    )
-
-    # Compute monotonic contribution via direct indexing
-    # simo_draws[, Xmo] performs column indexing: [n_draws × n_obs]
-    # For each observation n: add simo[Xmo[n]]
-    mo_contrib <- simo_draws[, Xmo, drop = FALSE]
-    eta <- eta + mo_contrib
+    eta <- monotonic_pred(eta, draws_mat, prep, term_id, n_obs)
   }
 
   # Add offset terms if present
@@ -1056,8 +1135,11 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
       }
     }
 
+    # Add smooth fixed effects (Xs * bs) for this response
+    eta <- smooth_fixed_pred(eta, draws_mat, prep)
+
     # Add smooth terms for this response using metadata-driven approach
-    eta <- add_smooth_contributions_metadata(
+    eta <- smooth_random_pred(
       eta = eta,
       draws_mat = draws_mat,
       prep = prep,
@@ -1181,7 +1263,7 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
         lscale <- prep$dpars[[paste0("lscale_", suffix)]]
 
         # Compute and add GP contribution
-        gp_contrib <- compute_approx_gp(Xgp, Mgp, zgp, sdgp, lscale)
+        gp_contrib <- approx_gp_pred(Xgp, Mgp, zgp, sdgp, lscale)
         eta <- eta + gp_contrib
       }
     }
@@ -1197,80 +1279,46 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
       is_resp_specific <- grepl(paste0("^", resp_name, "_"), suffix)
       is_shared <- !grepl("^[a-zA-Z]", suffix)
 
-      if (!is_resp_specific && !is_shared) {
-        next
+      if (is_resp_specific || is_shared) {
+        eta <- monotonic_pred(eta, draws_mat, prep, suffix, n_obs)
       }
-
-      # Get monotonic simplex parameters
-      simo_name <- paste0("simo_", suffix)
-      simo_names <- grep(
-        paste0("^", simo_name, "\\["),
-        colnames(draws_mat),
-        value = TRUE
-      )
-
-      if (length(simo_names) == 0) {
-        next
-      }
-
-      # Extract and validate simo parameters: [n_draws × k_levels]
-      simo_draws <- draws_mat[, simo_names, drop = FALSE]
-      checkmate::assert_matrix(
-        simo_draws,
-        any.missing = FALSE,
-        all.missing = FALSE
-      )
-      k_levels <- ncol(simo_draws)
-
-      # Extract and validate ordinal level indices
-      Xmo <- validate_monotonic_indices(
-        prep$sdata[[xmo_name]], 
-        xmo_name, 
-        k_levels, 
-        n_obs
-      )
-
-      # Compute monotonic contribution via direct indexing
-      # simo_draws[, Xmo] performs column indexing: [n_draws × n_obs]
-      mo_contrib <- simo_draws[, Xmo, drop = FALSE]
-      eta <- eta + mo_contrib
     }
 
     # Add offset terms if present for this response
     if ("offsets" %in% names(prep$sdata)) {
       # In multivariate models, offsets may be response-specific or shared
       # Extract offsets for this response based on observation count
-      
+
       # Calculate offset range for this response
       # Find observation start/end positions for this response
       resp_indices <- response_names[1:which(response_names == resp_name)]
-      n_obs_before <- sum(sapply(resp_indices[-length(resp_indices)], 
+      n_obs_before <- sum(sapply(resp_indices[-length(resp_indices)],
                                 function(r) {
                                   if (length(resp_indices) == 1) return(0)
                                   prep$sdata[[paste0("N_", r)]]
                                 }))
-      
+
       offset_start <- n_obs_before + 1
       offset_end <- n_obs_before + n_obs
-      
+
       # Extract response-specific offsets
       all_offsets <- prep$sdata$offsets
-      
+
       # Validate total offset length matches total observations
       total_obs <- sum(sapply(response_names, function(r) {
         prep$sdata[[paste0("N_", r)]]
       }))
-      
+
       if (length(all_offsets) != total_obs) {
         stop(insight::format_error(
           "Offset length {length(all_offsets)} does not match total ",
           "observations {total_obs} across all responses."
         ))
       }
-      
+
       # Extract offsets for current response
       resp_offsets <- all_offsets[offset_start:offset_end]
-      
+
       # Validate response-specific offset structure
       checkmate::assert_numeric(
         resp_offsets,

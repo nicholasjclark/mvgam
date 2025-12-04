@@ -127,17 +127,31 @@
         - Parses GLM parameters to extract design matrix (`X`/`Xc`) and coefficients (`b`)
         - Synthesizes missing `mu += X * b;` line when not already present
         - Handles edge case where brms passes `mu` as intercept parameter (when RE present)
+
+    - [ ] 2.3.9.2 **URGENT: Fix monotonic effects implementation to match brms .mo function**
+      **Bug**: Current monotonic prediction `bsp * simo_draws[, Xmo]` does not match brms implementation. Missing cumulative sum logic and D multiplier from brms's `.mo` function.
+      **Root Cause**: Our implementation is incomplete. brms `.mo` function does:
+        1. `cbind(0, simplex)` - prepend 0 to simplex
+        2. `for (i in seq_cols(simplex)[-1]) simplex[, i] <- simplex[, i] + simplex[, i - 1]` - cumulative sum
+        3. `D * simplex[, X + 1]` - multiply by D (ncol) and index with X+1 (0-based to 1-based)
+      **Investigation Plan**: 
+        - Create debug script with cat statements to trace monotonic predictions vs brms
+        - Use r-package-analyzer to understand complete brms monotonic prediction pathway
+        - Compare our `monotonic_pred()` output with brms `posterior_linpred()` for mo() terms
+        - Focus on brms source: `.mo <- function(simplex, X) { ... }` implementation
+      **Implementation**: Fix `monotonic_pred()` in `R/predictions.R` to implement exact brms logic
+      **Testing**: Validate against brms baseline with mo() models to ensure exact match
+
+    - [x] 2.3.9.3 **Fix: Data block declaration order bug for smooth terms in trend_formula**
       **Test Added**: `tests/testthat/test-stancode-standata.R` line 1233 verifies `mu_trend += X_trend * b_trend` is present in hierarchical ZMVN test with fixed + random effects in trend_formula.
       **Validation**: Debug script `tasks/debug_trend_effects.R` confirms fix - test case 04 (fixed + random) now shows `mu uses Xb: YES`.
-
-    - [x] 2.3.9.2 **Fix: Data block declaration order bug for smooth terms in trend_formula**
       **Bug**: `knots_1_trend` array is used in matrix declaration before it is declared, causing Stan compilation failure.
       **Error**: `Semantic error: Identifier 'knots_1_trend' not in scope`
       **Root Cause**: `extract_univariate_standata()` created stanvars in order of `names(standata)`, not in brms's dependency-correct declaration order.
       **Solution** (2025-12-03): Added stanvar reordering in `extract_univariate_standata()` (R/stan_assembly.R lines 6615-6641) that maps each stanvar name to its declaration line index and sorts by that order.
-      **Status**: Data block ordering FIXED, but revealed secondary bug in transformed parameters (see 2.3.9.3).
+      **Status**: Data block ordering FIXED, but revealed secondary bug in transformed parameters (see 2.3.9.4).
 
-    - [x] 2.3.9.3 **Fix: Transformed parameters ordering bug for smooth terms in trend_formula** **COMPLETE (2025-12-03)**
+    - [x] 2.3.9.4 **Fix: Transformed parameters ordering bug for smooth terms in trend_formula** **COMPLETE (2025-12-03)**
       **Bug**: `s_1_1_trend` (scaled smooth coefficients) used in mu_trend construction before declaration/computation.
       **Error**: `Semantic error in 'string', line 40: Identifier 's_1_1_trend' not in scope`
       **Affected**: Any smooth term in trend_formula (e.g., `~ s(x, k=5) + AR()`)

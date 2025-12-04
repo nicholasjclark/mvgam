@@ -134,8 +134,10 @@ categorize_mvgam_parameters <- function(x) {
 
   # Fixed effects from observation formula only
   # b_ = standard fixed effects, b[ = indexed (multivariate)
-  # bs_ = basis spline coefficients (brms), bs[ = basis spline coefficients (mvgam), Intercept = intercepts (all variants)
-  obs_beta_pattern <- "^(b_|b\\[|bs_|bs\\[|Intercept)"
+  # bs_ = basis spline coefficients (brms), bs[ = basis spline coefficients (mvgam)
+  # bsp_ = monotonic coefficients (brms), bsp[ = monotonic coefficients (mvgam)
+  # Intercept = intercepts (all variants)
+  obs_beta_pattern <- "^(b_|b\\[|bs_|bs\\[|bsp_|bsp\\[|Intercept)"
   obs_beta_pars <- all_pars[
     grepl(obs_beta_pattern, all_pars) &
       !grepl("_trend", all_pars) &
