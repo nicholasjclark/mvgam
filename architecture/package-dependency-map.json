@@ -762,13 +762,6 @@
                                             "is_s3_method":  false,
                                             "arguments":  null
                                         },
-                              "nobs.mvgam":  {
-                                                 "s3_class":  "mvgam",
-                                                 "s3_method":  "nobs",
-                                                 "signature":  "nobs.mvgam \u003c- function(object, ...) {",
-                                                 "is_s3_method":  true,
-                                                 "arguments":  "object"
-                                             },
                               "mvgam_trend_pattern":  {
                                                           "s3_class":  "",
                                                           "s3_method":  "",
@@ -1146,16 +1139,18 @@
                                                                        "is_s3_method":  false,
                                                                        "arguments":  "model_spec"
                                                                    },
-                              "process_trend_params":  {
-                                                           "s3_class":  "",
-                                                           "s3_method":  "",
-                                                           "signature":  "process_trend_params \u003c- function(param_specs, envir = parent.frame()) {",
-                                                           "is_s3_method":  false,
-                                                           "arguments":  [
-                                                                             "param_specs",
-                                                                             "envir"
-                                                                         ]
-                                                       },
+                              "validate_monotonic_indices":  {
+                                                                 "s3_class":  "",
+                                                                 "s3_method":  "",
+                                                                 "signature":  "validate_monotonic_indices \u003c- function(xmo_data, xmo_name, k_levels, n_obs) {",
+                                                                 "is_s3_method":  false,
+                                                                 "arguments":  [
+                                                                                   "xmo_data",
+                                                                                   "xmo_name",
+                                                                                   "k_levels",
+                                                                                   "n_obs"
+                                                                               ]
+                                                             },
                               "as_draws_df.mvgam":  {
                                                         "s3_class":  "mvgam",
                                                         "s3_method":  "as_draws_df",
@@ -2849,20 +2844,13 @@
                                                                    "is_s3_method":  true,
                                                                    "arguments":  "x"
                                                                },
-                              "generate_times_trend_matrices":  {
-                                                                    "s3_class":  "",
-                                                                    "s3_method":  "",
-                                                                    "signature":  "generate_times_trend_matrices \u003c- function(n_time, n_series, unique_times, unique_series, is_multivariate, response_names) {",
-                                                                    "is_s3_method":  false,
-                                                                    "arguments":  [
-                                                                                      "n_time",
-                                                                                      "n_series",
-                                                                                      "unique_times",
-                                                                                      "unique_series",
-                                                                                      "is_multivariate",
-                                                                                      "response_names"
-                                                                                  ]
-                                                                },
+                              "nobs.mvgam":  {
+                                                 "s3_class":  "mvgam",
+                                                 "s3_method":  "nobs",
+                                                 "signature":  "nobs.mvgam \u003c- function(object, ...) {",
+                                                 "is_s3_method":  true,
+                                                 "arguments":  "object"
+                                             },
                               "build_coefficient_addition_code":  {
                                                                       "s3_class":  "",
                                                                       "s3_method":  "",
@@ -3435,6 +3423,20 @@
                                                "is_s3_method":  false,
                                                "arguments":  "object"
                                            },
+                              "generate_times_trend_matrices":  {
+                                                                    "s3_class":  "",
+                                                                    "s3_method":  "",
+                                                                    "signature":  "generate_times_trend_matrices \u003c- function(n_time, n_series, unique_times, unique_series, is_multivariate, response_names) {",
+                                                                    "is_s3_method":  false,
+                                                                    "arguments":  [
+                                                                                      "n_time",
+                                                                                      "n_series",
+                                                                                      "unique_times",
+                                                                                      "unique_series",
+                                                                                      "is_multivariate",
+                                                                                      "response_names"
+                                                                                  ]
+                                                                },
                               "classify_single_mu_expression_structurally":  {
                                                                                  "s3_class":  "",
                                                                                  "s3_method":  "",
@@ -4619,6 +4621,16 @@
                                                                               "use_alias"
                                                                           ]
                                                         },
+                              "process_trend_params":  {
+                                                           "s3_class":  "",
+                                                           "s3_method":  "",
+                                                           "signature":  "process_trend_params \u003c- function(param_specs, envir = parent.frame()) {",
+                                                           "is_s3_method":  false,
+                                                           "arguments":  [
+                                                                             "param_specs",
+                                                                             "envir"
+                                                                         ]
+                                                       },
                               "remove_mvgam_variables":  {
                                                              "s3_class":  "",
                                                              "s3_method":  "",
@@ -5526,6 +5538,7 @@
                                                 "compute_approx_gp",
                                                 "has_nlpars",
                                                 "extract_linpred_nonlinear",
+                                                "validate_monotonic_indices",
                                                 "extract_smooth_coef",
                                                 "extract_linpred_from_prep",
                                                 "extract_random_effects_contribution",
@@ -6029,6 +6042,7 @@
                       "use_threading":  "R/backends.R",
                       "is_like_factor":  "R/ppc.mvgam.R",
                       "print_model_specification_simple":  "R/print.mvgam.R",
+                      "validate_monotonic_indices":  "R/predictions.R",
                       "is_equal":  "R/backends.R",
                       "is.brmsopencl":  "R/backends.R",
                       "is.mvgam_trend":  "R/validations.R",
@@ -6542,7 +6556,7 @@
                                      "use_threading":  "R/backends.R",
                                      "is_like_factor":  "R/ppc.mvgam.R",
                                      "print_model_specification_simple":  "R/print.mvgam.R",
-                                     "process_trend_params":  "R/trend_system.R",
+                                     "validate_monotonic_indices":  "R/predictions.R",
                                      "extract_trend_component_info":  "R/mvgam_core.R",
                                      "add_hierarchical_support":  "R/stan_assembly.R",
                                      "stability":  "R/stability.R",
@@ -6841,6 +6855,7 @@
                                      "print.mvgam_trend":  "R/trend_system.R",
                                      "create_mvgam_trend":  "R/trend_system.R",
                                      "loo_compare.mvgam":  "R/loo.mvgam.R",
+                                     "process_trend_params":  "R/trend_system.R",
                                      "remove_mvgam_variables":  "R/validations.R",
                                      "create_empty_brmsprior":  "R/priors.R",
                                      "parse_base_formula_safe":  "R/validations.R",
@@ -7044,6 +7059,7 @@
                                 "is_like_factor":  "is_like_factor \u003c- function(x) {",
                                 "process_trend_validation_rules":  "process_trend_validation_rules \u003c- function(trend_spec, data) {",
                                 "print_model_specification_simple":  "print_model_specification_simple \u003c- function(model_spec) {",
+                                "validate_monotonic_indices":  "validate_monotonic_indices \u003c- function(xmo_data, xmo_name, k_levels, n_obs) {",
                                 "is_equal":  "is_equal \u003c- function(x, y, check.attributes = FALSE, ...) {",
                                 "extract_and_rename_trend_parameters":  "extract_and_rename_trend_parameters \u003c- function(trend_setup, dimensions, suffix = \"_trend\") {",
                                 "is.mvgam_trend":  "is.mvgam_trend \u003c- function(x) {",
@@ -8346,22 +8362,22 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-12-03 16:40:35",
+                     "generated":  "2025-12-04 08:27:26",
                      "commit_hash":  "pending",
-                     "cached_files":  58,
+                     "cached_files":  0,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
-                     "total_functions":  528,
+                     "total_functions":  529,
                      "exported_functions":  57,
                      "s3_methods_count":  41,
                      "s3_classes_count":  31,
                      "dynamic_references":  38,
                      "package_name":  "mvgam",
                      "potentially_unused_functions":  37,
-                     "changed_files":  2,
+                     "changed_files":  60,
                      "total_files":  60,
-                     "zero_dependency_functions":  439
+                     "zero_dependency_functions":  440
                  },
     "dependencies":  {
 

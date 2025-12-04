@@ -497,148 +497,6 @@ validate_monotonic_indices <- function(xmo_data, xmo_name, k_levels, n_obs) {
   Xmo
 }
 
-#' @noRd
-extract_smooth_coef <- function(draws_mat, smooth_label, resp = NULL,
-                                n_basis) {
-    # Validate inputs
-    checkmate::assert_matrix(draws_mat)
-    checkmate::assert_string(smooth_label)
-    checkmate::assert_string(resp, null.ok = TRUE)
-    checkmate::assert_integerish(n_basis, lower = 1, len = 1)
-
-    # Build parameter name patterns
-    # Extract base smooth name for sds_ parameters (e.g., "count_1" from "count_1_1")
-    # Stan generates sds parameters using base names while smooth coefficients use full labels
-    base_smooth_name <- gsub("_\\d+$", "", smooth_label)
-    
-    if (!is.null(resp)) {
-      zs_pattern <- paste0("^zs_", resp, "_", smooth_label, "\\[")
-      s_pattern <- paste0("^s_", resp, "_", smooth_label, "\\[")
-      sds_pattern <- paste0("^sds_", resp, "_", base_smooth_name, "\\[")
-    } else {
-      zs_pattern <- paste0("^zs_", smooth_label, "\\[")
-      s_pattern <- paste0("^s_", smooth_label, "\\[")
-      sds_pattern <- paste0("^sds_", base_smooth_name, "\\[")
-    }
-
-    # Try standardized form first (zs_* + sds_*)
-    zs_names <- grep(zs_pattern, colnames(draws_mat), value = TRUE)
-
-    if (length(zs_names) > 0) {
-      # Standardized smooth requires unstandardization
-      if (length(zs_names) != n_basis) {
-        stop(insight::format_error(
-          "Smooth coefficient count mismatch: {length(zs_names)} ",
-          "{.field zs} parameters but {n_basis} basis functions."
-        ))
-      }
-
-      # Extract standardized coefficients [n_draws × n_basis]
-      zs_draws <- draws_mat[, zs_names, drop = FALSE]
-
-      # Extract standard deviation (single scalar per smooth)
-      sds_names <- grep(sds_pattern, colnames(draws_mat), value = TRUE)
-
-      if (length(sds_names) == 0) {
-        stop(insight::format_error(
-          "Found {.field zs_*} parameters but missing ",
-          "{.field sds_*} standard deviations. Model may be corrupted."
-        ))
-      }
-
-      if (length(sds_names) == 1) {
-        # Single sds parameter - standard smooth (s)
-        # Extract sds [n_draws × 1]
-        sds_draws <- draws_mat[, sds_names, drop = FALSE]
-        
-        # Convert draws to matrices and apply brms unstandardization
-        # Following brms pattern: zs_draws * sds_draws with broadcasting
-        zs_mat <- matrix(as.numeric(zs_draws), nrow = nrow(zs_draws), 
-                        ncol = ncol(zs_draws))
-        sds_vec <- as.vector(sds_draws)  # Convert for R broadcasting
-        
-        # Unstandardize: [n_draws × n_basis] * vector[n_draws]
-        # Each column of zs multiplied by corresponding sds value per draw
-        sm_coef <- zs_mat * sds_vec
-      } else if (length(sds_names) > 1) {
-        # Multiple sds parameters - tensor product smooth (t2)
-        # t2() smooths generate numbered components (e.g., _1, _2) that
-        # correspond to individual sds parameters (e.g., sds_1[1], sds_1[2])
-        
-        # Match sds parameter to smooth component using direct construction
-        # For tensor products: smooth_label = "1_1" should match sds_1[1]
-        label_suffix <- sub(".*_", "", smooth_label)
-        checkmate::assert_string(label_suffix, min.chars = 1, 
-                                .var.name = "label_suffix")
-        
-        # Validate sds_names is not empty before accessing
-        if (length(sds_names) == 0) {
-          stop(insight::format_error(
-            "No {.field sds} parameters found for tensor product smooth ",
-            "{.val {smooth_label}}. Model may be corrupted."
-          ))
-        }
-        
-        # Extract base sds name from first available parameter
-        # Example: "sds_1[1]" -> "sds_1"
-        base_sds_name <- gsub("\\[.*$", "", sds_names[1])
-        
-        # Construct the specific sds parameter name directly
-        sds_name_specific <- paste0(base_sds_name, "[", label_suffix, "]")
-        
-        # Validate the constructed name exists
-        if (!sds_name_specific %in% colnames(draws_mat)) {
-          sds_name_specific <- character(0)  # Will trigger error below
-        } else {
-          sds_name_specific <- sds_name_specific
-        }
-        
-        if (length(sds_name_specific) == 1) {
-          # Found the matching sds for this component
-          sds_draws <- draws_mat[, sds_name_specific, drop = FALSE]
-          zs_mat <- matrix(as.numeric(zs_draws), nrow = nrow(zs_draws), 
-                          ncol = ncol(zs_draws))
-          sds_vec <- as.vector(sds_draws)
-          sm_coef <- zs_mat * sds_vec
-        } else {
-          # Cannot match component-level sds parameter
-          stop(insight::format_error(
-            "Found {length(sds_names)} {.field sds} parameters for tensor ",
-            "product smooth but couldn't match to component ",
-            "{.val {smooth_label}}. Available sds parameters: ",
-            "{.val {sds_names}}. Check smooth term configuration or ",
-            "contact maintainer."
-          ))
-        }
-      } else {
-        # No sds parameters found - already handled above
-        stop(insight::format_error(
-          "Found {.field zs_*} parameters but missing ",
-          "{.field sds_*} standard deviations. Model may be corrupted."
-        ))
-      }
-
-      return(sm_coef)
-    }
-
-    # Try unstandardized form (s_*)
-    s_names <- grep(s_pattern, colnames(draws_mat), value = TRUE)
-
-    if (length(s_names) > 0) {
-      # Unstandardized smooth - use directly
-      if (length(s_names) != n_basis) {
-        stop(insight::format_error(
-          "Smooth coefficient count mismatch: {length(s_names)} ",
-          "{.field s} parameters but {n_basis} basis functions."
-        ))
-      }
-
-      return(draws_mat[, s_names, drop = FALSE])
-    }
-
-    # No matching coefficients found
-    return(NULL)
-  }
 
 #' Extract Linear Predictor from Prep Object
 #'
@@ -803,6 +661,112 @@ extract_random_effects_contribution <- function(prep, draws_mat, n_draws, n_obs)
   return(re_contrib)
 }
 
+#' Add Smooth Terms Contributions Using Metadata-Driven Approach
+#'
+#' Process smooth terms by grouping components using brms metadata (nb_ fields).
+#' Each nb_<id> field indicates the number of components for smooth term <id>.
+#' This unified approach handles both regular smooths and tensor products.
+#'
+#' @param eta Current linear predictor matrix [n_draws × n_obs] to add to
+#' @param draws_mat Parameter draws matrix with columns for coefficients
+#' @param prep Prepared prediction data from brms
+#' @param resp_prefix Response prefix for multivariate (e.g., "y1_") or "" for univariate
+#' @return Updated eta matrix with smooth contributions added
+#' @noRd
+add_smooth_contributions_metadata <- function(eta, draws_mat, prep, resp_prefix) {
+  # Parameter validation
+  checkmate::assert_matrix(eta)
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_list(prep)
+  checkmate::assert_string(resp_prefix)
+  
+  n_draws <- nrow(eta)
+  n_obs <- ncol(eta)
+  
+  # Build pattern based on response prefix
+  if (resp_prefix == "") {
+    # Univariate: look for nb_<id> fields  
+    nb_pattern <- "^nb_"
+    zs_prefix <- "Zs_"
+    coef_prefix <- "s_"
+  } else {
+    # Multivariate: look for nb_<resp>_<id> fields
+    resp_clean <- gsub("_$", "", resp_prefix)
+    nb_pattern <- paste0("^nb_", resp_clean, "_")
+    zs_prefix <- paste0("Zs_", resp_clean, "_")
+    coef_prefix <- paste0("s_", resp_clean, "_")
+  }
+  
+  nb_fields <- grep(nb_pattern, names(prep$sdata), value = TRUE)
+  
+  for (nb_field in nb_fields) {
+    # Extract smooth term ID from nb_[resp_]<id> field name
+    smooth_id <- sub(nb_pattern, "", nb_field)
+    n_components <- prep$sdata[[nb_field]]
+    
+    # Validate metadata values
+    checkmate::assert_integerish(n_components, lower = 1, len = 1)
+    
+    # Initialize total contribution for this smooth term
+    total_smooth_contrib <- matrix(0, nrow = n_draws, ncol = n_obs)
+    
+    # Process all components for this smooth term
+    for (component in seq_len(n_components)) {
+      # Get basis matrix for this component
+      zs_name <- paste0(zs_prefix, smooth_id, "_", component)
+      
+      if (zs_name %in% names(prep$sdata)) {
+        Zs <- prep$sdata[[zs_name]]
+        
+        # Validate matrix structure
+        if (!is.matrix(Zs)) {
+          stop(insight::format_error(
+            "Smooth basis {.field {zs_name}} must be a matrix."
+          ))
+        }
+        
+        if (nrow(Zs) != n_obs) {
+          stop(insight::format_error(
+            "Smooth basis {.field {zs_name}} has {nrow(Zs)} rows ",
+            "but expected {n_obs} observations."
+          ))
+        }
+        
+        # Extract coefficients for this specific component
+        component_pattern <- paste0("^", coef_prefix, smooth_id, "_", component, "\\[")
+        component_params <- grep(
+          component_pattern, 
+          colnames(draws_mat), 
+          value = TRUE
+        )
+        
+        if (length(component_params) > 0) {
+          # Get coefficients for this component
+          sm_coef <- draws_mat[, component_params, drop = FALSE]
+          
+          # Add this component's contribution: [n_draws × n_obs]
+          total_smooth_contrib <- total_smooth_contrib + 
+            sm_coef %*% t(Zs)
+        }
+      } else {
+        # Component matrix missing - log warning but continue
+        rlang::warn(
+          paste0(
+            "Expected smooth component matrix {.field ", zs_name, "} ", 
+            "not found in prep$sdata. Skipping this component."
+          ),
+          .frequency = "once"
+        )
+      }
+    }
+    
+    # Add total smooth term contribution to linear predictor
+    eta <- eta + total_smooth_contrib
+  }
+  
+  return(eta)
+}
+
 #' Extract Linear Predictor for Univariate Models
 #'
 #' @param prep A brmsprep object from prepare_predictions()
@@ -862,47 +826,34 @@ extract_linpred_univariate <- function(prep) {
     }
   }
 
-  # Add smooth terms
-  smooth_matrices <- grep("^Zs_", names(prep$sdata), value = TRUE)
-
-  for (zs_name in smooth_matrices) {
-    Zs <- prep$sdata[[zs_name]]
-
-    # Validate matrix structure
-    if (!is.matrix(Zs)) {
-      stop(insight::format_error(
-        "Smooth basis {.field {zs_name}} must be a matrix."
-      ))
+  # Add smooth fixed effects (Xs * bs)
+  if ("Xs" %in% names(prep$sdata) && ncol(prep$sdata$Xs) > 0) {
+    Xs <- prep$sdata$Xs
+    checkmate::assert_matrix(Xs)
+    
+    # Extract smooth fixed effect coefficients (bs[1], bs[2], etc.)
+    bs_names <- grep("^bs\\[", colnames(draws_mat), value = TRUE)
+    
+    if (length(bs_names) > 0) {
+      if (length(bs_names) != ncol(Xs)) {
+        stop(insight::format_error(
+          "Smooth parameter count mismatch: {length(bs_names)} ",
+          "bs coefficient(s) but {ncol(Xs)} smooth predictor(s)."
+        ))
+      }
+      
+      bs_draws <- draws_mat[, bs_names, drop = FALSE]
+      eta <- eta + bs_draws %*% t(Xs)
     }
-
-    if (nrow(Zs) != n_obs) {
-      stop(insight::format_error(
-        "Smooth basis {.field {zs_name}} has {nrow(Zs)} rows ",
-        "but expected {n_obs} observations."
-      ))
-    }
-
-    n_basis <- ncol(Zs)
-
-    # Extract smooth label: Zs_<label>
-    smooth_label <- sub("^Zs_", "", zs_name)
-
-    # Extract and unstandardize smooth coefficients
-    sm_coef <- extract_smooth_coef(
-      draws_mat = draws_mat,
-      smooth_label = smooth_label,
-      resp = NULL,
-      n_basis = n_basis
-    )
-
-    # Skip if smooth not present (optional smooths may not exist)
-    if (is.null(sm_coef)) {
-      next
-    }
-
-    # Compute smooth contribution: [n_draws × n_obs]
-    eta <- eta + sm_coef %*% t(Zs)
   }
+
+  # Add smooth terms using metadata-driven approach
+  eta <- add_smooth_contributions_metadata(
+    eta = eta,
+    draws_mat = draws_mat,
+    prep = prep,
+    resp_prefix = ""
+  )
 
   # Add random effects using pre-computed mapping (fixes parameter naming bug)
   re_contrib <- extract_random_effects_contribution(
@@ -1105,53 +1056,13 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
       }
     }
 
-    # Add smooth terms for this response
-    smooth_pattern <- paste0("^Zs_", resp_name, "_")
-    smooth_matrices <- grep(
-      smooth_pattern,
-      names(prep$sdata),
-      value = TRUE
+    # Add smooth terms for this response using metadata-driven approach
+    eta <- add_smooth_contributions_metadata(
+      eta = eta,
+      draws_mat = draws_mat,
+      prep = prep,
+      resp_prefix = paste0(resp_name, "_")
     )
-
-    for (zs_name in smooth_matrices) {
-      Zs <- prep$sdata[[zs_name]]
-
-      # Validate matrix structure
-      if (!is.matrix(Zs)) {
-        stop(insight::format_error(
-          "Smooth basis {.field {zs_name}} must be a matrix."
-        ))
-      }
-
-      if (nrow(Zs) != n_obs) {
-        stop(insight::format_error(
-          "Smooth basis {.field {zs_name}} has {nrow(Zs)} rows ",
-          "but expected {n_obs} observations for ",
-          "response {.val {resp_name}}."
-        ))
-      }
-
-      n_basis <- ncol(Zs)
-
-      # Extract smooth label: Zs_<response>_<label>
-      smooth_label <- sub(smooth_pattern, "", zs_name)
-
-      # Extract and unstandardize smooth coefficients
-      sm_coef <- extract_smooth_coef(
-        draws_mat = draws_mat,
-        smooth_label = smooth_label,
-        resp = resp_name,
-        n_basis = n_basis
-      )
-
-      # Skip if smooth not present (optional smooths may not exist)
-      if (is.null(sm_coef)) {
-        next
-      }
-
-      # Compute smooth contribution: [n_draws × n_obs]
-      eta <- eta + sm_coef %*% t(Zs)
-    }
 
     # Add random effects for this response (vectorized)
     # Multivariate brms uses Z_<group>_<response>_<term> naming

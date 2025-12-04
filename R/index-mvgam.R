@@ -134,8 +134,8 @@ categorize_mvgam_parameters <- function(x) {
 
   # Fixed effects from observation formula only
   # b_ = standard fixed effects, b[ = indexed (multivariate)
-  # bs_ = basis spline coefficients, Intercept = intercepts (all variants)
-  obs_beta_pattern <- "^(b_|b\\[|bs_|Intercept)"
+  # bs_ = basis spline coefficients (brms), bs[ = basis spline coefficients (mvgam), Intercept = intercepts (all variants)
+  obs_beta_pattern <- "^(b_|b\\[|bs_|bs\\[|Intercept)"
   obs_beta_pars <- all_pars[
     grepl(obs_beta_pattern, all_pars) &
       !grepl("_trend", all_pars) &
@@ -169,6 +169,7 @@ categorize_mvgam_parameters <- function(x) {
   # (uncentered generated quantity already filtered via variables.mvgam)
   # Note: Z and Z_raw are bridge parameters mapping observations to latent
   # trends - they lack _trend suffix as they connect both components
+  # FIXED: Exclude smooth and random effect parameters to prevent duplicates
   trend_dynamic_pars <- all_pars[
     (grepl("_trend", all_pars) |
        grepl("^Z\\[", all_pars) |
@@ -176,7 +177,9 @@ categorize_mvgam_parameters <- function(x) {
       !grepl("^(trend|lv_trend|innovations_trend|scaled_innovations_trend|mu_trend)\\[", all_pars) &
       all_pars != "b_Intercept_trend" &
       all_pars != "Intercept_trend" &
-      !grepl("^b_.*_trend", all_pars)
+      !grepl("^b_.*_trend", all_pars) &
+      !grepl("^(sds_.*_trend|s_.*_trend)", all_pars) &  # Exclude smooth parameters
+      !grepl("^(sd_.*_trend|r_.*_trend|cor_.*_trend)", all_pars)  # Exclude RE parameters
   ]
   trend_pars <- create_component(trend_dynamic_pars)
 

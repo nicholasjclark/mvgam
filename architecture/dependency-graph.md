@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-12-03 16:40:35  
+**Generated:** 2025-12-04 08:27:26  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 60
-- **Total Functions:** 528
+- **Total Functions:** 529
 - **Exported Functions:** 57
-- **Internal Functions:** 485
+- **Internal Functions:** 486
 - **S3 Methods:** 41
 - **S3 Classes:** 31
 
@@ -222,8 +222,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/mvgam-class.R`** (0 functions) - Class definitions and methods
 
 ### S3 Methods Files
-- **`R/predictions.R`** (9 functions) - Prediction methods
-  - Key functions: detect_gp_terms, compute_approx_gp, has_nlpars, extract_linpred_nonlinear, extract_smooth_coef, extract_linpred_from_prep, extract_random_effects_contribution, extract_linpred_univariate, extract_linpred_multivariate
+- **`R/predictions.R`** (10 functions) - Prediction methods
+  - Key functions: validate_monotonic_indicesdetect_gp_terms compute_approx_gp has_nlpars extract_linpred_nonlinear extract_smooth_coef extract_linpred_from_prep extract_random_effects_contribution extract_linpred_univariate extract_linpred_multivariate (+ 9 more)
 - **`R/add_residuals.R`** (2 functions) - Residual analysis
   - Key functions: add_residualsadd_residuals.mvgam (+ 1 more)
 
@@ -648,6 +648,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **extract_random_effects_contribution()** (internal)
 - **extract_smooth_coef()** (internal)
 - **has_nlpars()** (internal)
+- **validate_monotonic_indices()** (internal)
 
 ### `R/print.mvgam.R`:
 - **extract_mcmc_info()** (internal)

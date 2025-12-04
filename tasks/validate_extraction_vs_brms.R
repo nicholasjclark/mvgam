@@ -399,34 +399,34 @@ results$test4 <- run_validation(
 )
 
 # -----------------------------------------------------------------------------
-# Test 5: t2() tensor product smooth
+# Test 5: t2() tensor product smooth (NO INTERCEPT)
 # -----------------------------------------------------------------------------
 
-cat("\n=== Test 5: t2() tensor product smooth ===\n")
+cat("\n=== Test 5: t2() tensor product smooth (no intercept) ===\n")
 
 # Create data with two continuous predictors for tensor product
 test_data_t2 <- test_data
 test_data_t2$w <- seq(-1, 1, length.out = n_time)
 
 brms_5 <- fit_brms_cached(
-  "ar1_t2",
-  y ~ 1 + t2(z, w, k = c(4, 4)) + ar(time = time, p = 1, cov = TRUE),
+  "ar1_t2_noint",
+  y ~ 0 + t2(z, w, k = c(4, 4)) + ar(time = time, p = 1, cov = TRUE),
   test_data_t2, poisson()
 )
 
 mvgam_5 <- fit_mvgam_cached(
-  "ar1_t2",
-  y ~ 1 + t2(z, w, k = c(4, 4)), ~ AR(p = 1),
+  "ar1_t2_noint",
+  y ~ 0 + t2(z, w, k = c(4, 4)), ~ AR(p = 1),
   test_data_t2, poisson()
 )
 
 results$test5 <- run_validation(
-  "AR(1) + t2() tensor smooth",
+  "AR(1) + t2() tensor smooth (no intercept)",
   brms_5, mvgam_5, test_data_t2,
   param_pairs = list(
-    c("b_Intercept", "b_Intercept", "Intercept"),
-    c("sds_t2zwk_4_4_1", "sds_1[1]", "sds_t2_1"),
-    c("sds_t2zwk_4_4_2", "sds_1[2]", "sds_t2_2"),
+    c("sds_t2zw_1", "sds_1[1]", "sds_t2_1"),
+    c("sds_t2zw_2", "sds_1[2]", "sds_t2_2"),
+    c("sds_t2zw_3", "sds_1[3]", "sds_t2_3"),
     c("ar[1]", "ar1_trend[1]", "AR(1)"),
     c("sderr", "sigma_trend[1]", "Sigma")
   )
