@@ -3037,7 +3037,7 @@
                               "extract_trend_priors":  {
                                                            "s3_class":  "",
                                                            "s3_method":  "",
-                                                           "signature":  "extract_trend_priors \u003c- function(trend_formula, data, response_names = NULL) {",
+                                                           "signature":  "extract_trend_priors \u003c- function(trend_formula, data, response_names = NULL, .precomputed_dimensions = NULL) {",
                                                            "is_s3_method":  false,
                                                            "arguments":  [
                                                                              "trend_formula",
@@ -7407,7 +7407,7 @@
                                 "count_mathematical_operators":  "count_mathematical_operators \u003c- function(expr) {",
                                 "pw_trend_properties":  "pw_trend_properties \u003c- function() {",
                                 "xts.to.ts":  "xts.to.ts \u003c- function(x, freq = 52) {",
-                                "extract_trend_priors":  "extract_trend_priors \u003c- function(trend_formula, data, response_names = NULL) {",
+                                "extract_trend_priors":  "extract_trend_priors \u003c- function(trend_formula, data, response_names = NULL, .precomputed_dimensions = NULL) {",
                                 "extract_and_rename_trend_parameters":  "extract_and_rename_trend_parameters \u003c- function(trend_setup, dimensions, suffix = \"_trend\") {",
                                 "validate_bf_trend_formula":  "validate_bf_trend_formula \u003c- function(bf_obj) {",
                                 "register_core_trends":  "register_core_trends \u003c- function() {",
@@ -8520,9 +8520,9 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-12-05 14:03:16",
+                     "generated":  "2025-12-05 15:51:29",
                      "commit_hash":  "pending",
-                     "cached_files":  59,
+                     "cached_files":  60,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
@@ -8533,7 +8533,7 @@
                      "dynamic_references":  38,
                      "package_name":  "mvgam",
                      "potentially_unused_functions":  38,
-                     "changed_files":  1,
+                     "changed_files":  0,
                      "total_files":  60,
                      "zero_dependency_functions":  450
                  },

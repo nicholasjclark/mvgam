@@ -50,7 +50,7 @@
                                 "extract_prior_string":  "extract_prior_string \u003c- function(prior_frame, class_name, coef_name = NULL, handle_suffix = TRUE) {",
                                 "remove_trend_suffix_from_priors":  "remove_trend_suffix_from_priors \u003c- function(trend_priors, trend_specs, base_formula, data) {",
                                 "get_all_mvgam_trend_parameters":  "get_all_mvgam_trend_parameters \u003c- function(trend_specs) {",
-                                "extract_trend_priors":  "extract_trend_priors \u003c- function(trend_formula, data, response_names = NULL) {",
+                                "extract_trend_priors":  "extract_trend_priors \u003c- function(trend_formula, data, response_names = NULL, .precomputed_dimensions = NULL) {",
                                 "map_trend_priors":  "map_trend_priors \u003c- function(prior, trend_type) {",
                                 "get_prior.brmsformula":  "get_prior.brmsformula \u003c- function(object, ...) {",
                                 "get_prior.formula":  "get_prior.formula \u003c- function(object, ...) {",

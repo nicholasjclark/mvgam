@@ -225,11 +225,6 @@ The extraction system now successfully handles:
 - **`R/mock-stanfit.R`** - Added `get_brms_re_mapping()` and `compute_nonlinear_dpars()` with full brms attribution  
 - **`R/predictions.R`** - Fixed `extract_smooth_coef()`, added GP/monotonic/offset support, **added smooth fixed effects processing (lines 879-908)** implementing `Xs * bs` component
 
-### Testing Infrastructure
-- **`tasks/test_extract_linpred_all_models.R`** - Comprehensive test script for all 13 model fixtures
-- **`tasks/test_nl_dpars_approach.R`** - Investigation script verifying nonlinear implementation
-- **`tasks/fixtures/fit*.rds`** - Model fixtures covering all brms formula patterns
-
 ---
 
   - [x] **2.4 Core Prediction Infrastructure (Foundation Functions)**
@@ -238,22 +233,14 @@ The extraction system now successfully handles:
     - [x] ~~2.4.1~~ **SUPERSEDED**: `prepare_obs_predictions()` function superseded by more comprehensive `extract_component_linpred()` 
     - [x] ~~2.4.2~~ **SUPERSEDED**: `prepare_trend_predictions()` function superseded by more comprehensive `extract_component_linpred()`
     - [x] **2.4.3 COMPLETE**: `extract_linpred_from_prep(prep, dpar = "mu")` function implemented in `R/predictions.R` (lines 1009-1054). Handles linear predictor computation from prep objects with full support for univariate/multivariate models and all brms formula features.
-    - [x] **2.4.1-2 EVOLUTION**: `extract_component_linpred(mvgam_fit, newdata, component = "obs"|"trend", ...)` implemented in `R/predictions.R` (lines 1838-1926). **Consolidates and exceeds original 2.4.1-2 scope**: handles both observation and trend components, includes parameter extraction → mock stanfit creation → prep generation → linear predictor extraction in unified workflow. Validated in `tasks/validate_extraction_vs_brms.R` with 11/11 tests passing.
+    - [x] **2.4.1-2 EVOLUTION**: `extract_component_linpred(mvgam_fit, newdata, component = "obs"|"trend", ...)` implemented in `R/predictions.R` (lines 1838-1926). **Consolidates and exceeds original 2.4.1-2 scope**: handles both observation and trend components, includes parameter extraction → mock stanfit creation → prep generation → linear predictor extraction in unified workflow. Validated in `tasks/validate_extraction_vs_brms.R`.
     - [ ] 2.4.4 Add input validation function `validate_newdata_for_predictions(mvgam_fit, newdata)` in `R/predictions.R`. Check that newdata is data.frame, check for required variables from both formulas (use `all.vars()`), check for time/series variables if trend model present. Return validated newdata or stop with informative error via `insight::format_error()`. Reference `tasks/validate_extraction_vs_brms.R` for validation patterns and edge cases.
 
-  - [ ] **2.5 Local Integration Testing (in tasks/)** **FRAMEWORK COMPLETE**
-    **Note**: Core validation framework already exists in `tasks/validate_extraction_vs_brms.R` with 11/11 brms baseline tests. Additional integration testing should build on this foundation.
-    - [ ] 2.5.1 Create `tasks/test_integration_local.R` script. **START WITH `devtools::load_all()`**. Load `tasks/fixtures/fit1.rds`, create newdata, and test the unified workflow using `extract_component_linpred(mvgam_fit, newdata, component = "obs")` and `extract_component_linpred(mvgam_fit, newdata, component = "trend")`. Document any issues encountered. Reference existing validation patterns in `tasks/validate_extraction_vs_brms.R`.
-    - [ ] 2.5.2 In local integration script, combine observation and trend linear predictors additively. Apply inverse link function and verify predictions are reasonable (positive values for Poisson, proper range for probabilities). Print summary statistics of predictions. Compare methodology with `tasks/validate_extraction_vs_brms.R` Test 2T-4T (trend formula validation).
-    - [ ] 2.5.3 Test workflow with fit2 (multivariate) in local script. Test with fit3 (smooths + VAR). Document any model-specific adjustments needed. Update helper functions in `R/predictions.R` if issues found. Use validation model fixtures from `tasks/fixtures/val_*.rds` for consistency.
-    - [ ] 2.5.4 Test edge cases in local script: newdata with different number of rows, missing series levels, predictions at future time points. Document what works and what needs additional validation. Reference edge case handling patterns from `tasks/validate_extraction_vs_brms.R`.
-
-  - [ ] **2.6 Final Integration Tests (in tests/testthat/)**
+  - [ ] **2.5 Final Integration Tests (in tests/testthat/)**
     **Note**: Use `tasks/validate_extraction_vs_brms.R` methodology and test models as reference for integration test design.
-    - [ ] 2.6.1 Create `tests/testthat/test-predictions-integration.R` file. Write test "integration: basic prediction workflow" that fits a simple inline model (y ~ x, trend_formula = ~ RW()), creates newdata, and calls `extract_component_linpred(mvgam_fit, newdata, component = "obs")` and `extract_component_linpred(mvgam_fit, newdata, component = "trend")` without errors.
-    - [ ] 2.6.2 In integration test, combine observation and trend linear predictors additively. Verify dimensions are correct. Verify no NA values in output. Verify combining them produces sensible predictions. Follow validation patterns from `tasks/validate_extraction_vs_brms.R`.
-    - [ ] 2.6.3 Add integration test for multivariate model. Fit inline multivariate model with shared trend, test prediction workflow using `extract_component_linpred()` with `resp` parameter. Verify response-specific handling works correctly. Reference multivariate validation models in `tasks/fixtures/val_*.rds`.
-    - [ ] 2.6.4 Add integration test for edge case: pure brms model (no trend_formula). Fit inline model without trends, verify `extract_component_linpred(mvgam_fit, newdata, component = "trend")` handles NULL trend_model gracefully, and predictions work with only observation component.
+    - [ ] 2.6.1 Update `tests/local/` tests for more extensive prediction testing.
+    - [ ] 2.6.2 Update `tasks/validate_extraction_vs_brms.R` to include a multidimensional GP model.
+    - [ ] 2.6.3 Update `tasks/validate_extraction_vs_brms.R` to include a model with two different gp effects, one of which uses a by variable.
 
   - [ ] **2.7 Documentation and Validation**
     - [ ] 2.7.1 Add roxygen2 documentation to `categorize_mvgam_parameters()` explaining return structure and usage. Update `@examples` to show how to extract specific parameter groups. Run `devtools::document()` to generate .Rd file.
