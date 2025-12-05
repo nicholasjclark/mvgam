@@ -2845,11 +2845,6 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
   attr(data, "mvgam_series") <- series_values
   attr(data, "mvgam_series_source") <- series_source
 
-  if (Sys.getenv("MVGAM_DEBUG") == "TRUE") {
-    cat("  - series_source:", series_source, "\n")
-    cat("  - series values (first 5):", paste(head(series_values, 5), collapse=", "), "\n")
-    cat("  - unique series count:", length(unique(series_values)), "\n")
-  }
 
   return(data)
 }
@@ -2990,25 +2985,81 @@ extract_and_validate_trend_components <- function(data, mv_spec,
 
   # Extract trend variables using existing safe functionality
   trend_variables <- character(0)
+  all_formula_vars <- character(0)
   if (!is.null(trend_formula)) {
     # Use existing parse_trend_formula with precomputed dimensions to avoid redundant computation
     parsed_trend_result <- parse_trend_formula(trend_formula, data, response_vars,
                                              .precomputed_dimensions = dimensions)
     regular_terms <- parsed_trend_result$regular_terms %||% character(0)
 
-    # Extract actual variable names from function calls like mo(income), s(x), gp(time)
+    # Extract all variables using brms formula parsing
+    all_formula_vars <- character(0)
     for (term in regular_terms) {
-      term_formula <- as.formula(paste("~", term))
-      trend_variables <- c(trend_variables, all.vars(term_formula))
+      # Add dummy response for brms parsing
+      term_formula <- as.formula(paste("y ~", term))
+      bterms <- brms::brmsterms(term_formula)
+      
+      # Extract predictor variables from fixed effects (excluding intercept)
+      term_vars <- character(0)
+      if (!is.null(bterms$dpars$mu$fe) && 
+          !identical(bterms$dpars$mu$fe, ~ 1)) {
+        term_vars <- c(term_vars, all.vars(bterms$dpars$mu$fe))
+      }
+      
+      # Extract variables from smooth terms  
+      if (!is.null(bterms$dpars$mu$sm)) {
+        sm_allvars <- attr(bterms$dpars$mu$sm, "allvars")
+        if (!is.null(sm_allvars)) {
+          sm_vars <- all.vars(sm_allvars)
+          sm_vars <- sm_vars[sm_vars != "1"]  # Remove intercept
+          term_vars <- c(term_vars, sm_vars)
+        }
+      }
+      
+      # Extract variables from GP terms
+      if (!is.null(bterms$dpars$mu$gp)) {
+        gp_allvars <- attr(bterms$dpars$mu$gp, "allvars")
+        if (!is.null(gp_allvars)) {
+          gp_vars <- all.vars(gp_allvars)
+          term_vars <- c(term_vars, gp_vars)
+        }
+      }
+      
+      # Extract variables from special predictors (monotonic effects, etc.)
+      if (!is.null(bterms$dpars$mu$sp)) {
+        sp_allvars <- attr(bterms$dpars$mu$sp, "allvars")
+        if (!is.null(sp_allvars)) {
+          sp_vars <- all.vars(sp_allvars)
+          term_vars <- c(term_vars, sp_vars)
+        }
+      }
+      
+      # Extract grouping variables from random effects (needed for data subsetting)
+      grouping_vars <- character(0)
+      if (!is.null(bterms$dpars$mu$re) && nrow(bterms$dpars$mu$re) > 0) {
+        for (i in seq_len(nrow(bterms$dpars$mu$re))) {
+          group_factor <- bterms$dpars$mu$re$group[i]
+          # Parse nested grouping like "series:habitat" -> c("series", "habitat")
+          group_components <- unlist(strsplit(group_factor, ":", fixed = TRUE))
+          # Exclude standard mvgam variables that are handled separately
+          group_components <- group_components[!group_components %in% c("series", "time")]
+          grouping_vars <- c(grouping_vars, group_components)
+        }
+      }
+      
+      trend_variables <- c(trend_variables, term_vars)
+      all_formula_vars <- c(all_formula_vars, term_vars, grouping_vars)
     }
     trend_variables <- unique(trend_variables)
+    all_formula_vars <- unique(all_formula_vars)
   }
 
-  # Add extracted trend variables to dimensions metadata for extract_trend_data
+  # Add extracted variables to dimensions metadata for extract_trend_data
+  # Use all_formula_vars (including grouping variables) for data subsetting
   if (is.null(dimensions$metadata)) {
     dimensions$metadata <- list()
   }
-  dimensions$metadata$covariates <- trend_variables
+  dimensions$metadata$covariates <- all_formula_vars
 
   # Data extraction using precomputed dimensions and existing tested functionality
   trend_data <- data

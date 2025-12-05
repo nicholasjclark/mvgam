@@ -154,10 +154,11 @@ test_that("all trend types generate correct prior structures", {
       # Extract trend components from mvgam (identified by _trend suffix)
       mvgam_trend_priors <- mvgam_priors[grepl("_trend$", mvgam_priors$class), , drop = FALSE]
 
-      # Test equivalence: every brms prior should appear with _trend suffix
+      # Test equivalence: every brms prior (except Intercept) should appear with _trend suffix
+      # Trend formulas exclude intercepts by default
       for (i in seq_len(nrow(brms_priors))) {
         brms_row <- brms_priors[i, ]
-        if (brms_row$class != "") {
+        if (brms_row$class != "" && brms_row$class != "Intercept") {
           expected_trend_class <- paste0(brms_row$class, "_trend")
 
           # Find matching mvgam trend prior

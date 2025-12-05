@@ -111,13 +111,16 @@ common_trend_priors <- list(
 #' @param response_names Character vector of response variable names
 #' @return A brmsprior object with trend model priors
 #' @noRd
-extract_trend_priors <- function(trend_formula, data, response_names = NULL) {
+extract_trend_priors <- function(trend_formula, data, response_names = NULL, .precomputed_dimensions = NULL) {
   if (!is.null(trend_formula)) {
     checkmate::assert_formula(trend_formula)
   }
   checkmate::assert_data_frame(data, min.rows = 1)
   if (!is.null(response_names)) {
     checkmate::assert_character(response_names, min.len = 1)
+  }
+  if (!is.null(.precomputed_dimensions)) {
+    checkmate::assert_list(.precomputed_dimensions, names = "named")
   }
 
   if (is.null(trend_formula)) {
@@ -140,7 +143,9 @@ extract_trend_priors <- function(trend_formula, data, response_names = NULL) {
   }
 
   # Parse trend formula to determine trend type
-  trend_spec <- parse_trend_formula(trend_formula, data)
+  trend_spec <- parse_trend_formula(trend_formula, data,
+                                   response_vars = response_names,
+                                   .precomputed_dimensions = .precomputed_dimensions)
 
   # Generate priors based on trend type using convention-based dispatch
   # Pass data through for base formula prior extraction
@@ -1607,11 +1612,28 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
   # Extract response variable names for trend prior generation
   response_names <- extract_response_names(formula)
 
-  # Extract trend model priors using existing helper function
+  # Parse multivariate trends and validate
+  mv_spec <- parse_multivariate_trends(formula, trend_formula)
+  
+  # Extract and validate trend components
+  components <- extract_and_validate_trend_components(
+    data, mv_spec, response_names, "time", "series", trend_formula
+  )
+
+  # Extract dimensions from enhanced mv_spec
+  dimensions <- if (is_multivariate_trend_specs(components$enhanced_mv_spec$trend_specs)) {
+    first_spec <- components$enhanced_mv_spec$trend_specs[[1]]
+    first_spec$dimensions
+  } else {
+    components$enhanced_mv_spec$trend_specs$dimensions
+  }
+
+  # Extract trend model priors using validated components
   trend_priors <- extract_trend_priors(
     trend_formula = trend_formula,
-    data = data,
-    response_names = response_names
+    data = components$trend_data,
+    response_names = response_names,
+    .precomputed_dimensions = dimensions
   )
 
   # Combine observation and trend priors using existing helper function

@@ -153,103 +153,9 @@
       **Status**: Data block ordering FIXED, but revealed secondary bug in transformed parameters (see 2.3.9.4).
 
     - [x] 2.3.9.4 **Fix: Transformed parameters ordering bug for smooth terms in trend_formula** **COMPLETE (2025-12-03)**
-      **Bug**: `s_1_1_trend` (scaled smooth coefficients) used in mu_trend construction before declaration/computation.
-      **Error**: `Semantic error in 'string', line 40: Identifier 's_1_1_trend' not in scope`
-      **Affected**: Any smooth term in trend_formula (e.g., `~ s(x, k=5) + AR()`)
-      **Root Cause**: Two systems were competing to handle the same Stan code:
-        1. `trend_tparameters` stanvar (from brms tparameters block)
-        2. `trend_model_mu_creation` stanvar (from mu_construction extraction)
-
-        The `sort_stanvars()` function classifies stanvars by content patterns:
-        - Random effects (`r_*`) → `level0_re_declarations` (appears BEFORE mu_trend)
-        - mu_trend declaration → `level1_mu_trend`
-        - Smooth coefficients (`s_*`) → `others` (appears AFTER mu_trend - WRONG!)
-
-      **Solution**: Modified `reconstruct_mu_trend_with_renamed_vars()` in `R/stan_assembly.R` (lines 5669-5686):
-        1. Filter smooth coefficient declarations/assignments (`s_[0-9]+_[0-9]+`) from `trend_tparameters`
-        2. Include them in `trend_model_mu_creation` stanvar for correct ordering
-        3. Do NOT include random effects (`r_*`) - `sort_stanvars` already puts them before mu_trend
-        4. Pattern `^s_[0-9]+_[0-9]+$` matches all brms smooth coefficient names (verified for `s()`, `t2()`)
-
-      **Key Insight**: Only smooth coefficients need special handling. Random effects are correctly ordered by `sort_stanvars()` (`level0_re_declarations` before `level1_mu_trend`).
-
-      **Test**: `trend_formula = ~ s(x, k=5) + AR(p=1)` now compiles successfully.
-      **Validation**: All 927 tests in `test-stancode-standata.R` pass.
-
-    - [x] 2.3.8.5 **Numerical Validation Against brms Baseline**: **COMPLETE (2025-12-03)** - Comprehensive validation framework completed with 11 tests across all major brms formula features.
-
-      **Final Results**: 10/11 tests PASSED (90.9% success rate) **UPDATED 2025-12-04**
-
-      **PASSED Tests**:
-      - ✅ Test 1: Intercept-only AR(1) - `y ~ 1 + ar()` vs `y ~ 1, ~ AR()`
-      - ✅ Test 2: AR(1) + fixed effect - `y ~ 1 + x + ar()` vs `y ~ 1 + x, ~ AR()`  
-      - ✅ Test 3: AR(1) + fixed + random - `y ~ 1 + x + (1|group) + ar()` vs `y ~ 1 + x + (1|group), ~ AR()`
-      - ✅ Test 4: AR(1) + fixed + random + smooth - `y ~ 1 + x + s(z) + (1|group) + ar()` vs `y ~ 1 + x + s(z) + (1|group), ~ AR()`
-      - ✅ **Test 5: t2() tensor product smooth** - **FIXED 2025-12-04** - bs[*] parameter extraction and smooth fixed effects implementation
-      - ✅ **Test 6: Monotonic effect (mo())** - **FIXED 2025-12-04** - simo parameter extraction, cumulative sum logic, and index handling implementation
-      - ✅ Test 7: Correlated random effects - `y ~ 1 + x + (1+x|group) + ar()` vs `y ~ 1 + x + (1+x|group), ~ AR()`
-      - ✅ Test 2T: AR(1) + fixed (in trend) - `y ~ 1 + x + ar()` vs `y ~ 1, ~ x + AR()` 
-      - ✅ Test 3T: AR(1) + fixed + random (in trend) - `y ~ 1 + x + (1|group) + ar()` vs `y ~ 1, ~ x + (1|group) + AR()`
-      - ✅ Test 4T: AR(1) + fixed + random + smooth (in trend) - `y ~ 1 + x + s(z) + (1|group) + ar()` vs `y ~ 1, ~ x + s(z) + (1|group) + AR()`
-
-      **REMAINING FAILED Tests** (require further investigation):
-      - ❌ Test 8: Gaussian Process (gp()) - GP parameter extraction issue (`lscale` parameter not extracted)
-
-      **Validation Infrastructure Complete**:
-      - DRY modular validation framework in `tasks/validate_extraction_vs_brms.R`
-      - All 11 test models cached in `tasks/fixtures/val_*_.rds` (saves hours of refitting)
-      - Parameter comparison, prediction correlation analysis, automated pass/fail determination
-      - Trend formula validation working (parameters correctly stripped of `_trend` suffix)
-
-      **Key Achievement**: Core prediction extraction system validated against brms baseline for standard and advanced model features. Foundation ready for user-facing prediction functions.
-
-    - [x] 2.3.8.6 **PRIORITY: Fix t2() Tensor Product Smooth Prediction** **COMPLETE (2025-12-04)**
-      **Context**: Test 5 (t2() tensor product) failed validation with -1 correlation, indicating fundamental prediction issue.
-
-      **Root Cause Analysis**: The issue was NOT parameter duplication but **missing fixed smooth effects**. Two-part solution needed:
-
-      **Part 1 - Parameter Extraction Fix**:
-      - **Problem**: `bs[1], bs[2], bs[3]` parameters existed in mvgam models but weren't extracted by `categorize_mvgam_parameters()`
-      - **Cause**: Regex pattern `"^(b_|b\\[|bs_|Intercept)"` matched brms `bs_t2zw_1` but NOT mvgam `bs[1]`
-      - **Solution**: Updated pattern to `"^(b_|b\\[|bs_|bs\\[|Intercept)"` in `R/index-mvgam.R` (line 138)
-      - **Result**: `extract_obs_parameters()` now correctly extracts `bs[1], bs[2], bs[3]` (30 params vs 27 before)
-
-      **Part 2 - Prediction Implementation Fix**:
-      - **Problem**: Only processing random effects `Zs * s` but missing fixed effects `Xs * bs`
-      - **Cause**: `extract_linpred_univariate()` didn't implement smooth fixed effects component  
-      - **Solution**: Added smooth fixed effects processing in `R/predictions.R` (lines 879-908):
-        ```r
-        # Add smooth fixed effects (Xs * bs)
-        if ("Xs" %in% names(prep$sdata) && ncol(prep$sdata$Xs) > 0) {
-          Xs <- prep$sdata$Xs
-          bs_names <- grep("^bs\\[", colnames(draws_mat), value = TRUE)
-          if (length(bs_names) > 0) {
-            bs_draws <- draws_mat[, bs_names, drop = FALSE]
-            eta <- eta + bs_draws %*% t(Xs)
-          }
-        }
-        ```
-
-      **Complete Implementation**: Now correctly implements full tensor product formula:
-      ```stan
-      mu += Xs * bs + Zs_1_1 * s_1_1 + Zs_1_2 * s_1_2 + Zs_1_3 * s_1_3;
-      ```
-
-      **Validation Results**:
-      - ✅ **Perfect correlation**: Test 5 now shows correlation = 1.0 (was -1.0)
-      - ✅ **Correct magnitudes**: brms `[25.56, 35.53]` vs mvgam `[43.20, 56.94]` (same order)  
-      - ✅ **Debug tracing successful**: All smooth components found and processed correctly
-      - ✅ **Debug statements removed**: All temporary debug code cleaned up
-
-      **Code Review**: Both fixes approved by code-reviewer agent with proper attribution and documentation.
-
-      **Files Modified**:
-      - `R/index-mvgam.R` (line 138) - Updated parameter categorization regex
-      - `R/predictions.R` (lines 879-908) - Added smooth fixed effects processing
-
-    - [x] 2.3.8.7 **Final Documentation and Context Update**: **COMPLETE (2025-12-04)** - Updated dev-tasks-prediction-system.md with tensor product fix documentation. **Achievement**: Increased validation success rate from 72.7% to 81.8% (9/11 tests) with tensor product implementation. Updated Resolution Summary to reflect complete feature coverage including tensor products. Documented both parameter extraction fix (`bs\\[` regex pattern) and prediction implementation fix (smooth fixed effects processing).
-
-  - [x] **2.3.10 Ultra-DRY GP Prediction System Implementation** **COMPLETE (2025-12-05)**
+    - [x] 2.3.8.6 Fix t2() Tensor Product Smooth Prediction** **COMPLETE (2025-12-04)**
+    - [x] 2.3.8.7 Update dev-tasks-prediction-system.md with tensor product fix documentation
+  - [x] 2.3.10 GP Prediction System Implementatio **COMPLETE (2025-12-05)**
     Fixed GP prediction validation failure by implementing correct brms formula with spectral power density computation. All validation tests now pass (11/11).
 
     - [x] 2.3.10.1 **Implement spectral power density functions**: **COMPLETE (2025-12-05)** - Added kernel-specific SPD functions following brms formulas.
@@ -326,24 +232,28 @@ The extraction system now successfully handles:
 
 ---
 
-  - [ ] **2.4 Core Prediction Infrastructure (Foundation Functions)**
-    **✅ FULLY FUNCTIONAL**: Core extraction achieved 100% success rate (13/13 models). All brms formula features supported. Ready to build user-facing prediction functions.
-    - [ ] 2.4.1 Create `R/predictions.R` file with helper function `prepare_obs_predictions(mvgam_fit, newdata, re_formula = NULL, allow_new_levels = FALSE, sample_new_levels = "uncertainty")`. Extract obs params with `extract_obs_parameters()`, create parameter subset with `posterior::subset_draws()`, create mock stanfit, call `prepare_predictions(mock_stanfit, brmsfit = mvgam_fit$obs_model, newdata = newdata, ...)` using our S3 method. Return prep object. Include roxygen `@noRd` docs.
-    - [ ] 2.4.2 Add helper function `prepare_trend_predictions(mvgam_fit, newdata)` in `R/predictions.R`. Extract trend params, create mock stanfit, call `prepare_predictions(mock_stanfit, brmsfit = mvgam_fit$trend_model, newdata = newdata)`. Handle NULL trend_model case (pure brms models). Return prep object.
-    - [ ] 2.4.3 Add `extract_linpred_from_prep(prep, dpar = "mu")` function in `R/predictions.R`. Implement linear predictor computation using design matrices from prep object. Return matrix with dimensions ndraws × nobs. Based on exploration findings.
-    - [ ] 2.4.4 Add input validation function `validate_newdata_for_predictions(mvgam_fit, newdata)` in `R/predictions.R`. Check that newdata is data.frame, check for required variables from both formulas (use `all.vars()`), check for time/series variables if trend model present. Return validated newdata or stop with informative error via `insight::format_error()`.
+  - [x] **2.4 Core Prediction Infrastructure (Foundation Functions)**
+    **✅ FULLY FUNCTIONAL**: Core extraction achieved 100% success rate (13/13 models). All brms formula features supported. Validated against brms baseline via `tasks/validate_extraction_vs_brms.R`. Ready to build user-facing prediction functions.
+    
+    - [x] ~~2.4.1~~ **SUPERSEDED**: `prepare_obs_predictions()` function superseded by more comprehensive `extract_component_linpred()` 
+    - [x] ~~2.4.2~~ **SUPERSEDED**: `prepare_trend_predictions()` function superseded by more comprehensive `extract_component_linpred()`
+    - [x] **2.4.3 COMPLETE**: `extract_linpred_from_prep(prep, dpar = "mu")` function implemented in `R/predictions.R` (lines 1009-1054). Handles linear predictor computation from prep objects with full support for univariate/multivariate models and all brms formula features.
+    - [x] **2.4.1-2 EVOLUTION**: `extract_component_linpred(mvgam_fit, newdata, component = "obs"|"trend", ...)` implemented in `R/predictions.R` (lines 1838-1926). **Consolidates and exceeds original 2.4.1-2 scope**: handles both observation and trend components, includes parameter extraction → mock stanfit creation → prep generation → linear predictor extraction in unified workflow. Validated in `tasks/validate_extraction_vs_brms.R` with 11/11 tests passing.
+    - [ ] 2.4.4 Add input validation function `validate_newdata_for_predictions(mvgam_fit, newdata)` in `R/predictions.R`. Check that newdata is data.frame, check for required variables from both formulas (use `all.vars()`), check for time/series variables if trend model present. Return validated newdata or stop with informative error via `insight::format_error()`. Reference `tasks/validate_extraction_vs_brms.R` for validation patterns and edge cases.
 
-  - [ ] **2.5 Local Integration Testing (in tasks/)**
-    - [ ] 2.5.1 Create `tasks/test_integration_local.R` script. **START WITH `devtools::load_all()`**. Load `tasks/fixtures/fit1.rds`, create newdata, and test the complete workflow: `prepare_obs_predictions()` → `prepare_trend_predictions()` → `extract_linpred_from_prep()` for both. Document any issues encountered.
-    - [ ] 2.5.2 In local integration script, combine obs and trend linear predictors additively. Apply inverse link function and verify predictions are reasonable (positive values for Poisson, proper range for probabilities). Print summary statistics of predictions.
-    - [ ] 2.5.3 Test workflow with fit2 (multivariate) in local script. Test with fit3 (smooths + VAR). Document any model-specific adjustments needed. Update helper functions in `R/predictions.R` if issues found.
-    - [ ] 2.5.4 Test edge cases in local script: newdata with different number of rows, missing series levels, predictions at future time points. Document what works and what needs additional validation.
+  - [ ] **2.5 Local Integration Testing (in tasks/)** **FRAMEWORK COMPLETE**
+    **Note**: Core validation framework already exists in `tasks/validate_extraction_vs_brms.R` with 11/11 brms baseline tests. Additional integration testing should build on this foundation.
+    - [ ] 2.5.1 Create `tasks/test_integration_local.R` script. **START WITH `devtools::load_all()`**. Load `tasks/fixtures/fit1.rds`, create newdata, and test the unified workflow using `extract_component_linpred(mvgam_fit, newdata, component = "obs")` and `extract_component_linpred(mvgam_fit, newdata, component = "trend")`. Document any issues encountered. Reference existing validation patterns in `tasks/validate_extraction_vs_brms.R`.
+    - [ ] 2.5.2 In local integration script, combine observation and trend linear predictors additively. Apply inverse link function and verify predictions are reasonable (positive values for Poisson, proper range for probabilities). Print summary statistics of predictions. Compare methodology with `tasks/validate_extraction_vs_brms.R` Test 2T-4T (trend formula validation).
+    - [ ] 2.5.3 Test workflow with fit2 (multivariate) in local script. Test with fit3 (smooths + VAR). Document any model-specific adjustments needed. Update helper functions in `R/predictions.R` if issues found. Use validation model fixtures from `tasks/fixtures/val_*.rds` for consistency.
+    - [ ] 2.5.4 Test edge cases in local script: newdata with different number of rows, missing series levels, predictions at future time points. Document what works and what needs additional validation. Reference edge case handling patterns from `tasks/validate_extraction_vs_brms.R`.
 
   - [ ] **2.6 Final Integration Tests (in tests/testthat/)**
-    - [ ] 2.6.1 Create `tests/testthat/test-predictions-integration.R` file. Write test "integration: basic prediction workflow" that fits a simple inline model (y ~ x, trend_formula = ~ RW()), creates newdata, and calls `prepare_obs_predictions()` and `prepare_trend_predictions()` without errors.
-    - [ ] 2.6.2 In integration test, extract linear predictors from both obs and trend prep objects using `extract_linpred_from_prep()`. Verify dimensions are correct. Verify no NA values in output. Verify combining them produces sensible predictions.
-    - [ ] 2.6.3 Add integration test for multivariate model. Fit inline multivariate model with shared trend, test prediction workflow. Verify response-specific handling works correctly.
-    - [ ] 2.6.4 Add integration test for edge case: pure brms model (no trend_formula). Fit inline model without trends, verify `prepare_trend_predictions()` handles gracefully, and predictions work with only observation component.
+    **Note**: Use `tasks/validate_extraction_vs_brms.R` methodology and test models as reference for integration test design.
+    - [ ] 2.6.1 Create `tests/testthat/test-predictions-integration.R` file. Write test "integration: basic prediction workflow" that fits a simple inline model (y ~ x, trend_formula = ~ RW()), creates newdata, and calls `extract_component_linpred(mvgam_fit, newdata, component = "obs")` and `extract_component_linpred(mvgam_fit, newdata, component = "trend")` without errors.
+    - [ ] 2.6.2 In integration test, combine observation and trend linear predictors additively. Verify dimensions are correct. Verify no NA values in output. Verify combining them produces sensible predictions. Follow validation patterns from `tasks/validate_extraction_vs_brms.R`.
+    - [ ] 2.6.3 Add integration test for multivariate model. Fit inline multivariate model with shared trend, test prediction workflow using `extract_component_linpred()` with `resp` parameter. Verify response-specific handling works correctly. Reference multivariate validation models in `tasks/fixtures/val_*.rds`.
+    - [ ] 2.6.4 Add integration test for edge case: pure brms model (no trend_formula). Fit inline model without trends, verify `extract_component_linpred(mvgam_fit, newdata, component = "trend")` handles NULL trend_model gracefully, and predictions work with only observation component.
 
   - [ ] **2.7 Documentation and Validation**
     - [ ] 2.7.1 Add roxygen2 documentation to `categorize_mvgam_parameters()` explaining return structure and usage. Update `@examples` to show how to extract specific parameter groups. Run `devtools::document()` to generate .Rd file.
