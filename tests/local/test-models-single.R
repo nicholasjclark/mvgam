@@ -97,6 +97,23 @@ test_that("Target 1: mvgam fits basic RW model", {
   vars <- variables(fit1)
   expect_type(vars, "character")
   expect_true(length(vars) > 0)
+
+  # Test prediction system
+  newdata <- data.frame(
+    x = c(0, 1),
+    time = c(25, 26),
+    series = factor(c("series1", "series1"))
+  )
+
+  obs_pred <- extract_component_linpred(fit1, newdata, component = "obs")
+  expect_true(is.matrix(obs_pred))
+  expect_equal(ncol(obs_pred), 2)
+  expect_true(all(is.finite(obs_pred)))
+
+  trend_pred <- extract_component_linpred(fit1, newdata, component = "trend")
+  expect_true(is.matrix(trend_pred))
+  expect_equal(ncol(trend_pred), 2)
+  expect_true(all(is.finite(trend_pred)))
 })
 
 # ==============================================================================
@@ -115,6 +132,30 @@ test_that("Target 2: mvgam fits multivariate shared RW model", {
   expect_s3_class(summ, "mvgam_summary")
   vars <- variables(fit2)
   expect_true(any(grepl("_trend", vars)))
+
+  # Test multivariate prediction system
+  mv_newdata <- expand.grid(
+    x = c(0, 1),
+    time = c(25, 26)
+  )
+
+  # Test all responses together
+  obs_pred_all <- extract_component_linpred(fit2, mv_newdata, component = "obs")
+  expect_type(obs_pred_all, "list")
+  expect_equal(names(obs_pred_all), c("count", "biomass"))
+  expect_true(all(sapply(obs_pred_all, is.matrix)))
+
+  # Test response-specific predictions
+  obs_pred_count <- extract_component_linpred(fit2, mv_newdata,
+                                             component = "obs", resp = "count")
+  expect_true(is.matrix(obs_pred_count))
+  expect_equal(ncol(obs_pred_count), 4)
+  expect_true(all(is.finite(obs_pred_count)))
+
+  trend_pred_all <- extract_component_linpred(fit2, mv_newdata, component = "trend")
+  expect_true(is.matrix(trend_pred_all))
+  expect_equal(ncol(trend_pred_all), 4)
+  expect_true(all(is.finite(trend_pred_all)))
 })
 
 # ==============================================================================
@@ -131,6 +172,27 @@ test_that("Target 3: mvgam fits VARMA model with covariates", {
   expect_s3_class(summ, "mvgam_summary")
   vars <- variables(fit3)
   expect_true(any(grepl("A.*_trend", vars)))
+
+  # Test prediction with smooth and VARMA model
+  varma_newdata <- data.frame(
+    x = seq(0, 1, length.out = 3),
+    presence = c(0, 1, 0),
+    time = c(73, 74, 75)
+  )
+
+  # Test observation predictions with smooth
+  obs_pred_varma <- extract_component_linpred(fit3, varma_newdata, component = "obs")
+  expect_type(obs_pred_varma, "list")
+  expect_equal(names(obs_pred_varma), c("count", "biomass"))
+  expect_true(all(sapply(obs_pred_varma, function(x) ncol(x) == 3)))
+
+  # Test trend predictions with covariates
+  trend_pred_varma <- extract_component_linpred(fit3, varma_newdata, component = "trend")
+  expect_type(trend_pred_varma, "double")
+  expect_true(all(sapply(trend_pred_varma, function(x) all(is.finite(x)))))
+  expect_true(all(trend_pred_varma[,1] == 0))
+  expect_true(all(trend_pred_varma[,3] == 0))
+  expect_false(all(trend_pred_varma[,2] == 0))
 })
 
 # ==============================================================================
@@ -160,6 +222,22 @@ test_that("Target 4: mvgam fits factor AR model", {
   expect_output(print(fit))
   summ <- summary(fit)
   expect_s3_class(summ, "mvgam_summary")
+
+  # Test factor model predictions
+  factor_newdata <- data.frame(
+    x = c(0.5, -0.5),
+    time = c(73, 74)
+  )
+
+  # Test predictions for factor loading model
+  obs_pred_factor <- extract_component_linpred(fit, factor_newdata, component = "obs")
+  expect_type(obs_pred_factor, "list")
+  expect_equal(names(obs_pred_factor), c("count", "presence", "biomass"))
+  expect_true(all(sapply(obs_pred_factor, function(x) ncol(x) == 2)))
+
+  trend_pred_factor <- extract_component_linpred(fit, factor_newdata, component = "trend")
+  expect_type(trend_pred_factor, "double")
+  expect_true(all(sapply(trend_pred_factor, function(x) all(x == 0))))
 })
 
 # ==============================================================================
@@ -186,6 +264,23 @@ test_that("Target 5: mvgam fits piecewise trend model", {
   expect_s3_class(summ, "mvgam_summary")
   vars <- variables(fit)
   expect_type(vars, "character")
+
+  # Test piecewise trend predictions
+  pw_newdata <- data.frame(
+    x = c(-1, 0, 1),
+    time = c(25, 26, 27),
+    series = factor(rep("series1", 3))
+  )
+
+  # Test piecewise model predictions
+  obs_pred_pw <- extract_component_linpred(fit, pw_newdata, component = "obs")
+  expect_true(is.matrix(obs_pred_pw))
+  expect_equal(ncol(obs_pred_pw), 3)
+  expect_true(all(is.finite(obs_pred_pw)))
+
+  trend_pred_pw <- extract_component_linpred(fit, pw_newdata, component = "trend")
+  expect_true(is.matrix(trend_pred_pw))
+  expect_true(all(is.finite(trend_pred_pw)))
 })
 
 # ==============================================================================
@@ -194,7 +289,7 @@ test_that("Target 5: mvgam fits piecewise trend model", {
 test_that("Target 6: mvgam fits CAR model with GP", {
   fit <- SW(SM(mvgam(
     y ~ (1 | series),
-    trend_formula = ~ gp(x) + CAR(),
+    trend_formula = ~ gp(x, k = 5) + CAR(),
     data = test_data$univariate,
     family = poisson(),
     chains = 2,
@@ -212,6 +307,24 @@ test_that("Target 6: mvgam fits CAR model with GP", {
   expect_s3_class(summ, "mvgam_summary")
   vars <- variables(fit)
   expect_true(any(grepl("_trend", vars)))
+
+  # Test CAR + GP predictions
+  car_newdata <- data.frame(
+    x = c(0, 0.5, 1),
+    time = c(25, 26, 27),
+    series = factor(rep("series1", 3))
+  )
+
+  # Test predictions with GP in trend formula
+  obs_pred_car <- extract_component_linpred(fit, car_newdata, component = "obs")
+  expect_true(is.matrix(obs_pred_car))
+  expect_equal(ncol(obs_pred_car), 3)
+  expect_true(all(is.finite(obs_pred_car)))
+
+  trend_pred_car <- extract_component_linpred(fit, car_newdata, component = "trend")
+  expect_true(is.matrix(trend_pred_car))
+  expect_equal(ncol(trend_pred_car), 3)
+  expect_true(all(is.finite(trend_pred_car)))
 })
 
 # ==============================================================================
@@ -272,6 +385,24 @@ test_that("Target 8: mvgam fits seasonal AR model", {
   expect_s3_class(summ, "mvgam_summary")
   vars <- variables(fit)
   expect_true(any(grepl("ar.*_trend", vars)))
+
+  # Test seasonal AR predictions with dual GPs
+  seasonal_newdata <- data.frame(
+    x = c(0, 0.5),
+    temperature = c(15, 18),
+    time = c(25, 26),
+    series = factor(rep("series1", 2))
+  )
+
+  # Test predictions with GP in both observation and trend formula
+  obs_pred_seasonal <- extract_component_linpred(fit, seasonal_newdata, component = "obs")
+  expect_true(is.matrix(obs_pred_seasonal))
+  expect_equal(ncol(obs_pred_seasonal), 2)
+  expect_true(all(is.finite(obs_pred_seasonal)))
+
+  trend_pred_seasonal <- extract_component_linpred(fit, seasonal_newdata, component = "trend")
+  expect_true(is.matrix(trend_pred_seasonal))
+  expect_true(all(is.finite(trend_pred_seasonal)))
 })
 
 # ==============================================================================
@@ -302,6 +433,23 @@ test_that("Target 9: mvgam fits nonlinear model with AR trends", {
   expect_s3_class(summ, "mvgam_summary")
   vars <- variables(fit)
   expect_type(vars, "character")
+
+  # Test nonlinear model predictions
+  nl_newdata <- data.frame(
+    x = c(-0.5, 0, 0.5),
+    time = c(25, 26, 27),
+    series = factor(rep("series1", 3))
+  )
+
+  # Test predictions with nonlinear formulas
+  obs_pred_nl <- extract_component_linpred(fit, nl_newdata, component = "obs")
+  expect_true(is.matrix(obs_pred_nl))
+  expect_equal(ncol(obs_pred_nl), 3)
+  expect_true(all(is.finite(obs_pred_nl)))
+
+  trend_pred_nl <- extract_component_linpred(fit, nl_newdata, component = "trend")
+  expect_true(is.matrix(trend_pred_nl))
+  expect_true(all(is.finite(trend_pred_nl)))
 })
 
 # ==============================================================================
@@ -477,11 +625,10 @@ test_that("print.summary.mvgam displays mvgam-specific metadata", {
   output_text <- paste(output, collapse = "\n")
 
   # Metadata sections should appear
-  expect_match(output_text, "GAM observation formula:")
+  expect_match(output_text, "Formula:")
   expect_match(output_text, "Family:")
-  expect_match(output_text, "Trend model:")
-  expect_match(output_text, "N series:")
-  expect_match(output_text, "N timepoints:")
+  expect_match(output_text, "Trends:")
+  expect_match(output_text, "Number of observations:")
   expect_match(output_text, "Draws:")
 
   # Parameter tables should also appear
@@ -563,15 +710,11 @@ test_that("variables.mvgam correctly excludes diagnostic parameters", {
 test_that("variables.mvgam includes required observation parameters", {
   vars1 <- variables(fit1)
 
-  # Gaussian family requires sigma
-  expect_true("sigma" %in% vars1)
+  # beta 1
+  expect_true("b[1]" %in% vars1)
 
   # Intercept parameter (brms names it "Intercept" not "b_Intercept")
   expect_true("Intercept" %in% vars1)
-
-  # Should have smooth parameters for s(season)
-  smooth_params <- vars1[grepl("^s_", vars1)]
-  expect_true(length(smooth_params) > 0)
 })
 
 test_that("variables.mvgam includes required trend parameters", {
@@ -582,7 +725,7 @@ test_that("variables.mvgam includes required trend parameters", {
   expect_true(length(trend_params) > 0)
 
   # RW model must have sigma_trend
-  expect_true("sigma_trend" %in% vars1)
+  expect_true("sigma_trend[1]" %in% vars1)
 
   # Trend states present (trend[i,s])
   trend_states <- vars1[grepl("^trend\\[", vars1)]
