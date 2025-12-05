@@ -707,6 +707,77 @@ get_trend_validation_patterns <- function() {
 
 #' Validate observation formula excludes mvgam trend constructors
 #'
+#' Validate that all gp() terms use approximate GP (have k parameter)
+#' 
+#' @param formula A formula object
+#' @noRd
+validate_exact_gp_usage <- function(formula) {
+  # Input validation (required by CLAUDE.md standards)
+  checkmate::assert(
+    checkmate::check_formula(formula),
+    checkmate::check_class(formula, "brmsformula"),
+    checkmate::check_class(formula, "mvbrmsformula"),
+    checkmate::check_null(formula),
+    .var.name = "formula"
+  )
+  
+  if (is.null(formula)) return(invisible(NULL))
+  
+  # Handle different formula types
+  if (inherits(formula, "brmsformula")) {
+    # For brmsformula, extract the main formula component
+    main_formula <- formula$formula
+  } else if (inherits(formula, "mvbrmsformula")) {
+    # For multivariate brmsformula, check all response formulas
+    all_formulas <- formula$forms
+    for (form in all_formulas) {
+      if (!is.null(form$formula)) {
+        validate_exact_gp_usage(form$formula)
+      }
+    }
+    return(invisible(NULL))
+  } else {
+    # Regular formula object
+    main_formula <- formula
+  }
+  
+  # Get term labels from formula
+  termlabs <- attr(terms.formula(main_formula, keep.order = TRUE), 
+                   "term.labels")
+  which_gp <- grep("gp(", termlabs, fixed = TRUE)
+  
+  if (length(which_gp) == 0) return(invisible(NULL))
+  
+  # Check each gp() term with error handling
+  for (j in seq_along(which_gp)) {
+    gp_term <- termlabs[which_gp[j]]
+    
+    # Safe evaluation with error handling
+    gp_obj <- try({
+      eval(parse(text = gp_term))
+    }, silent = TRUE)
+    
+    if (inherits(gp_obj, "try-error")) {
+      stop(insight::format_error(
+        "Invalid GP term syntax: {.field {gp_term}}",
+        "GP terms must be valid function calls"
+      ))
+    }
+    
+    if (is.na(gp_obj$k)) {
+      stop(insight::format_error(
+        paste("Exact GP terms (without {.field k} parameter)",
+              "are not supported"),
+        paste("Found:", gp_term),
+        "Solution: Add {.field k} to specify number of basis functions",
+        paste("Example:", gsub("\\)$", ", k=20)", gp_term))
+      ))
+    }
+  }
+  
+  return(invisible(NULL))
+}
+
 #' Main validation for observation formulas - ensures they're clean for brms
 #' processing by checking they don't contain mvgam trend constructors.
 #'
@@ -746,6 +817,8 @@ validate_obs_formula_brms <- function(formula) {
     ))
   }
 
+  # Check for exact GP usage (gp() without k parameter)
+  validate_exact_gp_usage(formula)
 
   # Return original formula unchanged - brms handles all other validation
   return(formula)
@@ -926,6 +999,9 @@ validate_single_trend_formula <- function(formula, context = NULL, allow_respons
   validate_trend_formula_restrictions(formula_str,
                                      c("offsets", "brms_autocor", "addition_terms", "multiple_constructors"),
                                      formula)
+
+  # Check for exact GP usage (gp() without k parameter)
+  validate_exact_gp_usage(formula)
 
   return(formula)
 }

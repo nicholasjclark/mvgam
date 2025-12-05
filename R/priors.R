@@ -1372,6 +1372,9 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
     .var.name = "formula"
   )
 
+  # Validate observation formula for GP usage and trend constructors
+  validate_obs_formula_brms(formula)
+
   # Validate trend_formula if provided
   if (!is.null(trend_formula)) {
     checkmate::assert_formula(trend_formula, .var.name = "trend_formula")

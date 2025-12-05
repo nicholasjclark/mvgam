@@ -618,6 +618,55 @@ results$test4t <- run_validation(
   extract_fn = extract_mvgam_combined_pred
 )
 
+# -----------------------------------------------------------------------------
+# Test 8T: Gaussian Process in trend formula
+# -----------------------------------------------------------------------------
+
+cat("\n=== Test 8T: Gaussian Process in TREND ===\n")
+
+mvgam_8t <- fit_mvgam_cached(
+  "ar1_gp_trend",
+  y ~ 1, ~ gp(z, k = 5) + AR(p = 1),
+  test_data, poisson()
+)
+
+results$test8t <- run_validation(
+  "AR(1) + GP (in trend)",
+  brms_8, mvgam_8t, test_data,
+  param_pairs = list(
+    c("b_Intercept", "b_Intercept", "Intercept"),
+    c("sdgp_gpz", "sdgp_1_trend[1]", "sdgp"),
+    c("lscale_gpz", "lscale_1_trend[1,1]", "lscale"),
+    c("ar[1]", "ar1_trend[1]", "AR(1)"),
+    c("sderr", "sigma_trend[1]", "Sigma")
+  ),
+  extract_fn = extract_mvgam_combined_pred
+)
+
+# -----------------------------------------------------------------------------
+# Test 6T: Monotonic effect in trend formula
+# -----------------------------------------------------------------------------
+
+cat("\n=== Test 6T: Monotonic effect in TREND ===\n")
+
+mvgam_6t <- fit_mvgam_cached(
+  "ar1_mo_trend",
+  y ~ 1, ~ mo(ord_factor) + AR(p = 1),
+  test_data_mo, poisson()
+)
+
+results$test6t <- run_validation(
+  "AR(1) + monotonic (in trend)",
+  brms_6, mvgam_6t, validation_data_mo,
+  param_pairs = list(
+    c("b_Intercept", "b_Intercept", "Intercept"),
+    c("bsp_moord_factor", "bsp_trend[1]", "bsp_mo"),
+    c("ar[1]", "ar1_trend[1]", "AR(1)"),
+    c("sderr", "sigma_trend[1]", "Sigma")
+  ),
+  extract_fn = extract_mvgam_combined_pred
+)
+
 # =============================================================================
 # SUMMARY
 # =============================================================================

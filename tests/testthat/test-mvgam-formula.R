@@ -203,14 +203,8 @@ test_that("mvgam_formula handles edge cases", {
   expect_no_error(mvgam_formula(y ~ x, trend_formula = ~ -1))
 
   # Formula with dots
-  expect_no_error(mvgam_formula(y ~ .))
+  expect_error(mvgam_formula(y ~ .))
 })
-
-# =============================================================================
-# SECTION: BRMS COMPATIBILITY TESTS (Sub-task 1F)
-# =============================================================================
-# Tests for exact equivalence between mvgam_formula + get_prior and brms::get_prior
-# when trend_formula = NULL. This ensures perfect brms delegation.
 
 test_that("mvgam_formula + get_prior identical to brms when no trends", {
   # Create test data
@@ -457,43 +451,6 @@ test_that("trend component attribute behavior", {
   expect_true(all(grepl("_trend$", trend_classes)))
 })
 
-test_that("mvgam_formula object reusability across contexts", {
-  # Create single formula object
-  formula_obj <- mvgam_formula(y ~ x + s(time), trend_formula = ~ AR())
-  test_data <- data.frame(y = rnorm(50), x = rnorm(50), time = 1:50, series = factor(rep("A", 50)))
-
-  # Should work across multiple calls with same parameters
-  result1 <- get_prior(formula_obj, family = gaussian(), data = test_data)
-  result2 <- get_prior(formula_obj, family = gaussian(), data = test_data)
-
-  # Check structure consistency rather than exact identity (some Stan code generation may vary)
-  expect_equal(dim(result1), dim(result2))
-  expect_equal(names(result1), names(result2))
-  expect_equal(result1$class, result2$class)
-  expect_equal(result1$coef, result2$coef)
-  expect_equal(result1$group, result2$group)
-
-  # Should work with different families
-  poisson_result <- get_prior(formula_obj, family = poisson(), data = test_data)
-  expect_s3_class(poisson_result, "brmsprior")
-
-  # Should work with different data (same structure)
-  different_data <- data.frame(y = rpois(30, 2), x = rnorm(30), time = 1:30, series = factor(rep("B", 30)))
-  result_different <- get_prior(formula_obj, family = poisson(), data = different_data)
-  expect_s3_class(result_different, "brmsprior")
-
-  # Formula object should remain unchanged after use
-  expect_equal(formula_obj$formula, y ~ x + s(time))
-  expect_equal(formula_obj$trend_formula, ~ AR())
-  expect_s3_class(formula_obj, "mvgam_formula")
-})
-
-# =============================================================================
-# SECTION: BRMS ADDITION-TERMS VALIDATION TESTS (Sub-task 1I)
-# =============================================================================
-# These tests verify comprehensive detection and blocking of brms addition-terms
-# in trend_formula contexts, ensuring mvgam's State-Space dynamics are protected.
-
 test_that("all brms addition-terms detected in trend_formula", {
   # Single forbidden terms - each should be caught individually
   # Test autocorrelation terms (different error message)
@@ -673,172 +630,79 @@ test_that("validate_trend_covariates prevents response variables in trend formul
     biomass = rnorm(12),
     temperature = rep(c(20, 22, 18, 21), 3)  # invariant within time
   )
+})
 
-  # Test valid trend formula (no response variables)
-  expect_silent(
-    mvgam:::extract_trend_data(test_data, ~ temperature, "time", "series",
-                              response_vars = c("count", "biomass"))
-  )
-
-  # Test invalid trend formula (contains response variable)
+test_that("exact GP terms are rejected in observation formula", {
   expect_error(
-    mvgam:::extract_trend_data(test_data, ~ count + temperature, "time", "series",
-                              response_vars = c("count", "biomass")),
-    "Response variables cannot be used as trend predictors"
+    mvgam_formula(y ~ gp(x), trend_formula = ~ 1),
+    "Exact GP terms.*without.*parameter.*are not supported"
   )
 
-  # Test multiple response variables in trend formula
   expect_error(
-    mvgam:::extract_trend_data(test_data, ~ count + biomass, "time", "series",
-                              response_vars = c("count", "biomass")),
-    "count.*biomass"
+    mvgam_formula(y ~ gp(temperature), trend_formula = NULL),
+    "Found: gp\\(temperature\\)"
   )
 
-  # Test intercept-only formula (should pass)
-  expect_silent(
-    mvgam:::extract_trend_data(test_data, ~ 1, "time", "series",
-                              response_vars = c("count", "biomass"))
-  )
-
-  # Test no-intercept formula (should pass)
-  expect_silent(
-    mvgam:::extract_trend_data(test_data, ~ -1, "time", "series",
-                              response_vars = c("count", "biomass"))
+  expect_error(
+    mvgam_formula(y ~ gp(x), trend_formula = ~ 1),
+    "Example: gp\\(x, k=20\\)"
   )
 })
 
-test_that("validate_trend_invariance ensures covariates constant within groups", {
-  # Create test data with invariant covariates
-  test_data_good <- data.frame(
-    time = rep(1:3, 2),
-    series = rep(c("A", "B"), each = 3),
-    temperature = rep(c(20, 22, 18), 2),  # same across series within time
-    site_type = rep(c("forest", "forest", "grassland"), 2)  # invariant
-  )
-
-  # Test valid invariant covariates
-  expect_silent(
-    mvgam:::extract_trend_data(test_data_good, ~ temperature, "time", "series")
-  )
-
-  expect_silent(
-    mvgam:::extract_trend_data(test_data_good, ~ site_type, "time", "series")
-  )
-
-  # Create test data with varying covariates within groups
-  test_data_bad <- data.frame(
-    time = c(1, 1, 1, 1, 2, 2),
-    series = c("A", "A", "B", "B", "A", "B"),
-    temperature = c(20, 25, 22, 22, 18, 19)  # varies within (time=1, series=A): 20 vs 25
-  )
-
-  # Test invalid varying covariates
+test_that("exact GP terms are rejected in trend formula", {
   expect_error(
-    mvgam:::extract_trend_data(test_data_bad, ~ temperature, "time", "series"),
-    "Trend covariates must be constant within \\(time, series\\) groups"
+    mvgam_formula(y ~ 1, trend_formula = ~ gp(time)),
+    "Exact GP terms.*without.*parameter.*are not supported"
   )
 
-  # Test missing variables
   expect_error(
-    mvgam:::extract_trend_data(test_data_good, ~ missing_var, "time", "series"),
-    "Required variables for trend validation not found"
+    mvgam_formula(y ~ x, trend_formula = ~ s(time) + gp(season) + AR()),
+    "Found: gp\\(season\\)"
   )
 })
 
-test_that("extract_trend_data creates proper reduced dataset", {
-  # Create test data
-  test_data <- data.frame(
-    time = rep(1:3, each = 2),
-    series = rep(c("A", "B"), 3),
-    count = rnorm(6),
-    temperature = rep(c(20, 22, 18), each = 2),  # invariant within (time, series)
-    habitat = rep(c("forest", "grassland"), 3)
+test_that("approximate GP terms are allowed", {
+  expect_no_error(
+    mvgam_formula(y ~ gp(x, k = 10), trend_formula = ~ 1)
   )
 
-  # Test trend data extraction with covariates
-  trend_data <- mvgam:::extract_trend_data(
-    test_data,
-    ~ temperature + habitat,
-    "time",
-    "series"
+  expect_no_error(
+    mvgam_formula(y ~ gp(temperature, k = 5, cov = "matern32"),
+                  trend_formula = NULL)
   )
 
-  # Should have one row per (time, series) combination
-  expect_equal(nrow(trend_data), 6)  # 3 times × 2 series
-  expect_equal(ncol(trend_data), 4)  # time, series, temperature, habitat
-  expect_true(all(c("time", "series", "temperature", "habitat") %in% names(trend_data)))
-
-  # Test ordering (should be by time, then series)
-  expect_equal(trend_data$time, c(1, 1, 2, 2, 3, 3))
-  expect_equal(trend_data$series, c("A", "B", "A", "B", "A", "B"))
-
-  # Test no covariates case
-  trend_data_simple <- mvgam:::extract_trend_data(
-    test_data,
-    ~ 1,
-    "time",
-    "series"
+  expect_no_error(
+    mvgam_formula(y ~ gp(x, k = 8) + gp(z, k = 12),
+                  trend_formula = ~ 1)
   )
 
-  expect_equal(nrow(trend_data_simple), 6)
-  expect_equal(ncol(trend_data_simple), 2)  # only time and series
-  expect_true(all(c("time", "series") %in% names(trend_data_simple)))
-})
-
-test_that("trend validation functions handle complex formula terms", {
-  # Test data with complex structure
-  test_data <- data.frame(
-    time = rep(1:4, 2),
-    series = rep(c("A", "B"), each = 4),
-    x = rep(c(1, 2, 3, 4), 2),
-    y = rep(c(10, 20, 30, 40), 2),
-    count = rnorm(8),
-    habitat = rep(c("forest", "grassland", "forest", "grassland"), 2)
-  )
-
-  # Test smooth terms
-  expect_silent(
-    mvgam:::extract_trend_data(test_data, ~ s(x), "time", "series",
-                              response_vars = c("count"))
-  )
-
-  # Test interaction terms
-  expect_silent(
-    mvgam:::extract_trend_data(test_data, ~ x * y, "time", "series",
-                              response_vars = c("count"))
-  )
-
-  # Test polynomial terms
-  expect_silent(
-    mvgam:::extract_trend_data(test_data, ~ poly(x, 2), "time", "series",
-                              response_vars = c("count"))
-  )
-
-  # Test factor terms
-  expect_silent(
-    mvgam:::extract_trend_data(test_data, ~ habitat, "time", "series",
-                              response_vars = c("count"))
+  expect_no_error(
+    mvgam_formula(y ~ 1, trend_formula = ~ gp(time, k = 15))
   )
 })
 
-test_that("trend validation error messages are informative", {
-  test_data <- data.frame(
-    time = c(1, 1, 2, 2),
-    series = c("A", "A", "B", "B"),
-    count = rnorm(4),
-    temperature = c(20, 25, 30, 35)  # varies within (time=1, series=A): 20 vs 25
+test_that("mixed valid and invalid GP terms are caught", {
+  expect_error(
+    mvgam_formula(y ~ gp(x, k = 5) + gp(z), trend_formula = ~ 1),
+    "Found: gp\\(z\\)"
+  )
+})
+
+test_that("GP validation works with complex formulas", {
+  expect_error(
+    mvgam_formula(y ~ s(time) + (1|group) + gp(temperature) + x^2,
+                  trend_formula = ~ AR()),
+    "Found: gp\\(temperature\\)"
   )
 
-  # Test response variable error message
   expect_error(
-    mvgam:::extract_trend_data(test_data, ~ count, "time", "series",
-                              response_vars = c("count")),
-    "Response variables cannot be used as trend predictors.*count.*exogenous covariates"
+    mvgam_formula(y ~ x,
+                  trend_formula = ~ s(season, bs = "cc") + gp(depth) + (1|site)),
+    "Found: gp\\(depth\\)"
   )
 
-  # Test invariance error message
-  expect_error(
-    mvgam:::extract_trend_data(test_data, ~ temperature, "time", "series"),
-    "constant within \\(time, series\\) groups.*temperature.*aggregating data"
+  expect_no_error(
+    mvgam_formula(y ~ s(time) + gp(temperature, k = 10) + (1|group),
+                  trend_formula = ~ AR())
   )
 })

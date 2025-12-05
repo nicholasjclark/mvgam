@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-12-05 09:59:41  
+**Generated:** 2025-12-05 11:35:56  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 60
-- **Total Functions:** 531
+- **Total Functions:** 537
 - **Exported Functions:** 57
-- **Internal Functions:** 488
+- **Internal Functions:** 494
 - **S3 Methods:** 41
 - **S3 Classes:** 31
 
@@ -222,8 +222,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/mvgam-class.R`** (0 functions) - Class definitions and methods
 
 ### S3 Methods Files
-- **`R/predictions.R`** (12 functions) - Prediction methods
-  - Key functions: validate_monotonic_indicesdetect_gp_terms approx_gp_pred has_nlpars extract_linpred_nonlinear extract_linpred_from_prep population_random_pred smooth_fixed_pred monotonic_pred smooth_random_pred (+ 11 more)
+- **`R/predictions.R`** (18 functions) - Prediction methods
+  - Key functions: validate_monotonic_indicesdetect_gp_terms approx_gp_pred spd_gp_exp_quad spd_gp_matern32 spd_gp_matern52 compute_spd_vectorized detect_gp_kernel has_nlpars extract_linpred_nonlinear (+ 17 more)
 - **`R/add_residuals.R`** (2 functions) - Residual analysis
   - Key functions: add_residualsadd_residuals.mvgam (+ 1 more)
 
@@ -639,7 +639,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **ppc.mvgam()** (internal)
 
 ### `R/predictions.R`:
+- **add_all_gp_contributions()** (internal)
 - **approx_gp_pred()** (internal)
+- **compute_spd_vectorized()** (internal)
+- **detect_gp_kernel()** (internal)
 - **detect_gp_terms()** (internal)
 - **extract_linpred_from_prep()** (internal)
 - **extract_linpred_multivariate()** (internal)
@@ -650,6 +653,9 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **population_random_pred()** (internal)
 - **smooth_fixed_pred()** (internal)
 - **smooth_random_pred()** (internal)
+- **spd_gp_exp_quad()** (internal)
+- **spd_gp_matern32()** (internal)
+- **spd_gp_matern52()** (internal)
 - **validate_monotonic_indices()** (internal)
 
 ### `R/print.mvgam.R`:
