@@ -1,8 +1,6 @@
 # Tests for Prior Specification System
 # =====================================
 
-# Shared test fixtures to avoid redundancy
-# -----------------------------------------
 create_test_data <- function(n = 20, n_series = 1) {
   if (n_series == 1) {
     data.frame(
@@ -59,9 +57,6 @@ mock_obs_prior <- function() {
   prior_df
 }
 
-
-# Formula parsing tests
-# ---------------------
 test_that("parse_trend_formula handles all formula types", {
   test_data <- create_test_data()
 
@@ -85,8 +80,6 @@ test_that("parse_trend_formula handles all formula types", {
   expect_error(mvgam:::validate_trend_formula_brms(123))
 })
 
-# All trend types in one test
-# ----------------------------
 test_that("all trend types generate correct prior structures", {
   test_data <- create_test_data()
 
@@ -214,8 +207,6 @@ test_that("all trend types generate correct prior structures", {
   }
 })
 
-# Multivariate models
-# -------------------
 test_that("multivariate models handle priors correctly", {
   test_data <- create_test_data(n = 20, n_series = 2)
 
@@ -241,9 +232,9 @@ test_that("multivariate models handle priors correctly", {
   # Check for factor loading parameter Z (should exist for factor models)
   all_classes <- priors_factor$class
   trend_classes <- priors_factor$class[grepl("_trend$", priors_factor$class)]
-  
+
   # Z parameter should exist for factor models (not with _trend suffix)
-  expect_true("Z" %in% all_classes, 
+  expect_true("Z" %in% all_classes,
               info = "Factor loading parameter Z should be generated for factor models")
   expect_true(length(trend_classes) > 0,
               info = "Trend parameters should be generated")
@@ -310,8 +301,6 @@ test_that("multivariate models handle priors correctly", {
   }
 })
 
-# mvgam_formula tests
-# -------------------
 test_that("mvgam_formula constructor works correctly", {
   # Basic construction
   mf1 <- mvgam_formula(y ~ x)
@@ -380,8 +369,6 @@ test_that("get_prior.mvgam_formula works with all formula types", {
   expect_false(any(grepl("Intercept_trend", trend_classes_pred)))
 })
 
-# brms prior function integration tests for observation-only models
-# ------------------------------------------------------------------
 test_that("brms::set_prior() works for observation-only models", {
   # Test that brms::set_prior() works perfectly for observation parameters
   # when no trend components are involved
@@ -392,26 +379,24 @@ test_that("brms::set_prior() works for observation-only models", {
 
   obs_prior2 <- brms::set_prior("normal(0, 1)", class = "b")
   expect_s3_class(obs_prior2, "brmsprior")
-  
+
   # Test combination using brms
   combined_obs <- obs_prior1 + obs_prior2
   expect_s3_class(combined_obs, "brmsprior")
   expect_equal(nrow(combined_obs), 2)
-  
+
   # Test that these work with mvgam inspection functions for observation-only models
   test_data <- create_test_data()
-  
+
   # Should work with get_prior when trend_formula = NULL (observation-only)
   obs_only_priors <- get_prior(y ~ x, data = test_data, family = gaussian())
   expect_s3_class(obs_only_priors, "brmsprior")
-  
+
   # brms priors should combine cleanly with observation-only mvgam priors
   expect_no_error({
     final_combined <- obs_prior1 + obs_only_priors
   })
 })
-
-# Note: brms::prior() function removed - users should use brms::prior() directly
 
 test_that("brms::prior() function works for trend parameters", {
   # Basic trend parameter
@@ -525,8 +510,6 @@ test_that("brms::prior() function handles bounds correctly", {
   expect_no_error(brms::prior("normal(0, 1)", class = "ar1_trend", ub = 1.5))
 })
 
-# Prior combination tests
-# -----------------------
 test_that("combine_obs_trend_priors works correctly", {
   obs_prior <- mock_obs_prior()
   trend_prior <- mock_trend_prior()
@@ -543,11 +526,6 @@ test_that("combine_obs_trend_priors works correctly", {
   expect_equal(trend_count, 2) # 2 trend parameters
 })
 
-# Note: Enhanced print method removed as part of complete attribute elimination
-# Users now get standard brms brmsprior printing behavior
-
-# Validate_single_trend_formula tests
-# ------------------------------------
 test_that("validate_single_trend_formula rejects invalid terms", {
   # Valid formulas pass
   expect_no_error(mvgam:::validate_single_trend_formula(~ AR()))
@@ -561,8 +539,6 @@ test_that("validate_single_trend_formula rejects invalid terms", {
   expect_error(mvgam:::validate_single_trend_formula(~ mi(x) + AR()))
 })
 
-# Validate_trend_formula tests
-# -----------------------------
 test_that("validate_trend_formula_brms handles all formula types", {
   # Valid single formula
   expect_no_error(mvgam:::validate_trend_formula_brms(~ AR()))
@@ -574,8 +550,6 @@ test_that("validate_trend_formula_brms handles all formula types", {
   expect_error(mvgam:::validate_trend_formula_brms(~ AR() + RW()))
 })
 
-# Generate_trend_priors tests
-# ----------------------------
 test_that("generate_trend_priors creates correct structures", {
   test_data <- create_test_data()
 
@@ -592,27 +566,25 @@ test_that("generate_trend_priors creates correct structures", {
   expect_true(any(grepl("ar2_trend", ar_priors$class)))
 })
 
-# Distributional model tests
-# ---------------------------
 test_that("distributional models work correctly with trends", {
   test_data <- create_test_data(n = 30)
-  
+
   # bf() with sigma predictor and embedded family
   bf_sigma <- brms::bf(y ~ x, sigma ~ x1, family = gaussian())
   mf_distrib <- mvgam_formula(bf_sigma, trend_formula = ~ AR(p = 1))
   priors_distrib <- get_prior(mf_distrib, data = test_data)
-  
+
   expect_s3_class(priors_distrib, "brmsprior")
-  
+
   # Check observation parameters (should match brms exactly)
   brms_distrib_priors <- brms::get_prior(bf_sigma, data = test_data)
   obs_classes <- priors_distrib$class[!grepl("_trend$", priors_distrib$class)]
   trend_classes <- priors_distrib$class[grepl("_trend$", priors_distrib$class)]
-  
+
   # Should have both observation and trend parameters
   expect_true(length(obs_classes) > 0)
   expect_true(length(trend_classes) > 0)
-  
+
   # Verify observation priors match brms exactly
   for (i in seq_len(nrow(brms_distrib_priors))) {
     brms_row <- brms_distrib_priors[i, ]
@@ -622,18 +594,18 @@ test_that("distributional models work correctly with trends", {
         priors_distrib$coef == brms_row$coef &
         priors_distrib$group == brms_row$group &
         priors_distrib$dpar == brms_row$dpar, , drop = FALSE]
-      
+
       expect_true(nrow(matching_obs) > 0,
-                 info = paste("Missing distributional parameter:", brms_row$class, 
+                 info = paste("Missing distributional parameter:", brms_row$class,
                             "dpar:", brms_row$dpar))
     }
   }
-  
+
   # bf() with multiple parameters
   bf_multi_param <- brms::bf(y ~ x, sigma ~ x1, nu ~ x2, family = student())
   mf_multi <- mvgam_formula(bf_multi_param, trend_formula = ~ RW())
   priors_multi <- get_prior(mf_multi, data = test_data)
-  
+
   # Should have parameters for mu, sigma, and nu
   expect_true(any(grepl("Intercept", priors_multi$class[priors_multi$dpar == ""])))     # mu
   expect_true(any(grepl("Intercept", priors_multi$class[priors_multi$dpar == "sigma"]))) # sigma
@@ -641,8 +613,6 @@ test_that("distributional models work correctly with trends", {
   expect_true(any(grepl("_trend$", priors_multi$class)))  # trend parameters
 })
 
-# Multivariate response tests (mvbind)
-# -------------------------------------
 test_that("multivariate responses with mvbind work correctly", {
   # Create multivariate data
   mv_data <- data.frame(
@@ -652,31 +622,31 @@ test_that("multivariate responses with mvbind work correctly", {
     time = rep(1:20, 2),
     series = factor(rep(c("A", "B"), each = 20))
   )
-  
+
   # Combined bf() objects with different families (Pattern 4 from quick-reference)
   mv_formula <- brms::bf(count ~ x, family = poisson()) +
                 brms::bf(biomass ~ x, family = gaussian())
   mf_mvbind <- mvgam_formula(mv_formula, trend_formula = ~ VAR(p = 1))
   priors_mvbind <- get_prior(mf_mvbind, data = mv_data)
-  
+
   expect_s3_class(priors_mvbind, "brmsprior")
-  
+
   # Should have response-specific parameters
   response_names <- c("count", "biomass")
   for (resp in response_names) {
     resp_params <- priors_mvbind[priors_mvbind$resp == resp, ]
-    expect_true(nrow(resp_params) > 0, 
+    expect_true(nrow(resp_params) > 0,
                info = paste("Missing parameters for response:", resp))
   }
-  
+
   # Should have trend parameters
   trend_classes <- priors_mvbind$class[grepl("_trend$", priors_mvbind$class)]
   expect_true(length(trend_classes) > 0)
-  
+
   # Verify brms equivalence
   brms_mvbind_priors <- brms::get_prior(mv_formula, data = mv_data)
   obs_priors_mv <- priors_mvbind[!grepl("_trend$", priors_mvbind$class), ]
-  
+
   # Each brms parameter should appear in mvgam observation priors
   for (i in seq_len(nrow(brms_mvbind_priors))) {
     brms_row <- brms_mvbind_priors[i, ]
@@ -686,21 +656,19 @@ test_that("multivariate responses with mvbind work correctly", {
         obs_priors_mv$coef == brms_row$coef &
         obs_priors_mv$group == brms_row$group &
         obs_priors_mv$resp == brms_row$resp, , drop = FALSE]
-      
+
       expect_true(nrow(matching) > 0,
-                 info = paste("Missing mvbind parameter:", brms_row$class, 
+                 info = paste("Missing mvbind parameter:", brms_row$class,
                             "resp:", brms_row$resp))
     }
   }
 })
 
-# Non-Gaussian family tests
-# --------------------------
 test_that("non-Gaussian families work with trends", {
   test_data <- create_test_data()
   test_data$count <- rpois(nrow(test_data), 5)
   test_data$binary <- rbinom(nrow(test_data), 1, 0.3)
-  
+
   family_tests <- list(
     poisson = list(formula = count ~ x, family = poisson()),
     binomial = list(formula = binary ~ x, family = binomial()),
@@ -708,65 +676,63 @@ test_that("non-Gaussian families work with trends", {
     exponential = list(formula = y ~ x, family = exponential()),
     beta = list(formula = I((y + 10) / 20) ~ x, family = Beta())
   )
-  
+
   for (family_name in names(family_tests)) {
     family_spec <- family_tests[[family_name]]
-    
+
     # Test with trend
     mf_family <- mvgam_formula(family_spec$formula, trend_formula = ~ AR(p = 1))
     priors_family <- get_prior(mf_family, data = test_data, family = family_spec$family)
-    
+
     expect_s3_class(priors_family, "brmsprior")
-    
+
     # Should have trend parameters
     trend_classes <- priors_family$class[grepl("_trend$", priors_family$class)]
-    expect_true(length(trend_classes) > 0, 
+    expect_true(length(trend_classes) > 0,
                info = paste("No trend parameters for family:", family_name))
-    
+
     # Verify observation parameters match brms
-    brms_family_priors <- brms::get_prior(family_spec$formula, 
-                                         data = test_data, 
+    brms_family_priors <- brms::get_prior(family_spec$formula,
+                                         data = test_data,
                                          family = family_spec$family)
     obs_priors_fam <- priors_family[!grepl("_trend$", priors_family$class), ]
-    
+
     # Basic structure check
-    expect_true(nrow(obs_priors_fam) > 0, 
+    expect_true(nrow(obs_priors_fam) > 0,
                info = paste("No observation parameters for family:", family_name))
-    expect_true(nrow(brms_family_priors) > 0, 
+    expect_true(nrow(brms_family_priors) > 0,
                info = paste("brms returned no parameters for family:", family_name))
   }
 })
 
-# Edge cases with embedded families
-# ----------------------------------
 test_that("embedded family edge cases work correctly", {
   test_data <- create_test_data(n = 25)
   test_data$count <- rpois(nrow(test_data), 3)
-  
+
   # bf() with embedded family - no explicit family argument needed
   bf_embedded <- brms::bf(count ~ x, family = poisson())
   mf_embedded <- mvgam_formula(bf_embedded, trend_formula = ~ RW())
-  
+
   # Should not require family argument
   expect_no_error({
     priors_embedded <- get_prior(mf_embedded, data = test_data)
   })
-  
+
   priors_embedded <- get_prior(mf_embedded, data = test_data)
   expect_s3_class(priors_embedded, "brmsprior")
-  
+
   # Should have both observation and trend parameters
   expect_true(any(!grepl("_trend$", priors_embedded$class))) # obs
   expect_true(any(grepl("_trend$", priors_embedded$class)))  # trend
-  
+
   # Complex embedded case with multiple parameters
   bf_complex_embedded <- brms::bf(count ~ x, zi ~ x1, family = zero_inflated_poisson())
   mf_complex_embedded <- mvgam_formula(bf_complex_embedded, trend_formula = ~ AR(p = 1))
-  
+
   expect_no_error({
     priors_complex_embedded <- get_prior(mf_complex_embedded, data = test_data)
   })
-  
+
   # Should have zi parameters
   zi_params <- priors_complex_embedded[priors_complex_embedded$dpar == "zi", ]
   expect_true(nrow(zi_params) > 0, info = "Missing zero-inflation parameters")

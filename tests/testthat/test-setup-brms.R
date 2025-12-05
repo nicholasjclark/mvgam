@@ -245,7 +245,7 @@ test_that("setup_brms_lightweight handles various trend formula types", {
   setup_default <- setup_brms_lightweight(
     formula = y ~ x,
     data = data,
-    trend_formula = ~ gp(time)
+    trend_formula = ~ gp(time, k = 6)
   )
 
   expect_true("trend_specs" %in% names(setup_default))

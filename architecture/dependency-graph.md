@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-12-05 11:35:56  
+**Generated:** 2025-12-05 14:03:16  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 60
-- **Total Functions:** 537
+- **Total Functions:** 539
 - **Exported Functions:** 57
-- **Internal Functions:** 494
+- **Internal Functions:** 496
 - **S3 Methods:** 41
 - **S3 Classes:** 31
 
@@ -80,13 +80,13 @@
 - **extract_mvgam_components()** (`R/mvgam_core.R`)
   - Internal calls: extract_series_information, extract_time_information, extract_trend_component_info
 - **validate_obs_formula_brms()** (`R/validations.R`)
-  - Internal calls: formula2str_mvgam, get_trend_validation_patterns, mvgam, RW
+  - Internal calls: formula2str_mvgam, get_trend_validation_patterns, gp, mvgam, RW, validate_exact_gp_usage
 - **mvgam_formula()** (`R/priors.R`)
-  - Internal calls: validate_single_trend_formula
+  - Internal calls: validate_obs_formula_brms, validate_single_trend_formula
 
 ### Core Workflow Functions (Prior/Trend/Stan Assembly Systems)
 - **mvgam_formula()** (`R/priors.R`)
-  - Internal calls: validate_single_trend_formula
+  - Internal calls: validate_obs_formula_brms, validate_single_trend_formula
 - **get_prior()** (`R/priors.R`) - No internal dependencies tracked
 - **trend_param()** (`R/trend_system.R`) - No internal dependencies tracked
 - **register_trend_type()** (`R/trend_system.R`)
@@ -139,8 +139,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/portal_data.R`** (0 functions) - Data documentation and loading
 
 ### Validation Files
-- **`R/validations.R`** (72 functions) - Input validation and checks
-  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_list_trend_formula, validate_single_trend_formula, validate_nonlinear_trend_compatibility, validate_required_variables (+ 57 more)
+- **`R/validations.R`** (73 functions) - Input validation and checks
+  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_exact_gp_usage, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_list_trend_formula, validate_nonlinear_trend_compatibility, validate_required_variables (+ 58 more)
 
 ### Core Files
 - **`R/summary.mvgam.R`** (24 functions) - Summary methods
@@ -222,8 +222,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/mvgam-class.R`** (0 functions) - Class definitions and methods
 
 ### S3 Methods Files
-- **`R/predictions.R`** (18 functions) - Prediction methods
-  - Key functions: validate_monotonic_indicesdetect_gp_terms approx_gp_pred spd_gp_exp_quad spd_gp_matern32 spd_gp_matern52 compute_spd_vectorized detect_gp_kernel has_nlpars extract_linpred_nonlinear (+ 17 more)
+- **`R/predictions.R`** (19 functions) - Prediction methods
+  - Key functions: validate_monotonic_indicesdetect_gp_terms approx_gp_pred spd_gp_exp_quad spd_gp_matern32 spd_gp_matern52 compute_spd_vectorized detect_gp_kernel has_nlpars extract_linpred_nonlinear (+ 18 more)
 - **`R/add_residuals.R`** (2 functions) - Residual analysis
   - Key functions: add_residualsadd_residuals.mvgam (+ 1 more)
 
@@ -347,6 +347,9 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 
 ### `R/plot.mvgam.R` (1 potentially unused):
 - **plottable()** (internal, never called)
+
+### `R/predictions.R` (1 potentially unused):
+- **extract_component_linpred()** (internal, never called)
 
 ### `R/print.mvgam.R` (1 potentially unused):
 - **print_model_specification_simple()** (internal, never called)
@@ -644,6 +647,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **compute_spd_vectorized()** (internal)
 - **detect_gp_kernel()** (internal)
 - **detect_gp_terms()** (internal)
+- **extract_component_linpred()** (internal)
 - **extract_linpred_from_prep()** (internal)
 - **extract_linpred_multivariate()** (internal)
 - **extract_linpred_nonlinear()** (internal)
@@ -939,6 +943,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **validate_required_variables()** (internal)
 - **validate_series_time()** (internal)
 - **validate_setup_components()** (internal)
+- **validate_single_trend_formula()** (internal)
 - **validate_stan_code()** (internal)
 - **validate_stan_code_structure()** (internal)
 - **validate_time_series_for_trends()** (internal)

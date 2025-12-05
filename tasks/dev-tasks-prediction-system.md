@@ -275,7 +275,7 @@
 
     - [x] 2.3.11.3 **Update validation test suite**: Modify `tasks/validate_extraction_vs_brms.R` to include trend formula test cases. Added Test 8T: "GP in trend formula", Test 6T: "Monotonic in trend formula". Target achieved: 13/13 tests passing (100% maintained).
 
-  - [ ] **2.3.12 GP Formula Validation Enhancement** (NEW - Added 2025-12-05) 
+  - [X] **2.3.12 GP Formula Validation Enhancement** (NEW - Added 2025-12-05) 
     Implement low-level validation to reject exact GPs (without `k` argument) since the prediction system only supports approximate GPs with spectral power density computation.
 
     - [x] 2.3.12.1 **Add GP validation to formula processing**: Modify low-level formula validation functions to check all `gp()` terms have `k` argument specified. Integrate into `validate_trends()` and related formula processing to catch exact GPs early in `stancode()`, `standata()`, `mvgam()` workflows.

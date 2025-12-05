@@ -17,20 +17,20 @@ test_that("Trend registry initializes correctly", {
 test_that("Auto-discovery registry system works correctly", {
   # Clear registry for clean testing
   rm(list = ls(envir = trend_registry), envir = trend_registry)
-  
+
   # Auto-registration should discover all core trend types
   auto_register_trend_types()
-  
+
   # Check all expected trends are auto-discovered
   expected_trends <- c("AR", "RW", "VAR", "ZMVN", "CAR", "PW")
   registered_trends <- ls(trend_registry)
   expect_true(all(expected_trends %in% registered_trends))
-  
+
   # Verify properties are correctly loaded
   ar_info <- trend_registry[["AR"]]
   expect_true(ar_info$supports_factors)
   expect_null(ar_info$incompatibility_reason)
-  
+
   car_info <- trend_registry[["CAR"]]
   expect_false(car_info$supports_factors)
   expect_type(car_info$incompatibility_reason, "character")
@@ -41,27 +41,27 @@ test_that("Trend properties validation works correctly", {
   # Test valid properties
   valid_props <- list(supports_factors = TRUE, incompatibility_reason = NULL)
   expect_invisible(validate_trend_properties(valid_props, "TEST", "test_properties"))
-  
+
   # Test invalid properties - not a list
   expect_error(
     validate_trend_properties("not_a_list", "TEST", "test_properties"),
     "must return a list"
   )
-  
+
   # Test missing supports_factors field
   invalid_props <- list(incompatibility_reason = "test")
   expect_error(
     validate_trend_properties(invalid_props, "TEST", "test_properties"),
     "missing required fields.*supports_factors"
   )
-  
+
   # Test invalid supports_factors type
   invalid_props <- list(supports_factors = "not_logical")
   expect_error(
     validate_trend_properties(invalid_props, "TEST", "test_properties"),
     "must be a single logical value"
   )
-  
+
   # Test missing incompatibility_reason for non-factor trend
   invalid_props <- list(supports_factors = FALSE)
   expect_error(
@@ -80,16 +80,16 @@ test_that("Core trend properties functions return valid structures", {
     CAR = car_trend_properties,
     PW = pw_trend_properties
   )
-  
+
   for (trend_name in names(trend_properties_funcs)) {
     props <- trend_properties_funcs[[trend_name]]()
-    
+
     # Should return valid structure
     expect_type(props, "list")
     expect_true("supports_factors" %in% names(props))
     expect_type(props$supports_factors, "logical")
     expect_length(props$supports_factors, 1)
-    
+
     # If doesn't support factors, should have reason
     if (!props$supports_factors) {
       expect_true("incompatibility_reason" %in% names(props))
@@ -413,18 +413,18 @@ test_that("simplified RW constructor works correctly", {
     expect_false(rw_trend$ma)
     expect_false(rw_trend$cor)
     expect_null(rw_trend$n_lv)
-    
+
     # Test validation rules are automatically assigned
     expect_true(length(rw_trend$validation_rules) > 0)
     expect_true("requires_regular_intervals" %in% rw_trend$validation_rules)
     expect_true("supports_factors" %in% rw_trend$validation_rules)
     expect_true("supports_hierarchical" %in% rw_trend$validation_rules)
-    
+
     # Test RW with parameters
     rw_ma_trend <- RW(ma = TRUE, cor = TRUE)
     expect_true(rw_ma_trend$ma)
     expect_true(rw_ma_trend$cor)
-    
+
     # Test RW with custom variables
     rw_custom <- RW(time = week, series = species, ma = TRUE)
     expect_equal(rw_custom$time, "week")
@@ -443,20 +443,20 @@ test_that("helper functions work correctly", {
   expect_false(defaults$ma)
   expect_false(defaults$cor)
   expect_null(defaults$n_lv)
-  
+
   # Test get_default_validation_rules
   rw_rules <- get_default_validation_rules("RW")
   expect_true("requires_regular_intervals" %in% rw_rules)
   expect_true("supports_factors" %in% rw_rules)
   expect_true("supports_hierarchical" %in% rw_rules)
-  
+
   ar_rules <- get_default_validation_rules("AR")
   expect_equal(rw_rules, ar_rules)  # Should be same for stationary trends
-  
+
   car_rules <- get_default_validation_rules("CAR")
   expect_true("allows_irregular_intervals" %in% car_rules)
   expect_true("incompatible_with_factors" %in% car_rules)
-  
+
   # Test apply_mvgam_trend_defaults
   partial_trend <- list(trend = "RW", ma = TRUE)
   complete_trend <- apply_mvgam_trend_defaults(partial_trend)
@@ -465,7 +465,7 @@ test_that("helper functions work correctly", {
   expect_equal(complete_trend$time, "time")  # Filled by defaults
   expect_equal(complete_trend$series, "series")  # Filled by defaults
   expect_true(length(complete_trend$validation_rules) > 0)  # Auto-assigned
-  
+
   # Test create_mvgam_trend helper
   suppressWarnings({
     trend_obj <- create_mvgam_trend("RW", ma = TRUE, cor = FALSE)
@@ -486,7 +486,7 @@ test_that("trend constructors use process_trend_params correctly", {
     expect_s3_class(rw_trend, "mvgam_trend")
     expect_equal(rw_trend$trend, "RW")
     expect_false(rw_trend$ma)
-    
+
     # Test RW with ma = TRUE
     rw_ma_trend <- RW(ma = TRUE)
     expect_equal(rw_ma_trend$trend, "RW")
@@ -533,7 +533,7 @@ test_that("validation rules vocabulary is complete", {
   expect_equal(rule_incompatible_with_seasonal_smooths, "incompatible_with_seasonal_smooths")
   expect_equal(rule_requires_balanced_panels, "requires_balanced_panels")
   expect_equal(rule_requires_minimum_series_count, "requires_minimum_series_count")
-  
+
   # Test that validation rule assignment works for all trend types
   trend_types <- c("RW", "AR", "VAR", "CAR", "PW", "ZMVN")
   for (trend_type in trend_types) {
@@ -541,7 +541,7 @@ test_that("validation rules vocabulary is complete", {
     expect_true(length(rules) > 0, info = paste("No rules assigned for", trend_type))
     expect_true(all(rules %in% c(
       "requires_regular_intervals", "allows_irregular_intervals",
-      "supports_factors", "incompatible_with_factors", 
+      "supports_factors", "incompatible_with_factors",
       "supports_hierarchical", "incompatible_with_hierarchical",
       "requires_hierarchical", "requires_seasonal_period",
       "supports_multiple_seasonality", "incompatible_with_seasonal_smooths",
@@ -575,7 +575,7 @@ test_that("simplified AR constructor works correctly", {
     expect_false(ar_trend$ma)
     expect_false(ar_trend$cor)
     expect_null(ar_trend$n_lv)
-    
+
     # Test AR with custom parameters
     ar_custom <- AR(p = 3, ma = TRUE, cor = TRUE, n_lv = 2)
     expect_equal(ar_custom$trend, "AR")  # Always base type
@@ -583,17 +583,17 @@ test_that("simplified AR constructor works correctly", {
     expect_true(ar_custom$ma)
     expect_true(ar_custom$cor)
     expect_equal(ar_custom$n_lv, 2)
-    
+
     # Test AR with vector p
     ar_vector <- AR(p = c(1, 12))
     expect_equal(ar_vector$trend, "AR")  # Still base type
     expect_equal(ar_vector$p, c(1, 12))
-    
+
     # Test AR with custom time/series variables
     ar_vars <- AR(time = month, series = site)
     expect_equal(ar_vars$time, "month")
     expect_equal(ar_vars$series, "site")
-    
+
     # Test AR with grouping variables
     ar_grouped <- AR(gr = region, subgr = species)
     expect_equal(ar_grouped$gr, "region")
@@ -608,7 +608,7 @@ test_that("consistent dispatch metadata is added automatically", {
     expect_equal(rw_trend$stanvar_generator, "generate_rw_trend_stanvars")
     expect_equal(rw_trend$monitor_generator, "generate_rw_monitor_params")
     expect_equal(rw_trend$forecast_metadata$function_name, "forecast_rw_rcpp")
-    
+
     # Test AR gets correct dispatch metadata
     ar_trend <- AR()
     expect_equal(ar_trend$stanvar_generator, "generate_ar_trend_stanvars")
@@ -627,7 +627,7 @@ test_that("trend dispatch consistency validation works", {
     class = "mvgam_trend"
   )
   expect_silent(validate_trend_dispatch_consistency(consistent_trend))
-  
+
   # Create trend with inconsistent naming
   inconsistent_trend <- structure(
     list(
@@ -647,12 +647,12 @@ test_that("get_trend_dispatch_function generates correct names", {
   expect_equal(get_trend_dispatch_function("AR", "stanvar"), "generate_ar_trend_stanvars")
   expect_equal(get_trend_dispatch_function("RW", "stanvar"), "generate_rw_trend_stanvars")
   expect_equal(get_trend_dispatch_function("VAR", "stanvar"), "generate_var_trend_stanvars")
-  
+
   # Test forecast function names
   expect_equal(get_trend_dispatch_function("AR", "forecast"), "forecast_ar_rcpp")
   expect_equal(get_trend_dispatch_function("RW", "forecast"), "forecast_rw_rcpp")
   expect_equal(get_trend_dispatch_function("VAR", "forecast"), "forecast_var_rcpp")
-  
+
   # Test monitor generator names
   expect_equal(get_trend_dispatch_function("AR", "monitor"), "generate_ar_monitor_params")
   expect_equal(get_trend_dispatch_function("RW", "monitor"), "generate_rw_monitor_params")
@@ -671,7 +671,7 @@ test_that("create_mvgam_trend handles all parameters consistently", {
       .subgr = quote(species),
       custom_param = 42
     )
-    
+
     expect_equal(trend_obj$trend, "RW")
     expect_equal(trend_obj$time, "month")
     expect_equal(trend_obj$series, "site")

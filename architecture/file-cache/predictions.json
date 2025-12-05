@@ -20,7 +20,8 @@
                       "monotonic_pred",
                       "smooth_random_pred",
                       "extract_linpred_univariate",
-                      "extract_linpred_multivariate"
+                      "extract_linpred_multivariate",
+                      "extract_component_linpred"
                   ],
     "purpose":  "Prediction methods",
     "function_dependencies":  {
@@ -38,6 +39,7 @@
                                 "extract_linpred_multivariate":  "extract_linpred_multivariate \u003c- function(prep, resp = NULL) {",
                                 "validate_monotonic_indices":  "validate_monotonic_indices \u003c- function(xmo_data, xmo_name, k_levels, n_obs) {",
                                 "smooth_fixed_pred":  "smooth_fixed_pred \u003c- function(eta, draws_mat, prep) {",
+                                "extract_component_linpred":  "extract_component_linpred \u003c- function(mvgam_fit, newdata, component = \"obs\", resp = NULL, ndraws = NULL, re_formula = NULL, allow_new_levels = FALSE, sample_new_levels = \"uncertainty\") {",
                                 "approx_gp_pred":  "approx_gp_pred \u003c- function(Xgp, slambda, zgp, sdgp, lscale, kernel) {",
                                 "detect_gp_terms":  "detect_gp_terms \u003c- function(prep) {",
                                 "compute_spd_vectorized":  "compute_spd_vectorized \u003c- function(slambda, sdgp, lscale, kernel) {",
