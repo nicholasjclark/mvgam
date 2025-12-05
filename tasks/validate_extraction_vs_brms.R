@@ -526,7 +526,7 @@ results$test8 <- run_validation(
   param_pairs = list(
     c("b_Intercept", "b_Intercept", "Intercept"),
     c("sdgp_gpz", "sdgp_1[1]", "sdgp"),
-    c("lscale_gpz", "lscale_1[1]", "lscale"),
+    c("lscale_gpz", "lscale_1[1,1]", "lscale"),
     c("ar[1]", "ar1_trend[1]", "AR(1)"),
     c("sderr", "sigma_trend[1]", "Sigma")
   )

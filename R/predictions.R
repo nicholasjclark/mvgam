@@ -17,12 +17,12 @@
 #' GP terms are identified by Xgp_* matrices in prep$sdata. Each valid
 #'   GP term must have complete data structures:
 #' - Xgp_<suffix>: basis function evaluations (N × k matrix)
-#' - Mgp_<suffix>: spectral density transformation (k × k matrix)
-#' - nb_gp_<suffix>: number of basis functions (scalar)
+#' - slambda_<suffix>: eigenvalues for spectral basis functions (k × dims array)
+#' - NBgp_<suffix>: number of basis functions (scalar)
 #'
-#' And corresponding parameters in prep$dpars:
-#' - zgp_<suffix>: standard normal draws (ndraws × k × k array)
-#' - sdgp_<suffix>: marginal standard deviations (ndraws × k matrix)
+#' And corresponding parameters in prep$draws:
+#' - zgp_<suffix>: standard normal draws (ndraws × k matrix)
+#' - sdgp_<suffix>: marginal standard deviations (ndraws × k matrix)  
 #' - lscale_<suffix>: length-scale parameters (ndraws × k matrix)
 #'
 #' Full GP (gp(x) without k) is not supported and will not be detected.
@@ -58,26 +58,49 @@ detect_gp_terms <- function(prep) {
     # Check required sdata components
     required_sdata <- c(
       paste0("Xgp_", suffix),
-      paste0("Mgp_", suffix),
-      paste0("nb_gp_", suffix)
+      paste0("slambda_", suffix),
+      paste0("NBgp_", suffix)
     )
 
     if (!all(required_sdata %in% names(prep$sdata))) {
+      missing_sdata <- setdiff(required_sdata, names(prep$sdata))
       next
     }
 
-    # Check required parameter components
-    if (!"dpars" %in% names(prep)) {
+    # Check required parameter components in draws matrix
+    if (!"draws" %in% names(prep)) {
       next
     }
 
-    required_dpars <- c(
-      paste0("zgp_", suffix),
-      paste0("sdgp_", suffix),
-      paste0("lscale_", suffix)
-    )
-
-    if (!all(required_dpars %in% names(prep$dpars))) {
+    draws_names <- colnames(prep$draws)
+    
+    # Check for bracket notation GP parameters
+    has_zgp <- any(grepl(paste0("^zgp_", suffix, "\\["), draws_names))
+    has_sdgp <- any(grepl(paste0("^sdgp_", suffix, "\\["), draws_names))
+    
+    # Check for lscale with multiple possible patterns
+    has_lscale <- any(grepl(paste0("^lscale_", suffix, "\\["), draws_names))
+    if (!has_lscale) {
+      # Try alternative patterns for lscale
+      alt_patterns <- c(
+        paste0("^lsd_", suffix, "\\["),
+        paste0("^lengthscale_", suffix, "\\["),
+        paste0("^ls_", suffix, "\\[")
+      )
+      has_lscale <- any(sapply(alt_patterns, function(p) any(grepl(p, draws_names))))
+    }
+    
+    if (!has_zgp || !has_sdgp || !has_lscale) {
+      missing <- character()
+      if (!has_zgp) missing <- c(missing, paste0("zgp_", suffix, "[*]"))
+      if (!has_sdgp) missing <- c(missing, paste0("sdgp_", suffix, "[*]"))
+      if (!has_lscale) missing <- c(missing, paste0("lscale_", suffix, "[*]"))
+      
+      # Add debug output to investigate missing lscale
+      if (!has_lscale) {
+        all_scale_params <- grep("scale|lscale|lsd|ls", draws_names, value = TRUE, ignore.case = TRUE)
+      }
+      
       next
     }
 
@@ -100,104 +123,403 @@ detect_gp_terms <- function(prep) {
 #' Compute Approximate Gaussian Process Contribution
 #'
 #' Computes GP contributions to linear predictor using Hilbert space
-#'   approximation following brms Stan code formula. Implements
-#'   vectorized computation across all posterior draws.
+#' approximation. Uses spectral power density computation with 
+#' kernel-specific dispatch for accurate brms compatibility.
 #'
 #' @param Xgp Matrix (N × k) of basis function evaluations at
 #'   prediction points
-#' @param Mgp Matrix (k × k) spectral density transformation matrix
-#' @param zgp Array (ndraws × k × k) of standard normal draws forming
-#'   Cholesky factors
-#' @param sdgp Matrix (ndraws × k) of marginal standard deviations
-#' @param lscale Matrix (ndraws × k) of length-scale parameters
+#' @param slambda Array (k × dims) or (k × dims × 1) of eigenvalues
+#'   for spectral basis functions
+#' @param zgp Matrix (ndraws × k) of standard normal draws
+#' @param sdgp Vector (ndraws) of marginal standard deviations
+#' @param lscale Matrix (ndraws × dims) of length-scale parameters
+#' @param kernel Character string specifying kernel type: "exp_quad", 
+#'   "matern32", or "matern52"
 #'
 #' @return Matrix (ndraws × N) of GP contributions to add to linear
 #'   predictor
 #'
 #' @details
 #' Implements the brms Stan formula:
-#'   mu += Xgp * (Mgp * (sdgp .* (zgp * lscale)))
+#'   (sqrt(spd_gp(slambda, sdgp, lscale, kernel)) * zgp) %*% t(Xgp)
 #'
-#' Step-by-step computation per draw:
-#' 1. Transform latent factors: zgp[i,,] %*% lscale[i,]  -> (k)
-#' 2. Scale by SD: sdgp[i,] * step1  -> (k)
-#' 3. Apply spectral transform: Mgp %*% step2  -> (k)
-#' 4. Project to observations: Xgp %*% step3  -> (N)
-#'
-#' Loop required for 3D array matrix multiplication per draw.
+#' Computation steps:
+#' 1. Compute spectral power density using kernel-specific function
+#' 2. Take square root for direct multiplication with GP coefficients
+#' 3. Element-wise multiply with standard normal draws
+#' 4. Matrix multiply with transposed basis functions
 #'
 #' @noRd
-approx_gp_pred <- function(Xgp, Mgp, zgp, sdgp, lscale) {
-  # Validate matrix dimensions and finite values
+approx_gp_pred <- function(Xgp, slambda, zgp, sdgp, lscale, kernel) {
+  # Validate inputs
   checkmate::assert_matrix(Xgp, any.missing = FALSE, all.missing = FALSE)
-  checkmate::assert_matrix(Mgp, any.missing = FALSE, all.missing = FALSE)
-  checkmate::assert_array(zgp, d = 3, any.missing = FALSE)
-  checkmate::assert_matrix(sdgp, any.missing = FALSE, all.missing = FALSE)
-  checkmate::assert_matrix(
-    lscale,
-    any.missing = FALSE,
-    all.missing = FALSE
-  )
-
+  checkmate::assert_array(slambda, min.d = 2, max.d = 3, any.missing = FALSE)
+  checkmate::assert_matrix(zgp, any.missing = FALSE, all.missing = FALSE)
+  checkmate::assert_numeric(sdgp, any.missing = FALSE, min.len = 1)
+  checkmate::assert_matrix(lscale, any.missing = FALSE, all.missing = FALSE)
+  checkmate::assert_string(kernel, min.chars = 1)
+  
   # Extract dimensions
   n_obs <- nrow(Xgp)
-  k <- ncol(Xgp)
-  n_draws <- dim(zgp)[1]
-
+  n_basis <- ncol(Xgp)
+  n_draws <- nrow(zgp)
+  
   # Validate dimension consistency
-  if (nrow(Mgp) != k || ncol(Mgp) != k) {
+  if (ncol(zgp) != n_basis) {
     stop(insight::format_error(
-      "Dimension mismatch: {.field Mgp} has {nrow(Mgp)} rows and ",
-      "{ncol(Mgp)} columns, but expected {k} × {k} to match ",
-      "{.field Xgp} basis functions."
+      "Basis function mismatch: {.field Xgp} has {n_basis} basis functions ",
+      "but {.field zgp} has {ncol(zgp)} coefficients."
     ))
   }
-
-  if (dim(zgp)[2] != k || dim(zgp)[3] != k) {
+  
+  if (length(sdgp) != n_draws) {
     stop(insight::format_error(
-      "Dimension mismatch: {.field zgp} has dimensions ",
-      "{dim(zgp)[1]} × {dim(zgp)[2]} × {dim(zgp)[3]}, but expected ",
-      "{n_draws} × {k} × {k}."
+      "Draw count mismatch: {.field zgp} has {n_draws} draws ",
+      "but {.field sdgp} has {length(sdgp)} elements."
     ))
   }
+  
+  # Compute spectral power density (returns sqrt for direct use)
+  spd_sqrt <- compute_spd_vectorized(slambda, sdgp, lscale, kernel)
+  
+  # Apply correct brms formula: (spd * zgp) %*% t(Xgp)  
+  # spd_sqrt is [n_draws, n_basis], zgp is [n_draws, n_basis]
+  spd_zgp <- spd_sqrt * zgp
+  
+  # Matrix multiply with transposed basis functions
+  # spd_zgp %*% t(Xgp) gives [n_draws, n_obs]
+  result <- spd_zgp %*% t(Xgp)
+  
+  result
+}
 
-  if (nrow(sdgp) != n_draws || ncol(sdgp) != k) {
+
+#' Compute Spectral Power Density for Squared Exponential Kernel
+#'
+#' Computes spectral power density for approximate Gaussian processes
+#' using the squared exponential (exp_quad) kernel. Follows brms
+#' implementation exactly for consistency with Stan code generation.
+#'
+#' @param slambda Array of eigenvalues; either matrix [n_basis, n_dims] 
+#'   or 3D array [n_basis, n_dims, 1]
+#' @param sdgp Vector of marginal standard deviations [n_draws]
+#' @param lscale Matrix of length scale parameters [n_draws, n_dims]
+#'
+#' @return Matrix [n_draws, n_basis] of spectral power density values
+#'
+#' @details
+#' Mathematical formula: sdgp^2 * sqrt(2*pi)^D * prod(lscale) * 
+#'   exp(-0.5 * sum(lscale^2 * slambda[m]))
+#'
+#' @noRd
+spd_gp_exp_quad <- function(slambda, sdgp, lscale) {
+  # Validate inputs
+  checkmate::assert_array(slambda, min.d = 2, max.d = 3, any.missing = FALSE)
+  checkmate::assert_numeric(sdgp, any.missing = FALSE, min.len = 1)
+  checkmate::assert_matrix(lscale, any.missing = FALSE, all.missing = FALSE)
+  
+  # Handle array dimensions - extract eigenvalue matrix
+  if (length(dim(slambda)) == 3) {
+    slambda <- slambda[, , 1]
+  }
+  
+  n_basis <- nrow(slambda)
+  n_dims <- ncol(slambda)
+  n_draws <- length(sdgp)
+  
+  # Validate dimension consistency  
+  if (ncol(lscale) != n_dims) {
     stop(insight::format_error(
-      "Dimension mismatch: {.field sdgp} has {nrow(sdgp)} rows and ",
-      "{ncol(sdgp)} columns, but expected {n_draws} × {k}."
+      "Dimension mismatch: {.field lscale} has {ncol(lscale)} columns ",
+      "but {.field slambda} has {n_dims} dimensions."
     ))
   }
-
-  if (nrow(lscale) != n_draws || ncol(lscale) != k) {
+  
+  if (nrow(lscale) != n_draws) {
     stop(insight::format_error(
       "Dimension mismatch: {.field lscale} has {nrow(lscale)} rows ",
-      "and {ncol(lscale)} columns, but expected {n_draws} × {k}."
+      "but {.field sdgp} has {n_draws} elements."
     ))
   }
-
+  
+  # Pre-compute constants
+  constant_base <- sdgp^2 * sqrt(2 * pi)^n_dims
+  
   # Pre-allocate result matrix
-  result <- matrix(0, nrow = n_draws, ncol = n_obs)
-
-  # Compute GP contribution per draw
-  for (i in seq_len(n_draws)) {
-    # Step 1: Transform latent factors with length scales
-    # zgp[i,,] is (k × k), lscale[i,] is (k) -> result is (k)
-    step1 <- zgp[i, , ] %*% lscale[i, ]
-
-    # Step 2: Scale by marginal standard deviations
-    # sdgp[i,] is (k), step1 is (k) -> element-wise multiply gives (k)
-    step2 <- sdgp[i, ] * step1
-
-    # Step 3: Apply spectral density transformation
-    # Mgp is (k × k), step2 is (k) -> result is (k)
-    step3 <- Mgp %*% step2
-
-    # Step 4: Project onto observation space
-    # Xgp is (N × k), step3 is (k) -> result is (N)
-    result[i, ] <- Xgp %*% step3
+  out <- matrix(nrow = n_draws, ncol = n_basis)
+  
+  if (n_dims == 1 || all(apply(lscale, 1, function(x) length(unique(x)) == 1))) {
+    # Isotropic case: all length scales equal
+    lscale_iso <- lscale[, 1]
+    constant <- constant_base * lscale_iso^n_dims
+    neg_half_lscale2 <- -0.5 * lscale_iso^2
+    
+    for (m in seq_len(n_basis)) {
+      eigenval_sum <- sum(slambda[m, ]^2)
+      out[, m] <- constant * exp(neg_half_lscale2 * eigenval_sum)
+    }
+  } else {
+    # Non-isotropic case: different length scales per dimension
+    constant <- constant_base * apply(lscale, 1, prod)
+    neg_half_lscale2 <- -0.5 * lscale^2
+    
+    for (m in seq_len(n_basis)) {
+      # Broadcast eigenvalue vector to match lscale dimensions
+      slambda_expanded <- matrix(slambda[m, ]^2, 
+                                nrow = n_draws, 
+                                ncol = n_dims, 
+                                byrow = TRUE)
+      out[, m] <- constant * exp(rowSums(neg_half_lscale2 * slambda_expanded))
+    }
   }
+  
+  out
+}
 
-  result
+
+#' Compute Spectral Power Density for Matern 3/2 Kernel
+#'
+#' Computes spectral power density for approximate Gaussian processes
+#' using the Matern 3/2 kernel. Follows brms implementation exactly.
+#'
+#' @inheritParams spd_gp_exp_quad
+#' @return Matrix [n_draws, n_basis] of spectral power density values
+#'
+#' @details 
+#' Mathematical formula uses (3 + sum(lscale^2 * slambda[m]))^(-(D+3)/2)
+#' exponential term with appropriate constants.
+#'
+#' @noRd
+spd_gp_matern32 <- function(slambda, sdgp, lscale) {
+  # Validate inputs (same as exp_quad)
+  checkmate::assert_array(slambda, min.d = 2, max.d = 3, any.missing = FALSE)
+  checkmate::assert_numeric(sdgp, any.missing = FALSE, min.len = 1)
+  checkmate::assert_matrix(lscale, any.missing = FALSE, all.missing = FALSE)
+  
+  # Handle array dimensions
+  if (length(dim(slambda)) == 3) {
+    slambda <- slambda[, , 1]
+  }
+  
+  n_basis <- nrow(slambda)
+  n_dims <- ncol(slambda)
+  n_draws <- length(sdgp)
+  
+  # Validate dimensions
+  if (ncol(lscale) != n_dims || nrow(lscale) != n_draws) {
+    stop(insight::format_error(
+      "Dimension mismatch in Matern 3/2 spectral density computation."
+    ))
+  }
+  
+  # Pre-compute constants (following brms exactly)
+  constant_base <- sdgp^2 * 
+    (2^n_dims * pi^(n_dims / 2) * gamma((n_dims + 3) / 2) * 3^(3 / 2)) / 
+    (0.5 * sqrt(pi))
+  expo <- -(n_dims + 3) / 2
+  lscale2 <- lscale^2
+  
+  # Pre-allocate result
+  out <- matrix(nrow = n_draws, ncol = n_basis)
+  
+  if (n_dims == 1 || all(apply(lscale, 1, function(x) length(unique(x)) == 1))) {
+    # Isotropic case
+    lscale_iso <- lscale[, 1]
+    constant <- constant_base * lscale_iso^n_dims
+    
+    for (m in seq_len(n_basis)) {
+      eigenval_sum <- sum(lscale2[, 1] * slambda[m, ]^2)
+      out[, m] <- constant * (3 + eigenval_sum)^expo
+    }
+  } else {
+    # Non-isotropic case  
+    constant <- constant_base * apply(lscale, 1, prod)
+    
+    for (m in seq_len(n_basis)) {
+      slambda_expanded <- matrix(slambda[m, ]^2, 
+                                nrow = n_draws, 
+                                ncol = n_dims, 
+                                byrow = TRUE)
+      eigenval_term <- rowSums(lscale2 * slambda_expanded)
+      out[, m] <- constant * (3 + eigenval_term)^expo
+    }
+  }
+  
+  out
+}
+
+
+#' Compute Spectral Power Density for Matern 5/2 Kernel
+#'
+#' Computes spectral power density for approximate Gaussian processes
+#' using the Matern 5/2 kernel. Follows brms implementation exactly.
+#'
+#' @inheritParams spd_gp_exp_quad
+#' @return Matrix [n_draws, n_basis] of spectral power density values
+#'
+#' @details
+#' Mathematical formula uses (5 + sum(lscale^2 * slambda[m]))^(-(D+5)/2)
+#' exponential term with appropriate constants.
+#'
+#' @noRd  
+spd_gp_matern52 <- function(slambda, sdgp, lscale) {
+  # Validate inputs (same as others)
+  checkmate::assert_array(slambda, min.d = 2, max.d = 3, any.missing = FALSE)
+  checkmate::assert_numeric(sdgp, any.missing = FALSE, min.len = 1)
+  checkmate::assert_matrix(lscale, any.missing = FALSE, all.missing = FALSE)
+  
+  # Handle array dimensions
+  if (length(dim(slambda)) == 3) {
+    slambda <- slambda[, , 1]
+  }
+  
+  n_basis <- nrow(slambda)
+  n_dims <- ncol(slambda)  
+  n_draws <- length(sdgp)
+  
+  # Validate dimensions
+  if (ncol(lscale) != n_dims || nrow(lscale) != n_draws) {
+    stop(insight::format_error(
+      "Dimension mismatch in Matern 5/2 spectral density computation."
+    ))
+  }
+  
+  # Pre-compute constants (following brms exactly)
+  constant_base <- sdgp^2 * 
+    (2^n_dims * pi^(n_dims / 2) * gamma((n_dims + 5) / 2) * 5^(5 / 2)) / 
+    (0.75 * sqrt(pi))
+  expo <- -(n_dims + 5) / 2
+  lscale2 <- lscale^2
+  
+  # Pre-allocate result
+  out <- matrix(nrow = n_draws, ncol = n_basis)
+  
+  if (n_dims == 1 || all(apply(lscale, 1, function(x) length(unique(x)) == 1))) {
+    # Isotropic case
+    lscale_iso <- lscale[, 1] 
+    constant <- constant_base * lscale_iso^n_dims
+    
+    for (m in seq_len(n_basis)) {
+      eigenval_sum <- sum(lscale2[, 1] * slambda[m, ]^2)
+      out[, m] <- constant * (5 + eigenval_sum)^expo
+    }
+  } else {
+    # Non-isotropic case
+    constant <- constant_base * apply(lscale, 1, prod)
+    
+    for (m in seq_len(n_basis)) {
+      slambda_expanded <- matrix(slambda[m, ]^2, 
+                                nrow = n_draws, 
+                                ncol = n_dims, 
+                                byrow = TRUE)
+      eigenval_term <- rowSums(lscale2 * slambda_expanded)
+      out[, m] <- constant * (5 + eigenval_term)^expo
+    }
+  }
+  
+  out
+}
+
+
+#' Compute Spectral Power Density with Kernel Dispatch
+#'
+#' Kernel dispatcher function that computes spectral power density for approximate 
+#' Gaussian processes by dispatching to appropriate kernel-specific
+#' implementation. Returns sqrt(spd_result) for direct use in prediction.
+#'
+#' @param slambda Array of eigenvalues for spectral basis functions
+#' @param sdgp Vector of marginal standard deviations across draws  
+#' @param lscale Matrix of length scale parameters [draws, dimensions]
+#' @param kernel Character string specifying kernel type: "exp_quad", 
+#'   "matern32", or "matern52"
+#'
+#' @return Matrix [n_draws, n_basis] of sqrt(spectral_power_density)
+#'
+#' @noRd
+compute_spd_vectorized <- function(slambda, sdgp, lscale, kernel) {
+  # Validate kernel type
+  checkmate::assert_choice(kernel, c("exp_quad", "matern32", "matern52"))
+  
+  # Dispatch to appropriate function
+  spd_result <- switch(kernel,
+    "exp_quad" = spd_gp_exp_quad(slambda, sdgp, lscale),
+    "matern32" = spd_gp_matern32(slambda, sdgp, lscale), 
+    "matern52" = spd_gp_matern52(slambda, sdgp, lscale),
+    stop(insight::format_error(
+      "Unsupported kernel type: {.field {kernel}}. ",
+      "Supported types: exp_quad, matern32, matern52."
+    ))
+  )
+  
+  # Return sqrt for direct use in prediction formula
+  sqrt(spd_result)
+}
+
+
+#' Detect Kernel Type from brms Formula
+#'
+#' Extracts the kernel/covariance type from gp() terms in a brms formula.
+#' Caches the result in the prep object to avoid repeated parsing.
+#'
+#' @param prep A brmsprep object from prepare_predictions() 
+#' @param brmsfit A brmsfit object containing the original formula
+#'
+#' @return Character string: "exp_quad", "matern32", or "matern52"
+#'
+#' @details
+#' Searches the formula for gp() terms and extracts the cov parameter.
+#' Default is "exp_quad" if no cov parameter specified.
+#' 
+#' Pattern: gp(x1, x2, cov = "matern32") extracts "matern32"
+#' Pattern: gp(x1, x2) defaults to "exp_quad"
+#'
+#' @noRd
+detect_gp_kernel <- function(prep, brmsfit) {
+  # Check if already cached
+  if (!is.null(prep$gp_kernel)) {
+    return(prep$gp_kernel)
+  }
+  
+  # Extract formula string
+  formula_str <- deparse(brmsfit$formula$formula, width.cutoff = 500L)
+  formula_str <- paste(formula_str, collapse = " ")
+  
+  # Search for gp() terms with cov parameter
+  # Pattern: cov\s*=\s*["']([^"']+)
+  cov_match <- regmatches(
+    formula_str, 
+    regexec('cov\\s*=\\s*["\']([^"\']+)', formula_str)
+  )
+  
+  if (length(cov_match[[1]]) > 1) {
+    kernel <- cov_match[[1]][2]  # Extract captured group
+    
+    # Validate and normalize
+    kernel <- switch(kernel,
+      "exp_quad" = "exp_quad",
+      "exponential_quadratic" = "exp_quad",
+      "squared_exponential" = "exp_quad", 
+      "rbf" = "exp_quad",
+      "matern32" = "matern32",
+      "matern_32" = "matern32",
+      "matern3/2" = "matern32",
+      "matern52" = "matern52", 
+      "matern_52" = "matern52",
+      "matern5/2" = "matern52",
+      stop(insight::format_error(
+        "Unsupported GP kernel: {.field {kernel}}. ",
+        "Supported kernels: exp_quad, matern32, matern52."
+      ))
+    )
+  } else {
+    # Default kernel
+    kernel <- "exp_quad"
+  }
+  
+  # Cache in prep object
+  prep$gp_kernel <- kernel
+  
+  kernel
 }
 
 
@@ -502,6 +824,149 @@ validate_monotonic_indices <- function(xmo_data, xmo_name, k_levels, n_obs) {
       "or 1-based [1, {k_levels}]. Found range: [{min_val}, {max_val}]."
     ))
   }
+}
+
+
+#' Add All GP Contributions to Linear Predictor
+#'
+#' Universal function that detects, processes, and aggregates all 
+#' Gaussian Process terms in a model. Handles both univariate and
+#' multivariate contexts with response-specific filtering.
+#'
+#' @param eta Matrix [n_draws × n_obs] of current linear predictor values
+#' @param prep A brmsprep object containing GP data structures
+#' @param brmsfit A brmsfit object for kernel detection (optional)
+#' @param resp Character string for response name in multivariate models.
+#'   NULL for univariate models. When specified, only includes GPs that
+#'   are response-specific ("resp_1") or shared (no prefix).
+#'
+#' @return Matrix [n_draws × n_obs] with GP contributions added
+#'
+#' @details
+#' Processing steps:
+#' 1. Detect all GP terms via Xgp_* matrices
+#' 2. Filter by response context if multivariate
+#' 3. Detect kernel type once and cache
+#' 4. Loop through valid GP terms and aggregate contributions
+#' 5. Return updated linear predictor
+#'
+#' Response filtering (multivariate only):
+#' - Response-specific: "count_1", "biomass_2" (includes if matches resp)
+#' - Shared terms: "1", "2" (includes always - no letter prefix)
+#' - Other responses: "biomass_1" when resp="count" (excludes)
+#'
+#' @noRd
+add_all_gp_contributions <- function(eta, prep, brmsfit = NULL, resp = NULL) {
+  # Validate inputs
+  checkmate::assert_matrix(eta, any.missing = FALSE)
+  checkmate::assert_class(prep, "brmsprep") 
+  checkmate::assert_string(resp, null.ok = TRUE)
+  
+  # Detect GP terms
+  gp_info <- detect_gp_terms(prep)
+  if (is.null(gp_info)) {
+    return(eta)  # No GP terms found
+  }
+  
+  # Detect kernel type (use cached if available, detect if brmsfit provided)
+  kernel <- prep$gp_kernel
+  if (is.null(kernel) && !is.null(brmsfit)) {
+    kernel <- detect_gp_kernel(prep, brmsfit)
+  }
+  if (is.null(kernel)) {
+    kernel <- "exp_quad"  # Default fallback
+  }
+  
+  # Filter GP terms by response context (multivariate only)
+  suffixes <- gp_info$suffixes
+  if (!is.null(resp)) {
+    # Multivariate: include response-specific + shared terms
+    valid_suffixes <- character()
+    for (suffix in suffixes) {
+      is_resp_specific <- grepl(paste0("^", resp, "_"), suffix)
+      is_shared <- !grepl("^[a-zA-Z]", suffix)
+      
+      if (is_resp_specific || is_shared) {
+        valid_suffixes <- c(valid_suffixes, suffix)
+      }
+    }
+    suffixes <- valid_suffixes
+  }
+  
+  # Return early if no valid suffixes remain
+  if (length(suffixes) == 0) {
+    return(eta)
+  }
+  
+  # Process each valid GP term
+  for (suffix in suffixes) {
+    # Extract GP components from sdata and draws
+    Xgp <- prep$sdata[[paste0("Xgp_", suffix)]]
+    slambda <- prep$sdata[[paste0("slambda_", suffix)]]
+    
+    # Extract GP parameters from draws matrix using bracket patterns
+    draws_mat <- prep$draws
+    draws_names <- colnames(draws_mat)
+    
+    # Extract sdgp (should be single parameter per suffix)
+    sdgp_names <- grep(paste0("^sdgp_", suffix, "\\["), draws_names, value = TRUE)
+    if (length(sdgp_names) != 1) {
+      stop(insight::format_error(
+        "Expected single {.field sdgp} parameter for suffix {suffix} ",
+        "but found {length(sdgp_names)}: {paste(sdgp_names, collapse = ', ')}"
+      ))
+    }
+    sdgp <- draws_mat[, sdgp_names[1]]  # Extract as vector
+    
+    # Extract zgp parameters (multiple basis functions)
+    zgp_names <- grep(paste0("^zgp_", suffix, "\\["), draws_names, value = TRUE)
+    if (length(zgp_names) == 0) {
+      stop(insight::format_error(
+        "No {.field zgp} parameters found for suffix {suffix}"
+      ))
+    }
+    zgp <- draws_mat[, zgp_names, drop = FALSE]  # Keep as matrix
+    
+    # Extract lscale parameters (try multiple patterns)
+    lscale_names <- grep(paste0("^lscale_", suffix, "\\["), draws_names, value = TRUE)
+    if (length(lscale_names) == 0) {
+      # Try alternative patterns
+      alt_patterns <- c(
+        paste0("^lsd_", suffix, "\\["),
+        paste0("^lengthscale_", suffix, "\\["),
+        paste0("^ls_", suffix, "\\[")
+      )
+      for (pattern in alt_patterns) {
+        lscale_names <- grep(pattern, draws_names, value = TRUE)
+        if (length(lscale_names) > 0) break
+      }
+    }
+    if (length(lscale_names) == 0) {
+      stop(insight::format_error(
+        "No {.field lscale} parameters found for suffix {suffix}. ",
+        "Tried patterns: lscale_, lsd_, lengthscale_, ls_"
+      ))
+    }
+    lscale <- draws_mat[, lscale_names, drop = FALSE]  # Keep as matrix
+    
+    # Validate matrix dimensions and structure
+    checkmate::assert_matrix(Xgp, any.missing = FALSE, all.missing = FALSE)
+    checkmate::assert_array(slambda, min.d = 2, max.d = 3, any.missing = FALSE)
+    checkmate::assert_matrix(zgp, any.missing = FALSE, all.missing = FALSE)
+    checkmate::assert_numeric(sdgp, any.missing = FALSE, min.len = 1)
+    checkmate::assert_matrix(lscale, any.missing = FALSE, all.missing = FALSE)
+    
+    # Validate required components exist (after reshaping)
+    if (any(sapply(list(Xgp, slambda, zgp, sdgp, lscale), is.null))) {
+      next  # Skip incomplete GP term
+    }
+    
+    # Compute and add GP contribution
+    gp_contrib <- approx_gp_pred(Xgp, slambda, zgp, sdgp, lscale, kernel)
+    eta <- eta + gp_contrib
+  }
+  
+  eta
 }
 
 
@@ -830,7 +1295,7 @@ monotonic_pred <- function(eta, draws_mat, prep, suffix, n_obs) {
 #'
 #' Process smooth terms by grouping components using brms metadata (nb_ fields).
 #' Each nb_<id> field indicates the number of components for smooth term <id>.
-#' This unified approach handles both regular smooths and tensor products.
+#' This metadata-driven approach handles both regular smooths and tensor products.
 #'
 #' @param eta Current linear predictor matrix [n_draws × n_obs] to add to
 #' @param draws_mat Parameter draws matrix with columns for coefficients
@@ -1012,21 +1477,7 @@ extract_linpred_univariate <- function(prep) {
   eta <- eta + re_contrib
 
   # Add GP terms
-  gp_info <- detect_gp_terms(prep)
-  if (!is.null(gp_info)) {
-    for (suffix in gp_info$suffixes) {
-      # Extract all GP components for this term
-      Xgp <- prep$sdata[[paste0("Xgp_", suffix)]]
-      Mgp <- prep$sdata[[paste0("Mgp_", suffix)]]
-      zgp <- prep$dpars[[paste0("zgp_", suffix)]]
-      sdgp <- prep$dpars[[paste0("sdgp_", suffix)]]
-      lscale <- prep$dpars[[paste0("lscale_", suffix)]]
-
-      # Compute and add GP contribution
-      gp_contrib <- approx_gp_pred(Xgp, Mgp, zgp, sdgp, lscale)
-      eta <- eta + gp_contrib
-    }
-  }
+  eta <- add_all_gp_contributions(eta, prep, brmsfit = NULL, resp = NULL)
 
   # Add monotonic effects (mo() terms)
   xmo_names <- grep("^Xmo_", names(prep$sdata), value = TRUE)
@@ -1275,31 +1726,7 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
     }
 
     # Add GP terms for this response
-    gp_info <- detect_gp_terms(prep)
-    if (!is.null(gp_info)) {
-      for (suffix in gp_info$suffixes) {
-        # Check if GP term belongs to current response
-        # Response-specific: "count_1" matches response "count"
-        # Shared: "1" applies to all responses (no letter prefix)
-        is_resp_specific <- grepl(paste0("^", resp_name, "_"), suffix)
-        is_shared <- !grepl("^[a-zA-Z]", suffix)
-
-        if (!is_resp_specific && !is_shared) {
-          next
-        }
-
-        # Extract all GP components for this term
-        Xgp <- prep$sdata[[paste0("Xgp_", suffix)]]
-        Mgp <- prep$sdata[[paste0("Mgp_", suffix)]]
-        zgp <- prep$dpars[[paste0("zgp_", suffix)]]
-        sdgp <- prep$dpars[[paste0("sdgp_", suffix)]]
-        lscale <- prep$dpars[[paste0("lscale_", suffix)]]
-
-        # Compute and add GP contribution
-        gp_contrib <- approx_gp_pred(Xgp, Mgp, zgp, sdgp, lscale)
-        eta <- eta + gp_contrib
-      }
-    }
+    eta <- add_all_gp_contributions(eta, prep, brmsfit = NULL, resp = resp_name)
 
     # Add monotonic effects for this response
     xmo_names <- grep("^Xmo_", names(prep$sdata), value = TRUE)

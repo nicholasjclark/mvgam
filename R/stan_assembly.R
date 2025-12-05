@@ -1250,16 +1250,8 @@ convert_glm_to_standard_form <- function(code_lines, block_info, detected_glm_ty
   
   # Create mu construction for trend injection
   if (mu_already_exists) {
-    # DEBUG: Print mu exists case
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      cat("  mu vector already exists - only adding fixed effects\n")
-    }
     mu_initialization <- c("    // Add fixed effects for existing mu")
   } else {
-    # DEBUG: Print new mu case  
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      cat("  Creating new mu vector\n")
-    }
     mu_initialization <- c(
       "    // Initialize mu for trend injection",  
       "    vector[N] mu = rep_vector(0.0, N);"
@@ -1271,14 +1263,7 @@ convert_glm_to_standard_form <- function(code_lines, block_info, detected_glm_ty
     fixed_effects_line <- paste0("    mu += ", params$design_matrix, " * ", params$coefficients, ";")
     mu_initialization <- c(mu_initialization, fixed_effects_line)
     
-    # DEBUG: Print what we're adding
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      cat("  Adding fixed effects line:", fixed_effects_line, "\n")
-    }
   } else {
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      cat("  SKIPPING fixed effects - missing design_matrix or coefficients\n")
-    }
   }
   
   # Handle intercept (including no-intercept models)
@@ -1330,19 +1315,9 @@ insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_cod
   model_block_text <- paste(model_lines, collapse = "\n")
   detected_glm_types <- detect_glm_usage(model_block_text, skip_lines = processed_glm_lines)
   
-  # DEBUG: Print GLM detection results
-  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-    cat("  Checking for GLM usage (robust hybrid handling)...\n")
-    cat("  Detected GLM types:", if (length(detected_glm_types) > 0) paste(detected_glm_types, collapse = ", ") else "NONE", "\n")
-  }
   
   # Convert GLM calls to explicit form if present (handles both pure GLM and hybrid cases)
   if (length(detected_glm_types) > 0) {
-    # DEBUG: Print GLM conversion trigger
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      cat("  Triggering GLM-to-standard conversion for hybrid/GLM case\n")
-      cat("  GLM types to convert:", paste(detected_glm_types, collapse = ", "), "\n")
-    }
     
     # Convert GLM calls to explicit form, then recurse to find new mu += lines
     # Create GLM analysis for conversion (missing parameter bug fix)
@@ -1358,10 +1333,6 @@ insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_cod
   
   # Handle cases with no GLM calls
   if (length(mu_line_indices) == 0) {
-    # DEBUG: Print fallback to nonlinear handling
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      cat("  No mu += lines and no GLM calls - trying nonlinear pattern\n")
-    }
     
     # Handle nonlinear models: look for mu[n] = ... patterns inside for loops
     result_code <- handle_nonlinear_trend_injection(code_lines, block_info, trend_injection_code)
