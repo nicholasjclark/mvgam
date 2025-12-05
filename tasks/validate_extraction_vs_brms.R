@@ -59,45 +59,64 @@ fit_mvgam_cached <- function(name, formula, trend_formula, data, family, ...) {
   return(fit)
 }
 
+# OLD PATHWAY (reference only)
+# #' Extract mvgam observation-level predictions using our method
+# extract_mvgam_obs_pred <- function(mvgam_fit, newdata) {
+#   obs_params <- extract_obs_parameters(mvgam_fit)
+#   full_draws <- posterior::as_draws_matrix(mvgam_fit$fit)
+#   obs_draws <- full_draws[, obs_params, drop = FALSE]
+#   mock_fit <- create_mock_stanfit(obs_draws)
+#   prep <- prepare_predictions.mock_stanfit(
+#     object = mock_fit,
+#     brmsfit = mvgam_fit$obs_model,
+#     newdata = newdata
+#   )
+#   extract_linpred_from_prep(prep)
+# }
+# 
+# #' Extract mvgam trend-level predictions using our method
+# #' Note: Must strip _trend suffix from parameter names because:
+# #'   - Combined fit stores: b_trend[1], sd_1_trend[1], r_1_1_trend[1], etc.
+# #'   - But trend_model brmsfit expects: b[1], sd_1[1], r_1_1[1], etc.
+# extract_mvgam_trend_pred <- function(mvgam_fit, newdata) {
+#   trend_params <- extract_trend_parameters(mvgam_fit)
+#   full_draws <- posterior::as_draws_matrix(mvgam_fit$fit)
+#   trend_draws <- full_draws[, trend_params, drop = FALSE]
+# 
+#   # Strip _trend suffix so parameters match trend_model brmsfit expectations
+#   colnames(trend_draws) <- gsub("_trend", "", colnames(trend_draws))
+# 
+#   mock_fit <- create_mock_stanfit(trend_draws)
+#   prep <- prepare_predictions.mock_stanfit(
+#     object = mock_fit,
+#     brmsfit = mvgam_fit$trend_model,
+#     newdata = newdata
+#   )
+#   extract_linpred_from_prep(prep)
+# }
+# 
+# #' Extract combined obs + trend predictions (additive on link scale)
+# extract_mvgam_combined_pred <- function(mvgam_fit, newdata) {
+#   obs_pred <- extract_mvgam_obs_pred(mvgam_fit, newdata)
+#   trend_pred <- extract_mvgam_trend_pred(mvgam_fit, newdata)
+#   obs_pred + trend_pred
+# }
+
+# NEW PATHWAY using extract_component_linpred()
 #' Extract mvgam observation-level predictions using our method
 extract_mvgam_obs_pred <- function(mvgam_fit, newdata) {
-  obs_params <- extract_obs_parameters(mvgam_fit)
-  full_draws <- posterior::as_draws_matrix(mvgam_fit$fit)
-  obs_draws <- full_draws[, obs_params, drop = FALSE]
-  mock_fit <- create_mock_stanfit(obs_draws)
-  prep <- prepare_predictions.mock_stanfit(
-    object = mock_fit,
-    brmsfit = mvgam_fit$obs_model,
-    newdata = newdata
-  )
-  extract_linpred_from_prep(prep)
+  extract_component_linpred(mvgam_fit, newdata, component = "obs")
 }
 
 #' Extract mvgam trend-level predictions using our method
-#' Note: Must strip _trend suffix from parameter names because:
-#'   - Combined fit stores: b_trend[1], sd_1_trend[1], r_1_1_trend[1], etc.
-#'   - But trend_model brmsfit expects: b[1], sd_1[1], r_1_1[1], etc.
 extract_mvgam_trend_pred <- function(mvgam_fit, newdata) {
-  trend_params <- extract_trend_parameters(mvgam_fit)
-  full_draws <- posterior::as_draws_matrix(mvgam_fit$fit)
-  trend_draws <- full_draws[, trend_params, drop = FALSE]
-
-  # Strip _trend suffix so parameters match trend_model brmsfit expectations
-  colnames(trend_draws) <- gsub("_trend", "", colnames(trend_draws))
-
-  mock_fit <- create_mock_stanfit(trend_draws)
-  prep <- prepare_predictions.mock_stanfit(
-    object = mock_fit,
-    brmsfit = mvgam_fit$trend_model,
-    newdata = newdata
-  )
-  extract_linpred_from_prep(prep)
+  extract_component_linpred(mvgam_fit, newdata, component = "trend")
 }
 
 #' Extract combined obs + trend predictions (additive on link scale)
 extract_mvgam_combined_pred <- function(mvgam_fit, newdata) {
-  obs_pred <- extract_mvgam_obs_pred(mvgam_fit, newdata)
-  trend_pred <- extract_mvgam_trend_pred(mvgam_fit, newdata)
+  obs_pred <- extract_component_linpred(mvgam_fit, newdata, component = "obs")
+  trend_pred <- extract_component_linpred(mvgam_fit, newdata, component = "trend")
   obs_pred + trend_pred
 }
 

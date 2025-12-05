@@ -1802,3 +1802,124 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
     return(result)
   }
 }
+
+
+#' Extract Linear Predictor for Model Component
+#'
+#' Helper function that extracts linear predictors for specific model
+#' components (observation, trend, or distributional parameters).
+#'
+#' @param mvgam_fit mvgam object from mvgam()
+#' @param newdata data.frame with prediction covariates
+#' @param component Character string: "obs", "trend", or distributional
+#'   parameter name (e.g., "sigma", "zi", "hu")
+#' @param resp Character string for multivariate models (NULL for univariate)
+#' @param ndraws Integer number of posterior draws (NULL = all)
+#' @param re_formula Formula for random effects (NULL = include all, NA = exclude all)
+#' @param allow_new_levels Logical; allow new factor levels in random effects
+#' @param sample_new_levels Character; how to sample new levels
+#'   ("uncertainty" or "gaussian")
+#'
+#' @return Matrix [ndraws × nobs] of linear predictor values on link scale
+#'
+#' @details
+#' **Component Routing**:
+#' - "obs": Uses extract_obs_parameters() and mvgam_fit$obs_model
+#' - "trend": Uses extract_trend_parameters() and mvgam_fit$trend_model,
+#'   strips "_trend" suffix from parameter names
+#' - Distributional parameters: Routes to appropriate distributional
+#'   model component
+#'
+#' **Parameter Renaming**: Trend parameters have "_trend" suffix stripped
+#' because the combined fit stores parameters as "b_trend[1]" but the
+#' trend_model brmsfit expects "b[1]".
+#'
+#' @noRd
+extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
+                                     resp = NULL, ndraws = NULL,
+                                     re_formula = NULL, allow_new_levels = FALSE,
+                                     sample_new_levels = "uncertainty") {
+  # Validate inputs
+  checkmate::assert_class(mvgam_fit, "mvgam")
+  checkmate::assert_data_frame(newdata, min.rows = 1)
+  checkmate::assert_string(component)
+  checkmate::assert_string(resp, null.ok = TRUE)
+  checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
+  checkmate::assert_logical(allow_new_levels, len = 1)
+  checkmate::assert_choice(sample_new_levels, c("uncertainty", "gaussian"))
+  checkmate::assert(
+    checkmate::check_null(re_formula),
+    checkmate::check_class(re_formula, "formula"),
+    checkmate::check_identical(re_formula, NA)
+  )
+
+  # Extract parameters based on component
+  if (component == "obs") {
+    params <- extract_obs_parameters(mvgam_fit)
+    brms_model <- mvgam_fit$obs_model
+    strip_suffix <- FALSE
+  } else if (component == "trend") {
+    params <- extract_trend_parameters(mvgam_fit)
+    brms_model <- mvgam_fit$trend_model
+    strip_suffix <- TRUE
+  } else {
+    # Distributional parameter (sigma, zi, hu, etc.)
+    params <- extract_obs_parameters(mvgam_fit)
+    params <- grep(paste0("_", component), params, value = TRUE)
+    
+    if (length(params) == 0) {
+      stop(insight::format_error(
+        "No parameters found for component {.field {component}}."
+      ))
+    }
+    
+    brms_model <- mvgam_fit$obs_model
+    strip_suffix <- FALSE
+  }
+
+  # Validate brms_model exists
+  if (is.null(brms_model)) {
+    stop(insight::format_error(
+      "No brmsfit model found for component {.field {component}}."
+    ))
+  }
+
+  # Extract parameter draws
+  full_draws <- posterior::as_draws_matrix(mvgam_fit$fit)
+  
+  # Subset to requested draws if specified
+  if (!is.null(ndraws)) {
+    n_available <- nrow(full_draws)
+    if (ndraws > n_available) {
+      stop(insight::format_error(
+        "Requested {ndraws} draws but only {n_available} available."
+      ))
+    }
+    draw_indices <- sample(n_available, ndraws)
+    full_draws <- full_draws[draw_indices, , drop = FALSE]
+  }
+  
+  # Extract component-specific draws
+  component_draws <- full_draws[, params, drop = FALSE]
+  
+  # Strip suffix for trend parameters
+  if (strip_suffix) {
+    colnames(component_draws) <- gsub("_trend", "", colnames(component_draws))
+  }
+
+  # Create mock stanfit object
+  mock_fit <- create_mock_stanfit(component_draws)
+
+  # Generate prep object
+  prep <- prepare_predictions.mock_stanfit(
+    object = mock_fit,
+    brmsfit = brms_model,
+    newdata = newdata,
+    re_formula = re_formula,
+    allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels
+  )
+
+  # Extract linear predictor
+  extract_linpred_from_prep(prep, resp = resp)
+}
