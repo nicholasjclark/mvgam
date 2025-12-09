@@ -5,5 +5,5 @@ model: claude-haiku-4-5-20251001
 ---
 
 - Commit and push ALL changes in the project, following the explicit guidelines in CLAUDE.md. 
-- Ignore any metadata updates to architecture/ that may be added by the git hook
-- You have the capability to call multiple tools in a single response. You MUST do all of the above in a single message. Do not use any other tools or do anything else. 
+- DO NOT commit or push any metadata updates to `architecture/` that will be added by the git hook
+- You have the capability to call multiple tools in a single response. You MUST do all of the above in a single message. DO NOT use any other tools or do anything else. 
