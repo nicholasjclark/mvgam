@@ -1853,6 +1853,12 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
     checkmate::check_identical(re_formula, NA)
   )
 
+  # Validate prediction data factor levels against training data
+  if (!is.null(mvgam_fit$trend_metadata) &&
+      !is.null(mvgam_fit$trend_metadata$levels)) {
+    validate_prediction_factor_levels(newdata, mvgam_fit$trend_metadata)
+  }
+
   # Extract parameters based on component
   if (component == "obs") {
     params <- extract_obs_parameters(mvgam_fit)

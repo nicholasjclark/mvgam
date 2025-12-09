@@ -1924,6 +1924,156 @@ validate_factor_levels <- function(data, var_name, data_name = "data", auto_drop
   return(data)
 }
 
+
+#' Extract Factor Levels from Data Column
+#'
+#' Extracts unique levels from a factor or character column. Handles
+#' NULL/NA variable names, missing columns, empty columns, and both
+#' factor and character data types.
+#'
+#' @param data Data frame to extract levels from
+#' @param var_name Name of variable to extract levels from. Can be
+#'   NULL, NA, or "NA" (all return NULL).
+#'
+#' @return Character vector of unique levels (excluding NA values), or
+#'   NULL if variable is missing, NULL, NA, "NA", or column is empty.
+#'
+#' @details
+#' Level extraction behavior:
+#' - For factors: returns `levels()` (preserves level ordering)
+#' - For characters: returns `unique()` sorted alphabetically
+#' - For other types: coerces to character first
+#' - NA values are always excluded from returned levels
+#'
+#' Used by `extract_trend_data()` to store training factor levels in
+#' `trend_metadata$levels` for prediction validation.
+#'
+#' @noRd
+extract_factor_levels <- function(data, var_name) {
+  checkmate::assert_data_frame(data)
+
+  # Handle NULL/NA/missing variable name
+  if (is.null(var_name) ||
+      length(var_name) == 0 ||
+      is.na(var_name) ||
+      identical(var_name, "NA")) {
+    return(NULL)
+  }
+
+  checkmate::assert_string(var_name, min.chars = 1)
+
+  # Handle missing column
+  if (!var_name %in% names(data)) {
+    return(NULL)
+  }
+
+  col_data <- data[[var_name]]
+
+  # Handle empty or all-NA columns
+  if (length(col_data) == 0 || all(is.na(col_data))) {
+    return(NULL)
+  }
+
+  # Remove NA values before extraction
+  col_data <- col_data[!is.na(col_data)]
+
+  if (is.factor(col_data)) {
+    # Preserve all factor levels (including unused) for training metadata
+    return(levels(col_data))
+  } else {
+    # Character or other: unique sorted values
+    return(sort(unique(as.character(col_data))))
+  }
+}
+
+
+#' Validate Prediction Data Factor Levels
+#'
+#' Validates that factor levels in prediction data are a subset of training
+#' data levels. Called by `ensure_mvgam_variables()` when metadata with
+#' stored levels is provided.
+#'
+#' @param data Data frame of prediction data to validate
+#' @param metadata List containing `levels` (with series/gr/subgr) and
+#'   `variables` (with series_var/gr_var/subgr_var)
+#'
+#' @return Invisible TRUE if valid. Stops with informative error if
+#'   prediction data contains factor levels not in training data.
+#'
+#' @noRd
+validate_prediction_factor_levels <- function(data, metadata) {
+  checkmate::assert_data_frame(data, min.rows = 1)
+  checkmate::assert_list(metadata, names = "named")
+
+  # Validate required metadata structure
+  if (is.null(metadata$levels)) {
+    return(invisible(TRUE))
+  }
+  checkmate::assert_list(metadata$levels, names = "named")
+
+  if (is.null(metadata$variables)) {
+    return(invisible(TRUE))
+  }
+  checkmate::assert_list(metadata$variables, names = "named")
+
+  # Validate series levels
+  if (!is.null(metadata$levels$series)) {
+    series_var <- metadata$variables$series_var
+    if (!is.null(series_var) && series_var %in% names(data)) {
+      newdata_levels <- extract_factor_levels(data, series_var)
+      if (!is.null(newdata_levels)) {
+        invalid <- setdiff(newdata_levels, metadata$levels$series)
+        if (length(invalid) > 0) {
+          stop(insight::format_error(
+            "Series levels in newdata not found in training data: ",
+            "{.val {invalid}}.",
+            "Training data has levels: {.val {metadata$levels$series}}."
+          ), call. = FALSE)
+        }
+      }
+    }
+  }
+
+  # Validate gr levels (if hierarchical model)
+  if (!is.null(metadata$levels$gr)) {
+    gr_var <- metadata$variables$gr_var
+    if (!is.null(gr_var) && gr_var %in% names(data)) {
+      newdata_levels <- extract_factor_levels(data, gr_var)
+      if (!is.null(newdata_levels)) {
+        invalid <- setdiff(newdata_levels, metadata$levels$gr)
+        if (length(invalid) > 0) {
+          stop(insight::format_error(
+            "Grouping variable {.field {gr_var}} has levels not in ",
+            "training data: {.val {invalid}}.",
+            "Training data has levels: {.val {metadata$levels$gr}}."
+          ), call. = FALSE)
+        }
+      }
+    }
+  }
+
+  # Validate subgr levels (if hierarchical model)
+  if (!is.null(metadata$levels$subgr)) {
+    subgr_var <- metadata$variables$subgr_var
+    if (!is.null(subgr_var) && subgr_var %in% names(data)) {
+      newdata_levels <- extract_factor_levels(data, subgr_var)
+      if (!is.null(newdata_levels)) {
+        invalid <- setdiff(newdata_levels, metadata$levels$subgr)
+        if (length(invalid) > 0) {
+          stop(insight::format_error(
+            "Sub-grouping variable {.field {subgr_var}} has levels ",
+            "not in training data: {.val {invalid}}.",
+            "Training data has levels: {.val {metadata$levels$subgr}}."
+          ), call. = FALSE)
+        }
+      }
+    }
+  }
+
+  invisible(TRUE)
+}
+
+
 #' Validate Stan Code Structure
 #'
 #' @description
@@ -2722,6 +2872,11 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
     if (!is.null(metadata$variables)) {
       checkmate::assert_list(metadata$variables, names = "named")
     }
+
+    # Validate factor levels in prediction context
+    if (!is.null(metadata$levels)) {
+      validate_prediction_factor_levels(data, metadata)
+    }
   }
 
   # Always create implicit time mapping for consistency
@@ -3400,9 +3555,43 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
       is_car = !is.null(parsed_trend$trend_model) &&
                identical(parsed_trend$trend_model$trend, "CAR"),
       # Context-guarded fields for prediction context
-      time_source = if (has_mvgam_variables(data)) attr(data, "mvgam_time_source") else NULL,
-      series_source = if (has_mvgam_variables(data)) attr(data, "mvgam_series_source") else NULL,
-      response_vars = if (is.null(mvgam_object)) response_vars else NULL  # Only store in fitting context
+      time_source = if (has_mvgam_variables(data)) {
+        attr(data, "mvgam_time_source")
+      } else {
+        NULL
+      },
+      series_source = if (has_mvgam_variables(data)) {
+        attr(data, "mvgam_series_source")
+      } else {
+        NULL
+      },
+      response_vars = if (is.null(mvgam_object)) response_vars else NULL,
+      # Store factor levels for prediction validation
+      levels = list(
+        series = if (is.factor(series_vals)) {
+          levels(series_vals)
+        } else {
+          sort(unique(as.character(series_vals)))
+        },
+        gr = extract_factor_levels(
+          data,
+          if (!is.null(parsed_trend$trend_model$gr) &&
+              parsed_trend$trend_model$gr != "NA") {
+            parsed_trend$trend_model$gr
+          } else {
+            NA_character_
+          }
+        ),
+        subgr = extract_factor_levels(
+          data,
+          if (!is.null(parsed_trend$trend_model$subgr) &&
+              parsed_trend$trend_model$subgr != "NA") {
+            parsed_trend$trend_model$subgr
+          } else {
+            NA_character_
+          }
+        )
+      )
     )
   }
 

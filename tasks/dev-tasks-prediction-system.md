@@ -234,7 +234,23 @@ The extraction system now successfully handles:
     - [x] ~~2.4.2~~ **SUPERSEDED**: `prepare_trend_predictions()` function superseded by more comprehensive `extract_component_linpred()`
     - [x] **2.4.3 COMPLETE**: `extract_linpred_from_prep(prep, dpar = "mu")` function implemented in `R/predictions.R` (lines 1009-1054). Handles linear predictor computation from prep objects with full support for univariate/multivariate models and all brms formula features.
     - [x] **2.4.1-2 EVOLUTION**: `extract_component_linpred(mvgam_fit, newdata, component = "obs"|"trend", ...)` implemented in `R/predictions.R` (lines 1838-1926). **Consolidates and exceeds original 2.4.1-2 scope**: handles both observation and trend components, includes parameter extraction → mock stanfit creation → prep generation → linear predictor extraction in unified workflow. Validated in `tasks/validate_extraction_vs_brms.R`.
-    - [ ] 2.4.4 Add input validation function `validate_newdata_for_predictions(mvgam_fit, newdata)` in `R/predictions.R`. Check that newdata is data.frame, check for required variables from both formulas (use `all.vars()`), check for time/series variables if trend model present. Return validated newdata or stop with informative error via `insight::format_error()`. Reference `tasks/validate_extraction_vs_brms.R` for validation patterns and edge cases.
+  - [x] **2.4.4 Prediction Data Validation (via ensure_mvgam_variables)**
+    **Design**: Extend existing `ensure_mvgam_variables()` to validate prediction data factor levels against training levels. Store factor levels in `trend_metadata` during fitting. Single validation path for both fitting and prediction contexts.
+    **Code Review**: Approved 2025-12-10. Implementation completed 2025-12-10.
+
+    - [x] 2.4.4.1 **Add `extract_factor_levels()` helper** in `R/validations.R` (lines 1928-1987). Handles NULL/NA var names, missing columns, factor vs character. Returns character vector of levels or NULL.
+
+    - [x] 2.4.4.2 **Store factor levels in trend_metadata** in `extract_trend_data()` (validations.R:3477-3502). Added `levels` field with series/gr/subgr levels using new helper.
+
+    - [x] 2.4.4.3 **Add `validate_prediction_factor_levels()` helper** in `R/validations.R` (lines 1990-2074). Validates newdata factor levels are subset of training levels with informative errors.
+
+    - [x] 2.4.4.4 **Modify `ensure_mvgam_variables()`** (validations.R:2876-2879) to call `validate_prediction_factor_levels()` when `metadata$levels` is present.
+
+    - [x] 2.4.4.5 **Add integration call in `extract_component_linpred()`** (predictions.R:1856-1860). Validates newdata against `mvgam_fit$trend_metadata` before prediction. Note: placed here instead of mock_stanfit as this is the single caller.
+
+    - [x] 2.4.4.6 **Create test script** `tasks/test_prediction_factor_validation.R`. All unit tests pass. Integration tests require fixture regeneration for full validation.
+
+    - [ ] 2.4.4.7 **Move tests to testthat** after validation. Add to appropriate test file in `tests/testthat/`.
 
   - [ ] **2.5 Final Integration Tests (in tests/testthat/)**
     **Note**: Use `tasks/validate_extraction_vs_brms.R` methodology and test models as reference for integration test design.
