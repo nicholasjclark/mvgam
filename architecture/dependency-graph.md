@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-12-05 15:51:29  
+**Generated:** 2025-12-10 08:43:43  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 60
-- **Total Functions:** 539
+- **Total Functions:** 541
 - **Exported Functions:** 57
-- **Internal Functions:** 496
+- **Internal Functions:** 498
 - **S3 Methods:** 41
 - **S3 Classes:** 31
 
@@ -139,8 +139,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/portal_data.R`** (0 functions) - Data documentation and loading
 
 ### Validation Files
-- **`R/validations.R`** (73 functions) - Input validation and checks
-  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_exact_gp_usage, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_list_trend_formula, validate_nonlinear_trend_compatibility, validate_required_variables (+ 58 more)
+- **`R/validations.R`** (75 functions) - Input validation and checks
+  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_exact_gp_usage, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_list_trend_formula, validate_nonlinear_trend_compatibility, validate_required_variables (+ 60 more)
 
 ### Core Files
 - **`R/summary.mvgam.R`** (24 functions) - Summary methods
@@ -902,6 +902,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **eval_silent()** (internal)
 - **extract_all_bf_formulas()** (internal)
 - **extract_and_validate_trend_components()** (internal)
+- **extract_factor_levels()** (internal)
 - **extract_time_series_dimensions()** (internal)
 - **extract_trend_data()** (internal)
 - **filter_required_variables()** (internal)
@@ -939,6 +940,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **validate_no_factor_hierarchical()** (internal)
 - **validate_nonlinear_trend_compatibility()** (internal)
 - **validate_pos_integer()** (internal)
+- **validate_prediction_factor_levels()** (internal)
 - **validate_proportional()** (internal)
 - **validate_required_variables()** (internal)
 - **validate_series_time()** (internal)

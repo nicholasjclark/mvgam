@@ -1407,6 +1407,16 @@
                                                                           "is_s3_method":  false,
                                                                           "arguments":  "formula"
                                                                       },
+                              "extract_factor_levels":  {
+                                                            "s3_class":  "",
+                                                            "s3_method":  "",
+                                                            "signature":  "extract_factor_levels \u003c- function(data, var_name) {",
+                                                            "is_s3_method":  false,
+                                                            "arguments":  [
+                                                                              "data",
+                                                                              "var_name"
+                                                                          ]
+                                                        },
                               "mvgam_trend_registry":  {
                                                            "s3_class":  "",
                                                            "s3_method":  "",
@@ -4219,6 +4229,16 @@
                                                            "is_s3_method":  false,
                                                            "arguments":  "matches"
                                                        },
+                              "validate_prediction_factor_levels":  {
+                                                                        "s3_class":  "",
+                                                                        "s3_method":  "",
+                                                                        "signature":  "validate_prediction_factor_levels \u003c- function(data, metadata) {",
+                                                                        "is_s3_method":  false,
+                                                                        "arguments":  [
+                                                                                          "data",
+                                                                                          "metadata"
+                                                                                      ]
+                                                                    },
                               "to_assembly":  {
                                                   "s3_class":  "",
                                                   "s3_method":  "",
@@ -5274,6 +5294,8 @@
                                                 "is_try_error",
                                                 "is_multivariate_trend_specs",
                                                 "validate_factor_levels",
+                                                "extract_factor_levels",
+                                                "validate_prediction_factor_levels",
                                                 "validate_stan_code_structure",
                                                 "are_braces_balanced",
                                                 "parse_data_declarations",
@@ -6197,6 +6219,7 @@
                       "generate_rw_monitor_params":  "R/trend_system.R",
                       "extract_mu_assignment_lines":  "R/mu_expression_analysis.R",
                       "as_draws_df.mvgam":  "R/as.data.frame.mvgam.R",
+                      "extract_factor_levels":  "R/validations.R",
                       "mvgam_trend_registry":  "R/trend_system.R",
                       "convert_glm_to_standard_form":  "R/stan_assembly.R",
                       "add_consistent_dispatch_metadata":  "R/trend_system.R",
@@ -6498,6 +6521,7 @@
                       "get_prior.mvgam_formula":  "R/priors.R",
                       "extract_trend_data":  "R/validations.R",
                       "find_stan_block":  "R/stan_assembly.R",
+                      "validate_prediction_factor_levels":  "R/validations.R",
                       "to_assembly":  "R/glm_analysis.R",
                       "CAR":  "R/trend_system.R",
                       "plot_mvgam_resids":  "R/plot_mvgam_resids.R",
@@ -6711,6 +6735,7 @@
                                      "process_lag_parameters":  "R/validations.R",
                                      "generate_rw_monitor_params":  "R/trend_system.R",
                                      "match_trend_specific_pars":  "R/summary.mvgam.R",
+                                     "extract_factor_levels":  "R/validations.R",
                                      "mvgam_trend_registry":  "R/trend_system.R",
                                      "convert_glm_to_standard_form":  "R/stan_assembly.R",
                                      "add_consistent_dispatch_metadata":  "R/trend_system.R",
@@ -6954,6 +6979,7 @@
                                      "custom_trend":  "R/trend_system.R",
                                      "extract_trend_data":  "R/validations.R",
                                      "get_best_prior_match":  "R/priors.R",
+                                     "validate_prediction_factor_levels":  "R/validations.R",
                                      "to_assembly":  "R/glm_analysis.R",
                                      "CAR":  "R/trend_system.R",
                                      "plot_mvgam_resids":  "R/plot_mvgam_resids.R",
@@ -7232,6 +7258,7 @@
                                 "generate_rw_monitor_params":  "generate_rw_monitor_params \u003c- function(trend_spec) {",
                                 "extract_mu_assignment_lines":  "extract_mu_assignment_lines \u003c- function(model_block) {",
                                 "as_draws_df.mvgam":  "as_draws_df.mvgam \u003c- function( x, variable = NULL, regex = FALSE, inc_warmup = FALSE, use_alias = TRUE, ... ) {",
+                                "extract_factor_levels":  "extract_factor_levels \u003c- function(data, var_name) {",
                                 "mvgam_trend_registry":  "mvgam_trend_registry \u003c- function() {",
                                 "convert_glm_to_standard_form":  "convert_glm_to_standard_form \u003c- function(code_lines, block_info, detected_glm_types, analysis, processed_glm_lines = integer(0)) {",
                                 "add_consistent_dispatch_metadata":  "add_consistent_dispatch_metadata \u003c- function(trend_obj) {",
@@ -7529,6 +7556,7 @@
                                 "get_prior.mvgam_formula":  "get_prior.mvgam_formula \u003c- function(object, data, family = gaussian(), ...) {",
                                 "extract_trend_data":  "extract_trend_data \u003c- function(data, trend_formula = NULL, time_var = \"time\", series_var = \"series\", mvgam_object = NULL, newdata = NULL, response_vars = NULL, .return_metadata = FALSE, .precomputed_dimensions = NULL, trend_specs = NULL) {",
                                 "get_best_prior_match":  "get_best_prior_match \u003c- function(matches) {",
+                                "validate_prediction_factor_levels":  "validate_prediction_factor_levels \u003c- function(data, metadata) {",
                                 "to_assembly":  "to_assembly \u003c- function(state) {",
                                 "CAR":  "CAR = function(time = NA, series = NA) {",
                                 "plot_mvgam_resids":  "plot_mvgam_resids = function( object, series = 1, n_draws = 100L, n_points = 1000L ) {",
@@ -8520,22 +8548,22 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-12-05 15:51:29",
+                     "generated":  "2025-12-10 08:43:43",
                      "commit_hash":  "pending",
-                     "cached_files":  60,
+                     "cached_files":  58,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
-                     "total_functions":  539,
+                     "total_functions":  541,
                      "exported_functions":  57,
                      "s3_methods_count":  41,
                      "s3_classes_count":  31,
                      "dynamic_references":  38,
                      "package_name":  "mvgam",
                      "potentially_unused_functions":  38,
-                     "changed_files":  0,
+                     "changed_files":  2,
                      "total_files":  60,
-                     "zero_dependency_functions":  450
+                     "zero_dependency_functions":  452
                  },
     "dependencies":  {
 
