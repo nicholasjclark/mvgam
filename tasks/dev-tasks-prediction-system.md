@@ -250,7 +250,7 @@ The extraction system now successfully handles:
 
     - [x] 2.4.4.6 **Create test script** `tasks/test_prediction_factor_validation.R`. All unit tests pass. Integration tests require fixture regeneration for full validation.
 
-    - [ ] 2.4.4.7 **Move tests to testthat** after validation. Add to appropriate test file in `tests/testthat/`.
+    - [x] 2.4.4.7 **Move tests to testthat** after validation. Added to `tests/testthat/test-predict.R`: Tests for `validate_prediction_factor_levels()` covering invalid series levels, invalid gr levels, missing metadata handling, input type validation, and character column handling. All 41 tests pass.
 
   - [ ] **2.5 Final Integration Tests (in tests/testthat/)**
     **Note**: Use `tasks/validate_extraction_vs_brms.R` methodology and test models as reference for integration test design.
