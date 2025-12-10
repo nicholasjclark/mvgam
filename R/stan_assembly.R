@@ -5185,9 +5185,26 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
         all_available_vars <- unique(c(all_computed_vars, all_declared_vars))
 
         # Add any missing variables that exist in stancode
+        # all_declared_vars contains full declaration lines, so check if
+        # variable name appears in any line (not exact match)
         added_vars <- character(0)
         for (missing_var in missing_vars) {
-          if (missing_var %in% all_available_vars) {
+          # Exact match in computed vars (which are variable names)
+          in_computed <- missing_var %in% all_computed_vars
+
+          # Pattern match in declared lines (which are full declarations)
+          # Escape regex special chars and use word boundaries
+          escaped_var <- gsub(
+            "([.^$*+?{}\\[\\]()\\\\|])",
+            "\\\\\\1",
+            missing_var
+          )
+          in_declared <- any(grepl(
+            paste0("\\b", escaped_var, "\\b"),
+            all_declared_vars
+          ))
+
+          if (in_computed || in_declared) {
             renamed_var <- paste0(missing_var, suffix)
             mapping$original_to_renamed[[missing_var]] <- renamed_var
             mapping$renamed_to_original[[renamed_var]] <- missing_var
@@ -5200,8 +5217,13 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
 
         # Only error if there are still truly missing variables after comprehensive search
         if (length(missing_vars) > 0) {
-          insight::format_error(
-            "Variable mapping missing required variables: {.field {missing_vars}}. These variables were referenced in mu construction but not found in any Stan block (data, parameters, transformed data, transformed parameters, or computed variables)."
+          missing_str <- paste(missing_vars, collapse = ", ")
+          stop(
+            "Variable mapping missing required variables: ", missing_str, ". ",
+            "These variables were referenced in mu construction but not found ",
+            "in any Stan block (data, parameters, transformed data, ",
+            "transformed parameters, or computed variables).",
+            call. = FALSE
           )
         }
       }

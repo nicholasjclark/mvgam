@@ -5,6 +5,7 @@
     "functions":  [
                       "detect_gp_terms",
                       "approx_gp_pred",
+                      "prepare_spd_inputs",
                       "spd_gp_exp_quad",
                       "spd_gp_matern32",
                       "spd_gp_matern52",
@@ -34,6 +35,7 @@
                                 "extract_linpred_from_prep":  "extract_linpred_from_prep \u003c- function(prep, resp = NULL) {",
                                 "extract_linpred_nonlinear":  "extract_linpred_nonlinear \u003c- function(prep, resp = NULL) {",
                                 "detect_gp_kernel":  "detect_gp_kernel \u003c- function(prep, brmsfit) {",
+                                "prepare_spd_inputs":  "prepare_spd_inputs \u003c- function(slambda, sdgp, lscale) {",
                                 "spd_gp_matern52":  "spd_gp_matern52 \u003c- function(slambda, sdgp, lscale) {",
                                 "smooth_random_pred":  "smooth_random_pred \u003c- function(eta, draws_mat, prep, resp_prefix) {",
                                 "extract_linpred_multivariate":  "extract_linpred_multivariate \u003c- function(prep, resp = NULL) {",

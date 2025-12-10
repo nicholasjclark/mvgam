@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-12-10 08:49:21  
+**Generated:** 2025-12-10 12:36:13  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 60
-- **Total Functions:** 541
+- **Total Functions:** 542
 - **Exported Functions:** 57
-- **Internal Functions:** 498
+- **Internal Functions:** 499
 - **S3 Methods:** 41
 - **S3 Classes:** 31
 
@@ -222,8 +222,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/mvgam-class.R`** (0 functions) - Class definitions and methods
 
 ### S3 Methods Files
-- **`R/predictions.R`** (19 functions) - Prediction methods
-  - Key functions: validate_monotonic_indicesdetect_gp_terms approx_gp_pred spd_gp_exp_quad spd_gp_matern32 spd_gp_matern52 compute_spd_vectorized detect_gp_kernel has_nlpars extract_linpred_nonlinear (+ 18 more)
+- **`R/predictions.R`** (20 functions) - Prediction methods
+  - Key functions: validate_monotonic_indicesdetect_gp_terms approx_gp_pred prepare_spd_inputs spd_gp_exp_quad spd_gp_matern32 spd_gp_matern52 compute_spd_vectorized detect_gp_kernel has_nlpars (+ 19 more)
 - **`R/add_residuals.R`** (2 functions) - Residual analysis
   - Key functions: add_residualsadd_residuals.mvgam (+ 1 more)
 
@@ -655,6 +655,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **has_nlpars()** (internal)
 - **monotonic_pred()** (internal)
 - **population_random_pred()** (internal)
+- **prepare_spd_inputs()** (internal)
 - **smooth_fixed_pred()** (internal)
 - **smooth_random_pred()** (internal)
 - **spd_gp_exp_quad()** (internal)

@@ -25,10 +25,12 @@
 
 ### Task Files
 - `tasks/fit_and_save_models.R` - Script to generate test model fixtures
-- `tasks/test_parameter_extraction.R` - Comprehensive tests for parameter extraction helpers across 6+ models
-- `tasks/explore_prepare_predictions.R` - Exploration of prepare_predictions.mock_stanfit() across fit1, fit2, fit3
+- `tasks/test_parameter_extraction.R` - Tests for parameter extraction helpers across 6+ models
+- `tasks/explore_prepare_predictions.R` - Exploration of prepare_predictions.mock_stanfit()
 - `tasks/prep_structure_output.txt` - Full exploration output documenting prep object structure (gitignored)
 - `tasks/test_integration_local.R` - Local integration testing before final tests (PENDING)
+- `tasks/validate_extraction_vs_brms.R` - Numerical validation comparing mvgam vs brms predictions
+- `tasks/debug_gp2d.R` - Debug script for multidimensional GP isotropic handling
 - `tasks/fixtures/*.rds` - Fitted model fixtures for development (gitignored, 9 models)
 
 ### Notes
