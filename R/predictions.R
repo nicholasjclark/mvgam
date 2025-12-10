@@ -194,85 +194,139 @@ approx_gp_pred <- function(Xgp, slambda, zgp, sdgp, lscale, kernel) {
 }
 
 
-#' Compute Spectral Power Density for Squared Exponential Kernel
+#' Prepare SPD Inputs with Isotropic Detection
 #'
-#' Computes spectral power density for approximate Gaussian processes
-#' using the squared exponential (exp_quad) kernel. Follows brms
-#' implementation exactly for consistency with Stan code generation.
+#' Common helper for all GP spectral density functions. Validates inputs,
+#' extracts first eigenvalue matrix slice from 3D arrays, and determines
+#' if GP is isotropic or anisotropic. Follows brms pattern of checking
+#' lscale column count (structure) rather than comparing values.
 #'
-#' @param slambda Array of eigenvalues; either matrix [n_basis, n_dims] 
-#'   or 3D array [n_basis, n_dims, 1]
+#' @param slambda Array of eigenvalues; matrix [n_basis, n_dims] or
+#'   3D array [n_basis, n_dims, 1]
 #' @param sdgp Vector of marginal standard deviations [n_draws]
-#' @param lscale Matrix of length scale parameters [n_draws, n_dims]
+#' @param lscale Matrix of length scale parameters; [n_draws, 1] for
+#'   isotropic GPs (brms default) or [n_draws, n_dims] for anisotropic
 #'
-#' @return Matrix [n_draws, n_basis] of spectral power density values
-#'
-#' @details
-#' Mathematical formula: sdgp^2 * sqrt(2*pi)^D * prod(lscale) * 
-#'   exp(-0.5 * sum(lscale^2 * slambda[m]))
+#' @return List with validated/prepared components:
+#'   - slambda: 2D matrix [n_basis, n_dims]
+#'   - n_basis, n_dims, n_draws: dimension integers
+#'   - is_isotropic: logical indicating single shared length scale
+#'   - lscale_iso: vector [n_draws] if isotropic, NULL otherwise
+#'   - lscale2: lscale^2 matrix for anisotropic computation
 #'
 #' @noRd
-spd_gp_exp_quad <- function(slambda, sdgp, lscale) {
+prepare_spd_inputs <- function(slambda, sdgp, lscale) {
   # Validate inputs
-  checkmate::assert_array(slambda, min.d = 2, max.d = 3, any.missing = FALSE)
+  checkmate::assert_array(
+    slambda, min.d = 2, max.d = 3, any.missing = FALSE
+  )
   checkmate::assert_numeric(sdgp, any.missing = FALSE, min.len = 1)
-  checkmate::assert_matrix(lscale, any.missing = FALSE, all.missing = FALSE)
-  
-  # Handle array dimensions - extract eigenvalue matrix
+  checkmate::assert_matrix(
+    lscale, any.missing = FALSE, all.missing = FALSE
+  )
+
+  # Handle 3D array - extract first eigenvalue matrix slice
   if (length(dim(slambda)) == 3) {
     slambda <- slambda[, , 1]
   }
-  
+
   n_basis <- nrow(slambda)
   n_dims <- ncol(slambda)
   n_draws <- length(sdgp)
-  
-  # Validate dimension consistency  
-  if (ncol(lscale) != n_dims) {
-    stop(insight::format_error(
-      "Dimension mismatch: {.field lscale} has {ncol(lscale)} columns ",
-      "but {.field slambda} has {n_dims} dimensions."
-    ))
-  }
-  
+  n_lscale_dims <- ncol(lscale)
+
+  # Validate row count matches draws
   if (nrow(lscale) != n_draws) {
     stop(insight::format_error(
       "Dimension mismatch: {.field lscale} has {nrow(lscale)} rows ",
       "but {.field sdgp} has {n_draws} elements."
     ))
   }
-  
-  # Pre-compute constants
-  constant_base <- sdgp^2 * sqrt(2 * pi)^n_dims
-  
-  # Pre-allocate result matrix
-  out <- matrix(nrow = n_draws, ncol = n_basis)
-  
-  if (n_dims == 1 || all(apply(lscale, 1, function(x) length(unique(x)) == 1))) {
-    # Isotropic case: all length scales equal
+
+  # brms uses isotropic GPs by default (single shared length scale)
+  # Check column count: 1 = isotropic, n_dims = anisotropic
+  if (n_lscale_dims == 1L) {
+    is_isotropic <- TRUE
     lscale_iso <- lscale[, 1]
-    constant <- constant_base * lscale_iso^n_dims
-    neg_half_lscale2 <- -0.5 * lscale_iso^2
-    
-    for (m in seq_len(n_basis)) {
-      eigenval_sum <- sum(slambda[m, ]^2)
+    lscale2 <- lscale_iso^2
+  } else if (n_lscale_dims == n_dims) {
+    is_isotropic <- FALSE
+    lscale_iso <- NULL
+    lscale2 <- lscale^2
+  } else {
+    stop(insight::format_error(
+      "Dimension mismatch: {.field lscale} has {n_lscale_dims} ",
+      "columns but expected 1 (isotropic) or {n_dims} (anisotropic)."
+    ))
+  }
+
+  list(
+    slambda = slambda,
+    lscale = lscale,
+    n_basis = n_basis,
+    n_dims = n_dims,
+    n_draws = n_draws,
+    is_isotropic = is_isotropic,
+    lscale_iso = lscale_iso,
+    lscale2 = lscale2
+  )
+}
+
+
+#' Compute Spectral Power Density for Squared Exponential Kernel
+#'
+#' Computes spectral power density for approximate Gaussian processes
+#' using the squared exponential (exp_quad) kernel. Follows brms
+#' implementation exactly for consistency with Stan code generation.
+#'
+#' @param slambda Array of eigenvalues; matrix [n_basis, n_dims] or
+#'   3D array [n_basis, n_dims, 1]
+#' @param sdgp Vector of marginal standard deviations [n_draws]
+#' @param lscale Matrix of length scale parameters; [n_draws, 1] for
+#'   isotropic GPs (brms default) or [n_draws, n_dims] for anisotropic
+#'
+#' @return Matrix [n_draws, n_basis] of spectral power density values
+#'
+#' @details
+#' Mathematical formula where D = n_dims:
+#' sdgp^2 * sqrt(2*pi)^D * prod(lscale) * exp(-0.5 * sum(lscale^2 * slambda))
+#'
+#' @noRd
+spd_gp_exp_quad <- function(slambda, sdgp, lscale) {
+  p <- prepare_spd_inputs(slambda, sdgp, lscale)
+
+  # Pre-compute constants
+  constant_base <- sdgp^2 * sqrt(2 * pi)^p$n_dims
+
+  # Pre-allocate result matrix
+  out <- matrix(nrow = p$n_draws, ncol = p$n_basis)
+
+  if (p$is_isotropic) {
+    # Isotropic: single length scale for all dimensions (brms default)
+    constant <- constant_base * p$lscale_iso^p$n_dims
+    neg_half_lscale2 <- -0.5 * p$lscale2
+
+    for (m in seq_len(p$n_basis)) {
+      eigenval_sum <- sum(p$slambda[m, ]^2)
       out[, m] <- constant * exp(neg_half_lscale2 * eigenval_sum)
     }
   } else {
-    # Non-isotropic case: different length scales per dimension
-    constant <- constant_base * apply(lscale, 1, prod)
-    neg_half_lscale2 <- -0.5 * lscale^2
-    
-    for (m in seq_len(n_basis)) {
-      # Broadcast eigenvalue vector to match lscale dimensions
-      slambda_expanded <- matrix(slambda[m, ]^2, 
-                                nrow = n_draws, 
-                                ncol = n_dims, 
-                                byrow = TRUE)
-      out[, m] <- constant * exp(rowSums(neg_half_lscale2 * slambda_expanded))
+    # Anisotropic: different length scales per dimension
+    constant <- constant_base * apply(p$lscale, 1, prod)
+    neg_half_lscale2 <- -0.5 * p$lscale2
+
+    for (m in seq_len(p$n_basis)) {
+      slambda_expanded <- matrix(
+        p$slambda[m, ]^2,
+        nrow = p$n_draws,
+        ncol = p$n_dims,
+        byrow = TRUE
+      )
+      spd_term <- neg_half_lscale2 * slambda_expanded
+      out[, m] <- constant * exp(rowSums(spd_term))
     }
   }
-  
+
   out
 }
 
@@ -285,66 +339,47 @@ spd_gp_exp_quad <- function(slambda, sdgp, lscale) {
 #' @inheritParams spd_gp_exp_quad
 #' @return Matrix [n_draws, n_basis] of spectral power density values
 #'
-#' @details 
-#' Mathematical formula uses (3 + sum(lscale^2 * slambda[m]))^(-(D+3)/2)
-#' exponential term with appropriate constants.
+#' @details
+#' Mathematical formula where D = n_dims:
+#' (3 + sum(lscale^2 * slambda))^(-(D+3)/2) with appropriate constants.
 #'
 #' @noRd
 spd_gp_matern32 <- function(slambda, sdgp, lscale) {
-  # Validate inputs (same as exp_quad)
-  checkmate::assert_array(slambda, min.d = 2, max.d = 3, any.missing = FALSE)
-  checkmate::assert_numeric(sdgp, any.missing = FALSE, min.len = 1)
-  checkmate::assert_matrix(lscale, any.missing = FALSE, all.missing = FALSE)
-  
-  # Handle array dimensions
-  if (length(dim(slambda)) == 3) {
-    slambda <- slambda[, , 1]
-  }
-  
-  n_basis <- nrow(slambda)
-  n_dims <- ncol(slambda)
-  n_draws <- length(sdgp)
-  
-  # Validate dimensions
-  if (ncol(lscale) != n_dims || nrow(lscale) != n_draws) {
-    stop(insight::format_error(
-      "Dimension mismatch in Matern 3/2 spectral density computation."
-    ))
-  }
-  
+  p <- prepare_spd_inputs(slambda, sdgp, lscale)
+
   # Pre-compute constants (following brms exactly)
-  constant_base <- sdgp^2 * 
-    (2^n_dims * pi^(n_dims / 2) * gamma((n_dims + 3) / 2) * 3^(3 / 2)) / 
-    (0.5 * sqrt(pi))
-  expo <- -(n_dims + 3) / 2
-  lscale2 <- lscale^2
-  
+  d <- p$n_dims
+  gamma_term <- gamma((d + 3) / 2) * 3^(3 / 2)
+  constant_base <- sdgp^2 * (2^d * pi^(d / 2) * gamma_term) / (0.5 * sqrt(pi))
+  expo <- -(d + 3) / 2
+
   # Pre-allocate result
-  out <- matrix(nrow = n_draws, ncol = n_basis)
-  
-  if (n_dims == 1 || all(apply(lscale, 1, function(x) length(unique(x)) == 1))) {
-    # Isotropic case
-    lscale_iso <- lscale[, 1]
-    constant <- constant_base * lscale_iso^n_dims
-    
-    for (m in seq_len(n_basis)) {
-      eigenval_sum <- sum(lscale2[, 1] * slambda[m, ]^2)
+  out <- matrix(nrow = p$n_draws, ncol = p$n_basis)
+
+  if (p$is_isotropic) {
+    # Isotropic: single length scale for all dimensions
+    constant <- constant_base * p$lscale_iso^d
+
+    for (m in seq_len(p$n_basis)) {
+      eigenval_sum <- sum(p$lscale2 * p$slambda[m, ]^2)
       out[, m] <- constant * (3 + eigenval_sum)^expo
     }
   } else {
-    # Non-isotropic case  
-    constant <- constant_base * apply(lscale, 1, prod)
-    
-    for (m in seq_len(n_basis)) {
-      slambda_expanded <- matrix(slambda[m, ]^2, 
-                                nrow = n_draws, 
-                                ncol = n_dims, 
-                                byrow = TRUE)
-      eigenval_term <- rowSums(lscale2 * slambda_expanded)
+    # Anisotropic: different length scales per dimension
+    constant <- constant_base * apply(p$lscale, 1, prod)
+
+    for (m in seq_len(p$n_basis)) {
+      slambda_expanded <- matrix(
+        p$slambda[m, ]^2,
+        nrow = p$n_draws,
+        ncol = d,
+        byrow = TRUE
+      )
+      eigenval_term <- rowSums(p$lscale2 * slambda_expanded)
       out[, m] <- constant * (3 + eigenval_term)^expo
     }
   }
-  
+
   out
 }
 
@@ -358,65 +393,46 @@ spd_gp_matern32 <- function(slambda, sdgp, lscale) {
 #' @return Matrix [n_draws, n_basis] of spectral power density values
 #'
 #' @details
-#' Mathematical formula uses (5 + sum(lscale^2 * slambda[m]))^(-(D+5)/2)
-#' exponential term with appropriate constants.
+#' Mathematical formula where D = n_dims:
+#' (5 + sum(lscale^2 * slambda))^(-(D+5)/2) with appropriate constants.
 #'
-#' @noRd  
+#' @noRd
 spd_gp_matern52 <- function(slambda, sdgp, lscale) {
-  # Validate inputs (same as others)
-  checkmate::assert_array(slambda, min.d = 2, max.d = 3, any.missing = FALSE)
-  checkmate::assert_numeric(sdgp, any.missing = FALSE, min.len = 1)
-  checkmate::assert_matrix(lscale, any.missing = FALSE, all.missing = FALSE)
-  
-  # Handle array dimensions
-  if (length(dim(slambda)) == 3) {
-    slambda <- slambda[, , 1]
-  }
-  
-  n_basis <- nrow(slambda)
-  n_dims <- ncol(slambda)  
-  n_draws <- length(sdgp)
-  
-  # Validate dimensions
-  if (ncol(lscale) != n_dims || nrow(lscale) != n_draws) {
-    stop(insight::format_error(
-      "Dimension mismatch in Matern 5/2 spectral density computation."
-    ))
-  }
-  
+  p <- prepare_spd_inputs(slambda, sdgp, lscale)
+
   # Pre-compute constants (following brms exactly)
-  constant_base <- sdgp^2 * 
-    (2^n_dims * pi^(n_dims / 2) * gamma((n_dims + 5) / 2) * 5^(5 / 2)) / 
-    (0.75 * sqrt(pi))
-  expo <- -(n_dims + 5) / 2
-  lscale2 <- lscale^2
-  
+  d <- p$n_dims
+  gamma_term <- gamma((d + 5) / 2) * 5^(5 / 2)
+  constant_base <- sdgp^2 * (2^d * pi^(d / 2) * gamma_term) / (0.75 * sqrt(pi))
+  expo <- -(d + 5) / 2
+
   # Pre-allocate result
-  out <- matrix(nrow = n_draws, ncol = n_basis)
-  
-  if (n_dims == 1 || all(apply(lscale, 1, function(x) length(unique(x)) == 1))) {
-    # Isotropic case
-    lscale_iso <- lscale[, 1] 
-    constant <- constant_base * lscale_iso^n_dims
-    
-    for (m in seq_len(n_basis)) {
-      eigenval_sum <- sum(lscale2[, 1] * slambda[m, ]^2)
+  out <- matrix(nrow = p$n_draws, ncol = p$n_basis)
+
+  if (p$is_isotropic) {
+    # Isotropic: single length scale for all dimensions
+    constant <- constant_base * p$lscale_iso^d
+
+    for (m in seq_len(p$n_basis)) {
+      eigenval_sum <- sum(p$lscale2 * p$slambda[m, ]^2)
       out[, m] <- constant * (5 + eigenval_sum)^expo
     }
   } else {
-    # Non-isotropic case
-    constant <- constant_base * apply(lscale, 1, prod)
-    
-    for (m in seq_len(n_basis)) {
-      slambda_expanded <- matrix(slambda[m, ]^2, 
-                                nrow = n_draws, 
-                                ncol = n_dims, 
-                                byrow = TRUE)
-      eigenval_term <- rowSums(lscale2 * slambda_expanded)
+    # Anisotropic: different length scales per dimension
+    constant <- constant_base * apply(p$lscale, 1, prod)
+
+    for (m in seq_len(p$n_basis)) {
+      slambda_expanded <- matrix(
+        p$slambda[m, ]^2,
+        nrow = p$n_draws,
+        ncol = d,
+        byrow = TRUE
+      )
+      eigenval_term <- rowSums(p$lscale2 * slambda_expanded)
       out[, m] <- constant * (5 + eigenval_term)^expo
     }
   }
-  
+
   out
 }
 

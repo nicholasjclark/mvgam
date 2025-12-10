@@ -551,6 +551,37 @@ results$test8 <- run_validation(
   )
 )
 
+# -----------------------------------------------------------------------------
+# Test 9: Multidimensional Gaussian Process (gp(z, w))
+# -----------------------------------------------------------------------------
+
+cat("\n=== Test 9: Multidimensional GP (2D) ===\n")
+
+brms_9 <- fit_brms_cached(
+  "ar1_gp2d",
+  y ~ 1 + gp(z, w, k = 5) + ar(time = time, p = 1, cov = TRUE),
+  test_data_t2, poisson()
+)
+
+mvgam_9 <- fit_mvgam_cached(
+  "ar1_gp2d",
+  y ~ 1 + gp(z, w, k = 5), ~ AR(p = 1),
+  test_data_t2, poisson()
+)
+
+results$test9 <- run_validation(
+  "AR(1) + Multidimensional GP (2D)",
+  brms_9, mvgam_9, test_data_t2,
+  param_pairs = list(
+    c("b_Intercept", "b_Intercept", "Intercept"),
+    c("sdgp_gpzw", "sdgp_1[1]", "sdgp"),
+    c("lscale_gpzw[1]", "lscale_1[1,1]", "lscale_z"),
+    c("lscale_gpzw[2]", "lscale_1[1,2]", "lscale_w"),
+    c("ar[1]", "ar1_trend[1]", "AR(1)"),
+    c("sderr", "sigma_trend[1]", "Sigma")
+  )
+)
+
 # =============================================================================
 # TREND FORMULA TESTS
 # Effects in trend_formula instead of observation formula
@@ -680,6 +711,32 @@ results$test6t <- run_validation(
   param_pairs = list(
     c("b_Intercept", "b_Intercept", "Intercept"),
     c("bsp_moord_factor", "bsp_trend[1]", "bsp_mo"),
+    c("ar[1]", "ar1_trend[1]", "AR(1)"),
+    c("sderr", "sigma_trend[1]", "Sigma")
+  ),
+  extract_fn = extract_mvgam_combined_pred
+)
+
+# -----------------------------------------------------------------------------
+# Test 9T: Multidimensional GP in trend formula
+# -----------------------------------------------------------------------------
+
+cat("\n=== Test 9T: Multidimensional GP (2D) in TREND ===\n")
+
+mvgam_9t <- fit_mvgam_cached(
+  "ar1_gp2d_trend",
+  y ~ 1, ~ gp(z, w, k = 5) + AR(p = 1),
+  test_data_t2, poisson()
+)
+
+results$test9t <- run_validation(
+  "AR(1) + Multidimensional GP (in trend)",
+  brms_9, mvgam_9t, test_data_t2,
+  param_pairs = list(
+    c("b_Intercept", "b_Intercept", "Intercept"),
+    c("sdgp_gpzw", "sdgp_1_trend[1]", "sdgp"),
+    c("lscale_gpzw[1]", "lscale_1_trend[1,1]", "lscale_z"),
+    c("lscale_gpzw[2]", "lscale_1_trend[1,2]", "lscale_w"),
     c("ar[1]", "ar1_trend[1]", "AR(1)"),
     c("sderr", "sigma_trend[1]", "Sigma")
   ),
