@@ -145,6 +145,71 @@ filter_required_variables <- function(required_vars, formula = NULL) {
   return(required_vars)
 }
 
+#' Validate and Standardize Family Argument
+#'
+#' @description
+#' Checks and corrects validity of the model family. Converts functions,
+#' family objects, or character strings to a standardized brmsfamily object.
+#'
+#' @param family Either a function, an object of class 'family' or
+#'   'brmsfamily', or a character string of length one or two
+#' @param link An optional character string naming the link function.
+#'   Ignored if family is a function or a family object.
+#'
+#' @return A brmsfamily object
+#'
+#' @noRd
+validate_family <- function(family, link = NULL) {
+ # Input validation
+  checkmate::assert(
+    checkmate::check_function(family),
+    checkmate::check_class(family, "family"),
+    checkmate::check_class(family, "brmsfamily"),
+    checkmate::check_character(family, min.len = 1, max.len = 2),
+    combine = "or"
+  )
+  checkmate::assert_string(link, null.ok = TRUE)
+
+  # Handle function input (e.g., gaussian, poisson)
+  if (is.function(family)) {
+    family <- family()
+  }
+
+  # Already a brmsfamily - return as is
+  if (inherits(family, "brmsfamily")) {
+    return(family)
+  }
+
+  # Handle standard R family objects
+  if (inherits(family, "family")) {
+    link <- family$link
+    family <- family$family
+  }
+
+  # Handle character input
+  if (is.character(family)) {
+    if (is.null(link)) {
+      link <- family[2]
+    }
+    family_name <- family[1]
+
+    # Use brms family conversion with error handling
+    family_result <- try(
+      brms::brmsfamily(family_name, link = link),
+      silent = TRUE
+    )
+
+    if (inherits(family_result, "try-error")) {
+      stop("family not recognized", call. = FALSE)
+    }
+
+    return(family_result)
+  }
+
+  # Fallback for unexpected input
+  stop("family not recognized", call. = FALSE)
+}
+
 #' Validate Nonlinear Trend Compatibility
 #'
 #' @description
@@ -3526,7 +3591,7 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
       dplyr::slice_head(n = 1) %>%
       dplyr::ungroup() %>%
       dplyr::arrange(.data$time, .data$series) %>%
-      dplyr::select(.data$time, .data$series)
+      dplyr::select("time", "series")
 
     trend_data <- remove_mvgam_variables(trend_data)
   }

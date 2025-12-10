@@ -258,11 +258,11 @@ The extraction system now successfully handles:
     **Note**: Use `tasks/validate_extraction_vs_brms.R` methodology and test models as reference for integration test design.
     - [x] 2.6.1 Update `tests/local/` tests for more extensive prediction testing.
     - [x] 2.6.2 Update `tasks/validate_extraction_vs_brms.R` to include a multidimensional GP model. **COMPLETE (2025-12-10)**: Added Test 9 (2D GP `gp(z, w, k = 5)` in obs formula) and Test 9T (2D GP in trend formula). Fixed isotropic GP handling bug in `spd_gp_exp_quad()`, `spd_gp_matern32()`, and `spd_gp_matern52()` - created DRY helper `prepare_spd_inputs()` following brms pattern (check lscale column count for isotropic vs anisotropic). Both tests pass with cor >= 0.9999.
-    - [ ] 2.6.3 Update `tasks/validate_extraction_vs_brms.R` to include a model with two different gp effects, one of which uses a by variable.
+    - [X] 2.6.3 Update `tasks/validate_extraction_vs_brms.R` to include a model with two different gp effects, one of which uses a by variable.
 
   - [ ] **2.7 Documentation and Validation**
-    - [ ] 2.7.1 Add roxygen2 documentation to `categorize_mvgam_parameters()` explaining return structure and usage. Update `@examples` to show how to extract specific parameter groups. Run `devtools::document()` to generate .Rd file.
-    - [ ] 2.7.2 Add comprehensive input validation to all new functions in `R/predictions.R` using `checkmate::assert_*()`. Validate mvgam_fit is class "mvgam", newdata is data.frame, prep objects have expected structure based on exploration findings.
+    - [x] 2.7.1 `categorize_mvgam_parameters()` already has comprehensive roxygen2 documentation (lines 70-106 in `R/index-mvgam.R`) with @param, @return structure, @details, and @examples. Function is internal (@noRd) as intended.
+    - [x] 2.7.2 Comprehensive input validation already implemented throughout `R/predictions.R` with 50+ `checkmate::assert_*()` calls. Validates: mvgam_fit class, newdata as data.frame, prep object structure (class, draws, sdata, nobs, formula), matrices/arrays dimensions, numeric vectors, string parameters, and integer indices.
     - [ ] 2.7.3 Run full test suite with `devtools::test()`. Verify all tests pass with zero warnings. Fix any failures or warnings before proceeding. Document any unexpected behavior in test comments.
 
 ---
