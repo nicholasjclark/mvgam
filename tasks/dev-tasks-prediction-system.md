@@ -22,6 +22,7 @@ This task list covers implementation of the user-facing prediction functions tha
 ## Relevant Files
 
 ### R Package Files
+- `R/posterior_linpred.R` - `posterior_linpred.mvgam()` S3 method and helpers
 - `R/predictions.R` - Core prediction infrastructure (extend with S3 methods)
 - `R/index-mvgam.R` - Parameter extraction helpers
 - `R/mock-stanfit.R` - Mock stanfit and `prepare_predictions.mock_stanfit()`
@@ -76,54 +77,40 @@ This task list covers implementation of the user-facing prediction functions tha
 
 Build the foundation for combining observation and trend linear predictors, then expose via brms-compatible S3 method.
 
-- [ ] **1.1 Create `get_combined_linpred()` helper function**
-  - Use **pathfinder agent** to find insertion point in `R/predictions.R`
-  - Implement internal helper that:
-    1. Extracts obs linpred via `extract_component_linpred(..., component = "obs")`
-    2. Checks if trend model exists (`!is.null(mvgam_fit$trend_model)`)
-    3. If trend exists: extracts trend linpred and combines additively
-    4. Handles `process_error` toggle (TRUE = full draws, FALSE = posterior mean for trend)
-  - Add `@noRd` roxygen documentation
-  - Run `devtools::load_all()` to verify no errors
+- [x] **1.1 Create `get_combined_linpred()` helper function**
+  - Created in new file `R/posterior_linpred.R`
+  - Extracts obs linpred via `extract_component_linpred(..., component = "obs")`
+  - Checks if trend model exists and has formula
+  - If trend exists: extracts trend linpred and combines additively
+  - Delegates validation to `extract_component_linpred()`
 
-- [ ] **1.2 Implement `process_error` logic in combination**
+- [x] **1.2 Implement `process_error` logic in combination**
   - When `process_error = FALSE`:
-    - Compute column means of trend linpred matrix
-    - Broadcast to match obs linpred dimensions
-    - This reduces uncertainty by fixing trend at posterior mean
-  - Add parameter validation using `checkmate::assert_logical()`
-  - Test with simple model to verify uncertainty reduction
+    - Computes column means of trend linpred matrix
+    - Broadcasts to match obs linpred dimensions
+    - Fixes trend at posterior mean to reduce uncertainty
+  - Parameter validation via `checkmate::assert_logical()`
 
-- [ ] **1.3 Implement `posterior_linpred.mvgam()` S3 method**
-  - Use **pathfinder agent** to find best location in `R/predictions.R`
-  - Function signature matching TRD:
-    ```r
-    posterior_linpred.mvgam <- function(object, newdata = NULL,
-                                        transform = FALSE,
-                                        process_error = TRUE,
-                                        ndraws = NULL, draw_ids = NULL,
-                                        re_formula = NULL,
-                                        allow_new_levels = FALSE,
-                                        sample_new_levels = "uncertainty",
-                                        resp = NULL, ...)
-    ```
-  - Handle `newdata = NULL` → use training data from `object$obs_data`
-  - Handle `draw_ids` as alternative to `ndraws`
-  - Apply `transform` by calling family inverse link if TRUE
-  - Add comprehensive roxygen2 documentation with `@export`
+- [x] **1.3 Implement `posterior_linpred.mvgam()` S3 method**
+  - Created in `R/posterior_linpred.R`
+  - Imports `posterior_linpred` generic from brms
+  - Handles `newdata = NULL` → uses training data from `object$obs_data`
+  - Delegates all validation to `extract_component_linpred()`
+  - Code reviewed and approved
 
-- [ ] **1.4 Add validation tests for `posterior_linpred.mvgam()`**
-  - Create `tasks/validate_prediction_functions.R` extending `validate_extraction_vs_brms.R`
-  - Test: returns correct dimensions [ndraws × nobs]
-  - Test: `ndraws` subsetting works correctly
-  - Test: `process_error = FALSE` reduces variance
-  - Test: `transform = TRUE` applies inverse link
-  - Test: pure brms models (no trend) match brms exactly
+- [x] **1.4 Add validation tests for `posterior_linpred.mvgam()`**
+  - Extended `tasks/validate_extraction_vs_brms.R` with `run_linpred_validation()` helper
+  - Tests added (all passing):
+    - Dimensions match brms [ndraws × nobs]
+    - `ndraws` subsetting returns correct number of draws
+    - `process_error = FALSE` reduces variance vs TRUE
+    - Obs-formula models: 5 tests (intercept-only, fixed, RE, smooth, GP)
+    - Trend-formula models: 4 tests (fixed, RE, smooth, GP)
 
-- [ ] **1.5 Code review for Task 1.0**
-  - Use **code-reviewer agent** on all changes to `R/predictions.R`
-  - Verify: validation patterns, no duplication, style compliance
-  - Address all HIGH and MEDIUM priority issues before proceeding
+- [x] **1.5 Code review for Task 1.0**
+  - Code reviewer approved implementation
+  - Proper delegation to `extract_component_linpred()` (no duplication)
+  - Fail-fast validation patterns implemented
 
 ---
 

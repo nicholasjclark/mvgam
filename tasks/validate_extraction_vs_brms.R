@@ -813,6 +813,145 @@ results$test10t <- run_validation(
 )
 
 # =============================================================================
+# POSTERIOR_LINPRED.MVGAM VALIDATION
+# Tests the new S3 method against brms::posterior_linpred()
+# =============================================================================
+
+cat("\n\n")
+cat(rep("=", 60), "\n", sep = "")
+cat("POSTERIOR_LINPRED.MVGAM VALIDATION\n")
+cat(rep("=", 60), "\n", sep = "")
+
+#' Run validation using posterior_linpred.mvgam() S3 method
+run_linpred_validation <- function(test_name, brms_fit, mvgam_fit, newdata,
+                                   incl_autocor = FALSE) {
+  cat("\n--- posterior_linpred:", test_name, "---\n")
+
+  # Get predictions via S3 methods
+  brms_pred <- brms::posterior_linpred(brms_fit, newdata = newdata,
+                                       incl_autocor = incl_autocor)
+  mvgam_pred <- posterior_linpred(mvgam_fit, newdata = newdata)
+
+  # Check dimensions
+  if (!identical(dim(brms_pred), dim(mvgam_pred))) {
+    cat("  FAIL: Dimension mismatch\n")
+    cat("    brms:", dim(brms_pred), "\n")
+    cat("    mvgam:", dim(mvgam_pred), "\n")
+    return(list(name = test_name, passed = FALSE, reason = "dim_mismatch"))
+  }
+  cat("  Dimensions match:", dim(brms_pred), "\n")
+
+  # Compare summaries
+  brms_summ <- summarize_pred(brms_pred)
+  mvgam_summ <- summarize_pred(mvgam_pred)
+
+  stats <- c("mean", "median", "sd")
+  results <- lapply(stats, function(s) {
+    compare_vectors(brms_summ[[s]], mvgam_summ[[s]])
+  })
+  names(results) <- stats
+
+  for (s in stats) {
+    r <- results[[s]]
+    if (isTRUE(r$mismatch)) {
+      cat(sprintf("  %s: MISMATCH\n", s))
+    } else if (r$constant) {
+      cat(sprintf("  %s: constant, diff = %.6f\n", s, r$rmse))
+    } else {
+      cat(sprintf("  %s: cor=%.6f, rmse=%.6f\n", s, r$cor, r$rmse))
+    }
+  }
+
+  # Pass/fail based on mean correlation
+  mean_r <- results$mean
+  if (isTRUE(mean_r$mismatch)) {
+    passed <- FALSE
+  } else if (mean_r$constant) {
+    passed <- TRUE
+  } else {
+    passed <- mean_r$cor >= 0.925
+  }
+
+  status <- if (passed) "PASSED" else "FAILED"
+  cat(sprintf("  Result: %s\n", status))
+
+  list(name = paste0("linpred_", test_name), passed = passed, stats = results)
+}
+
+# Test posterior_linpred.mvgam() for obs-formula models (no trend effects)
+results$linpred_1 <- run_linpred_validation(
+  "Intercept-only AR(1)", brms_1, mvgam_1, test_data
+)
+
+results$linpred_2 <- run_linpred_validation(
+  "AR(1) + fixed effect", brms_2, mvgam_2, test_data
+)
+
+results$linpred_3 <- run_linpred_validation(
+  "AR(1) + random intercept", brms_3, mvgam_3, test_data
+)
+
+results$linpred_4 <- run_linpred_validation(
+  "AR(1) + fixed + random + smooth", brms_4, mvgam_4, test_data
+)
+
+results$linpred_8 <- run_linpred_validation(
+  "AR(1) + GP", brms_8, mvgam_8, test_data
+)
+
+# Test posterior_linpred.mvgam() for trend-formula models (combined)
+# mvgam trend formula linpred = fixed effects only (not AR states)
+# brms incl_autocor = FALSE excludes AR contributions, matching mvgam behavior
+results$linpred_2t <- run_linpred_validation(
+  "AR(1) + fixed (in trend)", brms_2, mvgam_2t, test_data
+)
+
+results$linpred_3t <- run_linpred_validation(
+  "AR(1) + fixed + random (in trend)", brms_3, mvgam_3t, test_data
+)
+
+results$linpred_4t <- run_linpred_validation(
+  "AR(1) + fixed + random + smooth (in trend)", brms_4, mvgam_4t, test_data
+)
+
+results$linpred_8t <- run_linpred_validation(
+  "AR(1) + GP (in trend)", brms_8, mvgam_8t, test_data
+)
+
+# Test process_error = FALSE reduces variance
+cat("\n--- posterior_linpred: process_error toggle ---\n")
+linpred_full <- posterior_linpred(mvgam_2t, newdata = test_data,
+                                  process_error = TRUE)
+linpred_fixed <- posterior_linpred(mvgam_2t, newdata = test_data,
+                                   process_error = FALSE)
+
+var_full <- mean(apply(linpred_full, 2, var))
+var_fixed <- mean(apply(linpred_fixed, 2, var))
+cat(sprintf("  process_error=TRUE variance:  %.4f\n", var_full))
+cat(sprintf("  process_error=FALSE variance: %.4f\n", var_fixed))
+cat(sprintf("  Variance ratio (fixed/full):  %.4f\n", var_fixed / var_full))
+
+pe_passed <- var_fixed < var_full
+results$linpred_process_error <- list(
+  name = "linpred_process_error_toggle",
+  passed = pe_passed,
+  var_full = var_full,
+  var_fixed = var_fixed
+)
+cat(sprintf("  Result: %s (fixed < full)\n", if (pe_passed) "PASSED" else "FAILED"))
+
+# Test ndraws subsetting
+cat("\n--- posterior_linpred: ndraws subsetting ---\n")
+linpred_sub <- posterior_linpred(mvgam_2, newdata = test_data, ndraws = 100)
+ndraws_passed <- nrow(linpred_sub) == 100
+cat(sprintf("  Requested ndraws: 100, Got: %d\n", nrow(linpred_sub)))
+cat(sprintf("  Result: %s\n", if (ndraws_passed) "PASSED" else "FAILED"))
+results$linpred_ndraws <- list(
+  name = "linpred_ndraws_subsetting",
+  passed = ndraws_passed
+)
+
+# =============================================================================
 # SUMMARY
 # =============================================================================
 
