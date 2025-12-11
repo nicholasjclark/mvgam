@@ -70,7 +70,67 @@ get_combined_linpred <- function(mvgam_fit, newdata,
     sample_new_levels = sample_new_levels
   )
 
-  # Apply process_error logic: FALSE = fix trend at posterior mean
+  # Detect structure: list indicates multivariate, matrix indicates univariate
+  is_multivariate <- is.list(obs_linpred) && !is.matrix(obs_linpred)
+
+  if (is_multivariate) {
+    # Multivariate: combine each response separately
+    combined <- lapply(names(obs_linpred), function(resp_name) {
+      obs_mat <- obs_linpred[[resp_name]]
+
+      # Trend may be shared (matrix) or response-specific (list)
+      # Shared trend means same latent process affects all responses
+      if (is.list(trend_linpred) && !is.matrix(trend_linpred)) {
+        trend_mat <- trend_linpred[[resp_name]]
+      } else {
+        # Shared trend across responses
+        checkmate::assert_matrix(trend_linpred)
+        trend_mat <- trend_linpred
+      }
+
+      # Validate dimensions match before combination
+      if (nrow(trend_mat) != nrow(obs_mat) ||
+          ncol(trend_mat) != ncol(obs_mat)) {
+        stop(insight::format_error(
+          "Dimension mismatch for response {.val {resp_name}}: ",
+          "obs_linpred is [{nrow(obs_mat)} x {ncol(obs_mat)}] but ",
+          "trend_linpred is [{nrow(trend_mat)} x {ncol(trend_mat)}]."
+        ))
+      }
+
+      # Apply process_error: FALSE fixes trend at posterior mean
+      if (!process_error) {
+        trend_mean <- colMeans(trend_mat)
+        trend_mat <- matrix(
+          trend_mean,
+          nrow = nrow(obs_mat),
+          ncol = ncol(obs_mat),
+          byrow = TRUE
+        )
+      }
+
+      # Combine additively on link scale
+      obs_mat + trend_mat
+    })
+    names(combined) <- names(obs_linpred)
+    return(combined)
+  }
+
+  # Univariate case: both components are matrices
+  checkmate::assert_matrix(obs_linpred)
+  checkmate::assert_matrix(trend_linpred)
+
+  # Validate dimensions match
+  if (nrow(trend_linpred) != nrow(obs_linpred) ||
+      ncol(trend_linpred) != ncol(obs_linpred)) {
+    stop(insight::format_error(
+      "Dimension mismatch: obs_linpred is ",
+      "[{nrow(obs_linpred)} x {ncol(obs_linpred)}] but ",
+      "trend_linpred is [{nrow(trend_linpred)} x {ncol(trend_linpred)}]."
+    ))
+  }
+
+  # Apply process_error: FALSE fixes trend at posterior mean
   if (!process_error) {
     trend_mean <- colMeans(trend_linpred)
     trend_linpred <- matrix(
@@ -184,13 +244,13 @@ posterior_linpred.mvgam <- function(object, newdata = NULL,
 
   # Handle newdata = NULL (use training data)
   if (is.null(newdata)) {
-    if (is.null(object$obs_data)) {
+    if (is.null(object$data)) {
       stop(insight::format_error(
         "No training data found in model object. ",
         "Please provide {.field newdata} explicitly."
       ))
     }
-    newdata <- object$obs_data
+    newdata <- object$data
   }
 
   # Delegate to get_combined_linpred (all other validation handled there)

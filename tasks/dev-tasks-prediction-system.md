@@ -73,9 +73,11 @@ This task list covers implementation of the user-facing prediction functions tha
 
 ## Tasks
 
-### 1.0 Core Combination Logic and `posterior_linpred.mvgam()`
+### 1.0 Core Combination Logic and `posterior_linpred.mvgam()` ✓
 
 Build the foundation for combining observation and trend linear predictors, then expose via brms-compatible S3 method.
+
+**Completed**: Commit 71db40be
 
 - [x] **1.1 Create `get_combined_linpred()` helper function**
   - Created in new file `R/posterior_linpred.R`
@@ -94,7 +96,7 @@ Build the foundation for combining observation and trend linear predictors, then
 - [x] **1.3 Implement `posterior_linpred.mvgam()` S3 method**
   - Created in `R/posterior_linpred.R`
   - Imports `posterior_linpred` generic from brms
-  - Handles `newdata = NULL` → uses training data from `object$obs_data`
+  - Handles `newdata = NULL` → uses training data from `object$data`
   - Delegates all validation to `extract_component_linpred()`
   - Code reviewed and approved
 

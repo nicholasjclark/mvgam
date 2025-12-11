@@ -461,7 +461,10 @@ test_that("summary.mvgam includes MCMC diagnostics", {
   # Check structure and class
   expect_s3_class(summ, "mvgam_summary")
   expect_true(!is.null(summ$fixed))
-  expect_true(!is.null(summ$trend))
+  # Trend parameters are subdivided following brms design into trend_spec,
+
+  # trend_fixed, trend_smooth, trend_random. RW model has trend_spec only.
+  expect_true(!is.null(summ$trend_spec))
 
   # Check diagnostics present in fixed effects
   if (!is.null(summ$fixed) && nrow(summ$fixed) > 0) {
@@ -475,10 +478,10 @@ test_that("summary.mvgam includes MCMC diagnostics", {
   }
 
   # Check diagnostics present in trend parameters
-  if (!is.null(summ$trend) && nrow(summ$trend) > 0) {
-    expect_true("Rhat" %in% names(summ$trend))
-    expect_true("Bulk_ESS" %in% names(summ$trend))
-    expect_true("Tail_ESS" %in% names(summ$trend))
+  if (!is.null(summ$trend_spec) && nrow(summ$trend_spec) > 0) {
+    expect_true("Rhat" %in% names(summ$trend_spec))
+    expect_true("Bulk_ESS" %in% names(summ$trend_spec))
+    expect_true("Tail_ESS" %in% names(summ$trend_spec))
   }
 
   # Check credible interval naming follows "l-95% CI" pattern
@@ -548,10 +551,11 @@ test_that("summary.mvgam categorizes parameters correctly", {
   summ3 <- summary(fit3)
 
   # All should have fixed effects and trend parameters
+  # Trend params are in $trend_spec (sigma_trend, ar1_trend, etc.)
   expect_true(!is.null(summ1$fixed))
-  expect_true(!is.null(summ1$trend))
+  expect_true(!is.null(summ1$trend_spec))
   expect_true(nrow(summ1$fixed) > 0)
-  expect_true(nrow(summ1$trend) > 0)
+  expect_true(nrow(summ1$trend_spec) > 0)
 
   # Multivariate model should have family-specific parameters
   expect_true(!is.null(summ2$spec))
@@ -572,8 +576,8 @@ test_that("summary.mvgam categorizes parameters correctly", {
     expect_false(any(grepl("_trend$", fixed_names)))
   }
 
-  # Trend parameters should have _trend suffix
-  trend_names <- rownames(summ1$trend)
+  # Trend-specific params (sigma_trend, ar1_trend) retain _trend suffix
+  trend_names <- rownames(summ1$trend_spec)
   expect_true(any(grepl("_trend", trend_names)))
 })
 
@@ -768,4 +772,77 @@ test_that("variables.mvgam works with smooth parameters", {
   # Should have smooth SDs sds_*
   smooth_sds <- vars3[grepl("^sds_", vars3)]
   expect_true(length(smooth_sds) > 0)
+})
+
+# ==============================================================================
+# POSTERIOR_LINPRED TESTS
+# ==============================================================================
+test_that("posterior_linpred returns matrix for univariate models", {
+  linpred <- posterior_linpred(fit1, newdata = test_data$univariate)
+
+  # Univariate models return a matrix
+  expect_true(is.matrix(linpred))
+  expect_false(is.list(linpred))
+
+  # Dimensions: [ndraws x nobs]
+  n_draws <- nrow(posterior::as_draws_matrix(fit1$fit))
+  n_obs <- nrow(test_data$univariate)
+  expect_equal(nrow(linpred), n_draws)
+  expect_equal(ncol(linpred), n_obs)
+})
+
+test_that("posterior_linpred returns named list for multivariate models", {
+  linpred <- posterior_linpred(fit2, newdata = test_data$multivariate)
+
+  # Multivariate models return named list
+  expect_true(is.list(linpred))
+  expect_false(is.matrix(linpred))
+
+  # Names match response variables from mvbind(count, biomass)
+  expect_named(linpred, c("count", "biomass"))
+
+  # Each element is a matrix
+  expect_true(is.matrix(linpred$count))
+  expect_true(is.matrix(linpred$biomass))
+
+  # Dimensions: [ndraws x n_obs_per_response]
+  n_draws <- nrow(posterior::as_draws_matrix(fit2$fit))
+  expect_equal(nrow(linpred$count), n_draws)
+  expect_equal(nrow(linpred$biomass), n_draws)
+})
+
+test_that("posterior_linpred ndraws subsetting works", {
+  linpred_100 <- posterior_linpred(fit1, newdata = test_data$univariate,
+                                   ndraws = 100)
+
+  expect_true(is.matrix(linpred_100))
+  expect_equal(nrow(linpred_100), 100)
+})
+
+test_that("posterior_linpred process_error toggle affects variance", {
+  linpred_full <- posterior_linpred(fit1, newdata = test_data$univariate,
+                                    process_error = TRUE)
+  linpred_mean <- posterior_linpred(fit1, newdata = test_data$univariate,
+                                    process_error = FALSE)
+
+  # Same dimensions
+  expect_equal(dim(linpred_full), dim(linpred_mean))
+
+  # process_error=FALSE should reduce or equal variance (trend fixed at mean)
+  var_full <- mean(apply(linpred_full, 2, var))
+  var_mean <- mean(apply(linpred_mean, 2, var))
+  expect_true(var_mean <= var_full * 1.01)
+})
+
+test_that("posterior_linpred resp argument filters multivariate response", {
+  # Request single response
+  linpred_count <- posterior_linpred(fit2, newdata = test_data$multivariate,
+                                     resp = "count")
+
+  # Returns matrix when resp specified
+  expect_true(is.matrix(linpred_count))
+  expect_false(is.list(linpred_count))
+
+  n_draws <- nrow(posterior::as_draws_matrix(fit2$fit))
+  expect_equal(nrow(linpred_count), n_draws)
 })

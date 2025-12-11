@@ -2019,23 +2019,29 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
     params <- extract_obs_parameters(mvgam_fit)
     brms_model <- mvgam_fit$obs_model
     strip_suffix <- FALSE
+    use_resp <- resp
   } else if (component == "trend") {
     params <- extract_trend_parameters(mvgam_fit)
     brms_model <- mvgam_fit$trend_model
     strip_suffix <- TRUE
+    # Detect if trend model is multivariate or shared
+    # Shared trends have univariate brmsfit structure and don't support resp
+    is_mv_trend <- brms::is.mvbrmsformula(brms_model$formula)
+    use_resp <- if (is_mv_trend) resp else NULL
   } else {
     # Distributional parameter (sigma, zi, hu, etc.)
     params <- extract_obs_parameters(mvgam_fit)
     params <- grep(paste0("_", component), params, value = TRUE)
-    
+
     if (length(params) == 0) {
       stop(insight::format_error(
         "No parameters found for component {.field {component}}."
       ))
     }
-    
+
     brms_model <- mvgam_fit$obs_model
     strip_suffix <- FALSE
+    use_resp <- resp
   }
 
   # Validate brms_model exists
@@ -2081,6 +2087,6 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
     sample_new_levels = sample_new_levels
   )
 
-  # Extract linear predictor
-  extract_linpred_from_prep(prep, resp = resp)
+  # Extract linear predictor (use_resp handles shared vs multivariate trends)
+  extract_linpred_from_prep(prep, resp = use_resp)
 }
