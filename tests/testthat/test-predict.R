@@ -287,3 +287,163 @@ test_that("validate_prediction_factor_levels handles character columns", {
     "Series levels in newdata not found in training data"
   )
 })
+
+# ==============================================================================
+# compute_family_epred tests
+# ==============================================================================
+
+test_that("compute_family_epred handles simple families correctly", {
+  # Create test linpred matrix
+  set.seed(123)
+  linpred <- matrix(rnorm(20), nrow = 4, ncol = 5)
+
+  # Poisson family (log link): epred = exp(linpred)
+  poisson_family <- list(
+    family = "poisson",
+    linkinv = exp
+  )
+  epred_poisson <- compute_family_epred(linpred, poisson_family)
+  expect_equal(epred_poisson, exp(linpred))
+  expect_true(all(epred_poisson >= 0))
+
+  # Gaussian family (identity link): epred = linpred
+  gaussian_family <- list(
+    family = "gaussian",
+    linkinv = identity
+  )
+  epred_gaussian <- compute_family_epred(linpred, gaussian_family)
+  expect_equal(epred_gaussian, linpred)
+
+  # Bernoulli family (logit link): epred = plogis(linpred)
+  bernoulli_family <- list(
+    family = "bernoulli",
+    linkinv = plogis
+  )
+  epred_bernoulli <- compute_family_epred(linpred, bernoulli_family)
+  expect_equal(epred_bernoulli, plogis(linpred))
+  expect_true(all(epred_bernoulli >= 0 & epred_bernoulli <= 1))
+})
+
+test_that("compute_family_epred handles binomial with trials", {
+  set.seed(123)
+  linpred <- matrix(rnorm(20), nrow = 4, ncol = 5)
+
+  binomial_family <- list(
+    family = "binomial",
+    linkinv = plogis
+  )
+
+  # Requires trials argument
+  expect_error(
+    compute_family_epred(linpred, binomial_family),
+    "requires.*trials"
+  )
+
+  # With trials: epred = p * trials (column-wise via R's recycling)
+  # linpred is [ndraws x nobs], trials is per-observation (per-column)
+  trials <- c(10, 20, 15, 25, 30)
+  epred <- compute_family_epred(linpred, binomial_family, trials = trials)
+
+  # R recycles trials across columns (each column multiplied by its trial count)
+  prob <- plogis(linpred)
+  expected <- sweep(prob, 2, trials, `*`)
+  expect_equal(epred, expected)
+})
+
+test_that("compute_family_epred handles lognormal with sigma", {
+  set.seed(123)
+  linpred <- matrix(rnorm(20, mean = 1), nrow = 4, ncol = 5)
+  sigma <- matrix(abs(rnorm(20, mean = 0.5)), nrow = 4, ncol = 5)
+
+  lognormal_family <- list(
+    family = "lognormal",
+    linkinv = exp
+  )
+
+  # Requires sigma argument
+  expect_error(
+    compute_family_epred(linpred, lognormal_family),
+    "requires.*sigma"
+  )
+
+  # With sigma: E[Y] = exp(mu + sigma^2/2)
+  epred <- compute_family_epred(linpred, lognormal_family, sigma = sigma)
+  expected <- exp(linpred + sigma^2 / 2)
+  expect_equal(epred, expected)
+  expect_true(all(epred > 0))
+})
+
+test_that("compute_family_epred rejects unsupported families", {
+  linpred <- matrix(rnorm(20), nrow = 4, ncol = 5)
+
+  nmix_family <- list(
+    family = "nmix",
+    linkinv = exp
+  )
+  expect_error(
+    compute_family_epred(linpred, nmix_family),
+    "not yet supported"
+  )
+
+  tweedie_family <- list(
+    family = "tweedie",
+    linkinv = exp
+  )
+  expect_error(
+    compute_family_epred(linpred, tweedie_family),
+    "not yet supported"
+  )
+})
+
+test_that("compute_family_epred validates inputs", {
+  linpred <- matrix(rnorm(20), nrow = 4, ncol = 5)
+
+  # Invalid family (missing components)
+  expect_error(
+    compute_family_epred(linpred, list(family = "poisson")),
+    "missing required components"
+  )
+
+  expect_error(
+    compute_family_epred(linpred, list(linkinv = exp)),
+    "missing required components"
+  )
+
+  # Invalid linpred type
+  expect_error(
+    compute_family_epred("not_a_matrix", list(family = "poisson", linkinv = exp)),
+    "Must be of type 'matrix'"
+  )
+
+  # Dimension mismatch for sigma
+  family <- list(family = "lognormal", linkinv = exp)
+  wrong_sigma <- matrix(1, nrow = 2, ncol = 3)
+  expect_error(
+    compute_family_epred(linpred, family, sigma = wrong_sigma),
+    "Dimension mismatch"
+  )
+})
+
+test_that("compute_family_epred handles multivariate input (list)", {
+  set.seed(123)
+  linpred_list <- list(
+    count = matrix(rnorm(20), nrow = 4, ncol = 5),
+    biomass = matrix(rnorm(20, mean = 1), nrow = 4, ncol = 5)
+  )
+
+  family_list <- list(
+    count = list(family = "poisson", linkinv = exp),
+    biomass = list(family = "gaussian", linkinv = identity)
+  )
+
+  epred <- compute_family_epred(linpred_list, family_list)
+
+  # Returns named list
+
+  expect_true(is.list(epred))
+  expect_named(epred, c("count", "biomass"))
+
+  # Each element correctly transformed
+  expect_equal(epred$count, exp(linpred_list$count))
+  expect_equal(epred$biomass, linpred_list$biomass)
+})
