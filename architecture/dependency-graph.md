@@ -1,16 +1,16 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-12-11 14:18:37  
+**Generated:** 2025-12-11 14:21:54  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
-- **Total Files:** 62
-- **Total Functions:** 588
+- **Total Files:** 63
+- **Total Functions:** 590
 - **Exported Functions:** 57
-- **Internal Functions:** 545
-- **S3 Methods:** 44
+- **Internal Functions:** 547
+- **S3 Methods:** 45
 - **S3 Classes:** 32
 
 ## External Dependencies
@@ -230,6 +230,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: validate_monotonic_indicesdetect_gp_terms approx_gp_pred prepare_spd_inputs spd_gp_exp_quad spd_gp_matern32 spd_gp_matern52 compute_spd_vectorized detect_gp_kernel has_nlpars (+ 19 more)
 - **`R/add_residuals.R`** (2 functions) - Residual analysis
   - Key functions: add_residualsadd_residuals.mvgam (+ 1 more)
+- **`R/posterior_predict.R`** (2 functions) - Prediction methods
+  - Key functions: sample_from_family, posterior_predict.mvgam
 
 ### Stan/Modeling Files
 - **`R/stan_assembly.R`** (81 functions) - Stan model integration
@@ -387,6 +389,9 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **posterior_epred_zero_inflated_negbinomial()** (internal, never called)
 - **posterior_epred_zero_inflated_poisson()** (internal, never called)
 - **posterior_epred_zero_one_inflated_beta()** (internal, never called)
+
+### `R/posterior_predict.R` (1 potentially unused):
+- **sample_from_family()** (internal, never called)
 
 ### `R/print.mvgam.R` (1 potentially unused):
 - **print_model_specification_simple()** (internal, never called)
@@ -719,6 +724,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### `R/posterior_linpred.R`:
 - **get_combined_linpred()** (internal)
 - **posterior_linpred.mvgam()** (internal)
+
+### `R/posterior_predict.R`:
+- **posterior_predict.mvgam()** (internal)
+- **sample_from_family()** (internal)
 
 ### `R/ppc.mvgam.R`:
 - **ecdf_plotdat()** (internal)

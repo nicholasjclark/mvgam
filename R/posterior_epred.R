@@ -9,6 +9,35 @@
 NULL
 
 
+#' Extract Family for Single Response
+#'
+#' Extracts the family object for a specific response from an mvgam model.
+#' Response-specific families embedded in bf() take precedence over the
+#' shared top-level family.
+#'
+#' @param object A fitted mvgam object.
+#' @param resp_name Response variable name (character length 1).
+#'
+#' @return A single family object with `$family` and `$linkinv` components.
+#'
+#' @noRd
+get_family_for_resp <- function(object, resp_name) {
+  checkmate::assert_string(resp_name)
+
+  form <- object$formula$forms[[resp_name]]
+  if (!is.null(form) && !is.null(form$family)) {
+    form$family
+  } else if (!is.null(object$family)) {
+    object$family
+  } else {
+    stop(insight::format_error(
+      "No family found for response {.val {resp_name}}. ",
+      "Family must be specified either in {.fn bf} or at top-level."
+    ))
+  }
+}
+
+
 #' Compute Expected Values from Linear Predictor
 #'
 #' Transforms linear predictor values to expected values (response scale) using
@@ -271,42 +300,109 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
   )
 
   # Extract family information for transformation
-  is_multivariate <- inherits(object$formula, "mvbrmsformula") &&
+  # Use resp argument as single source of truth for response selection
+  is_mv <- inherits(object$formula, "mvbrmsformula") &&
     !is.null(object$formula$forms) &&
     length(object$formula$forms) > 1
 
-  if (is_multivariate) {
-    # Multivariate: extract per-response families
-    # Family can be embedded in bf() or shared at top-level object$family
-    family <- lapply(names(linpred), function(resp_name) {
-      form <- object$formula$forms[[resp_name]]
-
-      # Use response-specific family if embedded in bf(), else fall back
-      if (!is.null(form$family)) {
-        form$family
-      } else if (!is.null(object$family)) {
-        object$family
-      } else {
-        stop(insight::format_error(
-          "No family found for response {.val {resp_name}}. ",
-          "Family must be specified either in {.fn bf} or at top-level."
-        ))
-      }
-    })
-    names(family) <- names(linpred)
-  } else {
-    # Univariate: single family object
+  if (!is_mv) {
+    # Univariate model
     family <- object$family
+  } else if (!is.null(resp)) {
+    # Multivariate with response filter
+    family <- get_family_for_resp(object, resp)
+  } else {
+    # Multivariate returning all responses
+    resp_names <- names(object$formula$forms)
+    family <- lapply(resp_names, function(r) get_family_for_resp(object, r))
+    names(family) <- resp_names
   }
 
+  # Extract trials for binomial families
+  trials <- extract_trials_for_family(object, family, newdata)
+
   # Transform to response scale
-  # compute_family_epred() throws appropriate errors for unsupported families
   compute_family_epred(
     linpred = linpred,
     family = family,
     sigma = NULL,
-    trials = NULL
+    trials = trials
   )
+}
+
+#' Extract trials from model object or newdata for binomial families
+#'
+#' @param object mvgam model object
+#' @param family Family object or list of families (for multivariate)
+#' @param newdata Data frame for predictions (NULL uses training data)
+#' @return Numeric vector of trials or NULL for non-binomial families
+#'
+#' @details
+#' Trials are extracted with the following precedence:
+#' \enumerate{
+#'   \item For training data predictions (newdata = NULL):
+#'         object$standata$trials or object$data$trials
+#'   \item For new data predictions: newdata$trials
+#' }
+#'
+#' @noRd
+extract_trials_for_family <- function(object, family, newdata) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert(
+    checkmate::check_class(family, "family"),
+    checkmate::check_class(family, "brmsfamily"),
+    checkmate::check_list(family, types = c("family", "brmsfamily"))
+  )
+  checkmate::assert_data_frame(newdata, null.ok = TRUE)
+
+  # Determine if family requires trials
+  # For multivariate: family is a named list of family objects
+  # For univariate: family is a single family object
+
+  is_mv_family <- is.list(family) &&
+    !inherits(family, "family") &&
+    !inherits(family, "brmsfamily") &&
+    !is.null(names(family))
+
+  family_name <- if (is_mv_family) {
+    family[[1]]$family
+  } else {
+    family$family
+  }
+
+  binomial_families <- c("binomial", "beta_binomial",
+                         "zero_inflated_binomial",
+                         "zero_inflated_beta_binomial")
+
+  if (!family_name %in% binomial_families) {
+    return(NULL)
+  }
+
+  # Extract trials from standata or newdata
+  trials <- NULL
+
+  if (is.null(newdata) || identical(newdata, object$data)) {
+    trials <- object$standata$trials %||% object$data$trials
+  } else {
+    if ("trials" %in% names(newdata)) {
+      trials <- newdata$trials
+    }
+  }
+
+  if (is.null(trials)) {
+    stop(insight::format_error(
+      "Family {.val {family_name}} requires {.field trials} data.",
+      "Ensure {.code trials} is present in your data or use ",
+      "{.code y | trials(n) ~ ...} formula syntax."
+    ))
+  }
+
+  # Validate trials values
+  checkmate::assert_numeric(trials, lower = 1, finite = TRUE,
+                            any.missing = FALSE, min.len = 1,
+                            .var.name = "trials")
+
+  trials
 }
 
 

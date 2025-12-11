@@ -447,3 +447,397 @@ test_that("compute_family_epred handles multivariate input (list)", {
   expect_equal(epred$count, exp(linpred_list$count))
   expect_equal(epred$biomass, linpred_list$biomass)
 })
+
+# ==============================================================================
+# data2draws helper function tests
+# ==============================================================================
+
+test_that("data2draws expands vector to 2D matrix correctly", {
+  # Single value expansion
+  result_single <- data2draws(5, dim = c(4, 3))
+  expect_true(is.matrix(result_single))
+  expect_equal(dim(result_single), c(4, 3))
+  expect_true(all(result_single == 5))
+
+  # Vector expansion: each row gets the same values
+  vec <- c(1, 2, 3)
+  result_vec <- data2draws(vec, dim = c(4, 3))
+  expect_equal(dim(result_vec), c(4, 3))
+  # Each row should be c(1, 2, 3)
+  for (i in 1:4) {
+    expect_equal(result_vec[i, ], vec)
+  }
+})
+
+test_that("data2draws expands to 3D array correctly", {
+  # For categorical models with dim = c(ndraws, nobs, ncats)
+  x_mat <- matrix(1:6, nrow = 2, ncol = 3)
+  result <- data2draws(x_mat, dim = c(4, 2, 3))
+  expect_true(is.array(result))
+  expect_equal(dim(result), c(4, 2, 3))
+  # Each draw slice should contain the original matrix
+  for (d in 1:4) {
+    expect_equal(result[d, , ], x_mat)
+  }
+})
+
+test_that("data2draws validates input length for 2D", {
+  # Wrong length should error
+  expect_error(
+    data2draws(c(1, 2), dim = c(4, 3)),
+    "Length of"
+  )
+})
+
+test_that("data2draws validates dimensions for 3D", {
+  # Wrong dimensions for 3D input
+  wrong_mat <- matrix(1:4, nrow = 2, ncol = 2)
+  expect_error(
+    data2draws(wrong_mat, dim = c(4, 3, 5)),
+    "Dimension of.*must match"
+  )
+})
+
+test_that("data2draws validates dim parameter", {
+  # dim must have length 2 or 3
+  expect_error(
+    data2draws(5, dim = c(4)),
+    "length >= 2"
+  )
+  expect_error(
+    data2draws(5, dim = c(4, 3, 2, 1)),
+    "length <= 3"
+  )
+})
+
+# ==============================================================================
+# dim_mu helper function tests
+# ==============================================================================
+
+test_that("dim_mu extracts correct dimensions", {
+  prep <- list(ndraws = 100, nobs = 50)
+  result <- dim_mu(prep)
+  expect_equal(result, c(100, 50))
+})
+
+test_that("dim_mu validates prep structure", {
+  expect_error(dim_mu(list(ndraws = 100)), "nobs")
+  expect_error(dim_mu(list(nobs = 50)), "ndraws")
+  # ndraws must be >= 1
+  expect_error(dim_mu(list(ndraws = 0, nobs = 50)), "not >= 1")
+  expect_error(dim_mu("not_a_list"), "Must be of type 'list'")
+})
+
+# ==============================================================================
+# multiply_dpar_rate_denom helper function tests
+# ==============================================================================
+
+test_that("multiply_dpar_rate_denom returns unchanged when no rate_denom", {
+  dpar <- matrix(1:12, nrow = 3, ncol = 4)
+  prep <- list(data = list())
+  result <- multiply_dpar_rate_denom(dpar, prep)
+  expect_equal(result, dpar)
+})
+test_that("multiply_dpar_rate_denom applies single rate_denom", {
+  dpar <- matrix(c(1, 2, 3, 4), nrow = 2, ncol = 2)
+  prep <- list(data = list(rate_denom = 10))
+  result <- multiply_dpar_rate_denom(dpar, prep)
+  expect_equal(result, dpar * 10)
+})
+
+test_that("multiply_dpar_rate_denom applies vector rate_denom", {
+  dpar <- matrix(1:6, nrow = 2, ncol = 3)
+  rate_denom <- c(10, 20, 30)
+  prep <- list(data = list(rate_denom = rate_denom))
+  result <- multiply_dpar_rate_denom(dpar, prep)
+  # Each column multiplied by corresponding rate_denom
+  expected <- dpar
+  for (j in 1:3) {
+    expected[, j] <- dpar[, j] * rate_denom[j]
+  }
+  expect_equal(result, expected)
+})
+
+# ==============================================================================
+# Family-specific posterior_epred_* function tests
+# ==============================================================================
+
+test_that("posterior_epred_gaussian returns mu directly", {
+  prep <- list(dpars = list(mu = matrix(1:6, nrow = 2, ncol = 3)))
+  result <- posterior_epred_gaussian(prep)
+  expect_equal(result, prep$dpars$mu)
+})
+
+test_that("posterior_epred_student returns mu directly", {
+  prep <- list(dpars = list(mu = matrix(1:6, nrow = 2, ncol = 3)))
+  result <- posterior_epred_student(prep)
+  expect_equal(result, prep$dpars$mu)
+})
+
+test_that("posterior_epred_beta returns mu directly", {
+  prep <- list(dpars = list(mu = matrix(runif(6), nrow = 2, ncol = 3)))
+  result <- posterior_epred_beta(prep)
+  expect_equal(result, prep$dpars$mu)
+})
+
+test_that("posterior_epred_bernoulli returns mu directly", {
+  prep <- list(dpars = list(mu = matrix(runif(6), nrow = 2, ncol = 3)))
+  result <- posterior_epred_bernoulli(prep)
+  expect_equal(result, prep$dpars$mu)
+})
+
+test_that("posterior_epred_poisson applies rate_denom", {
+  mu <- matrix(c(5, 10, 15, 20), nrow = 2, ncol = 2)
+  prep <- list(
+    dpars = list(mu = mu),
+    data = list(rate_denom = c(2, 3))
+  )
+  result <- posterior_epred_poisson(prep)
+  # Column 1 * 2, column 2 * 3
+  expected <- mu
+  expected[, 1] <- mu[, 1] * 2
+  expected[, 2] <- mu[, 2] * 3
+  expect_equal(result, expected)
+})
+
+test_that("posterior_epred_poisson returns mu when no rate_denom", {
+  mu <- matrix(c(5, 10, 15, 20), nrow = 2, ncol = 2)
+  prep <- list(
+    dpars = list(mu = mu),
+    data = list()
+  )
+  result <- posterior_epred_poisson(prep)
+  expect_equal(result, mu)
+})
+
+test_that("posterior_epred_negbinomial applies rate_denom", {
+  mu <- matrix(c(5, 10), nrow = 1, ncol = 2)
+  prep <- list(
+    dpars = list(mu = mu),
+    data = list(rate_denom = 10)
+  )
+  result <- posterior_epred_negbinomial(prep)
+  expect_equal(result, mu * 10)
+})
+
+test_that("posterior_epred_lognormal computes E[Y] = exp(mu + sigma^2/2)", {
+  mu <- matrix(c(0, 1, 2, 3), nrow = 2, ncol = 2)
+  sigma <- matrix(c(0.5, 0.5, 1, 1), nrow = 2, ncol = 2)
+  prep <- list(dpars = list(mu = mu, sigma = sigma))
+  result <- posterior_epred_lognormal(prep)
+  expected <- exp(mu + sigma^2 / 2)
+  expect_equal(result, expected)
+})
+
+test_that("posterior_epred_shifted_lognormal adds ndt shift", {
+  mu <- matrix(c(0, 1), nrow = 1, ncol = 2)
+  sigma <- matrix(c(0.5, 0.5), nrow = 1, ncol = 2)
+  ndt <- matrix(c(0.1, 0.2), nrow = 1, ncol = 2)
+  prep <- list(dpars = list(mu = mu, sigma = sigma, ndt = ndt))
+  result <- posterior_epred_shifted_lognormal(prep)
+  expected <- exp(mu + sigma^2 / 2) + ndt
+  expect_equal(result, expected)
+})
+
+test_that("posterior_epred_binomial multiplies mu by trials", {
+  mu <- matrix(c(0.2, 0.5, 0.8, 0.3), nrow = 2, ncol = 2)
+  trials <- c(10, 20)
+  prep <- list(
+    dpars = list(mu = mu),
+    data = list(trials = trials),
+    ndraws = 2,
+    nobs = 2
+  )
+  result <- posterior_epred_binomial(prep)
+  # Each column multiplied by corresponding trial count
+  expected <- mu
+  expected[, 1] <- mu[, 1] * 10
+  expected[, 2] <- mu[, 2] * 20
+  expect_equal(result, expected)
+})
+
+test_that("posterior_epred_beta_binomial multiplies mu by trials", {
+  mu <- matrix(c(0.2, 0.5), nrow = 1, ncol = 2)
+  trials <- c(10, 20)
+  prep <- list(
+    dpars = list(mu = mu),
+    data = list(trials = trials),
+    ndraws = 1,
+    nobs = 2
+  )
+  result <- posterior_epred_beta_binomial(prep)
+  expect_equal(result[1, 1], 0.2 * 10)
+  expect_equal(result[1, 2], 0.5 * 20)
+})
+
+# ==============================================================================
+# Zero-inflated family tests
+# ==============================================================================
+
+test_that("posterior_epred_zero_inflated_poisson applies zi correction", {
+  mu <- matrix(c(5, 10, 15, 20), nrow = 2, ncol = 2)
+  zi <- matrix(c(0.1, 0.2, 0.3, 0.4), nrow = 2, ncol = 2)
+  prep <- list(dpars = list(mu = mu, zi = zi))
+  result <- posterior_epred_zero_inflated_poisson(prep)
+  expected <- mu * (1 - zi)
+  expect_equal(result, expected)
+})
+
+test_that("posterior_epred_zero_inflated_negbinomial applies zi correction", {
+  mu <- matrix(c(5, 10), nrow = 1, ncol = 2)
+  zi <- matrix(c(0.2, 0.3), nrow = 1, ncol = 2)
+  prep <- list(dpars = list(mu = mu, zi = zi))
+  result <- posterior_epred_zero_inflated_negbinomial(prep)
+  expected <- mu * (1 - zi)
+  expect_equal(result, expected)
+})
+
+test_that("posterior_epred_zero_inflated_binomial applies zi and trials", {
+  mu <- matrix(c(0.5, 0.8), nrow = 1, ncol = 2)
+  zi <- matrix(c(0.1, 0.2), nrow = 1, ncol = 2)
+  trials <- c(10, 20)
+  prep <- list(
+    dpars = list(mu = mu, zi = zi),
+    data = list(trials = trials),
+    ndraws = 1,
+    nobs = 2
+  )
+  result <- posterior_epred_zero_inflated_binomial(prep)
+  # E[Y] = mu * trials * (1 - zi)
+  expect_equal(result[1, 1], 0.5 * 10 * (1 - 0.1))
+  expect_equal(result[1, 2], 0.8 * 20 * (1 - 0.2))
+})
+
+test_that("posterior_epred_zero_inflated_beta applies zi correction", {
+  mu <- matrix(c(0.3, 0.6), nrow = 1, ncol = 2)
+  zi <- matrix(c(0.1, 0.2), nrow = 1, ncol = 2)
+  prep <- list(dpars = list(mu = mu, zi = zi))
+  result <- posterior_epred_zero_inflated_beta(prep)
+  expected <- mu * (1 - zi)
+  expect_equal(result, expected)
+})
+
+test_that("posterior_epred_zero_one_inflated_beta computes correctly", {
+  mu <- matrix(c(0.5, 0.6), nrow = 1, ncol = 2)
+  zoi <- matrix(c(0.2, 0.3), nrow = 1, ncol = 2)
+  coi <- matrix(c(0.4, 0.5), nrow = 1, ncol = 2)
+  prep <- list(dpars = list(mu = mu, zoi = zoi, coi = coi))
+  result <- posterior_epred_zero_one_inflated_beta(prep)
+  # E[Y] = zoi * coi + mu * (1 - zoi)
+  expected <- zoi * coi + mu * (1 - zoi)
+  expect_equal(result, expected)
+})
+
+# ==============================================================================
+# Hurdle family tests
+# ==============================================================================
+
+test_that("posterior_epred_hurdle_poisson computes E[Y|Y>0] * P(Y>0)", {
+  mu <- matrix(c(2, 5), nrow = 1, ncol = 2)
+  hu <- matrix(c(0.2, 0.3), nrow = 1, ncol = 2)
+  prep <- list(dpars = list(mu = mu, hu = hu))
+  result <- posterior_epred_hurdle_poisson(prep)
+  # E[Y] = mu / (1 - exp(-mu)) * (1 - hu)
+  expected <- mu / (1 - exp(-mu)) * (1 - hu)
+  expect_equal(result, expected)
+})
+
+test_that("posterior_epred_hurdle_negbinomial uses shape parameter", {
+  mu <- matrix(c(5, 10), nrow = 1, ncol = 2)
+  hu <- matrix(c(0.2, 0.3), nrow = 1, ncol = 2)
+  shape <- matrix(c(2, 3), nrow = 1, ncol = 2)
+  prep <- list(dpars = list(mu = mu, hu = hu, shape = shape))
+  result <- posterior_epred_hurdle_negbinomial(prep)
+  # E[Y] = mu / (1 - (shape/(mu+shape))^shape) * (1 - hu)
+  expected <- mu / (1 - (shape / (mu + shape))^shape) * (1 - hu)
+  expect_equal(result, expected)
+})
+
+test_that("posterior_epred_hurdle_gamma applies hu correction", {
+  mu <- matrix(c(5, 10), nrow = 1, ncol = 2)
+  hu <- matrix(c(0.2, 0.3), nrow = 1, ncol = 2)
+  prep <- list(dpars = list(mu = mu, hu = hu))
+  result <- posterior_epred_hurdle_gamma(prep)
+  expected <- mu * (1 - hu)
+  expect_equal(result, expected)
+})
+
+test_that("posterior_epred_hurdle_lognormal combines lognormal E[Y] with hu", {
+  mu <- matrix(c(1, 2), nrow = 1, ncol = 2)
+  sigma <- matrix(c(0.5, 0.5), nrow = 1, ncol = 2)
+  hu <- matrix(c(0.2, 0.3), nrow = 1, ncol = 2)
+  prep <- list(dpars = list(mu = mu, sigma = sigma, hu = hu))
+  result <- posterior_epred_hurdle_lognormal(prep)
+  # E[Y] = exp(mu + sigma^2/2) * (1 - hu)
+  expected <- exp(mu + sigma^2 / 2) * (1 - hu)
+  expect_equal(result, expected)
+})
+
+# ==============================================================================
+# Complex distribution mean helper tests
+# ==============================================================================
+
+test_that("mean_discrete_weibull computes series approximation", {
+  # Test with simple inputs where series converges quickly
+  mu <- matrix(c(0.3, 0.5), nrow = 1, ncol = 2)
+  shape <- matrix(c(1, 1.5), nrow = 1, ncol = 2)
+  result <- mean_discrete_weibull(mu, shape)
+  expect_true(is.matrix(result))
+  expect_equal(dim(result), c(1, 2))
+  # Result should be positive for valid inputs
+  expect_true(all(result >= 0))
+})
+
+test_that("mean_com_poisson returns mu when shape = 1 (Poisson)", {
+  mu <- matrix(c(3, 5, 7), nrow = 1, ncol = 3)
+  shape <- 1
+  result <- mean_com_poisson(mu, shape)
+  # When shape = 1, COM-Poisson reduces to Poisson with E[Y] = mu
+  # Result preserves mu's dimensions so compare values ignoring attributes
+  expect_equal(as.numeric(result), as.numeric(mu))
+})
+
+test_that("mean_com_poisson uses approximation for large mu", {
+  # Large mu values should trigger closed-form approximation
+  mu <- matrix(c(10, 20), nrow = 1, ncol = 2)
+  shape <- matrix(c(2, 2), nrow = 1, ncol = 2)
+  result <- mean_com_poisson(mu, shape)
+  expect_true(all(is.finite(result)))
+  expect_true(all(result > 0))
+})
+
+test_that("mean_com_poisson validates shape parameter", {
+  mu <- matrix(c(3, 5), nrow = 1, ncol = 2)
+  expect_error(
+    mean_com_poisson(mu, shape = 0),
+    "shape must be positive"
+  )
+  expect_error(
+    mean_com_poisson(mu, shape = Inf),
+    "shape must be finite"
+  )
+})
+
+# ==============================================================================
+# Additional family edge cases
+# ==============================================================================
+
+test_that("posterior_epred_gen_extreme_value uses xi parameter", {
+  mu <- matrix(c(0, 1), nrow = 1, ncol = 2)
+  sigma <- matrix(c(1, 1), nrow = 1, ncol = 2)
+  xi <- matrix(c(0.1, 0.2), nrow = 1, ncol = 2)
+  prep <- list(dpars = list(mu = mu, sigma = sigma, xi = xi))
+  result <- posterior_epred_gen_extreme_value(prep)
+  expected <- mu + sigma * (gamma(1 - xi) - 1) / xi
+  expect_equal(result, expected)
+})
+
+test_that("posterior_epred_asym_laplace uses quantile parameter", {
+  mu <- matrix(c(0, 1), nrow = 1, ncol = 2)
+  sigma <- matrix(c(1, 1), nrow = 1, ncol = 2)
+  quantile <- matrix(c(0.25, 0.75), nrow = 1, ncol = 2)
+  prep <- list(dpars = list(mu = mu, sigma = sigma, quantile = quantile))
+  result <- posterior_epred_asym_laplace(prep)
+  expected <- mu + sigma * (1 - 2 * quantile) / (quantile * (1 - quantile))
+  expect_equal(result, expected)
+})
