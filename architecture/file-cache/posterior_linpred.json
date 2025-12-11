@@ -1,0 +1,20 @@
+﻿{
+    "s3_methods":  {
+                       "posterior_linpred":  [
+                                                 "mvgam"
+                                             ]
+                   },
+    "functions":  [
+                      "get_combined_linpred",
+                      "posterior_linpred.mvgam"
+                  ],
+    "purpose":  "",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "posterior_linpred.mvgam":  "posterior_linpred.mvgam \u003c- function(object, newdata = NULL, process_error = TRUE, ndraws = NULL, re_formula = NULL, allow_new_levels = FALSE, sample_new_levels = \"uncertainty\", resp = NULL, ...) {",
+                                "get_combined_linpred":  "get_combined_linpred \u003c- function(mvgam_fit, newdata, process_error = TRUE, ndraws = NULL, re_formula = NULL, allow_new_levels = FALSE, sample_new_levels = \"uncertainty\", resp = NULL) {"
+                            },
+    "file":  "R/posterior_linpred.R"
+}

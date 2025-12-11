@@ -813,6 +813,136 @@ results$test10t <- run_validation(
 )
 
 # =============================================================================
+# MULTIVARIATE MODEL TESTS
+# Tests extraction with multiple response variables
+# =============================================================================
+
+cat("\n\n")
+cat(rep("=", 60), "\n", sep = "")
+cat("MULTIVARIATE MODEL TESTS\n")
+cat(rep("=", 60), "\n", sep = "")
+
+# -----------------------------------------------------------------------------
+# Test 11: Multivariate model (mvbind) with shared AR(1)
+# Two Gaussian responses with response-specific fixed effects
+# -----------------------------------------------------------------------------
+
+cat("\n=== Test 11: Multivariate mvbind (2 responses) ===\n")
+
+# Create multivariate test data with two responses
+set.seed(123)
+n_mv <- 30
+latent_mv <- numeric(n_mv)
+latent_mv[1] <- rnorm(1, 0, 0.5)
+for (t in 2:n_mv) {
+  latent_mv[t] <- 0.6 * latent_mv[t - 1] + rnorm(1, 0, 0.4)
+}
+
+test_data_mv <- data.frame(
+  y1 = rnorm(n_mv, 2 + 0.5 * (1:n_mv / n_mv) + latent_mv, 0.3),
+  y2 = rnorm(n_mv, 1 - 0.3 * (1:n_mv / n_mv) + latent_mv, 0.4),
+  x = (1:n_mv) / n_mv,
+  time = 1:n_mv,
+  series = factor("s1")
+)
+
+brms_11 <- fit_brms_cached(
+  "mv_gauss",
+  bf(mvbind(y1, y2) ~ x + ar(time = time, p = 1, cov = TRUE)) + set_rescor(FALSE),
+  test_data_mv, gaussian()
+)
+
+mvgam_11 <- fit_mvgam_cached(
+  "mv_gauss",
+  bf(y1 ~ x) + bf(y2 ~ x), ~ AR(p = 1),
+  test_data_mv, gaussian()
+)
+
+# Validate y1 response
+cat("\n  Validating response: y1\n")
+brms_pred_y1 <- posterior_linpred(brms_11, newdata = test_data_mv,
+                                   resp = "y1", incl_autocor = FALSE)
+mvgam_pred_y1 <- extract_component_linpred(mvgam_11, test_data_mv,
+                                            component = "obs", resp = "y1")
+
+brms_summ_y1 <- summarize_pred(brms_pred_y1)
+mvgam_summ_y1 <- summarize_pred(mvgam_pred_y1)
+comp_y1 <- compare_vectors(brms_summ_y1$mean, mvgam_summ_y1$mean)
+cat(sprintf("    y1 mean: cor=%.4f, rmse=%.4f\n", comp_y1$cor, comp_y1$rmse))
+
+# Validate y2 response
+cat("  Validating response: y2\n")
+brms_pred_y2 <- posterior_linpred(brms_11, newdata = test_data_mv,
+                                   resp = "y2", incl_autocor = FALSE)
+mvgam_pred_y2 <- extract_component_linpred(mvgam_11, test_data_mv,
+                                            component = "obs", resp = "y2")
+
+brms_summ_y2 <- summarize_pred(brms_pred_y2)
+mvgam_summ_y2 <- summarize_pred(mvgam_pred_y2)
+comp_y2 <- compare_vectors(brms_summ_y2$mean, mvgam_summ_y2$mean)
+cat(sprintf("    y2 mean: cor=%.4f, rmse=%.4f\n", comp_y2$cor, comp_y2$rmse))
+
+# Pass if both responses have cor >= 0.925
+mv_passed <- !is.na(comp_y1$cor) && !is.na(comp_y2$cor) &&
+             comp_y1$cor >= 0.925 && comp_y2$cor >= 0.925
+status <- if (mv_passed) "PASSED" else "FAILED"
+cat(sprintf("\n  Result: %s (both responses cor >= 0.925)\n", status))
+
+results$test11 <- list(
+  name = "Multivariate mvbind (2 responses)",
+  passed = mv_passed,
+  y1_cor = comp_y1$cor,
+  y2_cor = comp_y2$cor
+)
+
+# -----------------------------------------------------------------------------
+# Test 11L: Multivariate posterior_linpred validation
+# Tests posterior_linpred.mvgam() returns correct list structure
+# -----------------------------------------------------------------------------
+
+cat("\n=== Test 11L: Multivariate posterior_linpred ===\n")
+
+mvgam_linpred_mv <- posterior_linpred(mvgam_11, newdata = test_data_mv)
+
+# Check returns list with both responses
+is_list_output <- is.list(mvgam_linpred_mv) && !is.matrix(mvgam_linpred_mv)
+has_both_resp <- all(c("y1", "y2") %in% names(mvgam_linpred_mv))
+
+cat(sprintf("  Returns list: %s\n", is_list_output))
+cat(sprintf("  Has both responses (y1, y2): %s\n", has_both_resp))
+
+if (is_list_output && has_both_resp) {
+  # Check dimensions match
+  dim_y1 <- dim(mvgam_linpred_mv$y1)
+  dim_y2 <- dim(mvgam_linpred_mv$y2)
+  cat(sprintf("  y1 dims: [%d x %d]\n", dim_y1[1], dim_y1[2]))
+  cat(sprintf("  y2 dims: [%d x %d]\n", dim_y2[1], dim_y2[2]))
+
+  # Compare against brms for each response
+  brms_y1 <- posterior_linpred(brms_11, newdata = test_data_mv,
+                                resp = "y1", incl_autocor = FALSE)
+  brms_y2 <- posterior_linpred(brms_11, newdata = test_data_mv,
+                                resp = "y2", incl_autocor = FALSE)
+
+  cor_y1 <- cor(colMeans(brms_y1), colMeans(mvgam_linpred_mv$y1))
+  cor_y2 <- cor(colMeans(brms_y2), colMeans(mvgam_linpred_mv$y2))
+  cat(sprintf("  y1 vs brms cor: %.4f\n", cor_y1))
+  cat(sprintf("  y2 vs brms cor: %.4f\n", cor_y2))
+
+  linpred_mv_passed <- cor_y1 >= 0.925 && cor_y2 >= 0.925
+} else {
+  linpred_mv_passed <- FALSE
+}
+
+status <- if (linpred_mv_passed) "PASSED" else "FAILED"
+cat(sprintf("  Result: %s\n", status))
+
+results$test11l <- list(
+  name = "Multivariate posterior_linpred",
+  passed = linpred_mv_passed
+)
+
+# =============================================================================
 # POSTERIOR_LINPRED.MVGAM VALIDATION
 # Tests the new S3 method against brms::posterior_linpred()
 # =============================================================================
@@ -950,6 +1080,164 @@ results$linpred_ndraws <- list(
   name = "linpred_ndraws_subsetting",
   passed = ndraws_passed
 )
+
+# =============================================================================
+# POSTERIOR_EPRED.MVGAM VALIDATION
+# Tests the new S3 method against brms::posterior_epred()
+# =============================================================================
+
+cat("\n\n")
+cat(rep("=", 60), "\n", sep = "")
+cat("POSTERIOR_EPRED.MVGAM VALIDATION\n")
+cat(rep("=", 60), "\n", sep = "")
+
+#' Run validation using posterior_epred.mvgam() S3 method
+run_epred_validation <- function(test_name, brms_fit, mvgam_fit, newdata,
+                                 incl_autocor = FALSE) {
+  cat("\n--- posterior_epred:", test_name, "---\n")
+
+  # Get predictions via S3 methods
+  brms_pred <- brms::posterior_epred(brms_fit, newdata = newdata,
+                                     incl_autocor = incl_autocor)
+  mvgam_pred <- posterior_epred(mvgam_fit, newdata = newdata)
+
+  # Check dimensions
+  if (!identical(dim(brms_pred), dim(mvgam_pred))) {
+    cat("  FAIL: Dimension mismatch\n")
+    cat("    brms:", dim(brms_pred), "\n")
+    cat("    mvgam:", dim(mvgam_pred), "\n")
+    return(list(name = paste0("epred_", test_name), passed = FALSE,
+                reason = "dim_mismatch"))
+  }
+  cat("  Dimensions match:", dim(brms_pred), "\n")
+
+  # Compare summaries
+  brms_summ <- summarize_pred(brms_pred)
+  mvgam_summ <- summarize_pred(mvgam_pred)
+
+  stats <- c("mean", "median", "sd")
+  stat_results <- lapply(stats, function(s) {
+    compare_vectors(brms_summ[[s]], mvgam_summ[[s]])
+  })
+  names(stat_results) <- stats
+
+  for (s in stats) {
+    r <- stat_results[[s]]
+    if (isTRUE(r$mismatch)) {
+      cat(sprintf("  %s: MISMATCH\n", s))
+    } else if (r$constant) {
+      cat(sprintf("  %s: constant, diff = %.6f\n", s, r$rmse))
+    } else {
+      cat(sprintf("  %s: cor=%.6f, rmse=%.6f\n", s, r$cor, r$rmse))
+    }
+  }
+
+  # Verify values are on correct scale for family
+  family_name <- mvgam_fit$family$family
+  scale_check <- TRUE
+  if (family_name == "poisson") {
+    # Poisson epred should be >= 0
+    if (any(mvgam_pred < 0)) {
+      cat("  WARNING: Poisson epred contains negative values\n")
+      scale_check <- FALSE
+    } else {
+      cat("  Scale check: Poisson epred >= 0 (OK)\n")
+    }
+  }
+
+  # Pass/fail based on mean correlation
+  mean_r <- stat_results$mean
+  if (isTRUE(mean_r$mismatch)) {
+    passed <- FALSE
+  } else if (mean_r$constant) {
+    passed <- scale_check
+  } else {
+    passed <- mean_r$cor >= 0.925 && scale_check
+  }
+
+  status <- if (passed) "PASSED" else "FAILED"
+  cat(sprintf("  Result: %s\n", status))
+
+  list(name = paste0("epred_", test_name), passed = passed, stats = stat_results)
+}
+
+# Test posterior_epred.mvgam() for Poisson models (obs-formula)
+results$epred_1 <- run_epred_validation(
+  "Intercept-only AR(1)", brms_1, mvgam_1, test_data
+)
+
+results$epred_2 <- run_epred_validation(
+  "AR(1) + fixed effect", brms_2, mvgam_2, test_data
+)
+
+results$epred_3 <- run_epred_validation(
+  "AR(1) + random intercept", brms_3, mvgam_3, test_data
+)
+
+results$epred_4 <- run_epred_validation(
+  "AR(1) + fixed + random + smooth", brms_4, mvgam_4, test_data
+)
+
+results$epred_8 <- run_epred_validation(
+  "AR(1) + GP", brms_8, mvgam_8, test_data
+)
+
+# Test posterior_epred.mvgam() for trend-formula models
+results$epred_2t <- run_epred_validation(
+  "AR(1) + fixed (in trend)", brms_2, mvgam_2t, test_data
+)
+
+results$epred_3t <- run_epred_validation(
+  "AR(1) + fixed + random (in trend)", brms_3, mvgam_3t, test_data
+)
+
+results$epred_4t <- run_epred_validation(
+  "AR(1) + fixed + random + smooth (in trend)", brms_4, mvgam_4t, test_data
+)
+
+results$epred_8t <- run_epred_validation(
+  "AR(1) + GP (in trend)", brms_8, mvgam_8t, test_data
+)
+
+# Test posterior_epred for Gaussian multivariate model
+cat("\n--- posterior_epred: Multivariate Gaussian ---\n")
+brms_epred_y1 <- brms::posterior_epred(brms_11, newdata = test_data_mv,
+                                        resp = "y1", incl_autocor = FALSE)
+brms_epred_y2 <- brms::posterior_epred(brms_11, newdata = test_data_mv,
+                                        resp = "y2", incl_autocor = FALSE)
+mvgam_epred_mv <- posterior_epred(mvgam_11, newdata = test_data_mv)
+
+# Check structure
+is_list_mv <- is.list(mvgam_epred_mv) && !is.matrix(mvgam_epred_mv)
+has_both_mv <- all(c("y1", "y2") %in% names(mvgam_epred_mv))
+cat(sprintf("  Returns list: %s\n", is_list_mv))
+cat(sprintf("  Has both responses: %s\n", has_both_mv))
+
+if (is_list_mv && has_both_mv) {
+  cor_y1_epred <- cor(colMeans(brms_epred_y1), colMeans(mvgam_epred_mv$y1))
+  cor_y2_epred <- cor(colMeans(brms_epred_y2), colMeans(mvgam_epred_mv$y2))
+  cat(sprintf("  y1 vs brms cor: %.4f\n", cor_y1_epred))
+  cat(sprintf("  y2 vs brms cor: %.4f\n", cor_y2_epred))
+  epred_mv_passed <- cor_y1_epred >= 0.925 && cor_y2_epred >= 0.925
+} else {
+  epred_mv_passed <- FALSE
+}
+status <- if (epred_mv_passed) "PASSED" else "FAILED"
+cat(sprintf("  Result: %s\n", status))
+results$epred_mv <- list(name = "epred_Multivariate Gaussian", passed = epred_mv_passed)
+
+# Test that epred = linkinv(linpred) for simple families
+cat("\n--- posterior_epred: linkinv consistency ---\n")
+linpred_test <- posterior_linpred(mvgam_2, newdata = test_data)
+epred_test <- posterior_epred(mvgam_2, newdata = test_data)
+# For Poisson with log link: epred = exp(linpred)
+expected_epred <- exp(linpred_test)
+linkinv_match <- all.equal(epred_test, expected_epred, tolerance = 1e-10)
+linkinv_passed <- isTRUE(linkinv_match)
+cat(sprintf("  Poisson: epred == exp(linpred): %s\n",
+            if (linkinv_passed) "TRUE" else as.character(linkinv_match)))
+cat(sprintf("  Result: %s\n", if (linkinv_passed) "PASSED" else "FAILED"))
+results$epred_linkinv <- list(name = "epred_linkinv_consistency", passed = linkinv_passed)
 
 # =============================================================================
 # SUMMARY

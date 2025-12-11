@@ -1,17 +1,17 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-12-10 13:49:54  
+**Generated:** 2025-12-11 14:18:37  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
-- **Total Files:** 60
-- **Total Functions:** 542
+- **Total Files:** 62
+- **Total Functions:** 588
 - **Exported Functions:** 57
-- **Internal Functions:** 499
-- **S3 Methods:** 41
-- **S3 Classes:** 31
+- **Internal Functions:** 545
+- **S3 Methods:** 44
+- **S3 Classes:** 32
 
 ## External Dependencies
 - bayesplot
@@ -46,7 +46,7 @@
 ## S3 Object System
 
 ### S3 Classes
-- array.mvgam, brmsformula, brmsopencl, brmsthreads, construct.mod.smooth.spec, construct.moi.smooth.spec, data.frame.mvgam, default, formula, how_to_cite, jsdgam, matrix.mod.smooth, matrix.moi.smooth, matrix.mvgam, mock_stanfit, mvgam, mvgam_fevd, mvgam_forecast, mvgam_formula, mvgam_irf, mvgam_lfo, mvgam_pooled, mvgam_pooled_summary, mvgam_prefit, mvgam_residcor, mvgam_summary, mvgam_trend, mvgamstancode, stanfit, to.ts, trend_param
+- array.mvgam, brmsformula, brmsopencl, brmsthreads, construct.mod.smooth.spec, construct.moi.smooth.spec, data.frame.mvgam, default, formula, gaussian, how_to_cite, jsdgam, matrix.mod.smooth, matrix.moi.smooth, matrix.mvgam, mock_stanfit, mvgam, mvgam_fevd, mvgam_forecast, mvgam_formula, mvgam_irf, mvgam_lfo, mvgam_pooled, mvgam_pooled_summary, mvgam_prefit, mvgam_residcor, mvgam_summary, mvgam_trend, mvgamstancode, stanfit, to.ts, trend_param
 
 ### Key S3 Methods
 - **as()**: array.mvgam, data.frame.mvgam, matrix.mvgam
@@ -139,8 +139,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/portal_data.R`** (0 functions) - Data documentation and loading
 
 ### Validation Files
-- **`R/validations.R`** (75 functions) - Input validation and checks
-  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_exact_gp_usage, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_list_trend_formula, validate_nonlinear_trend_compatibility, validate_required_variables (+ 60 more)
+- **`R/validations.R`** (76 functions) - Input validation and checks
+  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_exact_gp_usage, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_family, validate_nonlinear_trend_compatibility, validate_required_variables (+ 61 more)
 
 ### Core Files
 - **`R/summary.mvgam.R`** (24 functions) - Summary methods
@@ -165,10 +165,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: ppc, pp_check.mvgam, ppc.mvgam, ecdf_plotdat, is_like_factor
 - **`R/fevd.mvgam.R`** (4 functions)
   - Key functions: fevd, fevd.mvgam, gen_fevd, var_fecov
-- **`R/plot.mvgam.R`** (2 functions) - Plotting and visualization
-  - Key functions: plot.mvgam, plottable
 - **`R/series_to_mvgam.R`** (2 functions)
   - Key functions: series_to_mvgamxts.to.ts (+ 1 more)
+- **`R/plot.mvgam.R`** (2 functions) - Plotting and visualization
+  - Key functions: plot.mvgam, plottable
 - **`R/residuals.mvgam.R`** (1 functions) - Residual analysis
   - Key functions: residuals.mvgam
 - **`R/pairs.mvgam.R`** (1 functions)
@@ -179,47 +179,51 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### Other Files
 - **`R/trend_system.R`** (64 functions) - Trend modeling
   - Key functions: register_trend_type, list_trend_types, register_custom_trend, trend_param, is.trend_param, mvgam_trend_choices, custom_trend, create_mvgam_trend, RW, AR, CAR, VAR, GP, PW, ZMVN (+ 49 more)
+- **`R/posterior_epred.R`** (43 functions)
+  - Key functions: compute_family_epred, posterior_epred.mvgam, data2draws, dim_mu, multiply_dpar_rate_denom, posterior_epred_gaussian, posterior_epred_student, posterior_epred_skew_normal, posterior_epred_exponential, posterior_epred_gamma (+ 33 more)
 - **`R/glm_analysis.R`** (31 functions)
   - Key functions: analyze_stan, create_response_mapping, inject_trends_into_glm_calls, build_mu_with_trend_effects, to_injection, build_coefficient_addition_code, inject_trend_effects_linear, detect_glm_patterns, classify_mu_patterns, determine_glm_preservation (+ 21 more)
 - **`R/priors.R`** (28 functions) - Prior specification
   - Key functions: mvgam_formula, get_prior, extract_trend_priors, generate_trend_priors, generate_trend_priors_from_monitor_params, create_trend_parameter_prior, get_default_trend_parameter_prior, get_all_mvgam_trend_parameters, remove_trend_suffix_from_priors, build_ar_prior_spec, extract_prior_string, map_trend_priors, get_trend_parameter_prior, get_prior.default, get_prior.formula (+ 13 more)
-- **`R/mu_expression_analysis.R`** (26 functions)
-  - Key functions: extract_mu_construction_with_classification, add_glm_hidden_fixed_effects, classify_mu_expressions_structurally, create_analysis_context, classify_single_mu_expression_structurally, analyze_expression_structure, analyze_indexing_patterns_comprehensive, analyze_mathematical_operations_comprehensive, analyze_variable_relationships_comprehensive, determine_expression_type, extract_expression_variables_comprehensive, extract_comprehensive_variable_references, create_empty_mu_result, check_loop_requirement, build_execution_dependency_plan (+ 11 more)
 - **`R/backends.R`** (26 functions)
   - Key functions: is.stanfit, is.brmsthreads, validate_threads, is.brmsopencl, validate_opencl, validate_silent, repair_stanfit, is.mvgam, nlist, parse_model (+ 16 more)
+- **`R/mu_expression_analysis.R`** (26 functions)
+  - Key functions: extract_mu_construction_with_classification, add_glm_hidden_fixed_effects, classify_mu_expressions_structurally, create_analysis_context, classify_single_mu_expression_structurally, analyze_expression_structure, analyze_indexing_patterns_comprehensive, analyze_mathematical_operations_comprehensive, analyze_variable_relationships_comprehensive, determine_expression_type, extract_expression_variables_comprehensive, extract_comprehensive_variable_references, create_empty_mu_result, check_loop_requirement, build_execution_dependency_plan (+ 11 more)
 - **`R/monotonic.R`** (5 functions)
   - Key functions: smooth.construct.moi.smooth.spec, smooth.construct.mod.smooth.spec, Predict.matrix.moi.smooth, Predict.matrix.mod.smooth, add_mono_model_file
 - **`R/ensemble.R`** (4 functions)
   - Key functions: ensembleensemble.mvgam_forecast allsame split_fc_dots (+ 3 more)
 - **`R/mvgam_residcor-class.R`** (4 functions) - Class definitions and methods
   - Key functions: gather_matrix, cluster_cormat, reorder_clusters, plot.mvgam_residcor
-- **`R/mvgam_fevd-class.R`** (3 functions) - Class definitions and methods
-  - Key functions: summary.mvgam_fevd, plot.mvgam_fevd, fevd_df
-- **`R/tidier_methods.R`** (3 functions) - Method implementations
-  - Key functions: tidy.mvgam, split_hier_Sigma, augment.mvgam
 - **`R/residual_cor.R`** (3 functions) - Residual analysis
   - Key functions: residual_corresidual_cor.mvgam residual_cor.jsdgam (+ 2 more)
-- **`R/RcppExports.R`** (3 functions) - Exported functions
-  - Key functions: ar3_recursC, var1_recursC, varma_recursC
 - **`R/how_to_cite.R`** (3 functions)
   - Key functions: how_to_citeprint.how_to_cite how_to_cite.mvgam (+ 2 more)
+- **`R/tidier_methods.R`** (3 functions) - Method implementations
+  - Key functions: tidy.mvgam, split_hier_Sigma, augment.mvgam
+- **`R/mvgam_fevd-class.R`** (3 functions) - Class definitions and methods
+  - Key functions: summary.mvgam_fevd, plot.mvgam_fevd, fevd_df
+- **`R/RcppExports.R`** (3 functions) - Exported functions
+  - Key functions: ar3_recursC, var1_recursC, varma_recursC
 - **`R/ordinate.jsdgam.R`** (2 functions)
   - Key functions: ordinateordinate.jsdgam (+ 1 more)
 - **`R/mvgam_irf-class.R`** (2 functions) - Class definitions and methods
   - Key functions: summary.mvgam_irf, plot.mvgam_irf
-- **`R/stability.R`** (2 functions)
-  - Key functions: stabilitystability.mvgam (+ 1 more)
 - **`R/zzz.R`** (2 functions) - Package startup and attachment
   - Key functions: core_unloaded, mvgam_attach
+- **`R/posterior_linpred.R`** (2 functions)
+  - Key functions: get_combined_linpred, posterior_linpred.mvgam
+- **`R/stability.R`** (2 functions)
+  - Key functions: stabilitystability.mvgam (+ 1 more)
 - **`R/mvgam_forecast-class.R`** (1 functions) - Class definitions and methods
   - Key functions: summary.mvgam_forecast
-- **`R/dynamic.R`** (1 functions)
-  - Key functions: dynamic
 - **`R/lv_correlations.R`** (1 functions)
   - Key functions: lv_correlations
+- **`R/dynamic.R`** (1 functions)
+  - Key functions: dynamic
 - **`R/cpp_funs.R`** (0 functions)
-- **`R/mvgam-package.R`** (0 functions)
 - **`R/mvgam-class.R`** (0 functions) - Class definitions and methods
+- **`R/mvgam-package.R`** (0 functions)
 
 ### S3 Methods Files
 - **`R/predictions.R`** (20 functions) - Prediction methods
@@ -348,8 +352,41 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### `R/plot.mvgam.R` (1 potentially unused):
 - **plottable()** (internal, never called)
 
-### `R/predictions.R` (1 potentially unused):
-- **extract_component_linpred()** (internal, never called)
+### `R/posterior_epred.R` (34 potentially unused):
+- **posterior_epred_bernoulli()** (internal, never called)
+- **posterior_epred_beta()** (internal, never called)
+- **posterior_epred_beta_binomial()** (internal, never called)
+- **posterior_epred_binomial()** (internal, never called)
+- **posterior_epred_com_poisson()** (internal, never called)
+- **posterior_epred_discrete_weibull()** (internal, never called)
+- **posterior_epred_exgaussian()** (internal, never called)
+- **posterior_epred_exponential()** (internal, never called)
+- **posterior_epred_frechet()** (internal, never called)
+- **posterior_epred_gamma()** (internal, never called)
+- **posterior_epred_gaussian()** (internal, never called)
+- **posterior_epred_gen_extreme_value()** (internal, never called)
+- **posterior_epred_geometric()** (internal, never called)
+- **posterior_epred_hurdle_gamma()** (internal, never called)
+- **posterior_epred_hurdle_lognormal()** (internal, never called)
+- **posterior_epred_hurdle_negbinomial()** (internal, never called)
+- **posterior_epred_hurdle_poisson()** (internal, never called)
+- **posterior_epred_lognormal()** (internal, never called)
+- **posterior_epred_negbinomial()** (internal, never called)
+- **posterior_epred_negbinomial2()** (internal, never called)
+- **posterior_epred_poisson()** (internal, never called)
+- **posterior_epred_shifted_lognormal()** (internal, never called)
+- **posterior_epred_skew_normal()** (internal, never called)
+- **posterior_epred_student()** (internal, never called)
+- **posterior_epred_von_mises()** (internal, never called)
+- **posterior_epred_weibull()** (internal, never called)
+- **posterior_epred_wiener()** (internal, never called)
+- **posterior_epred_zero_inflated_asym_laplace()** (internal, never called)
+- **posterior_epred_zero_inflated_beta()** (internal, never called)
+- **posterior_epred_zero_inflated_beta_binomial()** (internal, never called)
+- **posterior_epred_zero_inflated_binomial()** (internal, never called)
+- **posterior_epred_zero_inflated_negbinomial()** (internal, never called)
+- **posterior_epred_zero_inflated_poisson()** (internal, never called)
+- **posterior_epred_zero_one_inflated_beta()** (internal, never called)
 
 ### `R/print.mvgam.R` (1 potentially unused):
 - **print_model_specification_simple()** (internal, never called)
@@ -633,6 +670,55 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### `R/plot_mvgam_uncertainty.R`:
 - **intersect_hist()** (internal)
 - **plot_mvgam_uncertainty()** (exported)
+
+### `R/posterior_epred.R`:
+- **compute_family_epred()** (internal)
+- **data2draws()** (internal)
+- **dim_mu()** (internal)
+- **mean_com_poisson()** (internal)
+- **mean_discrete_weibull()** (internal)
+- **multiply_dpar_rate_denom()** (internal)
+- **posterior_epred.mvgam()** (internal)
+- **posterior_epred_asym_laplace()** (internal)
+- **posterior_epred_bernoulli()** (internal)
+- **posterior_epred_beta()** (internal)
+- **posterior_epred_beta_binomial()** (internal)
+- **posterior_epred_binomial()** (internal)
+- **posterior_epred_com_poisson()** (internal)
+- **posterior_epred_discrete_weibull()** (internal)
+- **posterior_epred_exgaussian()** (internal)
+- **posterior_epred_exponential()** (internal)
+- **posterior_epred_frechet()** (internal)
+- **posterior_epred_gamma()** (internal)
+- **posterior_epred_gaussian()** (internal)
+- **posterior_epred_gen_extreme_value()** (internal)
+- **posterior_epred_geometric()** (internal)
+- **posterior_epred_hurdle_gamma()** (internal)
+- **posterior_epred_hurdle_lognormal()** (internal)
+- **posterior_epred_hurdle_negbinomial()** (internal)
+- **posterior_epred_hurdle_poisson()** (internal)
+- **posterior_epred_inverse.gaussian()** (internal)
+- **posterior_epred_lognormal()** (internal)
+- **posterior_epred_negbinomial()** (internal)
+- **posterior_epred_negbinomial2()** (internal)
+- **posterior_epred_poisson()** (internal)
+- **posterior_epred_shifted_lognormal()** (internal)
+- **posterior_epred_skew_normal()** (internal)
+- **posterior_epred_student()** (internal)
+- **posterior_epred_von_mises()** (internal)
+- **posterior_epred_weibull()** (internal)
+- **posterior_epred_wiener()** (internal)
+- **posterior_epred_zero_inflated_asym_laplace()** (internal)
+- **posterior_epred_zero_inflated_beta()** (internal)
+- **posterior_epred_zero_inflated_beta_binomial()** (internal)
+- **posterior_epred_zero_inflated_binomial()** (internal)
+- **posterior_epred_zero_inflated_negbinomial()** (internal)
+- **posterior_epred_zero_inflated_poisson()** (internal)
+- **posterior_epred_zero_one_inflated_beta()** (internal)
+
+### `R/posterior_linpred.R`:
+- **get_combined_linpred()** (internal)
+- **posterior_linpred.mvgam()** (internal)
 
 ### `R/ppc.mvgam.R`:
 - **ecdf_plotdat()** (internal)
@@ -933,8 +1019,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **validate_autocor_separation()** (internal)
 - **validate_factor_compatibility()** (internal)
 - **validate_factor_levels()** (internal)
+- **validate_family()** (internal)
 - **validate_grouping_arguments()** (internal)
 - **validate_grouping_structure()** (internal)
+- **validate_list_trend_formula()** (internal)
 - **validate_multivariate_series_time()** (internal)
 - **validate_multivariate_trend_constraints()** (internal)
 - **validate_mvgam_trend()** (internal)

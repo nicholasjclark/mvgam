@@ -14,7 +14,7 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - `R CMD INSTALL --preclean --no-multiarch` - Install package locally
 
 ### Documentation Memory
-- Use `Ref` and `context7` MCP servers to find relevant, up-to-date documentation when working with 3rd party libraries, as needed
+- Use `context7` MCP server to find relevant, up-to-date documentation when working with 3rd party libraries, as needed
 
 ## Architecture
 

@@ -846,3 +846,131 @@ test_that("posterior_linpred resp argument filters multivariate response", {
   n_draws <- nrow(posterior::as_draws_matrix(fit2$fit))
   expect_equal(nrow(linpred_count), n_draws)
 })
+
+# ==============================================================================
+# POSTERIOR_EPRED TESTS
+# ==============================================================================
+test_that("posterior_epred returns matrix for univariate Poisson models", {
+  epred <- posterior_epred(fit1, newdata = test_data$univariate)
+
+  # Univariate models return a matrix
+  expect_true(is.matrix(epred))
+  expect_false(is.list(epred))
+
+  # Dimensions: [ndraws x nobs]
+  n_draws <- nrow(posterior::as_draws_matrix(fit1$fit))
+  n_obs <- nrow(test_data$univariate)
+  expect_equal(nrow(epred), n_draws)
+  expect_equal(ncol(epred), n_obs)
+
+  # Poisson epred must be non-negative (response scale)
+  expect_true(all(epred >= 0))
+})
+
+test_that("posterior_epred equals exp(linpred) for Poisson models", {
+  # For Poisson with log link: E[Y] = exp(eta)
+  linpred <- posterior_linpred(fit1, newdata = test_data$univariate)
+  epred <- posterior_epred(fit1, newdata = test_data$univariate)
+
+  # Should be exact transformation
+
+  expect_equal(epred, exp(linpred), tolerance = 1e-10)
+})
+
+test_that("posterior_epred returns named list for multivariate models", {
+  epred <- posterior_epred(fit2, newdata = test_data$multivariate)
+
+  # Multivariate models return named list
+  expect_true(is.list(epred))
+  expect_false(is.matrix(epred))
+
+  # Names match response variables from mvbind(count, biomass)
+  expect_named(epred, c("count", "biomass"))
+
+  # Each element is a matrix
+  expect_true(is.matrix(epred$count))
+  expect_true(is.matrix(epred$biomass))
+
+  # Dimensions: [ndraws x n_obs_per_response]
+  n_draws <- nrow(posterior::as_draws_matrix(fit2$fit))
+  expect_equal(nrow(epred$count), n_draws)
+  expect_equal(nrow(epred$biomass), n_draws)
+
+  # Response-scale constraints: count (Poisson) must be non-negative
+  expect_true(all(epred$count >= 0))
+})
+
+test_that("posterior_epred ndraws subsetting works", {
+  epred_100 <- posterior_epred(fit1, newdata = test_data$univariate,
+                               ndraws = 100)
+
+  expect_true(is.matrix(epred_100))
+  expect_equal(nrow(epred_100), 100)
+
+  # All values still valid
+  expect_true(all(epred_100 >= 0))
+  expect_true(all(is.finite(epred_100)))
+})
+
+test_that("posterior_epred process_error toggle affects variance", {
+  epred_full <- posterior_epred(fit1, newdata = test_data$univariate,
+                                process_error = TRUE)
+  epred_mean <- posterior_epred(fit1, newdata = test_data$univariate,
+                                process_error = FALSE)
+
+  # Same dimensions
+  expect_equal(dim(epred_full), dim(epred_mean))
+
+  # process_error=FALSE should reduce or equal variance (trend fixed at mean)
+  var_full <- mean(apply(epred_full, 2, var))
+  var_mean <- mean(apply(epred_mean, 2, var))
+  expect_true(var_mean <= var_full * 1.01)
+})
+
+test_that("posterior_epred resp argument filters multivariate response", {
+  # Request single response
+  epred_count <- posterior_epred(fit2, newdata = test_data$multivariate,
+                                 resp = "count")
+
+  # Returns matrix when resp specified
+  expect_true(is.matrix(epred_count))
+  expect_false(is.list(epred_count))
+
+  n_draws <- nrow(posterior::as_draws_matrix(fit2$fit))
+  expect_equal(nrow(epred_count), n_draws)
+
+  # Poisson constraint
+  expect_true(all(epred_count >= 0))
+})
+
+test_that("posterior_epred uses training data when newdata is NULL", {
+  # Should work without explicitly passing newdata
+  epred_default <- posterior_epred(fit1)
+
+  expect_true(is.matrix(epred_default))
+  n_obs <- nrow(test_data$univariate)
+  expect_equal(ncol(epred_default), n_obs)
+})
+
+test_that("posterior_epred handles multivariate with different families", {
+  # fit2 has count (Poisson) and biomass (Gaussian implied by continuous data)
+  epred <- posterior_epred(fit2, newdata = test_data$multivariate)
+
+  # Both should be finite
+  expect_true(all(is.finite(epred$count)))
+  expect_true(all(is.finite(epred$biomass)))
+
+  # Count (Poisson) non-negative
+  expect_true(all(epred$count >= 0))
+})
+
+test_that("posterior_epred matches linpred transformation for Gaussian", {
+  # For Gaussian with identity link: E[Y] = eta (no transformation)
+  linpred <- posterior_linpred(fit2, newdata = test_data$multivariate,
+                               resp = "biomass")
+  epred <- posterior_epred(fit2, newdata = test_data$multivariate,
+                           resp = "biomass")
+
+  # Should be identical for identity link
+  expect_equal(epred, linpred, tolerance = 1e-10)
+})
