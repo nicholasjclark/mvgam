@@ -384,7 +384,7 @@ Credit Paul Bürkner and the brms development team in roxygen documentation.
 
 ---
 
-### 3.0 Implement `posterior_predict.mvgam()`
+### 3.0 Implement `posterior_predict.mvgam()` in `R/posterior_predict.R`
 
 Posterior predictive samples with observation-level noise.
 
@@ -397,7 +397,7 @@ Posterior predictive samples with observation-level noise.
     - `"negbinomial"`: `rnbinom(n, mu = epred, size = shape)` (line 522-533)
     - `"bernoulli"`: `rbinom(n, size = 1, prob = epred)` (line 507-510)
     - `"Gamma"`: `rgamma(n, shape = shape, scale = epred/shape)` (line 590-599)
-    - Additional families as needed
+    - Additional families as needed, following brms patterns (use the `r package analyzer` agent to understand brms sampling functions, and read `brms_posterior_predict_internals.R`)
   - Use **pathfinder agent** to find insertion point
 
 - [ ] **3.2 Handle distributional parameters extraction**
@@ -428,21 +428,15 @@ Posterior predictive samples with observation-level noise.
   - Ensure reproducibility with `set.seed()` documentation
   - Add roxygen2 documentation with `@export`
 
-- [ ] **3.4 Handle truncation (optional, lower priority)**
+- [ ] **3.4 Handle truncation**
   - Reference `rcontinuous()` (line 978-1003) and `rdiscrete()` (line 1015-1035)
   - Implement truncation handling if model has `trunc()` terms
-  - Can be deferred if no immediate need
 
 - [ ] **3.5 Add validation tests for `posterior_predict.mvgam()`**
-  - Test: Poisson predictions are non-negative integers
-  - Test: Bernoulli predictions are 0 or 1
-  - Test: Gaussian predictions have correct mean and sd
-  - Test: Predictions have MORE variance than epred (includes obs noise)
-  - Test: Distribution of predictions matches family
+  - Update `validate_extraction_vs_brms.R` so that ALL models are compared to brms equivalents. Think hard about ways to validate these predictions as the randomness of sampling means they won't necessarily be strongly correlated (consider using the `ks.test()` function)
 
 - [ ] **3.6 Code review for Task 3.0**
   - Use **code-reviewer agent** on all changes
-  - Verify family sampling matches brms behavior
 
 ---
 
