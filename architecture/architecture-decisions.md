@@ -57,7 +57,7 @@ mvgam(y ~ x1 + x2, trend_formula = ~ AR(), data = data)
 - Stanvars collection architecture: Returns proper brms `stanvars` collections compatible with `c()` combination method
 - Reserved word filtering: Excludes 432 Stan reserved words from renaming
 
-**Critical Integration Points**:
+**Integration Points**:
 - `generate_combined_stancode()` workflow: Parameter extraction integrated between Stage 1 (trend generation) and Stage 2 (injection)
 - Bidirectional parameter mapping: Maintains prediction compatibility with original brms parameter structure
 - Multivariate support: Handles both shared trends and response-specific trend patterns
@@ -94,7 +94,7 @@ get_prior.mvgam_formula <- function(object, data, ...) { /* trend integration */
 ```
 
 ### 6. Autocorrelation Separation Principle
-**Critical Innovation**: Distinguish observation-level correlation from State-Space dynamics
+Distinguish observation-level correlation from State-Space dynamics
 
 **Allowed Combinations**:
 ```r
@@ -236,12 +236,6 @@ as_draws.mvgam <- function(x, variable = NULL, ...) {
 }
 ```
 
-**Benefits**:
-- Minimal storage overhead
-- Parameter info always current with fit object
-- Consistent with ecosystem patterns
-- Simplified object construction
-
 ### 2. brms Method Compatibility
 **Requirement**: All brms ecosystem methods must work with mvgam objects
 **Strategy**: mvgam inherits from brmsfit, delegates to fit slot
@@ -344,13 +338,6 @@ data <- remove_mvgam_variables(data)
 - `has_mvgam_variables()`: Checks if attributes are ready for processing
 - `remove_mvgam_variables()`: Cleans up all mvgam-related attributes
 
-**Benefits**:
-- **Consistent Stan indexing**: All models use sequential time indices
-- **CAR model support**: Original time values available for distance matrices  
-- **Multivariate series creation**: Handles missing series column by creating from response structure
-- **Zero data pollution**: Original data frame completely unmodified
-- **Prediction consistency**: Same attribute creation logic for fitting and prediction
-
 ### 5. Data Ordering and Validation Architecture
 
 **Data Ordering for Stan**:
@@ -369,7 +356,7 @@ data <- remove_mvgam_variables(data)
 
 ### 7. Stanvars Combination Architecture
 
-**Critical Design Decision**: All trend generators must return proper brms "stanvars" class objects
+All trend generators must return proper brms "stanvars" class objects
 
 **Key Requirements**:
 1. **Never use** `stanvars$name <- brms::stanvar(...)` pattern
@@ -379,7 +366,7 @@ data <- remove_mvgam_variables(data)
 
 ### 8. Trend Parameter Naming Convention
 
-**Critical Design Decision**: Trend parameters (variances, ar parameters, etc..) must avoid naming conflicts with brms observation model parameters
+Trend parameters (variances, ar parameters, etc..) must avoid naming conflicts with brms observation model parameters
 
 **Naming Convention**:
 ```r
@@ -401,7 +388,7 @@ matrix[n_lv, n_lv] Sigma;              // CONFLICTS with multivariate families
 
 ### 9. Automatic Parameter Monitoring System
 
-**Critical Design Decision**: Trend objects automatically discover their own monitoring requirements using convention-based parameter generation
+Trend objects automatically discover their own monitoring requirements using convention-based parameter generation
 
 **Architecture Pattern**:
 ```r
@@ -428,7 +415,7 @@ monitor_params <- generate_monitor_params(trend_spec)
 
 ### 10. Ultra-Efficient Forecasting System
 
-**Critical Design Decision**: Forecasting system optimized for maximum runtime speed with minimal storage overhead
+Forecasting system optimized for maximum runtime speed with minimal storage overhead
 
 **Architecture Pattern**:
 ```r
@@ -524,16 +511,7 @@ for (n in 1:N) {
 // Result: mu[n] = brms_effects + trend_effects for each observation
 ```
 
-**Key Data Structures**:
-- `trend[n_trend, n_lv_trend]`: Matrix of computed trend values over time and series  
-- `times_trend[n_trend, n_lv_trend]`: Maps trend positions to time indices for mu_trend access
-- `obs_trend_time[N]`, `obs_trend_series[N]`: Map each brms observation to trend matrix position
-- `mu[N]`: brms linear predictor, extended with trend effects
-- `mu_trend[...]`: Trend intercepts/means from brms trend model
-- `Z[n_series_trend, n_lv_trend]`: Factor loadings matrix
-- `lv_trend[n_trend, n_lv_trend]`: Latent variable matrix (dynamic states)
-
-**Critical Design Decision**: The `trend` matrix contains the **final computed trend values** that get added to `mu`. The `mu_trend` array contains **trend intercepts** used during trend computation. Both components are essential for all trend models.
+The `trend` matrix contains the **final computed trend values** that get added to `mu`. The `mu_trend` array contains **trend intercepts** used during trend computation. Both components are essential for all trend models.
 
 ### Enhanced mu_trend Construction System
 
@@ -561,7 +539,7 @@ mu_trend += Intercept_trend + r_1_1_trend[J_1_trend[n]] * Z_1_1_trend[n];  // Ra
 
 **Implementation**: `extract_and_rename_stan_blocks()` uses variable-tracing to extract mu construction patterns from brms model blocks, then renames variables with `_trend` suffix for proper integration.
 
-## Critical Integration Points
+## Integration Points
 
 ### Centralized Mapping Generation Architecture
 
@@ -582,7 +560,7 @@ User Input → mvgam() → parse_multivariate_trends() → setup_brms_lightweigh
 → fit_mvgam_model() → create_mvgam_from_combined_fit()
 ```
 
-**Critical Validation Flow**:
+**Validation Flow**:
 ```
 data + trend_specs → validate_time_series_for_trends()
                   → extract_time_series_dimensions() 
@@ -658,7 +636,7 @@ trend_specs = list(
 
 ### 14. Prior Specification Using Native brms Classes
 
-**Critical Design Decision**: Use `brmsprior` class throughout rather than creating custom mvgamprior class
+**Design Decision**: Use `brmsprior` class throughout rather than creating custom mvgamprior class
 
 **Implementation Strategy**:
 - Use existing `brmsprior` data frame structure with standard columns
@@ -672,7 +650,7 @@ trend_specs = list(
 
 ### 12. Integrated Prior Generation System
 
-**Critical Design Decision**: Replace manual prior generators with convention-based dispatch using existing trend infrastructure.
+Replace manual prior generators with convention-based dispatch using existing trend infrastructure.
 
 **Architecture**: 
 - **Automated Prior Generation**: Uses `trend_obj$monitor_params` as authoritative source
@@ -704,9 +682,9 @@ trend_specs = list(
 
 ### 16. Trend Model Distribution Constraints
 
-**Critical Architectural Constraint**: All trend models are univariate Gaussian State-Space models.
+**Architectural Constraint**: All trend models are univariate Gaussian State-Space models.
 
-**Design Decision**: Trend components are ALWAYS Gaussian regardless of observation model family.
+Trend components are ALWAYS Gaussian regardless of observation model family.
 
 **Key Implications**:
 - **Likelihood Filtering**: When extracting model blocks from brms trend models, only Gaussian likelihood patterns need to be filtered (normal distribution, normal_lpdf, normal_glm_lpdf)
@@ -755,7 +733,22 @@ priors_obs_only <- get_prior(mvgam_formula(y ~ x), data = dat)
 
 **User Documentation**: Complete list of forbidden terms and rationale documented in `?mvgam_formula` with examples of correct/incorrect usage patterns.
 
-### 19. Dual-Context Function Architecture for Validation and Prediction
+### 19. Observation Family Support for Prediction Functions
+
+Multi-category families are NOT supported in mvgam.
+
+**Unsupported Families** (blocked at model specification time):
+- `categorical`, `multinomial`, `dirichlet`, `dirichlet2`, `logistic_normal`
+
+**Rationale**: These families require 3D linear predictors `[ndraws x nobs x (ncat-1)]` with one eta per category. State-Space trends are single processes that cannot be meaningfully combined with multiple category etas. Users needing these response types should use brms directly.
+
+**Supported Ordinal Families** (use 2D linpred → 3D epred):
+- `cumulative`, `sratio`, `cratio`, `acat`
+- These use single eta with threshold-based transformation to category probabilities
+
+**Implementation**: `validate_supported_family()` in `R/validations.R` blocks unsupported families during `generate_stan_components_mvgam_formula()`.
+
+### 20. Dual-Context Function Architecture for Validation and Prediction
 
 **Design Principle**: Functions that process trend metadata and data must work seamlessly in both fitting and prediction contexts to enable robust forecasting and model evaluation.
 
@@ -814,11 +807,5 @@ mvgam_object$trend_metadata <- list(
 - `extract_trend_data()`: Dual-context data extraction (R/validations.R:2671)
 - `validate_trend_setup()`: Future master validation function
 - `extract_trend_metadata()`: Future unified metadata extraction
-
-**Benefits**:
-- **User Experience**: Consistent interface across fitting and prediction
-- **Maintainability**: Single function to maintain instead of separate fitting/prediction versions
-- **Robustness**: Prediction validation uses exactly the same metadata and rules as fitting
-- **Extensibility**: New trend types automatically support both contexts
 
 **Future Applications**: This pattern should be applied to all validation and data processing functions that will need to work during prediction, including hierarchical validation, CAR special handling, and metadata-driven processing.

@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-12-11 14:21:54  
+**Generated:** 2025-12-12 12:34:48  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 63
-- **Total Functions:** 590
+- **Total Functions:** 626
 - **Exported Functions:** 57
-- **Internal Functions:** 547
+- **Internal Functions:** 583
 - **S3 Methods:** 45
 - **S3 Classes:** 32
 
@@ -39,7 +39,7 @@
 
 ### Main Entry Points
 - **Core Functions**: mvgam, series_to_mvgam, sim_mvgam
-- **Trend Types**: RW, GP, PW, VAR, CAR, ZMVN, AR
+- **Trend Types**: RW, GP, VAR, CAR, ZMVN, PW, AR
 - **Analysis Tools**: ppc, stability, fevd, irf, lfo_cv
 - **Plotting Functions**: plot_mvgam_fc, plot_mvgam_series, plot_mvgam_smooth, plot_mvgam_pterms, plot_mvgam_factors, plot_mvgam_trend, plot_mvgam_randomeffects, plot_mvgam_resids, plot_mvgam_uncertainty
 
@@ -139,8 +139,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/portal_data.R`** (0 functions) - Data documentation and loading
 
 ### Validation Files
-- **`R/validations.R`** (76 functions) - Input validation and checks
-  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_exact_gp_usage, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_family, validate_nonlinear_trend_compatibility, validate_required_variables (+ 61 more)
+- **`R/validations.R`** (77 functions) - Input validation and checks
+  - Key functions: is.mvgam_trend, apply_validation_rules, process_trend_validation_rules, dispatch_validation_rule, validate_trend_grouping, validate_trend_time_intervals, validate_regular_time_intervals, validate_brms_formula, validate_exact_gp_usage, validate_obs_formula_brms, validate_trend_formula_brms, validate_bf_trend_formula, validate_family, validate_supported_family, validate_nonlinear_trend_compatibility (+ 62 more)
 
 ### Core Files
 - **`R/summary.mvgam.R`** (24 functions) - Summary methods
@@ -177,10 +177,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: mcmc_plot.mvgam
 
 ### Other Files
+- **`R/posterior_epred.R`** (78 functions)
+  - Key functions: get_family_for_resp, compute_family_epred, posterior_epred.mvgam, extract_trials_for_family, data2draws, dim_mu, multiply_dpar_rate_denom, posterior_epred_gaussian, posterior_epred_student, posterior_epred_skew_normal (+ 68 more)
 - **`R/trend_system.R`** (64 functions) - Trend modeling
   - Key functions: register_trend_type, list_trend_types, register_custom_trend, trend_param, is.trend_param, mvgam_trend_choices, custom_trend, create_mvgam_trend, RW, AR, CAR, VAR, GP, PW, ZMVN (+ 49 more)
-- **`R/posterior_epred.R`** (43 functions)
-  - Key functions: compute_family_epred, posterior_epred.mvgam, data2draws, dim_mu, multiply_dpar_rate_denom, posterior_epred_gaussian, posterior_epred_student, posterior_epred_skew_normal, posterior_epred_exponential, posterior_epred_gamma (+ 33 more)
 - **`R/glm_analysis.R`** (31 functions)
   - Key functions: analyze_stan, create_response_mapping, inject_trends_into_glm_calls, build_mu_with_trend_effects, to_injection, build_coefficient_addition_code, inject_trend_effects_linear, detect_glm_patterns, classify_mu_patterns, determine_glm_preservation (+ 21 more)
 - **`R/priors.R`** (28 functions) - Prior specification
@@ -354,12 +354,24 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### `R/plot.mvgam.R` (1 potentially unused):
 - **plottable()** (internal, never called)
 
-### `R/posterior_epred.R` (34 potentially unused):
+### `R/posterior_epred.R` (48 potentially unused):
+- **dacat()** (internal, never called)
+- **dcratio()** (internal, never called)
+- **dcumulative()** (internal, never called)
+- **dsratio()** (internal, never called)
+- **get_counts()** (internal, never called)
+- **get_probs()** (internal, never called)
+- **posterior_epred_acat()** (internal, never called)
 - **posterior_epred_bernoulli()** (internal, never called)
 - **posterior_epred_beta()** (internal, never called)
 - **posterior_epred_beta_binomial()** (internal, never called)
 - **posterior_epred_binomial()** (internal, never called)
 - **posterior_epred_com_poisson()** (internal, never called)
+- **posterior_epred_cratio()** (internal, never called)
+- **posterior_epred_cumulative()** (internal, never called)
+- **posterior_epred_dirichlet()** (internal, never called)
+- **posterior_epred_dirichlet_multinomial()** (internal, never called)
+- **posterior_epred_dirichlet2()** (internal, never called)
 - **posterior_epred_discrete_weibull()** (internal, never called)
 - **posterior_epred_exgaussian()** (internal, never called)
 - **posterior_epred_exponential()** (internal, never called)
@@ -372,12 +384,14 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **posterior_epred_hurdle_lognormal()** (internal, never called)
 - **posterior_epred_hurdle_negbinomial()** (internal, never called)
 - **posterior_epred_hurdle_poisson()** (internal, never called)
+- **posterior_epred_logistic_normal()** (internal, never called)
 - **posterior_epred_lognormal()** (internal, never called)
 - **posterior_epred_negbinomial()** (internal, never called)
 - **posterior_epred_negbinomial2()** (internal, never called)
 - **posterior_epred_poisson()** (internal, never called)
 - **posterior_epred_shifted_lognormal()** (internal, never called)
 - **posterior_epred_skew_normal()** (internal, never called)
+- **posterior_epred_sratio()** (internal, never called)
 - **posterior_epred_student()** (internal, never called)
 - **posterior_epred_von_mises()** (internal, never called)
 - **posterior_epred_weibull()** (internal, never called)
@@ -678,18 +692,46 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 
 ### `R/posterior_epred.R`:
 - **compute_family_epred()** (internal)
+- **dacat()** (internal)
 - **data2draws()** (internal)
+- **dcategorical()** (internal)
+- **dcratio()** (internal)
+- **dcumulative()** (internal)
 - **dim_mu()** (internal)
+- **dsratio()** (internal)
+- **extract_ordinal_disc()** (internal)
+- **extract_ordinal_thresholds()** (internal)
+- **extract_trials_for_family()** (internal)
+- **get_counts()** (internal)
+- **get_family_for_resp()** (internal)
+- **get_Mu()** (internal)
+- **get_probs()** (internal)
+- **insert_refcat()** (internal)
+- **inv_link()** (internal)
+- **inv_link_acat()** (internal)
+- **inv_link_categorical()** (internal)
+- **inv_link_cratio()** (internal)
+- **inv_link_cumulative()** (internal)
+- **inv_link_sratio()** (internal)
+- **is_ordinal_family()** (internal)
+- **log_softmax()** (internal)
 - **mean_com_poisson()** (internal)
 - **mean_discrete_weibull()** (internal)
 - **multiply_dpar_rate_denom()** (internal)
 - **posterior_epred.mvgam()** (internal)
+- **posterior_epred_acat()** (internal)
 - **posterior_epred_asym_laplace()** (internal)
 - **posterior_epred_bernoulli()** (internal)
 - **posterior_epred_beta()** (internal)
 - **posterior_epred_beta_binomial()** (internal)
 - **posterior_epred_binomial()** (internal)
+- **posterior_epred_categorical()** (internal)
 - **posterior_epred_com_poisson()** (internal)
+- **posterior_epred_cratio()** (internal)
+- **posterior_epred_cumulative()** (internal)
+- **posterior_epred_dirichlet()** (internal)
+- **posterior_epred_dirichlet_multinomial()** (internal)
+- **posterior_epred_dirichlet2()** (internal)
 - **posterior_epred_discrete_weibull()** (internal)
 - **posterior_epred_exgaussian()** (internal)
 - **posterior_epred_exponential()** (internal)
@@ -703,12 +745,16 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **posterior_epred_hurdle_negbinomial()** (internal)
 - **posterior_epred_hurdle_poisson()** (internal)
 - **posterior_epred_inverse.gaussian()** (internal)
+- **posterior_epred_logistic_normal()** (internal)
 - **posterior_epred_lognormal()** (internal)
+- **posterior_epred_multinomial()** (internal)
 - **posterior_epred_negbinomial()** (internal)
 - **posterior_epred_negbinomial2()** (internal)
+- **posterior_epred_ordinal()** (internal)
 - **posterior_epred_poisson()** (internal)
 - **posterior_epred_shifted_lognormal()** (internal)
 - **posterior_epred_skew_normal()** (internal)
+- **posterior_epred_sratio()** (internal)
 - **posterior_epred_student()** (internal)
 - **posterior_epred_von_mises()** (internal)
 - **posterior_epred_weibull()** (internal)
@@ -720,6 +766,9 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **posterior_epred_zero_inflated_negbinomial()** (internal)
 - **posterior_epred_zero_inflated_poisson()** (internal)
 - **posterior_epred_zero_one_inflated_beta()** (internal)
+- **seq_cols()** (internal)
+- **slice_col()** (internal)
+- **subset_thres()** (internal)
 
 ### `R/posterior_linpred.R`:
 - **get_combined_linpred()** (internal)
@@ -1046,6 +1095,7 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **validate_single_trend_formula()** (internal)
 - **validate_stan_code()** (internal)
 - **validate_stan_code_structure()** (internal)
+- **validate_supported_family()** (internal)
 - **validate_time_series_for_trends()** (internal)
 - **validate_trend_components()** (internal)
 - **validate_trend_factor_compatibility()** (internal)
