@@ -21,7 +21,12 @@
 #' @param data Data frame or list of multiply imputed datasets
 #' @param backend Stan backend (defaults to "cmdstanr")
 #' @param combine Logical, pool multiple imputation results (default TRUE)
-#' @param family Family specification (supports all brms families)
+#' @param family Family specification. Supports most brms families including
+#'   ordinal families (see [brms::cumulative()], [brms::sratio()],
+#'   [brms::cratio()], [brms::acat()]). Multi-category families requiring
+#'   separate linear predictors for each response category are not supported:
+#'   [brms::categorical()], [brms::multinomial()], [brms::dirichlet()]. For
+#'   these response types, use brms directly.
 #' @param ... Additional arguments passed to Stan fitting
 #' @return mvgam object with dual brmsfit-like structure
 #' @export

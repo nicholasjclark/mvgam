@@ -288,25 +288,16 @@ Credit Paul Bürkner and the brms development team in roxygen documentation.
   - **Note**: Tasks 2.6.5.1-2.6.5.3 were exploratory work that informed the architecture
     decision to block multi-category families rather than implement complex 3D linpred handling
 
-- [ ] **2.6.5.6 Fix hurdle Stan code generation**
-  - Attempting the hurdle-poisson in `tasks/validate_extraction_vs_brms.R` errors:
-
-```
-  Validating combined Stan code...
-Semantic error:
-   -------------------------------------------------
-   119:      }
-   120:      // Likelihood calculations
-   121:        target += hurdle_poisson_log_lpmf(Y[n] | mu[n], hu);
-                                                   ^
-   122:    }
-   123:  
-   -------------------------------------------------
-
-Identifier 'n' not in scope.
-Error: Syntax error found! See the message above for more information.
-Called from: out$check_syntax(quiet = TRUE)
-```
+- [x] **2.6.5.6 Fix hurdle Stan code generation** ✓
+  - **Bug**: `reorganize_target_statements()` in `R/stan_polish.R` was moving
+    loop-dependent likelihood statements outside their for loops
+  - **Fix**: Added check for `\[[a-z]\]` pattern to skip extraction for
+    statements that use loop variable indexing (e.g., `Y[n]`, `mu[n]`)
+  - **Implementation**: Lines 550-556 in `R/stan_polish.R`
+  - **Tests**: Added hurdle_poisson stancode structure test to
+    `tests/testthat/test-stancode-standata.R` verifying likelihood inside for loop
+  - **Validation**: hurdle_poisson and hurdle_negbinomial pass validation in
+    `tasks/validate_extraction_vs_brms.R`
 
 - [x] **2.6.6 Port ordinal families** ✓
   - **Linpred status**: WORKING ✓
@@ -420,6 +411,7 @@ Posterior predictive samples with observation-level noise.
 
 - [ ] **3.3 Implement `posterior_predict.mvgam()` S3 method**
   - Function signature:
+  
     ```r
     posterior_predict.mvgam <- function(object, newdata = NULL,
                                         process_error = TRUE,
@@ -461,6 +453,7 @@ User-friendly interfaces with automatic summarization.
 - [ ] **4.1 Implement `predict.mvgam()` S3 method**
   - Reference `brms_posterior_predict_internals.R` lines 239-255 for `predict.brmsfit()`
   - Function signature:
+  
     ```r
     predict.mvgam <- function(object, newdata = NULL,
                               type = c("response", "link", "prediction"),
@@ -478,6 +471,7 @@ User-friendly interfaces with automatic summarization.
 
 - [ ] **4.2 Implement `fitted.mvgam()` S3 method**
   - Function signature:
+  
     ```r
     fitted.mvgam <- function(object,
                              scale = c("response", "linear"),

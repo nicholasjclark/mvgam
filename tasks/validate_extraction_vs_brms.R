@@ -1657,6 +1657,169 @@ results$epred_hp <- list(name = "epred_Hurdle Poisson family",
                           passed = hp_epred_passed,
                           cor = comp_hp_epred$cor)
 
+# -----------------------------------------------------------------------------
+# Test Hurdle Negative Binomial family
+# -----------------------------------------------------------------------------
+
+cat("\n--- Hurdle Negative Binomial family ---\n")
+
+set.seed(655)
+n_hnb <- 30
+mu_true_hnb <- exp(1.2 + 0.4 * rnorm(n_hnb))
+hu_true_hnb <- 0.35
+test_data_hnb <- data.frame(
+  y = ifelse(runif(n_hnb) < hu_true_hnb, 0,
+             rnbinom(n_hnb, mu = mu_true_hnb, size = 2)),
+  x = rnorm(n_hnb),
+  time = 1:n_hnb,
+  series = factor("s1")
+)
+
+brms_hnb <- fit_brms_cached(
+  "hurdle_negbinomial_ar1",
+  y ~ 1 + x + ar(time = time, p = 1, cov = TRUE),
+  test_data_hnb, hurdle_negbinomial()
+)
+
+mvgam_hnb <- fit_mvgam_cached(
+  "hurdle_negbinomial_ar1",
+  y ~ 1 + x, ~ AR(p = 1),
+  test_data_hnb, hurdle_negbinomial()
+)
+
+# Test posterior_linpred for Hurdle Negative Binomial
+cat("\n--- posterior_linpred: Hurdle Negative Binomial family ---\n")
+brms_linpred_hnb <- brms::posterior_linpred(brms_hnb, newdata = test_data_hnb,
+                                             incl_autocor = FALSE)
+mvgam_linpred_hnb <- posterior_linpred(mvgam_hnb, newdata = test_data_hnb)
+
+cat(sprintf("  Dimensions: brms %s, mvgam %s\n",
+            paste(dim(brms_linpred_hnb), collapse = "x"),
+            paste(dim(mvgam_linpred_hnb), collapse = "x")))
+
+brms_hnb_linpred_summ <- summarize_pred(brms_linpred_hnb)
+mvgam_hnb_linpred_summ <- summarize_pred(mvgam_linpred_hnb)
+comp_hnb_linpred <- compare_vectors(brms_hnb_linpred_summ$mean,
+                                     mvgam_hnb_linpred_summ$mean)
+cat(sprintf("  mean: cor=%.4f, rmse=%.4f\n", comp_hnb_linpred$cor,
+            comp_hnb_linpred$rmse))
+
+hnb_linpred_passed <- !is.na(comp_hnb_linpred$cor) && comp_hnb_linpred$cor >= 0.925
+status <- if (hnb_linpred_passed) "PASSED" else "FAILED"
+cat(sprintf("  Result: %s\n", status))
+results$linpred_hnb <- list(name = "linpred_Hurdle NegBinomial family",
+                             passed = hnb_linpred_passed,
+                             cor = comp_hnb_linpred$cor)
+
+# Test posterior_epred for Hurdle Negative Binomial
+cat("\n--- posterior_epred: Hurdle Negative Binomial family ---\n")
+brms_epred_hnb <- brms::posterior_epred(brms_hnb, newdata = test_data_hnb,
+                                         incl_autocor = FALSE)
+mvgam_epred_hnb <- posterior_epred(mvgam_hnb, newdata = test_data_hnb)
+
+cat(sprintf("  Dimensions: brms %s, mvgam %s\n",
+            paste(dim(brms_epred_hnb), collapse = "x"),
+            paste(dim(mvgam_epred_hnb), collapse = "x")))
+
+brms_hnb_epred_summ <- summarize_pred(brms_epred_hnb)
+mvgam_hnb_epred_summ <- summarize_pred(mvgam_epred_hnb)
+comp_hnb_epred <- compare_vectors(brms_hnb_epred_summ$mean,
+                                   mvgam_hnb_epred_summ$mean)
+cat(sprintf("  mean: cor=%.4f, rmse=%.4f\n", comp_hnb_epred$cor,
+            comp_hnb_epred$rmse))
+
+hnb_nonneg_ok <- all(mvgam_epred_hnb >= 0)
+cat(sprintf("  Values >= 0: %s\n", hnb_nonneg_ok))
+
+hnb_epred_passed <- !is.na(comp_hnb_epred$cor) && comp_hnb_epred$cor >= 0.75 &&
+                    hnb_nonneg_ok
+status <- if (hnb_epred_passed) "PASSED" else "FAILED"
+cat(sprintf("  Result: %s (threshold=0.75 for count family)\n", status))
+results$epred_hnb <- list(name = "epred_Hurdle NegBinomial family",
+                           passed = hnb_epred_passed,
+                           cor = comp_hnb_epred$cor)
+
+# -----------------------------------------------------------------------------
+# Test Zero-Inflated Poisson family
+# -----------------------------------------------------------------------------
+
+cat("\n--- Zero-Inflated Poisson family ---\n")
+
+set.seed(656)
+n_zip <- 30
+mu_true_zip <- exp(1.3 + 0.35 * rnorm(n_zip))
+zi_true <- 0.25
+test_data_zip <- data.frame(
+  y = ifelse(runif(n_zip) < zi_true, 0, rpois(n_zip, mu_true_zip)),
+  x = rnorm(n_zip),
+  time = 1:n_zip,
+  series = factor("s1")
+)
+
+brms_zip <- fit_brms_cached(
+  "zero_inflated_poisson_ar1",
+  y ~ 1 + x + ar(time = time, p = 1, cov = TRUE),
+  test_data_zip, zero_inflated_poisson()
+)
+
+mvgam_zip <- fit_mvgam_cached(
+  "zero_inflated_poisson_ar1",
+  y ~ 1 + x, ~ AR(p = 1),
+  test_data_zip, zero_inflated_poisson()
+)
+
+# Test posterior_linpred for Zero-Inflated Poisson
+cat("\n--- posterior_linpred: Zero-Inflated Poisson family ---\n")
+brms_linpred_zip <- brms::posterior_linpred(brms_zip, newdata = test_data_zip,
+                                             incl_autocor = FALSE)
+mvgam_linpred_zip <- posterior_linpred(mvgam_zip, newdata = test_data_zip)
+
+cat(sprintf("  Dimensions: brms %s, mvgam %s\n",
+            paste(dim(brms_linpred_zip), collapse = "x"),
+            paste(dim(mvgam_linpred_zip), collapse = "x")))
+
+brms_zip_linpred_summ <- summarize_pred(brms_linpred_zip)
+mvgam_zip_linpred_summ <- summarize_pred(mvgam_linpred_zip)
+comp_zip_linpred <- compare_vectors(brms_zip_linpred_summ$mean,
+                                     mvgam_zip_linpred_summ$mean)
+cat(sprintf("  mean: cor=%.4f, rmse=%.4f\n", comp_zip_linpred$cor,
+            comp_zip_linpred$rmse))
+
+zip_linpred_passed <- !is.na(comp_zip_linpred$cor) && comp_zip_linpred$cor >= 0.925
+status <- if (zip_linpred_passed) "PASSED" else "FAILED"
+cat(sprintf("  Result: %s\n", status))
+results$linpred_zip <- list(name = "linpred_Zero-Inflated Poisson family",
+                             passed = zip_linpred_passed,
+                             cor = comp_zip_linpred$cor)
+
+# Test posterior_epred for Zero-Inflated Poisson
+cat("\n--- posterior_epred: Zero-Inflated Poisson family ---\n")
+brms_epred_zip <- brms::posterior_epred(brms_zip, newdata = test_data_zip,
+                                         incl_autocor = FALSE)
+mvgam_epred_zip <- posterior_epred(mvgam_zip, newdata = test_data_zip)
+
+cat(sprintf("  Dimensions: brms %s, mvgam %s\n",
+            paste(dim(brms_epred_zip), collapse = "x"),
+            paste(dim(mvgam_epred_zip), collapse = "x")))
+
+brms_zip_epred_summ <- summarize_pred(brms_epred_zip)
+mvgam_zip_epred_summ <- summarize_pred(mvgam_epred_zip)
+comp_zip_epred <- compare_vectors(brms_zip_epred_summ$mean,
+                                   mvgam_zip_epred_summ$mean)
+cat(sprintf("  mean: cor=%.4f, rmse=%.4f\n", comp_zip_epred$cor,
+            comp_zip_epred$rmse))
+
+zip_nonneg_ok <- all(mvgam_epred_zip >= 0)
+cat(sprintf("  Values >= 0: %s\n", zip_nonneg_ok))
+
+zip_epred_passed <- !is.na(comp_zip_epred$cor) && comp_zip_epred$cor >= 0.75 &&
+                    zip_nonneg_ok
+status <- if (zip_epred_passed) "PASSED" else "FAILED"
+cat(sprintf("  Result: %s (threshold=0.75 for count family)\n", status))
+results$epred_zip <- list(name = "epred_Zero-Inflated Poisson family",
+                           passed = zip_epred_passed,
+                           cor = comp_zip_epred$cor)
+
 # =============================================================================
 # SUMMARY
 # =============================================================================

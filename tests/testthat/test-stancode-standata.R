@@ -2520,13 +2520,6 @@ mf <- mvgam_formula(y ~ x)
     ignore.case = TRUE
   )
 
-  # Test dirichlet2 family is blocked
-  expect_error(
-    stancode(mf, data = data, family = dirichlet2()),
-    regexp = "dirichlet2.*not supported",
-    ignore.case = TRUE
-  )
-
   # Test logistic_normal family is blocked
   expect_error(
     stancode(mf, data = data, family = logistic_normal()),
@@ -2572,5 +2565,40 @@ test_that("ordinal families remain supported", {
   # Adjacent category family should work
   expect_no_error(
     stancode(mf, data = data, family = acat(), validate = FALSE)
+  )
+})
+
+test_that("hurdle_poisson stancode has correct structure", {
+  data <- setup_stan_test_data()$univariate
+  mf <- mvgam_formula(y ~ x, trend_formula = ~ AR())
+
+  code <- stancode(mf, data = data, family = hurdle_poisson(), validate = FALSE)
+
+  # Hurdle function definitions should exist in functions block
+  expect_true(stan_pattern("real hurdle_poisson_lpmf", code))
+  expect_true(stan_pattern("real hurdle_poisson_log_lpmf", code))
+  expect_true(stan_pattern("real hurdle_poisson_logit_lpmf", code))
+
+  # Hurdle probability parameter should be declared
+  expect_true(stan_pattern("real<lower=0,upper=1> hu;", code))
+
+  # Prior for hu should exist
+  expect_true(stan_pattern("beta_lpdf\\(hu \\|", code))
+
+  # Likelihood must be INSIDE the for loop (this was the bug fix)
+  # The pattern ensures hurdle_poisson_log_lpmf appears after for(n in 1:N){
+  expect_true(stan_pattern(
+    "for\\(n in 1:N\\)\\{[^}]*hurdle_poisson_log_lpmf\\(Y\\[n\\]\\|mu\\[n\\],hu\\)",
+    code
+  ))
+
+  # Also verify mu is computed before the likelihood loop
+  expect_true(stan_pattern("mu\\[n\\]\\+=trend", code))
+
+  # Should pass stanc validation
+  expect_no_error(
+    stancode(
+      mf, data = data, family = hurdle_poisson(), validate = TRUE
+    )
   )
 })

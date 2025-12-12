@@ -126,7 +126,17 @@ compute_family_epred <- function(linpred, family,
     "gamma" = ,
     "negbinomial" = ,
     "negative binomial" = ,
-    "student" = family$linkinv(linpred),
+    "student" = ,
+    # Hurdle families: E[Y|Y>0] = g^-1(eta) for the count component
+    "hurdle_poisson" = ,
+    "hurdle_negbinomial" = ,
+    "hurdle_gamma" = ,
+    "hurdle_lognormal" = ,
+    # Zero-inflated families: E[Y|Y>0] = g^-1(eta) for the count component
+    "zero_inflated_poisson" = ,
+    "zero_inflated_negbinomial" = ,
+    "zero_inflated_binomial" = ,
+    "zero_inflated_beta" = family$linkinv(linpred),
 
     # Count families requiring trials: E[Y] = p * trials
     "binomial" = ,

@@ -29,9 +29,12 @@
 
 \item{data}{A data frame containing all variables referenced in the formula.}
 
-\item{family}{A family object or character string specifying the response
-distribution. If \code{object} contains embedded family specifications,
-this parameter can be omitted.}
+\item{family}{Family specification. Supports most brms families including
+ordinal families (see \code{\link[brms:brmsfamily]{brms::cumulative()}}, \code{\link[brms:brmsfamily]{brms::sratio()}},
+\code{\link[brms:brmsfamily]{brms::cratio()}}, \code{\link[brms:brmsfamily]{brms::acat()}}). Multi-category families requiring
+separate linear predictors for each response category are not supported:
+\code{\link[brms:brmsfamily]{brms::categorical()}}, \code{\link[brms:brmsfamily]{brms::multinomial()}}, \code{\link[brms:brmsfamily]{brms::dirichlet()}}. For
+these response types, use brms directly.}
 
 \item{prior}{An optional \code{brmsprior} object containing custom prior
 specifications. Can be created using \code{brms::prior()}.}

@@ -237,7 +237,6 @@ validate_supported_family <- function(family) {
     "categorical",
     "multinomial",
     "dirichlet",
-    "dirichlet2",
     "logistic_normal"
   )
 
@@ -245,12 +244,12 @@ validate_supported_family <- function(family) {
 
   if (family_name %in% unsupported_families) {
     stop(insight::format_error(
-      "Family {.field {family_name}} is not supported by mvgam.",
-      "\n\n",
-      "Multi-category families (categorical, multinomial, dirichlet, ",
-      "dirichlet2, logistic_normal) require multiple linear predictors ",
-      "(one per category) that cannot be combined with State-Space trends.",
-      "\n\n",
+      paste0("Family '", family_name, "' is not supported by mvgam."),
+      paste0(
+        "Multi-category families (categorical, multinomial, dirichlet) ",
+        "require multiple linear predictors (one per category) that ",
+        "cannot be combined with State-Space trends."
+      ),
       "For these response types, please use {.pkg brms} directly."
     ))
   }

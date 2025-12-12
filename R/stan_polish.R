@@ -509,10 +509,13 @@ reorganize_lprior_statements <- function(lines) {
 #' @return Character vector with target statements reorganized
 #'
 #' @details
-#' This function reorganizes target += statements for cosmetic purposes, moving them
-#' to the end of the if (!prior_only) block. It follows the same pattern as
-#' reorganize_lprior_statements() but operates on the model block instead of
-#' transformed parameters block.
+#' This function reorganizes target += statements for cosmetic purposes, moving
+#' them to the end of the if (!prior_only) block. It follows the same pattern
+#' as reorganize_lprior_statements() but operates on the model block.
+#'
+#' Target statements containing loop-dependent indexing (e.g., Y[n], mu[i]) are
+#' preserved in their original location to maintain loop variable scope. Only
+#' vectorized statements without element-wise indexing are reorganized.
 #'
 #' @noRd
 reorganize_target_statements <- function(lines) {
@@ -578,6 +581,14 @@ reorganize_target_statements <- function(lines) {
         } else {
           break
         }
+      }
+
+      # Skip extraction for loop-dependent target statements
+      # These must remain inside their for loop to maintain variable scope
+      full_statement <- paste(lines[statement_lines], collapse = " ")
+      if (grepl("\\[[a-z]\\]", full_statement)) {
+        i <- max(statement_lines) + 1
+        next
       }
 
       # Collect the statement text

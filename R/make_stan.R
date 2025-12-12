@@ -235,9 +235,7 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
 #'
 #' @param object An \code{mvgam_formula} object created by \code{mvgam_formula()}.
 #' @param data A data frame containing all variables referenced in the formula.
-#' @param family A family object or character string specifying the response
-#'   distribution. If \code{object} contains embedded family specifications,
-#'   this parameter can be omitted.
+#' @inheritParams mvgam
 #' @param prior An optional \code{brmsprior} object containing custom prior
 #'   specifications. Can be created using \code{brms::prior()}.
 #' @param data2 Optional data frame for out-of-sample prediction points.
@@ -340,9 +338,7 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
 #'
 #' @param object An \code{mvgam_formula} object created by \code{mvgam_formula()}.
 #' @param data A data frame containing all variables referenced in the formula.
-#' @param family A family object or character string specifying the response
-#'   distribution. If \code{object} contains embedded family specifications,
-#'   this parameter can be omitted.
+#' @inheritParams mvgam
 #' @param prior An optional \code{brmsprior} object containing custom prior
 #'   specifications. Can be created using \code{brms::prior()}.
 #' @param data2 Optional data frame for out-of-sample prediction points.

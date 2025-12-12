@@ -25,7 +25,12 @@ mvgam(
 
 \item{combine}{Logical, pool multiple imputation results (default TRUE)}
 
-\item{family}{Family specification (supports all brms families)}
+\item{family}{Family specification. Supports most brms families including
+ordinal families (see \code{\link[brms:brmsfamily]{brms::cumulative()}}, \code{\link[brms:brmsfamily]{brms::sratio()}},
+\code{\link[brms:brmsfamily]{brms::cratio()}}, \code{\link[brms:brmsfamily]{brms::acat()}}). Multi-category families requiring
+separate linear predictors for each response category are not supported:
+\code{\link[brms:brmsfamily]{brms::categorical()}}, \code{\link[brms:brmsfamily]{brms::multinomial()}}, \code{\link[brms:brmsfamily]{brms::dirichlet()}}. For
+these response types, use brms directly.}
 
 \item{...}{Additional arguments passed to Stan fitting}
 }
