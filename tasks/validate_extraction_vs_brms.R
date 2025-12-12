@@ -1460,6 +1460,203 @@ cat(sprintf("  Result: %s\n", if (binom_linkinv_passed) "PASSED" else "FAILED"))
 results$epred_binom_linkinv <- list(name = "epred_Binomial_linkinv_consistency",
                                      passed = binom_linkinv_passed)
 
+# -----------------------------------------------------------------------------
+# NOTE: Categorical family tests removed
+# Multi-category families (categorical, multinomial, dirichlet, dirichlet2,
+# logistic_normal) are not supported by mvgam because they require 3D linear
+# predictors that cannot be combined with State-Space trends.
+# Users should use brms directly for these response types.
+# See validate_supported_family() in R/validations.R
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# Test Ordinal (Cumulative) family posterior_linpred and posterior_epred
+# Ordinal linpred is 2D [ndraws x nobs] (single eta per observation)
+# Ordinal epred is 3D [ndraws x nobs x ncat] with category probabilities
+# Note: brms cumulative() doesn't support ar() terms, so we use ZMVN trend
+# -----------------------------------------------------------------------------
+
+cat("\n--- Ordinal (Cumulative) family ---\n")
+
+# Create ordinal test data with ordered factor response
+set.seed(456)
+n_ord <- 30
+# Generate ordinal response (4 ordered categories)
+latent <- 1.0 + 0.5 * rnorm(n_ord)
+# Cut points for ordinal categories
+cuts <- c(-Inf, -0.5, 0.5, 1.5, Inf)
+test_data_ord <- data.frame(
+  y = ordered(cut(latent, breaks = cuts, labels = c("Low", "Med", "High", "VHigh"))),
+  x = rnorm(n_ord),
+  z = rnorm(n_ord),
+  time = 1:n_ord,
+  series = factor("s1")
+)
+
+# Ordinal models without AR (brms doesn't support ar() for cumulative)
+brms_ord <- fit_brms_cached(
+  "cumulative_fx",
+  y ~ 1 + x + z,
+  test_data_ord, cumulative()
+)
+
+mvgam_ord <- fit_mvgam_cached(
+  "cumulative_fx",
+  y ~ 1 + x + z, ~ ZMVN(),
+  test_data_ord, cumulative()
+)
+
+# Test posterior_linpred for Ordinal
+cat("\n--- posterior_linpred: Ordinal (Cumulative) family ---\n")
+brms_linpred_ord <- brms::posterior_linpred(brms_ord, newdata = test_data_ord,
+                                             incl_autocor = FALSE)
+mvgam_linpred_ord <- posterior_linpred(mvgam_ord, newdata = test_data_ord)
+
+cat(sprintf("  brms dims: %s\n", paste(dim(brms_linpred_ord), collapse = " x ")))
+cat(sprintf("  mvgam dims: %s\n", paste(dim(mvgam_linpred_ord), collapse = " x ")))
+
+# For ordinal, linpred is 2D [ndraws x nobs] - single eta per observation
+# Verify dimensionality
+ord_linpred_is_2d <- length(dim(brms_linpred_ord)) == 2 &&
+                     length(dim(mvgam_linpred_ord)) == 2
+cat(sprintf("  Both linpred are 2D: %s\n", ord_linpred_is_2d))
+
+# Compare mean predictions
+brms_linpred_ord_mean <- colMeans(brms_linpred_ord)
+mvgam_linpred_ord_mean <- colMeans(mvgam_linpred_ord)
+ord_linpred_cor <- cor(brms_linpred_ord_mean, mvgam_linpred_ord_mean)
+cat(sprintf("  Correlation: %.4f\n", ord_linpred_cor))
+
+ord_linpred_passed <- ord_linpred_is_2d && !is.na(ord_linpred_cor) &&
+                      ord_linpred_cor >= 0.925
+status <- if (ord_linpred_passed) "PASSED" else "FAILED"
+cat(sprintf("  Result: %s\n", status))
+results$linpred_ord <- list(name = "linpred_Ordinal (Cumulative) family",
+                             passed = ord_linpred_passed,
+                             cor = ord_linpred_cor,
+                             is_2d = ord_linpred_is_2d)
+
+# Test posterior_epred for Ordinal
+cat("\n--- posterior_epred: Ordinal (Cumulative) family ---\n")
+brms_epred_ord <- brms::posterior_epred(brms_ord, newdata = test_data_ord,
+                                         incl_autocor = FALSE)
+mvgam_epred_ord <- posterior_epred(mvgam_ord, newdata = test_data_ord)
+
+cat(sprintf("  brms dims: %s\n", paste(dim(brms_epred_ord), collapse = " x ")))
+cat(sprintf("  mvgam dims: %s\n", paste(dim(mvgam_epred_ord), collapse = " x ")))
+
+# epred is 3D [ndraws x nobs x ncat] with probabilities
+ord_epred_is_3d <- length(dim(brms_epred_ord)) == 3 &&
+                   length(dim(mvgam_epred_ord)) == 3
+cat(sprintf("  Both epred are 3D: %s\n", ord_epred_is_3d))
+
+# Check probabilities sum to 1
+mvgam_ord_prob_sums <- apply(mvgam_epred_ord, 1:2, sum)
+ord_prob_sum_ok <- all(abs(mvgam_ord_prob_sums - 1) < 1e-10)
+cat(sprintf("  Probabilities sum to 1: %s\n", ord_prob_sum_ok))
+
+# Compare mean probabilities per category
+brms_epred_ord_mean <- apply(brms_epred_ord, 2:3, mean)
+mvgam_epred_ord_mean <- apply(mvgam_epred_ord, 2:3, mean)
+ord_epred_cor <- cor(as.vector(brms_epred_ord_mean), as.vector(mvgam_epred_ord_mean))
+cat(sprintf("  Overall cor (flattened): %.4f\n", ord_epred_cor))
+
+ord_epred_passed <- ord_epred_is_3d && !is.na(ord_epred_cor) &&
+                    ord_epred_cor >= 0.925 && ord_prob_sum_ok
+status <- if (ord_epred_passed) "PASSED" else "FAILED"
+cat(sprintf("  Result: %s\n", status))
+results$epred_ord <- list(name = "epred_Ordinal (Cumulative) family",
+                           passed = ord_epred_passed,
+                           cor = ord_epred_cor,
+                           is_3d = ord_epred_is_3d,
+                           prob_sum_ok = ord_prob_sum_ok)
+
+# -----------------------------------------------------------------------------
+# Test Hurdle Poisson family posterior_linpred and posterior_epred
+# E[Y] = mu / (1 - exp(-mu)) * (1 - hu)
+# -----------------------------------------------------------------------------
+
+cat("\n--- Hurdle Poisson family ---\n")
+
+# Create hurdle Poisson test data (zero-inflated counts)
+set.seed(654)
+n_hp <- 30
+# Generate data with excess zeros
+mu_true <- exp(1.5 + 0.3 * rnorm(n_hp))
+hu_true <- 0.3  # 30% chance of structural zero
+test_data_hp <- data.frame(
+  y = ifelse(runif(n_hp) < hu_true, 0, rpois(n_hp, mu_true)),
+  x = rnorm(n_hp),
+  time = 1:n_hp,
+  series = factor("s1")
+)
+
+brms_hp <- fit_brms_cached(
+  "hurdle_poisson_ar1",
+  y ~ 1 + x + ar(time = time, p = 1, cov = TRUE),
+  test_data_hp, hurdle_poisson()
+)
+
+mvgam_hp <- fit_mvgam_cached(
+  "hurdle_poisson_ar1",
+  y ~ 1 + x, ~ AR(p = 1),
+  test_data_hp, hurdle_poisson()
+)
+
+# Test posterior_linpred for Hurdle Poisson
+cat("\n--- posterior_linpred: Hurdle Poisson family ---\n")
+brms_linpred_hp <- brms::posterior_linpred(brms_hp, newdata = test_data_hp,
+                                            incl_autocor = FALSE)
+mvgam_linpred_hp <- posterior_linpred(mvgam_hp, newdata = test_data_hp)
+
+cat(sprintf("  Dimensions: brms %s, mvgam %s\n",
+            paste(dim(brms_linpred_hp), collapse = "x"),
+            paste(dim(mvgam_linpred_hp), collapse = "x")))
+
+brms_hp_linpred_summ <- summarize_pred(brms_linpred_hp)
+mvgam_hp_linpred_summ <- summarize_pred(mvgam_linpred_hp)
+comp_hp_linpred <- compare_vectors(brms_hp_linpred_summ$mean,
+                                    mvgam_hp_linpred_summ$mean)
+cat(sprintf("  mean: cor=%.4f, rmse=%.4f\n", comp_hp_linpred$cor,
+            comp_hp_linpred$rmse))
+
+hp_linpred_passed <- !is.na(comp_hp_linpred$cor) && comp_hp_linpred$cor >= 0.925
+status <- if (hp_linpred_passed) "PASSED" else "FAILED"
+cat(sprintf("  Result: %s\n", status))
+results$linpred_hp <- list(name = "linpred_Hurdle Poisson family",
+                            passed = hp_linpred_passed,
+                            cor = comp_hp_linpred$cor)
+
+# Test posterior_epred for Hurdle Poisson
+cat("\n--- posterior_epred: Hurdle Poisson family ---\n")
+brms_epred_hp <- brms::posterior_epred(brms_hp, newdata = test_data_hp,
+                                        incl_autocor = FALSE)
+mvgam_epred_hp <- posterior_epred(mvgam_hp, newdata = test_data_hp)
+
+cat(sprintf("  Dimensions: brms %s, mvgam %s\n",
+            paste(dim(brms_epred_hp), collapse = "x"),
+            paste(dim(mvgam_epred_hp), collapse = "x")))
+
+brms_hp_epred_summ <- summarize_pred(brms_epred_hp)
+mvgam_hp_epred_summ <- summarize_pred(mvgam_epred_hp)
+comp_hp_epred <- compare_vectors(brms_hp_epred_summ$mean,
+                                  mvgam_hp_epred_summ$mean)
+cat(sprintf("  mean: cor=%.4f, rmse=%.4f\n", comp_hp_epred$cor,
+            comp_hp_epred$rmse))
+
+# Check values are non-negative
+hp_nonneg_ok <- all(mvgam_epred_hp >= 0)
+cat(sprintf("  Values >= 0: %s\n", hp_nonneg_ok))
+
+# Use relaxed threshold for count models
+hp_epred_passed <- !is.na(comp_hp_epred$cor) && comp_hp_epred$cor >= 0.75 &&
+                   hp_nonneg_ok
+status <- if (hp_epred_passed) "PASSED" else "FAILED"
+cat(sprintf("  Result: %s (threshold=0.75 for count family)\n", status))
+results$epred_hp <- list(name = "epred_Hurdle Poisson family",
+                          passed = hp_epred_passed,
+                          cor = comp_hp_epred$cor)
+
 # =============================================================================
 # SUMMARY
 # =============================================================================

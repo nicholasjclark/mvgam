@@ -3,17 +3,17 @@ test_that("create_mock_stanfit validates input", {
   valid_matrix <- matrix(rnorm(20), nrow = 4, ncol = 5)
   colnames(valid_matrix) <- paste0("param_", 1:5)
   valid_draws <- posterior::as_draws_matrix(valid_matrix)
-  
+
   result <- create_mock_stanfit(valid_draws)
   expect_s3_class(result, "mock_stanfit")
   expect_equal(result$draws_cache, valid_draws)
-  
+
   # Invalid inputs
   expect_error(
     create_mock_stanfit("not_a_matrix"),
     "Must inherit from class 'draws_matrix'"
   )
-  
+
   expect_error(
     create_mock_stanfit(matrix(1:4, nrow = 2)),
     "Must inherit from class 'draws_matrix'"
@@ -30,7 +30,7 @@ test_that("has_nlpars correctly detects nonlinear formulas", {
     class = "brmsformula"
   )
   expect_false(has_nlpars(linear_formula))
-  
+
   nonlinear_formula <- structure(
     list(
       formula = structure(y ~ x, nl = TRUE),
@@ -39,7 +39,7 @@ test_that("has_nlpars correctly detects nonlinear formulas", {
     class = "brmsformula"
   )
   expect_true(has_nlpars(nonlinear_formula))
-  
+
   # Test with invalid objects
   expect_error(
     has_nlpars("not_a_formula"),
@@ -52,18 +52,18 @@ test_that("validate_monotonic_indices handles indexing correctly", {
   indices_0 <- c(0, 1, 2, 1, 0)
   result_0 <- validate_monotonic_indices(indices_0, "Xmo_1", 3, 5)
   expect_equal(result_0, c(0, 1, 2, 1, 0))
-  
+
   # Test 1-based indexing (needs conversion)
   indices_1 <- c(1, 2, 3, 2, 1)
   result_1 <- validate_monotonic_indices(indices_1, "Xmo_1", 3, 5)
   expect_equal(result_1, c(0, 1, 2, 1, 0))
-  
+
   # Test invalid range
   expect_error(
     validate_monotonic_indices(c(0, 5), "Xmo_1", 3, 2),
     "invalid index range"
   )
-  
+
   # Test wrong length
   expect_error(
     validate_monotonic_indices(c(0, 1), "Xmo_1", 3, 5),
@@ -76,20 +76,20 @@ test_that("spd_gp_exp_quad computes spectral density correctly", {
   slambda <- array(c(1, 2, 3, 4), dim = c(2, 2))
   sdgp <- c(0.5, 0.8)
   lscale <- matrix(c(1.0, 1.5, 2.0, 2.5), nrow = 2, ncol = 2)
-  
+
   result <- spd_gp_exp_quad(slambda, sdgp, lscale)
-  
+
   expect_true(is.matrix(result))
   expect_equal(dim(result), c(2, 2))  # n_draws x n_basis
   expect_true(all(result >= 0))  # Spectral density should be non-negative
   expect_true(all(is.finite(result)))
-  
+
   # Test input validation
   expect_error(
     spd_gp_exp_quad("not_array", sdgp, lscale),
     "Must be of type 'array'"
   )
-  
+
   expect_error(
     spd_gp_exp_quad(slambda, "not_numeric", lscale),
     "Must be of type 'numeric'"
@@ -840,4 +840,72 @@ test_that("posterior_epred_asym_laplace uses quantile parameter", {
   result <- posterior_epred_asym_laplace(prep)
   expected <- mu + sigma * (1 - 2 * quantile) / (quantile * (1 - quantile))
   expect_equal(result, expected)
+})
+
+# ==============================================================================
+# Ordinal and Categorical Family Helper Tests
+# ==============================================================================
+
+test_that("insert_refcat inserts reference category correctly", {
+  # Matrix input: 2 draws x 3 non-reference categories
+  eta <- matrix(c(0.5, 1.0, 1.5, 0.8, 1.2, 1.8), nrow = 2, ncol = 3)
+
+  # Insert reference at position 1 (default)
+  result1 <- insert_refcat(eta, refcat = 1)
+  expect_equal(dim(result1), c(2, 4))
+  # Reference category should be 0
+
+  expect_true(all(result1[, 1] == 0))
+  # Other columns should match original
+  expect_equal(result1[, 2:4], eta)
+
+
+  # Insert reference at position 2 (middle)
+  result2 <- insert_refcat(eta, refcat = 2)
+  expect_equal(dim(result2), c(2, 4))
+  expect_true(all(result2[, 2] == 0))
+  expect_equal(result2[, 1], eta[, 1])
+  expect_equal(result2[, 3:4], eta[, 2:3])
+
+  # Insert reference at last position
+  result4 <- insert_refcat(eta, refcat = 4)
+  expect_equal(dim(result4), c(2, 4))
+  expect_true(all(result4[, 4] == 0))
+  expect_equal(result4[, 1:3], eta)
+})
+
+test_that("log_softmax computes numerically stable softmax", {
+  # Simple test case
+  eta <- matrix(c(1, 2, 3, 4, 5, 6), nrow = 2, ncol = 3)
+  result <- log_softmax(eta)
+
+  expect_equal(dim(result), dim(eta))
+
+  # Log-probabilities should sum to 0 in log space (exp sums to 1)
+  row_logsumexp <- log(rowSums(exp(result)))
+  expect_equal(row_logsumexp, rep(0, 2), tolerance = 1e-10)
+
+  # All values should be <= 0 (log of probability)
+  expect_true(all(result <= 0))
+
+  # Test with extreme values (numerical stability)
+  eta_extreme <- matrix(c(1000, 1001, 1002), nrow = 1, ncol = 3)
+  result_extreme <- log_softmax(eta_extreme)
+  expect_true(all(is.finite(result_extreme)))
+  expect_equal(log(sum(exp(result_extreme))), 0, tolerance = 1e-10)
+})
+
+test_that("dcumulative computes ordinal probabilities correctly", {
+  # 2 draws, 3 categories (2 thresholds)
+  eta <- c(0.5, 0.8)  # Linear predictor values for 2 draws
+  thres <- matrix(c(-1, 1, -0.5, 1.5), nrow = 2, ncol = 2)  # 2 thresholds
+
+  result <- dcumulative(x = 1:3, eta = eta, thres = thres, link = "logit")
+
+  expect_equal(dim(result), c(2, 3))
+  # Probabilities should sum to 1 for each draw
+  row_sums <- rowSums(result)
+  expect_equal(row_sums, rep(1, 2), tolerance = 1e-10)
+  # All probabilities should be in [0, 1]
+  expect_true(all(result >= 0 & result <= 1))
 })

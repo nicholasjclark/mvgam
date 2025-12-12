@@ -2490,3 +2490,87 @@ test_that("stancode handles distributional regression models correctly", {
   # Final validation: ensure model compiles correctly
   expect_no_error(stancode(mf_distributional, data = data, family = gaussian(), validate = TRUE))
 })
+
+# Unsupported Family Validation Tests ----
+
+test_that("multi-category families are blocked with informative error", {
+  data <- setup_stan_test_data()$univariate
+
+  # Create a simple formula for testing
+mf <- mvgam_formula(y ~ x)
+
+  # Test categorical family is blocked
+  expect_error(
+    stancode(mf, data = data, family = categorical()),
+    regexp = "categorical.*not supported",
+    ignore.case = TRUE
+  )
+
+  # Test multinomial family is blocked
+  expect_error(
+    stancode(mf, data = data, family = multinomial()),
+    regexp = "multinomial.*not supported",
+    ignore.case = TRUE
+  )
+
+  # Test dirichlet family is blocked
+  expect_error(
+    stancode(mf, data = data, family = dirichlet()),
+    regexp = "dirichlet.*not supported",
+    ignore.case = TRUE
+  )
+
+  # Test dirichlet2 family is blocked
+  expect_error(
+    stancode(mf, data = data, family = dirichlet2()),
+    regexp = "dirichlet2.*not supported",
+    ignore.case = TRUE
+  )
+
+  # Test logistic_normal family is blocked
+  expect_error(
+    stancode(mf, data = data, family = logistic_normal()),
+    regexp = "logistic_normal.*not supported",
+    ignore.case = TRUE
+  )
+})
+
+test_that("error message directs users to brms for multi-category families", {
+  data <- setup_stan_test_data()$univariate
+  mf <- mvgam_formula(y ~ x)
+
+  # Verify error message mentions brms as alternative
+  expect_error(
+    stancode(mf, data = data, family = categorical()),
+    regexp = "brms",
+    ignore.case = TRUE
+  )
+})
+
+test_that("ordinal families remain supported", {
+  data <- setup_stan_test_data()$univariate
+
+  # Create ordered factor response for ordinal models
+  data$y_ord <- ordered(cut(data$y, breaks = 4, labels = c("low", "med", "high", "vhigh")))
+  mf <- mvgam_formula(y_ord ~ x)
+
+  # Cumulative family should work (ordinal uses 2D linpred)
+  expect_no_error(
+    stancode(mf, data = data, family = cumulative(), validate = FALSE)
+  )
+
+  # Sequential ratio family should work
+  expect_no_error(
+    stancode(mf, data = data, family = sratio(), validate = FALSE)
+  )
+
+  # Continuation ratio family should work
+  expect_no_error(
+    stancode(mf, data = data, family = cratio(), validate = FALSE)
+  )
+
+  # Adjacent category family should work
+  expect_no_error(
+    stancode(mf, data = data, family = acat(), validate = FALSE)
+  )
+})

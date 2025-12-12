@@ -85,6 +85,8 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
         "The {.field family} parameter must be a family object or function name."
       )
     }
+    # Block multi-category families that require 3D linear predictors
+    validate_supported_family(family)
   }
 
   # Parse multivariate trends and validate

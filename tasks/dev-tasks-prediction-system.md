@@ -216,18 +216,158 @@ Credit Paul Bürkner and the brms development team in roxygen documentation.
     - `hurdle_gamma`: `mu * (1 - hu)`
     - `hurdle_lognormal`: `exp(mu + sigma^2/2) * (1 - hu)`
   - `hurdle_cumulative` deferred (ordinal, returns 3D array)
+  
+- [x] **2.6.5.1 Clarify ordinal vs categorical linpred dimensionality**
+  - **Critical finding**: Task 2.6.6 description was INCORRECT
+  - **Ordinal families** (cumulative, sratio, cratio, acat):
+    - linpred is 2D `[ndraws x nobs]` - single eta per observation ✓
+    - epred is 3D `[ndraws x nobs x ncat]` - category probabilities
+    - Current mvgam implementation is CORRECT for linpred
+  - **Categorical family**:
+    - linpred is 3D `[ndraws x nobs x (ncat-1)]` - one eta per non-reference category
+    - epred is 3D `[ndraws x nobs x ncat]` - category probabilities
+    - Current mvgam returns 2D - needs fixing
+  - **Debug script**: `tasks/debug_ordinal_linpred.R` confirms these dimensions
+  - **Key structural insight**: For categorical, `prep$draws` is NULL; draws are stored in `bprepl$fe$b` for each category (muB, muC, etc.)
+  - **Verified**: `fe$b %*% t(fe$X)` approach matches brms linpred exactly (max diff: 0.0)
 
-- [ ] **2.6.6 Port ordinal families** - DEFERRED
-  - These return 3D arrays [ndraws x nobs x ncategories]
-  - Requires `posterior_epred_ordinal()` helper with threshold handling
-  - Not commonly used in mvgam ecological time series context
-  - Can be added later if needed
+- [x] **2.6.5.2 Analyze bprepl structure for categorical models**
+  - For categorical models, brms uses bprepl objects in `prep$dpars$muB`, `prep$dpars$muC`
+  - Key difference from standard models:
+    - Standard: `prep$draws` + `prep$sdata` contain all data
+    - Categorical: `prep$draws` is NULL, data is in bprepl objects
+  - **bprepl component structure** (from brms `predictor.R`):
+    - `bprepl$fe$b`: coefficient draws `[ndraws x ncoef]`
+    - `bprepl$fe$X`: design matrix `[nobs x ncoef]`
+    - `bprepl$sm$fe$Xs`, `bprepl$sm$fe$bs`: smooth fixed effects
+    - `bprepl$sm$re[[k]]$Zs`, `bprepl$sm$re[[k]]$s`: smooth random effects
+    - `bprepl$re$Z[[g]]`, `bprepl$re$r[[g]]`: random effects per group
+    - `bprepl$gp`: GP terms with `Igp` indices
+  - **brms computation pattern** (from `predictor.bprepl()`):
+    
+    ```r
+    eta = predictor_fe() + predictor_re() + predictor_sm() + predictor_gp() + predictor_offset()
+    ```
+    - Fixed effects: `tcrossprod(b, X)` → [ndraws x nobs]
+    - Smooths: same pattern with `Xs`/`bs` plus `Zs`/`s` for RE part
+    - Random effects: `Matrix::tcrossprod(r, Z)` (sparse matrix support)
+  - **Implementation approach**: Loop over bprepl components, sum contributions using tcrossprod
+  - **Reference**: [brms predictor.R](https://github.com/paul-buerkner/brms/blob/master/R/predictor.R)
 
-- [ ] **2.6.7 Port categorical/compositional families** - DEFERRED
-  - These return 3D arrays of category probabilities/counts
-  - Requires `insert_refcat()`, `dcategorical()` helpers from brms
-  - Not commonly used in mvgam ecological time series context
-  - Can be added later if needed
+- [x] **2.6.5.3 Implement DRY bprepl extraction following brms adapter pattern**
+  - **Implemented in**: `R/posterior_linpred.R` (lines 269-522)
+  - **Functions added**:
+    1. `is_categorical_family(prep)` - detects categorical via family or bprepl structure
+    2. `compute_linpred_from_bprepl(bprepl)` - computes linpred using tcrossprod pattern:
+       - Fixed effects: `tcrossprod(fe$b, fe$X)`
+       - Smooths: fixed (`sm$fe$bs/Xs`) + random (`sm$re[[k]]$s/Zs`)
+       - Random effects: `Matrix::tcrossprod(re$r[[g]], re$Z[[g]])`
+       - GPs: direct contribution from `gp$eta` or `gp$f`
+    3. `extract_linpred_categorical(prep)` - stacks into 3D `[ndraws x nobs x (ncat-1)]`
+  - **Code reviewer**: Approved with comprehensive validation
+  - **Reference**: brms predictor.bprepl() pattern
+
+- [x] **2.6.5.4 Block multi-category families at model specification time**
+  - **Architecture decision**: Multi-category families (categorical, multinomial, dirichlet,
+    dirichlet2, logistic_normal) require 3D linear predictors [ndraws x nobs x (ncat-1)].
+    State-Space trends in mvgam are single processes that cannot be meaningfully combined
+    with multiple category etas. Users should use brms directly for these families.
+  - **Implementation**: Added `validate_supported_family()` in `R/validations.R` (lines 227-259)
+    and call from `generate_stan_components_mvgam_formula()` in `R/make_stan.R` (line 89)
+  - **Error message includes**:
+    - List of unsupported families
+    - Explanation that these require multi-category linear predictors
+    - Recommendation to use brms directly for these response types
+  - **Note**: Ordinal families (cumulative, sratio, cratio, acat) ARE supported because
+    they use 2D linpred (single eta) with threshold-based transformation to 3D epred
+
+- [x] **2.6.5.5 Remove categorical bprepl extraction code**
+  - Removed functions from `R/posterior_linpred.R`:
+    - `is_categorical_family()`, `compute_linpred_from_bprepl()`, `extract_linpred_categorical()`
+  - Removed routing code from `R/predictions.R`
+  - **Note**: Tasks 2.6.5.1-2.6.5.3 were exploratory work that informed the architecture
+    decision to block multi-category families rather than implement complex 3D linpred handling
+
+- [ ] **2.6.5.6 Fix hurdle Stan code generation**
+  - Attempting the hurdle-poisson in `tasks/validate_extraction_vs_brms.R` errors:
+
+```
+  Validating combined Stan code...
+Semantic error:
+   -------------------------------------------------
+   119:      }
+   120:      // Likelihood calculations
+   121:        target += hurdle_poisson_log_lpmf(Y[n] | mu[n], hu);
+                                                   ^
+   122:    }
+   123:  
+   -------------------------------------------------
+
+Identifier 'n' not in scope.
+Error: Syntax error found! See the message above for more information.
+Called from: out$check_syntax(quiet = TRUE)
+```
+
+- [x] **2.6.6 Port ordinal families** ✓
+  - **Linpred status**: WORKING ✓
+    - Ordinal linpred: 2D `[ndraws x nobs]` - single eta per observation
+    - `posterior_linpred.mvgam()` returns correct 2D structure for ordinal models
+  - **Epred status**: WORKING ✓
+    - Returns 3D `[ndraws x nobs x ncat]` category probabilities
+    - Routing in `posterior_epred.mvgam()` detects ordinal families
+    - Extracts thresholds and disc from `object$fit` posterior draws
+    - Builds prep object and calls `posterior_epred_ordinal()`
+  - **Implementation** (in `R/posterior_epred.R`):
+    - `is_ordinal_family()`: detects ordinal family types
+    - `extract_ordinal_thresholds()`: extracts `Intercept[k]` parameters
+    - `extract_ordinal_disc()`: extracts discrimination or defaults to 1.0
+    - Ordinal density functions: `dcumulative()`, `dsratio()`, `dcratio()`, `dacat()`
+    - `posterior_epred_ordinal(prep)`: computes 3D category probabilities
+
+- [x] **2.6.6.1 Extract threshold parameters from posterior draws**
+  - **Implemented in** `R/posterior_epred.R` (lines 832-979):
+    - `is_ordinal_family(family)` - checks if family is ordinal
+    - `extract_ordinal_thresholds(object, ndraws)` - extracts threshold matrix
+    - `extract_ordinal_disc(object, ndraws, nobs)` - extracts discrimination
+  - Uses `posterior::as_draws_matrix()` for consistency with codebase
+  - Consistent `seq_len(ndraws)` subsampling between functions
+  - Returns matrix `[ndraws x nthres]` where nthres = ncat - 1
+  - Disc defaults to 1.0 if not present in model
+
+- [x] **2.6.6.2 Add ordinal detection and routing in posterior_epred.mvgam()**
+  - **Implemented in** `R/posterior_epred.R` (lines 332-386):
+    - Check if family is ordinal via `is_ordinal_family(family)`
+    - Build prep object with `mu`, `thres`, `disc` from extraction functions
+    - Validate dimensions match between linpred and extracted parameters
+    - Route to `posterior_epred_ordinal(prep)` for 3D output
+  - Handles multivariate case: errors if resp not specified for ordinal families
+
+- [x] **2.6.6.3 Add ordinal cases to compute_family_epred() as fallback**
+  - **Implemented in** `R/posterior_epred.R` (lines 170-179):
+    - Added cumulative, sratio, cratio, acat to switch statement
+    - Throws informative error directing to threshold-based approach
+    - Prevents silent incorrect results from `linkinv()` fallback
+
+- [x] **2.6.6.4 Validate ordinal epred against brms**
+  - Validation passed: `Success! Dims: 10 x 30 x 3`
+  - Returns correct 3D output: `[ndraws x nobs x ncat]`
+  - Key fixes applied during validation:
+    - Changed extraction to use `object$fit` instead of `object$model_output`
+    - Fixed threshold pattern from `^b_Intercept\\[` to `^Intercept\\[\\d+\\]$`
+    - Added `drop()` calls in `dcumulative()` for 1-column matrix handling
+
+- [x] **2.6.7 Multi-category families** - CANCELLED (not supported in mvgam)
+  - **Architecture decision**: Multi-category families (categorical, multinomial, dirichlet,
+    dirichlet2, logistic_normal) are NOT supported in mvgam because:
+    - They require 3D linear predictors [ndraws x nobs x (ncat-1)]
+    - State-Space trends are single processes incompatible with multi-category etas
+    - Broadcasting trend to all categories would be statistically inappropriate
+  - **Resolution**: Block at model specification time (task 2.6.5.4) with error
+    directing users to brms for these response types
+  - **Note**: Ordinal families (cumulative, sratio, cratio, acat) ARE supported
+    because they use single eta with threshold transformation
+  - **Epred functions remain** (may be useful if pure brms models without trends):
+    - `posterior_epred_categorical()`, `posterior_epred_multinomial()`, etc.
 
 - [x] **2.6.8 Port helper functions**
   - `data2draws()`: expand data to draws dimension (lines 349-373)

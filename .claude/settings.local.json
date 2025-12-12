@@ -43,7 +43,9 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(R CMD INSTALL:*)",
       "Bash(claude mcp add:*)",
-      "mcp__github__get_file_contents"
+      "mcp__github__get_file_contents",
+      "mcp__context7__get-library-docs",
+      "mcp__github__search_code"
     ],
     "deny": [],
     "ask": [],

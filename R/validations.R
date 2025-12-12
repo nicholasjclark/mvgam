@@ -210,6 +210,55 @@ validate_family <- function(family, link = NULL) {
   stop("family not recognized", call. = FALSE)
 }
 
+
+#' Validate Family is Supported by mvgam
+#'
+#' @description
+#' Checks that the family is supported by mvgam. Multi-category families
+#' (categorical, multinomial, dirichlet, etc.) are not supported because
+#' they require 3D linear predictors that cannot be combined with
+#' State-Space trend components.
+#'
+#' @param family A family or brmsfamily object
+#'
+#' @return Invisible TRUE if valid, stops with error if unsupported
+#'
+#' @noRd
+validate_supported_family <- function(family) {
+  checkmate::assert(
+    checkmate::check_class(family, "family"),
+    checkmate::check_class(family, "brmsfamily"),
+    combine = "or"
+  )
+
+  # Multi-category families require K-1 linear predictors per observation,
+  # which cannot be combined with single-process State-Space trends
+  unsupported_families <- c(
+    "categorical",
+    "multinomial",
+    "dirichlet",
+    "dirichlet2",
+    "logistic_normal"
+  )
+
+  family_name <- family$family
+
+  if (family_name %in% unsupported_families) {
+    stop(insight::format_error(
+      "Family {.field {family_name}} is not supported by mvgam.",
+      "\n\n",
+      "Multi-category families (categorical, multinomial, dirichlet, ",
+      "dirichlet2, logistic_normal) require multiple linear predictors ",
+      "(one per category) that cannot be combined with State-Space trends.",
+      "\n\n",
+      "For these response types, please use {.pkg brms} directly."
+    ))
+  }
+
+  invisible(TRUE)
+}
+
+
 #' Validate Nonlinear Trend Compatibility
 #'
 #' @description
