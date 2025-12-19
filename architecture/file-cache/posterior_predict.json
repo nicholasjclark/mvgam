@@ -6,6 +6,8 @@
                    },
     "functions":  [
                       "sample_from_family",
+                      "get_family_dpars",
+                      "extract_dpars_from_stanfit",
                       "posterior_predict.mvgam"
                   ],
     "purpose":  "Prediction methods",
@@ -13,8 +15,10 @@
 
                               },
     "function_signatures":  {
-                                "sample_from_family":  "sample_from_family \u003c- function(family_name, ndraws, epred, sigma = NULL, shape = NULL, trials = NULL, hu = NULL, zi = NULL) {",
-                                "posterior_predict.mvgam":  "posterior_predict.mvgam \u003c- function(object, newdata = NULL, process_error = TRUE, ndraws = NULL, re_formula = NULL, allow_new_levels = FALSE, sample_new_levels = \"uncertainty\", resp = NULL, ...) {"
+                                "sample_from_family":  "sample_from_family \u003c- function(family_name, ndraws, epred, sigma = NULL, shape = NULL, nu = NULL, trials = NULL, hu = NULL, zi = NULL, zoi = NULL, coi = NULL, alpha = NULL, ndt = NULL, xi = NULL, quantile = NULL, kappa = NULL, beta = NULL, bs = NULL, bias = NULL, disc = NULL, thres = NULL, link = \"logit\") {",
+                                "get_family_dpars":  "get_family_dpars \u003c- function(family_name) {",
+                                "posterior_predict.mvgam":  "posterior_predict.mvgam \u003c- function(object, newdata = NULL, process_error = TRUE, ndraws = NULL, re_formula = NULL, allow_new_levels = FALSE, sample_new_levels = \"uncertainty\", resp = NULL, ...) {",
+                                "extract_dpars_from_stanfit":  "extract_dpars_from_stanfit \u003c- function(stanfit, dpar_names, ndraws, nobs, draw_ids = NULL) {"
                             },
     "file":  "R/posterior_predict.R"
 }

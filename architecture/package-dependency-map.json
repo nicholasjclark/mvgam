@@ -586,6 +586,19 @@
                                                                    "is_s3_method":  false,
                                                                    "arguments":  "formula"
                                                                },
+                              "extract_dpars_from_stanfit":  {
+                                                                 "s3_class":  "",
+                                                                 "s3_method":  "",
+                                                                 "signature":  "extract_dpars_from_stanfit \u003c- function(stanfit, dpar_names, ndraws, nobs, draw_ids = NULL) {",
+                                                                 "is_s3_method":  false,
+                                                                 "arguments":  [
+                                                                                   "stanfit",
+                                                                                   "dpar_names",
+                                                                                   "ndraws",
+                                                                                   "nobs",
+                                                                                   "draw_ids"
+                                                                               ]
+                                                             },
                               "sort_stanvars":  {
                                                     "s3_class":  "",
                                                     "s3_method":  "",
@@ -3622,6 +3635,13 @@
                                                            "is_s3_method":  false,
                                                            "arguments":  null
                                                        },
+                              "get_family_dpars":  {
+                                                       "s3_class":  "",
+                                                       "s3_method":  "",
+                                                       "signature":  "get_family_dpars \u003c- function(family_name) {",
+                                                       "is_s3_method":  false,
+                                                       "arguments":  "family_name"
+                                                   },
                               "create_response_mapping":  {
                                                               "s3_class":  "",
                                                               "s3_method":  "",
@@ -3827,7 +3847,7 @@
                               "sample_from_family":  {
                                                          "s3_class":  "",
                                                          "s3_method":  "",
-                                                         "signature":  "sample_from_family \u003c- function(family_name, ndraws, epred, sigma = NULL, shape = NULL, trials = NULL, hu = NULL, zi = NULL) {",
+                                                         "signature":  "sample_from_family \u003c- function(family_name, ndraws, epred, sigma = NULL, shape = NULL, nu = NULL, trials = NULL, hu = NULL, zi = NULL, zoi = NULL, coi = NULL, alpha = NULL, ndt = NULL, xi = NULL, quantile = NULL, kappa = NULL, beta = NULL, bs = NULL, bias = NULL, disc = NULL, thres = NULL, link = \"logit\") {",
                                                          "is_s3_method":  false,
                                                          "arguments":  [
                                                                            "family_name",
@@ -3835,9 +3855,23 @@
                                                                            "epred",
                                                                            "sigma",
                                                                            "shape",
+                                                                           "nu",
                                                                            "trials",
                                                                            "hu",
-                                                                           "zi"
+                                                                           "zi",
+                                                                           "zoi",
+                                                                           "coi",
+                                                                           "alpha",
+                                                                           "ndt",
+                                                                           "xi",
+                                                                           "quantile",
+                                                                           "kappa",
+                                                                           "beta",
+                                                                           "bs",
+                                                                           "bias",
+                                                                           "disc",
+                                                                           "thres",
+                                                                           "link"
                                                                        ]
                                                      },
                               "as_draws_array.mvgam":  {
@@ -5949,7 +5983,6 @@
                                          "posterior_epred_hurdle_gamma":  "R/posterior_epred.R",
                                          "posterior_epred_student":  "R/posterior_epred.R",
                                          "validate_stan_code_structure":  "R/validations.R",
-                                         "posterior_epred_discrete_weibull":  "R/posterior_epred.R",
                                          "posterior_epred_negbinomial2":  "R/posterior_epred.R",
                                          "print_model_specification_simple":  "R/print.mvgam.R",
                                          "posterior_epred_zero_inflated_negbinomial":  "R/posterior_epred.R",
@@ -6009,7 +6042,7 @@
                                          "posterior_epred_dirichlet_multinomial":  "R/posterior_epred.R",
                                          "posterior_epred_dirichlet2":  "R/posterior_epred.R",
                                          "posterior_epred_gaussian":  "R/posterior_epred.R",
-                                         "sample_from_family":  "R/posterior_predict.R",
+                                         "posterior_epred_discrete_weibull":  "R/posterior_epred.R",
                                          "posterior_epred_zero_inflated_poisson":  "R/posterior_epred.R",
                                          "posterior_epred_com_poisson":  "R/posterior_epred.R",
                                          "get_trend_info":  "R/trend_system.R",
@@ -6471,6 +6504,8 @@
                                                   ],
                         "R/posterior_predict.R":  [
                                                       "sample_from_family",
+                                                      "get_family_dpars",
+                                                      "extract_dpars_from_stanfit",
                                                       "posterior_predict.mvgam"
                                                   ],
                         "R/portal_data.R":  [
@@ -7172,6 +7207,7 @@
                       "plottable":  "R/plot.mvgam.R",
                       "validate_exact_gp_usage":  "R/validations.R",
                       "is.stanfit":  "R/backends.R",
+                      "ZMVN":  "R/trend_system.R",
                       "mvgam_attach":  "R/zzz.R",
                       "generate_rw_monitor_params":  "R/trend_system.R",
                       "posterior_epred_cumulative":  "R/posterior_epred.R",
@@ -7185,6 +7221,7 @@
                       "analyze_variable_relationships_comprehensive":  "R/mu_expression_analysis.R",
                       "validate_trend_time_intervals":  "R/validations.R",
                       "var_trend_properties":  "R/trend_system.R",
+                      "as_draws_matrix.mvgam":  "R/as.data.frame.mvgam.R",
                       "create_mock_stanfit":  "R/mock-stanfit.R",
                       "is_nonlinear_formula":  "R/validations.R",
                       "plot_mvgam_pterms":  "R/plot_mvgam_pterms.R",
@@ -7541,7 +7578,7 @@
                       "extract_trials_for_family":  "R/posterior_epred.R",
                       "summary.mvgam_fevd":  "R/mvgam_fevd-class.R",
                       "create_mvgam_trend":  "R/trend_system.R",
-                      "as_draws_matrix.mvgam":  "R/as.data.frame.mvgam.R",
+                      "extract_dpars_from_stanfit":  "R/posterior_predict.R",
                       "generate_ar_trend_stanvars":  "R/stan_assembly.R",
                       "detect_glm_patterns":  "R/glm_analysis.R",
                       "parse_base_formula_safe":  "R/validations.R",
@@ -7552,7 +7589,7 @@
                       "as_draws_matrix.mock_stanfit":  "R/mock-stanfit.R",
                       "prepare_predictions.mock_stanfit":  "R/mock-stanfit.R",
                       "get_ar_parameter_prior":  "R/priors.R",
-                      "ZMVN":  "R/trend_system.R",
+                      "get_family_dpars":  "R/posterior_predict.R",
                       "posterior_epred_wiener":  "R/posterior_epred.R",
                       "extract_nonlinear_components":  "R/brms_integration.R",
                       "filter_trend_priors":  "R/priors.R",
@@ -7643,6 +7680,7 @@
                                      "posterior_epred_inverse.gaussian":  "R/posterior_epred.R",
                                      "get_brms_re_mapping":  "R/mock-stanfit.R",
                                      "validate_nonlinear_trend_compatibility":  "R/validations.R",
+                                     "extract_dpars_from_stanfit":  "R/posterior_predict.R",
                                      "sort_stanvars":  "R/stan_assembly.R",
                                      "get_trend_info":  "R/trend_system.R",
                                      "residuals.mvgam":  "R/residuals.mvgam.R",
@@ -7923,6 +7961,7 @@
                                      "patterns":  "R/validations.R",
                                      "xts.to.ts":  "R/series_to_mvgam.R",
                                      "detect_glm_patterns":  "R/glm_analysis.R",
+                                     "get_family_dpars":  "R/posterior_predict.R",
                                      "create_response_mapping":  "R/glm_analysis.R",
                                      "seq_cols":  "R/posterior_epred.R",
                                      "split_fc_dots":  "R/ensemble.R",
@@ -8376,6 +8415,7 @@
                                 "generate_stan_components_mvgam_formula":  "generate_stan_components_mvgam_formula \u003c- function(formula, data, family = gaussian(), prior = NULL, data2 = NULL, sample_prior = \"no\", sparse = NULL, knots = NULL, drop_unused_levels = TRUE, backend = \"rstan\", threads = getOption(\"mc.cores\", 1), normalize = TRUE, save_model = NULL, stan_funs = NULL, silent = 1L, stanvars = NULL, validate = TRUE, ...) {",
                                 "plottable":  "plottable = function(x) {",
                                 "validate_exact_gp_usage":  "validate_exact_gp_usage \u003c- function(formula) {",
+                                "ZMVN":  "ZMVN = function(time = NA, series = NA, gr = NA, subgr = NA, n_lv = NULL) {",
                                 "mvgam_attach":  "mvgam_attach \u003c- function() {",
                                 "generate_rw_monitor_params":  "generate_rw_monitor_params \u003c- function(trend_spec) {",
                                 "posterior_epred_cumulative":  "posterior_epred_cumulative \u003c- function(prep) {",
@@ -8389,6 +8429,7 @@
                                 "analyze_variable_relationships_comprehensive":  "analyze_variable_relationships_comprehensive \u003c- function(expr) {",
                                 "validate_trend_time_intervals":  "validate_trend_time_intervals \u003c- function(trend_spec, data) {",
                                 "var_trend_properties":  "var_trend_properties \u003c- function() {",
+                                "as_draws_matrix.mvgam":  "as_draws_matrix.mvgam \u003c- function( x, variable = NULL, regex = FALSE, inc_warmup = FALSE, use_alias = TRUE, ... ) {",
                                 "create_mock_stanfit":  "create_mock_stanfit \u003c- function(draws_matrix) {",
                                 "is_nonlinear_formula":  "is_nonlinear_formula \u003c- function(formula) {",
                                 "plot_mvgam_pterms":  "plot_mvgam_pterms = function(object, trend_effects = FALSE) {",
@@ -8585,7 +8626,7 @@
                                 "compiled_model":  "compiled_model \u003c- function(x) {",
                                 "error":  "error = function(e) NULL",
                                 "gen_irf":  "gen_irf \u003c- function(x, h = 6, cumulative = TRUE, orthogonal = FALSE) {",
-                                "sample_from_family":  "sample_from_family \u003c- function(family_name, ndraws, epred, sigma = NULL, shape = NULL, trials = NULL, hu = NULL, zi = NULL) {",
+                                "sample_from_family":  "sample_from_family \u003c- function(family_name, ndraws, epred, sigma = NULL, shape = NULL, nu = NULL, trials = NULL, hu = NULL, zi = NULL, zoi = NULL, coi = NULL, alpha = NULL, ndt = NULL, xi = NULL, quantile = NULL, kappa = NULL, beta = NULL, bs = NULL, bias = NULL, disc = NULL, thres = NULL, link = \"logit\") {",
                                 "remove_duplicate_functions":  "remove_duplicate_functions \u003c- function(functions_list) {",
                                 "as_draws_array.mvgam":  "as_draws_array.mvgam \u003c- function( x, variable = NULL, regex = FALSE, inc_warmup = FALSE, use_alias = TRUE, ... ) {",
                                 "classify_mu_patterns":  "classify_mu_patterns \u003c- function(stan_code, glm_patterns) {",
@@ -8746,7 +8787,7 @@
                                 "extract_trials_for_family":  "extract_trials_for_family \u003c- function(object, family, newdata) {",
                                 "summary.mvgam_fevd":  "summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {",
                                 "create_mvgam_trend":  "create_mvgam_trend \u003c- function(trend_type, ..., .time = NULL, .series = NULL, .gr = NULL, .subgr = NULL, .cap = NULL, .validation_rules = NULL) {",
-                                "as_draws_matrix.mvgam":  "as_draws_matrix.mvgam \u003c- function( x, variable = NULL, regex = FALSE, inc_warmup = FALSE, use_alias = TRUE, ... ) {",
+                                "extract_dpars_from_stanfit":  "extract_dpars_from_stanfit \u003c- function(stanfit, dpar_names, ndraws, nobs, draw_ids = NULL) {",
                                 "validate_trend_formula_brms":  "validate_trend_formula_brms \u003c- function(trend_formula) {",
                                 "generate_ar_trend_stanvars":  "generate_ar_trend_stanvars \u003c- function(trend_specs, data_info, prior = NULL) {",
                                 "detect_glm_patterns":  "detect_glm_patterns \u003c- function(stan_code) {",
@@ -8758,7 +8799,7 @@
                                 "as_draws_matrix.mock_stanfit":  "as_draws_matrix.mock_stanfit \u003c- function(x, ...) {",
                                 "prepare_predictions.mock_stanfit":  "prepare_predictions.mock_stanfit \u003c- function(object, brmsfit, newdata = NULL, re_formula = NULL, allow_new_levels = FALSE, sample_new_levels = \"uncertainty\", ...) {",
                                 "get_ar_parameter_prior":  "get_ar_parameter_prior \u003c- function(param_name, trend_obj) {",
-                                "ZMVN":  "ZMVN = function(time = NA, series = NA, gr = NA, subgr = NA, n_lv = NULL) {",
+                                "get_family_dpars":  "get_family_dpars \u003c- function(family_name) {",
                                 "posterior_epred_wiener":  "posterior_epred_wiener \u003c- function(prep) {",
                                 "extract_nonlinear_components":  "extract_nonlinear_components \u003c- function(formula) {",
                                 "filter_trend_priors":  "filter_trend_priors \u003c- function(combined_priors) {",
@@ -9694,22 +9735,22 @@
                                                    "rstantools",
                                                    "tibble"
                                                ],
-                     "generated":  "2025-12-12 13:36:12",
+                     "generated":  "2025-12-19 14:25:49",
                      "commit_hash":  "pending",
-                     "cached_files":  58,
+                     "cached_files":  62,
                      "version":  "2.0.0",
                      "commit_message":  "pre-commit analysis",
                      "unanalyzed_functions":  0,
-                     "total_functions":  626,
+                     "total_functions":  628,
                      "exported_functions":  57,
                      "s3_methods_count":  45,
                      "s3_classes_count":  32,
                      "dynamic_references":  39,
                      "package_name":  "mvgam",
-                     "potentially_unused_functions":  86,
-                     "changed_files":  5,
+                     "potentially_unused_functions":  85,
+                     "changed_files":  1,
                      "total_files":  63,
-                     "zero_dependency_functions":  538
+                     "zero_dependency_functions":  540
                  },
     "dependencies":  {
 

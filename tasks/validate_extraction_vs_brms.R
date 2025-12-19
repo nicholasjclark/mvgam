@@ -1939,6 +1939,220 @@ results$dpars_zip <- run_dpars_validation(
   "ZI Poisson (zi)", brms_zip, mvgam_zip, test_data_zip, c("zi")
 )
 
+
+# =============================================================================
+# POSTERIOR_PREDICT.MVGAM VALIDATION
+# Tests the new S3 method against brms::posterior_predict()
+# =============================================================================
+
+cat("\n\n")
+cat("============================================================\n")
+cat("POSTERIOR_PREDICT.MVGAM VALIDATION\n")
+cat("============================================================\n")
+
+#' Run validation using posterior_predict.mvgam() S3 method
+#' posterior_predict includes observation noise, so we expect:
+#' 1. Lower correlation than posterior_epred (stochastic sampling)
+#' 2. var(predict) > var(epred) for most families
+#' 3. Integer values for count families
+run_predict_validation <- function(test_name, brms_fit, mvgam_fit, newdata,
+                                   ndraws = 500, incl_autocor = FALSE) {
+  cat("\n--- posterior_predict:", test_name, "---\n")
+
+  # Get predictions via S3 methods (use same ndraws for fair comparison)
+  set.seed(123)
+  brms_pred <- brms::posterior_predict(brms_fit, newdata = newdata,
+                                       ndraws = ndraws,
+                                       incl_autocor = incl_autocor)
+  set.seed(123)
+  mvgam_pred <- posterior_predict(mvgam_fit, newdata = newdata, ndraws = ndraws)
+
+  # Check dimensions
+  if (!identical(dim(brms_pred), dim(mvgam_pred))) {
+    cat("  FAIL: Dimension mismatch\n")
+    cat("    brms:", dim(brms_pred), "\n")
+    cat("    mvgam:", dim(mvgam_pred), "\n")
+    return(list(name = paste0("predict_", test_name), passed = FALSE,
+                reason = "dim_mismatch"))
+  }
+  cat("  Dimensions match:", dim(brms_pred), "\n")
+
+  # Compare summary statistics across observations
+  brms_summ <- summarize_pred(brms_pred)
+  mvgam_summ <- summarize_pred(mvgam_pred)
+
+  stats <- c("mean", "median", "sd")
+  stat_results <- lapply(stats, function(s) {
+    compare_vectors(brms_summ[[s]], mvgam_summ[[s]])
+  })
+  names(stat_results) <- stats
+
+  for (s in stats) {
+    r <- stat_results[[s]]
+    if (isTRUE(r$mismatch)) {
+      cat(sprintf("  %s: MISMATCH\n", s))
+    } else if (r$constant) {
+      cat(sprintf("  %s: constant, diff = %.6f\n", s, r$rmse))
+    } else {
+      cat(sprintf("  %s: cor=%.4f, rmse=%.4f\n", s, r$cor, r$rmse))
+    }
+  }
+
+  # Family-specific checks
+  family_name <- mvgam_fit$family$family
+  scale_check <- TRUE
+
+  # Check integer values for count families
+  integer_families <- c("poisson", "negbinomial", "negative_binomial",
+                        "binomial", "beta_binomial",
+                        "hurdle_poisson", "hurdle_negbinomial",
+                        "zero_inflated_poisson", "zero_inflated_negbinomial",
+                        "zero_inflated_binomial")
+  if (family_name %in% integer_families) {
+    mvgam_is_int <- all(mvgam_pred == floor(mvgam_pred))
+    brms_is_int <- all(brms_pred == floor(brms_pred))
+    if (!mvgam_is_int) {
+      cat("  WARNING: mvgam predictions are not integers\n")
+      scale_check <- FALSE
+    } else {
+      cat("  Integer check: OK (all predictions are integers)\n")
+    }
+  }
+
+  # Check non-negative for count/positive families
+  nonneg_families <- c("poisson", "negbinomial", "negative_binomial",
+                       "gamma", "lognormal", "exponential",
+                       "hurdle_poisson", "hurdle_negbinomial", "hurdle_gamma",
+                       "hurdle_lognormal",
+                       "zero_inflated_poisson", "zero_inflated_negbinomial")
+  if (family_name %in% nonneg_families) {
+    if (any(mvgam_pred < 0)) {
+      cat("  WARNING: mvgam predictions contain negative values\n")
+      scale_check <- FALSE
+    } else {
+      cat("  Non-negative check: OK\n")
+    }
+  }
+
+  # Compare variance to epred (predict should have more variance)
+  set.seed(456)
+  mvgam_epred <- posterior_epred(mvgam_fit, newdata = newdata, ndraws = ndraws)
+  var_predict <- var(as.vector(mvgam_pred))
+  var_epred <- var(as.vector(mvgam_epred))
+  var_ratio <- var_predict / var_epred
+
+  cat(sprintf("  Variance: predict=%.2f, epred=%.2f, ratio=%.2f\n",
+              var_predict, var_epred, var_ratio))
+  if (var_ratio < 1.0) {
+    cat("  WARNING: var(predict) < var(epred), expected more variance\n")
+  }
+
+  # Relaxed threshold for posterior_predict due to sampling noise
+  # Mean predictions should still correlate reasonably well
+  cor_threshold <- 0.70
+
+  mean_r <- stat_results$mean
+  if (isTRUE(mean_r$mismatch)) {
+    passed <- FALSE
+  } else if (mean_r$constant) {
+    passed <- scale_check
+  } else {
+    passed <- mean_r$cor >= cor_threshold && scale_check
+  }
+
+  status <- if (passed) "PASSED" else "FAILED"
+  cat(sprintf("  Result: %s (mean cor=%.3f, threshold=%.2f)\n",
+              status, ifelse(mean_r$constant, NA, mean_r$cor), cor_threshold))
+
+  list(name = paste0("predict_", test_name), passed = passed,
+       stats = stat_results, var_ratio = var_ratio)
+}
+
+# Test posterior_predict.mvgam() for Poisson models
+cat("\n--- Testing Poisson family ---\n")
+results$predict_1 <- run_predict_validation(
+  "Intercept-only AR(1)", brms_1, mvgam_1, test_data
+)
+results$predict_2 <- run_predict_validation(
+  "AR(1) + fixed effect", brms_2, mvgam_2, test_data
+)
+results$predict_4 <- run_predict_validation(
+  "AR(1) + fixed + random + smooth", brms_4, mvgam_4, test_data
+)
+results$predict_8 <- run_predict_validation(
+  "AR(1) + GP", brms_8, mvgam_8, test_data
+)
+
+# Test posterior_predict for trend-formula models
+cat("\n--- Testing trend-formula models ---\n")
+results$predict_2t <- run_predict_validation(
+  "AR(1) + fixed (in trend)", brms_2, mvgam_2t, test_data
+)
+results$predict_4t <- run_predict_validation(
+  "AR(1) + fixed + random + smooth (in trend)", brms_4, mvgam_4t, test_data
+)
+
+# Test posterior_predict for Beta family (continuous 0-1)
+cat("\n--- Testing Beta family ---\n")
+results$predict_beta <- run_predict_validation(
+  "Beta AR(1)", brms_beta, mvgam_beta, test_data_beta
+)
+
+# Test posterior_predict for Binomial family
+cat("\n--- Testing Binomial family ---\n")
+results$predict_binom <- run_predict_validation(
+  "Binomial AR(1)", brms_binom, mvgam_binom, test_data_binom
+)
+
+# Test posterior_predict for Hurdle Poisson
+cat("\n--- Testing Hurdle Poisson family ---\n")
+results$predict_hp <- run_predict_validation(
+  "Hurdle Poisson AR(1)", brms_hp, mvgam_hp, test_data_hp
+)
+
+# Test posterior_predict for Hurdle Negative Binomial
+cat("\n--- Testing Hurdle Negative Binomial family ---\n")
+results$predict_hnb <- run_predict_validation(
+  "Hurdle NegBin AR(1)", brms_hnb, mvgam_hnb, test_data_hnb
+)
+
+# Test posterior_predict for Zero-Inflated Poisson
+cat("\n--- Testing Zero-Inflated Poisson family ---\n")
+results$predict_zip <- run_predict_validation(
+  "ZI Poisson AR(1)", brms_zip, mvgam_zip, test_data_zip
+)
+
+# Test posterior_predict for Multivariate Gaussian
+cat("\n--- Testing Multivariate Gaussian ---\n")
+set.seed(789)
+brms_predict_y1 <- brms::posterior_predict(brms_11, newdata = test_data_mv,
+                                            resp = "y1", ndraws = 500)
+brms_predict_y2 <- brms::posterior_predict(brms_11, newdata = test_data_mv,
+                                            resp = "y2", ndraws = 500)
+set.seed(789)
+mvgam_predict_mv <- posterior_predict(mvgam_11, newdata = test_data_mv,
+                                       ndraws = 500)
+
+cat("  Returns list:", is.list(mvgam_predict_mv), "\n")
+cat("  Has both responses:", all(c("y1", "y2") %in% names(mvgam_predict_mv)), "\n")
+
+if (is.list(mvgam_predict_mv)) {
+  mv_y1_cor <- cor(colMeans(brms_predict_y1), colMeans(mvgam_predict_mv$y1))
+  mv_y2_cor <- cor(colMeans(brms_predict_y2), colMeans(mvgam_predict_mv$y2))
+  cat(sprintf("  y1 mean cor: %.4f\n", mv_y1_cor))
+  cat(sprintf("  y2 mean cor: %.4f\n", mv_y2_cor))
+  mv_passed <- mv_y1_cor >= 0.70 && mv_y2_cor >= 0.70
+} else {
+  mv_passed <- FALSE
+  cat("  ERROR: Expected list for multivariate model\n")
+}
+results$predict_mv <- list(
+  name = "predict_multivariate",
+  passed = mv_passed
+)
+cat("  Result:", if (mv_passed) "PASSED" else "FAILED", "\n")
+
+
 # =============================================================================
 # SUMMARY
 # =============================================================================

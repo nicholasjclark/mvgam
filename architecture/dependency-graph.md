@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-12-12 13:36:12  
+**Generated:** 2025-12-19 14:25:49  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
 - **Total Files:** 63
-- **Total Functions:** 626
+- **Total Functions:** 628
 - **Exported Functions:** 57
-- **Internal Functions:** 583
+- **Internal Functions:** 585
 - **S3 Methods:** 45
 - **S3 Classes:** 32
 
@@ -39,7 +39,7 @@
 
 ### Main Entry Points
 - **Core Functions**: mvgam, series_to_mvgam, sim_mvgam
-- **Trend Types**: RW, GP, VAR, CAR, ZMVN, PW, AR
+- **Trend Types**: RW, GP, ZMVN, VAR, CAR, PW, AR
 - **Analysis Tools**: ppc, stability, fevd, irf, lfo_cv
 - **Plotting Functions**: plot_mvgam_fc, plot_mvgam_series, plot_mvgam_smooth, plot_mvgam_pterms, plot_mvgam_factors, plot_mvgam_trend, plot_mvgam_randomeffects, plot_mvgam_resids, plot_mvgam_uncertainty
 
@@ -228,10 +228,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 ### S3 Methods Files
 - **`R/predictions.R`** (20 functions) - Prediction methods
   - Key functions: validate_monotonic_indicesdetect_gp_terms approx_gp_pred prepare_spd_inputs spd_gp_exp_quad spd_gp_matern32 spd_gp_matern52 compute_spd_vectorized detect_gp_kernel has_nlpars (+ 19 more)
+- **`R/posterior_predict.R`** (4 functions) - Prediction methods
+  - Key functions: extract_dpars_from_stanfitsample_from_family get_family_dpars posterior_predict.mvgam (+ 3 more)
 - **`R/add_residuals.R`** (2 functions) - Residual analysis
   - Key functions: add_residualsadd_residuals.mvgam (+ 1 more)
-- **`R/posterior_predict.R`** (2 functions) - Prediction methods
-  - Key functions: sample_from_family, posterior_predict.mvgam
 
 ### Stan/Modeling Files
 - **`R/stan_assembly.R`** (81 functions) - Stan model integration
@@ -403,9 +403,6 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **posterior_epred_zero_inflated_negbinomial()** (internal, never called)
 - **posterior_epred_zero_inflated_poisson()** (internal, never called)
 - **posterior_epred_zero_one_inflated_beta()** (internal, never called)
-
-### `R/posterior_predict.R` (1 potentially unused):
-- **sample_from_family()** (internal, never called)
 
 ### `R/print.mvgam.R` (1 potentially unused):
 - **print_model_specification_simple()** (internal, never called)
@@ -775,6 +772,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **posterior_linpred.mvgam()** (internal)
 
 ### `R/posterior_predict.R`:
+- **extract_dpars_from_stanfit()** (internal)
+- **get_family_dpars()** (internal)
 - **posterior_predict.mvgam()** (internal)
 - **sample_from_family()** (internal)
 

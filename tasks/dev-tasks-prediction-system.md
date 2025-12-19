@@ -472,7 +472,7 @@ Posterior predictive samples with observation-level noise.
     - Uses 0.99 correlation threshold (stricter than linpred because
       dpars are same draws extracted via different pathways)
 
-- [ ] **3.3 Implement `posterior_predict.mvgam()` S3 method (using DRY prep object)**
+- [X] **3.3 Implement `posterior_predict.mvgam()` S3 method (using DRY prep object)**
   - Function signature:
 
     ```r
@@ -494,6 +494,8 @@ Posterior predictive samples with observation-level noise.
     - Consider refactoring `posterior_epred()` to also use `get_dpar()` pattern
   - Ensure reproducibility with `set.seed()` documentation
   - Add roxygen2 documentation with `@export`
+
+- [ ] **3.3.1 Fix all failures when running `validate_extraction_vs_brms.R`**
 
 - [ ] **3.4 Handle truncation**
   - Reference `rcontinuous()` (line 978-1003) and `rdiscrete()` (line 1015-1035)

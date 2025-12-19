@@ -21,7 +21,9 @@ NULL
 #' @param sigma Optional matrix [ndraws x nobs] of scale/dispersion.
 #'   Required for: gaussian, student, lognormal, hurdle_lognormal,
 #'   skew_normal, exgaussian, gen_extreme_value, asym_laplace.
-#'   For beta families, represents phi (precision parameter).
+#' @param phi Optional matrix [ndraws x nobs] of precision parameter.
+#'   Required for: beta, beta_binomial, zero_inflated_beta,
+#'   zero_inflated_beta_binomial, zero_one_inflated_beta.
 #' @param shape Optional matrix [ndraws x nobs] of shape parameters.
 #'   Required for: gamma, negbinomial, weibull, frechet, inverse.gaussian,
 #'   hurdle_negbinomial, hurdle_gamma, discrete_weibull, com_poisson
@@ -70,7 +72,8 @@ NULL
 #'
 #' @noRd
 sample_from_family <- function(family_name, ndraws, epred,
-                               sigma = NULL, shape = NULL, nu = NULL,
+                               sigma = NULL, phi = NULL,
+                               shape = NULL, nu = NULL,
                                trials = NULL, hu = NULL, zi = NULL,
                                zoi = NULL, coi = NULL,
                                alpha = NULL, ndt = NULL, xi = NULL,
@@ -178,11 +181,10 @@ sample_from_family <- function(family_name, ndraws, epred,
     },
 
     "beta" = {
-      checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
-      # sigma is phi (precision); mu and phi -> shape1, shape2
-      # shape1 = mu * phi, shape2 = (1 - mu) * phi
-      shape1 <- epred * sigma
-      shape2 <- (1 - epred) * sigma
+      checkmate::assert_matrix(phi, nrows = ndraws, ncols = ncol(epred))
+      # mu and phi (precision) -> shape1, shape2
+      shape1 <- epred * phi
+      shape2 <- (1 - epred) * phi
       stats::rbeta(length(epred), shape1 = shape1, shape2 = shape2)
     },
 
@@ -255,15 +257,14 @@ sample_from_family <- function(family_name, ndraws, epred,
 
     "beta_binomial" = {
       checkmate::assert_numeric(trials, min.len = 1)
-      checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
-      # epred = mu * trials, sigma = phi
-      # mu = epred / trials
+      checkmate::assert_matrix(phi, nrows = ndraws, ncols = ncol(epred))
+      # epred = mu * trials, mu = epred / trials
       if (length(trials) == 1) {
         mu <- epred / trials
       } else {
         mu <- sweep(epred, 2, trials, `/`)
       }
-      extraDistr::rbbinom(length(epred), size = trials, mu = mu, sigma = sigma)
+      extraDistr::rbbinom(length(epred), size = trials, mu = mu, sigma = phi)
     },
 
     "bernoulli" = {
@@ -300,13 +301,14 @@ sample_from_family <- function(family_name, ndraws, epred,
     "zero_inflated_beta_binomial" = {
       checkmate::assert_numeric(trials, min.len = 1)
       checkmate::assert_matrix(zi, nrows = ndraws, ncols = ncol(epred))
-      checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(phi, nrows = ndraws, ncols = ncol(epred))
       if (length(trials) == 1) {
         mu <- epred / trials
       } else {
         mu <- sweep(epred, 2, trials, `/`)
       }
-      draws <- extraDistr::rbbinom(length(epred), size = trials, mu = mu, sigma = sigma)
+      draws <- extraDistr::rbbinom(length(epred), size = trials, mu = mu,
+                                   sigma = phi)
       tmp <- stats::runif(length(epred))
       draws[tmp < zi] <- 0L
       draws
@@ -314,23 +316,23 @@ sample_from_family <- function(family_name, ndraws, epred,
 
     "zero_inflated_beta" = {
       checkmate::assert_matrix(zi, nrows = ndraws, ncols = ncol(epred))
-      checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
-      shape1 <- epred * sigma
-      shape2 <- (1 - epred) * sigma
+      checkmate::assert_matrix(phi, nrows = ndraws, ncols = ncol(epred))
+      shape1 <- epred * phi
+      shape2 <- (1 - epred) * phi
       tmp <- stats::runif(length(epred))
-      ifelse(tmp < zi, 0, stats::rbeta(length(epred), shape1 = shape1, shape2 = shape2))
+      ifelse(tmp < zi, 0, stats::rbeta(length(epred), shape1 = shape1,
+                                        shape2 = shape2))
     },
 
     "zero_one_inflated_beta" = {
       checkmate::assert_matrix(zoi, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(coi, nrows = ndraws, ncols = ncol(epred))
-      checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(phi, nrows = ndraws, ncols = ncol(epred))
       # zoi = P(Y in {0,1}), coi = P(Y=1 | Y in {0,1})
-      # sigma is phi (precision parameter for beta)
       tmp <- stats::runif(length(epred))
       one_or_zero <- stats::runif(length(epred))
-      shape1 <- epred * sigma
-      shape2 <- (1 - epred) * sigma
+      shape1 <- epred * phi
+      shape2 <- (1 - epred) * phi
       ifelse(
         tmp < zoi,
         ifelse(one_or_zero < coi, 1, 0),
@@ -781,9 +783,22 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
                                     sample_new_levels = "uncertainty",
                                     resp = NULL,
                                     ...) {
-  # Validate mvgam-specific parameters
+  # Validate all parameters
   checkmate::assert_class(object, "mvgam")
+  checkmate::assert_data_frame(newdata, null.ok = TRUE)
   checkmate::assert_logical(process_error, len = 1)
+  checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
+  checkmate::assert(
+    checkmate::check_class(re_formula, "formula"),
+    checkmate::check_true(is.na(re_formula)),
+    checkmate::check_null(re_formula)
+  )
+  checkmate::assert_logical(allow_new_levels, len = 1)
+  checkmate::assert_choice(
+    sample_new_levels,
+    choices = c("uncertainty", "gaussian", "old_levels")
+  )
+  checkmate::assert_string(resp, null.ok = TRUE)
 
   # Handle newdata = NULL (use training data)
   if (is.null(newdata)) {
@@ -796,19 +811,178 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
     newdata <- object$data
   }
 
-  # Get expected values (response scale, obs + trend combined)
-  epred <- posterior_epred(
+  # Get ALL draws from linpred (returns list for multivariate without resp).
+  # Using linpred + inverse link (not posterior_epred) because for ZI/hurdle
+  # families, posterior_epred returns E[Y]=(1-zi)*mu, but sampling requires
+  # the raw mu parameter to apply zi/hu during sampling.
+  linpred_all <- posterior_linpred(
     object,
     newdata = newdata,
     process_error = process_error,
-    ndraws = ndraws,
+    ndraws = NULL,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels,
     resp = resp
   )
 
-  # For now, simply return epred with a note that sampling is implemented
-  # TODO: Add family-specific noise to epred values
-  epred
+  # Sample draw_ids ONCE for consistent subsampling across all responses
+  if (is.list(linpred_all) && !is.matrix(linpred_all)) {
+    total_draws <- nrow(linpred_all[[1]])
+  } else {
+    total_draws <- nrow(linpred_all)
+  }
+
+  if (!is.null(ndraws)) {
+    if (ndraws > total_draws) {
+      stop(insight::format_error(
+        "Requested {.field ndraws} ({ndraws}) exceeds available ",
+        "draws ({total_draws})."
+      ))
+    }
+    draw_ids <- sample(total_draws, ndraws)
+  } else {
+    draw_ids <- seq_len(total_draws)
+    ndraws <- total_draws
+  }
+
+  # Multivariate detection (consistent with posterior_epred.mvgam)
+  is_mv <- inherits(object$formula, "mvbrmsformula") &&
+    !is.null(object$formula$forms) &&
+    length(object$formula$forms) > 1
+
+  if (is_mv && is.null(resp)) {
+    # Multivariate without resp: process each response with SAME draw_ids
+    resp_names <- names(linpred_all)
+    result_list <- lapply(resp_names, function(r) {
+      predict_single_response(
+        object = object,
+        linpred_resp = linpred_all[[r]],
+        resp = r,
+        draw_ids = draw_ids,
+        ndraws = ndraws,
+        newdata = newdata,
+        is_multivariate = TRUE
+      )
+    })
+    names(result_list) <- resp_names
+    return(result_list)
+  }
+
+  # Univariate or multivariate with resp specified
+  linpred_mat <- if (is.list(linpred_all)) linpred_all[[1]] else linpred_all
+  predict_single_response(
+    object = object,
+    linpred_resp = linpred_mat,
+    resp = resp,
+    draw_ids = draw_ids,
+    ndraws = ndraws,
+    newdata = newdata,
+    is_multivariate = is_mv
+  )
+}
+
+
+#' Predict from a single response (helper for posterior_predict.mvgam)
+#'
+#' Applies inverse link to linpred, extracts dpars, and samples from family.
+#' For ZI/hurdle families, uses raw mu (not deflated expected value) so that
+#' zi/hu can be applied during the sampling process itself.
+#'
+#' @param object mvgam model object
+#' @param linpred_resp Matrix [total_draws x nobs] of linear predictor
+#' @param resp Response name (NULL for univariate)
+#' @param draw_ids Integer vector of draw indices to use
+#' @param ndraws Number of draws (length of draw_ids)
+#' @param newdata Data frame for predictions
+#' @param is_multivariate Logical; TRUE if multivariate model
+#'
+#' @return Matrix [ndraws x nobs] of posterior predictive samples
+#'
+#' @noRd
+predict_single_response <- function(object, linpred_resp, resp, draw_ids,
+                                    ndraws, newdata, is_multivariate) {
+  # Validate parameters
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_matrix(linpred_resp)
+  checkmate::assert_integerish(draw_ids, lower = 1, any.missing = FALSE)
+  checkmate::assert_int(ndraws, lower = 1)
+  checkmate::assert_data_frame(newdata)
+  checkmate::assert_logical(is_multivariate, len = 1)
+  checkmate::assert_string(resp, null.ok = TRUE)
+
+  # For multivariate, resp must be specified
+  if (is_multivariate) {
+    checkmate::assert_string(resp, null.ok = FALSE)
+  }
+
+  # Subset linpred by draw_ids and apply inverse link
+  linpred <- linpred_resp[draw_ids, , drop = FALSE]
+  nobs <- ncol(linpred)
+
+  # Get family for this response
+  if (!is_multivariate) {
+    family <- object$family
+  } else {
+    family <- get_family_for_resp(object, resp)
+  }
+
+  mu <- family$linkinv(linpred)
+  family_name <- family$family
+
+  # Get dpar names for this family
+  dpar_names <- get_family_dpars(family_name)
+
+  # For multivariate, dpars are named {dpar}_{resp} in Stan output
+  if (is_multivariate) {
+    dpar_names_stan <- paste0(dpar_names, "_", resp)
+  } else {
+    dpar_names_stan <- dpar_names
+  }
+
+  # Extract dpars with matching draw_ids
+  dpars <- extract_dpars_from_stanfit(
+    stanfit = object$fit,
+    dpar_names = dpar_names_stan,
+    ndraws = ndraws,
+    nobs = nobs,
+    draw_ids = draw_ids
+  )
+
+  # Rename back to standard names for sample_from_family
+  if (is_multivariate && length(dpars) > 0) {
+    names(dpars) <- dpar_names
+  }
+
+  # Extract trials for binomial families
+  trials <- extract_trials_for_family(object, family, newdata)
+
+  # Sample from family distribution
+  samples <- sample_from_family(
+    family_name = family_name,
+    ndraws = ndraws,
+    epred = mu,
+    sigma = dpars$sigma,
+    phi = dpars$phi,
+    shape = dpars$shape,
+    nu = dpars$nu,
+    trials = trials,
+    hu = dpars$hu,
+    zi = dpars$zi,
+    zoi = dpars$zoi,
+    coi = dpars$coi,
+    alpha = dpars$alpha,
+    ndt = dpars$ndt,
+    xi = dpars$xi,
+    quantile = dpars$quantile,
+    kappa = dpars$kappa,
+    beta = dpars$beta,
+    bs = dpars$bs,
+    bias = dpars$bias,
+    disc = dpars$disc,
+    thres = dpars$thres
+  )
+
+  # Reshape vector to matrix [ndraws x nobs]
+  matrix(samples, nrow = ndraws, ncol = nobs, byrow = FALSE)
 }
