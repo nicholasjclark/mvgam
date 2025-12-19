@@ -18,19 +18,68 @@ NULL
 #' @param family_name Character name of the distribution (e.g., "poisson")
 #' @param ndraws Integer; number of draws per observation
 #' @param epred Matrix [ndraws x nobs] of expected values
-#' @param sigma Optional matrix of sigma (dispersion) parameters
-#' @param shape Optional matrix of shape parameters
-#' @param trials Optional vector of trial counts (length 1 or nobs)
-#' @param hu Optional matrix of hurdle probability parameters
-#' @param zi Optional matrix of zero-inflation parameters
+#' @param sigma Optional matrix [ndraws x nobs] of scale/dispersion.
+#'   Required for: gaussian, student, lognormal, hurdle_lognormal,
+#'   skew_normal, exgaussian, gen_extreme_value, asym_laplace.
+#'   For beta families, represents phi (precision parameter).
+#' @param shape Optional matrix [ndraws x nobs] of shape parameters.
+#'   Required for: gamma, negbinomial, weibull, frechet, inverse.gaussian,
+#'   hurdle_negbinomial, hurdle_gamma, discrete_weibull, com_poisson
+#' @param nu Optional matrix [ndraws x nobs] of degrees of freedom.
+#'   Required for: student
+#' @param trials Optional vector of trial counts (length 1 or nobs).
+#'   Required for: binomial, beta_binomial, zero_inflated_binomial,
+#'   zero_inflated_beta_binomial
+#' @param hu Optional matrix [ndraws x nobs] of hurdle probability.
+#'   Required for: hurdle_poisson, hurdle_negbinomial, hurdle_gamma,
+#'   hurdle_lognormal
+#' @param zi Optional matrix [ndraws x nobs] of zero-inflation probability.
+#'   Required for: zero_inflated_poisson, zero_inflated_negbinomial,
+#'   zero_inflated_binomial, zero_inflated_beta_binomial, zero_inflated_beta,
+#'   zero_inflated_asym_laplace
+#' @param zoi Optional matrix [ndraws x nobs] of zero-one inflation.
+#'   Required for: zero_one_inflated_beta (probability of boundary value)
+#' @param coi Optional matrix [ndraws x nobs] of conditional one-inflation.
+#'   Required for: zero_one_inflated_beta (P(Y=1 | Y in {0,1}))
+#' @param alpha Optional matrix [ndraws x nobs] of skewness parameters.
+#'   Required for: skew_normal
+#' @param ndt Optional matrix [ndraws x nobs] of non-decision time (>=0).
+#'   Required for: shifted_lognormal, exgaussian
+#' @param xi Optional matrix [ndraws x nobs] of shape/tail parameters.
+#'   Required for: gen_extreme_value
+#' @param quantile Optional matrix [ndraws x nobs] of quantile values (0,1).
+#'   Required for: asym_laplace, zero_inflated_asym_laplace
+#' @param kappa Optional matrix [ndraws x nobs] of concentration (>0).
+#'   Required for: von_mises
+#' @param beta Optional matrix [ndraws x nobs] of rate parameters (>0).
+#'   Required for: exgaussian
+#' @param bs Optional matrix [ndraws x nobs] of boundary separation (>0).
+#'   Required for: wiener
+#' @param bias Optional matrix [ndraws x nobs] of starting point bias (0-1).
+#'   Required for: wiener
+#' @param disc Optional matrix [ndraws x nobs] of discrimination (>0).
+#'   Required for: hurdle_cumulative. Defaults to 1 if NULL.
+#' @param thres Optional matrix [ndraws x nthres] of ordinal thresholds.
+#'   Required for: hurdle_cumulative
+#' @param link Character; link function for ordinal models.
+#'   Required for: hurdle_cumulative. Default "logit".
 #'
-#' @return Matrix [ndraws x nobs] of sampled values from the distribution
+#' @return Vector of sampled values with length = length(epred). Values are
+#'   integers for count families, doubles for continuous. Used internally
+#'   by posterior_predict.mvgam() which reshapes to [ndraws x nobs] matrix.
 #'
 #' @noRd
 sample_from_family <- function(family_name, ndraws, epred,
-                               sigma = NULL, shape = NULL,
-                               trials = NULL, hu = NULL, zi = NULL) {
+                               sigma = NULL, shape = NULL, nu = NULL,
+                               trials = NULL, hu = NULL, zi = NULL,
+                               zoi = NULL, coi = NULL,
+                               alpha = NULL, ndt = NULL, xi = NULL,
+                               quantile = NULL, kappa = NULL,
+                               beta = NULL, bs = NULL, bias = NULL,
+                               disc = NULL, thres = NULL,
+                               link = "logit") {
   checkmate::assert_string(family_name)
+  checkmate::assert_int(ndraws, lower = 1)
   checkmate::assert_matrix(epred)
 
   switch(
@@ -45,16 +94,14 @@ sample_from_family <- function(family_name, ndraws, epred,
 
     "student" = {
       checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
-      # nu parameter required for student t; may be handled separately
-      stop(insight::format_error(
-        "Student-t sampling requires nu parameter not yet implemented."
-      ))
+      checkmate::assert_matrix(nu, nrows = ndraws, ncols = ncol(epred))
+      extraDistr::rlst(length(epred), df = nu, mu = epred, sigma = sigma)
     },
 
     "skew_normal" = {
-      stop(insight::format_error(
-        "Skew-normal sampling not yet implemented for posterior_predict."
-      ))
+      checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(alpha, nrows = ndraws, ncols = ncol(epred))
+      brms::rskew_normal(length(epred), mu = epred, sigma = sigma, alpha = alpha)
     },
 
     "exponential" = {
@@ -86,9 +133,9 @@ sample_from_family <- function(family_name, ndraws, epred,
     },
 
     "gen_extreme_value" = {
-      stop(insight::format_error(
-        "Generalized extreme value sampling not yet implemented."
-      ))
+      checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(xi, nrows = ndraws, ncols = ncol(epred))
+      brms::rgen_extreme_value(length(epred), mu = epred, sigma = sigma, xi = xi)
     },
 
     "inverse.gaussian" = {
@@ -97,9 +144,9 @@ sample_from_family <- function(family_name, ndraws, epred,
     },
 
     "exgaussian" = {
-      stop(insight::format_error(
-        "Ex-Gaussian sampling not yet implemented."
-      ))
+      checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(beta, nrows = ndraws, ncols = ncol(epred))
+      brms::rexgaussian(length(epred), mu = epred, sigma = sigma, beta = beta)
     },
 
     "lognormal" = {
@@ -110,9 +157,24 @@ sample_from_family <- function(family_name, ndraws, epred,
     },
 
     "shifted_lognormal" = {
-      stop(insight::format_error(
-        "Shifted lognormal sampling not yet implemented."
-      ))
+      checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(ndt, nrows = ndraws, ncols = ncol(epred))
+      # Validate epred > ndt (shift must be less than expected value)
+      if (any(epred <= ndt)) {
+        stop(insight::format_error(
+          "For shifted_lognormal, expected values must exceed shift (ndt). ",
+          "Found {sum(epred <= ndt)} values where epred <= ndt."
+        ))
+      }
+      # epred = exp(meanlog + sigma^2/2) + ndt
+      # So meanlog = log(epred - ndt) - sigma^2/2
+      meanlog <- log(epred - ndt) - sigma^2 / 2
+      brms::rshifted_lnorm(
+        length(epred),
+        meanlog = meanlog,
+        sdlog = sigma,
+        shift = ndt
+      )
     },
 
     "beta" = {
@@ -125,9 +187,19 @@ sample_from_family <- function(family_name, ndraws, epred,
     },
 
     "von_mises" = {
-      stop(insight::format_error(
-        "Von Mises sampling not yet implemented."
-      ))
+      checkmate::assert_matrix(kappa, nrows = ndraws, ncols = ncol(epred))
+      brms::rvon_mises(length(epred), mu = epred, kappa = kappa)
+    },
+
+    "asym_laplace" = {
+      checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(quantile, nrows = ndraws, ncols = ncol(epred))
+      brms::rasym_laplace(
+        length(epred),
+        mu = epred,
+        sigma = sigma,
+        quantile = quantile
+      )
     },
 
     # ============ Count families (discrete) ============
@@ -154,15 +226,13 @@ sample_from_family <- function(family_name, ndraws, epred,
     },
 
     "discrete_weibull" = {
-      stop(insight::format_error(
-        "Discrete Weibull sampling not yet implemented."
-      ))
+      checkmate::assert_matrix(shape, nrows = ndraws, ncols = ncol(epred))
+      brms::rdiscrete_weibull(length(epred), mu = epred, shape = shape)
     },
 
     "com_poisson" = {
-      stop(insight::format_error(
-        "COM-Poisson sampling not yet implemented."
-      ))
+      checkmate::assert_matrix(shape, nrows = ndraws, ncols = ncol(epred))
+      brms::rcom_poisson(length(epred), mu = epred, shape = shape)
     },
 
     # ============ Binomial families ============
@@ -252,15 +322,49 @@ sample_from_family <- function(family_name, ndraws, epred,
     },
 
     "zero_one_inflated_beta" = {
-      stop(insight::format_error(
-        "Zero-one inflated beta sampling not yet implemented."
-      ))
+      checkmate::assert_matrix(zoi, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(coi, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
+      # zoi = P(Y in {0,1}), coi = P(Y=1 | Y in {0,1})
+      # sigma is phi (precision parameter for beta)
+      tmp <- stats::runif(length(epred))
+      one_or_zero <- stats::runif(length(epred))
+      shape1 <- epred * sigma
+      shape2 <- (1 - epred) * sigma
+      ifelse(
+        tmp < zoi,
+        ifelse(one_or_zero < coi, 1, 0),
+        stats::rbeta(length(epred), shape1 = shape1, shape2 = shape2)
+      )
     },
 
     "zero_inflated_asym_laplace" = {
-      stop(insight::format_error(
-        "Zero-inflated asymmetric Laplace sampling not yet implemented."
-      ))
+      checkmate::assert_matrix(zi, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(quantile, nrows = ndraws, ncols = ncol(epred))
+      tmp <- stats::runif(length(epred))
+      base <- brms::rasym_laplace(
+        length(epred),
+        mu = epred,
+        sigma = sigma,
+        quantile = quantile
+      )
+      ifelse(tmp < zi, 0, base)
+    },
+
+    "wiener" = {
+      # Wiener diffusion model: epred is drift rate (delta)
+      # bs=boundary separation, ndt=non-decision time, bias=starting point
+      checkmate::assert_matrix(bs, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(ndt, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(bias, nrows = ndraws, ncols = ncol(epred))
+      brms::rwiener(
+        length(epred),
+        alpha = bs,
+        tau = ndt,
+        beta = bias,
+        delta = epred
+      )
     },
 
     # ============ Hurdle families ============
@@ -297,6 +401,35 @@ sample_from_family <- function(family_name, ndraws, epred,
       ifelse(tmp < hu, 0, stats::rlnorm(length(epred), meanlog = mu, sdlog = sigma))
     },
 
+    "hurdle_cumulative" = {
+      checkmate::assert_matrix(hu, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(thres)
+      if (is.null(disc)) disc <- 1
+      nthres <- ncol(thres)
+      ncat <- nthres + 1L
+
+      # Compute cumulative probabilities for each category
+      # Using brms pordinal helper
+      pordinal <- getFromNamespace("pordinal", "brms")
+      first_greater <- getFromNamespace("first_greater", "brms")
+
+      # Get category probabilities [ndraws x ncat]
+      p <- pordinal(
+        q = seq_len(ncat),
+        eta = epred,
+        disc = disc,
+        thres = thres,
+        family = "cumulative",
+        link = link
+      )
+
+      # Sample: 0 if hurdle, else sample from categories 1:ncat
+      tmp <- stats::runif(length(epred))
+      u <- stats::runif(ndraws)
+      ordinal_samples <- first_greater(p, target = u)
+      ifelse(tmp < hu, 0L, ordinal_samples)
+    },
+
     # ============ Unsupported families ============
 
     stop(insight::format_error(
@@ -304,6 +437,97 @@ sample_from_family <- function(family_name, ndraws, epred,
       "is not yet implemented."
     ))
   )
+}
+
+
+#' Get Distributional Parameters Required by Family
+#'
+#' Returns a character vector of distributional parameter names (dpars) that
+#' a given family requires for posterior prediction sampling.
+#'
+#' @param family_name Character name of the family (e.g., "gaussian", "poisson")
+#'
+#' @return Character vector of parameter names. Possible values:
+#'   \itemize{
+#'     \item "sigma" - scale/dispersion (gaussian, student, lognormal, etc.)
+#'     \item "shape" - shape parameter (gamma, negbinomial, weibull, etc.)
+#'     \item "nu" - degrees of freedom (student-t)
+#'     \item "phi" - precision parameter (beta families)
+#'     \item "zi" - zero-inflation probability
+#'     \item "hu" - hurdle probability
+#'     \item "zoi" - zero-one inflation probability
+#'     \item "coi" - conditional one-inflation probability
+#'     \item "ndt" - non-decision time (shifted_lognormal, wiener, exgaussian)
+#'     \item "xi" - tail parameter (gen_extreme_value)
+#'     \item "quantile" - quantile parameter (asym_laplace)
+#'     \item "kappa" - concentration (von_mises)
+#'     \item "bs" - boundary separation (wiener)
+#'     \item "bias" - starting point bias (wiener)
+#'     \item "beta" - rate of exponential component (exgaussian)
+#'   }
+#'   Note: "trials" is NOT returned as it comes from data, not posterior.
+#'
+#' @details
+#' Includes all brms families for completeness. Families not yet implemented
+#' in \code{sample_from_family()} will error at sampling time, not here.
+#' Families not in the mapping return an empty character vector.
+#'
+#' @noRd
+get_family_dpars <- function(family_name) {
+  checkmate::assert_string(family_name)
+
+  # Map families to required distributional parameters
+  # Complete brms family coverage for future-proofing
+  dpar_map <- list(
+    # Continuous families
+    gaussian = c("sigma"),
+    student = c("sigma", "nu"),
+    skew_normal = c("sigma", "alpha"),
+    lognormal = c("sigma"),
+    shifted_lognormal = c("sigma", "ndt"),
+    gamma = c("shape"),
+    weibull = c("shape"),
+    frechet = c("shape"),
+    inverse.gaussian = c("shape"),
+    exgaussian = c("sigma", "beta"),
+    beta = c("phi"),
+    gen_extreme_value = c("sigma", "xi"),
+    asym_laplace = c("sigma", "quantile"),
+    wiener = c("bs", "ndt", "bias"),
+    von_mises = c("kappa"),
+    exponential = character(0),
+
+    # Count families
+    poisson = character(0),
+    negbinomial = c("shape"),
+    negbinomial2 = c("sigma"),
+    geometric = character(0),
+    discrete_weibull = c("shape"),
+    com_poisson = c("shape"),
+
+    # Binomial families (trials from data, not posterior)
+    binomial = character(0),
+    beta_binomial = c("phi"),
+    bernoulli = character(0),
+
+    # Zero-inflated families
+    zero_inflated_poisson = c("zi"),
+    zero_inflated_negbinomial = c("zi", "shape"),
+    zero_inflated_binomial = c("zi"),
+    zero_inflated_beta_binomial = c("zi", "phi"),
+    zero_inflated_beta = c("zi", "phi"),
+    zero_one_inflated_beta = c("zoi", "coi", "phi"),
+    zero_inflated_asym_laplace = c("zi", "sigma", "quantile"),
+
+    # Hurdle families
+    hurdle_poisson = c("hu"),
+    hurdle_negbinomial = c("hu", "shape"),
+    hurdle_gamma = c("hu", "shape"),
+    hurdle_lognormal = c("hu", "sigma"),
+    hurdle_cumulative = c("hu", "disc")
+  )
+
+  dpar_map[[family_name]] %||% character(0)
 }
 
 

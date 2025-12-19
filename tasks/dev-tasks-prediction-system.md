@@ -367,7 +367,7 @@ Credit Paul Bürkner and the brms development team in roxygen documentation.
   - `mean_discrete_weibull()`: series approximation for E[Y] (lines 606-625)
   - `mean_com_poisson()`: series + closed-form approximation (lines 640-710)
 
-- [ ] **2.6.9 Update `compute_family_epred()` to use new infrastructure** - OPTIONAL
+- [ ] **2.6.9 Update `compute_family_epred()` to use new infrastructure**
   - Current switch statement works correctly
   - Could refactor to use `get(paste0("posterior_epred_", family_name))`
   - Low priority since existing tests pass
@@ -388,30 +388,73 @@ Credit Paul Bürkner and the brms development team in roxygen documentation.
 
 Posterior predictive samples with observation-level noise.
 
-- [ ] **3.1 Create family-specific sampling infrastructure**
-  - Reference `brms_posterior_predict_internals.R` lines 312-968 for all family implementations
-  - Create `sample_from_family()` helper that dispatches based on `family$family`:
-    - `"gaussian"`: `rnorm(n, mean = epred, sd = sigma)` (line 312-322)
-    - `"poisson"`: `rpois(n, lambda = epred)` (line 512-520)
-    - `"binomial"`: `rbinom(n, size = trials, prob = epred)` (line 486-494)
-    - `"negbinomial"`: `rnbinom(n, mu = epred, size = shape)` (line 522-533)
-    - `"bernoulli"`: `rbinom(n, size = 1, prob = epred)` (line 507-510)
-    - `"Gamma"`: `rgamma(n, shape = shape, scale = epred/shape)` (line 590-599)
-    - Additional families as needed, following brms patterns (use the `r package analyzer` agent to understand brms sampling functions, and read `brms_posterior_predict_internals.R`)
-  - Use **pathfinder agent** to find insertion point
+- [x] **3.1 Create family-specific sampling infrastructure** ✓
+  - **Enhanced `sample_from_family()` in `R/posterior_predict.R` (lines 72-432)**
+  - **Complete brms family coverage (34 total families)**:
+    - Continuous: gaussian, student, skew_normal, lognormal, shifted_lognormal,
+      gamma, weibull, frechet, inverse.gaussian, exgaussian, beta,
+      gen_extreme_value, asym_laplace, von_mises, exponential, wiener
+    - Count: poisson, negbinomial, negbinomial2, geometric, discrete_weibull,
+      com_poisson
+    - Binomial: binomial, beta_binomial, bernoulli
+    - Zero-inflated: zi_poisson, zi_negbinomial, zi_binomial, zi_beta_binomial,
+      zi_beta, zero_one_inflated_beta, zi_asym_laplace
+    - Hurdle: hurdle_poisson, hurdle_negbinomial, hurdle_gamma, hurdle_lognormal,
+      hurdle_cumulative
+  - **New parameters added**: alpha, ndt, xi, quantile, kappa, beta, bs, bias,
+    disc, thres, link
+  - **All implementations use brms sampling functions**: rskew_normal, rexgaussian,
+    rshifted_lnorm, rvon_mises, rasym_laplace, rdiscrete_weibull, rcom_poisson,
+    rwiener, rgen_extreme_value
+  - **Created `get_family_dpars()` helper** (lines 434-524) mapping families to
+    required distributional parameters
+  - Added edge case validation for shifted_lognormal (epred > ndt)
+  - Code reviewer approved sampling infrastructure
 
-- [ ] **3.2 Handle distributional parameters extraction**
-  - For families requiring extra parameters (sigma, phi, shape):
-    - Reference brms patterns: `get_dpar(prep, "sigma", i = i)`
-    - Extract from combined fit using appropriate patterns
-    - Match dimensions to epred matrix
-  - Implement `extract_distributional_params()` helper
-  - Test with Gaussian family (requires sigma)
-  - Test with negative binomial (requires phi/shape)
+- [ ] **3.2 Handle distributional parameters extraction (DRY approach)**
 
-- [ ] **3.3 Implement `posterior_predict.mvgam()` S3 method**
+  **Key Findings from Investigation:**
+  - brms `get_dpar(prep, dpar, i, inv_link)` returns matrix `[ndraws x nobs]`
+  - brms prep$dpars contains `bprepl` objects (lazy evaluation) computed on demand
+  - mvgam's `prepare_predictions.mock_stanfit()` creates prep but doesn't populate dpars
+  - Solution: Extend prep object to include dpars so get_dpar() works seamlessly
+
+  **DRY Architecture:**
+  - Extend `prepare_predictions.mock_stanfit()` in `R/mock-stanfit.R` to:
+    1. Detect which dpars the family requires (sigma, shape, phi, nu, zi, hu)
+    2. Extract those parameters from stanfit posterior draws
+    3. Store in `prep$dpars` as matrices `[ndraws x nobs]` (broadcast if scalar)
+  - Both `posterior_epred()` and `posterior_predict()` use the same prep object
+  - Use brms's `get_dpar()` for extraction (no custom extraction logic)
+
+  **Sub-tasks:**
+  - [x] **3.2.1 Create `get_family_dpars()` helper** ✓
+    - Created in `R/posterior_predict.R` (lines 371-426)
+    - Returns vector of dpar names required by family
+    - Complete brms family coverage including all continuous, count, binomial,
+      zero-inflated, and hurdle families
+    - Uses `%||%` pattern for clean null handling
+
+  - [ ] **3.2.2 Create `extract_dpars_from_stanfit()` helper**
+    - Takes: stanfit object, dpar names, ndraws, nobs
+    - Extracts posterior draws for each dpar using existing pattern matching
+    - Returns named list of matrices `[ndraws x nobs]`
+    - Handles scalar vs indexed parameters (broadcast scalar to matrix)
+
+  - [ ] **3.2.3 Extend `prepare_predictions.mock_stanfit()` to populate dpars**
+    - After creating prep object, call `extract_dpars_from_stanfit()`
+    - Store result in `prep$dpars` alongside existing structure
+    - Ensure family metadata includes link function info for get_dpar()
+
+  - [ ] **3.2.4 Validate get_dpar() works with extended prep**
+    - Update `tasks/validate_get_dpar_integration.R`
+    - Test: `get_dpar(prep, "sigma")` returns correct matrix
+    - Test: Gaussian, negbinomial, student families
+    - Test: Scalar params broadcast correctly to [ndraws x nobs]
+
+- [ ] **3.3 Implement `posterior_predict.mvgam()` S3 method (using DRY prep object)**
   - Function signature:
-  
+
     ```r
     posterior_predict.mvgam <- function(object, newdata = NULL,
                                         process_error = TRUE,
@@ -421,10 +464,14 @@ Posterior predictive samples with observation-level noise.
                                         sample_new_levels = "uncertainty",
                                         resp = NULL, ...)
     ```
-  - Implementation:
-    1. Call `posterior_epred()` to get expected values
-    2. Extract distributional parameters
-    3. Sample from family using `sample_from_family()`
+  - **DRY Implementation:**
+    1. Create prep object via `prepare_predictions.mock_stanfit()` (now includes dpars)
+    2. Extract mu via `get_dpar(prep, "mu")` for expected values
+    3. Extract dpars via `get_dpar(prep, "sigma")`, `get_dpar(prep, "shape")`, etc.
+    4. Pass to `sample_from_family()` for observation noise
+  - **Shared Infrastructure:**
+    - Same prep object can be used by both `posterior_epred()` and `posterior_predict()`
+    - Consider refactoring `posterior_epred()` to also use `get_dpar()` pattern
   - Ensure reproducibility with `set.seed()` documentation
   - Add roxygen2 documentation with `@export`
 
