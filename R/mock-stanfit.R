@@ -368,9 +368,73 @@ prepare_predictions.mock_stanfit <- function(object,
     class = c("brmsprep", "mvgam_prep")
   )
 
-  # Generate dpars component for nonlinear formula models
+  # Populate dpars based on model type. Three cases:
+  # - Nonlinear: mu computed from formula evaluation
+  # - Multivariate: per-response extraction with {dpar}_{resp} naming
+  # - Univariate: direct extraction from posterior
   if (has_nlpars(brmsfit$formula)) {
     prep$dpars <- compute_nonlinear_dpars(prep, brmsfit$formula)
+  } else if (brms::is.mvbrmsformula(brmsfit$formula)) {
+    resp_names <- names(brmsfit$formula$forms)
+
+    if (is.null(resp_names) || length(resp_names) == 0) {
+      stop(insight::format_error(
+        "Multivariate formula missing response names in {.field forms}."
+      ))
+    }
+
+    # Empty list is valid when all families have no dpars (e.g., poisson)
+    prep$dpars <- list()
+
+    for (resp_name in resp_names) {
+      family_obj <- brmsfit$family[[resp_name]]
+      family_name <- family_obj$family
+      dpar_names <- get_family_dpars(family_name)
+
+      if (length(dpar_names) > 0) {
+        # brms stores per-response nobs as N_{response}
+        nobs_name <- paste0("N_", resp_name)
+        if (!nobs_name %in% names(sdata)) {
+          stop(insight::format_error(
+            "Missing {.field {nobs_name}} in standata for response ",
+            "{.val {resp_name}}."
+          ))
+        }
+        nobs_resp <- sdata[[nobs_name]]
+
+        # brms names multivariate dpars as {dpar}_{response}
+        dpar_names_mv <- paste0(dpar_names, "_", resp_name)
+
+        dpars_resp <- extract_dpars_from_stanfit(
+          stanfit = draws,
+          dpar_names = dpar_names_mv,
+          ndraws = nrow(draws),
+          nobs = nobs_resp
+        )
+
+        # Store with original names for downstream compatibility
+        if (length(dpars_resp) > 0) {
+          names(dpars_resp) <- dpar_names
+          prep$dpars[[resp_name]] <- dpars_resp
+        }
+      }
+    }
+  } else {
+    # Univariate: mu computed via extract_linpred_from_prep()
+    family_name <- brmsfit$family$family
+    dpar_names <- get_family_dpars(family_name)
+
+    if (length(dpar_names) > 0) {
+      dpars <- extract_dpars_from_stanfit(
+        stanfit = draws,
+        dpar_names = dpar_names,
+        ndraws = nrow(draws),
+        nobs = nrow(prediction_data)
+      )
+      if (length(dpars) > 0) {
+        prep$dpars <- dpars
+      }
+    }
   }
 
   return(prep)

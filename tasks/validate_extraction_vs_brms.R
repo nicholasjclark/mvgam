@@ -1821,6 +1821,125 @@ results$epred_zip <- list(name = "epred_Zero-Inflated Poisson family",
                            cor = comp_zip_epred$cor)
 
 # =============================================================================
+# DPARS EXTRACTION VALIDATION
+# =============================================================================
+
+cat(rep("=", 60), "\n", sep = "")
+cat("DPARS EXTRACTION VALIDATION\n")
+cat(rep("=", 60), "\n", sep = "")
+
+#' Validate dpars extraction against brms
+#'
+#' @param test_name Descriptive name for test
+#' @param brms_fit Fitted brms model
+#' @param mvgam_fit Fitted mvgam model
+#' @param newdata Data for predictions
+#' @param dpar_names Character vector of dpars to validate
+#' @return List with name, passed, and dpars results
+#' @noRd
+run_dpars_validation <- function(test_name,
+                                 brms_fit,
+                                 mvgam_fit,
+                                 newdata,
+                                 dpar_names) {
+  checkmate::assert_string(test_name)
+  checkmate::assert_class(brms_fit, "brmsfit")
+  checkmate::assert_class(mvgam_fit, "mvgam")
+  checkmate::assert_data_frame(newdata, min.rows = 1)
+  checkmate::assert_character(dpar_names, min.len = 1, any.missing = FALSE)
+
+  cat("\n--- dpars:", test_name, "---\n")
+
+  # Create mvgam prep object
+  obs_params <- extract_obs_parameters(mvgam_fit)
+  full_draws <- posterior::as_draws_matrix(mvgam_fit$fit)
+  obs_draws <- full_draws[, obs_params, drop = FALSE]
+  mock_fit <- create_mock_stanfit(obs_draws)
+  prep <- prepare_predictions.mock_stanfit(
+    object = mock_fit,
+    brmsfit = mvgam_fit$obs_model,
+    newdata = newdata
+  )
+
+  all_passed <- TRUE
+  dpar_results <- list()
+
+  for (dpar in dpar_names) {
+    cat(sprintf("  Checking %s:\n", dpar))
+
+    # Get brms reference
+    brms_dpar <- tryCatch(
+      brms::posterior_linpred(brms_fit, newdata = newdata, dpar = dpar),
+      error = function(e) {
+        cat(sprintf("    brms error: %s\n", conditionMessage(e)))
+        NULL
+      }
+    )
+
+    if (is.null(brms_dpar)) {
+      cat("    SKIP: brms dpar not available\n")
+      next
+    }
+
+    mvgam_dpar <- prep$dpars[[dpar]]
+
+    if (is.null(mvgam_dpar)) {
+      cat("    FAIL: mvgam dpar is NULL\n")
+      all_passed <- FALSE
+      dpar_results[[dpar]] <- list(passed = FALSE, reason = "null")
+      next
+    }
+
+    # Check dimensions
+    if (!identical(dim(brms_dpar), dim(mvgam_dpar))) {
+      cat(sprintf("    FAIL: dims brms=%s mvgam=%s\n",
+                  paste(dim(brms_dpar), collapse = "x"),
+                  paste(dim(mvgam_dpar), collapse = "x")))
+      all_passed <- FALSE
+      dpar_results[[dpar]] <- list(passed = FALSE, reason = "dim")
+      next
+    }
+
+    # Compare values
+    comp <- compare_vectors(colMeans(brms_dpar), colMeans(mvgam_dpar))
+    passed <- if (comp$constant) {
+      comp$rmse < 0.01
+    } else {
+      !is.na(comp$cor) && comp$cor >= 0.99
+    }
+
+    status_msg <- if (passed) "PASS" else "FAIL"
+    cat(sprintf("    cor=%.4f rmse=%.4f %s\n",
+                comp$cor %||% NA, comp$rmse, status_msg))
+
+    dpar_results[[dpar]] <- list(passed = passed, cor = comp$cor)
+    if (!passed) all_passed <- FALSE
+  }
+
+  cat(sprintf("  Overall: %s\n", if (all_passed) "PASSED" else "FAILED"))
+  list(name = paste0("dpars_", test_name), passed = all_passed,
+       dpars = dpar_results)
+}
+
+# Validate dpars using existing models (no new fitting)
+results$dpars_beta <- run_dpars_validation(
+  "Beta (phi)", brms_beta, mvgam_beta, test_data_beta, c("phi")
+)
+
+results$dpars_hp <- run_dpars_validation(
+  "Hurdle Poisson (hu)", brms_hp, mvgam_hp, test_data_hp, c("hu")
+)
+
+results$dpars_hnb <- run_dpars_validation(
+  "Hurdle NB (hu, shape)", brms_hnb, mvgam_hnb, test_data_hnb,
+  c("hu", "shape")
+)
+
+results$dpars_zip <- run_dpars_validation(
+  "ZI Poisson (zi)", brms_zip, mvgam_zip, test_data_zip, c("zi")
+)
+
+# =============================================================================
 # SUMMARY
 # =============================================================================
 

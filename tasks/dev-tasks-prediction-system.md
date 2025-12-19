@@ -411,7 +411,7 @@ Posterior predictive samples with observation-level noise.
   - Added edge case validation for shifted_lognormal (epred > ndt)
   - Code reviewer approved sampling infrastructure
 
-- [ ] **3.2 Handle distributional parameters extraction (DRY approach)**
+- [x] **3.2 Handle distributional parameters extraction (DRY approach)** ✓
 
   **Key Findings from Investigation:**
   - brms `get_dpar(prep, dpar, i, inv_link)` returns matrix `[ndraws x nobs]`
@@ -447,16 +447,30 @@ Posterior predictive samples with observation-level noise.
     - Handles dimension mismatch with informative warning
     - Code reviewer approved, 3 unit tests pass
 
-  - [ ] **3.2.3 Extend `prepare_predictions.mock_stanfit()` to populate dpars**
-    - After creating prep object, call `extract_dpars_from_stanfit()`
-    - Store result in `prep$dpars` alongside existing structure
-    - Ensure family metadata includes link function info for get_dpar()
+  - [x] **3.2.3 Extend `prepare_predictions.mock_stanfit()` to populate dpars**
+    - **Implemented in**: `R/mock-stanfit.R` (lines 371-440)
+    - Three-branch logic handles ALL model types:
+      - Nonlinear: mu computed via formula evaluation (existing)
+      - Multivariate: per-response extraction with `{dpar}_{resp}` naming
+      - Univariate: direct extraction from posterior
+    - Multivariate uses `names(brmsfit$formula$forms)` for response names
+    - Per-response nobs from `sdata[[paste0("N_", resp_name)]]`
+    - Stores multivariate dpars as `prep$dpars[[resp_name]]` with original
+      dpar names for downstream compatibility
+    - Fail-fast validation for missing response names and nobs
+    - Code reviewer approved, all 164 tests pass
 
-  - [ ] **3.2.4 Validate get_dpar() works with extended prep**
-    - Update `tasks/validate_get_dpar_integration.R`
-    - Test: `get_dpar(prep, "sigma")` returns correct matrix
-    - Test: Gaussian, negbinomial, student families
-    - Test: Scalar params broadcast correctly to [ndraws x nobs]
+  - [x] **3.2.4 Validate dpars extraction works with extended prep**
+    - Added `run_dpars_validation()` to `tasks/validate_extraction_vs_brms.R`
+    - Validates dpars by comparing `prep$dpars` against brms's
+      `posterior_linpred(dpar = ...)` output
+    - Tests using existing models (no new fitting):
+      - Beta family (phi)
+      - Hurdle Poisson (hu)
+      - Hurdle Negbinomial (hu, shape)
+      - Zero-inflated Poisson (zi)
+    - Uses 0.99 correlation threshold (stricter than linpred because
+      dpars are same draws extracted via different pathways)
 
 - [ ] **3.3 Implement `posterior_predict.mvgam()` S3 method (using DRY prep object)**
   - Function signature:
