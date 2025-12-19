@@ -909,3 +909,155 @@ test_that("dcumulative computes ordinal probabilities correctly", {
   # All probabilities should be in [0, 1]
   expect_true(all(result >= 0 & result <= 1))
 })
+
+# ==============================================================================
+# extract_dpars_from_stanfit tests
+# ==============================================================================
+
+test_that("extract_dpars_from_stanfit extracts and broadcasts scalar params", {
+  # Create mock draws with scalar sigma parameter
+  set.seed(123)
+  draws_mat <- matrix(
+    c(rnorm(10), abs(rnorm(10, mean = 1))),
+    nrow = 10, ncol = 2
+  )
+  colnames(draws_mat) <- c("b_Intercept", "sigma")
+  mock_draws <- posterior::as_draws_matrix(draws_mat)
+
+  # Extract sigma with nobs = 5 (should broadcast to [10 x 5])
+  result <- extract_dpars_from_stanfit(
+    mock_draws,
+    dpar_names = "sigma",
+    ndraws = 10,
+    nobs = 5
+  )
+
+  expect_true(is.list(result))
+  expect_named(result, "sigma")
+  expect_true(is.matrix(result$sigma))
+  expect_equal(dim(result$sigma), c(10, 5))
+
+  # Broadcasting with byrow=FALSE replicates scalar across columns
+  for (col in 1:5) {
+    expect_equal(result$sigma[, col], draws_mat[, "sigma"])
+  }
+
+  # Also test single indexed param broadcasts like scalar
+  draws_single_idx <- matrix(abs(rnorm(10, mean = 1)), nrow = 10, ncol = 1)
+  colnames(draws_single_idx) <- "zi[1]"
+  mock_single <- posterior::as_draws_matrix(draws_single_idx)
+
+  result_single <- extract_dpars_from_stanfit(
+    mock_single,
+    dpar_names = "zi",
+    ndraws = 10,
+    nobs = 4
+  )
+
+  expect_equal(dim(result_single$zi), c(10, 4))
+  # All columns should be identical (broadcasted from single indexed value)
+  for (col in 2:4) {
+    expect_equal(result_single$zi[, col], result_single$zi[, 1])
+  }
+})
+
+test_that("extract_dpars_from_stanfit handles indexed and missing params", {
+  # Create mock draws with indexed zi parameter and scalar sigma
+  set.seed(456)
+  ndraws <- 8
+  nobs <- 3
+  zi_vals <- matrix(runif(ndraws * nobs, 0, 0.5), nrow = ndraws, ncol = nobs)
+
+  draws_mat <- cbind(
+    matrix(rnorm(ndraws), ncol = 1),
+    abs(rnorm(ndraws, mean = 1)),
+    zi_vals
+  )
+  colnames(draws_mat) <- c("b_Intercept", "sigma", "zi[1]", "zi[2]", "zi[3]")
+  mock_draws <- posterior::as_draws_matrix(draws_mat)
+
+  # Extract both existing params
+  result <- extract_dpars_from_stanfit(
+    mock_draws,
+    dpar_names = c("sigma", "zi"),
+    ndraws = ndraws,
+    nobs = nobs
+  )
+
+  expect_true(is.list(result))
+  expect_named(result, c("sigma", "zi"))
+
+  # sigma is scalar, should be broadcasted
+  expect_equal(dim(result$sigma), c(ndraws, nobs))
+
+  # zi is indexed, should match original values
+  expect_equal(dim(result$zi), c(ndraws, nobs))
+  expect_equal(as.numeric(result$zi), as.numeric(zi_vals))
+
+  # Request shape (missing) - should return NULL
+  result_missing <- extract_dpars_from_stanfit(
+    mock_draws,
+    dpar_names = c("sigma", "shape"),
+    ndraws = ndraws,
+    nobs = nobs
+  )
+  expect_true(is.matrix(result_missing$sigma))
+  expect_null(result_missing$shape)
+
+  # Empty dpar_names should return empty list
+  result_empty <- extract_dpars_from_stanfit(
+    mock_draws,
+    dpar_names = character(0),
+    ndraws = ndraws,
+    nobs = nobs
+  )
+  expect_equal(result_empty, list())
+})
+
+test_that("extract_dpars_from_stanfit validates inputs correctly", {
+  # Create valid mock draws for testing
+  set.seed(789)
+  draws_mat <- matrix(abs(rnorm(20, mean = 1)), nrow = 10, ncol = 2)
+  colnames(draws_mat) <- c("b_Intercept", "sigma")
+  valid_draws <- posterior::as_draws_matrix(draws_mat)
+
+  # Invalid stanfit type
+  expect_error(
+    extract_dpars_from_stanfit("not_draws", "sigma", 10, 5),
+    "Must inherit from class"
+  )
+
+  # ndraws must be >= 1
+  expect_error(
+    extract_dpars_from_stanfit(valid_draws, "sigma", 0, 5),
+    "not >= 1"
+  )
+
+  # nobs must be >= 1
+  expect_error(
+    extract_dpars_from_stanfit(valid_draws, "sigma", 10, 0),
+    "not >= 1"
+  )
+
+  # ndraws exceeds available draws
+  expect_error(
+    extract_dpars_from_stanfit(valid_draws, "sigma", 100, 5),
+    "exceeds available draws"
+  )
+
+  # draw_ids exceeds available draws
+  expect_error(
+    extract_dpars_from_stanfit(valid_draws, "sigma", 10, 5, draw_ids = 1:100),
+    "exceed available draws"
+  )
+
+  # draw_ids with valid subset should work
+  result <- extract_dpars_from_stanfit(
+    valid_draws,
+    dpar_names = "sigma",
+    ndraws = 10,
+    nobs = 3,
+    draw_ids = c(1, 3, 5)
+  )
+  expect_equal(dim(result$sigma), c(3, 3))
+})

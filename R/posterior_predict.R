@@ -531,6 +531,178 @@ get_family_dpars <- function(family_name) {
 }
 
 
+#' Extract Distributional Parameters from Stanfit Object
+#'
+#' Extracts posterior draws for distributional parameters (dpars) required by
+#' family-specific sampling. Returns matrices in the format expected by
+#' \code{sample_from_family()}.
+#'
+#' @param stanfit A stanfit or draws object containing posterior samples
+#' @param dpar_names Character vector of distributional parameter names to
+#'   extract (e.g., c("sigma", "shape", "zi"))
+#' @param ndraws Integer; number of draws to extract
+#' @param nobs Integer; number of observations for matrix dimensions
+#' @param draw_ids Optional integer vector of specific draw indices to use.
+#'   If provided, overrides ndraws.
+#'
+#' @return Named list of matrices, each with dimensions [ndraws x nobs].
+#'   Scalar parameters are broadcast to full [ndraws x nobs] matrices.
+#'   Parameters not found in the posterior return NULL.
+#'
+#' @details
+#' This function handles both scalar and observation-indexed parameters:
+#' \itemize{
+#'   \item Scalar parameters (e.g., "sigma"): broadcast to [ndraws x nobs]
+#'   \item Indexed parameters (e.g., "sigma[1]", "sigma[2]", ...): extracted
+#'     as matrix with nobs columns
+#' }
+#'
+#' Example of scalar broadcasting:
+#' If posterior contains "sigma" (scalar), and ndraws=100, nobs=50:
+#'   - Extracts 100 draws of scalar sigma
+#'   - Returns matrix [100 x 50] with each row containing the same sigma value
+#'
+#' Parameter naming follows brms conventions. Some families use different
+#' internal names:
+#' \itemize{
+#'   \item Beta precision: "phi" in family specification
+#'   \item Negative binomial shape: "shape" (may be "r" in some
+#'     parameterizations)
+#' }
+#'
+#' @seealso [get_family_dpars()] for family-to-dpar mapping,
+#'   [sample_from_family()] which consumes these matrices.
+#'
+#' @noRd
+extract_dpars_from_stanfit <- function(stanfit,
+                                       dpar_names,
+                                       ndraws,
+                                       nobs,
+                                       draw_ids = NULL) {
+  # Validate stanfit can be converted to draws
+  checkmate::assert_multi_class(
+    stanfit,
+    c("stanfit", "CmdStanMCMC", "draws", "draws_matrix", "draws_array")
+  )
+  checkmate::assert_character(dpar_names, min.len = 0)
+  checkmate::assert_int(ndraws, lower = 1)
+  checkmate::assert_int(nobs, lower = 1)
+  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
+
+  # Return empty list if no dpars needed
+  if (length(dpar_names) == 0) {
+    return(list())
+  }
+
+  # Convert stanfit to draws matrix
+  draws_mat <- posterior::as_draws_matrix(stanfit)
+  all_cols <- colnames(draws_mat)
+  total_draws <- nrow(draws_mat)
+
+  # Determine which draw indices to use
+  if (!is.null(draw_ids)) {
+    if (max(draw_ids) > total_draws) {
+      stop(insight::format_error(
+        "Requested {.field draw_ids} exceed available draws.",
+        "Max requested: {max(draw_ids)}, available: {total_draws}."
+      ))
+    }
+    draw_indices <- draw_ids
+    ndraws <- length(draw_ids)
+  } else if (ndraws > total_draws) {
+    stop(insight::format_error(
+      "Requested {.field ndraws} ({ndraws}) exceeds available draws ",
+      "({total_draws})."
+    ))
+  } else {
+    draw_indices <- seq_len(ndraws)
+  }
+
+  # Extract each dpar
+  dpars_list <- list()
+
+  for (dpar in dpar_names) {
+    # Build patterns for scalar and indexed parameters
+    scalar_pattern <- paste0("^", dpar, "$")
+    indexed_pattern <- paste0("^", dpar, "\\[")
+
+    # Find matching columns
+    scalar_cols <- grep(scalar_pattern, all_cols, value = TRUE)
+    indexed_cols <- grep(indexed_pattern, all_cols, value = TRUE)
+
+    if (length(scalar_cols) > 0) {
+      # Scalar parameter - extract and broadcast to [ndraws x nobs]
+      scalar_draws <- as.numeric(draws_mat[draw_indices, scalar_cols[1]])
+      dpars_list[[dpar]] <- matrix(
+        scalar_draws,
+        nrow = ndraws,
+        ncol = nobs,
+        byrow = FALSE
+      )
+    } else if (length(indexed_cols) > 0) {
+      # Indexed parameters - extract and validate dimensions
+      # Sort columns by index to ensure correct ordering
+      indices <- as.integer(gsub(".*\\[(\\d+)\\].*", "\\1", indexed_cols))
+
+      # Validate index extraction succeeded
+      if (any(is.na(indices))) {
+        stop(insight::format_error(
+          "Failed to extract numeric indices from parameter names: ",
+          "{.val {indexed_cols[is.na(indices)]}}."
+        ))
+      }
+
+      indexed_cols <- indexed_cols[order(indices)]
+
+      # Extract as matrix
+      dpar_matrix <- as.matrix(
+        draws_mat[draw_indices, indexed_cols, drop = FALSE]
+      )
+
+      # Handle dimension mismatch when training data has different nobs than
+      # prediction data (e.g., newdata in posterior_predict has fewer/more
+      # observations than the fitted model's observation-level parameters)
+      if (ncol(dpar_matrix) == 1) {
+        # Single indexed parameter - broadcast like scalar
+        dpars_list[[dpar]] <- matrix(
+          dpar_matrix[, 1],
+          nrow = ndraws,
+          ncol = nobs,
+          byrow = FALSE
+        )
+      } else if (ncol(dpar_matrix) == nobs) {
+        # Correct number of columns
+        dpars_list[[dpar]] <- dpar_matrix
+      } else {
+        # Dimension mismatch - use first column with warning
+        if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+          rlang::warn(
+            paste0(
+              "Parameter '", dpar, "' has ", ncol(dpar_matrix),
+              " columns but ", nobs, " observations. ",
+              "Using first column (scalar behavior)."
+            ),
+            .frequency = "once",
+            .frequency_id = paste0("dpar_dim_mismatch_", dpar)
+          )
+        }
+        dpars_list[[dpar]] <- matrix(
+          dpar_matrix[, 1],
+          nrow = ndraws,
+          ncol = nobs,
+          byrow = FALSE
+        )
+      }
+    } else {
+      # Parameter not found - return NULL (caller handles defaults)
+      dpars_list[[dpar]] <- NULL
+    }
+  }
+
+  dpars_list
+}
+
+
 #' Extract Posterior Predictive Distribution from mvgam Models
 #'
 #' @description

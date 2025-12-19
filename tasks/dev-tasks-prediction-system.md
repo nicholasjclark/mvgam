@@ -435,11 +435,17 @@ Posterior predictive samples with observation-level noise.
       zero-inflated, and hurdle families
     - Uses `%||%` pattern for clean null handling
 
-  - [ ] **3.2.2 Create `extract_dpars_from_stanfit()` helper**
-    - Takes: stanfit object, dpar names, ndraws, nobs
-    - Extracts posterior draws for each dpar using existing pattern matching
+  - [x] **3.2.2 Create `extract_dpars_from_stanfit()` helper** ✓
+    - **Implemented in**: `R/posterior_predict.R` (lines 534-703)
+    - **Tests in**: `tests/testthat/test-predict.R` (lines 913-1063)
+    - Takes: stanfit object, dpar names, ndraws, nobs, draw_ids
+    - Extracts posterior draws for each dpar using grep pattern matching
     - Returns named list of matrices `[ndraws x nobs]`
     - Handles scalar vs indexed parameters (broadcast scalar to matrix)
+    - Validates stanfit class (stanfit, CmdStanMCMC, draws variants)
+    - Validates index extraction from parameter names
+    - Handles dimension mismatch with informative warning
+    - Code reviewer approved, 3 unit tests pass
 
   - [ ] **3.2.3 Extend `prepare_predictions.mock_stanfit()` to populate dpars**
     - After creating prep object, call `extract_dpars_from_stanfit()`
