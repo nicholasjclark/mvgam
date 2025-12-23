@@ -1061,3 +1061,67 @@ test_that("extract_dpars_from_stanfit validates inputs correctly", {
   )
   expect_equal(dim(result$sigma), c(3, 3))
 })
+
+# ==============================================================================
+# Truncation helper function tests
+# ==============================================================================
+
+test_that("extract_truncation_bounds handles NULL and constant bounds", {
+  # Mock mvgam object with no truncation bounds in standata
+  mock_no_trunc <- structure(
+    list(standata = list(N = 10)),
+    class = "mvgam"
+  )
+  result_none <- extract_truncation_bounds(mock_no_trunc, nobs = 10)
+  expect_null(result_none$lb)
+  expect_null(result_none$ub)
+
+  # Mock mvgam object with constant lb=0, ub=100 in standata
+  mock_trunc <- structure(
+    list(standata = list(N = 10, lb = 0, ub = 100)),
+    class = "mvgam"
+  )
+  result_const <- extract_truncation_bounds(mock_trunc, nobs = 5)
+  expect_equal(result_const$lb, rep(0, 5))
+  expect_equal(result_const$ub, rep(100, 5))
+})
+
+test_that("family_to_dist maps family names to R distribution abbreviations", {
+  # Maps family names to their R distribution abbreviations
+  expect_equal(family_to_dist("gaussian"), "norm")
+  expect_equal(family_to_dist("gamma"), "gamma")
+  expect_equal(family_to_dist("poisson"), "pois")
+  expect_equal(family_to_dist("negbinomial"), "nbinom")
+
+  # Unknown families return NA_character_
+  expect_true(is.na(family_to_dist("unknown_family")))
+})
+
+test_that("apply_truncation clamps samples to specified bounds", {
+  set.seed(42)
+  ndraws <- 50
+  nobs <- 4
+
+  # Normal samples centered at 5 with sd=3 will have values outside [0, 10]
+  samples <- matrix(
+    rnorm(ndraws * nobs, mean = 5, sd = 3),
+    nrow = ndraws,
+    ncol = nobs
+  )
+
+  # Apply truncation with lb=0, ub=10
+  result <- apply_truncation(
+    samples = samples,
+    family_name = "gaussian",
+    lb = 0,
+    ub = 10,
+    ntrys = 5,
+    ndraws = ndraws,
+    nobs = nobs
+  )
+
+  # All values should be within [0, 10] after truncation
+  expect_true(all(result >= 0))
+  expect_true(all(result <= 10))
+  expect_equal(dim(result), c(ndraws, nobs))
+})

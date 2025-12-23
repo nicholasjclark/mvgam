@@ -363,6 +363,198 @@ family_uses_integers <- function(family_name) {
 }
 
 
+#' Map Family Name to R Distribution Abbreviation
+#'
+#' Maps brms/mvgam family names to base R distribution abbreviations
+#' (e.g., "gaussian" -> "norm", "poisson" -> "pois") for use with
+#' truncation sampling functions.
+#'
+#' @param family_name Character; family name (e.g., "gaussian", "poisson")
+#'
+#' @return Character; R distribution abbreviation (e.g., "norm", "pois"),
+#'   or NA_character_ if family has no simple R distribution mapping.
+#'
+#' @noRd
+family_to_dist <- function(family_name) {
+  checkmate::assert_string(family_name)
+
+  dist_map <- c(
+    "gaussian" = "norm",
+    "student" = "lst",
+    "exponential" = "exp",
+    "gamma" = "gamma",
+    "weibull" = "weibull",
+    "lognormal" = "lnorm",
+    "beta" = "beta",
+    "poisson" = "pois",
+    "negbinomial" = "nbinom",
+    "negbinomial2" = "nbinom",
+    "geometric" = "geom",
+    "binomial" = "binom",
+    "bernoulli" = "binom"
+  )
+
+  if (family_name %in% names(dist_map)) {
+    return(dist_map[[family_name]])
+  }
+
+  NA_character_
+}
+
+
+#' Apply Truncation to Samples Matrix
+#'
+#' Applies truncation bounds to samples by resampling out-of-bounds values
+#' or clamping to bounds when resampling fails.
+#'
+#' @param samples Matrix [ndraws x nobs] or vector of samples
+#' @param family_name Character; distribution family name
+#' @param lb Numeric; lower bound(s) - scalar or vector of length nobs
+#' @param ub Numeric; upper bound(s) - scalar or vector of length nobs
+#' @param ntrys Integer; rejection sampling attempts for discrete families
+#' @param ndraws Integer; number of draws (needed if samples is vector)
+#' @param nobs Integer; number of observations (needed if samples is vector)
+#'
+#' @return Matrix [ndraws x nobs] of truncated samples
+#'
+#' @details
+#' The function works column-by-column to handle observation-specific bounds.
+#' For efficiency, columns with no out-of-bounds samples are skipped.
+#'
+#' Uses inverse CDF for continuous distributions when possible, falls back
+#' to rejection sampling. For discrete distributions, uses rejection sampling.
+#'
+#' When resampling fails (after ntrys for rejection), samples are clamped
+#' to bounds with a warning if >1% of samples were clamped.
+#'
+#' @noRd
+apply_truncation <- function(samples, family_name, lb, ub, ntrys,
+                             ndraws, nobs) {
+  checkmate::assert_string(family_name)
+  checkmate::assert_numeric(lb, null.ok = TRUE)
+  checkmate::assert_numeric(ub, null.ok = TRUE)
+  checkmate::assert_int(ntrys, lower = 1)
+  checkmate::assert_int(ndraws, lower = 1)
+
+  checkmate::assert_int(nobs, lower = 1)
+
+  # Convert vector to matrix for consistent handling
+  is_vector <- !is.matrix(samples)
+  if (is_vector) {
+    samples <- matrix(samples, nrow = ndraws, ncol = nobs)
+  }
+
+  # Handle NULL bounds
+  if (is.null(lb) || all(is.infinite(lb) & lb < 0)) {
+    lb <- rep(-Inf, nobs)
+  }
+  if (is.null(ub) || all(is.infinite(ub) & ub > 0)) {
+    ub <- rep(Inf, nobs)
+  }
+
+  # Expand scalar bounds to vector
+  if (length(lb) == 1) lb <- rep(lb, nobs)
+  if (length(ub) == 1) ub <- rep(ub, nobs)
+
+  # Get distribution abbreviation for resampling
+  dist <- family_to_dist(family_name)
+  is_discrete <- family_uses_integers(family_name)
+
+  # Track clamping for warning
+  n_clamped <- 0
+  total_samples <- ndraws * nobs
+
+  # Process each column (observation)
+  for (j in seq_len(nobs)) {
+    col_lb <- lb[j]
+    col_ub <- ub[j]
+
+    # Skip if no effective truncation
+    if (is.infinite(col_lb) && col_lb < 0 &&
+        is.infinite(col_ub) && col_ub > 0) {
+      next
+    }
+
+    # Find invalid samples
+    invalid <- !is.na(samples[, j]) &
+      (samples[, j] < col_lb | samples[, j] > col_ub)
+    n_invalid <- sum(invalid)
+
+    if (n_invalid == 0) next
+
+    # Attempt resampling if we have a known distribution
+    if (!is.na(dist)) {
+      if (is_discrete) {
+        new_samples <- sample_truncated_rejection(
+          n = n_invalid,
+          dist = dist,
+          lb = col_lb,
+          ub = col_ub,
+          ntrys = ntrys
+        )
+      } else {
+        new_samples <- sample_continuous_truncated(
+          n = n_invalid,
+          dist = dist,
+          lb = col_lb,
+          ub = col_ub,
+          ntrys = ntrys
+        )
+      }
+
+      # Replace valid resampled values
+      valid_new <- !is.na(new_samples)
+      samples[which(invalid)[valid_new], j] <- new_samples[valid_new]
+
+      # Check for remaining invalid samples after resampling
+      still_invalid <- invalid &
+        (samples[, j] < col_lb | samples[, j] > col_ub)
+      n_still_invalid <- sum(still_invalid)
+    } else {
+      # No known distribution - just clamp
+      still_invalid <- invalid
+      n_still_invalid <- n_invalid
+    }
+
+    # Clamp remaining out-of-bounds samples
+    if (n_still_invalid > 0) {
+      n_clamped <- n_clamped + n_still_invalid
+      clamp_idx <- which(still_invalid)
+      samples[clamp_idx[samples[clamp_idx, j] < col_lb], j] <- col_lb
+      samples[clamp_idx[samples[clamp_idx, j] > col_ub], j] <- col_ub
+    }
+  }
+
+  # Warn if significant clamping occurred (>1% matches brms threshold)
+  clamp_frac <- n_clamped / total_samples
+  if (clamp_frac > 0.01) {
+    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+      rlang::warn(
+        c(
+          paste0(
+            round(clamp_frac * 100, 1), "% of samples (",
+            n_clamped, " of ", total_samples, ") were clamped."
+          ),
+          "i" = paste(
+            "This may indicate the truncation region is too narrow",
+            "relative to the posterior predictive distribution."
+          )
+        ),
+        .frequency = "once",
+        .frequency_id = "mvgam_truncation_clamp"
+      )
+    }
+  }
+
+  # Convert back to vector if input was vector
+  if (is_vector) {
+    samples <- as.vector(samples)
+  }
+
+  samples
+}
+
+
 #' Sample from a Probability Distribution
 #'
 #' Internal helper that samples from a specified distribution using
@@ -444,8 +636,9 @@ sample_from_family <- function(family_name, ndraws, epred,
   checkmate::assert_int(ntrys, lower = 1)
 
   has_truncation <- !is.null(lb) || !is.null(ub)
+  nobs <- ncol(epred)
 
-  switch(
+  samples <- switch(
     family_name,
 
     # ============ Continuous families ============
@@ -804,6 +997,21 @@ sample_from_family <- function(family_name, ndraws, epred,
       "is not yet implemented."
     ))
   )
+
+  # Apply truncation if bounds are specified
+  if (has_truncation) {
+    samples <- apply_truncation(
+      samples = samples,
+      family_name = family_name,
+      lb = lb,
+      ub = ub,
+      ntrys = ntrys,
+      ndraws = ndraws,
+      nobs = nobs
+    )
+  }
+
+  samples
 }
 
 
@@ -1322,6 +1530,9 @@ predict_single_response <- function(object, linpred_resp, resp, draw_ids,
   # Extract trials for binomial families
   trials <- extract_trials_for_family(object, family, newdata)
 
+  # Extract constant truncation bounds if model has truncation
+  trunc_bounds <- extract_truncation_bounds(object, nobs)
+
   # Sample from family distribution
   samples <- sample_from_family(
     family_name = family_name,
@@ -1345,7 +1556,9 @@ predict_single_response <- function(object, linpred_resp, resp, draw_ids,
     bs = dpars$bs,
     bias = dpars$bias,
     disc = dpars$disc,
-    thres = dpars$thres
+    thres = dpars$thres,
+    lb = trunc_bounds$lb,
+    ub = trunc_bounds$ub
   )
 
   # Reshape vector to matrix [ndraws x nobs]
