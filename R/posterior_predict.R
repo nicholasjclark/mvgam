@@ -241,17 +241,22 @@ sample_from_family <- function(family_name, ndraws, epred,
 
     "binomial" = {
       checkmate::assert_numeric(trials, min.len = 1)
-      # epred = p * trials (on response scale)
-      # so probability = epred / trials
+      # epred from linkinv is probability (0-1), use directly as prob
+      # (matches brms behavior in posterior_predict_binomial)
       if (length(trials) == 1) {
-        prob <- epred / trials
-        stats::rbinom(length(epred), size = trials, prob = prob)
+        stats::rbinom(length(epred), size = trials, prob = epred)
       } else {
-        prob <- sweep(epred, 2, trials, `/`)
-        # rbinom vectorizes: each element uses corresponding trial count
-        mapply(stats::rbinom, n = nrow(epred),
-               size = rep(trials, each = nrow(epred)),
-               prob = prob)
+        # Different trial counts per observation: sample column-by-column
+        nobs <- ncol(epred)
+        result <- matrix(NA_integer_, nrow = ndraws, ncol = nobs)
+        for (j in seq_len(nobs)) {
+          result[, j] <- stats::rbinom(
+            ndraws,
+            size = trials[j],
+            prob = epred[, j]
+          )
+        }
+        result
       }
     },
 
