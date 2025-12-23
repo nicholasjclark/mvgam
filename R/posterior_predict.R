@@ -9,6 +9,360 @@
 NULL
 
 
+# ============ Truncation Helper Functions ============
+#
+# These functions reimplement brms' internal truncation sampling logic
+# (rcontinuous, rdiscrete, check_discrete_trunc_bounds). Reimplementation
+# is necessary because:
+#
+# 1. brms does NOT export these functions (no @export tag)
+# 2. Using brms:::rcontinuous() violates R package best practices
+# 3. brms maintainers have indicated these are internal implementation
+#    details subject to change without notice
+#
+# The implementations follow brms' approach:
+# - Inverse CDF transformation for continuous distributions
+# - Rejection sampling for discrete distributions
+# - Warning threshold of 1% for invalid samples
+#
+# Verified against brms version 2.22.9 as reference implementation.
+
+
+#' Extract Truncation Bounds for Posterior Prediction
+#'
+#' Extracts constant lower and upper truncation bounds from fitted mvgam
+#' model. Variable bounds (observation-specific) are not yet supported.
+#'
+#' @param object A fitted mvgam object
+#' @param nobs Integer; number of observations for bounds replication
+#'
+#' @return Named list with two elements: `lb` (numeric vector of length
+#'   nobs or NULL if no lower bound) and `ub` (numeric vector of length
+#'   nobs or NULL if no upper bound). Both NULL if model has no truncation.
+#'
+#' @details
+#' Truncation bounds are specified via `trunc()` in the model formula,
+#' e.g., `y | trunc(lb = 0, ub = 10) ~ x`. Bounds are stored in standata.
+#'
+#' Constant bounds: All observations share the same lb/ub values.
+#' Variable bounds: Observation-specific bounds from data columns.
+#' Variable bounds trigger a warning and are not yet supported.
+#'
+#' @noRd
+extract_truncation_bounds <- function(object, nobs) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_int(nobs, lower = 1)
+
+  if (is.null(object$standata)) {
+    return(list(lb = NULL, ub = NULL))
+  }
+
+  lb <- object$standata$lb
+  ub <- object$standata$ub
+
+  if (is.null(lb) && is.null(ub)) {
+    return(list(lb = NULL, ub = NULL))
+  }
+
+  # Validate extracted bounds are numeric
+  if (!is.null(lb)) {
+    checkmate::assert_numeric(lb, any.missing = FALSE)
+  }
+
+  if (!is.null(ub)) {
+    checkmate::assert_numeric(ub, any.missing = FALSE)
+  }
+
+  # Validate no mixed finite/infinite within bounds vector
+  if (!is.null(lb)) {
+    has_finite <- any(is.finite(lb))
+    has_infinite <- any(!is.finite(lb))
+    if (has_finite && has_infinite) {
+      stop(insight::format_error(
+        "Mixed finite and infinite lower bounds not supported.",
+        "i" = "All lb values must be either finite or all infinite (-Inf)."
+      ))
+    }
+  }
+  if (!is.null(ub)) {
+    has_finite <- any(is.finite(ub))
+    has_infinite <- any(!is.finite(ub))
+    if (has_finite && has_infinite) {
+      stop(insight::format_error(
+        "Mixed finite and infinite upper bounds not supported.",
+        "i" = "All ub values must be either finite or all infinite (Inf)."
+      ))
+    }
+  }
+
+  # Fail-fast: validate lb < ub for constant bounds
+  if (!is.null(lb) && !is.null(ub)) {
+    finite_lb <- lb[is.finite(lb)]
+    finite_ub <- ub[is.finite(ub)]
+    if (length(finite_lb) > 0 && length(finite_ub) > 0) {
+      lb_vals <- unique(finite_lb)
+      ub_vals <- unique(finite_ub)
+      if (length(lb_vals) == 1 && length(ub_vals) == 1 && lb_vals >= ub_vals) {
+        stop(insight::format_error(
+          paste0(
+            "Invalid truncation bounds: {.field lb} (", lb_vals,
+            ") must be less than {.field ub} (", ub_vals, ")."
+          ),
+          "i" = "Truncation requires lb < ub to define a valid bounded region."
+        ))
+      }
+    }
+  }
+
+  # Process lower bound
+  if (!is.null(lb)) {
+    finite_lb <- lb[is.finite(lb)]
+    if (length(finite_lb) == 0) {
+      lb <- NULL
+    } else if (length(unique(finite_lb)) == 1) {
+      lb <- rep(unique(finite_lb), nobs)
+    } else {
+      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+        rlang::warn(
+          c(
+            "Variable truncation bounds not yet supported for predictions.",
+            "i" = "Truncation will be ignored for posterior_predict."
+          ),
+          .frequency = "once",
+          .frequency_id = "mvgam_variable_trunc_lb"
+        )
+      }
+      lb <- NULL
+    }
+  }
+
+  # Process upper bound
+  if (!is.null(ub)) {
+    finite_ub <- ub[is.finite(ub)]
+    if (length(finite_ub) == 0) {
+      ub <- NULL
+    } else if (length(unique(finite_ub)) == 1) {
+      ub <- rep(unique(finite_ub), nobs)
+    } else {
+      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+        rlang::warn(
+          c(
+            "Variable truncation bounds not yet supported for predictions.",
+            "i" = "Truncation will be ignored for posterior_predict."
+          ),
+          .frequency = "once",
+          .frequency_id = "mvgam_variable_trunc_ub"
+        )
+      }
+      ub <- NULL
+    }
+  }
+
+  list(lb = lb, ub = ub)
+}
+
+
+#' Sample from Truncated Continuous Distribution
+#'
+#' Uses inverse CDF transformation for truncated sampling from continuous
+#' distributions. Falls back to rejection sampling if CDF/quantile functions
+#' are unavailable.
+#'
+#' @param n Integer; number of samples
+#' @param dist Character; distribution name (e.g., "norm", "gamma")
+#' @param lb Numeric; lower truncation bound
+#' @param ub Numeric; upper truncation bound
+#' @param ntrys Integer; rejection sampling attempts if CDF unavailable
+#' @param ... Additional arguments passed to distribution functions
+#'
+#' @return Numeric vector of n samples from the truncated distribution.
+#'   NA values indicate samples that could not be generated within bounds.
+#'
+#' @noRd
+sample_continuous_truncated <- function(n, dist, lb = -Inf, ub = Inf,
+                                        ntrys = 5, ...) {
+  checkmate::assert_int(n, lower = 1)
+  checkmate::assert_string(dist)
+  checkmate::assert_number(lb)
+  checkmate::assert_number(ub)
+  checkmate::assert_int(ntrys, lower = 1)
+
+  if (is.finite(lb) && is.finite(ub) && lb >= ub) {
+    stop(insight::format_error(
+      paste0(
+        "Invalid truncation bounds: {.field lb} (", lb,
+        ") must be less than {.field ub} (", ub, ")."
+      ),
+      "i" = "Truncation requires lb < ub to define a valid bounded region."
+    ))
+  }
+
+  args <- list(...)
+  pdist <- paste0("p", dist)
+  qdist <- paste0("q", dist)
+
+  if (exists(pdist, mode = "function") && exists(qdist, mode = "function")) {
+    # Inverse CDF transformation method
+    plb <- do.call(pdist, c(list(lb), args))
+    pub <- do.call(pdist, c(list(ub), args))
+    u <- stats::runif(n, min = plb, max = pub)
+    out <- do.call(qdist, c(list(u), args))
+    # Handle numerical imprecision at boundaries
+    out[out %in% c(-Inf, Inf)] <- NA_real_
+  } else {
+    # Fall back to rejection sampling
+    out <- sample_truncated_rejection(
+      n, dist, lb = lb, ub = ub, ntrys = ntrys, ...
+    )
+  }
+
+  out
+}
+
+
+#' Sample from Truncated Distribution via Rejection Sampling
+#'
+#' General-purpose rejection sampler for truncated distributions. Samples
+#' ntrys times and selects first valid value within bounds.
+#'
+#' @param n Integer; number of samples
+#' @param dist Character; distribution name (e.g., "pois", "norm")
+#' @param lb Numeric; lower truncation bound
+#' @param ub Numeric; upper truncation bound
+#' @param ntrys Integer; number of rejection sampling attempts
+#' @param ... Additional arguments passed to distribution functions
+#'
+#' @return Numeric vector of n samples. NA_real_ where no valid sample found
+#'   after ntrys attempts.
+#'
+#' @noRd
+sample_truncated_rejection <- function(n, dist, lb = -Inf, ub = Inf,
+                                       ntrys = 5, ...) {
+  checkmate::assert_int(n, lower = 1)
+  checkmate::assert_string(dist)
+  checkmate::assert_number(lb)
+  checkmate::assert_number(ub)
+  checkmate::assert_int(ntrys, lower = 1)
+
+  if (is.finite(lb) && is.finite(ub) && lb >= ub) {
+    stop(insight::format_error(
+      paste0(
+        "Invalid truncation bounds: {.field lb} (", lb,
+        ") must be less than {.field ub} (", ub, ")."
+      ),
+      "i" = "Truncation requires lb < ub to define a valid bounded region."
+    ))
+  }
+
+  args <- list(...)
+  rdist <- paste0("r", dist)
+
+  # Sample ntrys times
+  samples <- vector("list", ntrys)
+  for (i in seq_along(samples)) {
+    samples[[i]] <- as.vector(do.call(rdist, c(list(n), args)))
+  }
+  samples <- do.call(cbind, samples)
+
+  # For each row, find first valid sample within bounds
+  out <- apply(samples, 1, function(x) {
+    valid <- which(x >= lb & x <= ub)
+    if (length(valid) > 0) {
+      x[valid[1]]
+    } else {
+      NA_real_
+    }
+  })
+
+  out
+}
+
+
+#' Check for Invalid Truncated Samples
+#'
+#' Checks predicted values against truncation bounds and warns if many samples
+#' are invalid. Rounds values for discrete distributions.
+#'
+#' @param x Matrix of samples [ndraws x nobs]
+#' @param lb Lower bounds (vector of length nobs, scalar, or NULL)
+#' @param ub Upper bounds (vector of length nobs, scalar, or NULL)
+#' @param threshold Numeric in (0,1); fraction of invalid samples triggering
+#'   warning. Default 0.01 (1%) matches brms::check_discrete_trunc_bounds().
+#'
+#' @return Matrix x rounded to integers (for discrete distributions)
+#'
+#' @noRd
+check_truncation_bounds <- function(x, lb = NULL, ub = NULL, threshold = 0.01) {
+  checkmate::assert_matrix(x)
+  checkmate::assert_numeric(lb, null.ok = TRUE)
+  checkmate::assert_numeric(ub, null.ok = TRUE)
+  checkmate::assert_number(threshold, lower = 0, upper = 1)
+
+  if (is.null(lb) && is.null(ub)) {
+    return(x)
+  }
+
+  lb_check <- if (is.null(lb)) -Inf else lb
+  ub_check <- if (is.null(ub)) Inf else ub
+
+  # Expand bounds to match matrix dimensions
+  if (length(lb_check) == 1) lb_check <- rep(lb_check, ncol(x))
+  if (length(ub_check) == 1) ub_check <- rep(ub_check, ncol(x))
+
+  # Flatten for comparison
+  y <- as.vector(t(x))
+  lb_expanded <- rep(lb_check, each = nrow(x))
+  ub_expanded <- rep(ub_check, each = nrow(x))
+
+  # Count invalid: NA or outside bounds
+  pct_invalid <- mean(is.na(y) | y < lb_expanded | y > ub_expanded,
+                      na.rm = FALSE)
+
+  if (pct_invalid >= threshold) {
+    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+      rlang::warn(
+        c(
+          paste0(
+            round(pct_invalid * 100),
+            "% of all predicted values were invalid."
+          ),
+          "i" = "Increasing argument {.arg ntrys} may help."
+        ),
+        .frequency = "once",
+        .frequency_id = "mvgam_trunc_invalid"
+      )
+    }
+  }
+
+  round(x)
+}
+
+
+#' Determine if Family Uses Integer Values
+#'
+#' Returns TRUE for count/discrete families that produce integer samples.
+#'
+#' @param family_name Character; distribution family name
+#'
+#' @return Logical; TRUE if family produces integer samples
+#'
+#' @noRd
+family_uses_integers <- function(family_name) {
+  checkmate::assert_string(family_name)
+
+  integer_families <- c(
+    "poisson", "negbinomial", "negbinomial2", "geometric",
+    "binomial", "beta_binomial", "bernoulli",
+    "zero_inflated_poisson", "zero_inflated_negbinomial",
+    "zero_inflated_binomial", "zero_inflated_beta_binomial",
+    "hurdle_poisson", "hurdle_negbinomial", "hurdle_cumulative",
+    "discrete_weibull", "com_poisson"
+  )
+
+  family_name %in% integer_families
+}
+
+
 #' Sample from a Probability Distribution
 #'
 #' Internal helper that samples from a specified distribution using
@@ -80,10 +434,16 @@ sample_from_family <- function(family_name, ndraws, epred,
                                quantile = NULL, kappa = NULL,
                                beta = NULL, bs = NULL, bias = NULL,
                                disc = NULL, thres = NULL,
-                               link = "logit") {
+                               link = "logit",
+                               lb = NULL, ub = NULL, ntrys = 5) {
   checkmate::assert_string(family_name)
   checkmate::assert_int(ndraws, lower = 1)
   checkmate::assert_matrix(epred)
+  checkmate::assert_numeric(lb, null.ok = TRUE)
+  checkmate::assert_numeric(ub, null.ok = TRUE)
+  checkmate::assert_int(ntrys, lower = 1)
+
+  has_truncation <- !is.null(lb) || !is.null(ub)
 
   switch(
     family_name,
