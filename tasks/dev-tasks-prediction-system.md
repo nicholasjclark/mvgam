@@ -561,26 +561,17 @@ Posterior predictive samples with observation-level noise.
 
 User-friendly interfaces with automatic summarization.
 
-- [ ] **4.1 Implement `predict.mvgam()` S3 method**
-  - Reference `brms_posterior_predict_internals.R` lines 239-255 for `predict.brmsfit()`
-  - Function signature:
+- [x] **4.1 Implement `predict.mvgam()` S3 method**
+  - Created `R/predict.R` with `predict.mvgam()` S3 method
+  - Function signature matches brms conventions with `process_error` addition
+  - Delegates to `posterior_predict.mvgam()` for draws generation
+  - When `summary = TRUE`: returns matrix with Estimate, Est.Error, Q* columns
+  - When `summary = FALSE`: returns raw matrix of draws
+  - Created `summarize_predictions()` helper for brms-compatible summaries
+  - Added 11 new tests to `tests/testthat/test-predict.R` (all pass)
+  - Added 5 validation tests to `tasks/validate_extraction_vs_brms.R`
 
-    ```r
-    predict.mvgam <- function(object, newdata = NULL,
-                              type = c("response", "link", "prediction"),
-                              process_error = TRUE,
-                              ndraws = NULL,
-                              summary = TRUE,
-                              robust = FALSE,
-                              probs = c(0.025, 0.975),
-                              ...)
-    ```
-  - Dispatch to appropriate posterior_* function based on `type`
-  - When `summary = TRUE`: return data.frame with Estimate, Est.Error, Q2.5, Q97.5
-  - When `summary = FALSE`: return raw matrix
-  - Add roxygen2 documentation with `@export`
-
-  - **4.1.1 Implement process error prediction functions**
+  - [ ] **4.1.1 Implement process error prediction functions**
     - Create `sample_process_errors()` to sample from trend innovation distributions
     - Sample from multivariate normal for State-Space trend components
     - Handle correlation/covariance structures from all trend model options:

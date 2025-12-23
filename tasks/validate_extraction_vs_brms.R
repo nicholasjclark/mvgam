@@ -2224,6 +2224,80 @@ cat("  Result:", if (mv_passed) "PASSED" else "FAILED", "\n")
 
 
 # =============================================================================
+# TEST predict.mvgam() S3 METHOD (wrapper with summary)
+# =============================================================================
+
+cat("\n=== predict.mvgam() S3 METHOD ===\n")
+
+# Test 1: summary = TRUE returns matrix with correct columns
+cat("\n--- predict.mvgam with summary = TRUE ---\n")
+pred_summary <- predict(mvgam_1, newdata = test_data_1, summary = TRUE)
+pred_summary_cols <- colnames(pred_summary)
+has_correct_cols <- all(c("Estimate", "Est.Error", "Q2.5", "Q97.5") %in%
+                         pred_summary_cols)
+has_correct_rows <- nrow(pred_summary) == nrow(test_data_1)
+cat("  Has correct columns:", has_correct_cols, "\n")
+cat("  Has correct rows:", has_correct_rows, "\n")
+results$predict_summary <- list(
+  name = "predict_summary_format",
+  passed = has_correct_cols && has_correct_rows
+)
+
+# Test 2: summary = FALSE returns raw draws matrix
+cat("\n--- predict.mvgam with summary = FALSE ---\n")
+pred_raw <- predict(mvgam_1, newdata = test_data_1, summary = FALSE)
+is_matrix <- is.matrix(pred_raw)
+has_correct_dims <- ncol(pred_raw) == nrow(test_data_1)
+cat("  Is matrix:", is_matrix, "\n")
+cat("  Columns match observations:", has_correct_dims, "\n")
+results$predict_raw <- list(
+  name = "predict_raw_format",
+  passed = is_matrix && has_correct_dims
+)
+
+# Test 3: robust = TRUE uses median/MAD
+cat("\n--- predict.mvgam with robust = TRUE ---\n")
+pred_robust <- predict(mvgam_1, newdata = test_data_1, robust = TRUE)
+# Verify median is close to mean (for symmetric distributions)
+mean_close_median <- cor(pred_summary[, "Estimate"],
+                          pred_robust[, "Estimate"]) > 0.95
+cat("  Median correlates with mean:", mean_close_median, "\n")
+results$predict_robust <- list(
+  name = "predict_robust",
+  passed = mean_close_median
+)
+
+# Test 4: Custom quantiles work
+cat("\n--- predict.mvgam with custom probs ---\n")
+pred_custom <- predict(mvgam_1, newdata = test_data_1,
+                        probs = c(0.1, 0.5, 0.9))
+has_custom_cols <- all(c("Q10", "Q50", "Q90") %in% colnames(pred_custom))
+cat("  Has custom quantile columns:", has_custom_cols, "\n")
+results$predict_custom_probs <- list(
+  name = "predict_custom_probs",
+  passed = has_custom_cols
+)
+
+# Test 5: process_error works
+cat("\n--- predict.mvgam with process_error = FALSE ---\n")
+pred_pe_true <- predict(mvgam_1, newdata = test_data_1, summary = FALSE,
+                         process_error = TRUE, ndraws = 100)
+pred_pe_false <- predict(mvgam_1, newdata = test_data_1, summary = FALSE,
+                          process_error = FALSE, ndraws = 100)
+# process_error = FALSE should have less variance (trend fixed at mean)
+var_pe_true <- mean(apply(pred_pe_true, 2, var))
+var_pe_false <- mean(apply(pred_pe_false, 2, var))
+pe_reduces_var <- var_pe_false <= var_pe_true * 1.1  # Allow small tolerance
+cat(sprintf("  Variance with PE=TRUE: %.4f\n", var_pe_true))
+cat(sprintf("  Variance with PE=FALSE: %.4f\n", var_pe_false))
+cat("  process_error=FALSE reduces variance:", pe_reduces_var, "\n")
+results$predict_process_error <- list(
+  name = "predict_process_error",
+  passed = pe_reduces_var
+)
+
+
+# =============================================================================
 # SUMMARY
 # =============================================================================
 

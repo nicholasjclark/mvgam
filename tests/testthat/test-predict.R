@@ -1125,3 +1125,47 @@ test_that("apply_truncation clamps samples to specified bounds", {
   expect_true(all(result <= 10))
   expect_equal(dim(result), c(ndraws, nobs))
 })
+
+# Tests for summarize_predictions() ------------------------------------------
+
+test_that("summarize_predictions computes correct statistics", {
+  set.seed(123)
+  draws <- matrix(rnorm(100 * 5, mean = 5, sd = 2), nrow = 100)
+
+  # Non-robust summary (mean/sd)
+  result <- summarize_predictions(draws, probs = c(0.025, 0.975), robust = FALSE)
+
+  expect_equal(nrow(result), 5)
+  expect_equal(ncol(result), 4)
+  expect_equal(colnames(result), c("Estimate", "Est.Error", "Q2.5", "Q97.5"))
+  expect_equal(result[, "Estimate"], colMeans(draws), tolerance = 1e-10)
+  expect_equal(result[, "Est.Error"], apply(draws, 2, sd), tolerance = 1e-10)
+})
+
+test_that("summarize_predictions handles robust = TRUE", {
+  set.seed(456)
+  draws <- matrix(rnorm(100 * 3, mean = 10, sd = 3), nrow = 100)
+
+  result <- summarize_predictions(draws, probs = c(0.1, 0.9), robust = TRUE)
+
+  expect_equal(colnames(result), c("Estimate", "Est.Error", "Q10", "Q90"))
+  expect_equal(result[, "Estimate"], apply(draws, 2, median), tolerance = 1e-10)
+  expect_equal(result[, "Est.Error"], apply(draws, 2, mad), tolerance = 1e-10)
+})
+
+test_that("summarize_predictions handles single and multiple quantiles", {
+  draws <- matrix(rnorm(50 * 4), nrow = 50)
+
+  # Single quantile
+  result1 <- summarize_predictions(draws, probs = 0.5, robust = FALSE)
+  expect_equal(ncol(result1), 3)
+  expect_equal(colnames(result1), c("Estimate", "Est.Error", "Q50"))
+
+  # Multiple quantiles
+  result2 <- summarize_predictions(
+    draws,
+    probs = c(0.025, 0.25, 0.5, 0.75, 0.975),
+    robust = FALSE
+  )
+  expect_equal(ncol(result2), 7)
+})
