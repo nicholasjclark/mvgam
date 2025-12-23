@@ -2134,6 +2134,24 @@ results$predict_4 <- run_predict_validation(
 results$predict_8 <- run_predict_validation(
   "AR(1) + GP", brms_8, mvgam_8, test_data
 )
+results$predict_3 <- run_predict_validation(
+  "AR(1) + random intercepts", brms_3, mvgam_3, test_data
+)
+results$predict_5 <- run_predict_validation(
+  "t2() tensor product", brms_5, mvgam_5, test_data_t2
+)
+results$predict_6 <- run_predict_validation(
+  "Monotonic mo()", brms_6, mvgam_6, validation_data_mo
+)
+results$predict_7 <- run_predict_validation(
+  "Correlated random effects", brms_7, mvgam_7, test_data
+)
+results$predict_9 <- run_predict_validation(
+  "2D GP", brms_9, mvgam_9, test_data_t2
+)
+results$predict_10 <- run_predict_validation(
+  "Multiple GPs with by", brms_10, mvgam_10, test_data_gp2
+)
 
 # Test posterior_predict for trend-formula models
 cat("\n--- Testing trend-formula models ---\n")
