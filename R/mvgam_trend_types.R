@@ -784,7 +784,9 @@ PW = function(
 #' mod <- mvgam(
 #'   y ~ species,
 #'   trend_model = ZMVN(unit = site, gr = group, subgr = species),
-#'   data = site_dat
+#'   data = site_dat,
+#'   chains = 2,
+#'   silent = 2
 #' )
 #'
 #' # Inspect the estimated species-species residual covariances

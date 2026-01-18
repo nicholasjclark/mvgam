@@ -286,7 +286,7 @@ var_mod <- mvgam(y ~ -1,
 ```{r eval=FALSE}
 var_mod <- mvgam(
   # observation formula, which is empty
-  y ~ -1,
+  forumla = y ~ -1,
 
   # process model formula, which includes the smooth functions
   trend_formula = ~ te(temp, month, k = c(4, 4)) +
@@ -315,17 +315,14 @@ The convergence of this model isn't fabulous (more on this in a moment). But we 
 plot(var_mod, "smooths", trend_effects = TRUE)
 ```
 
-The VAR matrix is of particular interest here, as it captures lagged dependencies and cross-dependencies in the latent process model. Unfortunately `bayesplot` doesn't know this is a matrix of parameters so what we see is actually the transpose of the VAR matrix. A little bit of wrangling gives us these histograms in the correct order:
+The autoregressive coefficient matrix is of particular interest here, as it captures lagged dependencies and cross-dependencies in the latent process model. Unfortunately `bayesplot` doesn't know this is a matrix of parameters so what we see is actually the transpose of the VAR matrix. Using `dir = 'v'` in the `facet_args` argument will accomplish this:
 ```{r warning=FALSE, message=FALSE}
-A_pars <- matrix(NA, nrow = 5, ncol = 5)
-for (i in 1:5) {
-  for (j in 1:5) {
-    A_pars[i, j] <- paste0("A[", i, ",", j, "]")
-  }
-}
-mcmc_plot(var_mod,
-  variable = as.vector(t(A_pars)),
-  type = "hist"
+mcmc_plot(
+  var_mod,
+  variable = 'A',
+  regex = TRUE,
+  type = 'hist',
+  facet_args = list(dir = 'v')
 )
 ```
 
@@ -333,15 +330,12 @@ There is a lot happening in this matrix. Each cell captures the lagged effect of
   
 The process error $(\Sigma)$ captures unmodelled variation in the process models. Again, we fixed the off-diagonals to 0, so the histograms for these will look like flat boxes:
 ```{r warning=FALSE, message=FALSE}
-Sigma_pars <- matrix(NA, nrow = 5, ncol = 5)
-for (i in 1:5) {
-  for (j in 1:5) {
-    Sigma_pars[i, j] <- paste0("Sigma[", i, ",", j, "]")
-  }
-}
-mcmc_plot(var_mod,
-  variable = as.vector(t(Sigma_pars)),
-  type = "hist"
+mcmc_plot(
+  var_mod,
+  variable = 'Sigma',
+  regex = TRUE,
+  type = 'hist',
+  facet_args = list(dir = 'v')
 )
 ```
 
@@ -385,7 +379,7 @@ varcor_mod <- mvgam(y ~ -1,
 ```{r eval=FALSE}
 varcor_mod <- mvgam(
   # observation formula, which remains empty
-  y ~ -1,
+  formula = y ~ -1,
 
   # process model formula, which includes the smooth functions
   trend_formula = ~ te(temp, month, k = c(4, 4)) +
@@ -405,25 +399,31 @@ varcor_mod <- mvgam(
 
 The $(\Sigma)$ matrix now captures any evidence of contemporaneously correlated process error:
 ```{r warning=FALSE, message=FALSE}
-Sigma_pars <- matrix(NA, nrow = 5, ncol = 5)
-for (i in 1:5) {
-  for (j in 1:5) {
-    Sigma_pars[i, j] <- paste0("Sigma[", i, ",", j, "]")
-  }
-}
-mcmc_plot(varcor_mod,
-  variable = as.vector(t(Sigma_pars)),
-  type = "hist"
+mcmc_plot(
+  varcor_mod,
+  variable = 'Sigma',
+  regex = TRUE,
+  type = 'hist',
+  facet_args = list(dir = 'v')
 )
 ```
 
 This symmetric matrix tells us there is support for correlated process errors, as several of the off-diagonal entries are strongly non-zero. But it is easier to interpret these estimates if we convert the covariance matrix to a correlation matrix. Here we compute the posterior median process error correlations:
 ```{r}
-Sigma_post <- as.matrix(varcor_mod, variable = "Sigma", regex = TRUE)
-median_correlations <- cov2cor(matrix(apply(Sigma_post, 2, median),
-  nrow = 5, ncol = 5
-))
-rownames(median_correlations) <- colnames(median_correlations) <- levels(plankton_train$series)
+Sigma_post <- as.matrix(
+  varcor_mod, 
+  variable = "Sigma", 
+  regex = TRUE
+)
+median_correlations <- cov2cor(
+  matrix(apply(Sigma_post, 2, median),
+         nrow = 5, 
+         ncol = 5
+  )
+)
+rownames(median_correlations) <- 
+  colnames(median_correlations) <- 
+  levels(plankton_train$series)
 
 round(median_correlations, 2)
 ```

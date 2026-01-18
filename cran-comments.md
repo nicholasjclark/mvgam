@@ -1,10 +1,10 @@
-## Version 1.1.53
+## Version 1.1.54
 
 ## Summary of changes
-This version brings efficiency updates and added functionality to enhance the user interface. It also addresses a minor warning about S3 method consistency from a recent CRAN check (https://cran.r-project.org/web/checks/check_results_mvgam.html). There are no major structural changes or modifications that would break pre-existing workflows
+This version is a minor patch update to fix a test that spawned more than two cores. It also brings several cosmetic updates to improve the way summaries are printed and stored. There are no major structural changes or modifications that would break pre-existing workflows
 
 ## Test environments
-* Windows install: R 4.4.2
+* Windows install: R 4.4.3
 * win-builder: R-devel
 * win-builder: R-release
 * ubuntu-latest: R-release

@@ -5,6 +5,7 @@
 ^LICENSE\.md$
 ^_pkgdown\.yml$
 ^docs$
+^tasks$
 ^.claude$
 ^Claude\.md$
 ^index_files$
