@@ -6,8 +6,8 @@ test_that("ma and cor options should work for trends other than VAR", {
   test <- mvgam(
     y ~
       s(series, bs = 're') +
-        s(season, bs = 'cc') -
-        1,
+      s(season, bs = 'cc') -
+      1,
     trend_model = AR(p = 1, ma = TRUE),
     data = gaus_data$data_train,
     family = gaussian(),
@@ -25,8 +25,8 @@ test_that("ma and cor options should work for trends other than VAR", {
   test <- mvgam(
     y ~
       s(series, bs = 're') +
-        s(season, bs = 'cc') -
-        1,
+      s(season, bs = 'cc') -
+      1,
     trend_model = AR(p = 1, cor = TRUE),
     data = gaus_data$data_train,
     family = gaussian(),
@@ -43,8 +43,8 @@ test_that("ma and cor options should work for trends other than VAR", {
   test <- mvgam(
     y ~
       s(series, bs = 're') +
-        s(season, bs = 'cc') -
-        1,
+      s(season, bs = 'cc') -
+      1,
     trend_model = RW(ma = TRUE),
     data = gaus_data$data_train,
     family = gaussian(),
@@ -61,8 +61,8 @@ test_that("ma and cor options should work for trends other than VAR", {
   test <- mvgam(
     y ~
       s(series, bs = 're') +
-        s(season, bs = 'cc') -
-        1,
+      s(season, bs = 'cc') -
+      1,
     trend_model = RW(cor = TRUE),
     data = gaus_data$data_train,
     family = gaussian(),
@@ -81,8 +81,8 @@ test_that("VARMAs are set up correctly", {
   var <- mvgam(
     y ~
       s(series, bs = 're') +
-        s(season, bs = 'cc') -
-        1,
+      s(season, bs = 'cc') -
+      1,
     trend_model = VAR(),
     data = gaus_data$data_train,
     family = gaussian(),
@@ -93,8 +93,8 @@ test_that("VARMAs are set up correctly", {
   var <- SW(mvgam(
     y ~
       s(series, bs = 're') +
-        gp(time, c = 5 / 4, k = 20) -
-        1,
+      gp(time, c = 5 / 4, k = 20) -
+      1,
     trend_model = VAR(),
     data = gaus_data$data_train,
     family = gaussian(),
@@ -105,8 +105,8 @@ test_that("VARMAs are set up correctly", {
   varma <- SW(mvgam(
     y ~
       s(series, bs = 're') +
-        s(season, bs = 'cc') -
-        1,
+      s(season, bs = 'cc') -
+      1,
     trend_model = 'VARMA',
     data = gaus_data$data_train,
     family = gaussian(),

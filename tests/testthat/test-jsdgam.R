@@ -3074,7 +3074,7 @@ test_that("family must be correctly specified", {
         # Environmental model includes species-level intercepts
         # and random slopes for a linear effect of reflection
         s(taxon, bs = 're') +
-          s(taxon, bs = 're', by = reflection),
+        s(taxon, bs = 're', by = reflection),
       # Each factor estimates a different, possibly nonlinear effect of soil.dry
       factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
       data = spiderdat,
@@ -3115,7 +3115,7 @@ test_that("unit must exist in data", {
         # Environmental model includes species-level intercepts
         # and random slopes for a linear effect of reflection
         s(taxon, bs = 're') +
-          s(taxon, bs = 're', by = reflection),
+        s(taxon, bs = 're', by = reflection),
       # Each factor estimates a different, possibly nonlinear effect of soil.dry
       factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
       data = spiderdat,
@@ -3136,7 +3136,7 @@ test_that("species must exist in data", {
         # Environmental model includes species-level intercepts
         # and random slopes for a linear effect of reflection
         s(taxon, bs = 're') +
-          s(taxon, bs = 're', by = reflection),
+        s(taxon, bs = 're', by = reflection),
       # Each factor estimates a different, possibly nonlinear effect of soil.dry
       factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
       data = spiderdat,
@@ -3157,7 +3157,7 @@ test_that("species must be a factor in data", {
         # Environmental model includes species-level intercepts
         # and random slopes for a linear effect of reflection
         s(taxon, bs = 're') +
-          s(taxon, bs = 're', by = reflection),
+        s(taxon, bs = 're', by = reflection),
       # Each factor estimates a different, possibly nonlinear effect of soil.dry
       factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
       data = spiderdat,
@@ -3178,7 +3178,7 @@ test_that("unit must be a numeric / integer in data", {
         # Environmental model includes species-level intercepts
         # and random slopes for a linear effect of reflection
         s(taxon, bs = 're') +
-          s(taxon, bs = 're', by = reflection),
+        s(taxon, bs = 're', by = reflection),
       # Each factor estimates a different, possibly nonlinear effect of soil.dry
       factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
       data = spiderdat,
@@ -3198,7 +3198,7 @@ test_that("n_lv must be <= number of species", {
         # Environmental model includes species-level intercepts
         # and random slopes for a linear effect of reflection
         s(taxon, bs = 're') +
-          s(taxon, bs = 're', by = reflection),
+        s(taxon, bs = 're', by = reflection),
       # Each factor estimates a different, possibly nonlinear effect of soil.dry
       factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
       data = spiderdat,
@@ -3218,7 +3218,7 @@ test_that("knots must be a list", {
         # Environmental model includes species-level intercepts
         # and random slopes for a linear effect of reflection
         s(taxon, bs = 're') +
-          s(taxon, bs = 're', by = reflection),
+        s(taxon, bs = 're', by = reflection),
       # Each factor estimates a different, possibly nonlinear effect of soil.dry
       factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
       # supplying knots as a vector should fail
@@ -3245,7 +3245,7 @@ test_that("errors about knot lengths should be propagated from mgcv", {
         # Environmental model includes species-level intercepts
         # and random slopes for a linear effect of reflection
         s(taxon, bs = 're') +
-          s(taxon, bs = 're', by = reflection),
+        s(taxon, bs = 're', by = reflection),
       # Each factor estimates a different, possibly nonlinear effect of soil.dry
       factor_formula = ~ s(soil.dry, k = 5, by = trend, bs = 'cr') - 1,
       # knot length should be 5 for this CR basis
@@ -3273,7 +3273,7 @@ test_that("get_mvgam_priors accepts factor_formula", {
       # Environmental model includes species-level intercepts
       # and random slopes for a linear effect of reflection
       s(taxon, bs = 're') +
-        s(taxon, bs = 're', by = reflection),
+      s(taxon, bs = 're', by = reflection),
     # Each factor estimates a different, possibly nonlinear effect of soil.dry
     factor_formula = ~ s(soil.dry, k = 5, by = trend, bs = 'cr') - 1,
     data = spiderdat,
@@ -3292,7 +3292,7 @@ test_that("jsdgam should initiate correctly", {
       # Environmental model includes species-level intercepts
       # and random slopes for a linear effect of reflection
       s(taxon, bs = 're') +
-        s(taxon, bs = 're', by = reflection),
+      s(taxon, bs = 're', by = reflection),
     # Each factor estimates a different, possibly nonlinear effect of soil.dry
     factor_formula = ~ s(soil.dry, k = 5, bs = 'cr', by = trend) - 1,
     # supplying knots should also work if k matches length(knots)
@@ -3348,7 +3348,7 @@ test_that("jsdgam post-processing works correctly", {
       # Environmental model includes species-level intercepts
       # and random slopes for a linear effect of reflection
       s(taxon, bs = 're') +
-        s(taxon, bs = 're', by = reflection),
+      s(taxon, bs = 're', by = reflection),
     # Each factor estimates a different, possibly nonlinear effect of soil.dry
     factor_formula = ~ s(soil.dry, k = 5, bs = 'cr', by = trend) - 1,
     # supplying knots should also work if k matches length(knots)

@@ -41,7 +41,7 @@ test_that("cbind() syntax required for binomial()", {
   expect_warning(mvgam(
     formula = cbind(y, ntrials) ~
       s(series, bs = 're') +
-        gp(x, by = series, c = 5 / 4, k = 5),
+      gp(x, by = series, c = 5 / 4, k = 5),
     family = binomial(),
     data = dat_train,
     run_model = FALSE
@@ -62,7 +62,7 @@ test_that("cbind() syntax required for binomial()", {
   mod <- mvgam(
     cbind(y, ntrials) ~
       s(series, bs = 're') +
-        gp(x, by = series, c = 5 / 4, k = 5),
+      gp(x, by = series, c = 5 / 4, k = 5),
     family = binomial(),
     data = dat_train,
     run_model = FALSE
@@ -224,7 +224,7 @@ test_that("cbind() syntax required for beta_binomial()", {
   mod <- mvgam(
     cbind(y, ntrials) ~
       s(series, bs = 're') +
-        gp(x, by = series, c = 5 / 4, k = 5),
+      gp(x, by = series, c = 5 / 4, k = 5),
     family = beta_binomial(),
     data = dat_train,
     run_model = FALSE
@@ -325,7 +325,7 @@ test_that("bernoulli() behaves appropriately", {
   mod <- mvgam(
     y ~
       s(series, bs = 're') +
-        gp(x, by = series, c = 5 / 4, k = 5),
+      gp(x, by = series, c = 5 / 4, k = 5),
     family = bernoulli(),
     data = dat_train,
     run_model = FALSE
@@ -358,7 +358,7 @@ test_that("bernoulli() post-processing works", {
   mod <- SW(mvgam(
     y ~
       s(series, bs = 're') +
-        gp(x, by = series, c = 5 / 4, k = 5),
+      gp(x, by = series, c = 5 / 4, k = 5),
     trend_model = AR(),
     priors = prior(normal(0, 0.1), class = ar1),
     noncentred = TRUE,

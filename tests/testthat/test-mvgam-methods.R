@@ -31,7 +31,7 @@ test_that("stancode and standata working properly", {
   mod <- mvgam(
     y ~
       s(season) +
-        s(time, by = series),
+      s(time, by = series),
     family = poisson(),
     data = simdat$data_train,
     run_model = FALSE

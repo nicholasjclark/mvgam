@@ -29,8 +29,8 @@ beta_data <- sim_mvgam(
 gaus_ar <- mvgam(
   y ~
     s(series, bs = 're') +
-      s(season, bs = 'cc', k = 5) -
-      1,
+    s(season, bs = 'cc', k = 5) -
+    1,
   trend_model = AR(),
   data = gaus_data$data_train,
   family = gaussian(),
@@ -40,8 +40,8 @@ gaus_ar <- mvgam(
 gaus_arfc <- mvgam(
   y ~
     s(series, bs = 're') +
-      s(season, bs = 'cc', k = 5) -
-      1,
+    s(season, bs = 'cc', k = 5) -
+    1,
   trend_model = AR(),
   data = gaus_data$data_train,
   newdata = gaus_data$data_test,

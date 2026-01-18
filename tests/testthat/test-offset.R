@@ -8,8 +8,8 @@ test_that("offset incorporated into link-level linpred for beta", {
   testmod <- mvgam(
     y ~
       s(season, bs = 'cc') +
-        offset(pop) +
-        s(series, bs = 're'),
+      offset(pop) +
+      s(series, bs = 're'),
     trend_model = 'GP',
     data = beta_data$data_train,
     family = betar(),
@@ -46,7 +46,7 @@ test_that("offset incorporated into link-level linpred for NB", {
   testmod <- mvgam(
     out ~
       1 +
-        offset(pop),
+      offset(pop),
     trend_model = 'GP',
     data = data,
     family = nb(),

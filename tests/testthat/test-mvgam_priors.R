@@ -5,8 +5,8 @@ test_that("drift deprecation message works", {
     get_mvgam_priors(
       y ~
         s(series, bs = 're') +
-          s(season, bs = 'cc', k = 8) +
-          s(time, bs = 'moi', k = 8),
+        s(season, bs = 'cc', k = 8) +
+        s(time, bs = 'moi', k = 8),
       trend_model = RW(ma = TRUE),
       drift = TRUE,
       data = gaus_data$data_train,
@@ -71,9 +71,9 @@ test_that("get_mvgam_priors finds all classes for which priors can be specified"
     get_mvgam_priors(
       y ~
         s(season) +
-          cov +
-          cov2 +
-          cov * cov2,
+        cov +
+        cov2 +
+        cov * cov2,
       data = beta_data$data_train,
       family = betar()
     )$param_info,

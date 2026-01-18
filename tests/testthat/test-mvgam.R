@@ -31,8 +31,8 @@ test_that("drift deprecation message works", {
     mvgam(
       y ~
         s(series, bs = 're') +
-          s(season, bs = 'cc', k = 8) +
-          s(time, bs = 'moi', k = 8),
+        s(season, bs = 'cc', k = 8) +
+        s(time, bs = 'moi', k = 8),
       trend_model = RW(ma = TRUE),
       drift = TRUE,
       data = gaus_data$data_train,
@@ -49,7 +49,7 @@ test_that("id to link smooths not allowed yet", {
     mod <- mvgam(
       y ~
         s(time, id = 1) +
-          s(time, by = series, id = 1),
+        s(time, by = series, id = 1),
       data = beta_data$data_train,
       family = betar(),
       run_model = FALSE
@@ -332,8 +332,8 @@ test_that("noncentring working properly for a range of models", {
     mvgam(
       y ~
         s(series, bs = 're') +
-          s(season, bs = 'cc', k = 8) +
-          s(time, bs = 'moi', k = 8),
+        s(season, bs = 'cc', k = 8) +
+        s(time, bs = 'moi', k = 8),
       trend_model = RW(ma = TRUE),
       data = gaus_data$data_train,
       newdata = gaus_data$data_test,
@@ -348,8 +348,8 @@ test_that("noncentring working properly for a range of models", {
     mvgam(
       y ~
         s(series, bs = 're') +
-          s(season, bs = 'cc', k = 8) +
-          s(time, bs = 'moi', k = 8),
+        s(season, bs = 'cc', k = 8) +
+        s(time, bs = 'moi', k = 8),
       trend_model = RW(cor = TRUE),
       data = gaus_data$data_train,
       newdata = gaus_data$data_test,
@@ -364,8 +364,8 @@ test_that("noncentring working properly for a range of models", {
     mvgam(
       y ~
         s(series, bs = 're') +
-          s(season, bs = 'cc', k = 8) +
-          s(time, bs = 'moi', k = 8),
+        s(season, bs = 'cc', k = 8) +
+        s(time, bs = 'moi', k = 8),
       trend_model = AR(p = 2, cor = TRUE),
       data = gaus_data$data_train,
       newdata = gaus_data$data_test,
@@ -380,8 +380,8 @@ test_that("noncentring working properly for a range of models", {
     mvgam(
       y ~
         s(series, bs = 're') +
-          s(season, bs = 'cc', k = 8) +
-          s(season, series, bs = 'sz'),
+        s(season, bs = 'cc', k = 8) +
+        s(season, series, bs = 'sz'),
       trend_model = VAR(),
       data = gaus_data$data_train,
       newdata = gaus_data$data_test,
@@ -396,8 +396,8 @@ test_that("noncentring working properly for a range of models", {
   mod <- mvgam(
     y ~
       s(series, bs = 're') +
-        s(season, bs = 'cc', k = 8) +
-        s(time, bs = 'moi', k = 8),
+      s(season, bs = 'cc', k = 8) +
+      s(time, bs = 'moi', k = 8),
     trend_model = RW(),
     data = gaus_data$data_train,
     newdata = gaus_data$data_test,
@@ -442,8 +442,8 @@ test_that("noncentring working properly for a range of models", {
   mod <- mvgam(
     y ~
       s(series, bs = 're') +
-        s(season, bs = 'cc', k = 8) +
-        s(season, series, bs = 'sz'),
+      s(season, bs = 'cc', k = 8) +
+      s(season, series, bs = 'sz'),
     trend_model = AR(p = 3),
     priors = c(
       prior(beta(2, 2), class = ar1, lb = 0, ub = 1),
@@ -940,7 +940,7 @@ test_that("trend_formula setup is working properly", {
       y ~ 1,
       trend_formula = 1 ~
         s(series, bs = 're') +
-          s(season, bs = 'cc'),
+        s(season, bs = 'cc'),
       trend_model = AR(),
       data = mod_data,
       run_model = FALSE

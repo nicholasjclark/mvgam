@@ -6,9 +6,9 @@ test_that("gp_to_s is working properly for unidimensional gps", {
   # All true gp() terms should be changed to s() with k = k+1
   formula <- y ~
     s(series) +
-      gp(banana, k = 3, scale = FALSE) +
-      infect:you +
-      gp(hardcourt, k = 3)
+    gp(banana, k = 3, scale = FALSE) +
+    infect:you +
+    gp(hardcourt, k = 3)
   dat <- data.frame(
     y = rnorm(10),
     series = rnorm(10),
@@ -46,9 +46,9 @@ test_that("gp_to_s is working properly for unidimensional gps", {
         formula(
           y ~
             s(series) +
-              s(banana, k = 4) +
-              infect:you +
-              s(hardcourt, k = 4)
+            s(banana, k = 4) +
+            infect:you +
+            s(hardcourt, k = 4)
         ),
         keep.order = TRUE
       ),
@@ -77,8 +77,8 @@ test_that("gp_to_s is working properly for multidimensional gps", {
   # All true gp() terms should be changed to s() with k = k+1
   formula <- y ~
     s(series) +
-      gp(banana, hardcourt, k = 3, iso = FALSE, c = 1.33, cov = 'matern52') +
-      infect:you
+    gp(banana, hardcourt, k = 3, iso = FALSE, c = 1.33, cov = 'matern52') +
+    infect:you
   dat <- data.frame(
     y = rnorm(10),
     series = rnorm(10),
@@ -108,8 +108,8 @@ test_that("gp_to_s is working properly for multidimensional gps", {
         formula(
           y ~
             s(series) +
-              ti(banana, hardcourt, k = 3, mc = c(0, 0)) +
-              infect:you
+            ti(banana, hardcourt, k = 3, mc = c(0, 0)) +
+            infect:you
         ),
         keep.order = TRUE
       ),
@@ -123,8 +123,8 @@ test_that("unidimensional gp for observation models working properly", {
   mod <- mvgam(
     formula = y ~
       s(series, bs = 're') +
-        gp(time, by = series, k = 10, c = 5 / 4) +
-        year:season,
+      gp(time, by = series, k = 10, c = 5 / 4) +
+      year:season,
     data = gaus_data$data_train,
     family = gaussian(),
     run_model = FALSE,
@@ -149,8 +149,8 @@ test_that("unidimensional gp for observation models working properly", {
   brms_dat <- suppressWarnings(brms::make_standata(
     y ~
       s(series, bs = 're') +
-        gp(time, by = series, k = 10, c = 5 / 4) +
-        year:season,
+      gp(time, by = series, k = 10, c = 5 / 4) +
+      year:season,
     data = gaus_data$data_train,
     family = gaussian()
   ))
@@ -194,8 +194,8 @@ test_that("unidimensional gp for observation models working properly", {
         formula(
           y ~
             s(time, by = series, k = 11) +
-              year:season +
-              s(series, bs = "re")
+            year:season +
+            s(series, bs = "re")
         ),
         keep.order = TRUE
       ),
@@ -209,7 +209,7 @@ test_that("multidimensional gp for observation models working properly", {
   mod <- mvgam(
     y ~
       s(series, bs = 're') +
-        gp(time, year, k = 4, cov = 'matern32'),
+      gp(time, year, k = 4, cov = 'matern32'),
     data = gaus_data$data_train,
     family = gaussian(),
     run_model = FALSE,
@@ -234,7 +234,7 @@ test_that("multidimensional gp for observation models working properly", {
   brms_dat <- suppressWarnings(brms::make_standata(
     y ~
       s(series, bs = 're') +
-        gp(time, year, k = 4, gr = FALSE),
+      gp(time, year, k = 4, gr = FALSE),
     data = gaus_data$data_train,
     family = gaussian()
   ))
@@ -265,7 +265,7 @@ test_that("multidimensional gp for observation models working properly", {
         formula(
           y ~
             ti(time, year, k = 4, mc = c(0, 0)) +
-              s(series, bs = "re")
+            s(series, bs = "re")
         ),
         keep.order = TRUE
       ),
@@ -278,8 +278,8 @@ test_that("noncentring with gp terms working properly", {
   mod <- mvgam(
     y ~
       s(series, bs = 're') +
-        s(season, bs = 'cc', k = 8) +
-        gp(time, by = series, k = 10),
+      s(season, bs = 'cc', k = 8) +
+      gp(time, by = series, k = 10),
     trend_model = RW(),
     data = gaus_data$data_train,
     newdata = gaus_data$data_test,
@@ -383,7 +383,7 @@ test_that("unidimensional gp for process models working properly", {
         formula(
           y ~
             s(time, by = series, k = 11) +
-              year:season
+            year:season
         ),
         keep.order = TRUE
       ),
