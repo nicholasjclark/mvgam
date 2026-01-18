@@ -1,0 +1,22 @@
+﻿{
+    "s3_methods":  {
+
+                   },
+    "functions":  [
+                      "get_covariance_pattern",
+                      "get_observation_structure",
+                      "get_trend_type",
+                      "has_stochastic_trend"
+                  ],
+    "purpose":  "",
+    "function_dependencies":  {
+
+                              },
+    "function_signatures":  {
+                                "get_observation_structure":  "get_observation_structure \u003c- function(object, newdata = NULL) {",
+                                "get_trend_type":  "get_trend_type \u003c- function(object) {",
+                                "has_stochastic_trend":  "has_stochastic_trend \u003c- function(object) {",
+                                "get_covariance_pattern":  "get_covariance_pattern \u003c- function(trend_type) {"
+                            },
+    "file":  "R/sample_innovations.R"
+}

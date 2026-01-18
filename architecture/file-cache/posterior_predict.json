@@ -5,20 +5,36 @@
                                              ]
                    },
     "functions":  [
+                      "extract_truncation_bounds",
+                      "sample_continuous_truncated",
+                      "sample_truncated_rejection",
+                      "check_truncation_bounds",
+                      "family_uses_integers",
+                      "family_to_dist",
+                      "apply_truncation",
                       "sample_from_family",
                       "get_family_dpars",
                       "extract_dpars_from_stanfit",
-                      "posterior_predict.mvgam"
+                      "posterior_predict.mvgam",
+                      "predict_single_response"
                   ],
     "purpose":  "Prediction methods",
     "function_dependencies":  {
 
                               },
     "function_signatures":  {
-                                "sample_from_family":  "sample_from_family \u003c- function(family_name, ndraws, epred, sigma = NULL, shape = NULL, nu = NULL, trials = NULL, hu = NULL, zi = NULL, zoi = NULL, coi = NULL, alpha = NULL, ndt = NULL, xi = NULL, quantile = NULL, kappa = NULL, beta = NULL, bs = NULL, bias = NULL, disc = NULL, thres = NULL, link = \"logit\") {",
+                                "sample_from_family":  "sample_from_family \u003c- function(family_name, ndraws, epred, sigma = NULL, phi = NULL, shape = NULL, nu = NULL, trials = NULL, hu = NULL, zi = NULL, zoi = NULL, coi = NULL, alpha = NULL, ndt = NULL, xi = NULL, quantile = NULL, kappa = NULL, beta = NULL, bs = NULL, bias = NULL, disc = NULL, thres = NULL, link = \"logit\", lb = NULL, ub = NULL, ntrys = 5) {",
+                                "family_to_dist":  "family_to_dist \u003c- function(family_name) {",
+                                "check_truncation_bounds":  "check_truncation_bounds \u003c- function(x, lb = NULL, ub = NULL, threshold = 0.01) {",
+                                "sample_continuous_truncated":  "sample_continuous_truncated \u003c- function(n, dist, lb = -Inf, ub = Inf, ntrys = 5, ...) {",
+                                "predict_single_response":  "predict_single_response \u003c- function(object, linpred_resp, resp, draw_ids, ndraws, newdata, is_multivariate) {",
+                                "family_uses_integers":  "family_uses_integers \u003c- function(family_name) {",
+                                "extract_dpars_from_stanfit":  "extract_dpars_from_stanfit \u003c- function(stanfit, dpar_names, ndraws, nobs, draw_ids = NULL) {",
                                 "get_family_dpars":  "get_family_dpars \u003c- function(family_name) {",
                                 "posterior_predict.mvgam":  "posterior_predict.mvgam \u003c- function(object, newdata = NULL, process_error = TRUE, ndraws = NULL, re_formula = NULL, allow_new_levels = FALSE, sample_new_levels = \"uncertainty\", resp = NULL, ...) {",
-                                "extract_dpars_from_stanfit":  "extract_dpars_from_stanfit \u003c- function(stanfit, dpar_names, ndraws, nobs, draw_ids = NULL) {"
+                                "extract_truncation_bounds":  "extract_truncation_bounds \u003c- function(object, nobs) {",
+                                "apply_truncation":  "apply_truncation \u003c- function(samples, family_name, lb, ub, ntrys, ndraws, nobs) {",
+                                "sample_truncated_rejection":  "sample_truncated_rejection \u003c- function(n, dist, lb = -Inf, ub = Inf, ntrys = 5, ...) {"
                             },
     "file":  "R/posterior_predict.R"
 }

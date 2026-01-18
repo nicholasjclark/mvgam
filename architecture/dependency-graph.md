@@ -1,15 +1,15 @@
 ﻿# Package Dependency Map
 
-**Generated:** 2025-12-19 14:25:49  
+**Generated:** 2026-01-19 09:14:14  
 **Package:** mvgam v2.0.0  
 **Commit:** pending  
 
 ## Summary
 
-- **Total Files:** 63
-- **Total Functions:** 628
+- **Total Files:** 65
+- **Total Functions:** 642
 - **Exported Functions:** 57
-- **Internal Functions:** 585
+- **Internal Functions:** 599
 - **S3 Methods:** 45
 - **S3 Classes:** 32
 
@@ -54,7 +54,7 @@
 - **get_prior()**: brmsformula, default, formula, mvgam_formula
 - **is()**: brmsopencl, brmsthreads, mvgam, mvgam_trend, stanfit, trend_param
 - **plot()**: mvgam, mvgam_fevd, mvgam_forecast, mvgam_irf, mvgam_lfo, mvgam_residcor
-- **Predict()**: matrix.mod.smooth, matrix.moi.smooth
+- **Predict()**: matrix.mod.smooth, matrix.moi.smooth, mvgam
 - **print()**: how_to_cite, mvgam, mvgam_formula, mvgam_pooled_summary, mvgam_prefit, mvgam_summary, mvgam_trend, mvgamstancode, trend_param
 - **residual_cor()**: jsdgam, mvgam
 - **residuals()**: mvgam
@@ -135,8 +135,8 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **`R/globals.R`** (0 functions)
 
 ### Data Files
-- **`R/all_neon_tick_data.R`** (0 functions) - Data documentation and loading
 - **`R/portal_data.R`** (0 functions) - Data documentation and loading
+- **`R/all_neon_tick_data.R`** (0 functions) - Data documentation and loading
 
 ### Validation Files
 - **`R/validations.R`** (77 functions) - Input validation and checks
@@ -169,12 +169,12 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: series_to_mvgamxts.to.ts (+ 1 more)
 - **`R/plot.mvgam.R`** (2 functions) - Plotting and visualization
   - Key functions: plot.mvgam, plottable
-- **`R/residuals.mvgam.R`** (1 functions) - Residual analysis
-  - Key functions: residuals.mvgam
 - **`R/pairs.mvgam.R`** (1 functions)
   - Key functions: pairs.mvgam
 - **`R/mcmc_plot.mvgam.R`** (1 functions) - Plotting and visualization
   - Key functions: mcmc_plot.mvgam
+- **`R/residuals.mvgam.R`** (1 functions) - Residual analysis
+  - Key functions: residuals.mvgam
 
 ### Other Files
 - **`R/posterior_epred.R`** (78 functions)
@@ -191,45 +191,49 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: extract_mu_construction_with_classification, add_glm_hidden_fixed_effects, classify_mu_expressions_structurally, create_analysis_context, classify_single_mu_expression_structurally, analyze_expression_structure, analyze_indexing_patterns_comprehensive, analyze_mathematical_operations_comprehensive, analyze_variable_relationships_comprehensive, determine_expression_type, extract_expression_variables_comprehensive, extract_comprehensive_variable_references, create_empty_mu_result, check_loop_requirement, build_execution_dependency_plan (+ 11 more)
 - **`R/monotonic.R`** (5 functions)
   - Key functions: smooth.construct.moi.smooth.spec, smooth.construct.mod.smooth.spec, Predict.matrix.moi.smooth, Predict.matrix.mod.smooth, add_mono_model_file
-- **`R/ensemble.R`** (4 functions)
-  - Key functions: ensembleensemble.mvgam_forecast allsame split_fc_dots (+ 3 more)
+- **`R/sample_innovations.R`** (4 functions)
+  - Key functions: get_trend_type, has_stochastic_trend, get_covariance_pattern, get_observation_structure
 - **`R/mvgam_residcor-class.R`** (4 functions) - Class definitions and methods
   - Key functions: gather_matrix, cluster_cormat, reorder_clusters, plot.mvgam_residcor
-- **`R/residual_cor.R`** (3 functions) - Residual analysis
-  - Key functions: residual_corresidual_cor.mvgam residual_cor.jsdgam (+ 2 more)
+- **`R/ensemble.R`** (4 functions)
+  - Key functions: ensembleensemble.mvgam_forecast allsame split_fc_dots (+ 3 more)
 - **`R/how_to_cite.R`** (3 functions)
   - Key functions: how_to_citeprint.how_to_cite how_to_cite.mvgam (+ 2 more)
 - **`R/tidier_methods.R`** (3 functions) - Method implementations
   - Key functions: tidy.mvgam, split_hier_Sigma, augment.mvgam
-- **`R/mvgam_fevd-class.R`** (3 functions) - Class definitions and methods
-  - Key functions: summary.mvgam_fevd, plot.mvgam_fevd, fevd_df
 - **`R/RcppExports.R`** (3 functions) - Exported functions
   - Key functions: ar3_recursC, var1_recursC, varma_recursC
-- **`R/ordinate.jsdgam.R`** (2 functions)
-  - Key functions: ordinateordinate.jsdgam (+ 1 more)
-- **`R/mvgam_irf-class.R`** (2 functions) - Class definitions and methods
-  - Key functions: summary.mvgam_irf, plot.mvgam_irf
-- **`R/zzz.R`** (2 functions) - Package startup and attachment
-  - Key functions: core_unloaded, mvgam_attach
-- **`R/posterior_linpred.R`** (2 functions)
-  - Key functions: get_combined_linpred, posterior_linpred.mvgam
+- **`R/residual_cor.R`** (3 functions) - Residual analysis
+  - Key functions: residual_corresidual_cor.mvgam residual_cor.jsdgam (+ 2 more)
+- **`R/mvgam_fevd-class.R`** (3 functions) - Class definitions and methods
+  - Key functions: summary.mvgam_fevd, plot.mvgam_fevd, fevd_df
 - **`R/stability.R`** (2 functions)
   - Key functions: stabilitystability.mvgam (+ 1 more)
+- **`R/zzz.R`** (2 functions) - Package startup and attachment
+  - Key functions: core_unloaded, mvgam_attach
+- **`R/mvgam_irf-class.R`** (2 functions) - Class definitions and methods
+  - Key functions: summary.mvgam_irf, plot.mvgam_irf
+- **`R/ordinate.jsdgam.R`** (2 functions)
+  - Key functions: ordinateordinate.jsdgam (+ 1 more)
+- **`R/posterior_linpred.R`** (2 functions)
+  - Key functions: get_combined_linpred, posterior_linpred.mvgam
 - **`R/mvgam_forecast-class.R`** (1 functions) - Class definitions and methods
   - Key functions: summary.mvgam_forecast
-- **`R/lv_correlations.R`** (1 functions)
-  - Key functions: lv_correlations
 - **`R/dynamic.R`** (1 functions)
   - Key functions: dynamic
-- **`R/cpp_funs.R`** (0 functions)
+- **`R/lv_correlations.R`** (1 functions)
+  - Key functions: lv_correlations
 - **`R/mvgam-class.R`** (0 functions) - Class definitions and methods
+- **`R/cpp_funs.R`** (0 functions)
 - **`R/mvgam-package.R`** (0 functions)
 
 ### S3 Methods Files
 - **`R/predictions.R`** (20 functions) - Prediction methods
   - Key functions: validate_monotonic_indicesdetect_gp_terms approx_gp_pred prepare_spd_inputs spd_gp_exp_quad spd_gp_matern32 spd_gp_matern52 compute_spd_vectorized detect_gp_kernel has_nlpars (+ 19 more)
-- **`R/posterior_predict.R`** (4 functions) - Prediction methods
-  - Key functions: extract_dpars_from_stanfitsample_from_family get_family_dpars posterior_predict.mvgam (+ 3 more)
+- **`R/posterior_predict.R`** (12 functions) - Prediction methods
+  - Key functions: check_truncation_bounds, extract_dpars_from_stanfit, extract_truncation_bounds, sample_continuous_truncated, sample_truncated_rejection, family_uses_integers, family_to_dist, apply_truncation, sample_from_family, get_family_dpars (+ 2 more)
+- **`R/predict.R`** (2 functions) - Prediction methods
+  - Key functions: predict.mvgam, summarize_predictions
 - **`R/add_residuals.R`** (2 functions) - Residual analysis
   - Key functions: add_residualsadd_residuals.mvgam (+ 1 more)
 
@@ -252,18 +256,18 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
   - Key functions: plot_mvgam_uncertaintyintersect_hist (+ 1 more)
 - **`R/plot_mvgam_fc.R`** (2 functions) - Plotting and visualization
   - Key functions: plot_mvgam_fcplot.mvgam_forecast (+ 1 more)
-- **`R/plot_mvgam_smooth.R`** (1 functions) - Plotting and visualization
-  - Key functions: plot_mvgam_smooth
+- **`R/plot_mvgam_trend.R`** (1 functions) - Trend modeling
+  - Key functions: plot_mvgam_trend
 - **`R/plot_mvgam_pterms.R`** (1 functions) - Plotting and visualization
   - Key functions: plot_mvgam_pterms
+- **`R/plot_mvgam_resids.R`** (1 functions) - Plotting and visualization
+  - Key functions: plot_mvgam_resids
 - **`R/plot_mvgam_randomeffects.R`** (1 functions) - Plotting and visualization
   - Key functions: plot_mvgam_randomeffects
 - **`R/plot_mvgam_factors.R`** (1 functions) - Plotting and visualization
   - Key functions: plot_mvgam_factors
-- **`R/plot_mvgam_resids.R`** (1 functions) - Plotting and visualization
-  - Key functions: plot_mvgam_resids
-- **`R/plot_mvgam_trend.R`** (1 functions) - Trend modeling
-  - Key functions: plot_mvgam_trend
+- **`R/plot_mvgam_smooth.R`** (1 functions) - Plotting and visualization
+  - Key functions: plot_mvgam_smooth
 
 ## Function Location Quick Reference
 
@@ -404,6 +408,9 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **posterior_epred_zero_inflated_poisson()** (internal, never called)
 - **posterior_epred_zero_one_inflated_beta()** (internal, never called)
 
+### `R/posterior_predict.R` (1 potentially unused):
+- **check_truncation_bounds()** (internal, never called)
+
 ### `R/print.mvgam.R` (1 potentially unused):
 - **print_model_specification_simple()** (internal, never called)
 
@@ -415,6 +422,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **ar3_recursC()** (internal, never called)
 - **var1_recursC()** (internal, never called)
 - **varma_recursC()** (internal, never called)
+
+### `R/sample_innovations.R` (2 potentially unused):
+- **get_observation_structure()** (internal, never called)
+- **has_stochastic_trend()** (internal, never called)
 
 ### `R/sim_mvgam.R` (1 potentially unused):
 - **sim_seasonal()** (internal, never called)
@@ -772,10 +783,18 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **posterior_linpred.mvgam()** (internal)
 
 ### `R/posterior_predict.R`:
+- **apply_truncation()** (internal)
+- **check_truncation_bounds()** (internal)
 - **extract_dpars_from_stanfit()** (internal)
+- **extract_truncation_bounds()** (internal)
+- **family_to_dist()** (internal)
+- **family_uses_integers()** (internal)
 - **get_family_dpars()** (internal)
 - **posterior_predict.mvgam()** (internal)
+- **predict_single_response()** (internal)
+- **sample_continuous_truncated()** (internal)
 - **sample_from_family()** (internal)
+- **sample_truncated_rejection()** (internal)
 
 ### `R/ppc.mvgam.R`:
 - **ecdf_plotdat()** (internal)
@@ -783,6 +802,10 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 - **pp_check.mvgam()** (internal)
 - **ppc()** (exported)
 - **ppc.mvgam()** (internal)
+
+### `R/predict.R`:
+- **predict.mvgam()** (internal)
+- **summarize_predictions()** (internal)
 
 ### `R/predictions.R`:
 - **add_all_gp_contributions()** (internal)
@@ -847,6 +870,12 @@ sim_mvgam = function( T = 100, n_series = 3, seasonality = 'shared', use_lv = FA
 
 ### `R/residuals.mvgam.R`:
 - **residuals.mvgam()** (internal)
+
+### `R/sample_innovations.R`:
+- **get_covariance_pattern()** (internal)
+- **get_observation_structure()** (internal)
+- **get_trend_type()** (internal)
+- **has_stochastic_trend()** (internal)
 
 ### `R/series_to_mvgam.R`:
 - **series_to_mvgam()** (exported)
