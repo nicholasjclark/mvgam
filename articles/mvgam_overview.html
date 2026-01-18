@@ -34,7 +34,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.593</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.52</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-09-05</h4>
+            <h4 data-toc-skip class="date">2026-01-18</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/mvgam_overview.Rmd" class="external-link"><code>vignettes/mvgam_overview.Rmd</code></a></small>
       <div class="d-none name"><code>mvgam_overview.Rmd</code></div>
@@ -650,7 +650,7 @@ series and some of its descriptive features can be plotted using
 <code><a href="../reference/plot_mvgam_series.html">plot_mvgam_series()</a></code>:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">model_data</span>, series <span class="op">=</span> <span class="fl">1</span>, y <span class="op">=</span> <span class="st">"count"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-6-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-6-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level2">
 <h2 id="glms-with-temporal-random-effects">GLMs with temporal random effects<a class="anchor" aria-label="anchor" href="#glms-with-temporal-random-effects"></a>
@@ -902,7 +902,7 @@ about the types of plots that can be produced from fitted
 <code>mvgam</code> objects</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model1</span>, type <span class="op">=</span> <span class="st">"re"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/Plot%20random%20effect%20estimates-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/Plot%20random%20effect%20estimates-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level3">
 <h3 id="bayesplot-support">
@@ -918,13 +918,13 @@ for details):</p>
 <span>  variable <span class="op">=</span> <span class="st">"betas"</span>,</span>
 <span>  type <span class="op">=</span> <span class="st">"areas"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-13-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-13-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>We can also use the wide range of posterior checking functions
 available in <code>bayesplot</code> (see
 <code>?mvgam::ppc_check.mvgam</code> for details):</p>
 <div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/pp_check.mvgam.html">pp_check</a></span><span class="op">(</span>object <span class="op">=</span> <span class="va">model1</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-14-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-14-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>There is clearly some variation in these yearly intercept estimates.
 But how do these translate into time-varying predictions? To understand
 this, we can plot posterior hindcasts from this model for the training
@@ -932,7 +932,7 @@ period using <code><a href="../reference/plot.mvgam.html">plot.mvgam()</a></code
 <code>type = 'forecast'</code></p>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model1</span>, type <span class="op">=</span> <span class="st">"forecast"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/Plot%20posterior%20hindcasts-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/Plot%20posterior%20hindcasts-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>If you wish to extract these hindcasts for other downstream analyses,
 the <code><a href="../reference/hindcast.mvgam.html">hindcast()</a></code> function can be used. This will return a
 list object of class <code>mvgam_forecast</code>. In the
@@ -982,7 +982,7 @@ the model using <code><a href="../reference/plot.mvgam.html">plot.mvgam()</a></c
 <code>type = 'residuals'</code></p>
 <div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model1</span>, type <span class="op">=</span> <span class="st">"residuals"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/Plot%20posterior%20residuals-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/Plot%20posterior%20residuals-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 </div>
 </div>
 <div class="section level2">
@@ -1012,7 +1012,7 @@ set as <code>newdata</code>. For splitting, we will make use of the
 predictions do not capture the temporal variation in the test set</p>
 <div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model1b</span>, type <span class="op">=</span> <span class="st">"forecast"</span>, newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/Plotting%20predictions%20against%20test%20data-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/Plotting%20predictions%20against%20test%20data-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>As with the <code><a href="../reference/hindcast.mvgam.html">hindcast()</a></code> function, we can use the
 <code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code> function to automatically extract the posterior
 distributions for these predictions. This also returns an object of
@@ -1186,7 +1186,7 @@ to increases in <code>ndvi</code>:</p>
 <span>  lwd <span class="op">=</span> <span class="fl">2</span></span>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html" class="external-link">abline</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">0</span>, lwd <span class="op">=</span> <span class="fl">2.5</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/Histogram%20of%20NDVI%20effects-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/Histogram%20of%20NDVI%20effects-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <div class="section level3">
 <h3 id="marginaleffects-support">
 <code>marginaleffects</code> support<a class="anchor" aria-label="anchor" href="#marginaleffects-support"></a>
@@ -1206,7 +1206,7 @@ function for quickly understanding patterns from fitted
 <code>mvgam</code> models</p>
 <div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">model2</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-21-1.png" width="60%" style="display: block; margin: auto;"><img src="mvgam_overview_files/figure-html/unnamed-chunk-21-2.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-21-1.png" alt="" width="60%" style="display: block; margin: auto;"><img src="mvgam_overview_files/figure-html/unnamed-chunk-21-2.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 </div>
 </div>
 <div class="section level2">
@@ -1335,7 +1335,7 @@ parameters as well as the basis coefficients for the nonlinear effect of
 before:</p>
 <div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">model3</span>, type <span class="op">=</span> <span class="st">"link"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-24-1.png" width="60%" style="display: block; margin: auto;"><img src="mvgam_overview_files/figure-html/unnamed-chunk-24-2.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-24-1.png" alt="" width="60%" style="display: block; margin: auto;"><img src="mvgam_overview_files/figure-html/unnamed-chunk-24-2.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>Inspect the underlying <code>Stan</code> code to gain some idea of
 how the spline is being penalized:</p>
 <div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
@@ -1413,7 +1413,7 @@ enforce smoothness and reduce overfitting</p>
 <p>Forecasts from the above model are not ideal:</p>
 <div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model3</span>, type <span class="op">=</span> <span class="st">"forecast"</span>, newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-26-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-26-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>Why is this happening? The forecasts are driven almost entirely by
 variation in the temporal spline, which is extrapolating linearly
 <em>forever</em> beyond the edge of the training data. Any slight
@@ -1435,7 +1435,7 @@ functions:</p>
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html" class="external-link">abline</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">data_train</span><span class="op">$</span><span class="va">time</span><span class="op">)</span>, lty <span class="op">=</span> <span class="st">"dashed"</span>, lwd <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/Plot%20extrapolated%20temporal%20functions%20using%20newdata-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/Plot%20extrapolated%20temporal%20functions%20using%20newdata-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>This model is not doing well. Clearly we need to somehow account for
 the strong temporal autocorrelation when modelling these data without
 using a smooth function of <code>time</code>. Now onto another prominent
@@ -1540,11 +1540,11 @@ the latent AR1 process:</p>
 sample test data</p>
 <div class="sourceCode" id="cb42"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model4</span>, type <span class="op">=</span> <span class="st">"forecast"</span>, newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-28-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-28-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>The trend is evolving as an AR1 process, which we can also view:</p>
 <div class="sourceCode" id="cb43"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model4</span>, type <span class="op">=</span> <span class="st">"trend"</span>, newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></code></pre></div>
-<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-29-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="mvgam_overview_files/figure-html/unnamed-chunk-29-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>In-sample model performance can be interrogated using leave-one-out
 cross-validation utilities from the <code>loo</code> package (a higher
 value is preferred for this metric):</p>

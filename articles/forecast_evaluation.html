@@ -34,7 +34,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.593</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.52</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-09-05</h4>
+            <h4 data-toc-skip class="date">2026-01-18</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/forecast_evaluation.Rmd" class="external-link"><code>vignettes/forecast_evaluation.Rmd</code></a></small>
       <div class="d-none name"><code>forecast_evaluation.Rmd</code></div>
@@ -432,17 +432,17 @@ distributions and true observations for each series in the data:</p>
 <code>S3 plot</code> method for objects of this class:</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_mod1</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-18-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-18-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_mod2</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-18-2.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-18-2.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_mod1</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-18-3.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-18-3.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_mod2</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-18-4.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-18-4.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>Clearly the two models do not produce equivalent forecasts. We will
 come back to scoring these forecasts in a moment.</p>
 </div>
@@ -707,7 +707,7 @@ model (<code>mod1</code>) is better.</p>
 <span>  <span class="st">"\nMean difference = "</span>,</span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">diff_scores</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-28-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-28-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span></span>
 <span></span>
@@ -734,7 +734,7 @@ model (<code>mod1</code>) is better.</p>
 <span>  <span class="st">"\nMean difference = "</span>,</span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">diff_scores</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-28-2.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-28-2.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span></span>
 <span><span class="va">diff_scores</span> <span class="op">&lt;-</span> <span class="va">crps_mod2</span><span class="op">$</span><span class="va">series_3</span><span class="op">$</span><span class="va">score</span> <span class="op">-</span></span>
@@ -760,7 +760,7 @@ model (<code>mod1</code>) is better.</p>
 <span>  <span class="st">"\nMean difference = "</span>,</span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">diff_scores</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-28-3.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-28-3.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>The correlated AR(1) model consistently gives better forecasts, and
 the difference between scores tends to grow as the forecast horizon
 increases. This is not unexpected given the way that splines linearly

@@ -34,7 +34,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.593</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.52</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-09-05</h4>
+            <h4 data-toc-skip class="date">2026-01-18</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/data_in_mvgam.Rmd" class="external-link"><code>vignettes/data_in_mvgam.Rmd</code></a></small>
       <div class="d-none name"><code>data_in_mvgam.Rmd</code></div>
@@ -308,7 +308,8 @@ useful:</p>
 <span>  family <span class="op">=</span> <span class="fu"><a href="../reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">gauss_dat</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt; Error: Values &lt;= 0 not allowed for beta responses</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Values &lt;= 0 not allowed for beta responses</span></span></code></pre></div>
 <p>Please see <code><a href="../reference/mvgam_families.html">?mvgam_families</a></code> for more information on the
 types of responses that the package can handle and their
 restrictions</p>
@@ -423,7 +424,8 @@ intercept-only model, which is enough to trigger all the checks:</p>
 <span>  data <span class="op">=</span> <span class="va">bad_times</span>,</span>
 <span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt; Error: One or more series in data is missing observations for one or more timepoints</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> One or more series in data is missing observations for one or more timepoints</span></span></code></pre></div>
 <p>This error is useful as it tells us where the problem is. There are
 many ways to fill in missing timepoints, so the correct way will have to
 be left up to the user. But if you don’t have any covariates, it should
@@ -498,7 +500,8 @@ error:</p>
 <span>  data <span class="op">=</span> <span class="va">bad_levels</span>,</span>
 <span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt; Error: Mismatch between factor levels of "series" and unique values of "series"</span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Mismatch between factor levels of "series" and unique values of "series"</span></span>
 <span><span class="co">#&gt; Use</span></span>
 <span><span class="co">#&gt;   `setdiff(levels(data$series), unique(data$series))` </span></span>
 <span><span class="co">#&gt; and</span></span>

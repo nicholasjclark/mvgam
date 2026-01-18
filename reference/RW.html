@@ -14,7 +14,7 @@ purely to help set up a model with particular autoregressive trend models."><met
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.593</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.52</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -234,11 +234,11 @@ https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM observation formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ 1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x561bfe1ad8c0&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55ce575bbff8&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM process formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ~s(season, bs = "cc", k = 5, by = trend)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x561bfe1ad8c0&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55ce575bbff8&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> gaussian</span>
@@ -319,7 +319,7 @@ https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html</p>
 <span class="r-in"><span>  regex <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
 <span class="r-in"><span>  type <span class="op">=</span> <span class="st">'hist'</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value `binwidth`.</span>
 <span class="r-plt img"><img src="RW-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now an example illustrating hierarchical dynamics</span></span></span>
@@ -400,7 +400,7 @@ https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ species</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x561bfe1ad8c0&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x55ce575bbff8&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -482,7 +482,7 @@ https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect posterior estimates for the correlation weighting parameter</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/mcmc_plot.brmsfit.html" class="external-link">mcmc_plot</a></span><span class="op">(</span><span class="va">mod</span>, variable <span class="op">=</span> <span class="st">'alpha_cor'</span>, type <span class="op">=</span> <span class="st">'hist'</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value `binwidth`.</span>
 <span class="r-plt img"><img src="RW-7.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>

@@ -34,7 +34,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.593</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.52</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2025-09-05</h4>
+            <h4 data-toc-skip class="date">2026-01-18</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/trend_formulas.Rmd" class="external-link"><code>vignettes/trend_formulas.Rmd</code></a></small>
       <div class="d-none name"><code>trend_formulas.Rmd</code></div>
@@ -195,7 +195,7 @@ necessary; it is often better to build a model that respects the
 properties of the actual outcome variables)</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">plankton_data</span>, series <span class="op">=</span> <span class="st">"all"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-7-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-7-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>We have some missing observations, but this isn’t an issue for
 modelling in <code>mvgam</code>. A useful property to understand about
 these counts is that they tend to be highly seasonal. Below are some
@@ -217,7 +217,7 @@ in the lake for each month:</p>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">"z-score"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">xlab</a></span><span class="op">(</span><span class="st">"Time"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ggtitle</a></span><span class="op">(</span><span class="st">"Temperature (black) vs Other algae (red)"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-8-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-8-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">plankton_data</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">series</span> <span class="op">==</span> <span class="st">"Diatoms"</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
@@ -234,7 +234,7 @@ in the lake for each month:</p>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">"z-score"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">xlab</a></span><span class="op">(</span><span class="st">"Time"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ggtitle</a></span><span class="op">(</span><span class="st">"Temperature (black) vs Diatoms (red)"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-9-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-9-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>We will have to try and capture this seasonality in our process
 model, which should be easy to do given the flexibility of GAMs. Next we
 will split the data into training and testing splits:</p>
@@ -289,37 +289,37 @@ z-scored to have a mean of 0.</p>
 visualized:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_smooth.html">plot_mvgam_smooth</a></span><span class="op">(</span><span class="va">notrend_mod</span>, smooth <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-12-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-12-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>On this plot, red indicates below-average linear predictors and white
 indicates above-average. We can then plot the deviation smooths for a
 few algal groups to see how they vary from the “global” pattern:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_smooth.html">plot_mvgam_smooth</a></span><span class="op">(</span><span class="va">notrend_mod</span>, smooth <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-13-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-13-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_smooth.html">plot_mvgam_smooth</a></span><span class="op">(</span><span class="va">notrend_mod</span>, smooth <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-14-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-14-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>These multidimensional smooths have done a good job of capturing the
 seasonal variation in our observations:</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">notrend_mod</span>, type <span class="op">=</span> <span class="st">"forecast"</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-15-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-15-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">notrend_mod</span>, type <span class="op">=</span> <span class="st">"forecast"</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-16-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-16-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">notrend_mod</span>, type <span class="op">=</span> <span class="st">"forecast"</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-17-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-17-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>This basic model gives us confidence that we can capture the seasonal
 variation in the observations. But the model has not captured the
 remaining temporal dynamics, which is obvious when we inspect Dunn-Smyth
 residuals for a few series:</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">notrend_mod</span>, type <span class="op">=</span> <span class="st">"residuals"</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-18-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-18-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">notrend_mod</span>, type <span class="op">=</span> <span class="st">"residuals"</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-19-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-19-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level3">
 <h3 id="multiseries-dynamics">Multiseries dynamics<a class="anchor" aria-label="anchor" href="#multiseries-dynamics"></a>
@@ -587,7 +587,7 @@ operate on the process model. We can see the same plot using
 <code>trend_effects = TRUE</code> in the plotting functions:</p>
 <div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">var_mod</span>, <span class="st">"smooths"</span>, trend_effects <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-26-1.png" width="60%" style="display: block; margin: auto;"><img src="trend_formulas_files/figure-html/unnamed-chunk-26-2.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-26-1.png" alt="" width="60%" style="display: block; margin: auto;"><img src="trend_formulas_files/figure-html/unnamed-chunk-26-2.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>The autoregressive coefficient matrix is of particular interest here,
 as it captures lagged dependencies and cross-dependencies in the latent
 process model. Unfortunately <code>bayesplot</code> doesn’t know this is
@@ -602,7 +602,7 @@ argument will accomplish this:</p>
 <span>  type <span class="op">=</span> <span class="st">'hist'</span>,</span>
 <span>  facet_args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>dir <span class="op">=</span> <span class="st">'v'</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-27-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-27-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>There is a lot happening in this matrix. Each cell captures the
 lagged effect of the process in the column on the process in the row in
 the next timestep. So for example, the effect in cell [1,3] shows how an
@@ -622,13 +622,13 @@ boxes:</p>
 <span>  type <span class="op">=</span> <span class="st">'hist'</span>,</span>
 <span>  facet_args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>dir <span class="op">=</span> <span class="st">'v'</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-28-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-28-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>The observation error estimates <span class="math inline">\((\sigma_{obs})\)</span> represent how much the
 model thinks we might miss the true count when we take our imperfect
 measurements:</p>
 <div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/mcmc_plot.brmsfit.html" class="external-link">mcmc_plot</a></span><span class="op">(</span><span class="va">var_mod</span>, variable <span class="op">=</span> <span class="st">"sigma_obs"</span>, regex <span class="op">=</span> <span class="cn">TRUE</span>, type <span class="op">=</span> <span class="st">"hist"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-29-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-29-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>These are still a bit hard to identify overall, especially when
 trying to estimate both process and observation error. Often we need to
 make some strong assumptions about which of these is more important for
@@ -675,7 +675,7 @@ any evidence of contemporaneously correlated process error:</p>
 <span>  type <span class="op">=</span> <span class="st">'hist'</span>,</span>
 <span>  facet_args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>dir <span class="op">=</span> <span class="st">'v'</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-32-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-32-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>This symmetric matrix tells us there is support for correlated
 process errors, as several of the off-diagonal entries are strongly
 non-zero. But it is easier to interpret these estimates if we convert
@@ -751,7 +751,7 @@ positive shock for series 3 (Greens) using the <code><a href="https://rdrr.io/r/
 function:</p>
 <div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">irfs</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-36-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-36-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>This series of plots makes it clear that some of the other series
 would be expected to show both instantaneous responses to a shock for
 the Greens (due to their correlated process errors) as well as delayed
@@ -767,7 +767,7 @@ of all other series in a Vector Autoregression:</p>
 <div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fevds</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fevd.mvgam.html">fevd</a></span><span class="op">(</span><span class="va">varcor_mod</span>, h <span class="op">=</span> <span class="fl">12</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fevds</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-37-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-37-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>The plot above shows the median contribution to forecast error
 variance for each series.</p>
 </div>
@@ -796,7 +796,7 @@ capturing the dependence structure in the true evaluation set:</p>
 <span>  ylab <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/expression.html" class="external-link">expression</a></span><span class="op">(</span><span class="va">variogram</span><span class="op">[</span><span class="va">VAR1cor</span><span class="op">]</span> <span class="op">~</span> <span class="op">-</span><span class="op">~</span> <span class="va">variogram</span><span class="op">[</span><span class="va">VAR1</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html" class="external-link">abline</a></span><span class="op">(</span>h <span class="op">=</span> <span class="fl">0</span>, lty <span class="op">=</span> <span class="st">"dashed"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-38-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-38-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>And we can also compute the energy score for out of sample forecasts
 to get a sense of which model provides forecasts that are better
 calibrated:</p>
@@ -815,7 +815,7 @@ calibrated:</p>
 <span>  ylab <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/expression.html" class="external-link">expression</a></span><span class="op">(</span><span class="va">energy</span><span class="op">[</span><span class="va">VAR1cor</span><span class="op">]</span> <span class="op">~</span> <span class="op">-</span><span class="op">~</span> <span class="va">energy</span><span class="op">[</span><span class="va">VAR1</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html" class="external-link">abline</a></span><span class="op">(</span>h <span class="op">=</span> <span class="fl">0</span>, lty <span class="op">=</span> <span class="st">"dashed"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="trend_formulas_files/figure-html/unnamed-chunk-39-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="trend_formulas_files/figure-html/unnamed-chunk-39-1.png" alt="" width="60%" style="display: block; margin: auto;"></p>
 <p>The models tend to provide similar forecasts, though the correlated
 error model does slightly better overall. We would probably need to use
 a more extensive rolling forecast evaluation exercise if we felt like we
@@ -833,7 +833,7 @@ stationary:</p>
 <div class="sourceCode" id="cb40"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">description</span></span></code></pre></div>
 <pre><code><span><span class="co">#&gt; Methods text skeleton</span></span>
-<span><span class="co">#&gt; We used the R package mvgam (version 1.1.593; Clark &amp; Wells, 2023) to</span></span>
+<span><span class="co">#&gt; We used the R package mvgam (version 1.1.52; Clark &amp; Wells, 2023) to</span></span>
 <span><span class="co">#&gt;   construct, fit and interrogate the model. mvgam fits Bayesian</span></span>
 <span><span class="co">#&gt;   State-Space models that can include flexible predictor effects in both</span></span>
 <span><span class="co">#&gt;   the process and observation components by incorporating functionalities</span></span>
@@ -843,7 +843,7 @@ stationary:</p>
 <span><span class="co">#&gt;   Autoregressive process following methods described by Heaps (2023) and</span></span>
 <span><span class="co">#&gt;   Clark et al. (2025). The mvgam-constructed model and observed data were</span></span>
 <span><span class="co">#&gt;   passed to the probabilistic programming environment Stan (version</span></span>
-<span><span class="co">#&gt;   2.37.0; Carpenter et al. 2017, Stan Development Team 2025), specifically</span></span>
+<span><span class="co">#&gt;   2.38.0; Carpenter et al. 2017, Stan Development Team 2026), specifically</span></span>
 <span><span class="co">#&gt;   through the cmdstanr interface (Gabry &amp; Cesnovar, 2021). We ran 4</span></span>
 <span><span class="co">#&gt;   Hamiltonian Monte Carlo chains for 1000 warmup iterations and 500</span></span>
 <span><span class="co">#&gt;   sampling iterations for joint posterior estimation. Rank normalized</span></span>
@@ -872,7 +872,7 @@ stationary:</p>
 <span><span class="co">#&gt; Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt M,</span></span>
 <span><span class="co">#&gt;   Brubaker M, Guo J, Li P and Riddell A (2017). Stan: A probabilistic</span></span>
 <span><span class="co">#&gt;   programming language. Journal of Statistical Software 76.</span></span>
-<span><span class="co">#&gt; Gabry J, Cesnovar R, Johnson A, and Bronder S (2025). cmdstanr: R</span></span>
+<span><span class="co">#&gt; Gabry J, Cesnovar R, Johnson A, and Bronder S (2026). cmdstanr: R</span></span>
 <span><span class="co">#&gt;   Interface to 'CmdStan'. https://mc-stan.org/cmdstanr/,</span></span>
 <span><span class="co">#&gt;   https://discourse.mc-stan.org.</span></span>
 <span><span class="co">#&gt; Vehtari A, Gelman A, Simpson D, Carpenter B, and Burkner P (2021).</span></span>

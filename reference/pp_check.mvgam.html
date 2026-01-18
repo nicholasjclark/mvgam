@@ -12,7 +12,7 @@ of the bayesplot package."><meta property="og:image" content="https://nicholasjc
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.593</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.52</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -202,7 +202,7 @@ package.</p>
 <span class="r-in"><span>  group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Note: in most cases the default test statistic 'mean' is too weak to detect anything of interest.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value `binwidth`.</span>
 <span class="r-plt img"><img src="pp_check.mvgam-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Several types can be used to plot distributions of randomized</span></span></span>
@@ -227,13 +227,13 @@ package.</p>
 <span class="r-in"><span>  type <span class="op">=</span> <span class="st">"resid_hist_grouped"</span>,</span></span>
 <span class="r-in"><span>  group <span class="op">=</span> <span class="st">"series"</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value `binwidth`.</span>
 <span class="r-plt img"><img src="pp_check.mvgam-8.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Custom functions accepted</span></span></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"stat"</span>, stat <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">x</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Using all posterior draws for ppc type 'stat' by default.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value `binwidth`.</span>
 <span class="r-plt img"><img src="pp_check.mvgam-9.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>,</span></span>
 <span class="r-in"><span>  type <span class="op">=</span> <span class="st">"stat_grouped"</span>,</span></span>
@@ -241,7 +241,7 @@ package.</p>
 <span class="r-in"><span>  group <span class="op">=</span> <span class="st">"series"</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Using all posterior draws for ppc type 'stat_grouped' by default.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value `binwidth`.</span>
 <span class="r-plt img"><img src="pp_check.mvgam-10.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Some functions accept covariates to set the x-axes</span></span></span>
