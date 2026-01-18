@@ -433,7 +433,7 @@ Posterior predictive samples with observation-level noise.
     - Returns vector of dpar names required by family
     - Complete brms family coverage including all continuous, count, binomial,
       zero-inflated, and hurdle families
-    - Uses `%||%` pattern for clean null handling
+    - Uses `%||%` pattern for clean null handling/
 
   - [x] **3.2.2 Create `extract_dpars_from_stanfit()` helper** ✓
     - **Implemented in**: `R/posterior_predict.R` (lines 534-703)
@@ -572,18 +572,79 @@ User-friendly interfaces with automatic summarization.
   - Added 5 validation tests to `tasks/validate_extraction_vs_brms.R`
 
   - [ ] **4.1.1 Implement process error prediction functions**
-    - Create `sample_process_errors()` to sample from trend innovation distributions
-    - Sample from multivariate normal for State-Space trend components
-    - Handle correlation/covariance structures from all trend model options:
-      - `AR(p)`: Autoregressive with lag-p dependencies
-      - `RW()`: Random walk (special case of AR(1) with phi=1)
-      - `VAR(p)`: Vector autoregressive with cross-series correlations
-      - `GP()`: Gaussian process with temporal covariance kernels
-      - `CAR(p)`: Continuous autoregressive
-      - Factor models: Latent factor covariance structures
-    - Extract covariance parameters from posterior (sigma, Sigma, correlation matrices)
-    - Use `mvtnorm::rmvnorm()` or Cholesky decomposition for efficient sampling
-    - Propagate process error uncertainty through time for forecasting
+
+    Create `R/sample_innovations.R` with pattern-based sampling infrastructure.
+    All trend models sample from MVN; differences are in covariance parameterization.
+
+    **Covariance Patterns** (4 patterns cover all trend types):
+    | Pattern | Trends | Parameters | Formula |
+    |---------|--------|------------|---------|
+    | `none` | PW | None | Deterministic |
+    | `diagonal` | CAR | `sigma_trend` | `diag(sigma^2)` |
+    | `cholesky_scaled` | RW, AR, ZMVN | `sigma_trend`, `L_Omega_trend` | `diag(sigma) %*% L_Omega` |
+    | `full_covariance` | VAR | `Sigma_trend` | Direct covariance |
+
+    **Sub-tasks:**
+
+    - [x] **4.1.1.1 Create `R/sample_innovations.R` with core infrastructure**
+      - Defined `trend_covariance_patterns` list mapping trend types to patterns
+      - Created `get_covariance_pattern(trend_type)` with normalization and
+        fallback warning
+      - Created `get_observation_structure(object, newdata)` using existing
+        `ensure_mvgam_variables()`, `get_time_for_grouping()`,
+        `get_series_for_grouping()`
+      - Created `get_trend_type(object)` and `has_stochastic_trend(object)`
+      - Added roxygen2 file-level documentation
+      - Code reviewer approved with fixes applied
+
+    - [ ] **4.1.1.2 Implement `get_trend_covariance_structure()`**
+      - Extract trend type from `object$trend_model`
+      - Determine covariance pattern from trend type
+      - Extract relevant parameters from posterior draws:
+        - `sigma_trend` (all except PW)
+        - `L_Omega_trend` (cholesky_scaled with correlation)
+        - `Sigma_trend` (full_covariance / VAR)
+      - Detect hierarchical structure (check for `L_Omega_global_trend`, etc.)
+      - Return structured list with pattern, params, hierarchical flag
+
+    - [ ] **4.1.1.3 Implement pattern-specific samplers**
+      - `sample_none_innovations()` - returns zeros (PW)
+      - `sample_diagonal_innovations()` - independent per-series (CAR)
+      - `sample_cholesky_innovations()` - correlated via L_Sigma (RW, AR, ZMVN)
+      - `sample_full_cov_innovations()` - direct MVN from Sigma (VAR)
+      - All samplers respect time structure (same innovation for obs at same time)
+
+    - [ ] **4.1.1.4 Handle hierarchical covariance structures**
+      - Implement `sample_hierarchical_cholesky_innovations()` for grouped models
+      - Extract: `L_Omega_global_trend`, `L_deviation_group_trend`, `alpha_cor_trend`
+      - Combine global + group-specific correlations per the Stan model
+      - Handle group indices mapping from `object$trend_model`
+
+    - [ ] **4.1.1.5 Create main `sample_process_errors()` function**
+      - Signature: `sample_process_errors(object, ndraws, newdata, draw_ids = NULL)`
+      - Get observation structure via `get_observation_structure()`
+      - Get covariance structure via `get_trend_covariance_structure()`
+      - Dispatch to appropriate pattern sampler
+      - Return matrix `[ndraws x nobs]` of sampled innovations
+
+    - [ ] **4.1.1.6 Integrate with `get_combined_linpred()`**
+      - Modify `R/posterior_linpred.R` to call `sample_process_errors()` when
+        `process_error = TRUE`
+      - Add innovations to trend_linpred before combining with obs_linpred
+      - Ensure newdata is passed through for observation structure extraction
+
+    - [ ] **4.1.1.7 Add tests for innovation sampling**
+      - Test each covariance pattern produces correct dimensions
+      - Test correlated innovations have expected correlation structure
+      - Test hierarchical innovations respect group structure
+      - Test integration with `posterior_linpred()`, `posterior_epred()`,
+        `posterior_predict()`
+      - Verify `process_error = TRUE` increases variance vs FALSE
+
+    - [ ] **4.1.1.8 Code review for Task 4.1.1**
+      - Use **code-reviewer agent** on `R/sample_innovations.R`
+      - Verify DRY patterns, no duplication
+      - Check extensibility for future trend types
 
 - [ ] **4.2 Implement `fitted.mvgam()` S3 method**
   - Function signature:
