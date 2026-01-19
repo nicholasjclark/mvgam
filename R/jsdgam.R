@@ -734,7 +734,9 @@ jsdgam = function(
     # Check if cmdstan is accessible; if not, use rstan
     if (backend == 'cmdstanr') {
       if (!requireNamespace('cmdstanr', quietly = TRUE)) {
-        warning('cmdstanr library not found. Defaulting to rstan')
+        if (silent < 2) {
+          message('cmdstanr library not found; defaulting to rstan')
+        }
         use_cmdstan <- FALSE
       } else {
         use_cmdstan <- TRUE
