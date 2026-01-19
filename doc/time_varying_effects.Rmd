@@ -350,7 +350,7 @@ Bürkner, PC, Gabry, J and Vehtari, A [Approximate leave-future-out cross-valida
   
 Herrero, Asier, et al. [From the individual to the landscape and back: time‐varying effects of climate and herbivory on tree sapling growth at distribution limits](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/1365-2745.12527). *Journal of Ecology* 104.2 (2016): 430-442.
     
-Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. "[MARSS: multivariate autoregressive state-space models for analyzing time-series data.](https://journal.r-project.org/archive/2012/RJ-2012-002/index.html)" *R Journal*. 4.1 (2012): 11.
+Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. "[MARSS: multivariate autoregressive state-space models for analyzing time-series data.](https://journal.r-project.org/articles/RJ-2012-002/)" *R Journal*. 4.1 (2012): 11.
   
 Scheuerell, Mark D., and John G. Williams. [Forecasting climate induced changes in the survival of Snake River Spring/Summer Chinook Salmon (*Oncorhynchus Tshawytscha*)](https://onlinelibrary.wiley.com/doi/10.1111/j.1365-2419.2005.00346.x) *Fisheries Oceanography*  14 (2005): 448–57.
 
