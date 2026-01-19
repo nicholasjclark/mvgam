@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.54</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.594</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -57,9 +57,9 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="1.1.52" id="mvgam-1152">mvgam 1.1.52<a class="anchor" aria-label="anchor" href="#mvgam-1152"></a></h2>
+<h2 class="pkg-version" data-toc-text="1.1.594" id="mvgam-11594">mvgam 1.1.594<a class="anchor" aria-label="anchor" href="#mvgam-11594"></a></h2>
 <div class="section level3">
-<h3 id="new-functionalities-1-1-52">New functionalities<a class="anchor" aria-label="anchor" href="#new-functionalities-1-1-52"></a></h3>
+<h3 id="new-functionalities-1-1-594">New functionalities<a class="anchor" aria-label="anchor" href="#new-functionalities-1-1-594"></a></h3>
 <ul><li>Restructured <code><a href="../reference/summary.mvgam.html">summary.mvgam()</a></code> to now return an object of class <code>mvgam_summary</code> that can be re-used for later purposes, or that can be printed with <code><a href="../reference/print.mvgam_summary.html">print.mvgam_summary()</a></code> (<a href="https://github.com/nicholasjclark/mvgam/issues/119" class="external-link">#119</a>)</li>
 <li>Added a new function <code><a href="../reference/ordinate.jsdgam.html">ordinate.jsdgam()</a></code> to plot two-dimensional ordinations of site and species scores from latent factor models estimated in <code><a href="../reference/jsdgam.html">jsdgam()</a></code>
 </li>
@@ -69,13 +69,13 @@
 <li>Added a <code>mvgam_use_cases</code> help file to provide links to online resources that discuss how to use ‘mvgam’ in practice</li>
 </ul></div>
 <div class="section level3">
-<h3 id="changing-defaults-1-1-52">Changing defaults<a class="anchor" aria-label="anchor" href="#changing-defaults-1-1-52"></a></h3>
+<h3 id="changing-defaults-1-1-594">Changing defaults<a class="anchor" aria-label="anchor" href="#changing-defaults-1-1-594"></a></h3>
 <ul><li>The <code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code> method is now imported from ‘generics’ to help avoid conflict issues with other forecasting packages</li>
 <li>Deprecated the <code>incl_dynamics</code> argument in the <code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> and <code><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo_compare()</a></code> functions to ensure better consistency in log-likelihood and resulting LOO estimates from models with different observation families</li>
 <li>Changed default <code>type</code> in <code><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects()</a></code> to <code>expected</code> to match behaviour of ‘brms’</li>
 </ul></div>
 <div class="section level3">
-<h3 id="bug-fixes-1-1-52">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-1-1-52"></a></h3>
+<h3 id="bug-fixes-1-1-594">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-1-1-594"></a></h3>
 <ul><li>Bug fix to ensure forecast scores are properly computed when plotting objects of class <code>mvgam_forecast</code> if only a single out-of-sample observation was included in <code>newdata</code> (<a href="https://github.com/nicholasjclark/mvgam/issues/111" class="external-link">#111</a>)</li>
 <li>Bug fix to ensure offsets supplied with <code>offset(...)</code> in formulae are correctly incorporated when using <code><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp()</a></code> terms</li>
 <li>Bug fix to ensure piecewise trends are correctly predicted when using <code>process_error = TRUE</code> in <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code>
@@ -83,7 +83,7 @@
 <li>Bug fix to ensure variance of continuous time autoregressive processes (using <code><a href="../reference/RW.html">CAR()</a></code>) scales appropriately with time lags (<a href="https://github.com/nicholasjclark/mvgam/issues/107" class="external-link">#107</a>)</li>
 </ul></div>
 <div class="section level3">
-<h3 id="deprecations-1-1-52">Deprecations<a class="anchor" aria-label="anchor" href="#deprecations-1-1-52"></a></h3>
+<h3 id="deprecations-1-1-594">Deprecations<a class="anchor" aria-label="anchor" href="#deprecations-1-1-594"></a></h3>
 <ul><li>Altered the structure of objects of class <code>mvgam_forecast</code> so that the <code>train_times</code> and <code>test_times</code> slots now contain lists of length <code>n_series</code>. This allows for continuous time data to be better handled, where some series may have been sampled at different timepoints</li>
 </ul></div>
 </div>
