@@ -185,13 +185,13 @@ of model estimates
 
     mcmc_plot(mod, 
               type = 'rhat_hist')
-    #> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+    #> `stat_bin()` using `bins = 30`. Pick better value `binwidth`.
 
 <img src="man/figures/README-unnamed-chunk-9-1.png" alt="Rhats of parameters estimated with Stan in mvgam" width="100%" />
 
     mcmc_plot(mod, 
               type = 'neff_hist')
-    #> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+    #> `stat_bin()` using `bins = 30`. Pick better value `binwidth`.
 
 <img src="man/figures/README-unnamed-chunk-10-1.png" alt="Effective sample sizes of parameters estimated with Stan in mvgam" width="100%" />
 
@@ -246,13 +246,13 @@ scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.2029645
+    #> 8.69679425
     #> Out of sample DRPS:
-    #> 5.2327845
+    #> 5.28215875
     #> Out of sample DRPS:
-    #> 8.54444325
+    #> 8.7708515
     #> Out of sample DRPS:
-    #> 3.8400025
+    #> 3.4292165
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
@@ -319,7 +319,7 @@ can use the highly versatile `pp_check()` function to plot these:
       ndraws = 200
     )
 
-<img src="man/figures/README-unnamed-chunk-18-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-18-1.png" alt="" width="100%" />
 
 When describing the model, it can be helpful to use the `how_to_cite()`
 function to generate a scaffold for describing the model and sampling
@@ -330,7 +330,7 @@ details in scientific communications
     description
 
     #> Methods text skeleton
-    #> We used the R package mvgam (version 1.1.593; Clark & Wells, 2023) to
+    #> We used the R package mvgam (version 1.1.54; Clark & Wells, 2023) to
     #>   construct, fit and interrogate the model. mvgam fits Bayesian
     #>   State-Space models that can include flexible predictor effects in both
     #>   the process and observation components by incorporating functionalities
@@ -340,7 +340,7 @@ details in scientific communications
     #>   Autoregressive process following methods described by Heaps (2023) and
     #>   Clark et al. (2025). The mvgam-constructed model and observed data were
     #>   passed to the probabilistic programming environment Stan (version
-    #>   2.36.0; Carpenter et al. 2017, Stan Development Team 2025), specifically
+    #>   2.38.0; Carpenter et al. 2017, Stan Development Team 2026), specifically
     #>   through the cmdstanr interface (Gabry & Cesnovar, 2021). We ran 4
     #>   Hamiltonian Monte Carlo chains for 1500 warmup iterations and 500
     #>   sampling iterations for joint posterior estimation. Rank normalized
@@ -370,7 +370,7 @@ details in scientific communications
     #> Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt M,
     #>   Brubaker M, Guo J, Li P and Riddell A (2017). Stan: A probabilistic
     #>   programming language. Journal of Statistical Software 76.
-    #> Gabry J, Cesnovar R, Johnson A, and Bronder S (2025). cmdstanr: R
+    #> Gabry J, Cesnovar R, Johnson A, and Bronder S (2026). cmdstanr: R
     #>   Interface to 'CmdStan'. https://mc-stan.org/cmdstanr/,
     #>   https://discourse.mc-stan.org.
     #> Vehtari A, Gelman A, Simpson D, Carpenter B, and Burkner P (2021).
@@ -437,7 +437,7 @@ trends:
       series = "all"
     )
 
-<img src="man/figures/README-beta_sim-1.png" width="100%" />
+<img src="man/figures/README-beta_sim-1.png" alt="" width="100%" />
 
     mod <- mvgam(
       y ~ s(season, bs = "cc", k = 7) +
@@ -479,32 +479,34 @@ estimates for the `Beta` precision parameters *ϕ*.
     #> 
     #> Observation precision parameter estimates:
     #>        2.5%  50% 97.5% Rhat n_eff
-    #> phi[1]  8.1 12.0  18.0    1  1402
-    #> phi[2]  5.5  8.6  13.0    1  1205
-    #> phi[3]  4.1  6.0   8.5    1  1630
+    #> phi[1]  7.8 12.0  18.0    1  1829
+    #> phi[2]  5.6  8.6  13.0    1  1023
+    #> phi[3]  4.1  6.0   8.7    1  1404
     #> 
     #> GAM coefficient (beta) estimates:
     #>             2.5%  50% 97.5% Rhat n_eff
-    #> (Intercept) 0.11 0.45  0.68 1.01   882
+    #> (Intercept) 0.11 0.45   0.7 1.01   602
     #> 
     #> Approximate significance of GAM smooths:
-    #>                            edf Ref.df Chi.sq p-value
-    #> s(season)                4.345      5  6.892   0.104
-    #> s(season):seriesseries_1 1.481      4  7.378   0.207
-    #> s(season):seriesseries_2 1.023      4  6.610   0.626
-    #> s(season):seriesseries_3 1.136      4  4.712   0.475
+    #>                             edf Ref.df Chi.sq p-value  
+    #> s(season)                3.9071      5  9.792  0.0653 .
+    #> s(season):seriesseries_1 1.0934      4 11.307  0.2695  
+    #> s(season):seriesseries_2 2.5629      4  2.227  0.4544  
+    #> s(season):seriesseries_3 0.8565      4  6.556  0.5358  
+    #> ---
+    #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     #> 
     #> marginal deviation:
     #>              2.5%  50% 97.5% Rhat n_eff
-    #> alpha_gp[1] 0.110 0.40  0.86 1.01   596
-    #> alpha_gp[2] 0.550 0.91  1.50 1.00  1257
-    #> alpha_gp[3] 0.072 0.40  0.91 1.01   894
+    #> alpha_gp[1] 0.150 0.40  0.88 1.00   828
+    #> alpha_gp[2] 0.570 0.93  1.50 1.00  1018
+    #> alpha_gp[3] 0.052 0.40  0.92 1.01   672
     #> 
     #> length scale:
     #>           2.5%  50% 97.5% Rhat n_eff
-    #> rho_gp[1]  1.2  3.9    12 1.00  1832
-    #> rho_gp[2]  3.4 13.0    32 1.01   350
-    #> rho_gp[3]  1.2  4.9    23 1.01   515
+    #> rho_gp[1]  1.2  3.6    11 1.00  1482
+    #> rho_gp[2]  3.0 12.0    30 1.01   367
+    #> rho_gp[3]  1.3  4.9    26 1.00   532
     #> 
     #> Stan MCMC diagnostics:
     #> ✔ No issues with effective samples per iteration
@@ -529,7 +531,7 @@ Plot the hindcast and forecast distributions for each series
       ncol = 2
     )
 
-<img src="man/figures/README-beta_fc-1.png" width="100%" />
+<img src="man/figures/README-beta_fc-1.png" alt="" width="100%" />
 
 There are many more extended uses of `mvgam`, including the ability to
 fit hierarchical State-Space GAMs that include dynamic and spatially
