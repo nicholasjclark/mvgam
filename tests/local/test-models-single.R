@@ -114,6 +114,20 @@ test_that("Target 1: mvgam fits basic RW model", {
   expect_true(is.matrix(trend_pred))
   expect_equal(ncol(trend_pred), 2)
   expect_true(all(is.finite(trend_pred)))
+
+  # Test innovation sampling infrastructure
+  expect_equal(get_trend_type(fit1), "RW")
+  expect_equal(get_covariance_pattern("RW"), "cholesky_scaled")
+  expect_true(has_stochastic_trend(fit1))
+
+  cov_struct <- get_trend_covariance_structure(fit1, ndraws = 10)
+  expect_equal(cov_struct$pattern, "cholesky_scaled")
+  expect_true(cov_struct$n_series >= 1)
+  expect_false(cov_struct$hierarchical)
+  expect_false(cov_struct$has_correlations)
+  expect_equal(cov_struct$ndraws, 10)
+  expect_true("sigma_trend" %in% names(cov_struct$params))
+  expect_false("L_Omega_trend" %in% names(cov_struct$params))
 })
 
 # ==============================================================================
@@ -156,6 +170,14 @@ test_that("Target 2: mvgam fits multivariate shared RW model", {
   expect_true(is.matrix(trend_pred_all))
   expect_equal(ncol(trend_pred_all), 4)
   expect_true(all(is.finite(trend_pred_all)))
+
+  # Test covariance structure for correlated RW (cor = TRUE)
+  cov_struct2 <- get_trend_covariance_structure(fit2, ndraws = 10)
+  expect_equal(cov_struct2$pattern, "cholesky_scaled")
+  expect_true(cov_struct2$has_correlations)
+  expect_equal(cov_struct2$ndraws, 10)
+  expect_true("sigma_trend" %in% names(cov_struct2$params))
+  expect_true("L_Omega_trend" %in% names(cov_struct2$params))
 })
 
 # ==============================================================================
@@ -193,6 +215,10 @@ test_that("Target 3: mvgam fits VARMA model with covariates", {
   expect_true(all(trend_pred_varma[,1] == 0))
   expect_true(all(trend_pred_varma[,3] == 0))
   expect_false(all(trend_pred_varma[,2] == 0))
+
+  # Test VAR covariance pattern
+  expect_equal(get_covariance_pattern("VAR"), "full_covariance")
+  expect_true(has_stochastic_trend(fit3))
 })
 
 # ==============================================================================

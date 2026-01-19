@@ -597,22 +597,25 @@ User-friendly interfaces with automatic summarization.
       - Added roxygen2 file-level documentation
       - Code reviewer approved with fixes applied
 
-    - [ ] **4.1.1.2 Implement `get_trend_covariance_structure()`**
-      - Extract trend type from `object$trend_model`
-      - Determine covariance pattern from trend type
-      - Extract relevant parameters from posterior draws:
-        - `sigma_trend` (all except PW)
-        - `L_Omega_trend` (cholesky_scaled with correlation)
-        - `Sigma_trend` (full_covariance / VAR)
-      - Detect hierarchical structure (check for `L_Omega_global_trend`, etc.)
-      - Return structured list with pattern, params, hierarchical flag
+    - [x] **4.1.1.2 Implement `get_trend_covariance_structure()`**
+      - Uses `trend_metadata` as ground truth (no fallbacks)
+      - DRY design with `covariance_param_specs` defining required params
+      - Single `extract_posterior_param()` handles all parameter types
+      - Cholesky factors kept as vectors for memory efficiency
+      - Early memory optimization by subsetting draws_mat before extraction
+      - Helper functions: `validate_covariance_inputs()`,
+        `resolve_draw_indices()`, `extract_named_params()`, `get_group_info()`,
+        `cholesky_to_matrix()`
+      - Code reviewer approved
 
-    - [ ] **4.1.1.3 Implement pattern-specific samplers**
-      - `sample_none_innovations()` - returns zeros (PW)
-      - `sample_diagonal_innovations()` - independent per-series (CAR)
-      - `sample_cholesky_innovations()` - correlated via L_Sigma (RW, AR, ZMVN)
-      - `sample_full_cov_innovations()` - direct MVN from Sigma (VAR)
-      - All samplers respect time structure (same innovation for obs at same time)
+    - [x] **4.1.1.3 Implement pattern-specific samplers**
+      - `sample_innovations()` - main entry point with pattern dispatch
+      - `transform_diagonal_innovations()` - vectorized, independent per-series
+      - `transform_cholesky_innovations()` - correlated via L_Sigma (RW, AR, ZMVN)
+      - `transform_full_cov_innovations()` - direct MVN from Sigma (VAR)
+      - `map_innovations_to_obs()` - vectorized linear indexing for time/series
+      - DRY design: single dispatcher, pattern-specific transforms
+      - Code reviewer approved
 
     - [ ] **4.1.1.4 Handle hierarchical covariance structures**
       - Implement `sample_hierarchical_cholesky_innovations()` for grouped models

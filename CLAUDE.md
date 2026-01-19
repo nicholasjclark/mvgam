@@ -86,9 +86,21 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 4. **Session Warnings**: Use `if (!identical(Sys.getenv("TESTTHAT"), "true")) rlang::warn(..., .frequency = "once")` for one-time warnings
 
 #### Message Formatting Standards
-- Use `{.field parameter_name}` for parameter highlighting
+- Use single quotes around parameter names: `'parameter_name'`
+- Use `c()` with named elements for multi-line messages:
+  - `i = "..."` for informational hints (indented)
+  - `x = "..."` for error details (indented)
 - Include suggested solutions in error messages
 - Provide context about why constraints exist
+
+Example:
+```r
+stop(insight::format_error(c(
+  "Parameter 'ndraws' exceeds available draws.",
+  x = paste0("Requested: ", ndraws, ", available: ", total, "."),
+  i = "Use a smaller value or set ndraws = NULL to use all draws."
+)))
+```
 
 ### Export Guidelines
 - Only export functions that users directly need
