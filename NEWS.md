@@ -1,4 +1,4 @@
-# mvgam 1.1.52
+# mvgam 1.1.594
 
 ## New functionalities
 * Restructured `summary.mvgam()` to now return an object of class `mvgam_summary` that can be re-used for later purposes, or that can be printed with `print.mvgam_summary()` (#119)

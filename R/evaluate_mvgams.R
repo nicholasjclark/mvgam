@@ -142,37 +142,9 @@
 #'   n_evaluations = 5
 #' )
 #'
-#' # Now use approximate leave-future-out CV to compare
-#' # rolling forecasts; start at time point 40 to reduce
-#' # computational time and to ensure enough data is available
-#' # for estimating model parameters
-#' lfo_ar2 <- lfo_cv(
-#'   object = mod_ar2,
-#'   min_t = 40,
-#'   fc_horizon = 3,
-#'   silent = 2
-#' )
-#' lfo_rw <- lfo_cv(
-#'   object = mod_rw,
-#'   min_t = 40,
-#'   fc_horizon = 3,
-#'   silent = 2
-#' )
-#'
-#' # Plot Pareto-K values and ELPD estimates
-#' plot(lfo_ar2)
-#' plot(lfo_rw)
-#'
-#' # Proportion of timepoints in which AR2 model gives
-#' # better forecasts
-#' length(which((lfo_ar2$elpds - lfo_rw$elpds) > 0)) /
-#'   length(lfo_ar2$elpds)
-#'
-#' # A higher total ELPD is preferred
-#' lfo_ar2$sum_ELPD
-#' lfo_rw$sum_ELPD
+#' # A more appropriate comparison would be to use approximate
+#' # leave-future-out CV to compare forecasts (see ?mvgam::lfo_cv())
 #' }
-#'
 #' @name evaluate_mvgams
 NULL
 

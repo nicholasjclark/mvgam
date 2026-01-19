@@ -1,4 +1,4 @@
-## Version 1.1.54
+## Version 1.1.594
 
 ## Summary of changes
 This version is a minor patch update to fix a test that spawned more than two cores. It also brings several cosmetic updates to improve the way summaries are printed and stored. There are no major structural changes or modifications that would break pre-existing workflows
