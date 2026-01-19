@@ -1,5 +1,5 @@
 params <-
-list(EVAL = TRUE)
+  list(EVAL = TRUE)
 
 ## ----echo = FALSE----------------------------------------------------------------
 knitr::opts_chunk$set(
@@ -78,7 +78,6 @@ mod1 <- mvgam(
 #   silent = 2
 # )
 
-
 ## --------------------------------------------------------------------------------
 summary(mod1, include_betas = FALSE)
 
@@ -88,7 +87,8 @@ conditional_effects(mod1, type = "link")
 
 
 ## ----include=FALSE, message=FALSE------------------------------------------------
-mod2 <- mvgam(y ~ 1,
+mod2 <- mvgam(
+  y ~ 1,
   trend_formula = ~ s(season, bs = "cc", k = 8) - 1,
   trend_knots = list(season = c(0.5, 12.5)),
   trend_model = AR(cor = TRUE),
@@ -107,7 +107,6 @@ mod2 <- mvgam(y ~ 1,
 #   data = simdat$data_train,
 #   silent = 1
 # )
-
 
 ## --------------------------------------------------------------------------------
 summary(mod2, include_betas = FALSE)
@@ -143,7 +142,8 @@ plot(fc_mod2, series = 2)
 
 
 ## ----include=FALSE---------------------------------------------------------------
-mod2 <- mvgam(y ~ 1,
+mod2 <- mvgam(
+  y ~ 1,
   trend_formula = ~ s(season, bs = "cc", k = 8) - 1,
   trend_knots = list(season = c(0.5, 12.5)),
   trend_model = AR(cor = TRUE),
@@ -164,7 +164,6 @@ mod2 <- mvgam(y ~ 1,
 #   newdata = simdat$data_test,
 #   silent = 2
 # )
-
 
 ## --------------------------------------------------------------------------------
 fc_mod2 <- forecast(mod2)
@@ -205,8 +204,11 @@ crps_mod2 <- score(fc_mod2, score = "crps")
 
 diff_scores <- crps_mod2$series_1$score -
   crps_mod1$series_1$score
-plot(diff_scores,
-  pch = 16, cex = 1.25, col = "darkred",
+plot(
+  diff_scores,
+  pch = 16,
+  cex = 1.25,
+  col = "darkred",
   ylim = c(
     -1 * max(abs(diff_scores), na.rm = TRUE),
     max(abs(diff_scores), na.rm = TRUE)
@@ -217,21 +219,26 @@ plot(diff_scores,
 )
 abline(h = 0, lty = "dashed", lwd = 2)
 ar1_better <- length(which(diff_scores < 0))
-title(main = paste0(
-  "AR(1) better in ",
-  ar1_better,
-  " of ",
-  length(diff_scores),
-  " evaluations",
-  "\nMean difference = ",
-  round(mean(diff_scores, na.rm = TRUE), 2)
-))
+title(
+  main = paste0(
+    "AR(1) better in ",
+    ar1_better,
+    " of ",
+    length(diff_scores),
+    " evaluations",
+    "\nMean difference = ",
+    round(mean(diff_scores, na.rm = TRUE), 2)
+  )
+)
 
 
 diff_scores <- crps_mod2$series_2$score -
   crps_mod1$series_2$score
-plot(diff_scores,
-  pch = 16, cex = 1.25, col = "darkred",
+plot(
+  diff_scores,
+  pch = 16,
+  cex = 1.25,
+  col = "darkred",
   ylim = c(
     -1 * max(abs(diff_scores), na.rm = TRUE),
     max(abs(diff_scores), na.rm = TRUE)
@@ -242,20 +249,25 @@ plot(diff_scores,
 )
 abline(h = 0, lty = "dashed", lwd = 2)
 ar1_better <- length(which(diff_scores < 0))
-title(main = paste0(
-  "AR(1) better in ",
-  ar1_better,
-  " of ",
-  length(diff_scores),
-  " evaluations",
-  "\nMean difference = ",
-  round(mean(diff_scores, na.rm = TRUE), 2)
-))
+title(
+  main = paste0(
+    "AR(1) better in ",
+    ar1_better,
+    " of ",
+    length(diff_scores),
+    " evaluations",
+    "\nMean difference = ",
+    round(mean(diff_scores, na.rm = TRUE), 2)
+  )
+)
 
 diff_scores <- crps_mod2$series_3$score -
   crps_mod1$series_3$score
-plot(diff_scores,
-  pch = 16, cex = 1.25, col = "darkred",
+plot(
+  diff_scores,
+  pch = 16,
+  cex = 1.25,
+  col = "darkred",
   ylim = c(
     -1 * max(abs(diff_scores), na.rm = TRUE),
     max(abs(diff_scores), na.rm = TRUE)
@@ -266,13 +278,14 @@ plot(diff_scores,
 )
 abline(h = 0, lty = "dashed", lwd = 2)
 ar1_better <- length(which(diff_scores < 0))
-title(main = paste0(
-  "AR(1) better in ",
-  ar1_better,
-  " of ",
-  length(diff_scores),
-  " evaluations",
-  "\nMean difference = ",
-  round(mean(diff_scores, na.rm = TRUE), 2)
-))
-
+title(
+  main = paste0(
+    "AR(1) better in ",
+    ar1_better,
+    " of ",
+    length(diff_scores),
+    " evaluations",
+    "\nMean difference = ",
+    round(mean(diff_scores, na.rm = TRUE), 2)
+  )
+)

@@ -314,7 +314,8 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
       params = trend_beta_name_map$orig_name
     )
     trend_betas_out <- add_param_col(
-      trend_betas_out, trend_beta_name_map$alias
+      trend_betas_out,
+      trend_beta_name_map$alias
     )
     trend_betas_out <- tibble::add_column(
       trend_betas_out,
@@ -332,7 +333,8 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
       params = trend_re_param_name_map$orig_name
     )
     trend_re_params_out <- add_param_col(
-      trend_re_params_out, trend_re_param_name_map$alias
+      trend_re_params_out,
+      trend_re_param_name_map$alias
     )
     trend_re_params_out <- tibble::add_column(
       trend_re_params_out,
@@ -359,7 +361,8 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
           params = trend_re_beta_name_map$orig_name
         )
         trend_re_betas_out <- add_param_col(
-          trend_re_betas_out, trend_re_beta_name_map$alias
+          trend_re_betas_out,
+          trend_re_beta_name_map$alias
         )
         trend_re_betas_out <- tibble::add_column(
           trend_re_betas_out,
