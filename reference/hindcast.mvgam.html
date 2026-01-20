@@ -118,7 +118,7 @@ organized into a convenient format for plotting</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
 <span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">3</span>, trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
@@ -130,129 +130,25 @@ organized into a convenient format for plotting</p>
 <span class="r-in"><span><span class="co"># Hindcasts on response scale</span></span></span>
 <span class="r-in"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu">hindcast</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> List of 15</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x55c28fc0e1d0&gt; </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_model       :List of 7</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ trend_model: chr "AR1"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ ma         : logi FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ cor        : logi FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ unit       : chr "time"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ gr         : chr "NA"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ subgr      : chr "series"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ label      : language AR()</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "class")= chr "mvgam_trend"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "param_info")=List of 2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ param_names: chr [1:8] "trend" "tau" "sigma" "ar1" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ labels     : chr [1:8] "trend_estimates" "precision_parameter" "standard_deviation" "autoregressive_coef_1" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ drift             : logi FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ use_lv            : logi FALSE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ fit_engine        : chr "stan"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ type              : chr "response"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ series_names      : chr [1:3] "series_1" "series_2" "series_3"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ train_observations:List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:75] 2 2 0 0 2 4 6 6 4 1 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:75] 2 1 3 1 0 6 6 3 3 7 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:75] 1 0 0 0 0 1 1 0 1 0 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ train_times       :List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:75] 1 2 3 4 5 6 7 8 9 10 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:75] 1 2 3 4 5 6 7 8 9 10 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:75] 1 2 3 4 5 6 7 8 9 10 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_observations : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_times        : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ hindcasts         :List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: num [1:1000, 1:75] 1 0 0 5 5 2 0 4 1 0 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "ypred[1,1]" "ypred[2,1]" "ypred[3,1]" "ypred[4,1]" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: num [1:1000, 1:75] 0 2 1 2 1 4 1 2 4 1 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "ypred[1,2]" "ypred[2,2]" "ypred[3,2]" "ypred[4,2]" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: num [1:1000, 1:75] 0 0 0 0 1 0 0 0 2 0 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "ypred[1,3]" "ypred[2,3]" "ypred[3,3]" "ypred[4,3]" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ forecasts         : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "class")= chr "mvgam_forecast"</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span>, <span class="fl">12</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 12 × 7</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    series    time predQ50 predQ2.5 predQ97.5 truth type    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> series_1     1       1        0       4       2 response</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> series_1     2       0        0       3       2 response</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> series_1     3       0        0       2       0 response</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> series_1     4       0        0       2       0 response</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> series_1     5       1        0       4       2 response</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> series_1     6       3        0       7       4 response</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> series_1     7       4        1      10.0     6 response</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> series_1     8       3        0       9       6 response</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> series_1     9       3        0       8       4 response</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> series_1    10       3        0       8       1 response</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">11</span> series_1    11       2        0       6       3 response</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">12</span> series_1    12       1        0       4       3 response</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
-<span class="r-plt img"><img src="hindcast.mvgam-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
-<span class="r-plt img"><img src="hindcast.mvgam-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
-<span class="r-plt img"><img src="hindcast.mvgam-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Hindcasts as expectations</span></span></span>
 <span class="r-in"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu">hindcast</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'expected'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span>, <span class="fl">12</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 12 × 6</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    series    time predQ50 predQ2.5 predQ97.5 type    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> series_1     1   0.965    0.475     2.01  expected</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> series_1     2   0.634    0.303     1.50  expected</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> series_1     3   0.447    0.183     0.899 expected</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> series_1     4   0.529    0.216     1.10  expected</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> series_1     5   1.15     0.540     2.28  expected</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> series_1     6   2.83     1.52      5.15  expected</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> series_1     7   4.36     2.47      7.55  expected</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> series_1     8   3.57     2.06      6.80  expected</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> series_1     9   3.24     1.71      5.79  expected</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> series_1    10   2.95     1.38      4.91  expected</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">11</span> series_1    11   2.42     1.23      4.20  expected</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">12</span> series_1    12   1.07     0.538     2.29  expected</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="hindcast.mvgam-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="hindcast.mvgam-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="hindcast.mvgam-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Estimated latent trends</span></span></span>
 <span class="r-in"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu">hindcast</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'trend'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span>, <span class="fl">12</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 12 × 6</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    series    time predQ50 predQ2.5 predQ97.5 type </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> series_1     1  0.058<span style="text-decoration: underline;">2</span>   -<span style="color: #BB0000;">0.520</span>     0.790 trend</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> series_1     2  0.121    -<span style="color: #BB0000;">0.466</span>     1.03  trend</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> series_1     3 -<span style="color: #BB0000;">0.043</span><span style="color: #BB0000; text-decoration: underline;">8</span>   -<span style="color: #BB0000;">0.777</span>     0.614 trend</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> series_1     4 -<span style="color: #BB0000;">0.038</span><span style="color: #BB0000; text-decoration: underline;">6</span>   -<span style="color: #BB0000;">0.786</span>     0.660 trend</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> series_1     5  0.056<span style="text-decoration: underline;">5</span>   -<span style="color: #BB0000;">0.550</span>     0.680 trend</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> series_1     6  0.086<span style="text-decoration: underline;">1</span>   -<span style="color: #BB0000;">0.465</span>     0.736 trend</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> series_1     7  0.123    -<span style="color: #BB0000;">0.372</span>     0.759 trend</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> series_1     8  0.187    -<span style="color: #BB0000;">0.304</span>     0.832 trend</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> series_1     9  0.058<span style="text-decoration: underline;">2</span>   -<span style="color: #BB0000;">0.498</span>     0.616 trend</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> series_1    10 -<span style="color: #BB0000;">0.182</span>    -<span style="color: #BB0000;">0.925</span>     0.275 trend</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">11</span> series_1    11  0.038<span style="text-decoration: underline;">8</span>   -<span style="color: #BB0000;">0.552</span>     0.624 trend</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">12</span> series_1    12  0.141    -<span style="color: #BB0000;">0.456</span>     0.949 trend</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="hindcast.mvgam-7.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="hindcast.mvgam-8.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="hindcast.mvgam-9.png" alt="" width="700" height="433"></span>
-<span class="r-in"><span><span class="co"># }</span></span></span>
+<span class="r-in"><span><span class="op">}</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
