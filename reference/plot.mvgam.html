@@ -170,7 +170,7 @@ and <code>gratia</code> packages offer far more customisation.</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \dontrun{</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate some time series</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>  T <span class="op">=</span> <span class="fl">80</span>,</span></span>
@@ -188,15 +188,23 @@ and <code>gratia</code> packages offer far more customisation.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot predictions and residuals for each series</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="plot.mvgam-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="plot.mvgam-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="plot.mvgam-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'residuals'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="plot.mvgam-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'residuals'</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="plot.mvgam-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'residuals'</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="plot.mvgam-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot model effects</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'smooths'</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="plot.mvgam-7.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="plot.mvgam-8.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># More flexible plots with 'marginaleffects' utilities</span></span></span>
 <span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://marginaleffects.com/" class="external-link">marginaleffects</a></span><span class="op">)</span></span></span>
@@ -206,18 +214,21 @@ and <code>gratia</code> packages offer far more customisation.</p>
 <span class="r-in"><span>  condition <span class="op">=</span> <span class="st">'season'</span>,</span></span>
 <span class="r-in"><span>  type <span class="op">=</span> <span class="st">'link'</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="plot.mvgam-9.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>  <span class="va">mod</span>,</span></span>
 <span class="r-in"><span>  condition <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'season'</span>, <span class="st">'series'</span>, <span class="st">'series'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  type <span class="op">=</span> <span class="st">'link'</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="plot.mvgam-10.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>  <span class="va">mod</span>,</span></span>
 <span class="r-in"><span>  condition <span class="op">=</span> <span class="st">'series'</span>,</span></span>
 <span class="r-in"><span>  type <span class="op">=</span> <span class="st">'link'</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="plot.mvgam-11.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># When using a State-Space model with predictors on the process</span></span></span>
 <span class="r-in"><span><span class="co"># model, set trend_effects = TRUE to visualise process effects</span></span></span>
@@ -231,6 +242,7 @@ and <code>gratia</code> packages offer far more customisation.</p>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'smooths'</span>, trend_effects <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="plot.mvgam-12.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># But 'marginaleffects' functions work without any modification</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span></span></span>
@@ -238,7 +250,8 @@ and <code>gratia</code> packages offer far more customisation.</p>
 <span class="r-in"><span>  condition <span class="op">=</span> <span class="st">'season'</span>,</span></span>
 <span class="r-in"><span>  type <span class="op">=</span> <span class="st">'link'</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-plt img"><img src="plot.mvgam-13.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

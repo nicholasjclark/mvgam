@@ -160,7 +160,7 @@ package.</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \dontrun{</span></span></span>
 <span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>seasonality <span class="op">=</span> <span class="st">"hierarchical"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>  <span class="va">y</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span></span></span>
@@ -170,28 +170,40 @@ package.</p>
 <span class="r-in"><span>  chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>  silent <span class="op">=</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Use pp_check(mod, type = "xyz") for a list of available plot types</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Default is a density overlay for all observations</span></span></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using 10 posterior draws for ppc type 'dens_overlay' by default.</span>
+<span class="r-plt img"><img src="pp_check.mvgam-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Rootograms particularly useful for count data</span></span></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"rootogram"</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using all posterior draws for ppc type 'rootogram' by default.</span>
+<span class="r-plt img"><img src="pp_check.mvgam-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Grouping plots by series is useful</span></span></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>,</span></span>
 <span class="r-in"><span>  type <span class="op">=</span> <span class="st">"bars_grouped"</span>,</span></span>
 <span class="r-in"><span>  group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="pp_check.mvgam-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>,</span></span>
 <span class="r-in"><span>  type <span class="op">=</span> <span class="st">"ecdf_overlay_grouped"</span>,</span></span>
 <span class="r-in"><span>  group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="pp_check.mvgam-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>,</span></span>
 <span class="r-in"><span>  type <span class="op">=</span> <span class="st">"stat_freqpoly_grouped"</span>,</span></span>
 <span class="r-in"><span>  group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Note: in most cases the default test statistic 'mean' is too weak to detect anything of interest.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value `binwidth`.</span>
+<span class="r-plt img"><img src="pp_check.mvgam-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Several types can be used to plot distributions of randomized</span></span></span>
 <span class="r-in"><span><span class="co"># quantile residuals</span></span></span>
@@ -200,25 +212,37 @@ package.</p>
 <span class="r-in"><span>  x <span class="op">=</span> <span class="st">"season"</span>,</span></span>
 <span class="r-in"><span>  type <span class="op">=</span> <span class="st">"resid_ribbon"</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using 10 posterior draws for ppc type 'resid_ribbon' by default.</span>
+<span class="r-plt img"><img src="pp_check.mvgam-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  object <span class="op">=</span> <span class="va">mod</span>,</span></span>
 <span class="r-in"><span>  x <span class="op">=</span> <span class="st">"season"</span>,</span></span>
 <span class="r-in"><span>  group <span class="op">=</span> <span class="st">"series"</span>,</span></span>
 <span class="r-in"><span>  type <span class="op">=</span> <span class="st">"resid_ribbon_grouped"</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using 10 posterior draws for ppc type 'resid_ribbon_grouped' by default.</span>
+<span class="r-plt img"><img src="pp_check.mvgam-7.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>,</span></span>
 <span class="r-in"><span>  ndraws <span class="op">=</span> <span class="fl">5</span>,</span></span>
 <span class="r-in"><span>  type <span class="op">=</span> <span class="st">"resid_hist_grouped"</span>,</span></span>
 <span class="r-in"><span>  group <span class="op">=</span> <span class="st">"series"</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value `binwidth`.</span>
+<span class="r-plt img"><img src="pp_check.mvgam-8.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Custom functions accepted</span></span></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"stat"</span>, stat <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">x</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using all posterior draws for ppc type 'stat' by default.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value `binwidth`.</span>
+<span class="r-plt img"><img src="pp_check.mvgam-9.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>,</span></span>
 <span class="r-in"><span>  type <span class="op">=</span> <span class="st">"stat_grouped"</span>,</span></span>
 <span class="r-in"><span>  stat <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">x</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  group <span class="op">=</span> <span class="st">"series"</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using all posterior draws for ppc type 'stat_grouped' by default.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value `binwidth`.</span>
+<span class="r-plt img"><img src="pp_check.mvgam-10.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Some functions accept covariates to set the x-axes</span></span></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>,</span></span>
@@ -228,10 +252,14 @@ package.</p>
 <span class="r-in"><span>  prob_outer <span class="op">=</span> <span class="fl">0.8</span>,</span></span>
 <span class="r-in"><span>  group <span class="op">=</span> <span class="st">"series"</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using all posterior draws for ppc type 'ribbon_grouped' by default.</span>
+<span class="r-plt img"><img src="pp_check.mvgam-11.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Many plots can be made without the observed data</span></span></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, prefix <span class="op">=</span> <span class="st">"ppd"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using 10 posterior draws for ppc type 'dens_overlay' by default.</span>
+<span class="r-plt img"><img src="pp_check.mvgam-12.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

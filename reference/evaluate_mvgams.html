@@ -229,7 +229,7 @@ facilitate model selection. It is essentially a wrapper for
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \dontrun{</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate from a Poisson-AR2 model with a seasonal smooth</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span></span></span>
@@ -274,7 +274,9 @@ facilitate model selection. It is essentially a wrapper for
 <span class="r-in"><span>  score <span class="op">=</span> <span class="st">'drps'</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">score_ar2</span><span class="op">$</span><span class="va">series_1</span><span class="op">$</span><span class="va">score</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 25.28242</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">score_rw</span><span class="op">$</span><span class="va">series_1</span><span class="op">$</span><span class="va">score</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 39.65344</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Use rolling evaluation for approximate comparisons of 3-step ahead</span></span></span>
 <span class="r-in"><span><span class="co"># forecasts across the training period</span></span></span>
@@ -285,10 +287,21 @@ facilitate model selection. It is essentially a wrapper for
 <span class="r-in"><span>  n_samples <span class="op">=</span> <span class="fl">1000</span>,</span></span>
 <span class="r-in"><span>  n_evaluations <span class="op">=</span> <span class="fl">5</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> RPS summaries per model (lower is better)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>             Min.  1st Qu.   Median     Mean  3rd Qu.     Max.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Model 1 0.895669 1.444535 1.993402 2.389999 3.137164 4.280926</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Model 2 1.840698 2.166373 2.492047 2.534437 2.881306 3.270565</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 90% interval coverages per model (closer to 0.9 is better)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Model 1 0.9333333 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Model 2 1</span>
+<span class="r-plt img"><img src="evaluate_mvgams-1.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="evaluate_mvgams-2.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="evaluate_mvgams-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># A more appropriate comparison would be to use approximate</span></span></span>
 <span class="r-in"><span><span class="co"># leave-future-out CV to compare forecasts (see ?mvgam::lfo_cv())</span></span></span>
-<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
