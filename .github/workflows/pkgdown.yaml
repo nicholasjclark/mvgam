@@ -64,7 +64,7 @@ jobs:
         shell: Rscript {0}
 
       - name: Build site
-        run: pkgdown::build_site_github_pages(lazy = TRUE, new_process = FALSE, install = FALSE)
+        run: pkgdown::build_site_github_pages(lazy = TRUE, run_dont_run = TRUE, new_process = FALSE, install = FALSE)
         shell: Rscript {0}
 
       - name: Deploy to GitHub pages 🚀
