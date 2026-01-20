@@ -38,7 +38,7 @@ See \code{\link{mvgam_irf-class}} for a full description of the quantities that 
 computed and returned by this function, along with key references.
 }
 \examples{
-\donttest{
+\dontrun{
 # Fit a model to the portal time series that uses a latent VAR(1)
 mod <- mvgam(
   formula = captures ~ -1,

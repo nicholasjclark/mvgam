@@ -69,7 +69,7 @@ individual plotting functions and the functions from the \code{marginaleffects}
 and \code{gratia} packages offer far more customisation.
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate some time series
 dat <- sim_mvgam(
   T = 80,

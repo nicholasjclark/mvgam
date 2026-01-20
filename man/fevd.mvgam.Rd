@@ -28,7 +28,7 @@ Compute forecast error variance decompositions from
 \code{mvgam} models with Vector Autoregressive dynamics
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate some time series that follow a latent VAR(1) process
 simdat <- sim_mvgam(
   family = gaussian(),

@@ -92,7 +92,7 @@ of posterior checks that are created using \emph{unconditional} "new data"
 predictions, see \code{\link{pp_check.mvgam}}
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate some smooth effects and fit a model
 set.seed(0)
 

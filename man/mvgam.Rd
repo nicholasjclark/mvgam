@@ -461,7 +461,7 @@ to inspect posterior hindcast / forecast distributions.
 }
 
 \examples{
-\donttest{
+\dontrun{
 # =============================================================================
 # Basic Multi-Series Time Series Modeling
 # =============================================================================

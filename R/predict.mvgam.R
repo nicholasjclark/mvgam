@@ -88,7 +88,7 @@
 #'   [augment.mvgam()]
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate 4 time series with hierarchical seasonality
 #' # and independent AR1 dynamic processes
 #' set.seed(123)

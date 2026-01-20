@@ -48,7 +48,7 @@
 #' @name monotonic
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate data from a monotonically increasing function
 #' set.seed(123123)
 #'

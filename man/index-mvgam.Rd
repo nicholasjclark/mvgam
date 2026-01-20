@@ -27,7 +27,7 @@ with their aliases
 Index \code{mvgam} objects
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate data and fit a model
 simdat <- sim_mvgam(
   n_series = 1,

@@ -69,7 +69,7 @@ posterior empirical quantiles. Intervals are not calculated when using
 Compute probabilistic forecast scores for \pkg{mvgam} models
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate observations for three count-valued time series
 data <- sim_mvgam()
 

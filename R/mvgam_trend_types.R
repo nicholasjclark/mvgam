@@ -68,7 +68,7 @@
 #' @author Nicholas J Clark
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # A short example to illustrate CAR(1) models
 #' # Function to simulate CAR1 data with seasonality
 #' sim_corcar1 = function(n = 125,
@@ -566,7 +566,7 @@ GP = function(...) {
 #' @rdname piecewise_trends
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Example of logistic growth with possible changepoints
 #' dNt = function(r, N, k) {
 #'   r * N * (k - N)
@@ -722,7 +722,7 @@ PW = function(
 #'   arguments to be interpreted by the parsing functions in \pkg{mvgam}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate counts of four species over ten sampling locations
 #' site_dat <- data.frame(
 #'   site = rep(1:10, 4),

@@ -48,7 +48,7 @@
 #'@references Paul-Christian Bürkner, Jonah Gabry & Aki Vehtari (2020). Approximate leave-future-out cross-validation for Bayesian time series models
 #'Journal of Statistical Computation and Simulation. 90:14, 2499-2523.
 #'@examples
-#'\donttest{
+#'\dontrun{
 #'# Simulate from a Poisson-AR2 model with a seasonal smooth
 #'set.seed(100)
 #'dat <- sim_mvgam(T = 75,

@@ -61,7 +61,7 @@
 #' @seealso \code{\link{forecast.mvgam}}, \code{\link{ensemble}}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate observations for three count-valued time series
 #' data <- sim_mvgam()
 #'

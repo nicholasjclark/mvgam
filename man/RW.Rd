@@ -83,7 +83,7 @@ version on the package website at:
 https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html
 }
 \examples{
-\donttest{
+\dontrun{
 # A short example to illustrate CAR(1) models
 # Function to simulate CAR1 data with seasonality
 sim_corcar1 = function(n = 125,

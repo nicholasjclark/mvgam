@@ -25,7 +25,7 @@
 #' \code{\link{jsdgam}}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' #--------------------------------------------------
 #' # Simulate 4 time series with hierarchical seasonality
 #' # and a VAR(1) dynamic process

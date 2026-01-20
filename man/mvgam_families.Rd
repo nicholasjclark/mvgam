@@ -83,7 +83,7 @@ Note that currently it is not possible to change the default link
 functions in \pkg{mvgam}, so any call to change these will be silently ignored
 }
 \examples{
-\donttest{
+\dontrun{
 # =============================================================================
 # N-mixture Models
 # =============================================================================

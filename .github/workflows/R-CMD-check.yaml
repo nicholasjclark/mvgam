@@ -86,3 +86,8 @@ jobs:
         with:
           build_args: 'c("--no-manual", "--no-build-vignettes")'
           args: 'c("--no-manual", "--as-cran", "--ignore-vignettes")'
+
+      - name: Run dontrun examples
+        run: |
+          devtools::run_examples(run_dontrun = TRUE, fresh = FALSE)
+        shell: Rscript {0}

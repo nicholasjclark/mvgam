@@ -133,7 +133,7 @@
 #'`methods(class = "mvgam")` for an overview on available methods
 #'
 #'@examples
-#'\donttest{
+#'\dontrun{
 #' # ========================================================================
 #' # Example 1: Basic JSDGAM with Portal Data
 #' # ========================================================================

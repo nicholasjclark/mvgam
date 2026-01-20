@@ -31,7 +31,7 @@ science. Please do not consider the text returned by this function to be a
 completely adequate methods section; it is only meant to get you started.
 }
 \examples{
-\donttest{
+\dontrun{
 #--------------------------------------------------
 # Simulate 4 time series with hierarchical seasonality
 # and a VAR(1) dynamic process

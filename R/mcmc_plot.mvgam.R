@@ -21,7 +21,7 @@
 #' @seealso \code{\link{mvgam_draws}} for an overview of some of the shortcut strings
 #' that can be used for argument `variable`
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 #' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
 #'              trend_model = AR(),

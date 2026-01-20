@@ -90,7 +90,7 @@ process using \code{\link{irf}} for impulse response functions or
 \code{\link{fevd}} for forecast error variance decompositions.
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate some time series that follow a latent VAR(1) process
 simdat <- sim_mvgam(
   family = gaussian(),

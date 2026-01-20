@@ -61,7 +61,7 @@ the underlying dynamic function (\code{k} will increase as \code{rho}
 decreases).
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate a time-varying coefficient
 # (as a Gaussian Process with length scale = 10)
 set.seed(1111)

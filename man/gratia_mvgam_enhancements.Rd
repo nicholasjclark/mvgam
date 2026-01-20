@@ -269,7 +269,7 @@ package installed, making available the popular \code{draw()} function to plot p
 of \code{mvgam} smooth functions using \code{\link[ggplot2:ggplot]{ggplot2::ggplot()}} utilities
 }
 \examples{
-\donttest{
+\dontrun{
 # Fit a simple GAM and draw partial effects of smooths using 'gratia'
 set.seed(0)
 dat <- mgcv::gamSim(

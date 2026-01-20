@@ -127,7 +127,7 @@ Extract posterior draws in conventional formats as data.frames, matrices,
 or arrays.
 }
 \examples{
-\donttest{
+\dontrun{
 sim <- sim_mvgam(family = Gamma())
 
 mod1 <- mvgam(

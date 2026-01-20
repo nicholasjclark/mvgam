@@ -202,7 +202,7 @@
 #' @author Nicholas J Clark
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Fit a simple GAM and draw partial effects of smooths using 'gratia'
 #' set.seed(0)
 #' dat <- mgcv::gamSim(

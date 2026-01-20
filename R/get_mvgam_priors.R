@@ -44,7 +44,7 @@
 #'   that no priors in the model can be modified
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # ========================================================================
 #' # Example 1: Simulate data and inspect default priors
 #' # ========================================================================

@@ -55,7 +55,7 @@ A \code{ggplot} object
 Plot latent trend predictions from \pkg{mvgam} models
 }
 \examples{
-\donttest{
+\dontrun{
 simdat <- sim_mvgam(
   n_series = 3,
   trend_model = AR()

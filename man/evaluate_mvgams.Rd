@@ -140,7 +140,7 @@ facilitate model selection. It is essentially a wrapper for
 \code{roll_eval_mvgam}
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate from a Poisson-AR2 model with a seasonal smooth
 set.seed(1)
 dat <- sim_mvgam(

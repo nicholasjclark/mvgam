@@ -57,7 +57,7 @@
 #'   distributions (if \code{summarise == FALSE} or \code{data.frame} of
 #'   coefficient summaries)
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' simdat <- sim_mvgam(seasonality = "hierarchical")
 #'
 #' mod <- mvgam(

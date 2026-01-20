@@ -38,7 +38,7 @@ testing observations).
 Compute pointwise Log-Likelihoods from fitted \pkg{mvgam} objects
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate some data and fit a model
 simdat <- sim_mvgam(
   n_series = 1,

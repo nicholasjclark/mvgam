@@ -55,7 +55,7 @@
 #' @author Nicholas J Clark
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' sim <- sim_mvgam(family = Gamma())
 #'
 #' mod1 <- mvgam(

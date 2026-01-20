@@ -474,7 +474,7 @@ split_hier_Sigma <- function(object, params) {
 #' @family tidiers
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(0)
 #' dat <- sim_mvgam(
 #'   T = 80,

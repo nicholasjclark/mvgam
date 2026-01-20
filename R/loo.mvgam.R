@@ -37,7 +37,7 @@
 #' @author Nicholas J Clark
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' #--------------------------------------------------
 #' # Simulate 4 time series with hierarchical seasonality
 #' # and independent AR1 dynamic processes

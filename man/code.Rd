@@ -30,7 +30,7 @@ to fit the model in Stan.
 Generate Stan code and data objects for \pkg{mvgam} models
 }
 \examples{
-\donttest{
+\dontrun{
 simdat <- sim_mvgam()
 mod <- mvgam(y ~ s(season) +
                s(time, by = series),

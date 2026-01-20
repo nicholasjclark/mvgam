@@ -48,7 +48,7 @@
 #' @seealso [jsdgam()], [residual_cor()]
 #'
 #' @examples
-#'\donttest{
+#'\dontrun{
 #' # Fit a JSDGAM to the portal_data captures
 #' mod <- jsdgam(
 #'   formula = captures ~

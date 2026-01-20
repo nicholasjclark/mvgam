@@ -37,7 +37,7 @@
 #' @author Nicholas J Clark and Matthijs Hollanders
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' simdat <- sim_mvgam(
 #'   n_series = 3,
 #'   trend_model = AR()

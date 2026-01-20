@@ -43,7 +43,7 @@ Posterior hindcasts (i.e. retrodictions) are drawn from the fitted \code{mvgam} 
 organized into a convenient format for plotting
 }
 \examples{
-\donttest{
+\dontrun{
 simdat <- sim_mvgam(n_series = 3, trend_model = AR())
 mod <- mvgam(y ~ s(season, bs = 'cc'),
              trend_model = AR(),

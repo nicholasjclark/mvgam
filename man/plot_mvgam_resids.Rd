@@ -37,7 +37,7 @@ computational time), so uncertainty in these relationships may not be
 adequately represented.
 }
 \examples{
-\donttest{
+\dontrun{
 simdat <- sim_mvgam(
   n_series = 3,
   trend_model = AR()

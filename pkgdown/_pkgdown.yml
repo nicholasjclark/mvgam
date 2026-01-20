@@ -1,5 +1,8 @@
 url: https://nicholasjclark.github.io/mvgam/
 
+reference:
+  run_dont_run: true
+
 authors:
   Nicholas J Clark:
     href: https://researchers.uq.edu.au/researcher/15140

@@ -59,7 +59,7 @@
 #'   \code{\link[marginaleffects]{plot_slopes}}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate some data
 #' simdat <- sim_mvgam(
 #'   family = poisson(),

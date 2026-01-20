@@ -78,7 +78,7 @@ will assume any dynamic trend component has reached stationarity when
 returning hypothetical predictions.
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate some data and fit a model
 simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 

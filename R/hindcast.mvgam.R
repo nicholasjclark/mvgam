@@ -18,7 +18,7 @@ hindcast <- function(object, ...) {
 #'@rdname hindcast.mvgam
 #'@method hindcast mvgam
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' simdat <- sim_mvgam(n_series = 3, trend_model = AR())
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),
 #'              trend_model = AR(),

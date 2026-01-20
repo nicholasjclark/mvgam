@@ -40,7 +40,7 @@ will already implicitly capture correlations among the temporal posterior
 predictions.
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate some series and fit a few competing dynamic models
 set.seed(1)
 simdat <- sim_mvgam(

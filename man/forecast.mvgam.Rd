@@ -63,7 +63,7 @@ Posterior predictions are drawn from the fitted \code{mvgam} and
 used to simulate a forecast distribution
 }
 \examples{
-\donttest{
+\dontrun{
   # Simulate data with 3 series and AR trend model
   simdat <- sim_mvgam(n_series = 3, trend_model = AR())
 

@@ -23,7 +23,7 @@
 #' @return A \code{data.frame} of factor contributions
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' simdat <- sim_mvgam()
 #'
 #' mod <- mvgam(

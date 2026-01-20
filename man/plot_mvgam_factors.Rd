@@ -31,7 +31,7 @@ penalty on the factor's precision. If \code{plot == TRUE}, the factors
 are also plotted.
 }
 \examples{
-\donttest{
+\dontrun{
 simdat <- sim_mvgam()
 
 mod <- mvgam(

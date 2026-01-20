@@ -9,7 +9,7 @@
 #'   to fit the model in Stan.
 #' @export
 #' @examples
-#'\donttest{
+#'\dontrun{
 #' simdat <- sim_mvgam()
 #' mod <- mvgam(y ~ s(season) +
 #'                s(time, by = series),

@@ -85,7 +85,7 @@ See \code{\link{mvgam_residcor-class}} for a description of the quantities
 that are computed and returned by this function, along with key references.
 }
 \examples{
-\donttest{
+\dontrun{
 # Fit a JSDGAM to the portal_data captures
 mod <- jsdgam(
   formula = captures ~

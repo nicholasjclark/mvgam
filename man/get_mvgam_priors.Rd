@@ -199,7 +199,7 @@ code is legal (i.e. to check that lower bounds are smaller than upper
 bounds, for example)
 }
 \examples{
-\donttest{
+\dontrun{
 # ========================================================================
 # Example 1: Simulate data and inspect default priors
 # ========================================================================

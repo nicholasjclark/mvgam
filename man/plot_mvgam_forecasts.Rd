@@ -129,7 +129,7 @@ along with the true observed data that was used to train the model.
 Otherwise, a spaghetti plot is returned to show possible forecast paths.
 }
 \examples{
-\donttest{
+\dontrun{
 simdat <- sim_mvgam(
   n_series = 3,
   trend_model = AR()

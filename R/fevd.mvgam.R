@@ -25,7 +25,7 @@
 #' New Introduction to Multiple Time Series Analysis. 2nd ed. Springer-Verlag Berlin Heidelberg.
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate some time series that follow a latent VAR(1) process
 #' simdat <- sim_mvgam(
 #'   family = gaussian(),

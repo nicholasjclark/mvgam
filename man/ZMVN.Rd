@@ -62,7 +62,7 @@ Set up latent correlated multivariate Gaussian residual processes in
 purely to help set up a model with particular error processes
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate counts of four species over ten sampling locations
 site_dat <- data.frame(
   site = rep(1:10, 4),

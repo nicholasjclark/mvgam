@@ -110,7 +110,7 @@ predictions that respect the temporal dynamics of estimated latent trends
 at the actual time points supplied in \code{data} and \code{newdata}.
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate 4 time series with hierarchical seasonality
 # and independent AR1 dynamic processes
 set.seed(123)

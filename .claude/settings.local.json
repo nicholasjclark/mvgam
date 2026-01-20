@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:github.com)",
-      "Bash(R CMD Rd2pdf:*)"
+      "Bash(R CMD Rd2pdf:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)"
     ],
     "deny": []
   }

@@ -89,7 +89,7 @@
 #'   \code{\link{fevd}}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate some time series that follow a latent VAR(1) process
 #' simdat <- sim_mvgam(
 #'   family = gaussian(),

@@ -29,7 +29,7 @@
 #'   \code{\link{score.mvgam_forecast}}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate some series and fit a few competing dynamic models
 #' set.seed(1)
 #' simdat <- sim_mvgam(

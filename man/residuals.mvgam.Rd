@@ -50,7 +50,7 @@ residuals. Any observations that were missing (i.e. \code{NA}) in the original
 data will have missing values in the residuals.
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate some data and fit a model
 simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 

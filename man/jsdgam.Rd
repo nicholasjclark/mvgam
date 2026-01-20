@@ -230,7 +230,7 @@ allowed predictor effects, providing enormous flexibility for modelling
 species' communities.
 }
 \examples{
-\donttest{
+\dontrun{
 # ========================================================================
 # Example 1: Basic JSDGAM with Portal Data
 # ========================================================================

@@ -77,7 +77,7 @@
 #' @seealso \code{\link{pp_check.mvgam}}, \code{\link{predict.mvgam}}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate some smooth effects and fit a model
 #' set.seed(0)
 #'
@@ -1015,7 +1015,7 @@ ppc.mvgam <- function(
 #' @seealso \code{\link{ppc}}, \code{\link{predict.mvgam}}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' simdat <- sim_mvgam(seasonality = "hierarchical")
 #' mod <- mvgam(
 #'   y ~ series +

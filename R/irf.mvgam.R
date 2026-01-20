@@ -22,7 +22,7 @@
 #' @author Nicholas J Clark
 #' @seealso \code{\link{mvgam_irf-class}}, [VAR()], [plot.mvgam_irf()], [stability()], [fevd()]
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Fit a model to the portal time series that uses a latent VAR(1)
 #' mod <- mvgam(
 #'   formula = captures ~ -1,

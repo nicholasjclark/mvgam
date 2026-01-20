@@ -246,7 +246,7 @@ the package. See \code{\link{mvgam-class}} for details. Use
 This function allows a previously fitted \pkg{mvgam} model to be updated.
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate some data and fit a Poisson AR1 model
 simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 

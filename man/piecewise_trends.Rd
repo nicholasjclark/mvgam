@@ -72,7 +72,7 @@ scale of your outcome. Note also that no missing values are allowed in
 \code{cap}.
 }
 \examples{
-\donttest{
+\dontrun{
 # Example of logistic growth with possible changepoints
 dNt = function(r, N, k) {
   r * N * (k - N)

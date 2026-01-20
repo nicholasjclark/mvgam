@@ -50,7 +50,7 @@
 #'   \code{\link{posterior_predict.mvgam}}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate some data and fit a model
 #' simdat <- sim_mvgam(
 #'   n_series = 1,
@@ -144,7 +144,7 @@ posterior_epred.mvgam = function(
 #'   \code{\link{posterior_predict.mvgam}}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate some data and fit a model
 #' simdat <- sim_mvgam(
 #'   n_series = 1,
@@ -251,7 +251,7 @@ posterior_linpred.mvgam = function(
 #'   \code{\link{posterior_epred.mvgam}}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate some data and fit a model
 #' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 #'
@@ -351,7 +351,7 @@ rstantools::posterior_linpred
 #'   \code{\link{hindcast.mvgam}}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate some data and fit a model
 #' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 #'

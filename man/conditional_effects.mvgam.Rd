@@ -80,7 +80,7 @@ reference category is used for factors. Use
 more bespoke conditional effects plots.
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate some data
 simdat <- sim_mvgam(
   family = poisson(),

@@ -73,7 +73,7 @@ fit with \code{\link[mgcv]{summary.gam}} using \code{method = 'REML'}
 component coefficients
 }
 \examples{
-\donttest{
+\dontrun{
 simdat <- sim_mvgam(seasonality = "hierarchical")
 
 mod <- mvgam(

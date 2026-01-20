@@ -39,7 +39,7 @@ The arguments \code{robust} and \code{probs} are applied to both the fit and res
 calls (see \code{\link[=fitted.mvgam]{fitted.mvgam()}} and \code{\link[=residuals.mvgam]{residuals.mvgam()}} for details).
 }
 \examples{
-\donttest{
+\dontrun{
 set.seed(0)
 dat <- sim_mvgam(
   T = 80,

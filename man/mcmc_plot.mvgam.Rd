@@ -53,7 +53,7 @@ Convenient way to call MCMC plotting functions
 implemented in the \pkg{bayesplot} package for \pkg{mvgam} models
 }
 \examples{
-\donttest{
+\dontrun{
 simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
              trend_model = AR(),

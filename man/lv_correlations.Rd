@@ -27,7 +27,7 @@ user-friendly format that allows for a deeper investigation of relationships
 among the time series.
 }
 \examples{
-\donttest{
+\dontrun{
 #--------------------------------------------------
 # Fit a model that uses two AR(1) dynamic factors to model
 # the temporal dynamics of the four rodent species in the portal_data

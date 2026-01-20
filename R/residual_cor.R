@@ -113,7 +113,7 @@ residual_cor.mvgam <- function(
 #' @rdname residual_cor.jsdgam
 #' @method residual_cor jsdgam
 #' @examples
-#'\donttest{
+#'\dontrun{
 #' # Fit a JSDGAM to the portal_data captures
 #' mod <- jsdgam(
 #'   formula = captures ~

@@ -31,7 +31,7 @@
 #' @author Nicholas J Clark
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate some data and fit a model
 #' simdat <- sim_mvgam(
 #'   n_series = 1,

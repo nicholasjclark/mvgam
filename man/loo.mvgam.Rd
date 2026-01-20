@@ -46,7 +46,7 @@ out-of-sample evaluations for further scrutiny (see
 \code{\link{lfo_cv}}).
 }
 \examples{
-\donttest{
+\dontrun{
 #--------------------------------------------------
 # Simulate 4 time series with hierarchical seasonality
 # and independent AR1 dynamic processes

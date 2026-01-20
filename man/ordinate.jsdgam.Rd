@@ -61,7 +61,7 @@ that you can typically get better, more readable plot layouts if you also
 have the \pkg{ggarrow} and \pkg{ggpp} packages installed
 }
 \examples{
-\donttest{
+\dontrun{
 # Fit a JSDGAM to the portal_data captures
 mod <- jsdgam(
   formula = captures ~
