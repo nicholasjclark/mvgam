@@ -893,10 +893,8 @@ plot_predictions(
   type = 'expected'
 )
 
-\dontshow{
-# For R CMD check: make sure any open connections are closed afterward
+# Not needed for general use; cleans up connections for automated testing
 closeAllConnections()
-}
 }
 }
 \references{

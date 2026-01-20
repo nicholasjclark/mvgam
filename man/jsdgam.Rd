@@ -526,10 +526,8 @@ ggplot(newdata, aes(x = lon, y = lat, col = log_count)) +
   scale_color_viridis_c() +
   theme_classic()
 
-\dontshow{
-# For R CMD check: make sure any open connections are closed afterward
-  closeAllConnections()
-}
+# Not needed for general use; cleans up connections for automated testing
+closeAllConnections()
 }
 }
 \references{

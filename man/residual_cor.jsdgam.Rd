@@ -110,10 +110,9 @@ plot(
 if(requireNamespace('ggrepel', quietly = TRUE)){
   ordinate(mod)
 }
-\dontshow{
-# For R CMD check: make sure any open connections are closed afterward
- closeAllConnections()
-}
+
+# Not needed for general use; cleans up connections for automated testing
+closeAllConnections()
 }
 }
 \references{
