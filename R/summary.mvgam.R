@@ -772,7 +772,11 @@ extract_diagnostics <- function(object, digits = 2, variational = FALSE) {
 
     # Capture Stan diagnostic messages
     diag_output <- utils::capture.output({
-      check_all_diagnostics(object$model_output)
+      check_all_diagnostics(
+        object$model_output,
+        max_treedepth = object$max_treedepth,
+        ignore_b_trend = diagnostics$ignore_b_trend
+      )
     })
 
     diagnostics$sampler_message <- c(

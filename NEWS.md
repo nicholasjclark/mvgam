@@ -17,6 +17,7 @@
 * Bug fix to ensure offsets supplied with `offset(...)` in formulae are correctly incorporated when using `gp()` terms
 * Bug fix to ensure piecewise trends are correctly predicted when using `process_error = TRUE` in `predict()`
 * Bug fix to ensure variance of continuous time autoregressive processes (using `CAR()`) scales appropriately with time lags (#107)
+* Bug fix to ensure `summary.mvgam()` uses the correct `max_treedepth` value when checking Stan diagnostics, rather than always assuming the default of 10 (thanks to @StefanoMezzini for reporting)
 
 ## Deprecations
 * Altered the structure of objects of class `mvgam_forecast` so that the `train_times` and `test_times` slots now contain lists of length `n_series`. This allows for continuous time data to be better handled, where some series may have been sampled at different timepoints
