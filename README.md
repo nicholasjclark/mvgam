@@ -246,13 +246,13 @@ scoring rules. See `?score.mvgam_forecast` for more details
       plot(fcs, series = 3) +
       plot(fcs, series = 4)
     #> Out of sample DRPS:
-    #> 8.485496
+    #> 8.45472625
     #> Out of sample DRPS:
-    #> 5.35894675
+    #> 5.3935325
     #> Out of sample DRPS:
-    #> 8.47528325
+    #> 8.4410455
     #> Out of sample DRPS:
-    #> 3.4885155
+    #> 3.59626
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Plotting forecast distributions using mvgam in R" width="100%" />
 
@@ -479,34 +479,34 @@ estimates for the `Beta` precision parameters *ϕ*.
     #> 
     #> Observation precision parameter estimates:
     #>        2.5%  50% 97.5% Rhat n_eff
-    #> phi[1]  7.8 12.0  18.0    1  1829
-    #> phi[2]  5.6  8.6  13.0    1  1023
-    #> phi[3]  4.1  6.0   8.7    1  1404
+    #> phi[1]  8.0 12.0  17.0    1  1692
+    #> phi[2]  5.7  8.6  13.0    1  1322
+    #> phi[3]  4.0  6.0   8.6    1  1610
     #> 
     #> GAM coefficient (beta) estimates:
     #>             2.5%  50% 97.5% Rhat n_eff
-    #> (Intercept) 0.11 0.45   0.7 1.01   602
+    #> (Intercept) 0.09 0.46  0.68    1   386
     #> 
     #> Approximate significance of GAM smooths:
-    #>                             edf Ref.df Chi.sq p-value  
-    #> s(season)                3.9071      5  9.792  0.0653 .
-    #> s(season):seriesseries_1 1.0934      4 11.307  0.2695  
-    #> s(season):seriesseries_2 2.5629      4  2.227  0.4544  
-    #> s(season):seriesseries_3 0.8565      4  6.556  0.5358  
+    #>                            edf Ref.df Chi.sq p-value  
+    #> s(season)                3.190      5 13.979  0.0518 .
+    #> s(season):seriesseries_1 2.544      4  4.526  0.0795 .
+    #> s(season):seriesseries_2 2.166      4  2.382  0.4868  
+    #> s(season):seriesseries_3 1.355      4  3.952  0.3771  
     #> ---
     #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     #> 
     #> marginal deviation:
     #>              2.5%  50% 97.5% Rhat n_eff
-    #> alpha_gp[1] 0.150 0.40  0.88 1.00   828
-    #> alpha_gp[2] 0.570 0.93  1.50 1.00  1018
-    #> alpha_gp[3] 0.052 0.40  0.92 1.01   672
+    #> alpha_gp[1] 0.130 0.39  0.83 1.00   817
+    #> alpha_gp[2] 0.570 0.92  1.50 1.01  1032
+    #> alpha_gp[3] 0.067 0.39  0.92 1.00   765
     #> 
     #> length scale:
     #>           2.5%  50% 97.5% Rhat n_eff
-    #> rho_gp[1]  1.2  3.6    11 1.00  1482
-    #> rho_gp[2]  3.0 12.0    30 1.01   367
-    #> rho_gp[3]  1.3  4.9    26 1.00   532
+    #> rho_gp[1]  1.2  3.7    12 1.00  1088
+    #> rho_gp[2]  3.0 12.0    30 1.01   356
+    #> rho_gp[3]  1.2  4.7    31 1.01   425
     #> 
     #> Stan MCMC diagnostics:
     #> ✔ No issues with effective samples per iteration
