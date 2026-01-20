@@ -69,6 +69,7 @@ jobs:
               testthat
               usethis
               rcmdcheck
+              devtools
 
       - name: Build Cmdstan
         run: |
