@@ -81,6 +81,7 @@
 <li>Bug fix to ensure piecewise trends are correctly predicted when using <code>process_error = TRUE</code> in <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code>
 </li>
 <li>Bug fix to ensure variance of continuous time autoregressive processes (using <code><a href="../reference/RW.html">CAR()</a></code>) scales appropriately with time lags (<a href="https://github.com/nicholasjclark/mvgam/issues/107" class="external-link">#107</a>)</li>
+<li>Bug fix to ensure <code><a href="../reference/summary.mvgam.html">summary.mvgam()</a></code> uses the correct <code>max_treedepth</code> value when checking Stan diagnostics, rather than always assuming the default of 10 (thanks to <a href="https://github.com/StefanoMezzini" class="external-link">@StefanoMezzini</a> for reporting)</li>
 </ul></div>
 <div class="section level3">
 <h3 id="deprecations-1-1-594">Deprecations<a class="anchor" aria-label="anchor" href="#deprecations-1-1-594"></a></h3>

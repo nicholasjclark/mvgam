@@ -537,24 +537,24 @@ nicely</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
 <span><span class="co">#&gt;              2.5%   50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; speciessp_1 -0.23 0.730  1.40    1  1626</span></span>
-<span><span class="co">#&gt; speciessp_2 -1.20 0.028  0.89    1  2329</span></span>
+<span><span class="co">#&gt; speciessp_1 -0.24 0.730  1.40 1.01  1388</span></span>
+<span><span class="co">#&gt; speciessp_2 -1.20 0.024  0.89 1.00  2239</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM process model coefficient (beta) estimates:</span></span>
 <span><span class="co">#&gt;                               2.5%     50%  97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; (Intercept)_trend            2.700  3.0000  3.400    1  1398</span></span>
-<span><span class="co">#&gt; speciessp_2_trend           -1.200 -0.6200  0.140    1  1846</span></span>
-<span><span class="co">#&gt; s(time):trendtrend1.1_trend -0.075  0.0150  0.210    1   710</span></span>
-<span><span class="co">#&gt; s(time):trendtrend1.2_trend -0.250  0.0043  0.260    1  2165</span></span>
-<span><span class="co">#&gt; s(time):trendtrend1.3_trend -0.450 -0.2500 -0.028    1  1876</span></span>
-<span><span class="co">#&gt; s(time):trendtrend2.1_trend -0.240 -0.0150  0.079    1   589</span></span>
-<span><span class="co">#&gt; s(time):trendtrend2.2_trend -0.190  0.0290  0.450    1   793</span></span>
-<span><span class="co">#&gt; s(time):trendtrend2.3_trend  0.037  0.3200  0.610    1  2167</span></span>
+<span><span class="co">#&gt; (Intercept)_trend            2.700  3.0000  3.400    1  1353</span></span>
+<span><span class="co">#&gt; speciessp_2_trend           -1.200 -0.6200  0.110    1  1787</span></span>
+<span><span class="co">#&gt; s(time):trendtrend1.1_trend -0.075  0.0140  0.180    1  1125</span></span>
+<span><span class="co">#&gt; s(time):trendtrend1.2_trend -0.230  0.0029  0.240    1  2274</span></span>
+<span><span class="co">#&gt; s(time):trendtrend1.3_trend -0.460 -0.2500 -0.041    1  2266</span></span>
+<span><span class="co">#&gt; s(time):trendtrend2.1_trend -0.170 -0.0120  0.084    1   568</span></span>
+<span><span class="co">#&gt; s(time):trendtrend2.2_trend -0.180  0.0260  0.360    1  1073</span></span>
+<span><span class="co">#&gt; s(time):trendtrend2.3_trend  0.069  0.3300  0.620    1  2655</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">#&gt;                         edf Ref.df Chi.sq p-value</span></span>
-<span><span class="co">#&gt; s(time):seriestrend1 0.9909      3  1.714   0.874</span></span>
-<span><span class="co">#&gt; s(time):seriestrend2 1.2348      3  1.178   0.550</span></span>
+<span><span class="co">#&gt;                        edf Ref.df Chi.sq p-value</span></span>
+<span><span class="co">#&gt; s(time):seriestrend1 1.313      3  1.371   0.543</span></span>
+<span><span class="co">#&gt; s(time):seriestrend2 1.050      3  4.468   0.450</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
 <span><span class="co">#&gt; ✔ No issues with effective samples per iteration</span></span>
@@ -577,18 +577,18 @@ these may not be too helpful)</p>
 <span><span class="co">#&gt; Computed from 4000 by 60 log-likelihood matrix.</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;          Estimate   SE</span></span>
-<span><span class="co">#&gt; elpd_loo   -223.4 13.4</span></span>
-<span><span class="co">#&gt; p_loo        76.6 12.3</span></span>
-<span><span class="co">#&gt; looic       446.8 26.8</span></span>
+<span><span class="co">#&gt; elpd_loo   -213.1 11.9</span></span>
+<span><span class="co">#&gt; p_loo        66.5 10.6</span></span>
+<span><span class="co">#&gt; looic       426.2 23.8</span></span>
 <span><span class="co">#&gt; ------</span></span>
 <span><span class="co">#&gt; MCSE of elpd_loo is NA.</span></span>
-<span><span class="co">#&gt; MCSE and ESS estimates assume MCMC draws (r_eff in [0.5, 1.0]).</span></span>
+<span><span class="co">#&gt; MCSE and ESS estimates assume MCMC draws (r_eff in [0.5, 1.1]).</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Pareto k diagnostic values:</span></span>
 <span><span class="co">#&gt;                          Count Pct.    Min. ESS</span></span>
-<span><span class="co">#&gt; (-Inf, 0.7]   (good)     26    43.3%   1017    </span></span>
-<span><span class="co">#&gt;    (0.7, 1]   (bad)      15    25.0%   &lt;NA&gt;    </span></span>
-<span><span class="co">#&gt;    (1, Inf)   (very bad) 19    31.7%   &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt; (-Inf, 0.7]   (good)     29    48.3%   239     </span></span>
+<span><span class="co">#&gt;    (0.7, 1]   (bad)      13    21.7%   &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;    (1, Inf)   (very bad) 18    30.0%   &lt;NA&gt;    </span></span>
 <span><span class="co">#&gt; See help('pareto-k-diagnostic') for details.</span></span></code></pre></div>
 <p>Plot the estimated smooths of time from each species’ latent
 abundance process (on the log scale)</p>
@@ -768,8 +768,8 @@ site, though some observations are missing</p>
 <span><span class="co">#&gt; $ y         <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 1<span style="color: #949494;">, </span><span style="color: #BB0000;">NA</span><span style="color: #949494;">, </span><span style="color: #BB0000;">NA</span><span style="color: #949494;">, </span><span style="color: #BB0000;">NA</span><span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span><span style="color: #BB0000;">NA</span><span style="color: #949494;">, </span>1<span style="color: #949494;">, </span><span style="color: #BB0000;">NA</span><span style="color: #949494;">, </span><span style="color: #BB0000;">NA</span><span style="color: #949494;">, </span>0<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>0<span style="color: #949494;">, </span>0<span style="color: #949494;">, </span>0<span style="color: #949494;">, </span>0<span style="color: #949494;">, </span><span style="color: #BB0000;">NA</span><span style="color: #949494;">, </span><span style="color: #BB0000;">NA</span>…</span></span>
 <span><span class="co">#&gt; $ abund_cov <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -0.3734384<span style="color: #949494;">, </span>-0.3734384<span style="color: #949494;">, </span>-0.3734384<span style="color: #949494;">, </span>0.7064305<span style="color: #949494;">, </span>0.7064305<span style="color: #949494;">, </span>0.…</span></span>
 <span><span class="co">#&gt; $ abund_fac <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> 3<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>4<span style="color: #949494;">, </span>4<span style="color: #949494;">, </span>4<span style="color: #949494;">, </span>9<span style="color: #949494;">, </span>9<span style="color: #949494;">, </span>9<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>…</span></span>
-<span><span class="co">#&gt; $ det_cov   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -1.2827999<span style="color: #949494;">, </span>0.9610336<span style="color: #949494;">, </span>0.7895103<span style="color: #949494;">, </span>0.1887331<span style="color: #949494;">, </span>0.1954809<span style="color: #949494;">, </span>0.96…</span></span>
-<span><span class="co">#&gt; $ det_cov2  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.0304731<span style="color: #949494;">, </span>-1.8057050<span style="color: #949494;">, </span>1.0000728<span style="color: #949494;">, </span>-0.6993980<span style="color: #949494;">, </span>1.0455536<span style="color: #949494;">, </span>1.9…</span></span>
+<span><span class="co">#&gt; $ det_cov   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -1.28279990<span style="color: #949494;">, </span>1.11996398<span style="color: #949494;">, </span>-1.26741746<span style="color: #949494;">, </span>-1.29426683<span style="color: #949494;">, </span>0.1954808…</span></span>
+<span><span class="co">#&gt; $ det_cov2  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.03047314<span style="color: #949494;">, </span>1.61128100<span style="color: #949494;">, </span>0.06661865<span style="color: #949494;">, </span>-0.94290689<span style="color: #949494;">, </span>1.04555361<span style="color: #949494;">,</span>…</span></span>
 <span><span class="co">#&gt; $ replicate <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 1<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>3<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>2<span style="color: #949494;">, </span>…</span></span>
 <span><span class="co">#&gt; $ site      <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> site1<span style="color: #949494;">, </span>site1<span style="color: #949494;">, </span>site1<span style="color: #949494;">, </span>site2<span style="color: #949494;">, </span>site2<span style="color: #949494;">, </span>site2<span style="color: #949494;">, </span>site3<span style="color: #949494;">, </span>site3<span style="color: #949494;">, </span>site…</span></span>
 <span><span class="co">#&gt; $ species   <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> sp_1<span style="color: #949494;">, </span>sp_1<span style="color: #949494;">, </span>sp_1<span style="color: #949494;">, </span>sp_1<span style="color: #949494;">, </span>sp_1<span style="color: #949494;">, </span>sp_1<span style="color: #949494;">, </span>sp_1<span style="color: #949494;">, </span>sp_1<span style="color: #949494;">, </span>sp_1<span style="color: #949494;">, </span>sp_1<span style="color: #949494;">, </span>…</span></span>
@@ -777,13 +777,13 @@ site, though some observations are missing</p>
 <span><span class="co">#&gt; $ time      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>1<span style="color: #949494;">, </span>…</span></span>
 <span><span class="co">#&gt; $ cap       <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 33<span style="color: #949494;">, </span>33<span style="color: #949494;">, </span>33<span style="color: #949494;">, </span>33<span style="color: #949494;">, </span>33<span style="color: #949494;">, </span>33<span style="color: #949494;">, </span>33<span style="color: #949494;">, </span>33<span style="color: #949494;">, </span>33<span style="color: #949494;">, </span>33<span style="color: #949494;">, </span>33<span style="color: #949494;">, </span>33<span style="color: #949494;">, </span>33<span style="color: #949494;">, </span>33<span style="color: #949494;">, </span>33<span style="color: #949494;">, </span>…</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">mod_data</span><span class="op">)</span></span>
-<span><span class="co">#&gt;    y  abund_cov abund_fac    det_cov  det_cov2 replicate  site species</span></span>
-<span><span class="co">#&gt; 1  1 -0.3734384         3 -1.2827999  2.030473         1 site1    sp_1</span></span>
-<span><span class="co">#&gt; 2 NA -0.3734384         3  0.9610336 -1.805705         2 site1    sp_1</span></span>
-<span><span class="co">#&gt; 3 NA -0.3734384         3  0.7895103  1.000073         3 site1    sp_1</span></span>
-<span><span class="co">#&gt; 4 NA  0.7064305         4  0.1887331 -0.699398         1 site2    sp_1</span></span>
-<span><span class="co">#&gt; 5  2  0.7064305         4  0.1954809  1.045554         2 site2    sp_1</span></span>
-<span><span class="co">#&gt; 6  2  0.7064305         4  0.9673034  1.919712         3 site2    sp_1</span></span>
+<span><span class="co">#&gt;    y  abund_cov abund_fac    det_cov    det_cov2 replicate  site species</span></span>
+<span><span class="co">#&gt; 1  1 -0.3734384         3 -1.2827999  2.03047314         1 site1    sp_1</span></span>
+<span><span class="co">#&gt; 2 NA -0.3734384         3  1.1199640  1.61128100         2 site1    sp_1</span></span>
+<span><span class="co">#&gt; 3 NA -0.3734384         3 -1.2674175  0.06661865         3 site1    sp_1</span></span>
+<span><span class="co">#&gt; 4 NA  0.7064305         4 -1.2942668 -0.94290689         1 site2    sp_1</span></span>
+<span><span class="co">#&gt; 5  2  0.7064305         4  0.1954809  1.04555361         2 site2    sp_1</span></span>
+<span><span class="co">#&gt; 6  2  0.7064305         4  0.9673034  1.91971178         3 site2    sp_1</span></span>
 <span><span class="co">#&gt;         series time cap</span></span>
 <span><span class="co">#&gt; 1 site1_sp_1_1    1  33</span></span>
 <span><span class="co">#&gt; 2 site1_sp_1_2    1  33</span></span>
@@ -895,29 +895,29 @@ model</p>
 <span><span class="co">#&gt; Total post-warmup draws = 1000</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
-<span><span class="co">#&gt;             2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">#&gt; (Intercept) 0.14 0.47  0.82  NaN   NaN</span></span>
+<span><span class="co">#&gt;              2.5%  50% 97.5% Rhat n.eff</span></span>
+<span><span class="co">#&gt; (Intercept) 0.076 0.37  0.67  NaN   NaN</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM observation smooths:</span></span>
-<span><span class="co">#&gt;               edf Ref.df Chi.sq p-value    </span></span>
-<span><span class="co">#&gt; s(det_cov)  1.100      2   71.9  0.0148 *  </span></span>
-<span><span class="co">#&gt; s(det_cov2) 1.174      2  539.9  &lt;2e-16 ***</span></span>
+<span><span class="co">#&gt;               edf Ref.df Chi.sq  p-value    </span></span>
+<span><span class="co">#&gt; s(det_cov)  1.041      2  176.9 0.000177 ***</span></span>
+<span><span class="co">#&gt; s(det_cov2) 1.011      2  548.1  &lt; 2e-16 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM process model coefficient (beta) estimates:</span></span>
-<span><span class="co">#&gt;                    2.5%   50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">#&gt; (Intercept)_trend -0.71 -0.53 -0.36  NaN   NaN</span></span>
+<span><span class="co">#&gt;                      2.5%  50% 97.5% Rhat n.eff</span></span>
+<span><span class="co">#&gt; (Intercept)_trend -0.0083 0.14  0.29  NaN   NaN</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM process model group-level estimates:</span></span>
-<span><span class="co">#&gt;                          2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">#&gt; mean(s(abund_fac))_trend 0.20 0.34  0.47  NaN   NaN</span></span>
-<span><span class="co">#&gt; sd(s(abund_fac))_trend   0.25 0.36  0.52  NaN   NaN</span></span>
+<span><span class="co">#&gt;                           2.5%   50%  97.5% Rhat n.eff</span></span>
+<span><span class="co">#&gt; mean(s(abund_fac))_trend -0.44 -0.26 -0.076  NaN   NaN</span></span>
+<span><span class="co">#&gt; sd(s(abund_fac))_trend    0.29  0.42  0.620  NaN   NaN</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">#&gt;                edf Ref.df Chi.sq p-value   </span></span>
-<span><span class="co">#&gt; s(abund_cov) 1.670      2  2.089 0.22142   </span></span>
-<span><span class="co">#&gt; s(abund_fac) 8.801     10 26.187 0.00175 **</span></span>
+<span><span class="co">#&gt;               edf Ref.df Chi.sq p-value  </span></span>
+<span><span class="co">#&gt; s(abund_cov) 1.42      2  1.622  0.2656  </span></span>
+<span><span class="co">#&gt; s(abund_fac) 8.85     10 14.771  0.0918 .</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -931,7 +931,7 @@ inspect the estimated average detection probability</p>
 <code class="sourceCode R"><span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/r/predictions.html" class="external-link">avg_predictions</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"detection"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;  Estimate 2.5 % 97.5 %</span></span>
-<span><span class="co">#&gt;       0.6  0.53  0.663</span></span>
+<span><span class="co">#&gt;     0.575 0.515  0.636</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Type: detection</span></span></code></pre></div>
 <p>Next investigate estimated effects of covariates on latent abundance
