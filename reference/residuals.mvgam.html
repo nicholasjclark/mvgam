@@ -159,7 +159,7 @@ data will have missing values in the residuals.</p>
 <span class="r-in"><span><span class="co"># Extract posterior residuals</span></span></span>
 <span class="r-in"><span><span class="va">resids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/residuals.html" class="external-link">residuals</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">resids</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  num [1:75, 1:4] -0.429 -0.403 -0.352 -0.434 -0.699 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  num [1:75, 1:4] -0.432 -0.398 -0.348 -0.432 -0.691 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ : chr [1:4] "Estimate" "Est.Error" "Q2.5" "Q97.5"</span>
@@ -169,16 +169,16 @@ data will have missing values in the residuals.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 75 × 14</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>        y season  year series    time .observed .fitted .fit.variability</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>            <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>     0      1     1 series_1     1         0   0.328            0.174</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>     0      2     1 series_1     2         0   0.232            0.143</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>     0      3     1 series_1     3         0   0.218            0.131</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>     0      4     1 series_1     4         0   0.314            0.181</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>     0      5     1 series_1     5         0   0.622            0.321</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>     2      6     1 series_1     6         2   1.40             0.598</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>     3      7     1 series_1     7         3   2.25             0.958</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>     4      8     1 series_1     8         4   2.56             1.05 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>     2      9     1 series_1     9         2   1.50             0.676</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>     1     10     1 series_1    10         1   0.838            0.431</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span>     0      1     1 series_1     1         0   0.331            0.181</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span>     0      2     1 series_1     2         0   0.229            0.140</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span>     0      3     1 series_1     3         0   0.217            0.145</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span>     0      4     1 series_1     4         0   0.309            0.182</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span>     0      5     1 series_1     5         0   0.607            0.313</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span>     2      6     1 series_1     6         2   1.40             0.617</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span>     3      7     1 series_1     7         3   2.27             0.917</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span>     4      8     1 series_1     8         4   2.59             1.11 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span>     2      9     1 series_1     9         2   1.52             0.681</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span>     1     10     1 series_1    10         1   0.849            0.419</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 65 more rows</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># ℹ 6 more variables: .fit.cred.low &lt;dbl&gt;, .fit.cred.high &lt;dbl&gt;, .resid &lt;dbl&gt;,</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;">#   .resid.variability &lt;dbl&gt;, .resid.cred.low &lt;dbl&gt;, .resid.cred.high &lt;dbl&gt;</span></span>

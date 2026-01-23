@@ -246,7 +246,7 @@ Otherwise, a spaghetti plot is returned to show possible forecast paths.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 15</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x5584a21137b8&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x55ec905e5dd0&gt; </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_model       :List of 7</span>
@@ -277,15 +277,15 @@ Otherwise, a spaghetti plot is returned to show possible forecast paths.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_observations : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_times        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ hindcasts         :List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: num [1:1000, 1:75] 1 0 0 1 0 1 0 1 0 1 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: num [1:1000, 1:75] 0 0 1 1 1 2 0 1 1 0 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "ypred[1,1]" "ypred[2,1]" "ypred[3,1]" "ypred[4,1]" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: num [1:1000, 1:75] 0 0 3 1 0 0 0 0 4 0 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: num [1:1000, 1:75] 0 0 1 0 0 0 1 2 0 0 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "ypred[1,2]" "ypred[2,2]" "ypred[3,2]" "ypred[4,2]" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: num [1:1000, 1:75] 1 0 0 0 0 1 0 1 1 1 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: num [1:1000, 1:75] 0 0 2 0 0 1 1 0 0 1 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "ypred[1,3]" "ypred[2,3]" "ypred[3,3]" "ypred[4,3]" ...</span>
@@ -309,7 +309,7 @@ Otherwise, a spaghetti plot is returned to show possible forecast paths.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 16</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x5584a21137b8&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x55ec905e5dd0&gt; </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family_pars       : NULL</span>
@@ -347,34 +347,34 @@ Otherwise, a spaghetti plot is returned to show possible forecast paths.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:25] 76 77 78 79 80 81 82 83 84 85 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:25] 76 77 78 79 80 81 82 83 84 85 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ hindcasts         :List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: num [1:1000, 1:75] 1 0 0 1 0 1 0 1 0 1 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: num [1:1000, 1:75] 0 0 1 1 1 2 0 1 1 0 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "ypred[1,1]" "ypred[2,1]" "ypred[3,1]" "ypred[4,1]" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: num [1:1000, 1:75] 0 0 3 1 0 0 0 0 4 0 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: num [1:1000, 1:75] 0 0 1 0 0 0 1 2 0 0 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "ypred[1,2]" "ypred[2,2]" "ypred[3,2]" "ypred[4,2]" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: num [1:1000, 1:75] 1 0 0 0 0 1 0 1 1 1 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: num [1:1000, 1:75] 0 0 2 0 0 1 1 0 0 1 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "ypred[1,3]" "ypred[2,3]" "ypred[3,3]" "ypred[4,3]" ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ forecasts         :List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:1000, 1:25] 1 0 1 6 2 1 3 0 1 2 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:1000, 1:25] 1 1 0 0 5 3 0 1 1 0 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:1000, 1:25] 1 6 2 4 2 1 1 4 1 4 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:1000, 1:25] 3 1 1 2 4 1 0 0 1 7 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:1000, 1:25] 0 1 0 4 1 3 4 3 1 0 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:1000, 1:25] 1 6 3 1 6 3 1 2 1 3 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "class")= chr "mvgam_forecast"</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> 21.218245</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 21.172943</span>
 <span class="r-plt img"><img src="plot_mvgam_forecasts-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample CRPS:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> 18.8681439999999</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 18.032756</span>
 <span class="r-plt img"><img src="plot_mvgam_forecasts-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> 21.319339</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 21.195242</span>
 <span class="r-plt img"><img src="plot_mvgam_forecasts-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Forecasts as expectations</span></span></span>
