@@ -45,10 +45,28 @@
       "Bash(claude mcp add:*)",
       "mcp__github__get_file_contents",
       "mcp__context7__get-library-docs",
-      "mcp__github__search_code"
+      "mcp__github__search_code",
+      "Bash(.claude/hooks/package-dependency-mapper.sh:*)",
+      "Bash(bash:*)",
+      "Bash(echo:*)",
+      "Bash(chmod:*)",
+      "Bash(./.claude/hooks/package-dependency-mapper.sh test:*)"
     ],
     "deny": [],
     "ask": [],
     "defaultMode": "plan"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git push*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/package-dependency-mapper.sh pre_push"
+          }
+        ]
+      }
+    ]
   }
 }
