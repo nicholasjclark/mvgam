@@ -5,7 +5,7 @@
 * Added a new function `ordinate.jsdgam()` to plot two-dimensional ordinations of site and species scores from latent factor models estimated in `jsdgam()`
 * `residual_cor()` now supports models fitted with `mvgam()` in which latent factors were used or in which correlated dynamic processes were used
 * Added a `summary.mvgam_forecast()` function to compute and return prediction intervals of posterior hindcasts and forecasts in a `data.frame` format. This will make it easier for users to create their own custom plots of hindcast and forecast distributions (#108)
-* Added a `mvgam_use_cases` help file to provide links to online resources that discuss how to use 'mvgam' in practice
+* Added a [`mvgam_use_cases`](https://nicholasjclark.github.io/mvgam/reference/mvgam_use_cases.html) help file to provide links to online resources that discuss how to use 'mvgam' in practice
 
 ## Changing defaults
 * The `forecast()` method is now imported from 'generics' to help avoid conflict issues with other forecasting packages
