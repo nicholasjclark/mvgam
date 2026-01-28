@@ -84,6 +84,105 @@ categorize_file() {
     esac
 }
 
+# Extract function body and find calls to internal functions
+extract_function_calls() {
+    local file="$1"
+    local func_name="$2"
+    local all_funcs="$3"
+
+    # Extract function body using awk
+    local body
+    body=$(awk -v fname="$func_name" '
+        BEGIN { in_func=0; brace_count=0; started=0 }
+        $0 ~ "^[[:space:]]*" fname "[[:space:]]*(<-|=)[[:space:]]*function" {
+            in_func=1
+            started=1
+        }
+        in_func {
+            brace_count += gsub(/{/, "{")
+            brace_count -= gsub(/}/, "}")
+            print
+            if (started && brace_count == 0 && /}/) exit
+        }
+    ' "$file" 2>/dev/null)
+
+    if [[ -z "$body" ]]; then
+        return
+    fi
+
+    # Find all potential function calls in the body
+    local calls
+    calls=$(echo "$body" | grep -oE "[a-zA-Z_][a-zA-Z0-9_.]*[[:space:]]*\(" | sed 's/[[:space:]]*($//' | sort -u)
+
+    # Filter to only internal functions
+    local result=""
+    while IFS= read -r call; do
+        [[ -z "$call" ]] && continue
+        [[ "$call" == "$func_name" ]] && continue  # Skip self-calls
+        if echo "$all_funcs" | grep -qx "$call"; then
+            result+="$call "
+        fi
+    done <<< "$calls"
+
+    echo "$result" | tr ' ' '\n' | grep -v "^$" | sort -u | tr '\n' ',' | sed 's/,$//'
+}
+
+# Build dependency maps for priority files
+build_dependency_maps() {
+    local r_files="$1"
+    local all_funcs="$2"
+
+    # Priority files for detailed dependency analysis
+    local priority_pattern="mvgam_core|stan_assembly|brms_integration|priors|trend_system|validations|predictions"
+
+    # Forward dependencies: func -> [calls]
+    local forward_deps="{}"
+    # Reverse dependencies: func -> [called_by]
+    local reverse_deps="{}"
+
+    echo "Building dependency maps for priority files..." >&2
+
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+
+        # Only analyze priority files for dependencies
+        if ! echo "$file" | grep -qE "$priority_pattern"; then
+            continue
+        fi
+
+        local funcs
+        funcs=$(extract_functions_from_file "$file")
+
+        while IFS= read -r func; do
+            [[ -z "$func" ]] && continue
+
+            local calls
+            calls=$(extract_function_calls "$file" "$func" "$all_funcs")
+
+            if [[ -n "$calls" ]]; then
+                # Add to forward deps
+                forward_deps=$(echo "$forward_deps" | jq --arg f "$func" --arg c "$calls" '.[$f] = $c')
+
+                # Build reverse deps
+                IFS=',' read -ra call_array <<< "$calls"
+                for called in "${call_array[@]}"; do
+                    [[ -z "$called" ]] && continue
+                    local existing
+                    existing=$(echo "$reverse_deps" | jq -r --arg f "$called" '.[$f] // ""')
+                    if [[ -z "$existing" ]]; then
+                        reverse_deps=$(echo "$reverse_deps" | jq --arg f "$called" --arg c "$func" '.[$f] = $c')
+                    else
+                        reverse_deps=$(echo "$reverse_deps" | jq --arg f "$called" --arg c "$existing,$func" '.[$f] = $c')
+                    fi
+                done
+            fi
+        done <<< "$funcs"
+    done <<< "$r_files"
+
+    # Output as JSON object
+    echo "{\"forward\": $forward_deps, \"reverse\": $reverse_deps}"
+}
+
 # Main analysis function
 run_analysis() {
     local commit_hash="${1:-$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')}"
@@ -180,6 +279,29 @@ run_analysis() {
     local generated_time
     generated_time=$(date "+%Y-%m-%d %H:%M:%S")
 
+    # Build all functions list for dependency analysis
+    local all_funcs=""
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+        local funcs
+        funcs=$(extract_functions_from_file "$file")
+        all_funcs+="$funcs"$'\n'
+    done <<< "$r_files"
+    all_funcs=$(echo "$all_funcs" | sort -u | grep -v "^$")
+
+    # Build dependency maps
+    local dep_maps
+    dep_maps=$(build_dependency_maps "$r_files" "$all_funcs")
+
+    # Extract forward and reverse deps
+    local forward_deps reverse_deps
+    forward_deps=$(echo "$dep_maps" | jq -r '.forward')
+    reverse_deps=$(echo "$dep_maps" | jq -r '.reverse')
+
+    # Count functions with dependencies
+    local deps_count
+    deps_count=$(echo "$forward_deps" | jq 'keys | length')
+
     # Generate metadata JSON
     cat > "$METADATA_FILE" << EOF
 {
@@ -195,12 +317,22 @@ run_analysis() {
     "s3_methods_count": $s3_method_count,
     "s3_classes_count": $s3_class_count,
     "changed_files": $changed_count,
-    "cached_files": $cached_count
+    "cached_files": $cached_count,
+    "functions_with_deps": $deps_count
+}
+EOF
+
+    # Save full dependency map to cache file
+    cat > "$CACHE_FILE" << EOF
+{
+    "metadata": $(cat "$METADATA_FILE"),
+    "forward_dependencies": $forward_deps,
+    "reverse_dependencies": $reverse_deps
 }
 EOF
 
     # Generate markdown visualization
-    generate_markdown "$generated_time" "$commit_hash" "$r_files" "$exported_funcs" "$external_deps"
+    generate_markdown "$generated_time" "$commit_hash" "$r_files" "$exported_funcs" "$external_deps" "$forward_deps" "$reverse_deps"
 
     echo "Analysis complete. Files updated:" >&2
     echo "  - $METADATA_FILE" >&2
@@ -214,6 +346,8 @@ generate_markdown() {
     local r_files="$3"
     local exported_funcs="$4"
     local external_deps="$5"
+    local forward_deps="$6"
+    local reverse_deps="$7"
 
     local pkg_name
     pkg_name=$(get_package_name)
@@ -308,6 +442,24 @@ EOF
                 echo "$category_content"
             fi
         done
+
+        cat << 'EOF'
+
+## Function Dependencies
+
+### Forward Dependencies (Calls)
+EOF
+
+        # Output forward dependencies
+        echo "$forward_deps" | jq -r 'to_entries | sort_by(.key) | .[] | "- **\(.key)()** → \(.value)"' 2>/dev/null || echo "No dependencies tracked"
+
+        cat << 'EOF'
+
+### Reverse Dependencies (Called By)
+EOF
+
+        # Output reverse dependencies
+        echo "$reverse_deps" | jq -r 'to_entries | sort_by(.key) | .[] | "- **\(.key)()** ← \(.value)"' 2>/dev/null || echo "No reverse dependencies tracked"
 
         cat << 'EOF'
 
