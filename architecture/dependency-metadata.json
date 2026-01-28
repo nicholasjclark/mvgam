@@ -1,7 +1,7 @@
 {
-    "generated": "2026-01-28 16:05:27",
-    "commit_hash": "fe41ec20",
-    "commit_message": "fix: resolve metadata structure issues in innovation sampling",
+    "generated": "2026-01-28 16:11:59",
+    "commit_hash": "cfc135cc",
+    "commit_message": "Add pre-push Claude hook for dependency mapping",
     "package_name": "mvgam",
     "version": "2.0.0",
     "total_files": 65,
@@ -11,5 +11,6 @@
     "s3_methods_count": 79,
     "s3_classes_count": 32,
     "changed_files": 0,
-    "cached_files": 65
+    "cached_files": 65,
+    "functions_with_deps": 162
 }
