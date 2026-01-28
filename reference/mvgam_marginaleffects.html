@@ -149,13 +149,13 @@ arguments.</p></dd>
 <dt>vcov</dt>
 <dd><p>Type of uncertainty estimates to report (e.g., for robust standard errors). Acceptable values:</p><ul><li><p>FALSE: Do not compute standard errors. This can speed up computation considerably.</p></li>
 <li><p>TRUE: Unit-level standard errors using the default <code>vcov(model)</code> variance-covariance matrix.</p></li>
-<li><p>String which indicates the kind of uncertainty estimates to return.</p><ul><li><p>Heteroskedasticity-consistent: <code>"HC"</code>, <code>"HC0"</code>, <code>"HC1"</code>, <code>"HC2"</code>, <code>"HC3"</code>, <code>"HC4"</code>, <code>"HC4m"</code>, <code>"HC5"</code>. See <code>?sandwich::vcovHC</code></p></li>
+<li><p>String which indicates the kind of uncertainty estimates to return.</p><ul><li><p>Heteroskedasticity-consistent: <code>"HC"</code>, <code>"HC0"</code>, <code>"HC1"</code>, <code>"HC2"</code>, <code>"HC3"</code>, <code>"HC4"</code>, <code>"HC4m"</code>, <code>"HC5"</code>. See <code><a href="https://sandwich.R-Forge.R-project.org/reference/vcovHC.html" class="external-link">?sandwich::vcovHC</a></code></p></li>
 <li><p>Heteroskedasticity and autocorrelation consistent: <code>"HAC"</code></p></li>
 <li><p>Mixed-Models degrees of freedom: "satterthwaite", "kenward-roger"</p></li>
 <li><p>Other: <code>"NeweyWest"</code>, <code>"KernHAC"</code>, <code>"OPG"</code>. See the <code>sandwich</code> package documentation.</p></li>
 <li><p>"rsample", "boot", "fwb", and "simulation" are passed to the <code>method</code> argument of the <code><a href="https://marginaleffects.com/man/r/inferences.html" class="external-link">inferences()</a></code> function. To customize the bootstrap or simulation process, call <code><a href="https://marginaleffects.com/man/r/inferences.html" class="external-link">inferences()</a></code> directly.</p></li>
 </ul></li>
-<li><p>One-sided formula which indicates the name of cluster variables (e.g., <code>~unit_id</code>). This formula is passed to the <code>cluster</code> argument of the <code>sandwich::vcovCL</code> function.</p></li>
+<li><p>One-sided formula which indicates the name of cluster variables (e.g., <code>~unit_id</code>). This formula is passed to the <code>cluster</code> argument of the <code><a href="https://sandwich.R-Forge.R-project.org/reference/vcovCL.html" class="external-link">sandwich::vcovCL</a></code> function.</p></li>
 <li><p>Square covariance matrix</p></li>
 <li><p>Function which returns a covariance matrix (e.g., <code>stats::vcov(model)</code>)</p></li>
 </ul></dd>

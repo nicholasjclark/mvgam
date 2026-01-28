@@ -89,7 +89,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2026-01-23</h4>
+            <h4 data-toc-skip class="date">2026-01-28</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/trend_formulas.Rmd" class="external-link"><code>vignettes/trend_formulas.Rmd</code></a></small>
       <div class="d-none name"><code>trend_formulas.Rmd</code></div>
@@ -513,11 +513,11 @@ to interpret:</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Observation error parameter estimates:</span></span>
 <span><span class="co">#&gt;              2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; sigma_obs[1] 0.20 0.26  0.34 1.02   309</span></span>
-<span><span class="co">#&gt; sigma_obs[2] 0.26 0.40  0.54 1.01   232</span></span>
-<span><span class="co">#&gt; sigma_obs[3] 0.42 0.63  0.80 1.07    59</span></span>
-<span><span class="co">#&gt; sigma_obs[4] 0.26 0.38  0.50 1.01   354</span></span>
-<span><span class="co">#&gt; sigma_obs[5] 0.30 0.43  0.54 1.00   267</span></span>
+<span><span class="co">#&gt; sigma_obs[1] 0.20 0.26  0.34 1.01   366</span></span>
+<span><span class="co">#&gt; sigma_obs[2] 0.25 0.40  0.53 1.03   139</span></span>
+<span><span class="co">#&gt; sigma_obs[3] 0.43 0.63  0.79 1.02   151</span></span>
+<span><span class="co">#&gt; sigma_obs[4] 0.25 0.37  0.50 1.00   349</span></span>
+<span><span class="co">#&gt; sigma_obs[5] 0.31 0.43  0.54 1.02   349</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
 <span><span class="co">#&gt;             2.5% 50% 97.5% Rhat n_eff</span></span>
@@ -525,48 +525,48 @@ to interpret:</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; standard deviation:</span></span>
 <span><span class="co">#&gt;          2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; sigma[1] 0.26 0.34  0.43 1.01   517</span></span>
-<span><span class="co">#&gt; sigma[2] 0.23 0.40  0.54 1.02   147</span></span>
-<span><span class="co">#&gt; sigma[3] 0.21 0.54  0.82 1.11    35</span></span>
-<span><span class="co">#&gt; sigma[4] 0.31 0.45  0.58 1.02   374</span></span>
-<span><span class="co">#&gt; sigma[5] 0.24 0.37  0.51 1.01   230</span></span>
+<span><span class="co">#&gt; sigma[1] 0.26 0.34  0.43 1.02   489</span></span>
+<span><span class="co">#&gt; sigma[2] 0.25 0.41  0.54 1.01   167</span></span>
+<span><span class="co">#&gt; sigma[3] 0.27 0.56  0.81 1.03    97</span></span>
+<span><span class="co">#&gt; sigma[4] 0.33 0.46  0.59 1.01   306</span></span>
+<span><span class="co">#&gt; sigma[5] 0.25 0.37  0.52 1.02   209</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; var coefficient matrix:</span></span>
-<span><span class="co">#&gt;          2.5%    50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; A[1,1]  0.620  0.790 0.910 1.01   355</span></span>
-<span><span class="co">#&gt; A[1,2] -0.390 -0.130 0.041 1.01   277</span></span>
-<span><span class="co">#&gt; A[1,3] -0.160  0.017 0.180 1.00   600</span></span>
-<span><span class="co">#&gt; A[1,4] -0.058  0.064 0.200 1.00   614</span></span>
-<span><span class="co">#&gt; A[1,5] -0.038  0.110 0.350 1.01   330</span></span>
-<span><span class="co">#&gt; A[2,1] -0.510 -0.200 0.025 1.00   220</span></span>
-<span><span class="co">#&gt; A[2,2]  0.079  0.420 0.730 1.00   220</span></span>
-<span><span class="co">#&gt; A[2,3] -0.310  0.012 0.350 1.02   161</span></span>
-<span><span class="co">#&gt; A[2,4] -0.067  0.130 0.410 1.01   234</span></span>
-<span><span class="co">#&gt; A[2,5] -0.034  0.220 0.630 1.01   243</span></span>
-<span><span class="co">#&gt; A[3,1] -0.360 -0.036 0.170 1.01   513</span></span>
-<span><span class="co">#&gt; A[3,2] -0.500 -0.029 0.350 1.00   416</span></span>
-<span><span class="co">#&gt; A[3,3] -0.024  0.480 0.820 1.07    68</span></span>
-<span><span class="co">#&gt; A[3,4] -0.091  0.140 0.570 1.03   177</span></span>
-<span><span class="co">#&gt; A[3,5] -0.280  0.040 0.410 1.00   680</span></span>
-<span><span class="co">#&gt; A[4,1] -0.420 -0.120 0.075 1.01   209</span></span>
-<span><span class="co">#&gt; A[4,2] -0.650 -0.180 0.110 1.01   178</span></span>
-<span><span class="co">#&gt; A[4,3] -0.270  0.069 0.470 1.02   177</span></span>
-<span><span class="co">#&gt; A[4,4]  0.510  0.740 0.960 1.01   272</span></span>
-<span><span class="co">#&gt; A[4,5] -0.052  0.190 0.600 1.01   254</span></span>
-<span><span class="co">#&gt; A[5,1] -0.096  0.059 0.260 1.00   646</span></span>
-<span><span class="co">#&gt; A[5,2] -0.450 -0.120 0.120 1.01   234</span></span>
-<span><span class="co">#&gt; A[5,3] -0.200  0.055 0.310 1.01   251</span></span>
-<span><span class="co">#&gt; A[5,4] -0.210 -0.036 0.140 1.00   413</span></span>
-<span><span class="co">#&gt; A[5,5]  0.470  0.740 0.930 1.00   507</span></span>
+<span><span class="co">#&gt;           2.5%    50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; A[1,1]  0.6100  0.790 0.910 1.01   404</span></span>
+<span><span class="co">#&gt; A[1,2] -0.3900 -0.120 0.044 1.00   416</span></span>
+<span><span class="co">#&gt; A[1,3] -0.1300  0.011 0.180 1.00   840</span></span>
+<span><span class="co">#&gt; A[1,4] -0.0500  0.058 0.200 1.00   714</span></span>
+<span><span class="co">#&gt; A[1,5] -0.0360  0.110 0.330 1.01   420</span></span>
+<span><span class="co">#&gt; A[2,1] -0.5100 -0.190 0.021 1.01   293</span></span>
+<span><span class="co">#&gt; A[2,2]  0.0670  0.430 0.710 1.00   340</span></span>
+<span><span class="co">#&gt; A[2,3] -0.2200  0.015 0.300 1.01   219</span></span>
+<span><span class="co">#&gt; A[2,4] -0.0500  0.130 0.380 1.00   373</span></span>
+<span><span class="co">#&gt; A[2,5] -0.0180  0.220 0.600 1.01   318</span></span>
+<span><span class="co">#&gt; A[3,1] -0.3300 -0.029 0.200 1.01   472</span></span>
+<span><span class="co">#&gt; A[3,2] -0.5300 -0.018 0.340 1.01   334</span></span>
+<span><span class="co">#&gt; A[3,3]  0.0089  0.490 0.830 1.03   143</span></span>
+<span><span class="co">#&gt; A[3,4] -0.0920  0.130 0.490 1.02   245</span></span>
+<span><span class="co">#&gt; A[3,5] -0.2600  0.027 0.410 1.00   710</span></span>
+<span><span class="co">#&gt; A[4,1] -0.4100 -0.120 0.081 1.01   270</span></span>
+<span><span class="co">#&gt; A[4,2] -0.6000 -0.170 0.120 1.00   263</span></span>
+<span><span class="co">#&gt; A[4,3] -0.1500  0.068 0.400 1.01   255</span></span>
+<span><span class="co">#&gt; A[4,4]  0.5300  0.740 0.930 1.00   457</span></span>
+<span><span class="co">#&gt; A[4,5] -0.0600  0.180 0.570 1.01   278</span></span>
+<span><span class="co">#&gt; A[5,1] -0.0920  0.063 0.250 1.00   559</span></span>
+<span><span class="co">#&gt; A[5,2] -0.4400 -0.110 0.110 1.01   326</span></span>
+<span><span class="co">#&gt; A[5,3] -0.1100  0.053 0.270 1.00   655</span></span>
+<span><span class="co">#&gt; A[5,4] -0.1900 -0.032 0.120 1.00   845</span></span>
+<span><span class="co">#&gt; A[5,5]  0.4800  0.730 0.930 1.01   442</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
 <span><span class="co">#&gt;                               edf Ref.df Chi.sq p-value  </span></span>
-<span><span class="co">#&gt; te(temp,month)              4.981     15 33.021  0.0381 *</span></span>
-<span><span class="co">#&gt; te(temp,month):seriestrend1 1.161     15  7.330  0.9981  </span></span>
-<span><span class="co">#&gt; te(temp,month):seriestrend2 2.705     15 64.575  0.4715  </span></span>
-<span><span class="co">#&gt; te(temp,month):seriestrend3 1.550     15  1.496  1.0000  </span></span>
-<span><span class="co">#&gt; te(temp,month):seriestrend4 1.315     15  5.549  0.9993  </span></span>
-<span><span class="co">#&gt; te(temp,month):seriestrend5 1.622     15 12.466  0.9768  </span></span>
+<span><span class="co">#&gt; te(temp,month)              3.007     15 32.097  0.3719  </span></span>
+<span><span class="co">#&gt; te(temp,month):seriestrend1 1.639     15  6.870  0.9910  </span></span>
+<span><span class="co">#&gt; te(temp,month):seriestrend2 3.924     15 49.228  0.0479 *</span></span>
+<span><span class="co">#&gt; te(temp,month):seriestrend3 1.111     15  1.595  1.0000  </span></span>
+<span><span class="co">#&gt; te(temp,month):seriestrend4 2.855     15  6.812  0.9912  </span></span>
+<span><span class="co">#&gt; te(temp,month):seriestrend5 3.980     15  6.870  0.9037  </span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -699,11 +699,11 @@ posterior median process error correlations:</p>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">median_correlations</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="co">#&gt;             Bluegreens Diatoms Greens Other.algae Unicells</span></span>
-<span><span class="co">#&gt; Bluegreens        1.00   -0.21  -0.05        0.17     0.49</span></span>
-<span><span class="co">#&gt; Diatoms          -0.21    1.00   0.14        0.44     0.17</span></span>
-<span><span class="co">#&gt; Greens           -0.05    0.14   1.00        0.28    -0.04</span></span>
-<span><span class="co">#&gt; Other.algae       0.17    0.44   0.28        1.00     0.27</span></span>
-<span><span class="co">#&gt; Unicells          0.49    0.17  -0.04        0.27     1.00</span></span></code></pre></div>
+<span><span class="co">#&gt; Bluegreens        1.00   -0.21  -0.04        0.16     0.49</span></span>
+<span><span class="co">#&gt; Diatoms          -0.21    1.00   0.14        0.48     0.18</span></span>
+<span><span class="co">#&gt; Greens           -0.04    0.14   1.00        0.33    -0.05</span></span>
+<span><span class="co">#&gt; Other.algae       0.16    0.48   0.33        1.00     0.27</span></span>
+<span><span class="co">#&gt; Unicells          0.49    0.18  -0.05        0.27     1.00</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="impulse-response-functions">Impulse response functions<a class="anchor" aria-label="anchor" href="#impulse-response-functions"></a>
@@ -734,16 +734,16 @@ timesteps:</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 300 × 5</span></span></span>
 <span><span class="co">#&gt;    shock                  horizon irfQ50 irfQ2.5 irfQ97.5</span></span>
 <span><span class="co">#&gt;    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                    <span style="color: #949494; font-style: italic;">&lt;int&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> Process_1 -&gt; Process_1       1 0.348   0.259     0.455</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> Process_1 -&gt; Process_1       2 0.295   0.221     0.374</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> Process_1 -&gt; Process_1       3 0.251   0.186     0.321</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> Process_1 -&gt; Process_1       4 0.212   0.155     0.281</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> Process_1 -&gt; Process_1       5 0.181   0.123     0.252</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> Process_1 -&gt; Process_1       6 0.155   0.095<span style="text-decoration: underline;">4</span>    0.227</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> Process_1 -&gt; Process_1       7 0.132   0.074<span style="text-decoration: underline;">5</span>    0.205</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> Process_1 -&gt; Process_1       8 0.114   0.054<span style="text-decoration: underline;">5</span>    0.185</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> Process_1 -&gt; Process_1       9 0.098<span style="text-decoration: underline;">1</span>  0.040<span style="text-decoration: underline;">5</span>    0.169</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> Process_1 -&gt; Process_1      10 0.084<span style="text-decoration: underline;">4</span>  0.029<span style="text-decoration: underline;">4</span>    0.155</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 1</span> Process_1 -&gt; Process_1       1 0.353   0.262     0.446</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 2</span> Process_1 -&gt; Process_1       2 0.298   0.225     0.369</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 3</span> Process_1 -&gt; Process_1       3 0.252   0.188     0.320</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 4</span> Process_1 -&gt; Process_1       4 0.213   0.155     0.280</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 5</span> Process_1 -&gt; Process_1       5 0.182   0.120     0.251</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 6</span> Process_1 -&gt; Process_1       6 0.154   0.093<span style="text-decoration: underline;">8</span>    0.228</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 7</span> Process_1 -&gt; Process_1       7 0.132   0.073<span style="text-decoration: underline;">1</span>    0.206</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 8</span> Process_1 -&gt; Process_1       8 0.113   0.055<span style="text-decoration: underline;">2</span>    0.187</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;"> 9</span> Process_1 -&gt; Process_1       9 0.097<span style="text-decoration: underline;">2</span>  0.041<span style="text-decoration: underline;">1</span>    0.172</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">10</span> Process_1 -&gt; Process_1      10 0.083<span style="text-decoration: underline;">2</span>  0.030<span style="text-decoration: underline;">3</span>    0.157</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># ℹ 290 more rows</span></span></span></code></pre></div>
 <p>But it is easier to understand these responses using plots. For
 example, we can plot the expected responses of the remaining series to a
