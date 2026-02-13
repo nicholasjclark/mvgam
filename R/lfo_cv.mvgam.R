@@ -326,11 +326,11 @@ plot.mvgam_lfo = function(x, ...) {
   ) %>%
     dplyr::left_join(
       dplyr::tribble(
-        ~name                                ,
-        ~threshold                           ,
-        "elpds"                              ,
+        ~name                                              ,
+        ~threshold                                         ,
+        "elpds"                                            ,
         quantile(object$elpds, probs = 0.15, na.rm = TRUE) ,
-        "pareto_ks"                          ,
+        "pareto_ks"                                        ,
         object$pareto_k_threshold
       ),
       by = "name"

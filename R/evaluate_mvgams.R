@@ -762,7 +762,11 @@ drps_score <- function(truth, fc, interval_width = 0.9, log = FALSE) {
     fc <- log(fc + 0.001)
     nsum <- max(c(truth, fc), na.rm = TRUE) + 5
   } else {
-    nsum <- max(c(truth, quantile(fc, probs = 0.99, na.rm = TRUE)), na.rm = TRUE) + 1000
+    nsum <- max(
+      c(truth, quantile(fc, probs = 0.99, na.rm = TRUE)),
+      na.rm = TRUE
+    ) +
+      1000
   }
 
   Fy = ecdf(fc)

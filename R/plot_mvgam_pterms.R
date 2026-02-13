@@ -119,7 +119,8 @@ plot_mvgam_pterms = function(object, trend_effects = FALSE) {
             2,
             function(x) {
               quantile(
-                x, probs = c(0, 0.05, 0.5, 0.95, 1),
+                x,
+                probs = c(0, 0.05, 0.5, 0.95, 1),
                 na.rm = TRUE
               )
             }
@@ -161,14 +162,16 @@ plot_mvgam_pterms = function(object, trend_effects = FALSE) {
             2,
             function(x) {
               quantile(
-                x, probs = c(0, 0.3, 0.5, 0.7, 1),
+                x,
+                probs = c(0, 0.3, 0.5, 0.7, 1),
                 na.rm = TRUE
               )
             }
           )
         } else {
           bp$stats <- matrix(quantile(
-            betas, probs = c(0, 0.3, 0.5, 0.7, 1),
+            betas,
+            probs = c(0, 0.3, 0.5, 0.7, 1),
             na.rm = TRUE
           ))
         }
@@ -190,14 +193,16 @@ plot_mvgam_pterms = function(object, trend_effects = FALSE) {
             2,
             function(x) {
               quantile(
-                x, probs = c(0, 0.2, 0.5, 0.8, 1),
+                x,
+                probs = c(0, 0.2, 0.5, 0.8, 1),
                 na.rm = TRUE
               )
             }
           )
         } else {
           bp$stats <- matrix(quantile(
-            betas, probs = c(0, 0.2, 0.5, 0.8, 1),
+            betas,
+            probs = c(0, 0.2, 0.5, 0.8, 1),
             na.rm = TRUE
           ))
         }
@@ -219,14 +224,16 @@ plot_mvgam_pterms = function(object, trend_effects = FALSE) {
             2,
             function(x) {
               quantile(
-                x, probs = c(0, 0.4, 0.5, 0.6, 1),
+                x,
+                probs = c(0, 0.4, 0.5, 0.6, 1),
                 na.rm = TRUE
               )
             }
           )
         } else {
           bp$stats <- matrix(quantile(
-            betas, probs = c(0, 0.4, 0.5, 0.6, 1),
+            betas,
+            probs = c(0, 0.4, 0.5, 0.6, 1),
             na.rm = TRUE
           ))
         }

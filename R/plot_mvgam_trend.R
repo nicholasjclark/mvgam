@@ -221,7 +221,9 @@ plot_mvgam_trend = function(
   # Plot quantiles of the smooth function, along with observed values
   # if specified
   probs <- c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
-  cred <- sapply(1:NCOL(preds), function(n) quantile(preds[, n], probs = probs, na.rm = TRUE))
+  cred <- sapply(1:NCOL(preds), function(n) {
+    quantile(preds[, n], probs = probs, na.rm = TRUE)
+  })
 
   if (missing(xlab)) {
     xlab <- 'Time'
