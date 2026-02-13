@@ -1,4 +1,4 @@
-# mvgam 1.1.594
+# mvgam 1.1.595
 
 ## New functionalities
 * Restructured `summary.mvgam()` to now return an object of class `mvgam_summary` that can be re-used for later purposes, or that can be printed with `print.mvgam_summary()` (#119)
@@ -18,6 +18,7 @@
 * Bug fix to ensure piecewise trends are correctly predicted when using `process_error = TRUE` in `predict()`
 * Bug fix to ensure variance of continuous time autoregressive processes (using `CAR()`) scales appropriately with time lags (#107)
 * Bug fix to ensure `summary.mvgam()` uses the correct `max_treedepth` value when checking Stan diagnostics, rather than always assuming the default of 10 (thanks to @StefanoMezzini for reporting)
+* Bug fix to ensure `NA` residual values are handled properly when plotting residuals (this occurs because response values are allowed to be missing; (thanks to @StefanoMezzini for reporting)
 
 ## Deprecations
 * Altered the structure of objects of class `mvgam_forecast` so that the `train_times` and `test_times` slots now contain lists of length `n_series`. This allows for continuous time data to be better handled, where some series may have been sampled at different timepoints
