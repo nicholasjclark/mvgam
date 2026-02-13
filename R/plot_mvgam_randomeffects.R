@@ -100,7 +100,7 @@ plot_mvgam_randomeffects = function(object, trend_effects = FALSE) {
       # Plot the random effect estimates
       beta_creds <- sapply(
         1:NCOL(betas),
-        function(n) quantile(betas[, n], probs = probs)
+        function(n) quantile(betas[, n], probs = probs, na.rm = TRUE)
       )
       N <- NCOL(betas)
       x <- 1:N

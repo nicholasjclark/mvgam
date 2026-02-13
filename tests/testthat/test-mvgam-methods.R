@@ -330,6 +330,24 @@ test_that("plot_mvgam_resids gives reasonable outputs", {
   expect_ggplot(plot_mvgam_resids(mvgam:::mvgam_example2))
 })
 
+test_that("plot_mvgam_resids handles NA residuals without error", {
+  # mvgam_example1 has NAs in residuals from missing observations;
+  # quantile() calls must use na.rm = TRUE to avoid errors
+  mod <- mvgam:::mvgam_example1
+  expect_true(anyNA(mod$resids[[1]]))
+  expect_ggplot(plot_mvgam_resids(mod, series = 1))
+})
+
+test_that("residuals method returns NAs for missing observations", {
+  mod <- mvgam:::mvgam_example1
+  resids <- residuals(mod)
+
+  # Residuals should be NaN where observations were missing
+  na_obs <- which(is.na(mod$obs_data$y))
+  expect_true(length(na_obs) > 0)
+  expect_true(all(is.nan(resids[na_obs, "Estimate"])))
+})
+
 test_that("plot_mvgam_series gives reasonable outputs", {
   simdat <- sim_mvgam()
   expect_ggplot(plot_mvgam_series(

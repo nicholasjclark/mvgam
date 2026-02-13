@@ -699,12 +699,12 @@ terms_preds = function(
       serrors[[i]] <- (apply(
         contributions[[i]],
         2,
-        function(x) quantile(x, probs = max(probs))
+        function(x) quantile(x, probs = max(probs), na.rm = TRUE)
       ) -
         apply(
           contributions[[i]],
           2,
-          function(x) quantile(x, probs = min(probs))
+          function(x) quantile(x, probs = min(probs), na.rm = TRUE)
         )) /
         2
       if (robust) {

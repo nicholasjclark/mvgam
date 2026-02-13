@@ -82,7 +82,7 @@ plot_mvgam_factors = function(object, plot = TRUE) {
 
       cred <- as.data.frame(t(sapply(
         1:NCOL(preds),
-        function(n) quantile(preds[, n], probs = probs)
+        function(n) quantile(preds[, n], probs = probs, na.rm = TRUE)
       ))) %>%
         dplyr::mutate(lv = paste0('Factor ', x), time = 1:NCOL(preds))
       colnames(cred) <- c(

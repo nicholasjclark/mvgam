@@ -152,12 +152,12 @@ plot_mvgam_resids = function(
   ) %>%
     dplyr::group_by(lag) %>%
     dplyr::mutate(
-      ylow = quantile(acf, probs = 0.05),
-      yqlow = quantile(acf, probs = 0.2),
-      ymidlow = quantile(acf, probs = 0.25),
-      ymidhigh = quantile(acf, probs = 0.75),
-      yqhigh = quantile(acf, probs = 0.8),
-      yhigh = quantile(acf, probs = 0.95)
+      ylow = quantile(acf, probs = 0.05, na.rm = TRUE),
+      yqlow = quantile(acf, probs = 0.2, na.rm = TRUE),
+      ymidlow = quantile(acf, probs = 0.25, na.rm = TRUE),
+      ymidhigh = quantile(acf, probs = 0.75, na.rm = TRUE),
+      yqhigh = quantile(acf, probs = 0.8, na.rm = TRUE),
+      yhigh = quantile(acf, probs = 0.95, na.rm = TRUE)
     ) %>%
     dplyr::select(-acf) %>%
     dplyr::distinct()
@@ -203,12 +203,12 @@ plot_mvgam_resids = function(
   ) %>%
     dplyr::group_by(lag) %>%
     dplyr::mutate(
-      ylow = quantile(pacf, probs = 0.05),
-      yqlow = quantile(pacf, probs = 0.2),
-      ymidlow = quantile(pacf, probs = 0.25),
-      ymidhigh = quantile(pacf, probs = 0.75),
-      yqhigh = quantile(pacf, probs = 0.8),
-      yhigh = quantile(pacf, probs = 0.95)
+      ylow = quantile(pacf, probs = 0.05, na.rm = TRUE),
+      yqlow = quantile(pacf, probs = 0.2, na.rm = TRUE),
+      ymidlow = quantile(pacf, probs = 0.25, na.rm = TRUE),
+      ymidhigh = quantile(pacf, probs = 0.75, na.rm = TRUE),
+      yqhigh = quantile(pacf, probs = 0.8, na.rm = TRUE),
+      yhigh = quantile(pacf, probs = 0.95, na.rm = TRUE)
     ) %>%
     dplyr::select(-pacf) %>%
     dplyr::distinct()

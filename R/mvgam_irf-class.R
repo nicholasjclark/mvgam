@@ -94,8 +94,8 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
         dplyr::group_by(shock, horizon) %>%
         dplyr::summarise(
           irfQ50 = median(imp_resp),
-          irfQlower = quantile(imp_resp, min(probs)),
-          irfQupper = quantile(imp_resp, max(probs)),
+          irfQlower = quantile(imp_resp, min(probs), na.rm = TRUE),
+          irfQupper = quantile(imp_resp, max(probs), na.rm = TRUE),
           .groups = 'keep'
         ) %>%
         dplyr::ungroup()
@@ -168,14 +168,14 @@ plot.mvgam_irf = function(x, series = 1, ...) {
     dplyr::group_by(resp_var, horizon) %>%
     dplyr::summarise(
       med = median(imp_resp),
-      lower1 = quantile(imp_resp, 0.1),
-      lower2 = quantile(imp_resp, 0.2),
-      lower3 = quantile(imp_resp, 0.3),
-      lower4 = quantile(imp_resp, 0.4),
-      upper1 = quantile(imp_resp, 0.9),
-      upper2 = quantile(imp_resp, 0.8),
-      upper3 = quantile(imp_resp, 0.7),
-      upper4 = quantile(imp_resp, 0.6),
+      lower1 = quantile(imp_resp, 0.1, na.rm = TRUE),
+      lower2 = quantile(imp_resp, 0.2, na.rm = TRUE),
+      lower3 = quantile(imp_resp, 0.3, na.rm = TRUE),
+      lower4 = quantile(imp_resp, 0.4, na.rm = TRUE),
+      upper1 = quantile(imp_resp, 0.9, na.rm = TRUE),
+      upper2 = quantile(imp_resp, 0.8, na.rm = TRUE),
+      upper3 = quantile(imp_resp, 0.7, na.rm = TRUE),
+      upper4 = quantile(imp_resp, 0.6, na.rm = TRUE),
       .groups = 'keep'
     ) %>%
     dplyr::ungroup()

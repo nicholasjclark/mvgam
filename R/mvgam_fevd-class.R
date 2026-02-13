@@ -82,8 +82,8 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
     dplyr::group_by(horizon, target, Series) %>%
     dplyr::mutate(
       fevdQ50 = median(evd),
-      fevd_Qlower = quantile(evd, min(probs)),
-      fevd_Qupper = quantile(evd, max(probs))
+      fevd_Qlower = quantile(evd, min(probs), na.rm = TRUE),
+      fevd_Qupper = quantile(evd, max(probs), na.rm = TRUE)
     ) %>%
     dplyr::ungroup() %>%
     dplyr::mutate(

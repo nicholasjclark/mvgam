@@ -117,12 +117,18 @@ plot_mvgam_pterms = function(object, trend_effects = FALSE) {
           beta_creds <- apply(
             betas,
             2,
-            function(x) quantile(x, probs = c(0, 0.05, 0.5, 0.95, 1))
+            function(x) {
+              quantile(
+                x, probs = c(0, 0.05, 0.5, 0.95, 1),
+                na.rm = TRUE
+              )
+            }
           )
         } else {
           beta_creds <- matrix(quantile(
             betas,
-            probs = c(0, 0.05, 0.5, 0.95, 1)
+            probs = c(0, 0.05, 0.5, 0.95, 1),
+            na.rm = TRUE
           ))
         }
 
@@ -153,10 +159,18 @@ plot_mvgam_pterms = function(object, trend_effects = FALSE) {
           bp$stats <- apply(
             betas,
             2,
-            function(x) quantile(x, probs = c(0, 0.3, 0.5, 0.7, 1))
+            function(x) {
+              quantile(
+                x, probs = c(0, 0.3, 0.5, 0.7, 1),
+                na.rm = TRUE
+              )
+            }
           )
         } else {
-          bp$stats <- matrix(quantile(betas, probs = c(0, 0.3, 0.5, 0.7, 1)))
+          bp$stats <- matrix(quantile(
+            betas, probs = c(0, 0.3, 0.5, 0.7, 1),
+            na.rm = TRUE
+          ))
         }
 
         bxp(
@@ -174,10 +188,18 @@ plot_mvgam_pterms = function(object, trend_effects = FALSE) {
           bp$stats <- apply(
             betas,
             2,
-            function(x) quantile(x, probs = c(0, 0.2, 0.5, 0.8, 1))
+            function(x) {
+              quantile(
+                x, probs = c(0, 0.2, 0.5, 0.8, 1),
+                na.rm = TRUE
+              )
+            }
           )
         } else {
-          bp$stats <- matrix(quantile(betas, probs = c(0, 0.2, 0.5, 0.8, 1)))
+          bp$stats <- matrix(quantile(
+            betas, probs = c(0, 0.2, 0.5, 0.8, 1),
+            na.rm = TRUE
+          ))
         }
 
         bxp(
@@ -195,10 +217,18 @@ plot_mvgam_pterms = function(object, trend_effects = FALSE) {
           bp$stats <- apply(
             betas,
             2,
-            function(x) quantile(x, probs = c(0, 0.4, 0.5, 0.6, 1))
+            function(x) {
+              quantile(
+                x, probs = c(0, 0.4, 0.5, 0.6, 1),
+                na.rm = TRUE
+              )
+            }
           )
         } else {
-          bp$stats <- matrix(quantile(betas, probs = c(0, 0.4, 0.5, 0.6, 1)))
+          bp$stats <- matrix(quantile(
+            betas, probs = c(0, 0.4, 0.5, 0.6, 1),
+            na.rm = TRUE
+          ))
         }
 
         bxp(
@@ -215,7 +245,7 @@ plot_mvgam_pterms = function(object, trend_effects = FALSE) {
         box(bty = 'L', lwd = 2)
         title(pterms[i], adj = 0)
       } else {
-        beta_creds <- quantile(betas, probs = probs)
+        beta_creds <- quantile(betas, probs = probs, na.rm = TRUE)
         pred_vals <- seq(
           min(pred_vals_orig),
           max(pred_vals_orig),

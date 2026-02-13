@@ -329,7 +329,7 @@ plot.mvgam_lfo = function(x, ...) {
         ~name                                ,
         ~threshold                           ,
         "elpds"                              ,
-        quantile(object$elpds, probs = 0.15) ,
+        quantile(object$elpds, probs = 0.15, na.rm = TRUE) ,
         "pareto_ks"                          ,
         object$pareto_k_threshold
       ),
