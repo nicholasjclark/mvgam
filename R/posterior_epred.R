@@ -218,15 +218,23 @@ compute_family_epred <- function(linpred, family,
 #' @param object A fitted mvgam object from [mvgam()].
 #' @param newdata Optional data frame with covariates for prediction. If
 #'   NULL, uses original training data stored in the model object.
-#' @param process_error Logical; if TRUE (default), uses the full
-#'   posterior draws of the trend parameters (per-draw variation). If
-#'   FALSE, fixes the trend at its posterior mean for faster
-#'   computation. Like `posterior_linpred()`, this method does **not**
-#'   add sampled stochastic innovations — it remains a deterministic
-#'   function of the parameter draws so the invariant
-#'   \code{posterior_epred(x) == linkinv(posterior_linpred(x))} holds.
-#'   Use [posterior_predict.mvgam()] for samples that include latent
-#'   process noise.
+#' @param process_error Logical; if TRUE (default), the expected value is
+#'   the **marginal** E\[Y | X\] integrated over the trend's stochastic
+#'   dynamics. mvgam achieves this by Monte Carlo: sampled innovations
+#'   are added to the link-scale linear predictor before applying the
+#'   inverse link, matching brms's analytical convention for
+#'   autocorrelated residual models (e.g. Jensen correction
+#'   \eqn{\sigma^2/(1-\rho^2)/2} for AR(1) Poisson). If FALSE, the
+#'   trend is fixed at its posterior mean (no innovations) — faster
+#'   but ignores process noise.
+#'
+#'   Note: with `process_error = TRUE` the invariant
+#'   \code{posterior_epred(x) == linkinv(posterior_linpred(x))} no
+#'   longer holds (innovations are added in `epred` and `predict` but
+#'   not in `linpred`). For deterministic-state-at-fitted-values
+#'   semantics (matching the trained latent state without resampling),
+#'   use [forecast()] / [hindcast()] which return values at the actual
+#'   `lv_trend` posterior draws.
 #' @param ndraws Positive integer specifying number of posterior draws to
 #'   use. NULL (default) uses all available draws.
 #' @param re_formula Formula for random effects. NULL (default) includes
@@ -325,6 +333,21 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
     sample_new_levels = sample_new_levels,
     resp = resp
   )
+
+  # Marginal expectation for state-space models: integrate over the
+  # trend's stochastic dynamics by adding sampled innovations to the
+  # link-scale linpred before applying inverse link. Matches brms's
+  # convention for posterior_epred on AR-cov models, where the
+  # autocorrelation residual distribution is integrated analytically
+  # (e.g. Jensen correction sigma^2/(1-ar^2)/2 for Poisson log link).
+  # mvgam achieves the same marginal mean by Monte Carlo, which works
+  # uniformly across families/links and trend types.
+  if (isTRUE(process_error) && has_stochastic_trend(object)) {
+    innovations <- sample_process_errors(
+      object, ndraws = ndraws, newdata = newdata
+    )
+    linpred <- add_innovations_to_linpred(linpred, innovations)
+  }
 
   # Extract family information for transformation
   # Use resp argument as single source of truth for response selection

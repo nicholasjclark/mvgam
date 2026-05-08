@@ -1332,6 +1332,31 @@ get_trend_parameter_prior <- function(prior = NULL, param_name) {
 #' terms conflict with mvgam's State-Space dynamics. All forbidden terms remain
 #' fully supported in the main observation formula.
 #'
+#' @section Multivariate models — single shared trend type:
+#' For multivariate observation models (\code{mvbind()} or
+#' \code{bf() + bf()}), \strong{a single trend constructor applies to
+#' all responses}. Different trend types per response (e.g.
+#' \code{RW()} for one response and \code{AR(p = 3)} for another) are
+#' \strong{not supported and will not be added}. mvgam stores latent
+#' trend states in a single \code{lv_trend} matrix with shared dynamics
+#' parameters; mixing trend types per response would require parallel
+#' dynamics machinery throughout the codegen, sampling, and prediction
+#' pipelines.
+#'
+#' What multivariate models DO support:
+#' \itemize{
+#'   \item Different observation families per response (e.g.
+#'     \code{bf(count ~ x, family = poisson()) +
+#'     bf(biomass ~ x, family = Gamma())}).
+#'   \item Different fixed-effect, smooth, or GP terms per response in
+#'     the observation formulas.
+#'   \item Hierarchical / grouped trends via the \code{gr} argument on
+#'     the (single) trend constructor.
+#' }
+#'
+#' If you need genuinely different dynamics per response, fit
+#' independent univariate \code{mvgam()} models for each response.
+#'
 #' \strong{Examples:}
 #' \preformatted{
 #' # Correct usage

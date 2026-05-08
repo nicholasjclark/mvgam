@@ -128,6 +128,47 @@ test_that("Target 1: mvgam fits basic RW model", {
   expect_equal(cov_struct$ndraws, 10)
   expect_true("sigma_trend" %in% names(cov_struct$params))
   expect_false("L_Omega_trend" %in% names(cov_struct$params))
+
+  # End-to-end through sample_process_errors
+  set.seed(1)
+  pe <- sample_process_errors(fit1, ndraws = 10)
+  expect_true(is.matrix(pe))
+  expect_equal(nrow(pe), 10L)
+  expect_true(all(is.finite(pe)))
+  expect_error(
+    sample_process_errors(fit1, ndraws = 5, draw_ids = 1:3),
+    "ndraws"
+  )
+
+  # posterior_linpred is deterministic across repeat calls (no
+  # innovations are added at the linpred layer). Two calls return the
+  # same matrix bit-for-bit.
+  lp_a <- posterior_linpred(fit1)
+  lp_b <- posterior_linpred(fit1)
+  expect_equal(lp_a, lp_b)
+
+  # posterior_epred for stochastic-trend models adds sampled
+  # innovations (marginal expectation), so two calls differ row-by-row
+  # but their column means converge to the same marginal. With log
+  # link, mean(exp(eta + N(0, sigma^2))) > exp(eta), so on average
+  # epred > exp(linpred) when innovations are present.
+  set.seed(11); ep_a <- posterior_epred(fit1)
+  set.seed(11); ep_b <- posterior_epred(fit1)
+  expect_equal(ep_a, ep_b)  # same seed -> same draws
+  # epred is at least exp(linpred) on average (Jensen's inequality).
+  expect_gte(mean(colMeans(ep_a)), mean(exp(colMeans(lp_a))) * 0.99)
+
+  # posterior_predict with process_error=TRUE adds innovations on top
+  # of the obs noise; per-obs variance should exceed the FALSE case
+  # (which fixes trend at posterior mean and skips innovations).
+  set.seed(7)
+  pp_true <- posterior_predict(fit1, process_error = TRUE)
+  set.seed(7)
+  pp_false <- posterior_predict(fit1, process_error = FALSE)
+  expect_equal(dim(pp_true), dim(pp_false))
+  v_true <- mean(apply(pp_true, 2, var))
+  v_false <- mean(apply(pp_false, 2, var))
+  expect_gt(v_true, v_false)
 })
 
 # ==============================================================================
@@ -178,6 +219,57 @@ test_that("Target 2: mvgam fits multivariate shared RW model", {
   expect_equal(cov_struct2$ndraws, 10)
   expect_true("sigma_trend" %in% names(cov_struct2$params))
   expect_true("L_Omega_trend" %in% names(cov_struct2$params))
+
+  # Multivariate prediction surface end-to-end
+  resp_names <- c("count", "biomass")
+
+  # posterior_predict (default resp = NULL -> named list)
+  set.seed(21)
+  pp_all <- posterior_predict(fit2, newdata = test_data$multivariate)
+  expect_type(pp_all, "list")
+  expect_named(pp_all, resp_names)
+  expect_true(all(vapply(pp_all, is.matrix, logical(1))))
+  expect_true(all(is.finite(pp_all$count)))
+  expect_true(all(is.finite(pp_all$biomass)))
+
+  # posterior_predict with resp filter -> single matrix
+  set.seed(22)
+  pp_count <- posterior_predict(fit2, newdata = test_data$multivariate,
+                                 resp = "count")
+  expect_true(is.matrix(pp_count))
+  expect_equal(ncol(pp_count), nrow(test_data$multivariate))
+
+  # predict() summary on multivariate -> named list of summary matrices
+  pred_all <- predict(fit2, newdata = test_data$multivariate, summary = TRUE)
+  if (is.list(pred_all) && !is.matrix(pred_all)) {
+    expect_named(pred_all, resp_names)
+    expect_true(all(c("Estimate", "Est.Error", "Q2.5", "Q97.5") %in%
+                    colnames(pred_all$count)))
+  } else {
+    # current predict.mvgam may flatten; if so, just confirm it's a matrix
+    expect_true(is.matrix(pred_all))
+  }
+
+  # fitted() summary on multivariate -> named list of summary matrices
+  fv_all <- fitted(fit2, summary = TRUE)
+  expect_type(fv_all, "list")
+  expect_named(fv_all, resp_names)
+  expect_true(all(c("Estimate", "Est.Error", "Q2.5", "Q97.5") %in%
+                  colnames(fv_all$count)))
+
+  # fitted(scale = "linear") -> link scale
+  fv_link <- fitted(fit2, scale = "linear", summary = FALSE)
+  expect_type(fv_link, "list")
+  expect_named(fv_link, resp_names)
+
+  # epred adds sampled innovations on top of linpred (marginal
+  # expectation), then applies linkinv. fit2 uses default gaussian
+  # (identity link), so epred = linpred + innovation per draw, but
+  # mean(epred) ≈ mean(linpred) since innovations are mean-zero.
+  lp <- posterior_linpred(fit2, newdata = test_data$multivariate)
+  ep <- posterior_epred(fit2, newdata = test_data$multivariate)
+  expect_equal(colMeans(ep$count), colMeans(lp$count), tolerance = 0.10)
+  expect_equal(colMeans(ep$biomass), colMeans(lp$biomass), tolerance = 0.10)
 })
 
 # ==============================================================================

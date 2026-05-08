@@ -60,7 +60,12 @@ mvgam(y ~ x1 + x2, trend_formula = ~ AR(), data = data)
 **Integration Points**:
 - `generate_combined_stancode()` workflow: Parameter extraction integrated between Stage 1 (trend generation) and Stage 2 (injection)
 - Bidirectional parameter mapping: Maintains prediction compatibility with original brms parameter structure
-- Multivariate support: Handles both shared trends and response-specific trend patterns
+- Multivariate support: Multivariate observation models share a single
+  trend specification across all responses. **Response-specific trend
+  types are explicitly NOT supported** — every response must use the
+  same trend constructor (e.g. you cannot specify `RW()` for one
+  response and `AR(p = 3)` for another). See "Trend specification
+  scope" below for the formal decision.
 
 ### 4. Centralized Prior Resolution System
 **Decision**: Single helper function for all trend parameter priors across all trend types  
@@ -616,7 +621,53 @@ trend_specs = list(
 **Key Requirements**:
 1. **Field Compatibility**: Supports `trend`, `trend_type`, and `trend_model` field names, but this needs to be streamlined and simplified as we do not need to maintain backward compatibility
 2. **Multivariate Recognition**: If a named list lacks any trend-identifying field, it's treated as multivariate
-3. **Response-Specific Processing**: Each response gets processed with appropriate response suffix (`_count`, `_biomass`)
+3. **Per-Response Naming**: For multivariate observation models, the
+   per-response naming (`_count`, `_biomass`) is applied only to
+   observation→trend mapping arrays (`obs_trend_time`,
+   `obs_trend_series`, `times_trend`, `mu_ones`). The trend dynamics
+   parameters themselves (`sigma_trend`, `L_Omega_trend`, `ar1_trend`,
+   etc.) are deliberately shared across responses. See "Trend
+   specification scope" below.
+
+### Trend specification scope
+
+**Decision**: A single trend constructor applies to all responses in a
+multivariate model. Different trend *types* per response (e.g. `RW()`
+for `count` and `AR(p = 3)` for `biomass`) are **not supported and
+will not be implemented**.
+
+**Rationale**:
+- The State-Space architecture stores latent trend states in a single
+  `lv_trend` matrix and a single set of dynamics parameters
+  (`sigma_trend`, `L_Omega_trend`, `ar1_trend`, etc.). Per-response
+  trend types would require parallel dynamics machinery, separate
+  parameter blocks, and per-response posterior extraction in every
+  downstream consumer (sampling, prediction, summary, plotting,
+  forecast, scoring).
+- mvgam's value proposition is **shared latent dynamics with
+  per-response observation models** (different families, different
+  fixed effects, etc.) — not arbitrary mixing of dynamics types.
+  Mixing AR and RW across responses changes the model's fundamental
+  structure and is better served by fitting separate models.
+- The existing `bf(y1 ~ ...) + bf(y2 ~ ...)` and `list(y1 = ~ ...,
+  y2 = ~ ...)` syntaxes are reserved for **shared trend type with
+  per-response covariates** (e.g. each response's trend can have
+  different mean-function predictors but the same dynamics class).
+
+**Constraint enforcement**: User code that passes incompatible trend
+constructors per response (different trend constructor calls) should
+be rejected at validation time with an error referring back to this
+decision. See `validate_trend_formula_brms()`.
+
+**What IS supported for multivariate models**:
+- Different observation families per response (Poisson, Gaussian,
+  Gamma, etc.)
+- Different fixed-effect / smooth / GP terms in each response's
+  observation formula
+- Hierarchical / grouped trends via `gr` argument on the (single)
+  trend constructor — see Hierarchical Trends section
+- Per-response trend covariates (mean-function inputs) when the
+  trend type is shared
 
 ### Time Series Dimension Management System
 

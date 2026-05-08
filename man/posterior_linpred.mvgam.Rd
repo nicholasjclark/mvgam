@@ -27,14 +27,14 @@ posterior draws of the trend parameters (per-draw variation). If
 FALSE, fixes the trend at its posterior mean for faster
 computation.
 
-\code{posterior_linpred()} (and \code{posterior_epred()}) deliberately do
-\strong{not} add sampled stochastic innovations from the trend
-covariance structure. They remain deterministic functions of the
-parameter draws so the invariant
-\code{posterior_epred(x) == linkinv(posterior_linpred(x))} holds
-across separate calls. State-space process noise is added only by
-\code{posterior_predict()}, where it contributes to predictive
-uncertainty alongside observation-level noise.}
+\code{posterior_linpred()} does NOT add sampled stochastic innovations
+from the trend's covariance structure — it remains a
+deterministic function of the parameter draws. State-space
+process noise is added inside \code{posterior_epred()} and
+\code{posterior_predict()} (matching the brms convention of returning
+marginal expectations / predictive samples). For
+deterministic-state-at-fitted-values semantics use \code{\link[generics:forecast]{generics::forecast()}} /
+\code{\link[=hindcast]{hindcast()}}.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}

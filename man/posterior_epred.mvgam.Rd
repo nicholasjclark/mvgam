@@ -22,15 +22,23 @@
 \item{newdata}{Optional data frame with covariates for prediction. If
 NULL, uses original training data stored in the model object.}
 
-\item{process_error}{Logical; if TRUE (default), uses the full
-posterior draws of the trend parameters (per-draw variation). If
-FALSE, fixes the trend at its posterior mean for faster
-computation. Like \code{posterior_linpred()}, this method does \strong{not}
-add sampled stochastic innovations — it remains a deterministic
-function of the parameter draws so the invariant
-\code{posterior_epred(x) == linkinv(posterior_linpred(x))} holds.
-Use \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for samples that include latent
-process noise.}
+\item{process_error}{Logical; if TRUE (default), the expected value is
+the \strong{marginal} E[Y | X] integrated over the trend's stochastic
+dynamics. mvgam achieves this by Monte Carlo: sampled innovations
+are added to the link-scale linear predictor before applying the
+inverse link, matching brms's analytical convention for
+autocorrelated residual models (e.g. Jensen correction
+\eqn{\sigma^2/(1-\rho^2)/2} for AR(1) Poisson). If FALSE, the
+trend is fixed at its posterior mean (no innovations) — faster
+but ignores process noise.
+
+Note: with \code{process_error = TRUE} the invariant
+\code{posterior_epred(x) == linkinv(posterior_linpred(x))} no
+longer holds (innovations are added in \code{epred} and \code{predict} but
+not in \code{linpred}). For deterministic-state-at-fitted-values
+semantics (matching the trained latent state without resampling),
+use \code{\link[generics:forecast]{generics::forecast()}} / \code{\link[=hindcast]{hindcast()}} which return values at the actual
+\code{lv_trend} posterior draws.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}

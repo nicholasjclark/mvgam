@@ -140,8 +140,37 @@ get_observation_structure <- function(object, newdata = NULL) {
     if (is.null(series_var)) series_var <- "series"
   }
 
-  # Prepare data with standardized time/series attributes. For
-  # multivariate fits the data may not carry an explicit `series`
+  # The trained model already knows its series structure
+  # (object$standata$N_series_trend). For single-series models the
+  # newdata typically has no `series` column at all (e.g. brms drops
+  # columns the formula doesn't reference). Treat single-series as a
+  # first-class shortcut here: build the observation structure
+  # directly from object metadata + newdata's time column, without
+  # invoking ensure_mvgam_variables.
+  n_series_trained <- object$standata$N_series_trend %||%
+    object$trend_metadata$dimensions$n_series %||%
+    length(levels(as.factor(attr(object$obs_data %||% object$data,
+                                  "mvgam_series"))))
+
+  is_single_series <- !is.null(n_series_trained) && n_series_trained == 1L
+  has_explicit_series <- series_var %in% names(newdata)
+
+  if (is_single_series && !has_explicit_series) {
+    # Pull the trained level so series indices line up with the
+    # fitted model's encoding.
+    train_series <- attr(object$obs_data %||% object$data, "mvgam_series")
+    level_label <- if (!is.null(train_series)) {
+      as.character(train_series[1L])
+    } else {
+      "1"
+    }
+    return(build_single_series_observation_structure(
+      newdata, time_var, level_label
+    ))
+  }
+
+  # Otherwise: prepare data with standardized time/series attributes.
+  # For multivariate fits the data may not carry an explicit `series`
   # column (mvbind builds it implicitly); pass response_names so
   # ensure_mvgam_variables can recreate the multivariate series.
   data_prepared <- ensure_mvgam_variables(
@@ -196,6 +225,48 @@ get_observation_structure <- function(object, newdata = NULL) {
     n_obs = nrow(newdata),
     n_times = length(unique_times),
     n_series = length(series_levels),
+    unique_times = unique_times
+  )
+}
+
+
+#' Build a single-series observation structure directly
+#'
+#' Shortcut for trained models with `n_series == 1`. The trained model
+#' already encodes the (single) series identity in its standata, so we
+#' don't need to round-trip through `ensure_mvgam_variables`. We just
+#' read newdata's time column, repeat the trained series label across
+#' all rows, and produce the same structure
+#' `get_observation_structure()` returns for the multi-series path.
+#'
+#' @param newdata Data frame; must have a column matching `time_var`.
+#' @param time_var Character; name of the time column.
+#' @param level_label Character; the single trained series level used
+#'   for the integer/factor mapping. Pulled from
+#'   `attr(object$obs_data, "mvgam_series")[1]`.
+#'
+#' @noRd
+build_single_series_observation_structure <- function(newdata, time_var,
+                                                       level_label) {
+  if (!time_var %in% names(newdata)) {
+    stop(insight::format_error(c(
+      paste0("Required time variable '", time_var,
+             "' not found in newdata."),
+      i = "Add a time column or pass newdata that retains it."
+    )))
+  }
+  time_indices <- newdata[[time_var]]
+  unique_times <- sort(unique(time_indices))
+  n_obs <- nrow(newdata)
+  series_factor <- factor(rep(level_label, n_obs), levels = level_label)
+  list(
+    time = time_indices,
+    series = series_factor,
+    series_int = rep(1L, n_obs),
+    series_levels = level_label,
+    n_obs = n_obs,
+    n_times = length(unique_times),
+    n_series = 1L,
     unique_times = unique_times
   )
 }

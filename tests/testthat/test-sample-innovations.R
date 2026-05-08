@@ -385,6 +385,84 @@ test_that("extract_simple_full_cov_params reconstructs Sigma correctly", {
 })
 
 
+test_that("sample_process_errors validates mutually exclusive args", {
+  obj <- structure(list(), class = "mvgam")
+  expect_error(
+    sample_process_errors(obj, ndraws = 5, draw_ids = 1:3),
+    "ndraws"
+  )
+})
+
+
+test_that("sample_process_errors returns zeros for deterministic trends", {
+  # PW maps to "none" covariance pattern; sampler short-circuits
+  # without touching any posterior matrix.
+  obj <- structure(
+    list(
+      obs_data = data.frame(
+        time = rep(1:3, 2),
+        series = factor(rep(c("s1", "s2"), each = 3))
+      ),
+      trend_components = list(types = "PW")
+    ),
+    class = "mvgam"
+  )
+  out <- sample_process_errors(obj, ndraws = 4)
+  expect_equal(dim(out), c(4L, 6L))
+  expect_true(all(out == 0))
+
+  out_default <- sample_process_errors(obj)
+  expect_equal(dim(out_default), c(1L, 6L))
+
+  out_ids <- sample_process_errors(obj, draw_ids = c(2L, 5L, 7L))
+  expect_equal(dim(out_ids), c(3L, 6L))
+})
+
+
+test_that("add_innovations_to_linpred adds matrix in univariate case", {
+  ndraws <- 4
+  nobs <- 6
+  linpred <- matrix(seq_len(ndraws * nobs), ndraws, nobs)
+  innov <- matrix(0.1, ndraws, nobs)
+  out <- add_innovations_to_linpred(linpred, innov)
+  expect_true(is.matrix(out))
+  expect_equal(dim(out), c(ndraws, nobs))
+  expect_equal(out, linpred + innov)
+})
+
+
+test_that("add_innovations_to_linpred adds matrix per-response in mv case", {
+  ndraws <- 3
+  nobs <- 5
+  linpred_list <- list(
+    y1 = matrix(0, ndraws, nobs),
+    y2 = matrix(10, ndraws, nobs)
+  )
+  innov <- matrix(0.5, ndraws, nobs)
+  out <- add_innovations_to_linpred(linpred_list, innov)
+  expect_true(is.list(out) && !is.matrix(out))
+  expect_equal(names(out), c("y1", "y2"))
+  expect_equal(out$y1, linpred_list$y1 + innov)
+  expect_equal(out$y2, linpred_list$y2 + innov)
+})
+
+
+test_that("add_innovations_to_linpred errors on dim mismatch", {
+  ndraws <- 3
+  nobs <- 5
+  linpred <- matrix(0, ndraws, nobs)
+  bad <- matrix(0, ndraws, nobs + 1)
+  expect_error(
+    add_innovations_to_linpred(linpred, bad),
+    "dim mismatch"
+  )
+  expect_error(
+    add_innovations_to_linpred(list(y = linpred), bad),
+    "dim mismatch"
+  )
+})
+
+
 test_that("hierarchical transform produces non-trivial within-group cor", {
   # With a non-identity global Cholesky and alpha=1 (pure global),
   # within-group series should exhibit the prescribed correlation.
